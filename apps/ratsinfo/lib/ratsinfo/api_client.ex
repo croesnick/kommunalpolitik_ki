@@ -16,11 +16,11 @@ defmodule Ratsinfo.ApiClient do
   """
   @spec login(String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
   def login(username, password) do
-    body = URI.encode_query(%{"username" => username, "password" => password})
+    body = Jason.encode!(%{"login" => username, "password" => password})
 
     case Req.post(Config.base_url() <> "auth",
            body: body,
-           headers: [{"content-type", "application/x-www-form-urlencoded"} | Config.headers()],
+           headers: [{"content-type", "application/json"} | Config.headers()],
            receive_timeout: 30_000
          ) do
       {:ok, %{status: 200, body: body}} when is_map(body) ->

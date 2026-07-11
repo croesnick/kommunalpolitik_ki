@@ -1,227 +1,172 @@
 defmodule Ratsinfo.Store do
   @moduledoc """
-  Lokale SQLite-Persistenz für RIS-Daten.
+  Lokale Persistenz für RIS-Daten via Ecto + SQLite3.
 
   Speichert Sitzungen, TOPs, Textblöcke und Dokument-Metadaten.
   Bietet Volltextsuche (FTS5) über alle extrahierten Texte.
-
-  Schema:
-  - sitzungen: id, name, gremium, datum, ort, status, client_id, client_name, raw_json
-  - tops: id, sitzung_id, nummer, titel, restricted, raw_json
-  - dokumente: id, top_id, name, fileext, lokaler_pfad, downloaded
-  - texte: id, top_id, caption, content (FTS5-virtual-table für Volltextsuche)
   """
 
-  alias Exqlite.Basic
+  alias Ratsinfo.Repo
+  alias Ratsinfo.Schemas.{Dokument, Sitzung, Textblock, TOP}
+  import Ecto.Query
 
-  @db_path_default Path.join(System.user_home!(), ".local/share/ratsinfo/ratsinfo.db")
-
-  @doc "Standard-Datenbankpfad"
-  def db_path, do: @db_path_default
-
-  @doc "Datenbank öffnen/erstellen und Schema migrieren"
-  @spec open(String.t()) :: {:ok, Exqlite.Connection.t()} | {:error, term()}
-  def open(path \\ db_path()) do
-    dir = Path.dirname(path)
-    File.mkdir_p!(dir)
-
-    case Basic.connect(path) do
-      {:ok, conn} ->
-        migrate(conn)
-        {:ok, conn}
+  @doc "Repo starten und Migrationen ausführen (für CLI-Nutzung)"
+  @spec init() :: :ok | {:error, term()}
+  def init do
+    case Repo.open() do
+      {:ok, _pid} ->
+        migrate()
+        :ok
 
       {:error, reason} ->
         {:error, reason}
     end
   end
 
-  @doc "Schema erstellen (idempotent)"
-  def migrate(conn) do
-    statements = [
-      """
-      CREATE TABLE IF NOT EXISTS sitzungen (
-        id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        gremium TEXT,
-        datum TEXT,
-        ort TEXT,
-        status INTEGER DEFAULT 0,
-        client_id INTEGER,
-        client_name TEXT,
-        raw_json TEXT,
-        synced_at TEXT DEFAULT (datetime('now'))
-      )
-      """,
-      """
-      CREATE TABLE IF NOT EXISTS tops (
-        id TEXT PRIMARY KEY,
-        sitzung_id INTEGER NOT NULL,
-        nummer TEXT,
-        titel TEXT,
-        restricted INTEGER DEFAULT 0,
-        raw_json TEXT,
-        FOREIGN KEY (sitzung_id) REFERENCES sitzungen(id)
-      )
-      """,
-      """
-      CREATE TABLE IF NOT EXISTS dokumente (
-        id TEXT PRIMARY KEY,
-        top_id TEXT,
-        sitzung_id INTEGER,
-        name TEXT,
-        fileext TEXT,
-        lokaler_pfad TEXT,
-        downloaded INTEGER DEFAULT 0,
-        FOREIGN KEY (top_id) REFERENCES tops(id)
-      )
-      """,
-      """
-      CREATE VIRTUAL TABLE IF NOT EXISTS texte USING fts5(
-        top_id,
-        caption,
-        content,
-        sitzung_id UNINDEXED,
-        tokenize='unicode61 remove_diacritics 2'
-      )
-      """,
-      """
-      CREATE INDEX IF NOT EXISTS idx_tops_sitzung ON tops(sitzung_id)
-      """,
-      """
-      CREATE INDEX IF NOT EXISTS idx_dokumente_top ON dokumente(top_id)
-      """,
-      """
-      CREATE INDEX IF NOT EXISTS idx_dokumente_sitzung ON dokumente(sitzung_id)
-      """
-    ]
-
-    Enum.each(statements, fn sql ->
-      {:ok, _} = Basic.exec(conn, sql)
-    end)
-
-    :ok
+  @doc "Migrationen ausführen"
+  def migrate do
+    Ecto.Migrator.run(Repo, migrations_path(), :up, all: true)
   end
 
-  @doc "Sitzung speichern (upsert)"
-  @spec save_sitzung(Exqlite.Connection.t(), map()) :: :ok | {:error, term()}
-  def save_sitzung(conn, sitzung) do
-    id = sitzung["id"]
-    name = sitzung["name"]
-    gremium = sitzung["committeename"]
-    datum = sitzung["meetingdate"]
-    ort = sitzung["locationname"]
-    status = sitzung["state"] || 0
-    client_id = sitzung["clientid"]
-    client_name = sitzung["clientname"]
-    raw = Jason.encode!(sitzung)
-
-    sql = """
-    INSERT INTO sitzungen (id, name, gremium, datum, ort, status, client_id, client_name, raw_json, synced_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    ON CONFLICT(id) DO UPDATE SET
-      name = excluded.name,
-      gremium = excluded.gremium,
-      datum = excluded.datum,
-      ort = excluded.ort,
-      status = excluded.status,
-      client_id = excluded.client_id,
-      client_name = excluded.client_name,
-      raw_json = excluded.raw_json,
-      synced_at = datetime('now')
-    """
-
-    {:ok, _} = Basic.exec(conn, sql, [id, name, gremium, datum, ort, status, client_id, client_name, raw])
-    :ok
+  defp migrations_path do
+    Application.app_dir(:ratsinfo, "priv/repo/migrations")
   end
 
-  @doc "TOPs einer Sitzung speichern"
-  @spec save_tops(Exqlite.Connection.t(), integer(), [map()]) :: :ok
-  def save_tops(conn, sitzung_id, tops) do
+  @doc "Sitzung aus API-Response speichern (upsert)"
+  @spec save_sitzung(map()) :: {:ok, Sitzung.t()} | {:error, Ecto.Changeset.t()}
+  def save_sitzung(api_response) do
+    attrs = %{
+      id: api_response["id"],
+      name: api_response["name"],
+      gremium: api_response["committeename"],
+      datum: api_response["meetingdate"],
+      ort: api_response["locationname"],
+      status: api_response["state"] || 0,
+      client_id: api_response["clientid"],
+      client_name: api_response["clientname"],
+      raw_json: Jason.encode!(api_response)
+    }
+
+    %Sitzung{}
+    |> Sitzung.changeset(attrs)
+    |> Repo.insert(
+      on_conflict: :replace_all,
+      conflict_target: :id
+    )
+  end
+
+  @doc "TOPs aus API-Response speichern"
+  @spec save_tops(integer(), [map()]) :: :ok
+  def save_tops(sitzung_id, tops) do
     Enum.each(tops, fn top ->
-      id = top["id"]
-      nummer = top["numbering"]
-      titel = top["name"]
-      restricted = if(top["restricted"], do: 1, else: 0)
-      raw = Jason.encode!(top)
+      attrs = %{
+        id: top["id"],
+        sitzung_id: sitzung_id,
+        nummer: top["numbering"],
+        titel: top["name"],
+        restricted: top["restricted"] || false,
+        raw_json: Jason.encode!(top)
+      }
 
-      sql = """
-      INSERT INTO tops (id, sitzung_id, nummer, titel, restricted, raw_json)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        nummer = excluded.nummer,
-        titel = excluded.titel,
-        restricted = excluded.restricted,
-        raw_json = excluded.raw_json
-      """
-
-      {:ok, _} = Basic.exec(conn, sql, [id, sitzung_id, nummer, titel, restricted, raw])
+      %TOP{}
+      |> TOP.changeset(attrs)
+      |> Repo.insert(
+        on_conflict: :replace_all,
+        conflict_target: :id
+      )
     end)
 
     :ok
   end
 
-  @doc "Dokumente eines TOPs speichern"
-  @spec save_dokumente(Exqlite.Connection.t(), String.t(), integer(), [map()]) :: :ok
-  def save_dokumente(conn, top_id, sitzung_id, dokumente) do
+  @doc "Dokumente aus API-Response speichern"
+  @spec save_dokumente(String.t(), integer(), [map()]) :: :ok
+  def save_dokumente(top_id, sitzung_id, dokumente) do
     Enum.each(dokumente, fn doc ->
-      id = doc["id"]
-      name = doc["name"]
-      fileext = doc["fileext"]
+      attrs = %{
+        id: doc["id"],
+        top_id: top_id,
+        sitzung_id: sitzung_id,
+        name: doc["name"],
+        fileext: doc["fileext"],
+        downloaded: false
+      }
 
-      sql = """
-      INSERT INTO dokumente (id, top_id, sitzung_id, name, fileext, downloaded)
-      VALUES (?, ?, ?, ?, ?, 0)
-      ON CONFLICT(id) DO UPDATE SET
-        name = excluded.name,
-        fileext = excluded.fileext
-      """
-
-      {:ok, _} = Basic.exec(conn, sql, [id, top_id, sitzung_id, name, fileext])
+      %Dokument{}
+      |> Dokument.changeset(attrs)
+      |> Repo.insert(
+        on_conflict: :replace_all,
+        conflict_target: :id
+      )
     end)
 
     :ok
   end
 
-  @doc "Textblöcke eines TOPs für Volltextsuche indexieren"
-  @spec save_textbloecke(Exqlite.Connection.t(), String.t(), integer(), [map()]) :: :ok
-  def save_textbloecke(conn, top_id, sitzung_id, textbloecke) do
-    # Alte Textblöcke für diesen TOP löschen (FTS5 hat kein ON CONFLICT)
-    {:ok, _} = Basic.exec(conn, "DELETE FROM texte WHERE top_id = ?", [top_id])
+  @doc "Textblöcke für Volltextsuche indexieren"
+  @spec save_textbloecke(String.t(), integer(), [map()]) :: :ok
+  def save_textbloecke(top_id, sitzung_id, textbloecke) do
+    # Alte Textblöcke für diesen TOP löschen
+    Repo.delete_all(from(t in Textblock, where: t.top_id == ^top_id))
 
     Enum.each(textbloecke, fn tb ->
       caption = tb["caption"] || ""
       content = decode_content(tb["content"] || "")
-      fts_id = "#{top_id}-#{caption}"
+      id = "#{top_id}-#{caption}"
 
-      sql = """
-      INSERT INTO texte (top_id, caption, content, sitzung_id)
-      VALUES (?, ?, ?, ?)
-      """
-
-      {:ok, _} = Basic.exec(conn, sql, [top_id, caption, content, sitzung_id])
+      # FTS5 unterstützt kein UPSERT — plain SQL insert
+      Repo.query!(
+        "INSERT INTO texte (id, top_id, caption, content, sitzung_id) VALUES (?, ?, ?, ?, ?)",
+        [id, top_id, caption, content, sitzung_id]
+      )
     end)
 
     :ok
   end
 
   @doc "Lokale Volltextsuche über gespeicherte Textblöcke"
-  @spec search(Exqlite.Connection.t(), String.t(), keyword()) :: {:ok, [map()]} | {:error, term()}
-  def search(conn, query, _opts \\ []) do
+  @spec search(String.t(), keyword()) :: {:ok, [map()]} | {:error, term()}
+  def search(query, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 50)
+
     sql = """
-    SELECT t.titel, t.nummer, t.sitzung_id, s.name as sitzung_name, s.datum, s.gremium,
-           text.caption, snippet(texte, 2, '>>>', '<<<', '...', 20) as snippet
-    FROM texte
-    JOIN tops t ON texte.top_id = t.id
+    SELECT t.titel, t.nummer, t.sitzung_id, s.name as sitzung_name,
+           s.datum, s.gremium, tx.caption,
+           snippet(texte, 3, '>>>', '<<<', '...', 20) as snippet
+    FROM texte tx
+    JOIN tops t ON tx.top_id = t.id
     JOIN sitzungen s ON t.sitzung_id = s.id
     WHERE texte MATCH ?
     ORDER BY rank
-    LIMIT 50
+    LIMIT ?
     """
 
-    case Basic.exec(conn, sql, [query]) do
-      {:ok, _} ->
-        {:ok, rows} = Basic.all(conn)
-        {:ok, Enum.map(rows, &row_to_search_result/1)}
+    case Repo.query(sql, [query, limit]) do
+      {:ok, %{rows: rows}} ->
+        results =
+          Enum.map(rows, fn [
+                              titel,
+                              nummer,
+                              sitzung_id,
+                              sitzung_name,
+                              datum,
+                              gremium,
+                              caption,
+                              snippet
+                            ] ->
+            %{
+              titel: titel,
+              nummer: nummer,
+              sitzung_id: sitzung_id,
+              sitzung_name: sitzung_name,
+              datum: datum,
+              gremium: gremium,
+              caption: caption,
+              snippet: snippet
+            }
+          end)
+
+        {:ok, results}
 
       {:error, reason} ->
         {:error, reason}
@@ -229,83 +174,52 @@ defmodule Ratsinfo.Store do
   end
 
   @doc "Alle gespeicherten Sitzungen auflisten"
-  @spec list_sitzungen(Exqlite.Connection.t()) :: {:ok, [map()]}
-  def list_sitzungen(conn) do
-    sql = """
-    SELECT id, name, gremium, datum, ort, client_name, synced_at
-    FROM sitzungen
-    ORDER BY datum DESC
-    """
-
-    {:ok, _} = Basic.exec(conn, sql)
-    {:ok, rows} = Basic.all(conn)
-    {:ok, Enum.map(rows, &row_to_sitzung/1)}
+  @spec list_sitzungen() :: [Sitzung.t()]
+  def list_sitzungen do
+    Repo.all(from(s in Sitzung, order_by: [desc: s.datum]))
   end
 
-  @doc "Sitzungsdetails abrufen (aus lokaler DB)"
-  @spec get_sitzung(Exqlite.Connection.t(), integer()) :: {:ok, map()} | {:error, :not_found}
-  def get_sitzung(conn, id) do
-    sql = """
-    SELECT s.id, s.name, s.gremium, s.datum, s.ort, s.client_name, s.raw_json
-    FROM sitzungen s
-    WHERE s.id = ?
-    """
-
-    {:ok, _} = Basic.exec(conn, sql, [id])
-
-    case Basic.all(conn) do
-      {:ok, [row | _]} -> {:ok, row_to_sitzung_detail(row)}
-      {:ok, []} -> {:error, :not_found}
-    end
+  @doc "Sitzung abrufen"
+  @spec get_sitzung(integer()) :: Sitzung.t() | nil
+  def get_sitzung(id) do
+    Repo.get(Sitzung, id)
   end
 
-  @doc "TOPs einer Sitzung abrufen (aus lokaler DB)"
-  @spec list_tops(Exqlite.Connection.t(), integer()) :: {:ok, [map()]}
-  def list_tops(conn, sitzung_id) do
-    sql = """
-    SELECT id, sitzung_id, nummer, titel, restricted
-    FROM tops
-    WHERE sitzung_id = ?
-    ORDER BY CAST(nummer AS REAL)
-    """
-
-    {:ok, _} = Basic.exec(conn, sql, [sitzung_id])
-    {:ok, rows} = Basic.all(conn)
-    {:ok, Enum.map(rows, &row_to_top/1)}
+  @doc "TOPs einer Sitzung abrufen"
+  @spec list_tops(integer()) :: [TOP.t()]
+  def list_tops(sitzung_id) do
+    Repo.all(from(t in TOP, where: t.sitzung_id == ^sitzung_id, order_by: t.nummer))
   end
 
-  @doc "Markiere Dokument als heruntergeladen"
-  @spec mark_downloaded(Exqlite.Connection.t(), String.t(), String.t()) :: :ok
-  def mark_downloaded(conn, doc_id, local_path) do
-    {:ok, _} = Basic.exec(
-      conn,
-      "UPDATE dokumente SET downloaded = 1, lokaler_pfad = ? WHERE id = ?",
-      [local_path, doc_id]
-    )
-    :ok
+  @doc "Dokumente eines TOPs abrufen"
+  @spec list_dokumente(String.t()) :: [Dokument.t()]
+  def list_dokumente(top_id) do
+    Repo.all(from(d in Dokument, where: d.top_id == ^top_id))
   end
 
-  @doc "Anzahl gespeicherter Datensätze"
-  @spec stats(Exqlite.Connection.t()) :: map()
-  def stats(conn) do
-    {:ok, _} = Basic.exec(conn, "SELECT COUNT(*) FROM sitzungen")
-    {:ok, [[sitzungen]]} = Basic.all(conn)
+  @doc "Dokument als heruntergeladen markieren"
+  @spec mark_downloaded(String.t(), String.t()) :: {:ok, Dokument.t()} | {:error, term()}
+  def mark_downloaded(doc_id, local_path) do
+    doc = Repo.get(Dokument, doc_id)
 
-    {:ok, _} = Basic.exec(conn, "SELECT COUNT(*) FROM tops")
-    {:ok, [[tops]]} = Basic.all(conn)
+    doc
+    |> Dokument.changeset(%{downloaded: true, lokaler_pfad: local_path})
+    |> Repo.update()
+  end
 
-    {:ok, _} = Basic.exec(conn, "SELECT COUNT(*) FROM dokumente")
-    {:ok, [[dokumente]]} = Basic.all(conn)
-
-    {:ok, _} = Basic.exec(conn, "SELECT COUNT(*) FROM texte")
-    {:ok, [[texte]]} = Basic.all(conn)
-
-    %{sitzungen: sitzungen, tops: tops, dokumente: dokumente, texte: texte}
+  @doc "Statistik über gespeicherte Daten"
+  @spec stats() :: map()
+  def stats do
+    %{
+      sitzungen: Repo.aggregate(Sitzung, :count),
+      tops: Repo.aggregate(TOP, :count),
+      dokumente: Repo.aggregate(Dokument, :count),
+      texte: Repo.aggregate(Textblock, :count)
+    }
   end
 
   # --- Helpers ---
 
-  # Content kann base64-codiertes HTML sein (aus der API)
   defp decode_content(content) when is_binary(content) and byte_size(content) > 0 do
     case Base.decode64(content) do
       {:ok, decoded} -> strip_html(decoded)
@@ -320,30 +234,5 @@ defmodule Ratsinfo.Store do
     |> String.replace(~r/<[^>]*>/, " ")
     |> String.replace(~r/\s+/, " ")
     |> String.trim()
-  end
-
-  defp row_to_search_result([titel, nummer, sitzung_id, sitzung_name, datum, gremium, caption, snippet]) do
-    %{
-      titel: titel,
-      nummer: nummer,
-      sitzung_id: sitzung_id,
-      sitzung_name: sitzung_name,
-      datum: datum,
-      gremium: gremium,
-      caption: caption,
-      snippet: snippet
-    }
-  end
-
-  defp row_to_sitzung([id, name, gremium, datum, ort, client_name, synced_at]) do
-    %{id: id, name: name, gremium: gremium, datum: datum, ort: ort, client_name: client_name, synced_at: synced_at}
-  end
-
-  defp row_to_sitzung_detail([id, name, gremium, datum, ort, client_name, raw_json]) do
-    %{id: id, name: name, gremium: gremium, datum: datum, ort: ort, client_name: client_name, raw: raw_json}
-  end
-
-  defp row_to_top([id, sitzung_id, nummer, titel, restricted]) do
-    %{id: id, sitzung_id: sitzung_id, nummer: nummer, titel: titel, restricted: restricted == 1}
   end
 end

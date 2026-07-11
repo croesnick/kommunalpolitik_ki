@@ -22,3 +22,6 @@ skills/*-workspace/
 
 # Playwright MCP artifacts
 .playwright-mcp/
+
+# Erlang crash dumps
+erl_crash.dump
