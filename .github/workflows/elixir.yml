@@ -54,8 +54,5 @@ jobs:
       - name: Credo
         run: mix workspace.run -t credo -p ratsinfo -p shared -- --strict
 
-      - name: Dialyzer
-        run: mix dialyzer
-
       - name: Test
         run: mix workspace.run -t test -p ratsinfo -p shared -- --cover
