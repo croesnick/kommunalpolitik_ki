@@ -1,0 +1,23 @@
+{
+  "mcp": {
+    "allgaeuer_zeitung_mcp": {
+      "type": "local",
+      "command": [
+        "uv",
+        "run",
+        "--directory",
+        "tools/allgaeuer_zeitung_mcp",
+        "python",
+        "-m",
+        "newspaper_mcp"
+      ],
+      "environment": {
+        "AZ_EMAIL": "${AZ_EMAIL}",
+        "AZ_PASSWORD": "${AZ_PASSWORD}"
+      }
+    }
+  },
+  "skills": {
+    "paths": ["skills"]
+  }
+}

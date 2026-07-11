@@ -1,0 +1,23 @@
+{
+  "skill_name": "foerdermittel",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Welche Fördermittel gibt es für einen Verkehrsumbau der Bahnhofstraße in Buchloe? Wir hatten 2023 ein Verkehrskonzept gefordert, das nie richtig kam. Jetzt wollen wir das Thema wieder aufgreifen und brauchen eine Übersicht der Förderkulisse.",
+      "expected_output": "Markdown-Report mit Förderkulisse (SUMP, Städtebauförderung, KommKlimaFöR, BayGVFG), Eigenanteilsberechnung, Kumulierungsregeln, Fristen (SUMP-Frist verstrichen, KommKlimaFöR bis 31.12.2026), Best-Practices (Plochingen), und Quellen für jede Aussage.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Wir wollen den Gennachpark in Buchloe umgestalten — Begrünung, Moor-Revitalisierung, interimistische Nutzung mit Europaletten und Sträuchern. Gibt es da Förderung für? Der Park liegt auf einer Wiese unter dem Wasserturm.",
+      "expected_output": "Markdown-Report mit Förderkulisse für Grüninfrastruktur/Moor-Revitalisierung (Städtebauförderung Umweltbeitrag, KommKlimaFöR, BNE-Programme), Eigenanteil, Fristen, und Quellen. Sollte auch interimistische Nutzung als Brücke erwähnen.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Kann man Städtebauförderung und KommKlimaFöR gleichzeitig beantragen? Wir überlegen für die Bahnhofstraße beides zu kombinieren, um den Eigenanteil zu drücken. Bruttokosten schätzen wir auf ca. 120.000€.",
+      "expected_output": "Markdown-Report mit Kumulierungsregeln (SUMP-Bund + KommKlimaFöR-Bayern kumulierbar, Eigenanteil mind. 10%, Bundesförderung nachrangig), Berechnung des Eigenanteils bei 120.000€ (bei 90% Förderung: 12.000€), Hinweis auf frühzeitige Abstimmung mit Fördermittelgeber, und Quellen.",
+      "files": []
+    }
+  ]
+}

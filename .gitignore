@@ -1,0 +1,21 @@
+# Build artifacts
+artifacts/
+_build/
+.elixir/
+*.ez
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+
+# OS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp
+
+# Skill eval workspace (temporary artifacts)
+skills/*-workspace/
