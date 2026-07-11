@@ -6,6 +6,10 @@ Tools für die Stadtratsarbeit: RIS durchsuchen, PDFs ingesten, Fördermittel re
 
 Carsten ist Stadtrat in Buchloe (Grüne, Listenplatz 3) und Co-Sprecher der Grünen Buchloe. Dieses Repo bündelt CLI-Tools und MCP-Server, die die kommunalpolitische Arbeit erleichtern. Der übergeordnete Spin ist der Talk „KI als Gemeinderat" — ein AI Harness für Ratsarbeit mit Quellenbindung, lokaler Datensouveränität und demokratischer Verantwortung.
 
+## Projekt-Verwaltung
+
+Zur Verwaltung dieses Projekts wird **GitHub Projects** genutzt. Das Board liegt unter https://github.com/users/croesnick/projects (Repo: `croesnick/kommunalpolitik_ki`). Aufgaben, Ideen und Meilensteine werden als Issues mit Labels organisiert, nicht in externen Tools.
+
 ## Architektur-Prinzipien
 
 ### 1. Elixir-first
