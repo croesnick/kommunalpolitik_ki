@@ -1,7 +1,7 @@
 defmodule SharedTest do
   use ExUnit.Case, async: true
 
-  alias Shared.{Sitzung, TOP, Gremium, Dokument, Textblock, Abstimmung, Suchergebnis}
+  alias Shared.{Abstimmung, Dokument, Gremium, Sitzung, Suchergebnis, Textblock, TOP}
 
   describe "Gremium" do
     test "can be constructed with defaults" do

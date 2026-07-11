@@ -3,7 +3,7 @@ defmodule Shared.TOP do
   Ein Tagesordnungspunkt (TOP) innerhalb einer Sitzung.
   """
 
-  alias Shared.{Dokument, Textblock, Abstimmung}
+  alias Shared.{Abstimmung, Dokument, Textblock}
 
   @type t :: %__MODULE__{
           id: String.t(),

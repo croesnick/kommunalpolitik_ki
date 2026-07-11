@@ -52,10 +52,10 @@ jobs:
         run: mix format --check-formatted
 
       - name: Credo
-        run: mix workspace.run -t credo -- --strict
+        run: mix workspace.run -t credo -- --strict -p ratsinfo -p shared
 
       - name: Dialyzer
         run: mix dialyzer
 
       - name: Test
-        run: mix workspace.run -t test -- --cover
+        run: mix workspace.run -t test -p ratsinfo -p shared -- --cover
