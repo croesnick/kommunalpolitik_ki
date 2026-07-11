@@ -41,7 +41,9 @@ jobs:
             build-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
 
       - name: Install deps
-        run: mix deps.get
+        run: |
+          mix deps.get
+          mix workspace.run -t deps.get
 
       - name: Compile
         run: mix compile --warnings-as-errors
