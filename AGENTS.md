@@ -54,11 +54,41 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 
 | Tool | Sprache | Zweck | Status |
 |---|---|---|---|
-| `apps/ratsinfo` | Elixir | RIS-Scraper + CLI + lokale Volltextsuche | Geplant |
-| `apps/shared` | Elixir | Geteilte Domain-Models (Sitzung, TOP, Dokument) | Geplant |
+| `apps/ratsinfo` | Elixir | RIS-Scraper + CLI + lokale Volltextsuche | Funktionsfähig |
+| `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard mit DAG-Blockern | Geplant |
+| `apps/shared` | Elixir | Geteilte Domain-Models (Sitzung, TOP, Dokument) | Funktionsfähig |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen (MCP) | Bestehend |
 | `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren (MCP) | Geplant |
-| `skills/foerdermittel` | Markdown-Skill | Fördermittel-Recherche orchestrieren | In Arbeit |
+| `skills/foerdermittel` | Markdown-Skill | Fördermittel-Recherche orchestrieren | Funktionsfähig |
+
+## ratsprojekte — Planungsstand
+
+### Konzept
+Agentic AI-first Projekt-Tracker für Stadtratsarbeit. Verwaltet politische Projekte mit Blockern, Abhängigkeiten (DAG), Fristen und Quellen. Die AI kann lesen und Vorschläge machen (GO-Prinzip), Carsten entscheidet und bestätigt im Dashboard. Langfristig: Antragsvorlagen aus Projektdaten generieren.
+
+### Architektur
+- Phoenix LiveView für Dashboard
+- `anubis_mcp` für AI-Zugriff (später)
+- Ecto + SQLite3 (geteilte DB mit ratsinfo)
+- vis-network für Dependency-Graph (später)
+
+### Datenmodell (DAG)
+```
+Projekt (titel, status, priorität, beschreibung)
+├── Blocker (typ: rechtlich/finanziell/politisch/organisatorisch/infrastruktur,
+│            status: offen/in_arbeit/geloest)
+│   ├── depends_on: [Blocker] (n:m DAG — mehrere Parents)
+│   └── Quellen (sitzung/foerderprogramm/gesetz/url/zeitungsartikel)
+└── Quellen (strukturiert, für Antragsvorlagen-Generierung)
+```
+
+### Roadmap
+1. **MVP**: Datenmodell + Seed + LiveView (Projekt-Liste, Blocker-Detail) — Issues #7-#10
+2. **Antragsvorlagen**: Markdown-Render aus Projektdaten — Issue #11
+3. **Dependency-Graph**: vis-network in LiveView
+4. **MCP-Server**: AI-Tools für lesen/suggest (GO-Prinzip)
+5. **Ratsinfo-Integration**: Quellen verlinken mit Sitzung/TOP
+6. **AI-Skill**: „Frag den Projekt-Tracker"
 
 ## Tooling-Vorgaben
 
