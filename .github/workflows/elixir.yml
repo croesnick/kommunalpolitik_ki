@@ -52,7 +52,7 @@ jobs:
         run: mix format --check-formatted
 
       - name: Credo
-        run: mix workspace.run -t credo -- --strict -p ratsinfo -p shared
+        run: mix workspace.run -t credo -p ratsinfo -p shared -- --strict
 
       - name: Dialyzer
         run: mix dialyzer
