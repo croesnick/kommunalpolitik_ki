@@ -19,3 +19,6 @@ __pycache__/
 
 # Skill eval workspace (temporary artifacts)
 skills/*-workspace/
+
+# Playwright MCP artifacts
+.playwright-mcp/

@@ -5,7 +5,7 @@ defmodule Shared.MixProject do
     [
       app: :shared,
       version: "0.1.0",
-      elixir: "~> 1.20",
+      elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",
       elixirc_paths: elixirc_paths(Mix.env()),
