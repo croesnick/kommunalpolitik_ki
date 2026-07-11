@@ -32,7 +32,9 @@ def _parse_article_teaser(article: Tag) -> SearchResult | None:
     url = href if href.startswith("http") else urljoin(BASE_URL, href)
 
     heading = article.find(["h2", "h3", "h4"])
-    title = heading.get_text(strip=True) if heading else (link.get_text(strip=True) or "")
+    title = (
+        heading.get_text(strip=True) if heading else (link.get_text(strip=True) or "")
+    )
 
     kicker_el = article.select_one(
         '[class*="topline"], [class*="kicker"], [class*="label"]'

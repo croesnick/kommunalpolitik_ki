@@ -30,7 +30,9 @@ async def _get_cookies() -> list[dict]:
 def _build_client(cookies: list[dict]) -> httpx.AsyncClient:
     jar = httpx.Cookies()
     for c in cookies:
-        jar.set(c["name"], c["value"], domain=c.get("domain", ""), path=c.get("path", "/"))
+        jar.set(
+            c["name"], c["value"], domain=c.get("domain", ""), path=c.get("path", "/")
+        )
     return httpx.AsyncClient(
         cookies=jar,
         headers={
@@ -83,7 +85,9 @@ async def fetch_html(url: str, *, force_relogin: bool = False) -> str:
                 response.raise_for_status()
 
                 if await _is_auth_failure(response):
-                    raise RuntimeError(f"Authentication still failing after re-login for {url}")
+                    raise RuntimeError(
+                        f"Authentication still failing after re-login for {url}"
+                    )
 
             return response.text
         finally:
@@ -102,7 +106,10 @@ async def fetch_article_html(url: str) -> str:
     html = await fetch_html(url)
 
     if is_body_truncated(html):
-        log.info("Article body truncated (Piano paywall), falling back to Playwright: %s", url)
+        log.info(
+            "Article body truncated (Piano paywall), falling back to Playwright: %s",
+            url,
+        )
         from .browser_fallback import fetch_article_with_playwright
 
         html = await fetch_article_with_playwright(url)

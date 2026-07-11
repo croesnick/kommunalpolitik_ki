@@ -25,18 +25,50 @@ mcp = FastMCP(
 
 SECTIONS: list[Section] = [
     Section(name="Startseite", slug="home", url="https://www.allgaeuer-zeitung.de/"),
-    Section(name="Allgäu", slug="allgaeu", url="https://www.allgaeuer-zeitung.de/allgaeu"),
-    Section(name="Kempten", slug="kempten", url="https://www.allgaeuer-zeitung.de/kempten"),
-    Section(name="Oberallgäu", slug="immenstadt", url="https://www.allgaeuer-zeitung.de/immenstadt"),
-    Section(name="Memmingen", slug="memmingen", url="https://www.allgaeuer-zeitung.de/memmingen"),
-    Section(name="Kaufbeuren", slug="kaufbeuren", url="https://www.allgaeuer-zeitung.de/kaufbeuren"),
-    Section(name="Füssen", slug="fuessen", url="https://www.allgaeuer-zeitung.de/fuessen"),
-    Section(name="Westallgäu", slug="weiler", url="https://www.allgaeuer-zeitung.de/weiler"),
-    Section(name="Marktoberdorf", slug="marktoberdorf", url="https://www.allgaeuer-zeitung.de/marktoberdorf"),
-    Section(name="Buchloe", slug="buchloe", url="https://www.allgaeuer-zeitung.de/buchloe"),
-    Section(name="Bilder", slug="bilder", url="https://www.allgaeuer-zeitung.de/bilder"),
+    Section(
+        name="Allgäu", slug="allgaeu", url="https://www.allgaeuer-zeitung.de/allgaeu"
+    ),
+    Section(
+        name="Kempten", slug="kempten", url="https://www.allgaeuer-zeitung.de/kempten"
+    ),
+    Section(
+        name="Oberallgäu",
+        slug="immenstadt",
+        url="https://www.allgaeuer-zeitung.de/immenstadt",
+    ),
+    Section(
+        name="Memmingen",
+        slug="memmingen",
+        url="https://www.allgaeuer-zeitung.de/memmingen",
+    ),
+    Section(
+        name="Kaufbeuren",
+        slug="kaufbeuren",
+        url="https://www.allgaeuer-zeitung.de/kaufbeuren",
+    ),
+    Section(
+        name="Füssen", slug="fuessen", url="https://www.allgaeuer-zeitung.de/fuessen"
+    ),
+    Section(
+        name="Westallgäu", slug="weiler", url="https://www.allgaeuer-zeitung.de/weiler"
+    ),
+    Section(
+        name="Marktoberdorf",
+        slug="marktoberdorf",
+        url="https://www.allgaeuer-zeitung.de/marktoberdorf",
+    ),
+    Section(
+        name="Buchloe", slug="buchloe", url="https://www.allgaeuer-zeitung.de/buchloe"
+    ),
+    Section(
+        name="Bilder", slug="bilder", url="https://www.allgaeuer-zeitung.de/bilder"
+    ),
     Section(name="Sport", slug="sport", url="https://www.allgaeuer-zeitung.de/sport"),
-    Section(name="AZ+", slug="azplus", url="https://www.allgaeuer-zeitung.de/specials/azplus"),
+    Section(
+        name="AZ+",
+        slug="azplus",
+        url="https://www.allgaeuer-zeitung.de/specials/azplus",
+    ),
 ]
 
 

@@ -79,7 +79,9 @@ async def _ensure_logged_in(page: "Page") -> bool:
     # The SSO flow may redirect through anmelden.allgaeuer-zeitung.de.
     # Wait for the login form to appear.
     try:
-        await page.wait_for_selector('input[name="username"], input[type="email"]', timeout=10000)
+        await page.wait_for_selector(
+            'input[name="username"], input[type="email"]', timeout=10000
+        )
     except Exception:
         # Maybe already logged in (redirected back to www)
         logout = await page.query_selector('a[href*="logout"]')
@@ -87,7 +89,9 @@ async def _ensure_logged_in(page: "Page") -> bool:
             _logged_in = True
             return True
         # Navigate to login page directly
-        await page.goto("https://anmelden.allgaeuer-zeitung.de/anmelden", wait_until="networkidle")
+        await page.goto(
+            "https://anmelden.allgaeuer-zeitung.de/anmelden", wait_until="networkidle"
+        )
 
     await page.fill('input[name="username"], input[type="email"]', creds.email)
     await page.fill('input[name="password"], input[type="password"]', creds.password)
@@ -105,7 +109,9 @@ async def _ensure_logged_in(page: "Page") -> bool:
 
     # Accept consent dialog
     try:
-        await page.get_by_role("button", name="Akzeptieren und weiter").click(timeout=5000)
+        await page.get_by_role("button", name="Akzeptieren und weiter").click(
+            timeout=5000
+        )
         await page.wait_for_load_state("networkidle")
     except Exception:
         pass
@@ -158,7 +164,9 @@ async def fetch_article_with_playwright(url: str) -> str:
 
         # Dismiss consent dialog if it appears
         try:
-            await page.get_by_role("button", name="Akzeptieren und weiter").click(timeout=3000)
+            await page.get_by_role("button", name="Akzeptieren und weiter").click(
+                timeout=3000
+            )
             await page.wait_for_load_state("networkidle")
         except Exception:
             pass

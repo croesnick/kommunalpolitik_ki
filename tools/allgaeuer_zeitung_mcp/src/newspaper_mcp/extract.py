@@ -25,7 +25,9 @@ def is_body_truncated(html: str) -> bool:
     paid = soup.select_one("#article-body-paid-content")
     if not paid:
         return False
-    piano = paid.find(class_="piano-inline-paywall") or paid.find(id="piano-inline-paywall")
+    piano = paid.find(class_="piano-inline-paywall") or paid.find(
+        id="piano-inline-paywall"
+    )
     if not piano:
         return False
     # Count substantial paragraphs before the paywall
@@ -91,8 +93,7 @@ def _extract_kicker(soup: BeautifulSoup) -> str | None:
 
 def _extract_author_from_dom(soup: BeautifulSoup) -> str | None:
     meta = soup.select_one(
-        'article [class*="author"], article [class*="Author"], '
-        'article [rel="author"]'
+        'article [class*="author"], article [class*="Author"], article [rel="author"]'
     )
     if meta:
         text = meta.get_text(" ", strip=True)
@@ -137,17 +138,15 @@ def extract_article(html: str, url: str) -> Article:
         log.debug("trafilatura returned short/empty body, falling back to DOM")
         body_text = _extract_body_from_dom(soup)
 
-    title = (
-        jsonld.get("headline")
-        if jsonld
-        else None
-    ) or _extract_title(soup)
+    title = (jsonld.get("headline") if jsonld else None) or _extract_title(soup)
 
     author = None
     if jsonld and jsonld.get("author"):
         authors = jsonld["author"]
         if isinstance(authors, list):
-            author = ", ".join(a.get("name", "") for a in authors if isinstance(a, dict))
+            author = ", ".join(
+                a.get("name", "") for a in authors if isinstance(a, dict)
+            )
         elif isinstance(authors, dict):
             author = authors.get("name")
     if not author:

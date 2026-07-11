@@ -12,9 +12,13 @@ class SearchResult(BaseModel):
     title: str
     url: str
     kicker: str | None = Field(None, description="Category/label shown above the title")
-    date: str | None = Field(None, description="Publication date as displayed on the page")
+    date: str | None = Field(
+        None, description="Publication date as displayed on the page"
+    )
     author: str | None = None
-    is_premium: bool = Field(False, description="Whether the article is behind the AZ+ paywall")
+    is_premium: bool = Field(
+        False, description="Whether the article is behind the AZ+ paywall"
+    )
 
 
 class Article(BaseModel):
@@ -24,9 +28,13 @@ class Article(BaseModel):
     title: str
     kicker: str | None = None
     author: str | None = None
-    date_published: str | None = Field(None, description="ISO 8601 publication timestamp")
+    date_published: str | None = Field(
+        None, description="ISO 8601 publication timestamp"
+    )
     description: str | None = Field(None, description="Article teaser/lead paragraph")
-    body_text: str = Field(..., description="Clean article body text, no ads or navigation")
+    body_text: str = Field(
+        ..., description="Clean article body text, no ads or navigation"
+    )
     image_url: str | None = None
     is_premium: bool = False
 
