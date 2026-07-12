@@ -1,7 +1,5 @@
 import Config
 
-config :ratsprojekte, tidewave: true
-
 config :ratsprojekte, Ratsprojekte.Repo,
   database: Path.join(System.user_home!(), ".local/share/ratsinfo/ratsinfo.db"),
   pool_size: 10,
