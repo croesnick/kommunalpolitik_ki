@@ -28,63 +28,69 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
         Rechtlich-inhaltliche Standortbestimmung — welche Realisierungsstränge gibt es und stehen die Vorbedingungen?
       </p>
 
-      <div :for={projekt <- @projekte} class="project-card">
-        <div class="project-header">
-          <div>
-            <h2>{projekt.titel}</h2>
-            <div class="desc">{projekt.beschreibung}</div>
-          </div>
-          <div class="badges">
-            <.badge status={projekt.status} />
-            <.prio_badge prio={projekt.prioritaet} />
-          </div>
-        </div>
-
-        <div :for={{strang, i} <- Enum.with_index(projekt.realisierungsstraenge)} class="strang">
-          <.oder_separator :if={i > 0} />
-
-          <div class="strang-header">
-            <.strang_label label={strang.label} />
-            <span class="strang-title">{strang.titel}</span>
+      <.link
+        :for={projekt <- @projekte}
+        navigate={~p"/projekte/#{projekt.id}"}
+        class="project-card-link"
+      >
+        <div class="project-card">
+          <div class="project-header">
+            <div>
+              <h2>{projekt.titel}</h2>
+              <div class="desc">{projekt.beschreibung}</div>
+            </div>
+            <div class="badges">
+              <.badge status={projekt.status} />
+              <.prio_badge prio={projekt.prioritaet} />
+            </div>
           </div>
 
-          <div class="strang-desc">{strang.beschreibung}</div>
+          <div :for={{strang, i} <- Enum.with_index(projekt.realisierungsstraenge)} class="strang">
+            <.oder_separator :if={i > 0} />
 
-          <div class="section-label">Rechtliche Vorbedingungen</div>
+            <div class="strang-header">
+              <.strang_label label={strang.label} />
+              <span class="strang-title">{strang.titel}</span>
+            </div>
 
-          <div
-            :for={vorb <- strang.vorbedingungen}
-            class={"vorbedingung #{if vorb.erfuellt, do: "vorb-met", else: "vorb-unmet"}"}
-          >
-            <span class="vorb-icon">{if vorb.erfuellt, do: "✓", else: "⚠"}</span>
-            <span class="vorb-text">{vorb.text}</span>
-            <span
-              :if={vorb.rechtliche_grundlage}
-              class={"legal-badge #{if vorb.erfuellt, do: "legal-met", else: "legal-unmet"}"}
+            <div class="strang-desc">{strang.beschreibung}</div>
+
+            <div class="section-label">Rechtliche Vorbedingungen</div>
+
+            <div
+              :for={vorb <- strang.vorbedingungen}
+              class={"vorbedingung #{if vorb.erfuellt, do: "vorb-met", else: "vorb-unmet"}"}
             >
-              {vorb.rechtliche_grundlage}
-            </span>
-          </div>
+              <span class="vorb-icon">{if vorb.erfuellt, do: "✓", else: "⚠"}</span>
+              <span class="vorb-text">{vorb.text}</span>
+              <span
+                :if={vorb.rechtliche_grundlage}
+                class={"legal-badge #{if vorb.erfuellt, do: "legal-met", else: "legal-unmet"}"}
+              >
+                {vorb.rechtliche_grundlage}
+              </span>
+            </div>
 
-          <div class="section-label" style="margin-top: 12px;">Schritte auf diesem Weg</div>
+            <div class="section-label" style="margin-top: 12px;">Schritte auf diesem Weg</div>
 
-          <div :for={schritt <- strang.schritte} class="schritt">
-            <span class="schritt-arrow">→</span>
-            <span>{schritt.text}</span>
-            <span :if={schritt.frist} class="frist-badge">
-              ⏰ {Calendar.strftime(schritt.frist, "%d.%m.%Y")}
-            </span>
-          </div>
+            <div :for={schritt <- strang.schritte} class="schritt">
+              <span class="schritt-arrow">→</span>
+              <span>{schritt.text}</span>
+              <span :if={schritt.frist} class="frist-badge">
+                ⏰ {Calendar.strftime(schritt.frist, "%d.%m.%Y")}
+              </span>
+            </div>
 
-          <div :if={strang.quellen != []} class="sources">
-            <div :for={q <- strang.quellen} class="source-item">
-              📄 <a :if={q.url} href={q.url} target="_blank">{q.titel}</a>
-              <span :if={!q.url}>{q.titel}</span>
-              <span :if={q.paragraf} class="source-paragraf">{q.paragraf}</span>
+            <div :if={strang.quellen != []} class="sources">
+              <div :for={q <- strang.quellen} class="source-item">
+                📄 <a :if={q.url} href={q.url} target="_blank">{q.titel}</a>
+                <span :if={!q.url}>{q.titel}</span>
+                <span :if={q.paragraf} class="source-paragraf">{q.paragraf}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </.link>
     </div>
     """
   end

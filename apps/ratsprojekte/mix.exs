@@ -12,7 +12,8 @@ defmodule Ratsprojekte.MixProject do
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",
       deps: deps(),
-      compilers: [:phoenix_live_view] ++ Mix.compilers()
+      compilers: [:phoenix_live_view] ++ Mix.compilers(),
+      listeners: [Phoenix.CodeReloader]
     ]
   end
 

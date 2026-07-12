@@ -323,9 +323,11 @@ end
 {:ok, _} = Application.ensure_all_started(:ecto_sql)
 {:ok, _} = Application.ensure_all_started(:ecto_sqlite3)
 
-{:ok, _} =
-  Ratsprojekte.Repo.start_link(
-    config: [database: System.user_home!() <> "/.local/share/ratsinfo/ratsinfo.db"]
-  )
+case Ratsprojekte.Repo.start_link(
+       config: [database: System.user_home!() <> "/.local/share/ratsinfo/ratsinfo.db"]
+     ) do
+  {:ok, _} -> :ok
+  {:error, {:already_started, _}} -> :ok
+end
 
 Ratsprojekte.Seeds.run()

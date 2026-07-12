@@ -1,4 +1,5 @@
 {
+  "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "allgaeuer_zeitung_mcp": {
       "type": "local",
@@ -17,8 +18,9 @@
       }
     },
     "tidewave": {
-      "type": "url",
-      "url": "http://localhost:4000/tidewave/mcp"
+      "type": "remote",
+      "url": "http://localhost:4000/tidewave/mcp",
+      "enabled": true
     }
   },
   "skills": {

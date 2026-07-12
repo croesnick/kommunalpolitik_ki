@@ -108,6 +108,15 @@ Projekt (titel, beschreibung, status, prioritaet)
 | mix format | Formatter | `mix format --check-formatted` |
 | mix test | Test-Runner | `mix workspace.run -t test --affected` |
 
+### Debugging (Phoenix-Apps mit Tidewave)
+
+Phoenix-Apps mit Tidewave-MCP (wie ratsprojekte) werden grundsätzlich über
+Tidewave gedebuggt, wenn sie lokal laufen. Der AI-Harness kann über den
+Tidewave-MCP-Endpoint (`http://localhost:4000/tidewave/mcp`) direkt auf die
+laufende App zugreifen: Evaluator ausführen, Logs inspizieren, Module
+inspizieren. Voraussetzung: App läuft mit `mix phx.server` und Tidewave ist
+in `endpoint.ex` als Plug eingetragen (nur `:dev`).
+
 ### Python
 
 | Werkzeug | Rolle | Befehl |
