@@ -28,3 +28,6 @@ erl_crash.dump
 
 # Screenshots
 *.png
+
+# UI prototype HTML files (root level)
+/ui-*.html
