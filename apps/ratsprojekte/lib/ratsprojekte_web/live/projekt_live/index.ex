@@ -1,7 +1,8 @@
 defmodule RatsprojekteWeb.ProjektLive.Index do
   use RatsprojekteWeb, :live_view
 
-  alias Ratsprojekte.{Repo, Schemas.Projekt}
+  alias Ratsprojekte.Repo
+  alias Ratsprojekte.Schemas.Projekt
   import Ecto.Query
 
   @impl true
@@ -10,7 +11,7 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
       Repo.all(
         from p in Projekt,
           order_by: [desc: p.prioritaet, desc: p.inserted_at],
-          preload: [:blocker]
+          preload: [realisierungsstraenge: [:vorbedingungen, :schritte, :quellen]]
       )
 
     {:ok, assign(socket, projekte: projekte)}
@@ -19,24 +20,69 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-4xl mx-auto p-6">
-      <h1 class="text-2xl font-bold mb-6">Stadtrats-Projekte</h1>
+    <div style="max-width: 1000px; margin: 0 auto; padding: 24px;">
+      <h1 style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">
+        Stadtrats-Projekte Buchloe
+      </h1>
+      <p style="font-size: 14px; color: #64748b; margin-bottom: 24px;">
+        Rechtlich-inhaltliche Standortbestimmung — welche Realisierungsstränge gibt es und stehen die Vorbedingungen?
+      </p>
 
-      <div class="space-y-4">
-        <div :for={projekt <- @projekte} class="border rounded-lg p-4 hover:bg-gray-50">
-          <.link navigate={"/projekte/#{projekt.id}"} class="block">
-            <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold">{projekt.titel}</h2>
-              <div class="flex gap-2">
-                <.status_badge status={projekt.status} />
-                <.prio_badge prio={projekt.prioritaet} />
-              </div>
+      <div :for={projekt <- @projekte} class="project-card">
+        <div class="project-header">
+          <div>
+            <h2>{projekt.titel}</h2>
+            <div class="desc">{projekt.beschreibung}</div>
+          </div>
+          <div class="badges">
+            <.badge status={projekt.status} />
+            <.prio_badge prio={projekt.prioritaet} />
+          </div>
+        </div>
+
+        <div :for={{strang, i} <- Enum.with_index(projekt.realisierungsstraenge)} class="strang">
+          <.oder_separator :if={i > 0} />
+
+          <div class="strang-header">
+            <.strang_label label={strang.label} />
+            <span class="strang-title">{strang.titel}</span>
+          </div>
+
+          <div class="strang-desc">{strang.beschreibung}</div>
+
+          <div class="section-label">Rechtliche Vorbedingungen</div>
+
+          <div
+            :for={vorb <- strang.vorbedingungen}
+            class={"vorbedingung #{if vorb.erfuellt, do: "vorb-met", else: "vorb-unmet"}"}
+          >
+            <span class="vorb-icon">{if vorb.erfuellt, do: "✓", else: "⚠"}</span>
+            <span class="vorb-text">{vorb.text}</span>
+            <span
+              :if={vorb.rechtliche_grundlage}
+              class={"legal-badge #{if vorb.erfuellt, do: "legal-met", else: "legal-unmet"}"}
+            >
+              {vorb.rechtliche_grundlage}
+            </span>
+          </div>
+
+          <div class="section-label" style="margin-top: 12px;">Schritte auf diesem Weg</div>
+
+          <div :for={schritt <- strang.schritte} class="schritt">
+            <span class="schritt-arrow">→</span>
+            <span>{schritt.text}</span>
+            <span :if={schritt.frist} class="frist-badge">
+              ⏰ {Calendar.strftime(schritt.frist, "%d.%m.%Y")}
+            </span>
+          </div>
+
+          <div :if={strang.quellen != []} class="sources">
+            <div :for={q <- strang.quellen} class="source-item">
+              📄 <a :if={q.url} href={q.url} target="_blank">{q.titel}</a>
+              <span :if={!q.url}>{q.titel}</span>
+              <span :if={q.paragraf} class="source-paragraf">{q.paragraf}</span>
             </div>
-            <p class="text-sm text-gray-600 mt-1">{projekt.beschreibung}</p>
-            <p class="text-xs text-gray-400 mt-2">
-              {length(projekt.blocker)} Blocker
-            </p>
-          </.link>
+          </div>
         </div>
       </div>
     </div>
@@ -45,18 +91,17 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
 
   attr(:status, :atom, required: true)
 
-  defp status_badge(assigns) do
-    colors = %{
-      idee: "bg-blue-100 text-blue-800",
-      aktiv: "bg-green-100 text-green-800",
-      blockiert: "bg-red-100 text-red-800",
-      abgeschlossen: "bg-gray-100 text-gray-800"
-    }
+  defp badge(assigns) do
+    colors = %{idee: "#dbeafe", aktiv: "#dcfce7", abgeschlossen: "#f3f4f6"}
+    text_colors = %{idee: "#1e40af", aktiv: "#166534", abgeschlossen: "#374151"}
 
-    assigns = assign(assigns, :color, Map.get(colors, assigns.status, "bg-gray-100"))
+    assigns =
+      assigns
+      |> assign(:bg, Map.get(colors, assigns.status, "#f3f4f6"))
+      |> assign(:fg, Map.get(text_colors, assigns.status, "#374151"))
 
     ~H"""
-    <span class={"px-2 py-1 rounded text-xs font-medium #{@color}"}>
+    <span class="badge" style={"background: #{@bg}; color: #{@fg};"}>
       {@status}
     </span>
     """
@@ -65,18 +110,37 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
   attr(:prio, :atom, required: true)
 
   defp prio_badge(assigns) do
-    colors = %{
-      hoch: "bg-red-100 text-red-800",
-      mittel: "bg-yellow-100 text-yellow-800",
-      niedrig: "bg-gray-100 text-gray-800"
-    }
+    colors = %{hoch: "#fee2e2", mittel: "#fef9c3", niedrig: "#f3f4f6"}
+    text_colors = %{hoch: "#991b1b", mittel: "#854d0e", niedrig: "#374151"}
 
-    assigns = assign(assigns, :color, Map.get(colors, assigns.prio, "bg-gray-100"))
+    assigns =
+      assigns
+      |> assign(:bg, Map.get(colors, assigns.prio, "#f3f4f6"))
+      |> assign(:fg, Map.get(text_colors, assigns.prio, "#374151"))
 
     ~H"""
-    <span class={"px-2 py-1 rounded text-xs #{@color}"}>
+    <span class="badge" style={"background: #{@bg}; color: #{@fg};"}>
       {@prio}
     </span>
+    """
+  end
+
+  attr(:label, :string, required: true)
+
+  defp strang_label(assigns) do
+    colors = %{"A" => "#16a34a", "B" => "#ca8a04", "C" => "#2563eb"}
+    assigns = assign(assigns, :bg, Map.get(colors, assigns.label, "#6b7280"))
+
+    ~H"""
+    <span class="strang-label" style={"background: #{@bg};"}>
+      {@label}
+    </span>
+    """
+  end
+
+  defp oder_separator(assigns) do
+    ~H"""
+    <div class="oder-separator">— ODER —</div>
     """
   end
 end

@@ -5,11 +5,11 @@ defmodule Ratsprojekte.Schemas.Projekt do
   schema "projekte" do
     field(:titel, :string)
     field(:beschreibung, :string)
-    field(:status, Ecto.Enum, values: [:idee, :aktiv, :blockiert, :abgeschlossen], default: :idee)
+    field(:status, Ecto.Enum, values: [:idee, :aktiv, :abgeschlossen], default: :idee)
     field(:prioritaet, Ecto.Enum, values: [:hoch, :mittel, :niedrig], default: :mittel)
 
-    has_many(:blocker, Ratsprojekte.Schemas.Blocker)
-    has_many(:quellen, Ratsprojekte.Schemas.Quelle, where: [blocker_id: nil])
+    has_many(:realisierungsstraenge, Ratsprojekte.Schemas.Realisierungsstrang)
+    has_many(:quellen, Ratsprojekte.Schemas.Quelle, where: [realisierungsstrang_id: nil])
 
     timestamps(type: :utc_datetime)
   end

@@ -14,6 +14,5 @@ defmodule RatsprojekteWeb.Router do
     pipe_through(:browser)
 
     live("/", ProjektLive.Index, :index)
-    live("/projekte/:id", ProjektLive.Show, :show)
   end
 end

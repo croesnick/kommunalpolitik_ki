@@ -10,14 +10,22 @@ defmodule Ratsprojekte.Schemas.Quelle do
     field(:abrufdatum, :date)
 
     belongs_to(:projekt, Ratsprojekte.Schemas.Projekt)
-    belongs_to(:blocker, Ratsprojekte.Schemas.Blocker)
+    belongs_to(:realisierungsstrang, Ratsprojekte.Schemas.Realisierungsstrang)
 
     timestamps(type: :utc_datetime)
   end
 
   def changeset(quelle, attrs) do
     quelle
-    |> cast(attrs, [:typ, :titel, :url, :paragraf, :abrufdatum, :projekt_id, :blocker_id])
+    |> cast(attrs, [
+      :typ,
+      :titel,
+      :url,
+      :paragraf,
+      :abrufdatum,
+      :projekt_id,
+      :realisierungsstrang_id
+    ])
     |> validate_required([:typ, :titel])
   end
 end

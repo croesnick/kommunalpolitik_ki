@@ -39,6 +39,7 @@ defmodule Ratsprojekte.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
+      {:tidewave, "~> 0.6", only: :dev},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
