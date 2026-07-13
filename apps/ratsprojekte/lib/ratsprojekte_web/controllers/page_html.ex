@@ -6,5 +6,5 @@ defmodule RatsprojekteWeb.PageHTML do
   """
   use RatsprojekteWeb, :html
 
-  embed_templates "page_html/*"
+  embed_templates("page_html/*")
 end

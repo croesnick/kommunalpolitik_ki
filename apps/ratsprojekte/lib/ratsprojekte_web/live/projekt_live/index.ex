@@ -9,9 +9,10 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
   def mount(_params, _session, socket) do
     projekte =
       Repo.all(
-        from p in Projekt,
+        from(p in Projekt,
           order_by: [desc: p.prioritaet, desc: p.inserted_at],
           preload: [realisierungsstraenge: [:vorbedingungen, :schritte, :quellen]]
+        )
       )
 
     {:ok, assign(socket, projekte: projekte)}

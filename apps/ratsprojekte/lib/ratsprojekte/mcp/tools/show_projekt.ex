@@ -20,9 +20,10 @@ defmodule Ratsprojekte.MCP.Tools.ShowProjekt do
   import Ecto.Query
 
   schema do
-    field :id, :integer,
+    field(:id, :integer,
       required: true,
       description: "Projekt-ID (von list_projekte)"
+    )
   end
 
   @impl true

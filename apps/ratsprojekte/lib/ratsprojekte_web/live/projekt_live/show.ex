@@ -9,12 +9,13 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
   def mount(%{"id" => id}, _session, socket) do
     projekt =
       Repo.one(
-        from p in Projekt,
+        from(p in Projekt,
           where: p.id == ^id,
           preload: [
             realisierungsstraenge: [:vorbedingungen, :schritte, :quellen],
             quellen: []
           ]
+        )
       )
 
     case projekt do

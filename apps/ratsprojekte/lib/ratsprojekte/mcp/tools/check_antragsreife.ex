@@ -27,9 +27,10 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
   @beschlussvorschlag_min_length 20
 
   schema do
-    field :id, :integer,
+    field(:id, :integer,
       required: true,
       description: "Projekt-ID (von list_projekte)"
+    )
   end
 
   @impl true

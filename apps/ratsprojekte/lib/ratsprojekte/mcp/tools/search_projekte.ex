@@ -16,11 +16,12 @@ defmodule Ratsprojekte.MCP.Tools.SearchProjekte do
   import Ecto.Query
 
   schema do
-    field :query, :string,
+    field(:query, :string,
       required: true,
       description: "Suchbegriff (wird in Titel und Beschreibung gesucht)"
+    )
 
-    field :limit, :integer, default: 20, description: "Maximale Anzahl Ergebnisse"
+    field(:limit, :integer, default: 20, description: "Maximale Anzahl Ergebnisse")
   end
 
   @impl true

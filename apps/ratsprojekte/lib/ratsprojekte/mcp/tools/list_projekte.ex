@@ -14,10 +14,11 @@ defmodule Ratsprojekte.MCP.Tools.ListProjekte do
   import Ecto.Query
 
   schema do
-    field :status, :string,
+    field(:status, :string,
       description: "Filter nach Status: 'idee', 'aktiv' oder 'abgeschlossen'"
+    )
 
-    field :limit, :integer, default: 50, description: "Maximale Anzahl Ergebnisse"
+    field(:limit, :integer, default: 50, description: "Maximale Anzahl Ergebnisse")
   end
 
   @impl true
