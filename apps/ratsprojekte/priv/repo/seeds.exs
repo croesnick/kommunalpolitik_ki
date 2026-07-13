@@ -307,7 +307,7 @@ defmodule Ratsprojekte.Seeds do
       })
   end
 
-  defp create_quelle(strang, typ, titel, opts \\ []) do
+  defp create_quelle(strang, typ, titel, opts) do
     {:ok, _} =
       Ratsprojekte.Repo.insert(%Quelle{
         typ: typ,

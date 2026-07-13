@@ -4,10 +4,11 @@ config :ratsprojekte, Ratsprojekte.Repo,
   database: Path.join(System.user_home!(), ".local/share/ratsinfo/ratsinfo.db"),
   pool_size: 10,
   stacktrace: true,
-  show_sensitive_data_on_connection_error: true
+  show_sensitive_data_on_connection_error: true,
+  log: :info
 
 config :ratsprojekte, RatsprojekteWeb.Endpoint,
-  http: [ip: {127, 0, 0, 1}, port: 4001],
+  http: [ip: {127, 0, 0, 1}, port: 4000],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
