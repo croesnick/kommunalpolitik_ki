@@ -15,4 +15,5 @@ defmodule Ratsprojekte.MCP.Server do
   component(Ratsprojekte.MCP.Tools.ListProjekte)
   component(Ratsprojekte.MCP.Tools.ShowProjekt)
   component(Ratsprojekte.MCP.Tools.SearchProjekte)
+  component(Ratsprojekte.MCP.Tools.CheckAntragsreife)
 end
