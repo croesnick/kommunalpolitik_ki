@@ -231,6 +231,7 @@ defmodule Ratsinfo.Store do
 
   defp strip_html(html) do
     html
+    |> HtmlEntities.decode()
     |> String.replace(~r/<[^>]*>/, " ")
     |> String.replace(~r/\s+/, " ")
     |> String.trim()
