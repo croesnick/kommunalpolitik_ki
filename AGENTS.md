@@ -65,11 +65,12 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | Tool | Sprache | Zweck | AI-Schnittstelle | Status |
 |---|---|---|---|---|
 | `apps/ratsinfo` | Elixir | RIS-Scraper + CLI + lokale Volltextsuche | CLI (`ratsinfo sync/search/show`) | Funktionsfähig |
-| `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard | LiveView + MCP (geplant) | In Arbeit |
+| `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard | LiveView + MCP (`/mcp`) | Funktionsfähig |
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | Funktionsfähig |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | Bestehend |
 | `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (geplant) | Geplant |
 | `skills/foerdermittel` | Markdown-Skill | Fördermittel-Recherche orchestrieren | Agent Skill | Funktionsfähig |
+| `skills/projekt_tracker` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Funktionsfähig |
 
 ## ratsprojekte — Planungsstand
 
@@ -78,7 +79,7 @@ Rechtlich-inhaltliche Standortbestimmung für Stadtratsprojekte. Kein Task-Track
 
 ### Architektur
 - Phoenix LiveView für Dashboard
-- `anubis_mcp` für AI-Zugriff (später)
+- `anubis_mcp` (LGPL-3.0) für AI-Zugriff — MCP-Endpoint unter `http://localhost:4000/mcp` (dev-only, read-only Tools)
 - Ecto + SQLite3 (geteilte DB mit ratsinfo)
 
 ### Datenmodell
@@ -91,11 +92,12 @@ Projekt (titel, beschreibung, status, prioritaet)
 ```
 
 ### Roadmap
-1. **MVP**: Datenmodell + Seed + LiveView — Issues #12, #13, #14
-2. **Antragsvorlagen**: Markdown-Render aus Projektdaten — Issue #15
-3. **MCP-Server**: AI-Tools für lesen/suggest (GO-Prinzip)
-4. **Ratsinfo-Integration**: Quellen verlinken mit Sitzung/TOP
-5. **AI-Skill**: „Frag den Projekt-Tracker"
+1. **MVP**: Datenmodell + Seed + LiveView — Issues #12, #13, #14 ✅
+2. **Projekt-Detailansicht**: Show-LiveView `/projekte/:id` — Issue #16 ✅
+3. **MCP-Server**: AI-Tools für lesen (GO-Prinzip) — Issue #17 ✅
+4. **AI-Skill**: „Frag den Projekt-Tracker" — `skills/projekt_tracker/` ✅
+5. **Antragsvorlagen**: Markdown-Render aus Projektdaten — Issue #15
+6. **Ratsinfo-Integration**: Quellen verlinken mit Sitzung/TOP
 
 ## Tooling-Vorgaben
 

@@ -21,6 +21,11 @@
       "type": "remote",
       "url": "http://localhost:4000/tidewave/mcp",
       "enabled": true
+    },
+    "ratsprojekte": {
+      "type": "remote",
+      "url": "http://localhost:4000/mcp",
+      "enabled": true
     }
   },
   "skills": {

@@ -7,12 +7,17 @@ defmodule Ratsprojekte.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      RatsprojekteWeb.Telemetry,
-      Ratsprojekte.Repo,
-      {Phoenix.PubSub, name: Ratsprojekte.PubSub},
-      RatsprojekteWeb.Endpoint
-    ]
+    children =
+      [
+        RatsprojekteWeb.Telemetry,
+        Ratsprojekte.Repo,
+        {Phoenix.PubSub, name: Ratsprojekte.PubSub}
+      ] ++
+        if(Mix.env() == :dev,
+          do: [{Ratsprojekte.MCP.Server, transport: :streamable_http}],
+          else: []
+        ) ++
+        [RatsprojekteWeb.Endpoint]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
