@@ -132,8 +132,8 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
       <.filter_form filter={@filter} status_optionen={@status_optionen} />
 
       <div :for={{_dom_id, projekt} <- @streams.projekte} class="project-card">
-        <.link navigate={~p"/projekte/#{projekt.slug}"} class="project-card-link">
-          <div class="project-header">
+        <div class="project-header">
+          <.link navigate={~p"/projekte/#{projekt.slug}"} class="project-card-link">
             <div>
               <h2>{projekt.titel}</h2>
               <div class="desc">{projekt.beschreibung}</div>
@@ -142,11 +142,7 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
               <.badge kind={:status} value={projekt.status} />
               <.badge kind={:priority} value={projekt.prioritaet} />
             </div>
-          </div>
-        </.link>
-
-        <p class="slug-row project-card-slug" style="margin: var(--space-1) 0 0;">
-          <code>{projekt.slug}</code>
+          </.link>
           <button
             type="button"
             class="copy-tag-btn"
@@ -154,10 +150,10 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
             aria-label={"Vault-Tag #ratsprojekt/#{projekt.slug} kopieren"}
             phx-click={JS.dispatch("ratsprojekte:copy-tag")}
           >
-            <span class="copy-tag-label">Kopieren</span>
+            <span class="copy-tag-label">{projekt.slug}</span>
             <span class="copy-tag-done" aria-hidden="true">✓ Kopiert</span>
           </button>
-        </p>
+        </div>
 
         <div
           :for={{strang, i} <- Enum.with_index(projekt.realisierungsstraenge)}
