@@ -67,6 +67,12 @@ Der Obsidian-Vault ist das Gedächtnis — roh, unstrukturiert, alles. ratsproje
 
 Der `proposal_vorbereitung`-Skill orchestriert diesen Workflow: sammeln → konsolidieren (in den Vault) → Gates prüfen → Proposal einbringen.
 
+### 11. Projektlebenszyklus (kanonisch)
+
+Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Abschluss/Archivierung ist in [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) als Mermaid-Chart dokumentiert. Dieses Dokument ist der **Single Source of Truth für den Projektlebenszyklus** — alle Skills, MCP-Tools und AI-Workflows richten sich nach ihm.
+
+**Pflicht**: Bei Änderungen am Lifecycle (neue States, Übergänge, Gates) wird zuerst das Lifecycle-Dokument aktualisiert, *bevor* Code oder Skills angepasst werden. Jede OpenCode-Sitzung, die Workflow-Änderungen vornimmt, prüft und aktualisiert das Dokument.
+
 ## Lizenz-Bewusstsein
 
 Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder kommerziell von Artifex). Für ein persönliches/Open-Source-Projekt ist AGPL in Ordnung; bei proprietärer Nutzung Alternative evaluieren (`pdfplumber` MIT, `pdf.js` Apache-2.0). Pro Tool in der Tool-Doku dokumentieren.
@@ -98,10 +104,15 @@ Rechtlich-inhaltliche Standortbestimmung für Stadtratsprojekte. Kein Task-Track
 ### Datenmodell
 ```
 Projekt (titel, slug, beschreibung, status, prioritaet, beschlussvorschlag, adressat)
+  status: idee | aktiv | abgeschlossen | verworfen  (siehe docs/ratsprojekte-lifecycle.md)
 ├── Realisierungsstrang (label A/B/C, titel, beschreibung, rechtliche_grundlage, bedingung, bedingung_erfuellt)
 │   ├── Vorbedingung (text, erfuellt, rechtliche_grundlage, typ)
 │   └── Schritt (text, frist) — geordnete Liste, keine Checkboxen
 └── Quelle (typ, titel, url, paragraf, abrufdatum)
+
+PendingProposal (projekt_id, typ, status)  — AI-Vorschläge, GO-Gate vor Mutation
+  typ:    add_projekt | add_realisierungsstrang | change_status
+  status: pending | approved | rejected
 ```
 
 ### Slug-Konvention
@@ -178,7 +189,7 @@ uv run pytest
 kommunalpolitik_ki/
 ├── apps/                   # Elixir-Apps (workspace-Pattern)
 │   ├── ratsinfo/           # RIS-Scraper + CLI (AI: CLI)
-│   ├── ratsprojekte/       # Projekt-Dashboard (AI: LiveView + MCP geplant)
+│   ├── ratsprojekte/       # Projekt-Dashboard (AI: LiveView + MCP)
 │   └── shared/             # Geteilte Domain-Models
 ├── tools/                  # Nicht-Elixir
 │   ├── allgaeuer_zeitung_mcp/  # AZ-Artikel (AI: MCP)
@@ -188,6 +199,8 @@ kommunalpolitik_ki/
 │   ├── projekt_tracker/    # Projekt-Standortbestimmung (AI: Agent Skill)
 │   ├── proposal_vorbereitung/ # Proposal-Workflow (AI: Agent Skill)
 │   └── vault_suche/        # Vault-Volltextsuche (AI: Agent Skill)
+├── docs/                   # Kanonische Dokumentation
+│   └── ratsprojekte-lifecycle.md  # Projektlebenszyklus (Mermaid-Chart)
 ├── artifacts/              # shared Elixir build output (gitignored)
 ├── mix.exs                 # workspace root
 ├── .workspace.exs

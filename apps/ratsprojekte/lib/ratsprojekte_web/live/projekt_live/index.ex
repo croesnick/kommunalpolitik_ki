@@ -145,8 +145,8 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
           </div>
         </.link>
 
-        <p class="slug-row" style="font-size: var(--text-xs); color: var(--color-text-faint); margin-top: var(--space-1);">
-          <span>Slug: <code>{projekt.slug}</code></span>
+        <p class="slug-row project-card-slug" style="margin: var(--space-1) 0 0;">
+          <code>{projekt.slug}</code>
           <button
             type="button"
             class="copy-tag-btn"

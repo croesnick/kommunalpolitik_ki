@@ -170,6 +170,7 @@ Orchestrator, die Carsten ausdrücklich anfordert:
 | Folgeschritt | Skill / Weg | Wann |
 |---|---|---|
 | Bestehendes Projekt anreichern | ad-hoc gegen `projekt_tracker`-Stand halten | Wenn Treffer zu einem existierenden ratsprojekt passen |
+| Projektlebenszyklus | [`docs/ratsprojekte-lifecycle.md`](../../docs/ratsprojekte-lifecycle.md) | Verbindliche Referenz für Status-Übergänge, bei Treffern mit Projektbezug |
 | Projektstand abrufen | `projekt_tracker` | Wenn unklar ist, welches Projekt gemeint ist |
 | Förderrecherche | `foerdermittel` | Wenn Treffer Finanzierungshinweise enthalten |
 | AZ-Artikel | `allgaeuer_zeitung_mcp` | Wenn Treffer auf einen Artikel verweisen |

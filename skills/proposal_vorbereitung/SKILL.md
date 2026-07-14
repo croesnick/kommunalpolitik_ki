@@ -84,6 +84,12 @@ Bevor das `propose_*`-MCP-Tool aufgerufen wird, muss die AI die Gates aus
 sind die gleichen, die später `check_antragsreife` deterministisch prüft —
 aber *vor* dem Proposal, um sicherzustellen, dass der Proposal vollständig ist.
 
+> **Lifecycle-Referenz**: Der vollständige Projektlebenszyklus
+> (Vault-Idee → Proposal → Projekt → Stränge → Abschluss/Archivierung) ist
+> in [`docs/ratsprojekte-lifecycle.md`](../../docs/ratsprojekte-lifecycle.md)
+> als Mermaid-Chart dokumentiert. Jede Statusänderung muss dem Chart
+> entsprechen — keine Übergänge vorschlagen, die der Chart nicht zeigt.
+
 #### Hard Gates (Pflicht vor Proposal)
 
 | Gate | Frage | Bei Nein |
@@ -203,6 +209,7 @@ Quelle" markieren.
 | Förderrecherche | `foerdermittel` | Wenn Finanzierung unklar |
 | Projektstand abrufen | `projekt_tracker` | Wenn bestehendes Projekt relevant |
 | Antragsreife prüfen (post-Proposal) | `check_antragsreife` MCP-Tool | Nach Accept, für Reife-Check |
+| Projektlebenszyklus | [`docs/ratsprojekte-lifecycle.md`](../../docs/ratsprojekte-lifecycle.md) | Verbindliche Referenz für Status-Übergänge |
 
 ## Output
 

@@ -131,6 +131,17 @@ body {
   flex-wrap: wrap;
 }
 
+/* Slug row auf der Übersichtsseite — dezent, klein, ohne "Slug:" Label */
+.project-card-slug {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.project-card-slug code {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
 .copy-tag-btn {
   display: inline-flex;
   align-items: center;

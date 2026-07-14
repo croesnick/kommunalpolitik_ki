@@ -70,12 +70,20 @@ Projekte angehängt — nutze sie:
 - **Sitzung**: Sitzungsdatum und TOP
 - **Ohne bestätigte Quelle**: als "nicht belegt" kennzeichnen
 
+## Lifecycle-Referenz
+
+Der vollständige Projektlebenszyklus ist in
+[`docs/ratsprojekte-lifecycle.md`](../../docs/ratsprojekte-lifecycle.md)
+als Mermaid-Chart dokumentiert. Das ist die verbindliche Referenz für
+Statuswerte und gültige Übergänge. Die Statusliste
+(`idee/aktiv/abgeschlossen/verworfen`) richtet sich nach dem Chart.
+
 ## Output-Format
 
 ```markdown
 ## Projektstand: [Projekttitel]
 
-**Status:** [idee/aktiv/abgeschlossen] | **Priorität:** [hoch/mittel/niedrig]
+**Status:** [idee/aktiv/abgeschlossen/verworfen] | **Priorität:** [hoch/mittel/niedrig]
 
 ### Realisierungsstränge
 
