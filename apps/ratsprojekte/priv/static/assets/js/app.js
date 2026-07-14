@@ -1,19 +1,17 @@
-// For Phoenix.HTML support, including form and button helpers
-// copy the following scripts into your javascript bundle:
-// * deps/phoenix_html/priv/static/phoenix_html.js
+import { Socket } from "./phoenix.mjs"
+import { LiveSocket } from "./phoenix_live_view.esm.js"
 
-// For Phoenix.Channels support, copy the following scripts
-// into your javascript bundle:
-// * deps/phoenix/priv/static/phoenix.js
+let csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content")
 
-// For Phoenix.LiveView support, copy the following scripts
-// into your javascript bundle:
-// * deps/phoenix_live_view/priv/static/phoenix_live_view.js
+let liveSocket = new LiveSocket("/live", Socket, {
+  params: { _csrf_token: csrfToken }
+})
+
+liveSocket.connect()
 
 // Handle flash close
-// (you can safely remove this if you don't use the default flash component)
 document.querySelectorAll("[role=alert][data-flash]").forEach((el) => {
   el.addEventListener("click", () => {
-    el.setAttribute("hidden", "");
-  });
-});
+    el.setAttribute("hidden", "")
+  })
+})
