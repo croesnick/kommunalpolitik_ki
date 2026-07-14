@@ -1,0 +1,15 @@
+# Lokale Konfiguration für Vault-Zugriff
+#
+# Diese Datei ist eine Vorlage. Kopiere sie nach `config.local.yml`
+# (im gleichen Verzeichnis) und trage deine Werte ein. `config.local.yml`
+# ist in .gitignore eingetragen und wird nicht committet.
+#
+#   cp config.local.yml.example config.local.yml
+#
+# Skills, die Vault-Zugriff brauchen (z.B. vault_suche), lesen diese Datei
+# beim Start. Fehlt sie, fragt der Skill interaktiv nach dem Vault-Namen.
+
+obsidian:
+  # Name des Vaults, wie er in Obsidian angezeigt wird.
+  # Findest du in Obsidian oben links im Vault-Switcher.
+  vault: "MeinVaultName"

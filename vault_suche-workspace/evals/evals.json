@@ -1,0 +1,46 @@
+{
+  "skill_name": "vault_suche",
+  "evals": [
+    {
+      "id": 0,
+      "name": "bahnhofstrasse",
+      "prompt": "Such im Vault nach allem zur Bahnhofstraße in Buchloe. Ich will wissen, was ich schon an Notizen dazu habe.",
+      "expected_output": "Strukturierte Trefferliste mit relevanten Notizen zur Bahnhofstraße, Vault-Name korrekt verwendet, kein automatischer Handoff.",
+      "files": [],
+      "expectations": [
+        "result.md mentions the vault name 'All The Notes'",
+        "At least one 'obsidian search' command was executed (visible in commands.log)",
+        "Output contains a structured Trefferliste with at least 1 relevant note about Bahnhofstraße",
+        "No automatic invocation of projekt_tracker, foerdermittel, allgaeuer_zeitung_mcp, or ratsinfo (commands.log shows only obsidian/read commands)",
+        "Output ends with 'Nächste Schritte' suggestions, not an automatic handoff to another skill"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "kinderbetreuung",
+      "prompt": "Guck mal in meine Notizen, ob ich was zur Kinderbetreuung oder Kita-Situation in Buchloe habe. Mich interessiert vor allem, ob ich da schon was zur Situation am Kindergartenplatz-Mangel oder zu Spielplätzen aufgeschrieben habe.",
+      "expected_output": "Trefferliste mit Notizen zu Kinderbetreuung/Kita/Spielplätzen, mehrere Suchbegriffe abgeleitet, strukturierte Ausgabe.",
+      "files": [],
+      "expectations": [
+        "result.md mentions the vault name 'All The Notes'",
+        "At least 2 different search terms were used (e.g. 'Kita', 'Kindergarten', 'Spielplatz', 'Kinderbetreuung') — not just one",
+        "If results found: output contains a structured list with per-note relevance assessment",
+        "If no results found: output has an explicit 'Nicht gefunden' section with alternative search suggestions",
+        "No automatic handoff to other skills (projekt_tracker, foerdermittel, etc.)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "muellabfuhr-noresult",
+      "prompt": "Such im Vault nach „Müllabfuhr-Privatisierung Ostallgäu 2024\". Ich glaube nicht, dass ich da was habe, aber schau mal.",
+      "expected_output": "Graceful no-result-Behandlung: explizit „nichts gefunden\" melden, ggf. alternative Suchbegriffe vorschlagen, nicht fantasisieren, keine Treffer erfinden.",
+      "files": [],
+      "expectations": [
+        "result.md explicitly states 'keine Treffer' or 'nichts gefunden' (graceful no-results handling)",
+        "No fabricated note titles or paths in the output",
+        "At least 1 'obsidian search' command was executed",
+        "Output contains suggestion for alternative searches or next steps"
+      ]
+    }
+  ]
+}

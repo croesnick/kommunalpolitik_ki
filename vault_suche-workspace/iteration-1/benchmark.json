@@ -1,0 +1,179 @@
+{
+  "metadata": {
+    "skill_name": "vault_suche",
+    "skill_path": "/Users/crn/projects/kommunalpolitik_ki/skills/vault_suche",
+    "executor_model": "zai-org/GLM-5.2",
+    "analyzer_model": "zai-org/GLM-5.2",
+    "timestamp": "2026-07-13T18:20:00Z",
+    "evals_run": [0, 1, 2],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": 0,
+      "eval_name": "bahnhofstrasse",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "result.md mentions the vault name 'All The Notes'", "passed": true, "evidence": "Line 3: '**Vault:** All The Notes'"},
+        {"text": "At least one 'obsidian search' command was executed", "passed": true, "evidence": "5 search:context commands logged"},
+        {"text": "Output contains a structured Trefferliste with at least 1 relevant note about Bahnhofstraße", "passed": true, "evidence": "6 relevant notes listed with title, path, date, relevance, core content"},
+        {"text": "No automatic invocation of other skills", "passed": true, "evidence": "commands.log shows only obsidian commands"},
+        {"text": "Output ends with 'Nächste Schritte' suggestions, not automatic handoff", "passed": true, "evidence": "5 Vorschläge as questions, 'GO bei Carsten' stated"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 0,
+      "eval_name": "bahnhofstrasse",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8,
+        "passed": 4,
+        "failed": 1,
+        "total": 5,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "result.md mentions the vault name 'All The Notes'", "passed": false, "evidence": "Says 'Vault: aktiv (Default)' — vault name never explicitly mentioned"},
+        {"text": "At least one 'obsidian search' command was executed", "passed": true, "evidence": "search + search:context + outline + backlinks commands"},
+        {"text": "Output contains a structured Trefferliste with at least 1 relevant note about Bahnhofstraße", "passed": true, "evidence": "Central note + 15 related notes grouped by area"},
+        {"text": "No automatic invocation of other skills", "passed": true, "evidence": "Only obsidian commands used"},
+        {"text": "Output ends with 'Nächste Schritte' suggestions, not automatic handoff", "passed": true, "evidence": "Ends with 'Offene Fäden' section, no skill invoked"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "kinderbetreuung",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "result.md mentions the vault name 'All The Notes'", "passed": true, "evidence": "Line 3: '**Vault:** All The Notes'"},
+        {"text": "At least 2 different search terms were used", "passed": true, "evidence": "6 search terms: Kinderbetreuung, Kita, Kindergarten, Spielplatz, Kind, Buchloe"},
+        {"text": "If results found: output contains a structured list with per-note relevance assessment", "passed": true, "evidence": "6 notes each with Relevanz, Kerninhalt, Quellen-Eignung"},
+        {"text": "If no results found: explicit 'Nicht gefunden' section with alternatives", "passed": true, "evidence": "N/A (results found), but still includes 'Nicht gefunden' section for gaps"},
+        {"text": "No automatic handoff to other skills", "passed": true, "evidence": "Vorschläge A-E as questions, 'GO liegt bei Carsten'"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "kinderbetreuung",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8,
+        "passed": 4,
+        "failed": 1,
+        "total": 5,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "result.md mentions the vault name 'All The Notes'", "passed": true, "evidence": "Line 3: mentions both 'All The Notes' and 'Dahoam'"},
+        {"text": "At least 2 different search terms were used", "passed": true, "evidence": "6 search terms including Kinderbetreuung, Kita, Kindergarten, Spielplatz"},
+        {"text": "If results found: output contains a structured list with per-note relevance assessment", "passed": false, "evidence": "Notes described in prose by topic, but no per-note 'Relevanz' assessment or source suitability rating"},
+        {"text": "If no results found: explicit 'Nicht gefunden' section with alternatives", "passed": true, "evidence": "N/A (results found)"},
+        {"text": "No automatic handoff to other skills", "passed": true, "evidence": "Ends with Handlungsempfehlung, no skill invoked"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "muellabfuhr-noresult",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "result.md explicitly states 'keine Treffer' or 'nichts gefunden'", "passed": true, "evidence": "Line 5: '0 relevante Notizen'; Line 25: 'nichts gefunden'"},
+        {"text": "No fabricated note titles or paths in the output", "passed": true, "evidence": "All listed notes are real search results from commands.log"},
+        {"text": "At least 1 'obsidian search' command was executed", "passed": true, "evidence": "9 search commands logged"},
+        {"text": "Output contains suggestion for alternative searches or next steps", "passed": true, "evidence": "'Mögliche alternative Suchbegriffe' + 'Nächste Schritte' sections"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "muellabfuhr-noresult",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "result.md explicitly states 'keine Treffer' or 'nichts gefunden'", "passed": true, "evidence": "Line 3: '**Ergebnis: keine Treffer.**'"},
+        {"text": "No fabricated note titles or paths in the output", "passed": true, "evidence": "All notes are real search results"},
+        {"text": "At least 1 'obsidian search' command was executed", "passed": true, "evidence": "10 search commands logged"},
+        {"text": "Output contains suggestion for alternative searches or next steps", "passed": true, "evidence": "Line 29: suggests RIS, AZ, Landratsamt Ostallgäu"}
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {"mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0},
+      "time_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0},
+      "tokens": {"mean": 0, "stddev": 0, "min": 0, "max": 0}
+    },
+    "without_skill": {
+      "pass_rate": {"mean": 0.867, "stddev": 0.094, "min": 0.8, "max": 1.0},
+      "time_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0},
+      "tokens": {"mean": 0, "stddev": 0, "min": 0, "max": 0}
+    },
+    "delta": {
+      "pass_rate": "+0.13",
+      "time_seconds": "+0.0",
+      "tokens": "+0"
+    }
+  },
+  "notes": [
+    "with_skill achieves 100% pass rate across all 3 evals; without_skill averages 87% — delta is +13%.",
+    "The skill's main differentiators: (1) always reads and states vault name from config.local.yml, (2) structured per-note relevance assessment in the output template, (3) explicit 'Nächste Schritte' as questions with GO-Prinzip.",
+    "without_skill already handles no-result cases well (eval 2: 100% pass). The skill adds no value there.",
+    "without_skill fails on vault-name-mention (eval 0) and per-note-relevance-assessment (eval 1) — both are structural choices the skill enforces.",
+    "The no-result case (eval 2) is non-discriminating: both configs score 100%. The skill's value shows in structured output and config-driven vault targeting, not in no-result handling."
+  ]
+}

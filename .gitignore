@@ -31,3 +31,7 @@ erl_crash.dump
 
 # UI prototype HTML files (root level)
 /ui-*.html
+
+# Local config (vault names, personal settings) — not tracked
+config.local.yml
+*.local.yml
