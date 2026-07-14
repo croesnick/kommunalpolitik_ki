@@ -15,10 +15,14 @@ defmodule RatsprojekteWeb.Router do
     plug(:accepts, ["json"])
   end
 
+  pipeline :mcp do
+    plug(:accepts, ["json", "event-stream"])
+  end
+
   # MCP-Endpoint für AI-Zugriff (dev-only, read-only)
   if Mix.env() == :dev do
     scope "/mcp" do
-      pipe_through(:api)
+      pipe_through(:mcp)
 
       forward("/", Anubis.Server.Transport.StreamableHTTP.Plug, server: Ratsprojekte.MCP.Server)
     end

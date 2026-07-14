@@ -20,4 +20,8 @@ config :logger, :default_formatter,
 
 config :phoenix, :json_library, Jason
 
+config :mime, :types, %{
+  "text/event-stream" => ["event-stream"]
+}
+
 import_config "#{config_env()}.exs"
