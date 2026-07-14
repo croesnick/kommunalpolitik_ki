@@ -56,6 +56,17 @@ Nur Zugriff auf das, was als Stadtrat bzw. öffentlich regulär abrufbar ist. Ni
 
 Technische Tools nicht als „AI-Zugriff" oder „ich will RAG bauen" framen, sondern als „strukturierte öffentliche Ratsinformationen", „digitale Arbeitsfähigkeit", „Transparenz".
 
+### 10. Vault = Source of Truth, ratsprojekte = Distillat
+
+Der Obsidian-Vault ist das Gedächtnis — roh, unstrukturiert, alles. ratsprojekte ist das Distillat — konsolidiert, strukturiert, antragsreif, quellenbelegt. Der Datenfluss ist **strikt einseitig**: Vault → ratsprojekte. Nie umgekehrt.
+
+- **Vault** ist Source of Truth, nicht ratsprojekte.
+- **ratsprojekte** bekommt nur Distillate, nie Rohmaterial.
+- **Pflicht**: Alles, was in der OpenCode-Session entsteht, fließt als konsolidierte Notiz zurück in den Vault, *bevor* es als Proposal in ratsprojekte eingereicht wird.
+- **Kein Rückfluss**: ratsprojekte schreibt nie zurück in den Vault. ratsprojekte ist das Endprodukt, nicht der Input.
+
+Der `proposal_vorbereitung`-Skill orchestriert diesen Workflow: sammeln → konsolidieren (in den Vault) → Gates prüfen → Proposal einbringen.
+
 ## Lizenz-Bewusstsein
 
 Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder kommerziell von Artifex). Für ein persönliches/Open-Source-Projekt ist AGPL in Ordnung; bei proprietärer Nutzung Alternative evaluieren (`pdfplumber` MIT, `pdf.js` Apache-2.0). Pro Tool in der Tool-Doku dokumentieren.
@@ -71,6 +82,8 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (geplant) | Geplant |
 | `skills/foerdermittel` | Markdown-Skill | Fördermittel-Recherche orchestrieren | Agent Skill | Funktionsfähig |
 | `skills/projekt_tracker` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Funktionsfähig |
+| `skills/proposal_vorbereitung` | Markdown-Skill | Proposal-Workflow: sammeln → Vault → Gates → Proposal | Agent Skill | Funktionsfähig |
+| `skills/vault_suche` | Markdown-Skill | Obsidian-Vault durchsuchen | Agent Skill | Funktionsfähig |
 
 ## ratsprojekte — Planungsstand
 
@@ -98,6 +111,7 @@ Projekt (titel, beschreibung, status, prioritaet)
 4. **AI-Skill**: „Frag den Projekt-Tracker" — `skills/projekt_tracker/` ✅
 5. **Antragsvorlagen**: Markdown-Render aus Projektdaten — Issue #15
 6. **Ratsinfo-Integration**: Quellen verlinken mit Sitzung/TOP
+7. **Proposal-Workflow-Skill**: `skills/proposal_vorbereitung/` ✅
 
 ## Tooling-Vorgaben
 
@@ -158,7 +172,10 @@ kommunalpolitik_ki/
 │   ├── allgaeuer_zeitung_mcp/  # AZ-Artikel (AI: MCP)
 │   └── pdf_ingest/         # PDF-Ingestion (AI: MCP, geplant)
 ├── skills/                 # AI-Harness-Skills
-│   └── foerdermittel/      # Fördermittel-Recherche (AI: Agent Skill)
+│   ├── foerdermittel/      # Fördermittel-Recherche (AI: Agent Skill)
+│   ├── projekt_tracker/    # Projekt-Standortbestimmung (AI: Agent Skill)
+│   ├── proposal_vorbereitung/ # Proposal-Workflow (AI: Agent Skill)
+│   └── vault_suche/        # Vault-Volltextsuche (AI: Agent Skill)
 ├── artifacts/              # shared Elixir build output (gitignored)
 ├── mix.exs                 # workspace root
 ├── .workspace.exs

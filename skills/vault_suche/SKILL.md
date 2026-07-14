@@ -6,7 +6,7 @@ description: >
   berät, der Mensch entscheidet (GO-Prinzip). Nutze diesen Skill immer, wenn
   Carsten bittet, im Vault nach etwas zu suchen, Notizen zu einem Thema zu
   finden, oder den Vault nach Infos zu durchsuchen, die dann für etwas anderes
-  (z.B. ratsprojekt anreichern, Förderrecherche, Delta-Report) verwendet werden
+  (z.B. ratsprojekt anreichern, Förderrecherche) verwendet werden
   sollen. Typische Trigger: „Such im Vault nach…", „Guck mal in meinen Notizen
   nach…", „Was hab ich im Vault zu Thema X?", „Finde Notizen zur Bahnhofstraße
   / zum Verkehrskonzept / zum Bauhof", „Hol mal alles aus dem Vault zu…".
@@ -23,8 +23,8 @@ description: >
 
 Wenn Carsten bittet, den Obsidian-Vault nach einem Thema, Begriff oder Konzept
 zu durchsuchen — um zu verstehen, was er schon an Notizen dazu hat, bevor es
-weiterverarbeitet wird (z.B. um ein ratsprojekt anzureichern, eine
-Förderanfrage vorzubereiten, oder einen Delta-Report zu erstellen).
+weiterverarbeitet wird (z.B. um ein ratsprojekt anzureichern oder eine
+Förderanfrage vorzubereiten).
 
 Der Skill ist **Suche + Sammlung + Kontext**, nicht Auswertung oder
 Verarbeitung. Was nach den Treffern passiert, entscheidet Carsten — der Skill
@@ -133,8 +133,7 @@ Strukturierte Liste der relevanten Notizen:
 
 ### Nächste Schritte
 - Vorschlag: „Soll ich `projekt_tracker` aufrufen und schauen, welches Projekt
-  zu den Treffern passt — und dann ad-hoc einen Delta gegen den Projektstand
-  erstellen?"
+  zu den Treffern passt — und dann ad-hoc gegen den Projektstand halten?"
 - Vorschlag: „Soll ich in `foerdermittel` recherchieren, weil im Vault
   Förderhinweise gefunden wurden?"
 - Oder: „Die Notizen reichen nicht — soll ich woanders suchen (AZ, RIS, Web)?"
@@ -149,8 +148,8 @@ halten?"), aber er führt keinen Handoff ohne ausdrücklichen GO durch.
 
 ## Quellenpflicht
 
-Vault-Notizen sind Quellen. Jeder Treffer, der später in einen Delta-Report,
-eine Förderrecherche oder einen Projektstand einfließt, muss als Quelle
+Vault-Notizen sind Quellen. Jeder Treffer, der später in eine Förderrecherche
+oder einen Projektstand einfließt, muss als Quelle
 identifiziert werden:
 
 - **Welche Notiz?** Titel, Pfad
@@ -170,7 +169,7 @@ Orchestrator, die Carsten ausdrücklich anfordert:
 
 | Folgeschritt | Skill / Weg | Wann |
 |---|---|---|
-| Bestehendes Projekt anreichern | ad-hoc Delta gegen `projekt_tracker`-Stand | Wenn Treffer zu einem existierenden ratsprojekt passen |
+| Bestehendes Projekt anreichern | ad-hoc gegen `projekt_tracker`-Stand halten | Wenn Treffer zu einem existierenden ratsprojekt passen |
 | Projektstand abrufen | `projekt_tracker` | Wenn unklar ist, welches Projekt gemeint ist |
 | Förderrecherche | `foerdermittel` | Wenn Treffer Finanzierungshinweise enthalten |
 | AZ-Artikel | `allgaeuer_zeitung_mcp` | Wenn Treffer auf einen Artikel verweisen |
