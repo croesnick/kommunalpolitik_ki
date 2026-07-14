@@ -2,7 +2,8 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
   use RatsprojekteWeb, :live_view
 
   alias Ratsprojekte.Repo
-  alias Ratsprojekte.Schemas.Projekt
+  alias Ratsprojekte.Schemas.{PendingProposal, Projekt}
+  alias RatsprojekteWeb.NavAssigns
   import Ecto.Query
 
   @impl true
@@ -23,27 +24,40 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
         {:ok, socket |> put_flash(:error, "Projekt nicht gefunden") |> redirect(to: ~p"/")}
 
       projekt ->
-        {:ok, assign(socket, projekt: projekt)}
+        pending_count =
+          Repo.aggregate(
+            from(pp in PendingProposal,
+              where: pp.projekt_id == ^projekt.id and pp.status == :pending
+            ),
+            :count
+          )
+
+        {:ok,
+         socket
+         |> NavAssigns.attach(:projekte)
+         |> assign(projekt: projekt, pending_count: pending_count)}
     end
   end
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div style="max-width: 1000px; margin: 0 auto; padding: 24px;">
-      <div class="show-back">
-        <.link navigate={~p"/"}>← Zurück zur Übersicht</.link>
-      </div>
-
-      <h1 style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">
+    <div class="page">
+      <h1 class="page-title">
         {@projekt.titel}
       </h1>
-      <p style="font-size: 14px; color: #64748b; margin-bottom: 12px;">
+      <p class="page-subtitle" style="margin-bottom: var(--space-3);">
         {@projekt.beschreibung}
       </p>
-      <div class="badges" style="margin-bottom: 24px;">
-        <.badge status={@projekt.status} />
-        <.prio_badge prio={@projekt.prioritaet} />
+      <div class="badges" style="margin-bottom: var(--space-6);">
+        <.badge kind={:status} value={@projekt.status} />
+        <.badge kind={:priority} value={@projekt.prioritaet} />
+        <.link
+          navigate={~p"/projekte/#{@projekt.id}/proposals"}
+          class={"projekt-proposal-link #{if @pending_count > 0, do: "has-pending", else: "no-pending"}"}
+        >
+          🤖 {if @pending_count > 0, do: "Offene Vorschläge (#{@pending_count})", else: "Vorschläge"}
+        </.link>
       </div>
 
       <div :for={{strang, i} <- Enum.with_index(@projekt.realisierungsstraenge)} class="strang">
@@ -82,7 +96,7 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
           </span>
         </div>
 
-        <div class="section-label" style="margin-top: 12px;">Schritte auf diesem Weg</div>
+        <div class="section-label spaced">Schritte auf diesem Weg</div>
 
         <div :for={schritt <- strang.schritte} class="schritt">
           <span class="schritt-arrow">→</span>
@@ -93,7 +107,7 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
         </div>
 
         <div :if={strang.quellen != []} class="sources">
-          <div class="section-label" style="padding-left: 0; margin-top: 12px;">Quellen</div>
+          <div class="section-label flush spaced">Quellen</div>
           <div :for={q <- strang.quellen} class="source-item">
             📄 <a :if={q.url} href={q.url} target="_blank">{q.titel}</a>
             <span :if={!q.url}>{q.titel}</span>
@@ -103,7 +117,7 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
       </div>
 
       <div :if={@projekt.quellen != []} class="projekt-quellen">
-        <div class="section-label" style="padding-left: 0; margin-top: 24px;">Projekt-Quellen</div>
+        <div class="section-label flush spaced">Projekt-Quellen</div>
         <div :for={q <- @projekt.quellen} class="source-item">
           📄 <a :if={q.url} href={q.url} target="_blank">{q.titel}</a>
           <span :if={!q.url}>{q.titel}</span>
@@ -138,55 +152,6 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
           else: "#{@offen} von #{@total} Vorbedingungen offen"}
       </span>
     </div>
-    """
-  end
-
-  attr(:status, :atom, required: true)
-
-  defp badge(assigns) do
-    colors = %{idee: "#dbeafe", aktiv: "#dcfce7", abgeschlossen: "#f3f4f6"}
-    text_colors = %{idee: "#1e40af", aktiv: "#166534", abgeschlossen: "#374151"}
-
-    assigns =
-      assigns
-      |> assign(:bg, Map.get(colors, assigns.status, "#f3f4f6"))
-      |> assign(:fg, Map.get(text_colors, assigns.status, "#374151"))
-
-    ~H"""
-    <span class="badge" style={"background: #{@bg}; color: #{@fg};"}>
-      {@status}
-    </span>
-    """
-  end
-
-  attr(:prio, :atom, required: true)
-
-  defp prio_badge(assigns) do
-    colors = %{hoch: "#fee2e2", mittel: "#fef9c3", niedrig: "#f3f4f6"}
-    text_colors = %{hoch: "#991b1b", mittel: "#854d0e", niedrig: "#374151"}
-
-    assigns =
-      assigns
-      |> assign(:bg, Map.get(colors, assigns.prio, "#f3f4f6"))
-      |> assign(:fg, Map.get(text_colors, assigns.prio, "#374151"))
-
-    ~H"""
-    <span class="badge" style={"background: #{@bg}; color: #{@fg};"}>
-      {@prio}
-    </span>
-    """
-  end
-
-  attr(:label, :string, required: true)
-
-  defp strang_label(assigns) do
-    colors = %{"A" => "#16a34a", "B" => "#ca8a04", "C" => "#2563eb"}
-    assigns = assign(assigns, :bg, Map.get(colors, assigns.label, "#6b7280"))
-
-    ~H"""
-    <span class="strang-label" style={"background: #{@bg};"}>
-      {@label}
-    </span>
     """
   end
 

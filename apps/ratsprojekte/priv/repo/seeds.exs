@@ -16,8 +16,9 @@ defmodule Ratsprojekte.Seeds do
     _bahnhof = create_bahnhofstr()
     _gennach = create_gennachpark()
     _freibad = create_freibad()
+    _westtangente = create_westtangente()
 
-    IO.puts("Seeds erstellt: Bahnhofstraße, Gennachpark, Freibad")
+    IO.puts("Seeds erstellt: Bahnhofstraße, Gennachpark, Freibad, Westtangente")
   end
 
   defp create_bahnhofstr do
@@ -255,12 +256,52 @@ defmodule Ratsprojekte.Seeds do
     create_vorbedingung(
       strang_a,
       "Kosten-Nutzen-Analyse für Kartenterminals muss vorliegen",
-      false
+      false,
+      nil,
+      :wissen_fehlt
     )
 
     create_schritt(strang_a, "Kosten-Nutzen-Analyse Kartenterminals von Verwaltung anfordern")
     create_schritt(strang_a, "Bündel-Antrag im Stadtrat einbringen")
     create_schritt(strang_a, "Bei Beschluss: Umsetzung durch Bauamt/Stadtwerke")
+
+    projekt
+  end
+
+  defp create_westtangente do
+    {:ok, projekt} =
+      Ratsprojekte.Repo.insert(%Projekt{
+        titel: "Westtangente prüfen",
+        beschreibung:
+          "Prüfung, ob eine Westtangente als Ortsumgehung die Bahnhofstraße entlasten kann. Verworfen nach Bauausschuss 03/2025.",
+        status: :verworfen,
+        prioritaet: :niedrig,
+        verworfen_am: ~D[2025-03-15],
+        verworfen_grund:
+          "Keine politische Mehrheit im Bauausschuss 03/2025; Verkehrsgutachten sieht keine Entlastung der Bahnhofstraße."
+      })
+
+    strang_a =
+      create_strang(
+        projekt,
+        "A",
+        "Westtangente als Entlastung der Bahnhofstraße",
+        "Ortsumgehung West, um Durchgangsverkehr aus der Bahnhofstraße herauszunehmen.",
+        "Art. 13f BayFAG (Sonderbaulast)",
+        "Verkehrsgutachten muss Entlastung der Bahnhofstraße belegen",
+        false
+      )
+
+    create_vorbedingung(
+      strang_a,
+      "Verkehrsgutachten muss Entlastung der Bahnhofstraße belegen",
+      false,
+      "Art. 13f BayFAG"
+    )
+
+    create_quelle(strang_a, :sitzung, "Verkehrsgutachten Westtangente (03/2025)",
+      paragraf: "Bauausschuss 03/2025"
+    )
 
     projekt
   end
@@ -288,12 +329,13 @@ defmodule Ratsprojekte.Seeds do
     strang
   end
 
-  defp create_vorbedingung(strang, text, erfuellt, rechtliche_grundlage \\ nil) do
+  defp create_vorbedingung(strang, text, erfuellt, rechtliche_grundlage \\ nil, typ \\ :rechtlich) do
     {:ok, _} =
       Ratsprojekte.Repo.insert(%Vorbedingung{
         text: text,
         erfuellt: erfuellt,
         rechtliche_grundlage: rechtliche_grundlage,
+        typ: typ,
         realisierungsstrang_id: strang.id
       })
   end

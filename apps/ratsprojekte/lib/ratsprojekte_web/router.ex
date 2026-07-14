@@ -8,6 +8,7 @@ defmodule RatsprojekteWeb.Router do
     plug(:put_root_layout, html: {RatsprojekteWeb.Layouts, :root})
     plug(:protect_from_forgery)
     plug(:put_secure_browser_headers)
+    plug(RatsprojekteWeb.Plugs.Nav)
   end
 
   pipeline :api do
@@ -28,5 +29,13 @@ defmodule RatsprojekteWeb.Router do
 
     live("/", ProjektLive.Index, :index)
     live("/projekte/:id", ProjektLive.Show, :show)
+
+    # Propose-Confirm-Pattern: GO-Gate für AI-Vorschläge in der LiveView
+    live("/projekte/:projekt_id/proposals", ProposalLive.Index, :index)
+    live("/projekte/:projekt_id/proposals/:id", ProposalLive.Show, :show)
+
+    # Top-level proposals (für add_projekt Vorschläge ohne Eltern-Projekt)
+    live("/proposals", ProposalLive.Index, :index)
+    live("/proposals/:id", ProposalLive.Show, :show)
   end
 end

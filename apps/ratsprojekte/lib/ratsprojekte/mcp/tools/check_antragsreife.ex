@@ -14,6 +14,20 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
   Keine LLM-Calls in diesem Tool — es liefert nur strukturelle Fakten.
   Der Report ist transient und wird nicht in der DB persistiert.
 
+  ## Prüf-Stufen
+
+  Das Tool unterstützt zwei Stufen mit unterschiedlichen Schwellen:
+
+  - `stufe: "fraktion"` — Fraktionsreife. Der Entwurf ist gut genug, um ihn
+    in der Fraktion zu diskutieren. Hard Gates müssen `pass` sein, aber
+    `warn` (offene Vorbedingungen) führt zu `fraktionsreif_mit_vorbehalten`
+    statt zu harter Blockade. Politische Kriterien dürfen `unchecked` sein.
+  - `stufe: "stadtrat"` (Default) — Stadtratsreife. Höchste Schwelle, alle
+    Kriterien geprüft. `warn` führt zu `antragsreif_mit_vorbehalten`.
+
+  Die Kriterien-Listen sind für beide Stufen identisch. Die Stufe beeinflusst
+  nur die Empfehlung, nicht die Kriterien selbst.
+
   Verwende list_projekte, um die Projekt-ID zu finden.
   """
 
@@ -31,10 +45,16 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
       required: true,
       description: "Projekt-ID (von list_projekte)"
     )
+
+    field(:stufe, :string,
+      default: "stadtrat",
+      description:
+        "Prüfstufe: 'fraktion' (niedrigere Schwelle, politische Kriterien offen erlaubt) oder 'stadtrat' (höchste Schwelle, alle Kriterien geprüft). Default: 'stadtrat'."
+    )
   end
 
   @impl true
-  def execute(%{id: id}, frame) do
+  def execute(%{id: id, stufe: stufe}, frame) do
     projekt =
       Repo.one(
         from(p in Projekt,
@@ -55,17 +75,18 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
         {:reply, Response.error(Response.tool(), "Projekt #{id} nicht gefunden"), frame}
 
       projekt ->
-        {:reply, Response.json(Response.tool(), build_report(projekt)), frame}
+        {:reply, Response.json(Response.tool(), build_report(projekt, stufe)), frame}
     end
   end
 
-  defp build_report(projekt) do
+  defp build_report(projekt, stufe) do
     hard_gates = hard_gates(projekt)
-    empfehlung = empfehlung(hard_gates)
+    empfehlung = empfehlung(hard_gates, stufe)
 
     %{
       projekt_id: projekt.id,
       projekt_titel: projekt.titel,
+      stufe: stufe,
       check_datum: DateTime.to_iso8601(DateTime.utc_now()),
       hard_gates: hard_gates,
       soft_gates: soft_gates(),
@@ -173,7 +194,7 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
           vorb = strang.vorbedingungen
           erfuellt = Enum.count(vorb, & &1.erfuellt)
           offen = length(vorb) - erfuellt
-          {strang.label, erfuellt, offen, length(vorb)}
+          {strang.label, erfuellt, offen, length(vorb), vorb}
         end)
 
       vorbedingungen_report(per_strang)
@@ -181,18 +202,26 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
   end
 
   defp vorbedingungen_report(per_strang) do
-    gesamt_offen = Enum.reduce(per_strang, 0, fn {_, _, offen, _}, acc -> acc + offen end)
+    gesamt_offen = Enum.reduce(per_strang, 0, fn {_, _, offen, _, _}, acc -> acc + offen end)
 
     if gesamt_offen == 0 do
       gate(:vorbedingungen_erfuellt, :pass, "Alle Stränge: alle Vorbedingungen erfüllt")
     else
-      details =
-        Enum.map_join(per_strang, "; ", fn {label, erfuellt, _offen, gesamt} ->
-          "Strang #{label}: #{erfuellt} von #{gesamt} erfüllt"
-        end)
-
+      details = Enum.map_join(per_strang, "; ", &format_strang_report/1)
       gate(:vorbedingungen_erfuellt, :warn, details)
     end
+  end
+
+  defp format_strang_report({label, _erfuellt, _offen, _gesamt, vorb}) do
+    by_typ =
+      vorb
+      |> Enum.group_by(& &1.typ)
+      |> Enum.map_join(", ", fn {typ, items} ->
+        erfuellt_typ = Enum.count(items, & &1.erfuellt)
+        "#{erfuellt_typ}/#{length(items)} #{typ}"
+      end)
+
+    "Strang #{label}: #{by_typ} erfüllt"
   end
 
   defp gate(kriterium, status, detail) do
@@ -201,15 +230,24 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
 
   # --- Empfehlung ---
 
-  defp empfehlung(hard_gates) do
+  defp empfehlung(hard_gates, stufe) do
     statuses = Enum.map(hard_gates, & &1.status)
 
     cond do
-      :fail in statuses -> "nicht_antragsreif"
-      :warn in statuses -> "antragsreif_mit_vorbehalten"
-      true -> "antragsreif"
+      :fail in statuses -> empfehlung_fail(stufe)
+      :warn in statuses -> empfehlung_warn(stufe)
+      true -> empfehlung_pass(stufe)
     end
   end
+
+  defp empfehlung_fail("fraktion"), do: "nicht_fraktionsreif"
+  defp empfehlung_fail(_stufe), do: "nicht_antragsreif"
+
+  defp empfehlung_warn("fraktion"), do: "fraktionsreif_mit_vorbehalten"
+  defp empfehlung_warn(_stufe), do: "antragsreif_mit_vorbehalten"
+
+  defp empfehlung_pass("fraktion"), do: "fraktionsreif"
+  defp empfehlung_pass(_stufe), do: "antragsreif"
 
   # --- Soft Gates (LLM-bewertet durch AI-Harness) ---
 

@@ -56,13 +56,43 @@ politische Verantwortung bleibt beim Stadtrat (GO-Prinzip).
 
 Status-Werte: `unchecked` (vom Tool gesetzt, bis der Stadtrat bewertet).
 
-## Empfehlung-Logik
+## 4. Prüf-Stufen
 
-Das Tool leitet aus den Hard Gates eine Empfehlung ab:
+Das Tool unterstützt zwei Stufen mit unterschiedlichen Schwellen:
+
+### Stufe `fraktion` — Fraktionsreife
+
+Der Entwurf ist gut genug, um ihn in der Fraktion zu diskutieren.
+- Hard Gates müssen `pass` sein (strukturelle Muss-Kriterien)
+- Soft Gates sind `pending` erlaubt (werden in der Fraktion debattiert)
+- Politische Kriterien sind `unchecked` erlaubt (das ist der Gegenstand der Fraktionsdiskussion)
+
+### Stufe `stadtrat` — Stadtratsreife (Default)
+
+Der Antrag ist bereit für den Stadtrat.
+- Hard Gates müssen `pass` sein
+- Soft Gates sollten bewertet sein
+- Politische Kriterien müssen vom Stadtrat geprüft worden sein
+
+Die Kriterien-Listen (Hard Gates, Soft Gates, Politische Kriterien) sind für
+beide Stufen identisch. Die Stufe beeinflusst nur die Empfehlung, nicht die
+Kriterien selbst.
+
+## 5. Empfehlung-Logik
+
+Das Tool leitet aus den Hard Gates eine Empfehlung ab — stufenabhängig:
+
+### Stufe `fraktion`
+
+- Alle Hard Gates `pass` → `empfehlung: "fraktionsreif"`
+- Alle Hard Gates `pass`, aber Vorbedingungen offen (`warn`) → `empfehlung: "fraktionsreif_mit_vorbehalten"`
+- Mindestens ein Hard Gate `fail` → `empfehlung: "nicht_fraktionsreif"`
+
+### Stufe `stadtrat` (Default)
 
 - Alle Hard Gates `pass` → `empfehlung: "antragsreif"`
-- Mindestens ein Hard Gate `fail` → `empfehlung: "nicht_antragsreif"`
 - Alle Hard Gates `pass`, aber Vorbedingungen offen (`warn`) → `empfehlung: "antragsreif_mit_vorbehalten"`
+- Mindestens ein Hard Gate `fail` → `empfehlung: "nicht_antragsreif"`
 
-Soft Gates und Politische Kriterien gehen nicht in die Empfehlung ein —
-sie sind bewertungsfähig, nicht entscheidungsblockierend.
+Soft Gates und Politische Kriterien gehen in keiner Stufe in die Empfehlung
+ein — sie sind bewertungsfähig, nicht entscheidungsblockierend.

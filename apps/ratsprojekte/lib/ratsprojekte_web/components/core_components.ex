@@ -30,6 +30,86 @@ defmodule RatsprojekteWeb.CoreComponents do
 
   alias Phoenix.LiveView.JS
 
+  # ============================================================
+  # Shared domain components (ratsprojekte design system)
+  # ============================================================
+
+  @doc """
+  Renders a status/priority/proposal badge using a CSS modifier class.
+
+  The `kind` decides which family of tokens is used; the `value` is the
+  atom that selects the concrete modifier. Centralises the previously
+  duplicated badge/1 + status_badge/1 function components that lived in
+  every LiveView with their own hardcoded colour maps.
+
+  ## Examples
+
+      <.badge kind={:status} value={:idee} />
+      <.badge kind={:priority} value={:hoch} />
+      <.badge kind={:proposal} value={:pending} />
+  """
+  attr(:kind, :atom, required: true, values: [:status, :priority, :proposal])
+  attr(:value, :atom, required: true)
+
+  def badge(assigns) do
+    modifier = badge_modifier(assigns.kind, assigns.value)
+
+    assigns = assign(assigns, :modifier, modifier)
+
+    ~H"""
+    <span class={"badge #{@modifier}"}>{@value}</span>
+    """
+  end
+
+  defp badge_modifier(:status, v), do: "badge-#{v}"
+  defp badge_modifier(:priority, v), do: "badge-#{v}"
+  defp badge_modifier(:proposal, v), do: "badge-#{v}"
+
+  @doc """
+  Renders the circular label for a Realisierungsstrang (A/B/C/D).
+
+  Colour is selected via a CSS modifier class so the palette lives in
+  `app.css` rather than in an Elixir colour map.
+  """
+  attr(:label, :string, required: true)
+
+  def strang_label(assigns) do
+    modifier =
+      case assigns.label do
+        l when l in ["A", "B", "C", "D"] -> "label-#{l}"
+        _ -> "label-default"
+      end
+
+    assigns = assign(assigns, :modifier, modifier)
+
+    ~H"""
+    <span class={"strang-label #{@modifier}"}>{@label}</span>
+    """
+  end
+
+  @doc """
+  Renders a status/priority badge for a project. Thin wrapper around
+  `<.badge kind={:status} .../>` for call-sites that read more naturally.
+  """
+  attr(:status, :atom, required: true)
+
+  def status_badge(assigns) do
+    ~H"""
+    <.badge kind={:status} value={@status} />
+    """
+  end
+
+  @doc """
+  Renders a priority badge for a project.
+  """
+  attr(:prio, :atom, required: true)
+
+  def prio_badge(assigns) do
+    ~H"""
+    <.badge kind={:priority} value={@prio} />
+    """
+  end
+
   @doc """
   Renders flash notices.
 

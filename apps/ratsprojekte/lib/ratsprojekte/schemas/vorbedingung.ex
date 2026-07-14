@@ -6,6 +6,7 @@ defmodule Ratsprojekte.Schemas.Vorbedingung do
     field(:text, :string)
     field(:erfuellt, :boolean, default: false)
     field(:rechtliche_grundlage, :string)
+    field(:typ, Ecto.Enum, values: [:rechtlich, :wissen_fehlt], default: :rechtlich)
     field(:position, :integer, default: 0)
 
     belongs_to(:realisierungsstrang, Ratsprojekte.Schemas.Realisierungsstrang)
@@ -15,7 +16,14 @@ defmodule Ratsprojekte.Schemas.Vorbedingung do
 
   def changeset(vorbedingung, attrs) do
     vorbedingung
-    |> cast(attrs, [:text, :erfuellt, :rechtliche_grundlage, :position, :realisierungsstrang_id])
+    |> cast(attrs, [
+      :text,
+      :erfuellt,
+      :rechtliche_grundlage,
+      :typ,
+      :position,
+      :realisierungsstrang_id
+    ])
     |> validate_required([:text, :realisierungsstrang_id])
   end
 end

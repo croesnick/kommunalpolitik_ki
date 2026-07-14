@@ -1,4 +1,4 @@
 [
-  ignore_paths: ["artifacts", "tools", "skills"],
+  ignore_paths: ["artifacts", "apps/artifacts", "tools", "skills"],
   checks: []
 ]
