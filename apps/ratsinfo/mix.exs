@@ -10,6 +10,7 @@ defmodule Ratsinfo.MixProject do
       lockfile: "../workspace.lock",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      escript: [main_module: Ratsinfo.CLI],
       deps: deps()
     ]
   end

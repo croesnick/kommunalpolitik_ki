@@ -18,9 +18,37 @@ defmodule Ratsinfo.CLI do
 
   @spec main([String.t()]) :: :ok
   def main(args \\ System.argv()) do
+    # Im escript-Kontext sind NIF-priv-Verzeichnisse gezippt und können von dort
+    # nicht dlopen-geladen werden. Exqlite-priv auf Code-Pfad bringen, damit die
+    # sqlite3_nif.so direkt vom Dateisystem lädt. Im normalen `mix run`-Kontext
+    # ist der Pfad bereits korrekt und der Append ist ein No-Op.
+    for path <- nif_priv_paths() do
+      Code.prepend_path(path)
+    end
+
+    {:ok, _} = Application.ensure_all_started(:ratsinfo)
+
     optimus = build_cli()
     parsed = Optimus.parse(optimus, args)
     run(parsed)
+  end
+
+  # Exqlite ist die einzige NIF-Abhängigkeit. `:code.priv_dir(:exqlite)` schaut
+  # auf dem Code-Pfad nach dem ebin-Verzeichnis der App und leitet daraus den
+  # priv-Pfad ab. Im escript-Kontext ist exqlite im Zip gezippt und der Pfad
+  # zeigt in das Zip-Archiv — die NIF-`.so` kann aber nicht daraus dlopen-geladen
+  # werden. Wir bringen das physische ebin-Verzeichnis aus dem Build-Tree auf den
+  # Code-Pfad, so dass `priv_dir` auf das reale Dateisystem zeigt.
+  defp nif_priv_paths do
+    base = Path.dirname(:escript.script_name())
+
+    paths = [
+      Path.join([base, "_build/dev/lib/exqlite/ebin"]),
+      Path.join([base, "../_build/dev/lib/exqlite/ebin"]),
+      Path.join([Application.app_dir(:exqlite), "ebin"])
+    ]
+
+    Enum.filter(paths, &File.dir?/1)
   end
 
   defp build_cli do
