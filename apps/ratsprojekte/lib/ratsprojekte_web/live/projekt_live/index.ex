@@ -145,6 +145,20 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
           </div>
         </.link>
 
+        <p class="slug-row" style="font-size: var(--text-xs); color: var(--color-text-faint); margin-top: var(--space-1);">
+          <span>Slug: <code>{projekt.slug}</code></span>
+          <button
+            type="button"
+            class="copy-tag-btn"
+            data-tag={"#ratsprojekt/#{projekt.slug}"}
+            aria-label={"Vault-Tag #ratsprojekt/#{projekt.slug} kopieren"}
+            phx-click={JS.dispatch("ratsprojekte:copy-tag")}
+          >
+            <span class="copy-tag-label">Kopieren</span>
+            <span class="copy-tag-done" aria-hidden="true">✓ Kopiert</span>
+          </button>
+        </p>
+
         <div
           :for={{strang, i} <- Enum.with_index(projekt.realisierungsstraenge)}
           class="strang"
