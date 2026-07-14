@@ -45,7 +45,7 @@ defmodule Ratsprojekte.MCP.Tools.ShowPendingProposal do
   defp format(%PendingProposal{projekt: %Projekt{} = projekt} = proposal) do
     %{
       id: proposal.id,
-      projekt_id: projekt.id,
+      projekt_slug: projekt.slug,
       projekt_titel: projekt.titel,
       typ: proposal.typ,
       payload: proposal.payload,
@@ -57,7 +57,7 @@ defmodule Ratsprojekte.MCP.Tools.ShowPendingProposal do
       entschieden_am: proposal.entschieden_am && DateTime.to_iso8601(proposal.entschieden_am),
       entschieden_von: proposal.entschieden_von,
       entscheidungskommentar: proposal.entscheidungskommentar,
-      review_url: "http://localhost:4000/projekte/#{projekt.id}/proposals/#{proposal.id}"
+      review_url: "http://localhost:4000/projekte/#{projekt.slug}/proposals/#{proposal.id}"
     }
   end
 end

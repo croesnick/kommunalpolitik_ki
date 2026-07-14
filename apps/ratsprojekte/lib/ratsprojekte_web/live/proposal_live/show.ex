@@ -8,17 +8,21 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
 
   @impl true
   def mount(params, _session, socket) do
-    projekt_id = params["projekt_id"]
+    projekt_slug = params["projekt_slug"]
 
-    # Bei geschachtelter URL (/projekte/:projekt_id/...) zuerst das Projekt prüfen —
+    # Bei geschachtelter URL (/projekte/:projekt_slug/...) zuerst das Projekt prüfen —
     # existiert es nicht, hat auch die Proposal-Suche in diesem Scope keinen Sinn.
-    projekt = if projekt_id, do: Repo.get(Projekt, projekt_id), else: nil
+    projekt =
+      if projekt_slug,
+        do: Repo.one(from(p in Projekt, where: p.slug == ^projekt_slug)),
+        else: nil
 
-    if projekt_id != nil and projekt == nil do
+    if projekt_slug != nil and projekt == nil do
       {:ok, socket |> put_flash(:error, "Projekt nicht gefunden") |> redirect(to: ~p"/")}
     else
+      projekt_id = if projekt, do: projekt.id, else: nil
       proposal = fetch_proposal(params["id"], projekt_id)
-      mount_proposal(socket, proposal, projekt, projekt_id)
+      mount_proposal(socket, proposal, projekt, projekt_slug)
     end
   end
 
@@ -36,11 +40,11 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
     end
   end
 
-  defp mount_proposal(socket, nil, _projekt, projekt_id) do
+  defp mount_proposal(socket, nil, _projekt, projekt_slug) do
     {:ok,
      socket
      |> put_flash(:error, "Vorschlag nicht gefunden")
-     |> redirect(to: back_path(projekt_id))}
+     |> redirect(to: back_path(projekt_slug))}
   end
 
   defp mount_proposal(socket, proposal, nil, nil) do
@@ -315,7 +319,7 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
   # --- Helpers ---
 
   defp back_path(nil), do: ~p"/proposals"
-  defp back_path(projekt_id), do: ~p"/projekte/#{projekt_id}/proposals"
+  defp back_path(projekt_slug), do: ~p"/projekte/#{projekt_slug}/proposals"
 
   defp payload_heading(:add_projekt), do: "Vorgeschlagenes Projekt"
   defp payload_heading(:add_realisierungsstrang), do: "Vorgeschlagener Realisierungsstrang"

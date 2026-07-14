@@ -13,6 +13,10 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjekt do
 
   Nach dem Aufruf liefert das Tool eine `review_url`, unter der der
   Stadtrat den Vorschlag prüfen kann.
+
+  Der `slug` ist der zukünftige Slug des Projekts (kebab-case, z.B.
+  'freibad-digitalisierung'). Wird nach Accept als Projekt-Slug gespeichert
+  und in der URL sowie als Vault-Tag `#ratsprojekt/<slug>` verwendet.
   """
 
   use Anubis.Server.Component, type: :tool
@@ -25,6 +29,12 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjekt do
     field(:titel, :string,
       required: true,
       description: "Titel des neuen Projekts"
+    )
+
+    field(:slug, :string,
+      description:
+        "Projekt-Slug (kebab-case, z.B. 'freibad-digitalisierung'). " <>
+          "Wird in der URL und als Vault-Tag #ratsprojekt/<slug> verwendet."
     )
 
     field(:beschreibung, :string, description: "Beschreibung des Projekts (optional)")
@@ -49,6 +59,7 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjekt do
   def execute(params, frame) do
     payload = %{
       "titel" => params[:titel],
+      "slug" => params[:slug],
       "beschreibung" => params[:beschreibung],
       "prioritaet" => params[:prioritaet] || "mittel"
     }

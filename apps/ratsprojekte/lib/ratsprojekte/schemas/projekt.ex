@@ -12,6 +12,7 @@ defmodule Ratsprojekte.Schemas.Projekt do
     field(:abgeschlossen_am, :date)
     field(:verworfen_am, :date)
     field(:verworfen_grund, :string)
+    field(:slug, :string)
 
     has_many(:realisierungsstraenge, Ratsprojekte.Schemas.Realisierungsstrang)
     has_many(:quellen, Ratsprojekte.Schemas.Quelle, where: [realisierungsstrang_id: nil])
@@ -30,9 +31,12 @@ defmodule Ratsprojekte.Schemas.Projekt do
       :adressat,
       :abgeschlossen_am,
       :verworfen_am,
-      :verworfen_grund
+      :verworfen_grund,
+      :slug
     ])
-    |> validate_required([:titel])
+    |> validate_required([:titel, :slug])
+    |> validate_format(:slug, ~r/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    |> unique_constraint(:slug)
     |> validate_status_dates()
   end
 

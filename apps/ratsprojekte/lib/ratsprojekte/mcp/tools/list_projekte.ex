@@ -113,7 +113,7 @@ defmodule Ratsprojekte.MCP.Tools.ListProjekte do
 
   defp format(projekt) do
     %{
-      id: projekt.id,
+      slug: projekt.slug,
       titel: projekt.titel,
       beschreibung: projekt.beschreibung,
       status: projekt.status,
@@ -121,7 +121,7 @@ defmodule Ratsprojekte.MCP.Tools.ListProjekte do
       anzahl_straenge: length(projekt.realisierungsstraenge),
       abgeschlossen_am: projekt.abgeschlossen_am,
       verworfen_am: projekt.verworfen_am,
-      url: "http://localhost:4000/projekte/#{projekt.id}"
+      url: "http://localhost:4000/projekte/#{projekt.slug}"
     }
   end
 end

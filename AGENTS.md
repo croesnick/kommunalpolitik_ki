@@ -97,12 +97,23 @@ Rechtlich-inhaltliche Standortbestimmung für Stadtratsprojekte. Kein Task-Track
 
 ### Datenmodell
 ```
-Projekt (titel, beschreibung, status, prioritaet)
+Projekt (titel, slug, beschreibung, status, prioritaet, beschlussvorschlag, adressat)
 ├── Realisierungsstrang (label A/B/C, titel, beschreibung, rechtliche_grundlage, bedingung, bedingung_erfuellt)
-│   ├── Vorbedingung (text, erfuellt, rechtliche_grundlage)
+│   ├── Vorbedingung (text, erfuellt, rechtliche_grundlage, typ)
 │   └── Schritt (text, frist) — geordnete Liste, keine Checkboxen
 └── Quelle (typ, titel, url, paragraf, abrufdatum)
 ```
+
+### Slug-Konvention
+
+Projekte werden über Slugs identifiziert, nicht über DB-IDs. Der Slug ist der stabile Vertrag zwischen ratsprojekte und dem Obsidian-Vault:
+
+- **Format**: kebab-case, lowercase, ASCII only (`^[a-z0-9]+(?:-[a-z0-9]+)*$`). Umlaute als ae/oe/ue/ss.
+- **ratsprojekte URL**: `/projekte/freibad-digitalisierung` (Slug in der URL, nicht die ID)
+- **Vault-Tag**: `#ratsprojekt/freibad-digitalisierung` (gleicher Slug als Obsidian-Tag)
+- **MCP-Tools**: alle projektbezogenen Tools nehmen `slug` als Parameter, nie `id`
+- **Intern**: DB-IDs bleiben als Primary Keys und Foreign Keys in `pending_proposals.projekt_id`. Slug→ID-Auflösung passiert an der Grenze (LiveView mount, MCP tool execute).
+- **Copy-Button**: auf der Projekt-Detailseite kopiert ein Button den Vault-Tag `#ratsprojekt/{slug}` in die Zwischenablage
 
 ### Roadmap
 1. **MVP**: Datenmodell + Seed + LiveView — Issues #12, #13, #14 ✅
@@ -112,6 +123,7 @@ Projekt (titel, beschreibung, status, prioritaet)
 5. **Antragsvorlagen**: Markdown-Render aus Projektdaten — Issue #15
 6. **Ratsinfo-Integration**: Quellen verlinken mit Sitzung/TOP
 7. **Proposal-Workflow-Skill**: `skills/proposal_vorbereitung/` ✅
+8. **Slug-basierte Projektrouten**: Slug statt ID in URLs, MCP-Tools, Vault-Tags ✅
 
 ## Tooling-Vorgaben
 

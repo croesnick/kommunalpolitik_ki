@@ -5,7 +5,7 @@ defmodule Ratsprojekte.MCP.Tools.SearchProjekte do
   Sucht in Projekt-Titeln und -Beschreibungen. Nützlich wenn man nach
   einem bestimmten Thema fragt (z.B. 'Bahnhof', 'Park', 'Digitalisierung').
 
-  Gibt passende Projekte mit ID, Titel, Status und Priorität zurück.
+  Gibt passende Projekte mit Slug, Titel, Status und Priorität zurück.
   """
 
   use Anubis.Server.Component, type: :tool
@@ -43,12 +43,12 @@ defmodule Ratsprojekte.MCP.Tools.SearchProjekte do
     formatted =
       Enum.map(projekte, fn p ->
         %{
-          id: p.id,
+          slug: p.slug,
           titel: p.titel,
           beschreibung: p.beschreibung,
           status: p.status,
           prioritaet: p.prioritaet,
-          url: "http://localhost:4000/projekte/#{p.id}"
+          url: "http://localhost:4000/projekte/#{p.slug}"
         }
       end)
 

@@ -132,7 +132,7 @@ defmodule RatsprojekteWeb.ProjektLive.Index do
       <.filter_form filter={@filter} status_optionen={@status_optionen} />
 
       <div :for={{_dom_id, projekt} <- @streams.projekte} class="project-card">
-        <.link navigate={~p"/projekte/#{projekt.id}"} class="project-card-link">
+        <.link navigate={~p"/projekte/#{projekt.slug}"} class="project-card-link">
           <div class="project-header">
             <div>
               <h2>{projekt.titel}</h2>

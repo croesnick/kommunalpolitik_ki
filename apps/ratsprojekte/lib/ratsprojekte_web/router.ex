@@ -28,11 +28,11 @@ defmodule RatsprojekteWeb.Router do
     pipe_through(:browser)
 
     live("/", ProjektLive.Index, :index)
-    live("/projekte/:id", ProjektLive.Show, :show)
+    live("/projekte/:slug", ProjektLive.Show, :show)
 
     # Propose-Confirm-Pattern: GO-Gate für AI-Vorschläge in der LiveView
-    live("/projekte/:projekt_id/proposals", ProposalLive.Index, :index)
-    live("/projekte/:projekt_id/proposals/:id", ProposalLive.Show, :show)
+    live("/projekte/:projekt_slug/proposals", ProposalLive.Index, :index)
+    live("/projekte/:projekt_slug/proposals/:id", ProposalLive.Show, :show)
 
     # Top-level proposals (für add_projekt Vorschläge ohne Eltern-Projekt)
     live("/proposals", ProposalLive.Index, :index)

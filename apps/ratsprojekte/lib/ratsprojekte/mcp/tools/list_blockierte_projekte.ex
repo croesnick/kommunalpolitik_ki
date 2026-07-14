@@ -56,13 +56,13 @@ defmodule Ratsprojekte.MCP.Tools.ListBlockierteProjekte do
     erfuellt = Enum.count(straenge, & &1.bedingung_erfuellt)
 
     %{
-      id: projekt.id,
+      slug: projekt.slug,
       titel: projekt.titel,
       status: projekt.status,
       prioritaet: projekt.prioritaet,
       anzahl_straenge: length(straenge),
       anzahl_straenge_erfuellt: erfuellt,
-      url: "http://localhost:4000/projekte/#{projekt.id}"
+      url: "http://localhost:4000/projekte/#{projekt.slug}"
     }
   end
 end

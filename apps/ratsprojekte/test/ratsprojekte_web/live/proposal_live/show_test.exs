@@ -22,7 +22,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
       projekt: projekt,
       proposal: proposal
     } do
-      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.id}/proposals/#{proposal.id}")
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
 
       # Header.
       assert html =~ "Vorschlag: Neuer Realisierungsstrang per Vorschlag"
@@ -65,7 +65,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
       projekt: projekt,
       proposal: proposal
     } do
-      {:ok, _view, html} = live(conn, ~p"/projekte/#{projekt.id}/proposals/#{proposal.id}")
+      {:ok, _view, html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
 
       assert html =~ proposal.payload["titel"]
     end
@@ -78,7 +78,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
     } do
       proposal = proposal(projekt)
 
-      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.id}/proposals/#{proposal.id}")
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
 
       # Vor Accept: 2 Stränge.
       assert count_straenge_for(projekt) == 2
@@ -117,7 +117,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
     } do
       proposal = proposal(projekt)
 
-      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.id}/proposals/#{proposal.id}")
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
 
       view
       |> form("#decision-form", kommentar: "")
@@ -136,7 +136,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
     test "sets status without creating strang", %{conn: conn, projekt: projekt} do
       proposal = proposal(projekt)
 
-      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.id}/proposals/#{proposal.id}")
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
 
       # Vor Reject: 2 Stränge.
       assert count_straenge_for(projekt) == 2
@@ -159,8 +159,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
   end
 
   describe "edge cases" do
-    test "redirects to index when projekt missing", %{conn: conn} do
-      projekt = bahnhofstr()
+    test "redirects to index when projekt missing", %{conn: conn, projekt: projekt} do
       proposal = proposal(projekt)
 
       # Proposal existiert, aber die URL verweist auf ein nicht-existierendes Projekt.
@@ -172,10 +171,10 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
     end
 
     test "redirects to proposal index for unknown proposal id", %{conn: conn, projekt: projekt} do
-      expected_path = "/projekte/#{projekt.id}/proposals"
+      expected_path = "/projekte/#{projekt.slug}/proposals"
 
       assert {:error, {:redirect, %{to: ^expected_path, flash: flash}}} =
-               live(conn, ~p"/projekte/#{projekt.id}/proposals/99999")
+               live(conn, ~p"/projekte/#{projekt.slug}/proposals/99999")
 
       assert flash["error"] == "Vorschlag nicht gefunden"
     end
@@ -186,7 +185,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
       proposal(projekt)
       proposal(projekt)
 
-      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.id}/proposals")
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals")
 
       # Das `"` wird vom HTML-Renderer zu `&quot;` encoded.
       assert html =~ "Vorschläge für"
@@ -195,7 +194,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
     end
 
     test "shows empty state when no proposals", %{conn: conn, projekt: projekt} do
-      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.id}/proposals")
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals")
 
       assert html =~ "Keine Vorschläge für dieses Projekt."
       refute has_element?(view, ".project-card-link")
@@ -204,7 +203,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
     test "shows proposal status badge", %{conn: conn, projekt: projekt} do
       _pending = proposal(projekt)
 
-      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.id}/proposals")
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals")
 
       assert has_element?(view, "span.badge", "pending")
     end
@@ -232,7 +231,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
       projekt: projekt,
       proposal: proposal
     } do
-      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.id}/proposals/#{proposal.id}")
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
 
       assert html =~ "Vorgeschlagene Statusänderung"
       assert has_element?(view, "span", "Neuer Status")
@@ -248,7 +247,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
       projekt: projekt,
       proposal: proposal
     } do
-      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.id}/proposals/#{proposal.id}")
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
 
       # Vorher: Projekt ist noch aktiv.
       assert Repo.get!(Projekt, projekt.id).status == :aktiv
@@ -284,7 +283,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
           begruendung: "Projekt verworfen — keine Mehrheit."
         })
 
-      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.id}/proposals/#{proposal.id}")
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
 
       view
       |> form("#decision-form", kommentar: "")
@@ -304,7 +303,7 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
       projekt: projekt,
       proposal: proposal
     } do
-      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.id}/proposals/#{proposal.id}")
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
 
       view
       |> form("#decision-form", kommentar: "Noch nicht.")

@@ -9,7 +9,7 @@ defmodule Ratsprojekte.MCP.Tools.ShowProjekt do
   - Geordnete Schritte mit optionalen Fristen
   - Quellen mit URL, Paragraf und Typ
 
-  Verwende list_projekte, um die Projekt-ID zu finden.
+  Verwende list_projekte, um den Slug zu finden.
   """
 
   use Anubis.Server.Component, type: :tool
@@ -20,18 +20,18 @@ defmodule Ratsprojekte.MCP.Tools.ShowProjekt do
   import Ecto.Query
 
   schema do
-    field(:id, :integer,
+    field(:slug, :string,
       required: true,
-      description: "Projekt-ID (von list_projekte)"
+      description: "Projekt-Slug (von list_projekte / search_projekte)"
     )
   end
 
   @impl true
-  def execute(%{id: id}, frame) do
+  def execute(%{slug: slug}, frame) do
     projekt =
       Repo.one(
         from(p in Projekt,
-          where: p.id == ^id,
+          where: p.slug == ^slug,
           preload: [
             realisierungsstraenge:
               ^from(rs in Realisierungsstrang,
@@ -45,7 +45,7 @@ defmodule Ratsprojekte.MCP.Tools.ShowProjekt do
 
     case projekt do
       nil ->
-        {:reply, Response.error(Response.tool(), "Projekt #{id} nicht gefunden"), frame}
+        {:reply, Response.error(Response.tool(), "Projekt '#{slug}' nicht gefunden"), frame}
 
       projekt ->
         {:reply, Response.json(Response.tool(), format(projekt)), frame}
@@ -54,7 +54,7 @@ defmodule Ratsprojekte.MCP.Tools.ShowProjekt do
 
   defp format(projekt) do
     %{
-      id: projekt.id,
+      slug: projekt.slug,
       titel: projekt.titel,
       beschreibung: projekt.beschreibung,
       status: projekt.status,

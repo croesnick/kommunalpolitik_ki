@@ -15,7 +15,7 @@ defmodule RatsprojekteWeb.ProjektLive.ShowTest do
       conn: conn,
       projekt: projekt
     } do
-      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.id}")
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}")
 
       assert html =~ "Bahnhofstraße umgestalten"
       assert html =~ "Boulevard Bahnhofstraße — Tempo 30, Begrünung, Sitzgelegenheiten."
@@ -57,14 +57,14 @@ defmodule RatsprojekteWeb.ProjektLive.ShowTest do
     end
 
     test "shows status and prio badge", %{conn: conn, projekt: projekt} do
-      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.id}")
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}")
 
       assert has_element?(view, "span.badge", "aktiv")
       assert has_element?(view, "span.badge", "hoch")
     end
 
     test "strang_status counts vorbedingungen correctly", %{conn: conn, projekt: projekt} do
-      {:ok, _view, html} = live(conn, ~p"/projekte/#{projekt.id}")
+      {:ok, _view, html} = live(conn, ~p"/projekte/#{projekt.slug}")
 
       # Strang A: 2 Vorbedingungen, beide offen.
       # Strang B: 1 Vorbedingung, erfüllt.
@@ -75,7 +75,7 @@ defmodule RatsprojekteWeb.ProjektLive.ShowTest do
     end
 
     test "renders projekt title", %{conn: conn, projekt: projekt} do
-      {:ok, _view, html} = live(conn, ~p"/projekte/#{projekt.id}")
+      {:ok, _view, html} = live(conn, ~p"/projekte/#{projekt.slug}")
 
       assert html =~ projekt.titel
     end
@@ -94,13 +94,13 @@ defmodule RatsprojekteWeb.ProjektLive.ShowTest do
       projekt = bahnhofstr()
       proposal(projekt)
 
-      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.id}")
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}")
 
       assert html =~ "Offene Vorschläge (1)"
 
       assert has_element?(
                view,
-               "a[href='/projekte/#{projekt.id}/proposals']",
+               "a[href='/projekte/#{projekt.slug}/proposals']",
                "Offene Vorschläge (1)"
              )
     end
@@ -110,13 +110,13 @@ defmodule RatsprojekteWeb.ProjektLive.ShowTest do
     } do
       projekt = bahnhofstr()
 
-      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.id}")
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}")
 
       # Link ist immer sichtbar — auch ohne offene Vorschläge, damit der Stadtrat
       # historische (approved/rejected) Vorschläge durchsuchen kann.
       assert has_element?(
                view,
-               "a[href='/projekte/#{projekt.id}/proposals']",
+               "a[href='/projekte/#{projekt.slug}/proposals']",
                "🤖 Vorschläge"
              )
 
@@ -130,7 +130,7 @@ defmodule RatsprojekteWeb.ProjektLive.ShowTest do
       proposal(projekt)
       proposal(projekt)
 
-      {:ok, _view, html} = live(conn, ~p"/projekte/#{projekt.id}")
+      {:ok, _view, html} = live(conn, ~p"/projekte/#{projekt.slug}")
 
       assert html =~ "Offene Vorschläge (3)"
     end
@@ -154,7 +154,7 @@ defmodule RatsprojekteWeb.ProjektLive.ShowTest do
 
       _pending = proposal(projekt)
 
-      {:ok, _view, html} = live(conn, ~p"/projekte/#{projekt.id}")
+      {:ok, _view, html} = live(conn, ~p"/projekte/#{projekt.slug}")
 
       assert html =~ "Offene Vorschläge (1)"
     end

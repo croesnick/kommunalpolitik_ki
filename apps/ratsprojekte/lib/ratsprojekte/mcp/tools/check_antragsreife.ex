@@ -28,7 +28,7 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
   Die Kriterien-Listen sind für beide Stufen identisch. Die Stufe beeinflusst
   nur die Empfehlung, nicht die Kriterien selbst.
 
-  Verwende list_projekte, um die Projekt-ID zu finden.
+  Verwende list_projekte, um den Slug zu finden.
   """
 
   use Anubis.Server.Component, type: :tool
@@ -41,9 +41,9 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
   @beschlussvorschlag_min_length 20
 
   schema do
-    field(:id, :integer,
+    field(:slug, :string,
       required: true,
-      description: "Projekt-ID (von list_projekte)"
+      description: "Projekt-Slug (von list_projekte)"
     )
 
     field(:stufe, :string,
@@ -54,11 +54,11 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
   end
 
   @impl true
-  def execute(%{id: id, stufe: stufe}, frame) do
+  def execute(%{slug: slug, stufe: stufe}, frame) do
     projekt =
       Repo.one(
         from(p in Projekt,
-          where: p.id == ^id,
+          where: p.slug == ^slug,
           preload: [
             realisierungsstraenge:
               ^from(rs in Realisierungsstrang,
@@ -72,7 +72,7 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
 
     case projekt do
       nil ->
-        {:reply, Response.error(Response.tool(), "Projekt #{id} nicht gefunden"), frame}
+        {:reply, Response.error(Response.tool(), "Projekt '#{slug}' nicht gefunden"), frame}
 
       projekt ->
         {:reply, Response.json(Response.tool(), build_report(projekt, stufe)), frame}
@@ -84,7 +84,7 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
     empfehlung = empfehlung(hard_gates, stufe)
 
     %{
-      projekt_id: projekt.id,
+      projekt_slug: projekt.slug,
       projekt_titel: projekt.titel,
       stufe: stufe,
       check_datum: DateTime.to_iso8601(DateTime.utc_now()),
@@ -92,7 +92,7 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
       soft_gates: soft_gates(),
       politische_kriterien: politische_kriterien(),
       empfehlung: empfehlung,
-      quelle: "ratsprojekte Projekt ##{projekt.id}, Stand #{Date.to_iso8601(Date.utc_today())}"
+      quelle: "ratsprojekte Projekt '#{projekt.slug}', Stand #{Date.to_iso8601(Date.utc_today())}"
     }
   end
 

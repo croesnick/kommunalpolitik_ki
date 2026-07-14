@@ -16,7 +16,7 @@ defmodule Ratsprojekte.MCP.Tools.ProposeStatusChange do
   - `list_pending_proposals` — alle offenen Vorschläge für ein Projekt
   - `show_pending_proposal` — Details zu einem konkreten Vorschlag
 
-  Verwende list_projekte oder search_projekte, um die `projekt_id` zu finden.
+  Verwende list_projekte oder search_projekte, um den Projekt-Slug zu finden.
   """
 
   use Anubis.Server.Component, type: :tool
@@ -24,13 +24,14 @@ defmodule Ratsprojekte.MCP.Tools.ProposeStatusChange do
   alias Anubis.Server.Response
   alias Ratsprojekte.Repo
   alias Ratsprojekte.Schemas.{PendingProposal, Projekt}
+  import Ecto.Query
 
   @status_werte ~w(idee aktiv abgeschlossen verworfen)
 
   schema do
-    field(:projekt_id, :integer,
+    field(:projekt_slug, :string,
       required: true,
-      description: "Projekt-ID des Projekts, dessen Status geändert werden soll"
+      description: "Projekt-Slug des Projekts, dessen Status geändert werden soll"
     )
 
     field(:status, :string,
@@ -62,12 +63,14 @@ defmodule Ratsprojekte.MCP.Tools.ProposeStatusChange do
 
   @impl true
   def execute(params, frame) do
-    projekt_id = params[:projekt_id]
+    projekt_slug = params[:projekt_slug]
     status = params[:status]
+    projekt = Repo.one(from(p in Projekt, where: p.slug == ^projekt_slug))
 
     cond do
-      Repo.get(Projekt, projekt_id) == nil ->
-        {:reply, Response.error(Response.tool(), "Projekt #{projekt_id} nicht gefunden"), frame}
+      projekt == nil ->
+        {:reply, Response.error(Response.tool(), "Projekt '#{projekt_slug}' nicht gefunden"),
+         frame}
 
       status not in @status_werte ->
         {:reply,
@@ -77,12 +80,12 @@ defmodule Ratsprojekte.MCP.Tools.ProposeStatusChange do
          ), frame}
 
       true ->
-        build_and_insert(params, frame)
+        build_and_insert(params, projekt, frame)
     end
   end
 
-  defp build_and_insert(params, frame) do
-    projekt_id = params[:projekt_id]
+  defp build_and_insert(params, projekt, frame) do
+    projekt_id = projekt.id
     status = params[:status]
 
     payload = %{
@@ -108,11 +111,11 @@ defmodule Ratsprojekte.MCP.Tools.ProposeStatusChange do
       {:ok, proposal} ->
         body = %{
           id: proposal.id,
-          projekt_id: projekt_id,
+          projekt_slug: projekt.slug,
           typ: :change_status,
           neuer_status: status,
           status: proposal.status,
-          review_url: "http://localhost:4000/projekte/#{projekt_id}/proposals/#{proposal.id}",
+          review_url: "http://localhost:4000/projekte/#{projekt.slug}/proposals/#{proposal.id}",
           hinweis: "Vorschlag angelegt. Stadtrat muss in der LiveView bestätigen (GO-Prinzip)."
         }
 

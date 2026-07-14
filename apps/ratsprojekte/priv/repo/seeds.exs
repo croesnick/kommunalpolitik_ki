@@ -28,7 +28,8 @@ defmodule Ratsprojekte.Seeds do
         beschreibung:
           "Boulevard Bahnhofstraße — Tempo 30, Begrünung, Sitzgelegenheiten, autofreie Tage.",
         status: :aktiv,
-        prioritaet: :hoch
+        prioritaet: :hoch,
+        slug: "bahnhofstrasse"
       })
 
     strang_a =
@@ -147,7 +148,8 @@ defmodule Ratsprojekte.Seeds do
         beschreibung:
           "Mehrgenerationen-Moorpark im Süden Buchloes. Im FNP verankert (02/2025). Haushaltsansatz existiert laut UBI.",
         status: :aktiv,
-        prioritaet: :hoch
+        prioritaet: :hoch,
+        slug: "gennachpark"
       })
 
     strang_a =
@@ -237,7 +239,8 @@ defmodule Ratsprojekte.Seeds do
         beschreibung:
           "Smart Metering + Kartenzahlung im Freibad. Leck im Technikraum tagelang unbemerkt geblieben.",
         status: :idee,
-        prioritaet: :mittel
+        prioritaet: :mittel,
+        slug: "freibad-digitalisierung"
       })
 
     strang_a =
@@ -278,7 +281,8 @@ defmodule Ratsprojekte.Seeds do
         prioritaet: :niedrig,
         verworfen_am: ~D[2025-03-15],
         verworfen_grund:
-          "Keine politische Mehrheit im Bauausschuss 03/2025; Verkehrsgutachten sieht keine Entlastung der Bahnhofstraße."
+          "Keine politische Mehrheit im Bauausschuss 03/2025; Verkehrsgutachten sieht keine Entlastung der Bahnhofstraße.",
+        slug: "westtangente"
       })
 
     strang_a =

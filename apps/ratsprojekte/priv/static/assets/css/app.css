@@ -123,6 +123,56 @@ body {
   margin-bottom: var(--space-6);
 }
 
+/* Slug row + inline copy-to-clipboard button (Projekt show) */
+.slug-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.copy-tag-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
+  font-size: var(--text-xs);
+  font-family: inherit;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.copy-tag-btn:hover,
+.copy-tag-btn:focus-visible {
+  color: var(--color-text);
+  border-color: var(--color-border-input);
+  background: var(--color-surface);
+  outline: none;
+}
+
+.copy-tag-done {
+  display: none;
+  color: var(--color-aktiv-text);
+}
+
+.copy-tag-btn.copied {
+  color: var(--color-aktiv-text);
+  border-color: var(--color-aktiv);
+  background: var(--color-aktiv);
+}
+
+.copy-tag-btn.copied .copy-tag-label {
+  display: none;
+}
+
+.copy-tag-btn.copied .copy-tag-done {
+  display: inline;
+}
+
 /* Section label */
 .section-label {
   font-size: var(--text-xs);

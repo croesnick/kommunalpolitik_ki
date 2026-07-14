@@ -42,6 +42,10 @@ ratsprojekte (Distillat — strukturiert, antragsreif, quellenbelegt)
 - **Pflicht**: Alles, was in der OpenCode-Session entsteht, fließt als
   konsolidierte Notiz zurück in den Vault, *bevor* es als Proposal
   eingereicht wird. ratsprojekte ist das Endprodukt, nicht der Input.
+- **Vault-Tag**: Vault-Notizen zu einem Projekt werden mit
+  `#ratsprojekt/{slug}` getaggt. Der Slug ist der gleiche wie in der
+  ratsprojekte-URL. So findet der AI über `vault_suche` alle Notizen
+  zu einem Projekt und kann sie als Quellen in Proposals eintragen.
 
 ## Workflow: Idea → Vault-Notiz → Proposal
 
@@ -119,6 +123,7 @@ MCP-Tool aufgerufen:
 ```
 propose_projekt(
   titel: "…",
+  slug: "freibad-digitalisierung",  # kebab-case, wird Vault-Tag #ratsprojekt/freibad-digitalisierung
   beschreibung: "…",
   prioritaet: "mittel",           # optional
   begruendung: "Warum … (min 10 Zeichen, Quellenpflicht)",
@@ -130,11 +135,18 @@ Das Tool liefert eine `review_url` (z.B.
 `http://localhost:4000/proposals/5`). Carsten prüft dort und klickt
 Accept oder Reject (GO-Gate).
 
+**Slug-Konvention**: Der Slug ist der stabile Vertrag zwischen ratsprojekte
+und dem Vault. Er wird Teil der URL (`/projekte/freibad-digitalisierung`)
+und ist das Vault-Tag (`#ratsprojekt/freibad-digitalisierung`). Format:
+kebab-case, lowercase, ASCII only (`^[a-z0-9]+(?:-[a-z0-9]+)*$`). Umlaute
+als ae/oe/ue/ss. Der Slug wird bei der Projekterstellung vergeben und
+ändert sich nicht mehr.
+
 #### Neuer Strang für bestehendes Projekt: `propose_realisierungsstrang`
 
 ```
 propose_realisierungsstrang(
-  projekt_id: 3,
+  projekt_slug: "freibad-digitalisierung",
   label: "B",
   titel: "…",
   beschreibung: "…",
@@ -148,7 +160,7 @@ propose_realisierungsstrang(
 
 ```
 propose_status_change(
-  projekt_id: 3,
+  projekt_slug: "freibad-digitalisierung",
   neuer_status: "aktiv",        # idee/aktiv/abgeschlossen/verworfen
   datum: "2025-07-14",          # optional
   verworfen_grund: "…",         # bei verworfen

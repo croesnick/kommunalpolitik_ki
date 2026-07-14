@@ -26,7 +26,8 @@ defmodule Ratsprojekte.Fixtures do
         titel: "Bahnhofstraße umgestalten",
         beschreibung: "Boulevard Bahnhofstraße — Tempo 30, Begrünung, Sitzgelegenheiten.",
         status: :aktiv,
-        prioritaet: :hoch
+        prioritaet: :hoch,
+        slug: "bahnhofstrasse"
       })
 
     strang_a =
@@ -89,7 +90,8 @@ defmodule Ratsprojekte.Fixtures do
         status: :verworfen,
         prioritaet: :niedrig,
         verworfen_am: ~D[2025-03-15],
-        verworfen_grund: "Keine politische Mehrheit im Bauausschuss 03/2025."
+        verworfen_grund: "Keine politische Mehrheit im Bauausschuss 03/2025.",
+        slug: "westtangente-test"
       })
 
     strang_a =
@@ -117,7 +119,8 @@ defmodule Ratsprojekte.Fixtures do
         titel: "Freibad Digitalisierung",
         beschreibung: "Smart Metering + Kartenzahlung im Freibad.",
         status: :idee,
-        prioritaet: :mittel
+        prioritaet: :mittel,
+        slug: "freibad-digitalisierung-test"
       })
 
     strang_a =
@@ -151,7 +154,8 @@ defmodule Ratsprojekte.Fixtures do
         beschreibung: "Mehrgenerationen-Moorpark im Süden Buchloes.",
         status: :abgeschlossen,
         prioritaet: :hoch,
-        abgeschlossen_am: ~D[2025-02-01]
+        abgeschlossen_am: ~D[2025-02-01],
+        slug: "gennachpark-test"
       })
 
     strang_a =

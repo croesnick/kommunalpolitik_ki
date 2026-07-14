@@ -16,7 +16,7 @@ defmodule Ratsprojekte.MCP.Tools.ProposeRealisierungsstrang do
   - `list_pending_proposals` — alle offenen Vorschläge für ein Projekt
   - `show_pending_proposal` — Details zu einem konkreten Vorschlag
 
-  Verwende list_projekte oder search_projekte, um die `projekt_id` zu finden.
+  Verwende list_projekte oder search_projekte, um den Projekt-Slug zu finden.
   """
 
   use Anubis.Server.Component, type: :tool
@@ -24,11 +24,12 @@ defmodule Ratsprojekte.MCP.Tools.ProposeRealisierungsstrang do
   alias Anubis.Server.Response
   alias Ratsprojekte.Repo
   alias Ratsprojekte.Schemas.{PendingProposal, Projekt}
+  import Ecto.Query
 
   schema do
-    field(:projekt_id, :integer,
+    field(:projekt_slug, :string,
       required: true,
-      description: "Projekt-ID (von list_projekte / search_projekte)"
+      description: "Projekt-Slug (von list_projekte / search_projekte)"
     )
 
     field(:label, :string,
@@ -60,10 +61,12 @@ defmodule Ratsprojekte.MCP.Tools.ProposeRealisierungsstrang do
 
   @impl true
   def execute(params, frame) do
-    projekt_id = params[:projekt_id]
+    projekt_slug = params[:projekt_slug]
 
-    if Repo.get(Projekt, projekt_id) == nil do
-      {:reply, Response.error(Response.tool(), "Projekt #{projekt_id} nicht gefunden"), frame}
+    projekt = Repo.one(from(p in Projekt, where: p.slug == ^projekt_slug))
+
+    if projekt == nil do
+      {:reply, Response.error(Response.tool(), "Projekt '#{projekt_slug}' nicht gefunden"), frame}
     else
       payload = %{
         "label" => params[:label],
@@ -78,7 +81,7 @@ defmodule Ratsprojekte.MCP.Tools.ProposeRealisierungsstrang do
         payload: payload,
         begruendung: params[:begruendung],
         quellen: params[:quellen],
-        projekt_id: projekt_id,
+        projekt_id: projekt.id,
         vorgeschlagen_von: "ai-harness",
         vorgeschlagen_am: DateTime.utc_now()
       }
@@ -89,9 +92,9 @@ defmodule Ratsprojekte.MCP.Tools.ProposeRealisierungsstrang do
         {:ok, proposal} ->
           body = %{
             id: proposal.id,
-            projekt_id: projekt_id,
+            projekt_slug: projekt_slug,
             status: proposal.status,
-            review_url: "http://localhost:4000/projekte/#{projekt_id}/proposals/#{proposal.id}",
+            review_url: "http://localhost:4000/projekte/#{projekt.slug}/proposals/#{proposal.id}",
             hinweis: "Vorschlag angelegt. Stadtrat muss in der LiveView bestätigen (GO-Prinzip)."
           }
 

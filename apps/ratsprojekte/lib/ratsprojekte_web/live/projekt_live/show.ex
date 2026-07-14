@@ -7,11 +7,11 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
   import Ecto.Query
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
+  def mount(%{"slug" => slug}, _session, socket) do
     projekt =
       Repo.one(
         from(p in Projekt,
-          where: p.id == ^id,
+          where: p.slug == ^slug,
           preload: [
             realisierungsstraenge: [:vorbedingungen, :schritte, :quellen],
             quellen: []
@@ -46,6 +46,22 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
       <h1 class="page-title">
         {@projekt.titel}
       </h1>
+      <p
+        class="page-subtitle slug-row"
+        style="font-size: var(--text-sm); color: var(--color-text-faint); margin-bottom: var(--space-1);"
+      >
+        <span>Slug: <code>{@projekt.slug}</code></span>
+        <button
+          type="button"
+          class="copy-tag-btn"
+          data-tag={"#ratsprojekt/#{@projekt.slug}"}
+          aria-label={"Vault-Tag #ratsprojekt/#{@projekt.slug} kopieren"}
+          phx-click={JS.dispatch("ratsprojekte:copy-tag")}
+        >
+          <span class="copy-tag-label">Kopieren</span>
+          <span class="copy-tag-done" aria-hidden="true">✓ Kopiert</span>
+        </button>
+      </p>
       <p class="page-subtitle" style="margin-bottom: var(--space-3);">
         {@projekt.beschreibung}
       </p>
@@ -53,7 +69,7 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
         <.badge kind={:status} value={@projekt.status} />
         <.badge kind={:priority} value={@projekt.prioritaet} />
         <.link
-          navigate={~p"/projekte/#{@projekt.id}/proposals"}
+          navigate={~p"/projekte/#{@projekt.slug}/proposals"}
           class={"projekt-proposal-link #{if @pending_count > 0, do: "has-pending", else: "no-pending"}"}
         >
           🤖 {if @pending_count > 0, do: "Offene Vorschläge (#{@pending_count})", else: "Vorschläge"}

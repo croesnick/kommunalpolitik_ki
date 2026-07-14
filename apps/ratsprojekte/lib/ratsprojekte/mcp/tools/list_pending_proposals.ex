@@ -17,13 +17,13 @@ defmodule Ratsprojekte.MCP.Tools.ListPendingProposals do
 
   alias Anubis.Server.Response
   alias Ratsprojekte.Repo
-  alias Ratsprojekte.Schemas.PendingProposal
+  alias Ratsprojekte.Schemas.{PendingProposal, Projekt}
   import Ecto.Query
 
   schema do
-    field(:projekt_id, :integer,
+    field(:projekt_slug, :string,
       required: true,
-      description: "Projekt-ID (von list_projekte / search_projekte)"
+      description: "Projekt-Slug (von list_projekte / search_projekte)"
     )
 
     field(:status, :string,
@@ -34,29 +34,35 @@ defmodule Ratsprojekte.MCP.Tools.ListPendingProposals do
 
   @impl true
   def execute(params, frame) do
-    projekt_id = params[:projekt_id]
+    projekt_slug = params[:projekt_slug]
 
-    status =
-      case params[:status] || "pending" do
-        "pending" -> :pending
-        "approved" -> :approved
-        "rejected" -> :rejected
-        other -> String.to_existing_atom(other)
-      end
+    projekt = Repo.one(from(p in Projekt, where: p.slug == ^projekt_slug))
 
-    proposals =
-      Repo.all(
-        from(pp in PendingProposal,
-          where: pp.projekt_id == ^projekt_id and pp.status == ^status,
-          order_by: [asc: pp.vorgeschlagen_am]
+    if projekt == nil do
+      {:reply, Response.error(Response.tool(), "Projekt '#{projekt_slug}' nicht gefunden"), frame}
+    else
+      status =
+        case params[:status] || "pending" do
+          "pending" -> :pending
+          "approved" -> :approved
+          "rejected" -> :rejected
+          other -> String.to_existing_atom(other)
+        end
+
+      proposals =
+        Repo.all(
+          from(pp in PendingProposal,
+            where: pp.projekt_id == ^projekt.id and pp.status == ^status,
+            order_by: [asc: pp.vorgeschlagen_am]
+          )
         )
-      )
 
-    formatted = Enum.map(proposals, &format/1)
-    {:reply, Response.json(Response.tool(), formatted), frame}
+      formatted = Enum.map(proposals, &format(&1, projekt))
+      {:reply, Response.json(Response.tool(), formatted), frame}
+    end
   end
 
-  defp format(proposal) do
+  defp format(proposal, projekt) do
     %{
       id: proposal.id,
       typ: proposal.typ,
@@ -65,7 +71,7 @@ defmodule Ratsprojekte.MCP.Tools.ListPendingProposals do
       quellen: proposal.quellen,
       vorgeschlagen_am: DateTime.to_iso8601(proposal.vorgeschlagen_am),
       status: proposal.status,
-      review_url: "http://localhost:4000/projekte/#{proposal.projekt_id}/proposals/#{proposal.id}"
+      review_url: "http://localhost:4000/projekte/#{projekt.slug}/proposals/#{proposal.id}"
     }
   end
 end

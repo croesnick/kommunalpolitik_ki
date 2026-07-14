@@ -8,10 +8,10 @@ defmodule RatsprojekteWeb.ProposalLive.Index do
 
   @impl true
   def mount(params, _session, socket) do
-    projekt_id = params["projekt_id"]
+    projekt_slug = params["projekt_slug"]
 
-    if projekt_id do
-      projekt = Repo.get(Projekt, projekt_id)
+    if projekt_slug do
+      projekt = Repo.one(from(p in Projekt, where: p.slug == ^projekt_slug))
 
       case projekt do
         nil ->
@@ -105,7 +105,9 @@ defmodule RatsprojekteWeb.ProposalLive.Index do
   defp empty_message(_projekt), do: "Keine Vorschläge für dieses Projekt."
 
   defp proposal_path(nil, proposal), do: ~p"/proposals/#{proposal.id}"
-  defp proposal_path(projekt, proposal), do: ~p"/projekte/#{projekt.id}/proposals/#{proposal.id}"
+
+  defp proposal_path(projekt, proposal),
+    do: ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}"
 
   defp payload_titel(proposal) do
     case proposal.payload do
