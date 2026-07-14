@@ -23,7 +23,8 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjekt do
 
   alias Anubis.Server.Response
   alias Ratsprojekte.Repo
-  alias Ratsprojekte.Schemas.PendingProposal
+  alias Ratsprojekte.Schemas.{PendingProposal, Projekt}
+  import Ecto.Query
 
   schema do
     field(:titel, :string,
@@ -57,40 +58,52 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjekt do
 
   @impl true
   def execute(params, frame) do
-    payload = %{
-      "titel" => params[:titel],
-      "slug" => params[:slug],
-      "beschreibung" => params[:beschreibung],
-      "prioritaet" => params[:prioritaet] || "mittel"
-    }
+    slug = params[:slug]
 
-    attrs = %{
-      typ: :add_projekt,
-      payload: payload,
-      begruendung: params[:begruendung],
-      quellen: params[:quellen],
-      projekt_id: nil,
-      vorgeschlagen_von: "ai-harness",
-      vorgeschlagen_am: DateTime.utc_now()
-    }
+    if slug && Repo.exists?(from(p in Projekt, where: p.slug == ^slug)) do
+      {:reply,
+       Response.error(
+         Response.tool(),
+         "Ein Projekt mit Slug '#{slug}' existiert bereits. " <>
+           "Verwende propose_projekt_update, um das bestehende Projekt zu aktualisieren, " <>
+           "oder propose_realisierungsstrang, um einen neuen Realisierungsstrang hinzuzufügen."
+       ), frame}
+    else
+      payload = %{
+        "titel" => params[:titel],
+        "slug" => params[:slug],
+        "beschreibung" => params[:beschreibung],
+        "prioritaet" => params[:prioritaet] || "mittel"
+      }
 
-    changeset = PendingProposal.propose_changeset(%PendingProposal{}, attrs)
+      attrs = %{
+        typ: :add_projekt,
+        payload: payload,
+        begruendung: params[:begruendung],
+        quellen: params[:quellen],
+        projekt_id: nil,
+        vorgeschlagen_von: "ai-harness",
+        vorgeschlagen_am: DateTime.utc_now()
+      }
 
-    case Repo.insert(changeset) do
-      {:ok, proposal} ->
-        body = %{
-          id: proposal.id,
-          typ: :add_projekt,
-          status: proposal.status,
-          review_url: "http://localhost:4000/proposals/#{proposal.id}",
-          hinweis: "Vorschlag angelegt. Stadtrat muss in der LiveView bestätigen (GO-Prinzip)."
-        }
+      changeset = PendingProposal.propose_changeset(%PendingProposal{}, attrs)
 
-        {:reply, Response.json(Response.tool(), body), frame}
+      case Repo.insert(changeset) do
+        {:ok, proposal} ->
+          body = %{
+            id: proposal.id,
+            typ: :add_projekt,
+            status: proposal.status,
+            review_url: "http://localhost:4000/proposals/#{proposal.id}",
+            hinweis: "Vorschlag angelegt. Stadtrat muss in der LiveView bestätigen (GO-Prinzip)."
+          }
 
-      {:error, changeset} ->
-        errors = format_errors(changeset)
-        {:reply, Response.error(Response.tool(), "Vorschlag ungültig: #{errors}"), frame}
+          {:reply, Response.json(Response.tool(), body), frame}
+
+        {:error, changeset} ->
+          errors = format_errors(changeset)
+          {:reply, Response.error(Response.tool(), "Vorschlag ungültig: #{errors}"), frame}
+      end
     end
   end
 
