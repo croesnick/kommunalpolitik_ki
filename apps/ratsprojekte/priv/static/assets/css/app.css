@@ -131,6 +131,12 @@ body {
   flex-wrap: wrap;
 }
 
+.projekt-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
 .copy-tag-btn {
   display: inline-flex;
   align-items: center;

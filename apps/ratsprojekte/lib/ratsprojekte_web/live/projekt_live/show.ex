@@ -43,14 +43,10 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
   def render(assigns) do
     ~H"""
     <div class="page">
-      <h1 class="page-title">
-        {@projekt.titel}
-      </h1>
-      <p
-        class="page-subtitle slug-row"
-        style="font-size: var(--text-sm); color: var(--color-text-faint); margin-bottom: var(--space-1);"
-      >
-        <span>Slug: <code>{@projekt.slug}</code></span>
+      <div class="projekt-title-row">
+        <h1 class="page-title">
+          {@projekt.titel}
+        </h1>
         <button
           type="button"
           class="copy-tag-btn"
@@ -58,10 +54,10 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
           aria-label={"Vault-Tag #ratsprojekt/#{@projekt.slug} kopieren"}
           phx-click={JS.dispatch("ratsprojekte:copy-tag")}
         >
-          <span class="copy-tag-label">Kopieren</span>
+          <span class="copy-tag-label">{@projekt.slug}</span>
           <span class="copy-tag-done" aria-hidden="true">✓ Kopiert</span>
         </button>
-      </p>
+      </div>
       <p class="page-subtitle" style="margin-bottom: var(--space-3);">
         {@projekt.beschreibung}
       </p>
