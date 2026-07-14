@@ -4,7 +4,7 @@ Dieses Dokument definiert die Kriterien, nach denen das MCP-Tool
 `check_antragsreife` ein Projekt der Stadtratsarbeit bewertet. Es ist
 versionisiert und für den Stadtrat lesbar formuliert.
 
-Stand: 2025-07-13
+Stand: 2025-07-14
 
 ## Überblick
 
@@ -27,6 +27,8 @@ Drei Klassen von Kriterien, scharf getrennt:
 | `beschlussvorschlag_konkret` | Feld `projekt.beschlussvorschlag` gesetzt, nicht leer, länger als 20 Zeichen. |
 | `realisierungsstrang_vorhanden` | Mindestens ein Realisierungsstrang vorhanden. |
 | `vorbedingungen_erfuellt` | Status `pass`, wenn alle Stränge alle Vorbedingungen erfüllt haben; `warn`, wenn Vorbedingungen offen sind. |
+| `value_proposition_vorhanden` | Feld `projekt.value_proposition` gesetzt, nicht leer, länger als 20 Zeichen. Welches konkrete Problem löst das Projekt? (Roadmap: noch nicht code-enforced — die AI prüft dieses Gate vor dem Proposal manuell und trägt die VP in die `begruendung` ein.) |
+| `success_metrics_vorhanden` | Feld `projekt.success_metrics` gesetzt, nicht leer, länger als 10 Zeichen. Mindestens eine messbare Größe. (Roadmap: noch nicht code-enforced — die AI prüft dieses Gate vor dem Proposal manuell und trägt die Metriken in die `begruendung` ein.) |
 
 Status-Werte: `pass` | `fail` | `warn`.
 

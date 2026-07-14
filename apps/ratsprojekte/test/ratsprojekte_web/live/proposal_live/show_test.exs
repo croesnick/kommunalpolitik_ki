@@ -71,6 +71,105 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
     end
   end
 
+  describe "inline edit" do
+    setup %{projekt: projekt} do
+      proposal = proposal(projekt)
+      %{proposal: proposal}
+    end
+
+    test "shows edit button when pending, hidden when decided", %{
+      conn: conn,
+      projekt: projekt,
+      proposal: proposal
+    } do
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
+      assert has_element?(view, "button[phx-click='edit_begruendung']")
+
+      decided =
+        proposal(projekt, %{
+          status: :approved,
+          entschieden_am: DateTime.truncate(DateTime.utc_now(), :second),
+          entschieden_von: "stadtrat"
+        })
+
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{decided.id}")
+      refute has_element?(view, "button[phx-click='edit_begruendung']")
+      assert html =~ decided.begruendung
+    end
+
+    test "clicking edit reveals textarea pre-filled with current begruendung", %{
+      conn: conn,
+      projekt: projekt,
+      proposal: proposal
+    } do
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
+
+      view |> element("button[phx-click='edit_begruendung']") |> render_click()
+
+      assert has_element?(view, "form#begruendung-edit-form")
+      assert has_element?(view, "textarea[name='begruendung']")
+      # textarea pre-filled
+      assert render(view) =~ proposal.begruendung
+    end
+
+    test "save persists updated begruendung to db", %{
+      conn: conn,
+      projekt: projekt,
+      proposal: proposal
+    } do
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
+
+      view |> element("button[phx-click='edit_begruendung']") |> render_click()
+
+      view
+      |> form("#begruendung-edit-form",
+        begruendung: "Neue, ausreichend lange Begründung für den Test."
+      )
+      |> render_submit()
+
+      reloaded = Repo.get!(PendingProposal, proposal.id)
+      assert reloaded.begruendung == "Neue, ausreichend lange Begründung für den Test."
+      refute has_element?(view, "form#begruendung-edit-form")
+    end
+
+    test "cancel reverts to static display without saving", %{
+      conn: conn,
+      projekt: projekt,
+      proposal: proposal
+    } do
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
+
+      view |> element("button[phx-click='edit_begruendung']") |> render_click()
+      view |> element("button[phx-click='cancel_begruendung']") |> render_click()
+
+      refute has_element?(view, "form#begruendung-edit-form")
+
+      reloaded = Repo.get!(PendingProposal, proposal.id)
+      assert reloaded.begruendung == proposal.begruendung
+    end
+
+    test "too short begruendung shows error flash and keeps form", %{
+      conn: conn,
+      projekt: projekt,
+      proposal: proposal
+    } do
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
+
+      view |> element("button[phx-click='edit_begruendung']") |> render_click()
+
+      view
+      |> form("#begruendung-edit-form", begruendung: "zu kurz")
+      |> render_submit()
+
+      # Form stays open, flash shows error.
+      assert has_element?(view, "form#begruendung-edit-form")
+
+      # DB unchanged.
+      reloaded = Repo.get!(PendingProposal, proposal.id)
+      assert reloaded.begruendung == proposal.begruendung
+    end
+  end
+
   describe "accept" do
     test "creates realisierungsstrang atomically and sets proposal approved", %{
       conn: conn,

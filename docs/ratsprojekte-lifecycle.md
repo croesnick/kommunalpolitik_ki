@@ -112,6 +112,30 @@ Der Chart ist also **Spezifikation + Dokumentation**: er zeigt, wo der
 Lifecycle hin soll. Wenn Transitions-Guards später im Ecto-Changeset
 nachgezogen werden, ist dieser Chart die Referenz.
 
+## Querschnitts-Regel: Value Proposition + Success Metrics
+
+Jedes Projekt und jeder Proposal braucht beides:
+
+- **Value Proposition**: Welches konkrete Problem löst das Projekt? Für wen?
+  Was ändert sich durch die Umsetzung? (Kein reines "Digitalisierung von X" —
+  sondern: "X wird messbar, Y wird schneller, Z wird transparenter".)
+- **Success Metrics**: Woran wird gemessen, ob das Projekt erfolgreich war?
+  Mindestens eine messbare Größe (z.B. "Bargeld-Anteil im Freibad < 30%",
+  "Leckerkennung innerhalb 24h", "Bearbeitungszeit um 50% reduziert").
+
+Diese Regel ist **querschnittlich** — sie gilt nicht nur für ein einzelnes
+Projekt, sondern für alle Proposals und Projekte. Ein Proposal ohne VP+SM ist
+nicht antragsreif, auch wenn alle anderen Hard Gates passieren.
+
+### Enforcement-Status
+
+- **Policy-level (ab sofort verbindlich):** Die AI prüft VP+SM vor jedem
+  `propose_*`-Aufruf und trägt sie in die `begruendung` ein. Ein Proposal
+  ohne VP+SM wird nicht vorgeschlagen.
+- **Code-level (Roadmap):** Die Felder `value_proposition` und
+  `success_metrics` werden als Projekt-Spalten + Hard Gates in
+  `check_antragsreife` nachgezogen. Bis dahin ist die Regel dokumentenbasiert.
+
 ## Beziehung zum Vault-Workflow
 
 ```
@@ -142,6 +166,16 @@ Projekts berührt (lesen, vorschlagen, ändern), **muss**:
    Status, Übergang oder ein neues Gate in Code oder Skill gegossen wird,
    wird er zuerst hier eingetragen. Das Dokument ist der Single Source of
    Truth für den Lifecycle.
+
+### GO über `decide_proposal`-MCP-Tool
+
+GO wird im Chat erteilt, die AI führt es über das `decide_proposal`-MCP-Tool
+aus (`aktion: "accept" | "reject"`, mit Kommentar). Der Browser-Weg über die
+LiveView bleibt als Alternative. Die AI darf Proposals nicht selbst genehmigen
+— sie braucht für jede `decide_proposal`-Ausführung ein vorheriges, explizites
+GO im Chat. Das `entschieden_von`-Feld zeigt "stadtrat-via-ai" anstelle von
+"stadtrat" bei Chat-basierten Entscheidungen, um den Audit-Trail klar zu
+halten.
 
 ### Wann das Dokument zu aktualisieren ist
 

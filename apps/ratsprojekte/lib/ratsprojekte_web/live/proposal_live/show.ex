@@ -1,6 +1,7 @@
 defmodule RatsprojekteWeb.ProposalLive.Show do
   use RatsprojekteWeb, :live_view
 
+  alias Ratsprojekte.ProposalApplier
   alias Ratsprojekte.Repo
   alias Ratsprojekte.Schemas.{PendingProposal, Projekt, Realisierungsstrang}
   alias RatsprojekteWeb.NavAssigns
@@ -54,7 +55,12 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
     {:ok,
      socket
      |> NavAssigns.attach(:vorschlaege)
-     |> assign(projekt: proposal.projekt, proposal: proposal, existing_labels: existing_labels)
+     |> assign(
+       projekt: proposal.projekt,
+       proposal: proposal,
+       existing_labels: existing_labels,
+       editing_begruendung: false
+     )
      |> assign_form()}
   end
 
@@ -64,7 +70,12 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
     {:ok,
      socket
      |> NavAssigns.attach(:projekte)
-     |> assign(projekt: projekt, proposal: proposal, existing_labels: existing_labels)
+     |> assign(
+       projekt: projekt,
+       proposal: proposal,
+       existing_labels: existing_labels,
+       editing_begruendung: false
+     )
      |> assign_form()}
   end
 
@@ -79,90 +90,43 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
     end
   end
 
+  @impl true
+  def handle_event("edit_begruendung", _params, socket) do
+    {:noreply, assign(socket, :editing_begruendung, true)}
+  end
+
+  @impl true
+  def handle_event("cancel_begruendung", _params, socket) do
+    {:noreply, assign(socket, :editing_begruendung, false)}
+  end
+
+  @impl true
+  def handle_event("save_begruendung", %{"begruendung" => begruendung}, socket) do
+    %{proposal: proposal} = socket.assigns
+
+    changeset =
+      PendingProposal.update_begruendung_changeset(proposal, %{begruendung: begruendung})
+
+    case Repo.update(changeset) do
+      {:ok, updated_proposal} ->
+        {:noreply,
+         socket
+         |> assign(proposal: updated_proposal, editing_begruendung: false)
+         |> put_flash(:info, "Begründung aktualisiert.")}
+
+      {:error, changeset} ->
+        errors = format_errors(changeset)
+        {:noreply, put_flash(socket, :error, "Speichern fehlgeschlagen: #{errors}")}
+    end
+  end
+
   defp accept(socket, kommentar) do
     %{proposal: proposal, projekt: projekt} = socket.assigns
 
-    case proposal.typ do
-      :add_realisierungsstrang ->
-        strang_attrs = Map.put(proposal.payload, "projekt_id", projekt.id)
-        apply_proposal(proposal, Realisierungsstrang, strang_attrs, kommentar, socket)
+    opts = [entschieden_von: "stadtrat", entscheidungskommentar: blank_to_nil(kommentar)]
 
-      :add_projekt ->
-        apply_proposal(proposal, Projekt, proposal.payload, kommentar, socket)
-
-      :change_status ->
-        apply_status_change(proposal, projekt, kommentar, socket)
-    end
-  end
-
-  # Atomar: Record anlegen + Proposal auf approved setzen. Schlägt das
-  # Anlegen fehl, bleibt das Proposal `pending` (Idempotenz).
-  defp apply_proposal(proposal, schema_mod, attrs, kommentar, socket) do
-    decision_attrs = %{
-      status: :approved,
-      entschieden_am: DateTime.utc_now(),
-      entschieden_von: "stadtrat",
-      entscheidungskommentar: blank_to_nil(kommentar)
-    }
-
-    result =
-      Repo.transaction(fn ->
-        record = Repo.insert!(schema_mod.changeset(struct(schema_mod), attrs))
-        _ = record
-
-        Repo.update!(PendingProposal.decision_changeset(proposal, decision_attrs))
-      end)
-
+    result = ProposalApplier.apply_proposal(proposal, projekt, opts)
     handle_apply_result(result, proposal.typ, socket)
-  end
-
-  # :change_status — statt neuem Record wird das bestehende Projekt
-  # aktualisiert (Status + ggf. abgeschlossen_am / verworfen_am / verworfen_grund).
-  defp apply_status_change(proposal, projekt, kommentar, socket) do
-    status = String.to_existing_atom(proposal.payload["status"])
-    datum = parse_date(proposal.payload["datum"])
-    verworfen_grund = proposal.payload["verworfen_grund"]
-
-    update_attrs = %{status: status}
-
-    update_attrs =
-      if datum, do: put_date_field(update_attrs, status, datum), else: update_attrs
-
-    update_attrs =
-      if verworfen_grund,
-        do: Map.put(update_attrs, :verworfen_grund, verworfen_grund),
-        else: update_attrs
-
-    decision_attrs = %{
-      status: :approved,
-      entschieden_am: DateTime.utc_now(),
-      entschieden_von: "stadtrat",
-      entscheidungskommentar: blank_to_nil(kommentar)
-    }
-
-    result =
-      Repo.transaction(fn ->
-        Repo.update!(Projekt.changeset(projekt, update_attrs))
-        Repo.update!(PendingProposal.decision_changeset(proposal, decision_attrs))
-      end)
-
-    handle_apply_result(result, proposal.typ, socket)
-  end
-
-  defp put_date_field(attrs, :abgeschlossen, datum),
-    do: Map.put(attrs, :abgeschlossen_am, datum)
-
-  defp put_date_field(attrs, :verworfen, datum), do: Map.put(attrs, :verworfen_am, datum)
-  defp put_date_field(attrs, _, _), do: attrs
-
-  defp parse_date(nil), do: nil
-  defp parse_date(""), do: nil
-
-  defp parse_date(date_string) do
-    case Date.from_iso8601(date_string) do
-      {:ok, date} -> date
-      {:error, _} -> nil
-    end
   end
 
   defp handle_apply_result({:ok, _}, typ, socket) do
@@ -171,6 +135,10 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
     updated = Repo.preload(Repo.get!(PendingProposal, proposal.id), [:projekt])
 
     {:noreply, socket |> put_flash(:info, accept_flash(typ)) |> assign(proposal: updated)}
+  end
+
+  defp handle_apply_result({:error, :strang_not_found}, _typ, socket) do
+    {:noreply, put_flash(socket, :error, "Strang nicht gefunden — wurde er gelöscht?")}
   end
 
   defp handle_apply_result({:error, changeset}, _typ, socket) do
@@ -184,20 +152,17 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
 
   defp accept_flash(:change_status), do: "Vorschlag angenommen — Projektstatus geändert."
 
+  defp accept_flash(:update_projekt), do: "Vorschlag angenommen — Projekt aktualisiert."
+
+  defp accept_flash(:update_strang),
+    do: "Vorschlag angenommen — Realisierungsstrang aktualisiert."
+
   defp reject(socket, kommentar) do
     %{proposal: proposal} = socket.assigns
 
-    decision_attrs = %{
-      status: :rejected,
-      entschieden_am: DateTime.utc_now(),
-      entschieden_von: "stadtrat",
-      entscheidungskommentar: blank_to_nil(kommentar)
-    }
+    opts = [entschieden_von: "stadtrat", entscheidungskommentar: blank_to_nil(kommentar)]
 
-    proposal
-    |> PendingProposal.decision_changeset(decision_attrs)
-    |> Repo.update()
-    |> case do
+    case ProposalApplier.reject_proposal(proposal, opts) do
       {:ok, updated} ->
         {:noreply,
          socket
@@ -256,6 +221,42 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
               label="Verworfungsgrund"
               value={payload_field(@proposal.payload, "verworfen_grund")}
             />
+          <% :update_projekt -> %>
+            <%= if payload_field(@proposal.payload, "titel") != "" do %>
+              <.payload_row label="Titel" value={payload_field(@proposal.payload, "titel")} />
+            <% end %>
+            <%= if payload_field(@proposal.payload, "beschreibung") != "" do %>
+              <.payload_row
+                label="Beschreibung"
+                value={payload_field(@proposal.payload, "beschreibung")}
+              />
+            <% end %>
+            <%= if payload_field(@proposal.payload, "prioritaet") != "" do %>
+              <.payload_row
+                label="Priorität"
+                value={payload_field(@proposal.payload, "prioritaet")}
+              />
+            <% end %>
+          <% :update_strang -> %>
+            <.payload_row label="Strang" value={payload_field(@proposal.payload, "label")} />
+            <%= if payload_field(@proposal.payload, "titel") != "" do %>
+              <.payload_row label="Titel" value={payload_field(@proposal.payload, "titel")} />
+            <% end %>
+            <%= if payload_field(@proposal.payload, "beschreibung") != "" do %>
+              <.payload_row
+                label="Beschreibung"
+                value={payload_field(@proposal.payload, "beschreibung")}
+              />
+            <% end %>
+            <%= if payload_field(@proposal.payload, "rechtliche_grundlage") != "" do %>
+              <.payload_row
+                label="Rechtliche Grundlage"
+                value={payload_field(@proposal.payload, "rechtliche_grundlage")}
+              />
+            <% end %>
+            <%= if payload_field(@proposal.payload, "bedingung") != "" do %>
+              <.payload_row label="Bedingung" value={payload_field(@proposal.payload, "bedingung")} />
+            <% end %>
         <% end %>
       </div>
 
@@ -272,10 +273,39 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
 
       <div class="section-label flush spaced">
         Begründung (Quellenpflicht)
+        <%= if @proposal.status == :pending and not @editing_begruendung do %>
+          <button
+            type="button"
+            phx-click="edit_begruendung"
+            class="btn btn-ghost btn-sm"
+            aria-label="Begründung bearbeiten"
+          >
+            ✎ Bearbeiten
+          </button>
+        <% end %>
       </div>
-      <div class="callout">
-        {@proposal.begruendung}
-      </div>
+
+      <%= if @editing_begruendung and @proposal.status == :pending do %>
+        <form phx-submit="save_begruendung" id="begruendung-edit-form" class="begruendung-edit-form">
+          <textarea
+            name="begruendung"
+            class="decision-textarea"
+            minlength="10"
+            maxlength="1000"
+            required
+          >{@proposal.begruendung}</textarea>
+          <div class="decision-actions">
+            <button type="submit" class="btn btn-primary">✓ Speichern</button>
+            <button type="button" phx-click="cancel_begruendung" class="btn btn-ghost">
+              ✗ Abbrechen
+            </button>
+          </div>
+        </form>
+      <% else %>
+        <div class="callout">
+          {@proposal.begruendung}
+        </div>
+      <% end %>
 
       <%= if @proposal.quellen do %>
         <div class="section-label flush spaced">Quellen</div>
@@ -324,10 +354,14 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
   defp payload_heading(:add_projekt), do: "Vorgeschlagenes Projekt"
   defp payload_heading(:add_realisierungsstrang), do: "Vorgeschlagener Realisierungsstrang"
   defp payload_heading(:change_status), do: "Vorgeschlagene Statusänderung"
+  defp payload_heading(:update_projekt), do: "Vorgeschlagene Projektaktualisierung"
+  defp payload_heading(:update_strang), do: "Vorgeschlagene Strang-Aktualisierung"
 
   defp accept_button_label(:add_projekt), do: "Projekt anlegen"
   defp accept_button_label(:add_realisierungsstrang), do: "Strang anlegen"
   defp accept_button_label(:change_status), do: "Status ändern"
+  defp accept_button_label(:update_projekt), do: "Projekt aktualisieren"
+  defp accept_button_label(:update_strang), do: "Strang aktualisieren"
 
   defp existing_labels(projekt_id) do
     query =

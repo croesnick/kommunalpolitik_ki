@@ -48,6 +48,8 @@ Jede Aussage, die ein Tool produziert und politisch relevant ist, braucht eine Q
 
 Die KI entscheidet nichts ohne GO. Keine Triage-Änderung, kein Vault-Eintrag, kein Task-Update ohne Bestätigung. Das ist nicht nur eine Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt beim Menschen. Tools sind read-only by design, wo immer möglich.
 
+GO kann in der AI-Session (Chat) erteilt werden — die AI führt die Entscheidung dann über das `decide_proposal`-MCP-Tool aus. Der Browser-Weg über die LiveView bleibt als Alternative, ist aber nicht der einzige Weg. Entscheidend ist das explizite GO durch den Menschen, nicht der Kanal.
+
 ### 8. Datenschutz-Grenze
 
 Nur Zugriff auf das, was als Stadtrat bzw. öffentlich regulär abrufbar ist. Nicht-öffentliche Unterlagen bleiben lokal und kontrolliert. Keine Schreibzugriffe ins RIS. Keine öffentliche Bereitstellung ohne Prüfung.
@@ -87,6 +89,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | Bestehend |
 | `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (geplant) | Geplant |
 | `skills/foerdermittel` | Markdown-Skill | Fördermittel-Recherche orchestrieren | Agent Skill | Funktionsfähig |
+| `skills/projekt_delta` | Markdown-Skill | Neue Infos gegen Projektstand halten, Delta produzieren | Agent Skill | Funktionsfähig |
 | `skills/projekt_tracker` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Funktionsfähig |
 | `skills/proposal_vorbereitung` | Markdown-Skill | Proposal-Workflow: sammeln → Vault → Gates → Proposal | Agent Skill | Funktionsfähig |
 | `skills/vault_suche` | Markdown-Skill | Obsidian-Vault durchsuchen | Agent Skill | Funktionsfähig |
@@ -135,6 +138,7 @@ Projekte werden über Slugs identifiziert, nicht über DB-IDs. Der Slug ist der 
 6. **Ratsinfo-Integration**: Quellen verlinken mit Sitzung/TOP
 7. **Proposal-Workflow-Skill**: `skills/proposal_vorbereitung/` ✅
 8. **Slug-basierte Projektrouten**: Slug statt ID in URLs, MCP-Tools, Vault-Tags ✅
+9. **Value Proposition + Success Metrics**: Projekt-Felder `value_proposition` + `success_metrics` als Hard Gates in `check_antragsreife` (Migration + Schema + MCP + LiveView). Bis dahin policy-level via Lifecycle-Dokument + Skills.
 
 ## Tooling-Vorgaben
 
@@ -196,6 +200,7 @@ kommunalpolitik_ki/
 │   └── pdf_ingest/         # PDF-Ingestion (AI: MCP, geplant)
 ├── skills/                 # AI-Harness-Skills
 │   ├── foerdermittel/      # Fördermittel-Recherche (AI: Agent Skill)
+│   ├── projekt_delta/      # Neue Infos gegen Projektstand halten (AI: Agent Skill)
 │   ├── projekt_tracker/    # Projekt-Standortbestimmung (AI: Agent Skill)
 │   ├── proposal_vorbereitung/ # Proposal-Workflow (AI: Agent Skill)
 │   └── vault_suche/        # Vault-Volltextsuche (AI: Agent Skill)

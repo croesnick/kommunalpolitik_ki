@@ -10,18 +10,33 @@ defmodule Ratsprojekte.MCP.Server do
 
   ## Schreib-Tools (Staging only)
 
-  `propose_realisierungsstrang`, `propose_projekt` und `propose_status_change`
-  schreiben ausschließlich in die Staging-Tabelle `pending_proposals` — nicht
-  in `realisierungsstraenge`, `projekte` bzw. in den Projekt-Status. Die AI kann
+  `propose_realisierungsstrang`, `propose_projekt`, `propose_status_change`,
+  `propose_projekt_update` und `propose_strang_update` schreiben ausschließlich
+  in die Staging-Tabelle `pending_proposals` — nicht in `realisierungsstraenge`,
+  `projekte`, den Projekt-Status bzw. in die Projektfelder. Die AI kann
   Vorschläge machen, aber nicht bestätigen oder ablehnen.
+
+  ## GO-Execution
+
+  `decide_proposal` führt ein GO aus, das der Stadtrat im Chat gegeben hat
+  (Accept/Reject). Die AI darf dieses Tool NIEMALS ohne explizites,
+  unmissverständliches GO des Stadtrats aufrufen — kein stillschweigendes
+  Accept. `entschieden_von` wird auf `"stadtrat-via-ai"` gesetzt, damit im
+  Audit-Trail klar bleibt, welches GO aus dem Chat und welches aus der
+  LiveView kam. Die Apply-Logik teilt sich dieses Tool mit der LiveView
+  (`Ratsprojekte.ProposalApplier`) — Single Source of Truth.
 
   ## GO-Prinzip
 
-  Approve/Reject eines Vorschlags geht NUR über die LiveView — bewusst KEIN
-  MCP-Tool dafür. Realisierungsstrang- und Statusänderungs-Vorschläge unter
+  Approve/Reject eines Vorschlags geht über die LiveView *oder* über das
+  `decide_proposal`-MCP-Tool (wenn der Stadtrat GO im Chat gegeben hat).
+  Beide Wege nutzen `Ratsprojekte.ProposalApplier` als Single Source of Truth.
+  Die AI ruft `decide_proposal` NIEMALS ohne explizites GO auf — das GO muss
+  vom Menschen kommen, nicht von der AI. `entschieden_von` unterscheidet:
+  `"stadtrat"` (Browser) vs. `"stadtrat-via-ai"` (Chat).
+  Realisierungsstrang- und Statusänderungs-Vorschläge unter
   `/projekte/:projekt_id/proposals/:id`, Projekt-Vorschläge unter
-  `/proposals/:id`. Der Stadtrat entscheidet, nicht die AI. Das ist das
-  disziplinarische GO-Gate für demokratische Verantwortung.
+  `/proposals/:id`.
   """
 
   use Anubis.Server,
@@ -39,6 +54,11 @@ defmodule Ratsprojekte.MCP.Server do
   component(Ratsprojekte.MCP.Tools.ProposeRealisierungsstrang)
   component(Ratsprojekte.MCP.Tools.ProposeProjekt)
   component(Ratsprojekte.MCP.Tools.ProposeStatusChange)
+  component(Ratsprojekte.MCP.Tools.ProposeProjektUpdate)
+  component(Ratsprojekte.MCP.Tools.ProposeStrangUpdate)
   component(Ratsprojekte.MCP.Tools.ListPendingProposals)
   component(Ratsprojekte.MCP.Tools.ShowPendingProposal)
+
+  # GO-Execution: führt GO aus dem Chat aus. Nur mit explizitem GO des Stadtrats.
+  component(Ratsprojekte.MCP.Tools.DecideProposal)
 end

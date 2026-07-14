@@ -99,6 +99,8 @@ aber *vor* dem Proposal, um sicherzustellen, dass der Proposal vollständig ist.
 | `beschlussvorschlag_konkret` | Gibt es einen konkreten Beschlussvorschlag (> 20 Zeichen)? | Mit Carsten formulieren |
 | `realisierungsstrang_vorhanden` | Gibt es mindestens einen Realisierungsstrang? | Strang formulieren |
 | `vorbedingungen_erfuellt` | Sind die Vorbedingungen bekannt (auch wenn offen)? | Vorbedingungen identifizieren |
+| `value_proposition_vorhanden` | Welches konkrete Problem löst das Projekt? Für wen? Was ändert sich? (> 20 Zeichen, kein reines "Digitalisierung von X") | Mit Carsten konkretisieren — kein Proposal ohne VP |
+| `success_metrics_vorhanden` | Woran wird gemessen, ob das Projekt erfolgreich war? Mindestens eine messbare Größe. | Mit Carsten definieren — kein Proposal ohne Metriken |
 
 #### Soft Gates (im Proposal beantworten)
 
@@ -176,9 +178,11 @@ propose_status_change(
 
 ## Was die AI *nicht* tut
 
-- **Kein Approve/Reject**: Es gibt bewusst kein MCP-Tool dafür. Die
-  Entscheidung liegt bei Carsten in der LiveView (`/proposals/:id`).
-  Das ist das GO-Gate, architektonisch erzwungen.
+- **Kein `decide_proposal` ohne GO**: Die AI kann Proposals vorschlagen
+  (`propose_*`-Tools) und — wenn der Stadtrat GO gibt — über
+  `decide_proposal` ausführen. Aber sie ruft `decide_proposal` NIEMALS
+  auf, ohne dass der Stadtrat im Chat explizit GO gegeben hat. Kein
+  stillschweigendes Accept. Das GO muss vom Menschen kommen.
 - **Kein Schreiben in ratsprojekte ohne Proposal**: Alle Writes gehen
   durch `pending_proposals`. Nie direktes `Repo.insert`.
 - **Keine Vault-Änderung ohne GO**: Die AI schreibt nicht ungefragt in

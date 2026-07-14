@@ -2,7 +2,7 @@ defmodule Ratsprojekte.Schemas.PendingProposal do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @typen [:add_realisierungsstrang, :add_projekt, :change_status]
+  @typen [:add_realisierungsstrang, :add_projekt, :change_status, :update_projekt, :update_strang]
   @statuses [:pending, :approved, :rejected]
 
   schema "pending_proposals" do
@@ -25,8 +25,9 @@ defmodule Ratsprojekte.Schemas.PendingProposal do
 
   # Changeset fuer neuen Vorschlag (von AI).
   # Schreibt nur in die Staging-Tabelle, nicht in realisierungsstraenge.
-  # projekt_id ist fuer :add_realisierungsstrang und :change_status Pflicht,
-  # fuer :add_projekt optional (neues Projekt ohne Eltern-Projekt).
+  # projekt_id ist fuer :add_realisierungsstrang, :change_status,
+  # :update_projekt und :update_strang Pflicht, fuer :add_projekt optional
+  # (neues Projekt ohne Eltern-Projekt).
   def propose_changeset(proposal, attrs) do
     proposal
     |> cast(attrs, [
@@ -54,6 +55,20 @@ defmodule Ratsprojekte.Schemas.PendingProposal do
       {:change_status, nil} ->
         add_error(changeset, :projekt_id, "ist für Statusänderungs-Vorschläge erforderlich")
 
+      {:update_projekt, nil} ->
+        add_error(
+          changeset,
+          :projekt_id,
+          "ist für Projektaktualisierungs-Vorschläge erforderlich"
+        )
+
+      {:update_strang, nil} ->
+        add_error(
+          changeset,
+          :projekt_id,
+          "ist für Strang-Aktualisierungs-Vorschläge erforderlich"
+        )
+
       _ ->
         changeset
     end
@@ -65,5 +80,15 @@ defmodule Ratsprojekte.Schemas.PendingProposal do
     |> cast(attrs, [:status, :entschieden_am, :entschieden_von, :entscheidungskommentar])
     |> validate_required([:status, :entschieden_am, :entschieden_von])
     |> validate_inclusion(:status, [:approved, :rejected])
+  end
+
+  # Changeset fuer manuelle Begründungs-Korrektur durch den Stadtrat (LiveView).
+  # Erlaubt das Anpassen der AI-Begründung vor der Entscheidung — GO-Prinzip:
+  # der Mensch kontrolliert und formuliert die öffentliche Begründung.
+  def update_begruendung_changeset(proposal, attrs) do
+    proposal
+    |> cast(attrs, [:begruendung])
+    |> validate_required([:begruendung])
+    |> validate_length(:begruendung, min: 10, max: 1000)
   end
 end
