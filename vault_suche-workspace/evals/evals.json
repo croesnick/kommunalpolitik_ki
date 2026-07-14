@@ -11,7 +11,7 @@
         "result.md mentions the vault name 'All The Notes'",
         "At least one 'obsidian search' command was executed (visible in commands.log)",
         "Output contains a structured Trefferliste with at least 1 relevant note about Bahnhofstraße",
-        "No automatic invocation of projekt_tracker, foerdermittel, allgaeuer_zeitung_mcp, or ratsinfo (commands.log shows only obsidian/read commands)",
+        "No automatic invocation of ratsprojekt_stand, foerdermittel_recherche, allgaeuer_zeitung_mcp, or ratsinfo (commands.log shows only obsidian/read commands)",
         "Output ends with 'Nächste Schritte' suggestions, not an automatic handoff to another skill"
       ]
     },
@@ -26,7 +26,7 @@
         "At least 2 different search terms were used (e.g. 'Kita', 'Kindergarten', 'Spielplatz', 'Kinderbetreuung') — not just one",
         "If results found: output contains a structured list with per-note relevance assessment",
         "If no results found: output has an explicit 'Nicht gefunden' section with alternative search suggestions",
-        "No automatic handoff to other skills (projekt_tracker, foerdermittel, etc.)"
+        "No automatic handoff to other skills (ratsprojekt_stand, foerdermittel_recherche, etc.)"
       ]
     },
     {
