@@ -42,7 +42,7 @@ Ein Tool ohne AI-Schnittstelle gehört nicht in dieses Repo. Die AI-Schnittstell
 
 ### 6. Quellenpflicht (nicht optional)
 
-Jede Aussage, die ein Tool produziert und politisch relevant ist, braucht eine Quelle: URL, Abrufdatum, ggf. Paragraf. Ein Stadtrat ohne Quellen ist unglaubwürdig. Ein Stadtrat mit Quellen ist eine Bastion. Das gilt für den `foerdermittel`-Skill, `ratsinfo report`, und jeden anderen Output.
+Jede Aussage, die ein Tool produziert und politisch relevant ist, braucht eine Quelle: URL, Abrufdatum, ggf. Paragraf. Ein Stadtrat ohne Quellen ist unglaubwürdig. Ein Stadtrat mit Quellen ist eine Bastion. Das gilt für den `foerdermittel_recherche`-Skill, `ratsinfo report`, und jeden anderen Output.
 
 ### 7. GO-Prinzip: AI berät, Mensch entscheidet
 
@@ -67,7 +67,7 @@ Der Obsidian-Vault ist das Gedächtnis — roh, unstrukturiert, alles. ratsproje
 - **Pflicht**: Alles, was in der OpenCode-Session entsteht, fließt als konsolidierte Notiz zurück in den Vault, *bevor* es als Proposal in ratsprojekte eingereicht wird.
 - **Kein Rückfluss**: ratsprojekte schreibt nie zurück in den Vault. ratsprojekte ist das Endprodukt, nicht der Input.
 
-Der `proposal_vorbereitung`-Skill orchestriert diesen Workflow: sammeln → konsolidieren (in den Vault) → Gates prüfen → Proposal einbringen.
+Der `ratsprojekt_proposal`-Skill orchestriert diesen Workflow: sammeln → konsolidieren (in den Vault) → Gates prüfen → Proposal einbringen.
 
 ### 11. Projektlebenszyklus (kanonisch)
 
@@ -88,10 +88,10 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | Funktionsfähig |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | Bestehend |
 | `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (geplant) | Geplant |
-| `skills/foerdermittel` | Markdown-Skill | Fördermittel-Recherche orchestrieren | Agent Skill | Funktionsfähig |
-| `skills/projekt_delta` | Markdown-Skill | Neue Infos gegen Projektstand halten, Delta produzieren | Agent Skill | Funktionsfähig |
-| `skills/projekt_tracker` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Funktionsfähig |
-| `skills/proposal_vorbereitung` | Markdown-Skill | Proposal-Workflow: sammeln → Vault → Gates → Proposal | Agent Skill | Funktionsfähig |
+| `skills/foerdermittel_recherche` | Markdown-Skill | Fördermittel-Recherche orchestrieren | Agent Skill | Funktionsfähig |
+| `skills/ratsprojekt_delta` | Markdown-Skill | Neue Infos gegen Projektstand halten, Delta produzieren | Agent Skill | Funktionsfähig |
+| `skills/ratsprojekt_stand` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Funktionsfähig |
+| `skills/ratsprojekt_proposal` | Markdown-Skill | Proposal-Workflow: sammeln → Vault → Gates → Proposal | Agent Skill | Funktionsfähig |
 | `skills/vault_suche` | Markdown-Skill | Obsidian-Vault durchsuchen | Agent Skill | Funktionsfähig |
 
 ## ratsprojekte — Planungsstand
@@ -133,10 +133,10 @@ Projekte werden über Slugs identifiziert, nicht über DB-IDs. Der Slug ist der 
 1. **MVP**: Datenmodell + Seed + LiveView — Issues #12, #13, #14 ✅
 2. **Projekt-Detailansicht**: Show-LiveView `/projekte/:id` — Issue #16 ✅
 3. **MCP-Server**: AI-Tools für lesen (GO-Prinzip) — Issue #17 ✅
-4. **AI-Skill**: „Frag den Projekt-Tracker" — `skills/projekt_tracker/` ✅
+4. **AI-Skill**: „Frag den Projekt-Tracker" — `skills/ratsprojekt_stand/` ✅
 5. **Antragsvorlagen**: Markdown-Render aus Projektdaten — Issue #15
 6. **Ratsinfo-Integration**: Quellen verlinken mit Sitzung/TOP
-7. **Proposal-Workflow-Skill**: `skills/proposal_vorbereitung/` ✅
+7. **Proposal-Workflow-Skill**: `skills/ratsprojekt_proposal/` ✅
 8. **Slug-basierte Projektrouten**: Slug statt ID in URLs, MCP-Tools, Vault-Tags ✅
 9. **Value Proposition + Success Metrics**: Projekt-Felder `value_proposition` + `success_metrics` als Hard Gates in `check_antragsreife` (Migration + Schema + MCP + LiveView). Bis dahin policy-level via Lifecycle-Dokument + Skills.
 
@@ -199,10 +199,10 @@ kommunalpolitik_ki/
 │   ├── allgaeuer_zeitung_mcp/  # AZ-Artikel (AI: MCP)
 │   └── pdf_ingest/         # PDF-Ingestion (AI: MCP, geplant)
 ├── skills/                 # AI-Harness-Skills
-│   ├── foerdermittel/      # Fördermittel-Recherche (AI: Agent Skill)
-│   ├── projekt_delta/      # Neue Infos gegen Projektstand halten (AI: Agent Skill)
-│   ├── projekt_tracker/    # Projekt-Standortbestimmung (AI: Agent Skill)
-│   ├── proposal_vorbereitung/ # Proposal-Workflow (AI: Agent Skill)
+│   ├── foerdermittel_recherche/  # Fördermittel-Recherche (AI: Agent Skill)
+│   ├── ratsprojekt_delta/      # Neue Infos gegen Projektstand halten (AI: Agent Skill)
+│   ├── ratsprojekt_stand/      # Projekt-Standortbestimmung (AI: Agent Skill)
+│   ├── ratsprojekt_proposal/   # Proposal-Workflow (AI: Agent Skill)
 │   └── vault_suche/        # Vault-Volltextsuche (AI: Agent Skill)
 ├── docs/                   # Kanonische Dokumentation
 │   └── ratsprojekte-lifecycle.md  # Projektlebenszyklus (Mermaid-Chart)

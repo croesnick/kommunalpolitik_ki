@@ -12,7 +12,7 @@
 stateDiagram-v2
     [*] --> Vault_Idee: Notiz im Obsidian-Vault
 
-    Vault_Idee --> Proposal_Pending: proposal_vorbereitung-Skill
+    Vault_Idee --> Proposal_Pending: ratsprojekt_proposal-Skill
     note right of Vault_Idee
         Noch nicht in ratsprojekte-DB.
         Slug wird hier festgelegt: #ratsprojekt/{slug}
@@ -88,7 +88,7 @@ gewünschten Lifecycle, nicht den heute vollständig enforcebaren.
 
 | Übergang | Im Code enforced? | Anmerkung |
 |---|---|---|
-| `Vault_Idee → Proposal_Pending` | nein | manueller Skill-Aufruf durch `proposal_vorbereitung` |
+| `Vault_Idee → Proposal_Pending` | nein | manueller Skill-Aufruf durch `ratsprojekt_proposal` |
 | `Proposal_Pending → Projekt_Idee` (nur via `approved`) | ✅ ja | via `decision_changeset`, `validate_inclusion(:status, [:approved, :rejected])` |
 | `Proposal_Pending → Vault_Idee` (rejected-Rücklauf) | ❌ nein | kein Reopen-Pfad im Code; Skill-Spezifikation |
 | `Projekt_Idee → Projekt_Aktiv` (nur via approved change_status) | ❌ nein | `Projekt.changeset` erlaubt jede Direction; Chart ist normativ |
@@ -141,7 +141,7 @@ nicht antragsreif, auch wenn alle anderen Hard Gates passieren.
 ```
 Obsidian-Vault (Source of Truth, roh)
     │
-    │  proposal_vorbereitung-Skill: sammeln → konsolidieren → Gates prüfen
+    │  ratsprojekt_proposal-Skill: sammeln → konsolidieren → Gates prüfen
     ▼
 ratsprojekte (Distillat, strukturiert, antragsreif)
 ```

@@ -1,5 +1,5 @@
 ---
-name: projekt_delta
+name: ratsprojekt_delta
 description: >
   Neue Informationen (Emails, Förderrichtlinien, Zeitungsartikel, Obsidian-Notizen)
   gegen den aktuellen Stand eines Stadtratsprojekts halten und ein strukturiertes
@@ -22,8 +22,8 @@ description: >
 Wenn Carsten neue Informationen zu einem **bestehenden** ratsprojekt hat und
 wissen will, was sich dadurch ändert — an Vorbedingungen, Quellen,
 Realisierungssträngen, Status oder Antragsreife. Der Skill ist **Delta-Produktion**,
-nicht Standortbestimmung (dafür: `projekt_tracker`) und nicht Proposal-Vorbereitung
-(dafür: `proposal_vorbereitung`).
+nicht Standortbestimmung (dafür: `ratsprojekt_stand`) und nicht Proposal-Vorbereitung
+(dafür: `ratsprojekt_proposal`).
 
 Der Skill endet mit einem strukturierten Delta-Report. Was danach passiert
 (Vault-Notiz ergänzen, Proposal einbringen, Status ändern), entscheidet Carsten.
@@ -90,7 +90,7 @@ neue Info in ratsprojekte einflösse?*
 
 Siehe Output-Format. Der Report ist **beratend** — die AI schlägt vor, was sich
 ändern würde, aber sie ändert nichts. Carsten entscheidet, ob eine der
-Änderungen als Proposal eingbracht wird (→ `proposal_vorbereitung`).
+Änderungen als Proposal eingbracht wird (→ `ratsprojekt_proposal`).
 
 ## GO-Prinzip: AI vergleicht, Mensch entscheidet
 
@@ -169,7 +169,7 @@ zwischen `Projekt_Idee` / `Projekt_Aktiv` / `Projekt_Abgeschlossen` /
 
 ### Nächste Schritte (GO bei Carsten)
 
-- [ ] Proposal einbringen für [Änderung]? → `proposal_vorbereitung`
+- [ ] Proposal einbringen für [Änderung]? → `ratsprojekt_proposal`
 - [ ] Vault-Notiz um neue Info ergänzen? → `vault_suche` + manuelle Notiz
 - [ ] Quellen nachtragen? → `propose_*`-Tools
 - [ ] Status ändern? → `propose_status_change`
@@ -180,17 +180,17 @@ zwischen `Projekt_Idee` / `Projekt_Aktiv` / `Projekt_Abgeschlossen` /
 
 | Vorheriger Schritt | Skill / Tool | Wann |
 |---|---|---|
-| Projekt-Stand abrufen | `projekt_tracker` oder `show_projekt` MCP | Phase 2 |
+| Projekt-Stand abrufen | `ratsprojekt_stand` oder `show_projekt` MCP | Phase 2 |
 | Vault durchsuchen | `vault_suche` | Phase 3 — Vault-Inhalte zum Projekt finden |
 | Antragsreife prüfen | `check_antragsreife` MCP | Phase 2 — Benchmark für Delta |
 | AZ-Artikel lesen | `allgaeuer_zeitung_mcp` | Wenn die neue Info ein AZ-Artikel ist |
 | Ratsinfo durchsuchen | `ratsinfo` CLI | Wenn die neue Info eine RIS-Sitzung ist |
-| Förderrecherche | `foerdermittel` | Wenn die neue Info eine Förderrichtlinie ist |
+| Förderrecherche | `foerdermittel_recherche` | Wenn die neue Info eine Förderrichtlinie ist |
 | Projektlebenszyklus | [`docs/ratsprojekte-lifecycle.md`](../../docs/ratsprojekte-lifecycle.md) | Verbindliche Referenz für Status-Übergänge |
 
 | Folgeschritt | Skill / Tool | Wann |
 |---|---|---|
-| Proposal einbringen | `proposal_vorbereitung` | Wenn Delta eine Änderung empfiehlt und Carsten GO gibt |
+| Proposal einbringen | `ratsprojekt_proposal` | Wenn Delta eine Änderung empfiehlt und Carsten GO gibt |
 | Vault-Notiz ergänzen | `vault_suche` + manuell | Wenn neue Info im Vault ergänzt werden soll |
 | Status ändern | `propose_status_change` | Wenn Delta einen Status-Wechsel empfiehlt und Carsten GO gibt |
 | Nichts tun | — | Wenn Delta keine Action-relevanten Änderungen bringt |

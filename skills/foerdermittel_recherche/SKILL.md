@@ -1,5 +1,5 @@
 ---
-name: foerdermittel
+name: foerdermittel_recherche
 description: |
   Orchestriert strukturierte Fördermittel-Recherche für kommunale Projekte.
   Nutze diesen Skill immer, wenn nach Fördergeldern, Finanzierung, Eigenanteilen,

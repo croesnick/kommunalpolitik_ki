@@ -12,7 +12,7 @@ description: >
   / zum Verkehrskonzept / zum Bauhof", „Hol mal alles aus dem Vault zu…".
   Der Skill liefert eine strukturierte Trefferliste — was danach damit passiert,
   entscheidet Carsten. Oft folgt die Weiterverarbeitung ad-hoc: Treffer gegen
-  einen Projektstand aus `projekt_tracker` halten, an `foerdermittel` anhängen,
+  einen Projektstand aus `ratsprojekt_stand` halten, an `foerdermittel_recherche` anhängen,
   oder eine AZ-/Ratsinfo-Recherche nachschieben — aber nur auf Carstens
   ausdrücklichen Wunsch.
 ---
@@ -132,9 +132,9 @@ Strukturierte Liste der relevanten Notizen:
 - [Themen, zu denen der Vault nichts hergab — explizit benennen]
 
 ### Nächste Schritte
-- Vorschlag: „Soll ich `projekt_tracker` aufrufen und schauen, welches Projekt
+- Vorschlag: „Soll ich `ratsprojekt_stand` aufrufen und schauen, welches Projekt
   zu den Treffern passt — und dann ad-hoc gegen den Projektstand halten?"
-- Vorschlag: „Soll ich in `foerdermittel` recherchieren, weil im Vault
+- Vorschlag: „Soll ich in `foerdermittel_recherche` recherchieren, weil im Vault
   Förderhinweise gefunden wurden?"
 - Oder: „Die Notizen reichen nicht — soll ich woanders suchen (AZ, RIS, Web)?"
 ```
@@ -169,10 +169,10 @@ Orchestrator, die Carsten ausdrücklich anfordert:
 
 | Folgeschritt | Skill / Weg | Wann |
 |---|---|---|
-| Bestehendes Projekt anreichern | ad-hoc gegen `projekt_tracker`-Stand halten | Wenn Treffer zu einem existierenden ratsprojekt passen |
+| Bestehendes Projekt anreichern | ad-hoc gegen `ratsprojekt_stand`-Stand halten | Wenn Treffer zu einem existierenden ratsprojekt passen |
 | Projektlebenszyklus | [`docs/ratsprojekte-lifecycle.md`](../../docs/ratsprojekte-lifecycle.md) | Verbindliche Referenz für Status-Übergänge, bei Treffern mit Projektbezug |
-| Projektstand abrufen | `projekt_tracker` | Wenn unklar ist, welches Projekt gemeint ist |
-| Förderrecherche | `foerdermittel` | Wenn Treffer Finanzierungshinweise enthalten |
+| Projektstand abrufen | `ratsprojekt_stand` | Wenn unklar ist, welches Projekt gemeint ist |
+| Förderrecherche | `foerdermittel_recherche` | Wenn Treffer Finanzierungshinweise enthalten |
 | AZ-Artikel | `allgaeuer_zeitung_mcp` | Wenn Treffer auf einen Artikel verweisen |
 | Ratsinfo | `ratsinfo` CLI | Wenn Treffer auf eine RIS-Sitzung/TOP verweisen |
 

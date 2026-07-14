@@ -1,5 +1,5 @@
 ---
-name: proposal_vorbereitung
+name: ratsprojekt_proposal
 description: >
   Leitfaden für die AI, um ein neues Stadtratsprojekt oder eine Projektänderung
   vorzubereiten und als Proposal in ratsprojekte einzubringen. Nutze diesen
@@ -23,7 +23,7 @@ Qualitätssicherungsschritt** bevor der AI das `propose_projekt`- oder
 `propose_realisierungsstrang`-MCP-Tool aufruft.
 
 Der Skill aktiviert sich *nicht* bei reinen Standortabfragen (dafür:
-`projekt_tracker`) oder Förderrecherchen (dafür: `foerdermittel`). Er
+`ratsprojekt_stand`) oder Förderrecherchen (dafür: `foerdermittel_recherche`). Er
 greift, wenn das Ziel ein **Proposal** ist.
 
 ## Architekturprinzip: Vault = Source of Truth, ratsprojekte = Distillat
@@ -58,12 +58,12 @@ Material sammeln aus allen verfügbaren Quellen:
    das er vergessen hat oder das an anderer Stelle liegt.
 
 2. **Recherche ergänzen** — je nach Thema:
-   - Förderung relevant? → `foerdermittel`-Skill
+   - Förderung relevant? → `foerdermittel_recherche`-Skill
    - Lokalberichterstattung? → `allgaeuer_zeitung_mcp`
    - Ratsinformationen? → `ratsinfo` CLI
    - Web-Recherche? → `web_search` / `web_fetch`
 
-3. **Bestehende Projekte prüfen** — `projekt_tracker` oder
+3. **Bestehende Projekte prüfen** — `ratsprojekt_stand` oder
    `search_projekte` MCP-Tool aufrufen. Gibt es schon ein Projekt, das
    dieses Thema abdeckt? Wenn ja: Proposal als `add_realisierungsstrang`
    oder `change_status` für das bestehende Projekt, nicht als neues.
@@ -72,7 +72,7 @@ Material sammeln aus allen verfügbaren Quellen:
 
 **Pflicht**: Das gesammelte Material wird zu einer konsolidierten Notiz
 destilliert und in den Vault zurückgeschrieben. Das gilt auch für Material,
-das in der OpenCode-Session entstanden ist (z.B. ein `foerdermittel`-Report).
+das in der OpenCode-Session entstanden ist (z.B. ein `foerdermittel_recherche`-Report).
 
 Die Vault-Notiz ist die Voraussetzung für den Proposal — nicht optional.
 ratsprojekte bekommt nur Distillate, nie Rohmaterial.
@@ -210,8 +210,8 @@ Quelle" markieren.
 | Vorheriger Schritt | Skill | Wann |
 |---|---|---|
 | Vault durchsuchen | `vault_suche` | Immer — Materialbasis prüfen |
-| Förderrecherche | `foerdermittel` | Wenn Finanzierung unklar |
-| Projektstand abrufen | `projekt_tracker` | Wenn bestehendes Projekt relevant |
+| Förderrecherche | `foerdermittel_recherche` | Wenn Finanzierung unklar |
+| Projektstand abrufen | `ratsprojekt_stand` | Wenn bestehendes Projekt relevant |
 | Antragsreife prüfen (post-Proposal) | `check_antragsreife` MCP-Tool | Nach Accept, für Reife-Check |
 | Projektlebenszyklus | [`docs/ratsprojekte-lifecycle.md`](../../docs/ratsprojekte-lifecycle.md) | Verbindliche Referenz für Status-Übergänge |
 

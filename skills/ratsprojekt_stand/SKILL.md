@@ -1,5 +1,5 @@
 ---
-name: projekt_tracker
+name: ratsprojekt_stand
 description: >
   Standortbestimmung für Stadtratsprojekte aus dem ratsprojekte-Dashboard abrufen.
   Zeigt Realisierungsstränge, rechtliche Vorbedingungen, offene Fristen und Quellen.

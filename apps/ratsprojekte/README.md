@@ -50,7 +50,7 @@ Registriert in `opencode.json` als remote MCP unter `ratsprojekte`.
 
 ## AI Skill
 
-`skills/projekt_tracker/SKILL.md` — "Frag den Projekt-Tracker".
+`skills/ratsprojekt_stand/SKILL.md` — "Frag den Projekt-Tracker".
 Wird automatisch von OpenCode discovered (unter `skills/`).
 
 ## Architektur
