@@ -35,3 +35,8 @@ erl_crash.dump
 # Local config (vault names, personal settings) — not tracked
 config.local.yml
 *.local.yml
+
+# Skill eval workspace artifacts (generated during skill-creator iterations)
+vault_suche-workspace/iteration-1/eval-*/
+vault_suche-workspace/iteration-1/review.html
+vault_suche-workspace/iteration-1/benchmark.md
