@@ -4,16 +4,16 @@ description: >
   Obsidian-Vault nach thematisch relevanten Notizen durchsuchen, Treffer mit
   Kontext sammeln, dem Stadtrat zur Entscheidung vorlegen. Read-only — die AI
   berät, der Mensch entscheidet (GO-Prinzip). Nutze diesen Skill immer, wenn
-  Carsten bittet, im Vault nach etwas zu suchen, Notizen zu einem Thema zu
+  der Stadtrat bittet, im Vault nach etwas zu suchen, Notizen zu einem Thema zu
   finden, oder den Vault nach Infos zu durchsuchen, die dann für etwas anderes
   (z.B. ratsprojekt anreichern, Förderrecherche) verwendet werden
   sollen. Typische Trigger: „Such im Vault nach…", „Guck mal in meinen Notizen
   nach…", „Was hab ich im Vault zu Thema X?", „Finde Notizen zur Bahnhofstraße
   / zum Verkehrskonzept / zum Bauhof", „Hol mal alles aus dem Vault zu…".
   Der Skill liefert eine strukturierte Trefferliste — was danach damit passiert,
-  entscheidet Carsten. Oft folgt die Weiterverarbeitung ad-hoc: Treffer gegen
+  entscheidet die nutzende Person. Oft folgt die Weiterverarbeitung ad-hoc: Treffer gegen
   einen Projektstand aus `ratsprojekt_stand` halten, an `foerdermittel_recherche` anhängen,
-  oder eine AZ-/Ratsinfo-Recherche nachschieben — aber nur auf Carstens
+  oder eine AZ-/Ratsinfo-Recherche nachschieben — aber nur auf
   ausdrücklichen Wunsch.
 ---
 
@@ -21,13 +21,13 @@ description: >
 
 ## Wann dieser Skill greift
 
-Wenn Carsten bittet, den Obsidian-Vault nach einem Thema, Begriff oder Konzept
-zu durchsuchen — um zu verstehen, was er schon an Notizen dazu hat, bevor es
+Wenn der Stadtrat bittet, den Obsidian-Vault nach einem Thema, Begriff oder Konzept
+zu durchsuchen — um zu verstehen, was schon an Notizen dazu vorhanden ist, bevor es
 weiterverarbeitet wird (z.B. um ein ratsprojekt anzureichern oder eine
 Förderanfrage vorzubereiten).
 
 Der Skill ist **Suche + Sammlung + Kontext**, nicht Auswertung oder
-Verarbeitung. Was nach den Treffern passiert, entscheidet Carsten — der Skill
+Verarbeitung. Was nach den Treffern passiert, entscheidet die nutzende Person — der Skill
 endet mit der Trefferliste und einem Vorschlag, was als Nächstes sinnvoll wäre.
 
 ## Konfiguration: Vault-Zugriff
@@ -47,7 +47,7 @@ obsidian:
   vault: "MeinVaultName"   # Name wie in Obsidian angezeigt
 ```
 
-Fehlt die Datei oder der `vault`-Eintrag, fragt der Skill Carsten direkt nach
+Fehlt die Datei oder der `vault`-Eintrag, fragt der Skill die nutzende Person direkt nach
 dem Vault-Namen und speichert ihn *nicht* automatisch (GO-Prinzip: die AI
 schreibt keine Config, der Mensch entscheidet, was konfiguriert wird).
 
@@ -59,14 +59,14 @@ Der Skill merkt sich den Vault-Namen für die restliche Session.
 
 - `config.local.yml` im Repo-Root lesen
 - Wenn `obsidian.vault` gesetzt: Vault-Namen übernehmen
-- Wenn nicht: Carsten fragen „Wie heißt dein Obsidian-Vault?" und für die
-  Session merken. Hinweis geben, dass er ihn in `config.local.yml` (siehe
-  `config.local.yml.example`) eintragen kann, um das erneute Fragen zu
+- Wenn nicht: die nutzende Person fragen „Wie heißt dein Obsidian-Vault?" und für die
+  Session merken. Hinweis geben, dass der Eintrag in `config.local.yml` (siehe
+  `config.local.yml.example`) erfolgen kann, um das erneute Fragen zu
   vermeiden.
 
 ### 2. Suchbegriffe ableiten
 
-Aus Carstens Anfrage die Suchbegriffe ableiten. Meist reicht der genannte
+Aus der Anfrage die Suchbegriffe ableiten. Meist reicht der genannte
 Begriff („Bahnhofstraße", „Bauhof"), aber der Skill ergänzt sinnvolle Synonyme
 und verwandte Begriffe:
 
@@ -143,7 +143,7 @@ Strukturierte Liste der relevanten Notizen:
 
 Der Skill schreibt nichts in den Vault, legt keine Notizen an, ändert keine
 Properties. Er liest und präsentiert. Was mit den Treffern passiert, entscheidet
-Carsten. Der Skill macht Vorschläge („soll ich das gegen den Stand von Projekt X
+die nutzende Person. Der Skill macht Vorschläge („soll ich das gegen den Stand von Projekt X
 halten?"), aber er führt keinen Handoff ohne ausdrücklichen GO durch.
 
 ## Quellenpflicht
@@ -165,7 +165,7 @@ generelle Quellenpflicht im Projekt hin (siehe `AGENTS.md` §6).
 
 Der Skill ist bewusst dünner Endpunkt: er sucht, sammelt, präsentiert. Die
 Verarbeitung geschieht in nachfolgenden Skills oder ad-hoc durch den
-Orchestrator, die Carsten ausdrücklich anfordert:
+Orchestrator, die nutzende Person ausdrücklich anfordert:
 
 | Folgeschritt | Skill / Weg | Wann |
 |---|---|---|
@@ -177,4 +177,4 @@ Orchestrator, die Carsten ausdrücklich anfordert:
 | Ratsinfo | `ratsinfo` CLI | Wenn Treffer auf eine RIS-Sitzung/TOP verweisen |
 
 Der Skill endet immer mit Vorschlägen aus dieser Tabelle, aber der GO liegt
-bei Carsten.
+bei der nutzenden Person.

@@ -4,7 +4,7 @@ description: |
   Orchestriert strukturierte Fördermittel-Recherche für kommunale Projekte.
   Nutze diesen Skill immer, wenn nach Fördergeldern, Finanzierung, Eigenanteilen,
   Fördertöpfen, Kumulierungsregeln, Fristen oder Förderkulissen für Projekte
-  in der Kommune (insbesondere Buchloe/Bayern) gefragt wird. Auch bei Fragen
+  in der Kommune (insbesondere in Bayern) gefragt wird. Auch bei Fragen
   wie „Was kostet das die Stadt?", „Können wir Förderung beantragen?", „Gibt
   es Geld für X?" oder „Können wir uns das leisten?" verwenden. Ebenso wenn
   es um Städtebauförderung, SUMP, KommKlimaFöR, BayFAG, BayGVFG, RZStra oder
@@ -32,7 +32,7 @@ Wer ist Eigentümer? Wer ist Baulastträger? Welche Finanzierungsmodelle gibt es
 Welche Förderungen existieren für diesen Projekttyp? Bund, Land, EU. Förderhöhe (%-Sätze), Fördervoraussetzungen, Antragsfristen. Beispiel: SUMP-Förderung (BMDV, bis 90%), Bayerische Städtebauförderung (StMB, 60-90%), KommKlimaFöR (bis 31.12.2026).
 
 ### 3. Stand vergleichbarer Konzepte
-Gibt es schon ein Verkehrskonzept, ISEK, Bauleitplanung, die relevant sind? Wurde der Antrag schon gestellt? Wo hakt es? Beispiel: In Buchloe wurde 2023 ein Verkehrskonzept gefordert, das nie richtig kam — das ist ein Ansatzpunkt.
+Gibt es schon ein Verkehrskonzept, ISEK, Bauleitplanung, die relevant sind? Wurde der Antrag schon gestellt? Wo hakt es? Beispiel: In der Kommune wurde 2023 ein Verkehrskonzept gefordert, das nie richtig kam — das ist ein Ansatzpunkt.
 
 ### 4. Best-Practices
 Welche anderen Kommunen haben Ähnliches umgesetzt? Mit welchen Kosten und Förderungen? Welche Lehren ziehen sich daraus? Beispiel: Plochingen (BW) — Bahnhofstraße neu gestaltet für 890.000€, davon 476.724€ Förderung.
@@ -141,4 +141,4 @@ bleiben 12.000€ Eigenanteil")
 
 ## Kontext: Wer diesen Skill nutzt
 
-Carsten ist Stadtrat in Buchloe (Grüne, Listenplatz 3) und Co-Sprecher der Grünen Buchloe. Die Recherche dient der Sitzungsvorbereitung, Antragsformulierung und Fraktionsarbeit. Der Output muss für Fraktionskolleg:innen verständlich sein, die kein CLI/RAG nutzen.
+Der Skill wird von einem Stadtrat in einer Kommune genutzt. Die Recherche dient der Sitzungsvorbereitung, Antragsformulierung und Fraktionsarbeit. Der Output muss für Fraktionskolleg:innen verständlich sein, die kein CLI/RAG nutzen.

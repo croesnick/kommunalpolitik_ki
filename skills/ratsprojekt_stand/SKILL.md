@@ -4,7 +4,7 @@ description: >
   Standortbestimmung für Stadtratsprojekte aus dem ratsprojekte-Dashboard abrufen.
   Zeigt Realisierungsstränge, rechtliche Vorbedingungen, offene Fristen und Quellen.
   Nutze diesen Skill immer, wenn nach dem Stand, der Machbarkeit, den Vorbedingungen
-  oder Realisierungssträngen eines konkreten kommunalen Projekts in Buchloe gefragt wird.
+  oder Realisierungssträngen eines konkreten kommunalen Projekts gefragt wird.
   Auch bei Fragen wie "Wo steht Projekt X?", "Welche Optionen haben wir für…?",
   "Was steht der Bahnhofstraße entgegen?", "Welche rechtlichen Grundlagen brauchen wir für…?"
   oder "Gibt es einen Plan B für…?" verwenden.
@@ -14,7 +14,7 @@ description: >
 
 ## Wann dieser Skill greift
 
-Wenn Carsten nach dem Stand eines Projekts, nach Realisierungsoptionen,
+Wenn der Stadtrat nach dem Stand eines Projekts, nach Realisierungsoptionen,
 nach Vorbedingungen oder nach rechtlichen Grundlagen fragt — für Projekte,
 die im ratsprojekte-Tracker erfasst sind (Bahnhofstraße, Gennachpark,
 Freibad, und zukünftige).

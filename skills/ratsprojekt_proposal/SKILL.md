@@ -3,7 +3,7 @@ name: ratsprojekt_proposal
 description: >
   Leitfaden für die AI, um ein neues Stadtratsprojekt oder eine Projektänderung
   vorzubereiten und als Proposal in ratsprojekte einzubringen. Nutze diesen
-  Skill immer, wenn Carsten ein neues Projekt vorschlagen will, eine Idee in
+  Skill immer, wenn der Stadtrat ein neues Projekt vorschlagen will, eine Idee in
   ein ratsprojekt überführen will, oder einen Strang/Status zu einem
   bestehenden Projekt hinzufügen will. Auch bei „Ich will das als Projekt
   anlegen", „Kannst du das als Proposal einbringen?", „Mach daraus ein
@@ -16,7 +16,7 @@ description: >
 
 ## Wann dieser Skill greift
 
-Wenn Carsten Material, Ideen oder Recherchen hat, die in ein ratsprojekt
+Wenn der Stadtrat Material, Ideen oder Recherchen hat, die in ein ratsprojekt
 einfließen sollen — als neues Projekt, als neuer Realisierungsstrang, oder
 als Statusänderung. Der Skill ist der **Strukturierungs- und
 Qualitätssicherungsschritt** bevor der AI das `propose_projekt`- oder
@@ -54,8 +54,8 @@ ratsprojekte (Distillat — strukturiert, antragsreif, quellenbelegt)
 Material sammeln aus allen verfügbaren Quellen:
 
 1. **Vault durchsuchen** — `vault_suche`-Skill aufrufen, um bestehende
-   Notizen zum Thema zu finden. Carsten hat oft schon Material im Vault,
-   das er vergessen hat oder das an anderer Stelle liegt.
+   Notizen zum Thema zu finden. Oft liegt bereits Material im Vault vor,
+   das vergessen wurde oder an anderer Stelle liegt.
 
 2. **Recherche ergänzen** — je nach Thema:
    - Förderung relevant? → `foerdermittel_recherche`-Skill
@@ -95,12 +95,12 @@ aber *vor* dem Proposal, um sicherzustellen, dass der Proposal vollständig ist.
 | Gate | Frage | Bei Nein |
 |---|---|---|
 | `quellen_vorhanden` | Hat das Projekt mindestens eine Quelle mit URL und Abrufdatum? | Quellen nachtragen, *dann* vorschlagen |
-| `adressat_gesetzt` | Ist klar, an wen der Antrag gerichtet ist (Stadtrat, Bürgermeister, Vergabeausschuss)? | Mit Carsten klären |
-| `beschlussvorschlag_konkret` | Gibt es einen konkreten Beschlussvorschlag (> 20 Zeichen)? | Mit Carsten formulieren |
+| `adressat_gesetzt` | Ist klar, an wen der Antrag gerichtet ist (Stadtrat, Bürgermeister, Vergabeausschuss)? | Mit dem Stadtrat klären |
+| `beschlussvorschlag_konkret` | Gibt es einen konkreten Beschlussvorschlag (> 20 Zeichen)? | Mit dem Stadtrat formulieren |
 | `realisierungsstrang_vorhanden` | Gibt es mindestens einen Realisierungsstrang? | Strang formulieren |
 | `vorbedingungen_erfuellt` | Sind die Vorbedingungen bekannt (auch wenn offen)? | Vorbedingungen identifizieren |
-| `value_proposition_vorhanden` | Welches konkrete Problem löst das Projekt? Für wen? Was ändert sich? (> 20 Zeichen, kein reines "Digitalisierung von X") | Mit Carsten konkretisieren — kein Proposal ohne VP |
-| `success_metrics_vorhanden` | Woran wird gemessen, ob das Projekt erfolgreich war? Mindestens eine messbare Größe. | Mit Carsten definieren — kein Proposal ohne Metriken |
+| `value_proposition_vorhanden` | Welches konkrete Problem löst das Projekt? Für wen? Was ändert sich? (> 20 Zeichen, kein reines "Digitalisierung von X") | Mit dem Stadtrat konkretisieren — kein Proposal ohne VP |
+| `success_metrics_vorhanden` | Woran wird gemessen, ob das Projekt erfolgreich war? Mindestens eine messbare Größe. | Mit dem Stadtrat definieren — kein Proposal ohne Metriken |
 
 #### Soft Gates (im Proposal beantworten)
 
@@ -118,7 +118,7 @@ aber *vor* dem Proposal, um sicherzustellen, dass der Proposal vollständig ist.
 | `konsensfaehigkeit` | Ist der Antrag mehrheitsfähig? |
 | `widerspruch_fraktionsposition` | Widerspricht der Antrag der Fraktionsposition? |
 
-Die AI bewertet diese *nicht*. Sie weist Carsten darauf hin, dass diese
+Die AI bewertet diese *nicht*. Sie weist die nutzende Person darauf hin, dass diese
 vor der finalen Einreichung geprüft werden müssen.
 
 ### Phase 4: Proposal einbringen
@@ -140,7 +140,7 @@ propose_projekt(
 ```
 
 Das Tool liefert eine `review_url` (z.B.
-`http://localhost:4000/proposals/5`). Carsten prüft dort und klickt
+`http://localhost:4000/proposals/5`). Die nutzende Person prüft dort und klickt
 Accept oder Reject (GO-Gate).
 
 **Slug-Konvention**: Der Slug ist der stabile Vertrag zwischen ratsprojekte
@@ -186,11 +186,11 @@ propose_status_change(
 - **Kein Schreiben in ratsprojekte ohne Proposal**: Alle Writes gehen
   durch `pending_proposals`. Nie direktes `Repo.insert`.
 - **Keine Vault-Änderung ohne GO**: Die AI schreibt nicht ungefragt in
-  den Vault. Sie schlägt die konsolidierte Notiz vor und Carsten
+  den Vault. Sie schlägt die konsolidierte Notiz vor und die nutzende Person
   entscheidet, ob sie in den Vault kommt.
 - **Keine politische Bewertung**: Die AI bewertet nicht, ob ein Antrag
   mehrheitsfähig ist oder der Fraktionsposition widerspricht. Das
-  bleibt bei Carsten.
+  bleibt bei der nutzenden Person.
 
 ## Quellenpflicht
 
@@ -219,11 +219,11 @@ Quelle" markieren.
 
 Der Skill endet mit:
 
-1. **Konsolidierte Vault-Notiz** (Vorschlag an Carsten, mit GO)
+1. **Konsolidierte Vault-Notiz** (Vorschlag an die nutzende Person, mit GO)
 2. **Proposal-Aufruf** (MCP-Tool), falls Gates erfüllt
 3. **Review-URL** (`http://localhost:4000/proposals/:id`)
 4. **Hinweis auf offene Gates** (welche Soft/Political Gates noch offen sind)
 
 Wenn die Gates *nicht* erfüllt sind: kein Proposal, sondern eine
-Liste der offenen Fragen an Carsten. Erst wenn alle Hard Gates
+Liste der offenen Fragen an die nutzende Person. Erst wenn alle Hard Gates
 beantwortet sind, wird vorgeschlagen.

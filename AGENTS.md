@@ -4,7 +4,7 @@ Tools für die Stadtratsarbeit: RIS durchsuchen, PDFs ingesten, Fördermittel re
 
 ## Kontext
 
-Carsten ist Stadtrat in Buchloe (Grüne, Listenplatz 3) und Co-Sprecher der Grünen Buchloe. Dieses Repo bündelt CLI-Tools und MCP-Server, die die kommunalpolitische Arbeit erleichtern. Der übergeordnete Spin ist der Talk „KI als Gemeinderat" — ein AI Harness für Ratsarbeit mit Quellenbindung, lokaler Datensouveränität und demokratischer Verantwortung.
+Dieses Repo bündelt CLI-Tools und MCP-Server, die die kommunalpolitische Arbeit erleichtern — ein AI-Harness für Ratsarbeit mit Quellenbindung, lokaler Datensouveränität und demokratischer Verantwortung.
 
 ## Projekt-Verwaltung
 
@@ -75,6 +75,16 @@ Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Ab
 
 **Pflicht**: Bei Änderungen am Lifecycle (neue States, Übergänge, Gates) wird zuerst das Lifecycle-Dokument aktualisiert, *bevor* Code oder Skills angepasst werden. Jede OpenCode-Sitzung, die Workflow-Änderungen vornimmt, prüft und aktualisiert das Dokument.
 
+### Kanonische Dokumentation unter `docs/`
+
+| Dokument | Zweck | Single Source of Truth für |
+|---|---|---|
+| [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) | Projektlebenszyklus (Mermaid-Chart) | Statuswerte, Übergänge, Gates |
+| [`docs/workflows.md`](docs/workflows.md) | Use Cases & Lückenanalyse für die Ratsarbeit | Workflows, Lücken, Priorisierung |
+| [`docs/nomenklatur.md`](docs/nomenklatur.md) | Fachbegriffe der Ratsarbeit | Begriffsdefinitionen (Sitzungsmappe, Ratsprojekt, Vault, etc.) |
+
+Diese drei Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows oder Begriffen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
+
 ## Lizenz-Bewusstsein
 
 Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder kommerziell von Artifex). Für ein persönliches/Open-Source-Projekt ist AGPL in Ordnung; bei proprietärer Nutzung Alternative evaluieren (`pdfplumber` MIT, `pdf.js` Apache-2.0). Pro Tool in der Tool-Doku dokumentieren.
@@ -87,7 +97,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard | LiveView + MCP (`/mcp`) | Funktionsfähig |
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | Funktionsfähig |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | Bestehend |
-| `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (geplant) | Geplant |
+| `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (nicht in opencode.json registriert) | Funktionsfähig |
 | `skills/foerdermittel_recherche` | Markdown-Skill | Fördermittel-Recherche orchestrieren | Agent Skill | Funktionsfähig |
 | `skills/ratsprojekt_delta` | Markdown-Skill | Neue Infos gegen Projektstand halten, Delta produzieren | Agent Skill | Funktionsfähig |
 | `skills/ratsprojekt_stand` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Funktionsfähig |
@@ -205,7 +215,9 @@ kommunalpolitik_ki/
 │   ├── ratsprojekt_proposal/   # Proposal-Workflow (AI: Agent Skill)
 │   └── vault_suche/        # Vault-Volltextsuche (AI: Agent Skill)
 ├── docs/                   # Kanonische Dokumentation
-│   └── ratsprojekte-lifecycle.md  # Projektlebenszyklus (Mermaid-Chart)
+│   ├── ratsprojekte-lifecycle.md  # Projektlebenszyklus (Mermaid-Chart)
+│   ├── workflows.md               # Use Cases & Lückenanalyse der Ratsarbeit
+│   └── nomenklatur.md             # Fachbegriffe der Ratsarbeit
 ├── artifacts/              # shared Elixir build output (gitignored)
 ├── mix.exs                 # workspace root
 ├── .workspace.exs
@@ -218,7 +230,7 @@ kommunalpolitik_ki/
 
 ## RIS-Datenquelle
 
-Das Ratsinformationssystem der VGem Buchloe läuft unter:
+Das Ratsinformationssystem der Verwaltungsgemeinschaft läuft unter:
 
 ```
 https://ris.komuna.net/vgbuchloe/Meeting.mvc/Calendar?atDate=1.1.2025

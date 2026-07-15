@@ -6,7 +6,7 @@ description: >
   Delta produzieren. Zeigt auf, welche Vorbedingungen sich ändern würden, welche
   neuen Quellen entstehen, und ob die Antragsreife steigt oder sinkt. Read-only —
   die AI berät, der Mensch entscheidet (GO-Prinzip). Nutze diesen Skill immer, wenn
-  Carsten neue Informationen zu einem bestehenden Projekt hat und wissen will, was
+  der Stadtrat neue Informationen zu einem bestehenden Projekt hat und wissen will, was
   sich dadurch ändert. Typische Trigger: „Hier ist eine Email von …", „Neue
   Förderrichtlinie ist raus", „Ich hab eine Notiz aus dem Vault", „Schau dir das
   mal an, was bedeutet das für Projekt X?", „Laut diesem Artikel soll die
@@ -19,14 +19,14 @@ description: >
 
 ## Wann dieser Skill greift
 
-Wenn Carsten neue Informationen zu einem **bestehenden** ratsprojekt hat und
+Wenn der Stadtrat neue Informationen zu einem **bestehenden** ratsprojekt hat und
 wissen will, was sich dadurch ändert — an Vorbedingungen, Quellen,
 Realisierungssträngen, Status oder Antragsreife. Der Skill ist **Delta-Produktion**,
 nicht Standortbestimmung (dafür: `ratsprojekt_stand`) und nicht Proposal-Vorbereitung
 (dafür: `ratsprojekt_proposal`).
 
 Der Skill endet mit einem strukturierten Delta-Report. Was danach passiert
-(Vault-Notiz ergänzen, Proposal einbringen, Status ändern), entscheidet Carsten.
+(Vault-Notiz ergänzen, Proposal einbringen, Status ändern), entscheidet die nutzende Person.
 
 ## Architekturprinzip: Drei Divergenz-Richtungen
 
@@ -43,7 +43,7 @@ one-way flow (Vault → ratsprojekte): Divergenz zwischen Vault und ratsprojekte
 
 ### Phase 1: Neue Info aufnehmen
 
-Carsten liefert neue Informationen. Mögliche Formate:
+Der Stadtrat liefert neue Informationen. Mögliche Formate:
 
 - **Email / Brief / Gesprächsinhalt** — als Text oder Zusammenfassung
 - **Zeitungsartikel** — URL oder Text (→ `allgaeuer_zeitung_mcp` für AZ, `web_fetch` für andere)
@@ -89,13 +89,13 @@ neue Info in ratsprojekte einflösse?*
 ### Phase 5: Delta-Report ausgeben
 
 Siehe Output-Format. Der Report ist **beratend** — die AI schlägt vor, was sich
-ändern würde, aber sie ändert nichts. Carsten entscheidet, ob eine der
+ändern würde, aber sie ändert nichts. Die nutzende Person entscheidet, ob eine der
 Änderungen als Proposal eingbracht wird (→ `ratsprojekt_proposal`).
 
 ## GO-Prinzip: AI vergleicht, Mensch entscheidet
 
 Der Skill ist **read-only**. Er liest ratsprojekte (via MCP), liest den Vault
-(via `vault_suche`), liest die neue Info (von Carsten geliefert) und produziert
+(via `vault_suche`), liest die neue Info (von der nutzenden Person geliefert) und produziert
 ein Delta. Er trägt nichts in die Datenbank ein, ändert keinen Status, markiert
 keine Vorbedingungen als erfüllt. Das ist nicht nur eine Arbeitsregel, sondern
 ethische Architektur: demokratische Verantwortung bleibt beim Stadtrat.
@@ -167,7 +167,7 @@ zwischen `Projekt_Idee` / `Projekt_Aktiv` / `Projekt_Abgeschlossen` /
 - [Wichtigste Änderung 2]
 - [Empfehlung: Proposal einbringen / Vault-Notiz ergänzen / Status ändern / nichts tun]
 
-### Nächste Schritte (GO bei Carsten)
+### Nächste Schritte (GO durch die nutzende Person)
 
 - [ ] Proposal einbringen für [Änderung]? → `ratsprojekt_proposal`
 - [ ] Vault-Notiz um neue Info ergänzen? → `vault_suche` + manuelle Notiz
@@ -190,7 +190,7 @@ zwischen `Projekt_Idee` / `Projekt_Aktiv` / `Projekt_Abgeschlossen` /
 
 | Folgeschritt | Skill / Tool | Wann |
 |---|---|---|
-| Proposal einbringen | `ratsprojekt_proposal` | Wenn Delta eine Änderung empfiehlt und Carsten GO gibt |
+| Proposal einbringen | `ratsprojekt_proposal` | Wenn Delta eine Änderung empfiehlt und die nutzende Person GO gibt |
 | Vault-Notiz ergänzen | `vault_suche` + manuell | Wenn neue Info im Vault ergänzt werden soll |
-| Status ändern | `propose_status_change` | Wenn Delta einen Status-Wechsel empfiehlt und Carsten GO gibt |
+| Status ändern | `propose_status_change` | Wenn Delta einen Status-Wechsel empfiehlt und die nutzende Person GO gibt |
 | Nichts tun | — | Wenn Delta keine Action-relevanten Änderungen bringt |
