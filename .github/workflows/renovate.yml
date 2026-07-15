@@ -1,0 +1,31 @@
+name: Renovate
+
+on:
+  schedule:
+    # Every 6 hours — plenty for a single personal repo.
+    # Renovate deduplicates within its window, so hourly is fine but noisier.
+    - cron: '0 6/6 * * *'
+  workflow_dispatch:
+    inputs:
+      log_level:
+        description: 'Renovate log level'
+        required: false
+        default: info
+
+permissions: {} # Renovate uses the PAT, not GITHUB_TOKEN
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Self-hosted Renovate
+        uses: renovatebot/github-action@v46
+        env:
+          LOG_LEVEL: ${{ github.event.inputs.log_level || 'info' }}
+          # Self-hosted config via env — the action does NOT auto-detect the
+          # current repo. Root renovate.json is picked up automatically as
+          # per-repo config.
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+          RENOVATE_PLATFORM: github
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_REPOSITORY_CACHE: enabled

@@ -1,4 +1,4 @@
-name: Elixir CI
+name: elixir
 
 on:
   push:
@@ -6,53 +6,57 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: elixir-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   elixir:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        elixir: ["1.19"]
-        otp: ["27"]
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: erlef/setup-beam@v1
+      - name: Setup Erlang/Elixir
+        id: setup-beam
+        uses: erlef/setup-beam@v1
         with:
-          elixir-version: ${{ matrix.elixir }}
-          otp-version: ${{ matrix.otp }}
+          elixir-version: "1.19.x"
+          otp-version: "27"
 
-      - name: Restore deps cache
+      - name: Restore deps & build cache
         uses: actions/cache@v4
         with:
-          path: artifacts/deps
-          key: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+          path: |
+            artifacts/deps
+            _build
+          key: elixir-deps-${{ runner.os }}-${{ steps.setup-beam.outputs.otpvsn }}-${{ steps.setup-beam.outputs.elixirvsn }}-${{ hashFiles('**/workspace.lock') }}
           restore-keys: |
-            deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
+            elixir-deps-${{ runner.os }}-${{ steps.setup-beam.outputs.otpvsn }}-${{ steps.setup-beam.outputs.elixirvsn }}-
+            elixir-deps-${{ runner.os }}-${{ steps.setup-beam.outputs.otpvsn }}-
+            elixir-deps-${{ runner.os }}-
 
-      - name: Restore build cache
-        uses: actions/cache@v4
-        with:
-          path: artifacts/build
-          key: build-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            build-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
-
-      - name: Install deps
+      - name: Install dependencies
         run: |
           mix deps.get
           mix workspace.run -t deps.get
 
-      - name: Compile
-        run: mix compile --warnings-as-errors
-
       - name: Check formatting
         run: mix format --check-formatted
 
-      - name: Credo
+      - name: Compile (warnings as errors)
+        run: mix compile --warnings-as-errors
+
+      - name: Lint (credo)
         run: mix workspace.run -t credo -p ratsinfo -p shared -- --strict
 
-      - name: Test
+      - name: Tests
         run: mix workspace.run -t test -p ratsinfo -p shared -- --cover
+
+      # Note: mix dialyzer intentionally omitted. Only 2 of 3 workspace apps
+      # have dialyxir as a dependency — ratsprojekte does not — so a workspace-
+      # wide dialyzer run would fail.
