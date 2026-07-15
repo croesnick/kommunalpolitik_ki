@@ -82,8 +82,9 @@ Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Ab
 | [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) | Projektlebenszyklus (Mermaid-Chart) | Statuswerte, Übergänge, Gates |
 | [`docs/workflows.md`](docs/workflows.md) | Use Cases & Lückenanalyse für die Ratsarbeit | Workflows, Lücken, Priorisierung |
 | [`docs/nomenklatur.md`](docs/nomenklatur.md) | Fachbegriffe der Ratsarbeit | Begriffsdefinitionen (Sitzungsmappe, Ratsprojekt, Vault, etc.) |
+| [`docs/prerequisites.md`](docs/prerequisites.md) | Externe Abhängigkeiten (nicht im Repo) | Installationsanleitungen, Fallbacks, benötigt von |
 
-Diese drei Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows oder Begriffen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
+Diese vier Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows, Begriffen oder Voraussetzungen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
 
 ## Lizenz-Bewusstsein
 
@@ -97,12 +98,22 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard | LiveView + MCP (`/mcp`) | Funktionsfähig |
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | Funktionsfähig |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | Bestehend |
-| `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (nicht in opencode.json registriert) | Funktionsfähig |
+| `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (`opencode.json`) | Funktionsfähig |
 | `skills/foerdermittel_recherche` | Markdown-Skill | Fördermittel-Recherche orchestrieren | Agent Skill | Funktionsfähig |
 | `skills/ratsprojekt_delta` | Markdown-Skill | Neue Infos gegen Projektstand halten, Delta produzieren | Agent Skill | Funktionsfähig |
 | `skills/ratsprojekt_stand` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Funktionsfähig |
 | `skills/ratsprojekt_proposal` | Markdown-Skill | Proposal-Workflow: sammeln → Vault → Gates → Proposal | Agent Skill | Funktionsfähig |
+| `skills/sitzungsvorbereitung` | Markdown-Skill | Sitzungsmappe erstellen (WF 1: sync → TOPs → AZ → Vault → Mappe) | Agent Skill | Funktionsfähig |
 | `skills/vault_suche` | Markdown-Skill | Obsidian-Vault durchsuchen | Agent Skill | Funktionsfähig |
+
+### Externe Abhängigkeiten (nicht im Repo)
+
+| Abhängigkeit | Rolle | Verwendung von |
+|---|---|---|
+| `obsidian` CLI | Vault-Read/Write (Obsidian-App muss laufen) | `vault_suche`, `sitzungsvorbereitung`, `ratsprojekt_proposal` |
+| `obsidian-cli` Skill | Anleitung für `obsidian` CLI (global installiert unter `~/.agents/skills/obsidian-cli/`) | alle Vault-Workflows |
+
+> **Hinweis:** Der `obsidian` CLI ist eine externe Abhängigkeit, die lokal installiert sein muss. Vollständige Dokumentation (Install, Konfiguration, Fallbacks, Limitierungen) siehe [`docs/prerequisites.md`](docs/prerequisites.md).
 
 ## ratsprojekte — Planungsstand
 

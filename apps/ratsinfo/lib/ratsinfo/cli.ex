@@ -102,18 +102,19 @@ defmodule Ratsinfo.CLI do
           name: "sessions",
           description: "Gespeicherte Sitzungen auflisten",
           options: [
-            remote: [
-              short: "r",
-              long: "remote",
-              help: "Von API abrufen statt aus lokaler DB",
-              flag: true
-            ],
             client_id: [
               value_name: "CLIENT_ID",
               short: "c",
               long: "client",
               help: "Client-ID (nur mit --remote)",
               default: "32"
+            ]
+          ],
+          flags: [
+            remote: [
+              short: "r",
+              long: "remote",
+              help: "Von API abrufen statt aus lokaler DB"
             ]
           ]
         ],
@@ -189,9 +190,13 @@ defmodule Ratsinfo.CLI do
   end
 
   defp run({:ok, [command], result}), do: run_command(command, result)
-  defp run({:error, reason}), do: IO.puts("Error: #{inspect(reason)}")
+  defp run({:error, reason}), do: IO.puts("Error: #{format_error(reason)}")
+  defp run({:error, _path, reason}), do: IO.puts("Error: #{format_error(reason)}")
   defp run(:help), do: :ok
   defp run(:version), do: IO.puts("ratsinfo 0.1.0")
+
+  defp format_error(reason) when is_list(reason), do: Enum.join(reason, ", ")
+  defp format_error(reason), do: inspect(reason)
 
   # --- Commands ---
 
@@ -248,7 +253,7 @@ defmodule Ratsinfo.CLI do
   end
 
   defp run_command(:sessions, opts) do
-    if opts.options.remote do
+    if opts.flags[:remote] do
       client_id = String.to_integer(opts.options.client_id)
       {:ok, sitzungen} = ApiClient.list_sitzungen(client_id: client_id)
       print_remote_sessions(sitzungen)
@@ -305,7 +310,18 @@ defmodule Ratsinfo.CLI do
   end
 
   defp run_command(:open, opts) do
-    IO.puts("Dokument-Download noch nicht implementiert (ID: #{opts.args.id})")
+    :ok = Store.init()
+
+    doc_id = opts.args.id
+
+    case Store.get_dokument(doc_id) do
+      nil ->
+        IO.puts("Dokument #{doc_id} nicht gefunden. Führe 'ratsinfo sync' aus.")
+
+      dokument ->
+        download_and_open(dokument)
+    end
+
     :ok
   end
 
@@ -338,6 +354,59 @@ defmodule Ratsinfo.CLI do
     end
 
     :ok
+  end
+
+  # --- Download Helpers ---
+
+  defp download_and_open(dokument) do
+    download_dir = download_path()
+    File.mkdir_p!(download_dir)
+
+    filename = build_filename(dokument)
+    local_path = Path.join(download_dir, filename)
+
+    if dokument.downloaded and File.exists?(local_path) do
+      IO.puts("Bereits heruntergeladen: #{local_path}")
+    else
+      IO.puts("Lade Dokument #{dokument.id} herunter...")
+
+      {:ok, token} = Auth.get_token()
+
+      case ApiClient.download_dokument(dokument.id, token) do
+        {:ok, binary} ->
+          File.write!(local_path, binary)
+          Store.mark_downloaded(dokument.id, local_path)
+          IO.puts("Gespeichert: #{local_path}")
+
+        {:error, reason} ->
+          IO.puts("Download fehlgeschlagen: #{inspect(reason)}")
+          :ok
+      end
+    end
+
+    open_file(local_path)
+  end
+
+  defp download_path do
+    System.get_env("RATSINFO_DOWNLOAD_DIR") ||
+      Path.join(System.user_home!(), ".cache/ratsinfo/downloads")
+  end
+
+  defp build_filename(dokument) do
+    name = dokument.name || dokument.id
+    ext = dokument.fileext || ".pdf"
+    # Dateisystem-sicheren Namen erzeugen
+    safe_name = name |> String.replace(~r/[^\w\-]/, "_") |> String.trim("_")
+    "#{safe_name}#{ext}"
+  end
+
+  defp open_file(path) do
+    cmd = if macos?(), do: "open", else: "xdg-open"
+    System.cmd(cmd, [path], stderr_to_stdout: true)
+  end
+
+  defp macos? do
+    :os.type() == {:unix, :darwin}
   end
 
   # --- Sync Helpers ---

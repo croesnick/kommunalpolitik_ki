@@ -27,22 +27,59 @@ bündelt. Die Sitzungsmappe ist ein Vault-Tool, nicht Teil von ratsprojekte.
 | Schritt | Tool / Skill | Status |
 |---|---|---|
 | Agenda abrufen (Sitzungen + TOPs) | `ratsinfo sessions --remote` + `ratsinfo show <id>` | ✅ |
-| Vorlagen-PDFs lesen | `pdf_ingest ingest(path)` | ⚠️ Code existiert, nicht als MCP registriert |
+| Vorlagen-PDFs lesen | `pdf_ingest ingest(path)` | ✅ Registriert in opencode.json |
 | Querverweis: hängt ein TOP an einem Ratsprojekt? | `ratsinfo search` + `ratsprojekte search_projekte` | ❌ Kein automatischer Link RIS-Sitzung ↔ Ratsprojekt |
 | AZ-Artikel zum Thema finden | `allgaeuer_zeitung_mcp search_articles` | ✅ |
 | Vault-Notizen zum Thema | `vault_suche` | ✅ |
-| Sitzungsmappe im Vault erstellen | Vault-Write (externer Skill `obsidian-cli`) | ❌ Kein Workflow-Skill, keine Vault-Write-Integration |
+| Sitzungsmappe im Vault erstellen | Vault-Write (externer Skill `obsidian-cli`) | ⚠️ Vault-Write via obsidian-cli möglich, Skill folgt |
 
 ### Lücken
 
-- **pdf_ingest nicht als MCP registriert** — Blocker: die AI kann PDFs nicht
-  verarbeiten, obwohl der Code fertig ist.
-- **Kein "Sitzungsvorbereitung"-Skill**, der den Workflow orchestriert
-  (Agenda → PDFs → Cross-Ref Projekte → AZ → Vault → Sitzungsmappe).
+- **~~pdf_ingest nicht als MCP registriert~~** — ✅ Behoben. pdf_ingest ist
+  jetzt in `opencode.json` eingetragen.
+- **Sitzungsvorbereitung-Skill fehlt noch** — Pipeline manuell getestet und
+  funktioniert (sync → show → AZ → vault_suche → obsidian create). Skill unter
+  `skills/sitzungsvorbereitung/` folgt.
 - **Kein RIS↔Ratsprojekt-Link** — TOPs und Projekte sind isoliert.
 - **Sitzungsmappe als Vault-Tool**: Für jede Sitzung soll eine Notiz im Vault
   entstehen, die alle Vorbereitungsergebnisse bündelt. Dafür brauchen wir
   Vault-Write-Fähigkeit (externer Skill `obsidian-cli` als Voraussetzung).
+
+**Test 15.07.2026:** Pipeline manuell durchgespielt für 3. Stadtratssitzung
+(21.07.2026). Sync: 2 neue Sitzungen gezogen (66→68). TOPs +
+Beschlussvorschläge via `ratsinfo show`. AZ-Artikel zur Gansbichlstraße
+gefunden und eingebunden. Vault-Suche lieferte Treffer zu Bahnhofstraße und
+KinderKram. Sitzungsmappe in Vault geschrieben via `obsidian eval` (Ordner +
+Datei erstellt). Bekannte Lücken: `ratsinfo sessions --remote` Bug,
+`ratsinfo open` Stub, RIS-Volltextsuche findet "Gansbichl" nicht.
+
+### Datenfluss & Trust Boundaries
+
+Die Pipeline führt externe Strings (AZ-Artikel-Titel, RIS-TOP-Titel,
+PDF-Dateinamen) durch mehrere Stufen und serialisiert sie am Ende als
+YAML-Frontmatter. Das Frontmatter ist die einzige strukturierte
+Schnittstelle zum Vault — und genau da können Zeichen aus externen Quellen
+das Format brechen.
+
+```
+RIS-API (HTML)  → ratsinfo (SQLite) → CLI-Output (Text)
+AZ-MCP (JSON)   → Artikel-Titel (Strings)
+Vault-Suche     → obsidian CLI (Text)
+                         ↓
+           AI komponiert → Markdown + YAML-Frontmatter
+                         ↓
+                  obsidian write → Vault-Datei
+                         ↓
+              ⚠ Validierung? (bisher: keine)
+```
+
+**Bug-Klasse:** Deutsche typografische Anführungszeichen („...") in
+double-quoted YAML-Strings werden als String-Ende interpretiert →
+ungültiges YAML → Properties in Obsidian nicht sichtbar.
+
+**Gefunden am 15.07.2026:** AZ-Titel `„Völlig konsterniert" – Anwohner...`
+brach das Frontmatter der Sitzungsmappe. Gefixt durch Single-Quotes als
+YAML-Wrapper. Validierung in Skill `sitzungsvorbereitung` dokumentiert.
 
 > **Abgrenzung:** Anträge und Änderungsanträge formulieren ist *nicht* Teil
 > der Sitzungsvorbereitung. Das ist ein nachgelagerter Schritt, der auf der
@@ -319,15 +356,15 @@ nach der Sitzung (basierend auf Beschlüssen) einen Nachbericht.
 
 | # | Lücke | Fix | Workflow |
 |---|---|---|---|
-| 1 | pdf_ingest nicht als MCP registriert | `opencode.json`-Eintrag | WF 1, 3, 7 |
+| ~~1~~ | ~~pdf_ingest nicht als MCP registriert~~ (erledigt) | ✅ In `opencode.json` eingetragen | WF 1, 3, 7 |
 | 2 | `ratsinfo open` ist Stub | Implementieren: PDF-Download + Öffnen | WF 7 |
-| 3 | Vault-Write-Gap | `obsidian-cli`-Skill als Voraussetzung referenzieren | WF 1, 2, 6, 8 |
+| 3 | Vault-Write-Gap | `obsidian-cli` erfolgreich getestet (Ordner + Datei via `obsidian eval`), Vault-Write funktioniert — Integration in Skill folgt | WF 1, 2, 6, 8 |
 
 ### 🟡 Workflow-Skills fehlen
 
 | # | Skill / Feature | Beschreibung | Workflow |
 |---|---|---|---|
-| 4 | sitzungsvorbereitung | Agenda → PDFs → Cross-Ref Projekte → AZ → Vault → Sitzungsmappe | WF 1 |
+| 4 | sitzungsvorbereitung | in Arbeit — Pipeline getestet, Skill folgt | WF 1 |
 | 5 | beschluss_tracking | RIS-Beschluss-ID in ratsprojekt + Fristen-Tracking | WF 4 |
 | 6 | ris_sync_cross_check | RIS-Sync → "was ist neu zu meinen Projekten?" | WF 4 |
 
@@ -343,3 +380,4 @@ nach der Sitzung (basierend auf Beschlüssen) einen Nachbericht.
 | 12 | Bürgeranliegen im Vault | Notiz-Template + Tag-Konvention + Link zu Fraktionssitzungen | WF 8 |
 | 13 | Nextcloud-MCP | WebDAV/CalDAV-Anbindung, ODS-Parsing, Datei-Read/Write | WF 9 |
 | 14 | Öffentlichkeitsarbeit-Template-Tool | Vorbericht/Nachbericht aus Sitzungsdaten generieren | WF 10 |
+| 15 | YAML-Frontmatter-Validierung nach Vault-Write | Single-Quote-Regel + Post-Write-Validierung in allen Skills mit strukturiertem Vault-Write (aktuell nur `sitzungsvorbereitung`, potenziell `ratsprojekt_proposal` bei Vault-Konsolidierung) | WF 1, 2, 6 |

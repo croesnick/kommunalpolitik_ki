@@ -128,6 +128,7 @@ defmodule Ratsinfo.Store do
   @spec search(String.t(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def search(query, opts \\ []) do
     limit = Keyword.get(opts, :limit, 50)
+    fts_query = build_fts_query(query)
 
     sql = """
     SELECT t.titel, t.nummer, t.sitzung_id, s.name as sitzung_name,
@@ -141,7 +142,7 @@ defmodule Ratsinfo.Store do
     LIMIT ?
     """
 
-    case Repo.query(sql, [query, limit]) do
+    case Repo.query(sql, [fts_query, limit]) do
       {:ok, %{rows: rows}} ->
         results =
           Enum.map(rows, fn [
@@ -197,6 +198,12 @@ defmodule Ratsinfo.Store do
     Repo.all(from(d in Dokument, where: d.top_id == ^top_id))
   end
 
+  @doc "Einzelnes Dokument abrufen"
+  @spec get_dokument(String.t()) :: Dokument.t() | nil
+  def get_dokument(doc_id) do
+    Repo.get(Dokument, doc_id)
+  end
+
   @doc "Dokument als heruntergeladen markieren"
   @spec mark_downloaded(String.t(), String.t()) :: {:ok, Dokument.t()} | {:error, term()}
   def mark_downloaded(doc_id, local_path) do
@@ -219,6 +226,32 @@ defmodule Ratsinfo.Store do
   end
 
   # --- Helpers ---
+
+  # FTS5-Query bauen: jeden Term quoten, Präfix-Matching aktivieren (`*`),
+  # mehrere Terme mit OR verknüpfen.
+  #
+  # Beispiele:
+  #   "Gansbichl"         → `"Gansbichl"*`
+  #   "Wasserschutzgebiet" → `"Wasserschutzgebiet"*`
+  #   "Bahnhofstraße Verkehr" → `"Bahnhofstraße"* OR "Verkehr"*`
+  #
+  # Präfix-Matching (`*` nach gequotetem Term) findet "Gansbichl" in
+  # "Gansbichlstraße". Ohne `*` würde FTS5 nur exakte Token-Matches finden.
+  # Quoting verhindert, dass FTS5-Sonderzeichen (OR, AND, NOT, *, etc.)
+  # als Operatoren interpretiert werden.
+  defp build_fts_query(query) when is_binary(query) do
+    query
+    |> String.split()
+    |> Enum.map_join(" OR ", &quote_fts_term/1)
+  end
+
+  defp build_fts_query(_), do: ""
+
+  defp quote_fts_term(term) do
+    # Doppelte Quotes im Term escapen (FTS5: "" inside quoted string = literal ")
+    escaped = String.replace(term, "\"", "\"\"")
+    "\"#{escaped}\"*"
+  end
 
   defp decode_content(content) when is_binary(content) and byte_size(content) > 0 do
     case Base.decode64(content) do

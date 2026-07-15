@@ -33,11 +33,12 @@ verarbeiten, den Vault durchsuchen und Fördermittel recherchieren.
 | `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard | LiveView + MCP (`/mcp`) | ✅ |
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | ✅ |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | ✅ |
-| `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (noch nicht registriert) | ✅ |
+| `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (`opencode.json`) | ✅ |
 | `skills/foerdermittel_recherche` | Skill | Fördermittel-Recherche orchestrieren | Agent Skill | ✅ |
 | `skills/ratsprojekt_delta` | Skill | Neue Infos gegen Projektstand halten | Agent Skill | ✅ |
 | `skills/ratsprojekt_stand` | Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | ✅ |
 | `skills/ratsprojekt_proposal` | Skill | Proposal-Workflow: Vault → Gates → Proposal | Agent Skill | ✅ |
+| `skills/sitzungsvorbereitung` | Skill | Sitzungsmappe erstellen (WF 1) | Agent Skill | ✅ |
 | `skills/vault_suche` | Skill | Obsidian-Vault durchsuchen | Agent Skill | ✅ |
 
 ## Architektur-Prinzipien (Auszug)
@@ -69,11 +70,13 @@ kommunalpolitik_ki/
 │   ├── ratsprojekt_delta/
 │   ├── ratsprojekt_stand/
 │   ├── ratsprojekt_proposal/
+│   ├── sitzungsvorbereitung/
 │   └── vault_suche/
 ├── docs/                   # Kanonische Dokumentation
 │   ├── ratsprojekte-lifecycle.md
 │   ├── workflows.md
-│   └── nomenklatur.md
+│   ├── nomenklatur.md
+│   └── prerequisites.md
 ├── opencode.json           # MCP-Server + Skills-Konfiguration
 ├── AGENTS.md               # Projekt-Prinzipien & Architektur
 └── mix.exs                 # workspace root

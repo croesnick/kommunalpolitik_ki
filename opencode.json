@@ -17,6 +17,18 @@
         "AZ_PASSWORD": "${AZ_PASSWORD}"
       }
     },
+    "pdf_ingest": {
+      "type": "local",
+      "command": [
+        "uv",
+        "run",
+        "--directory",
+        "tools/pdf_ingest",
+        "python",
+        "-m",
+        "pdf_ingest"
+      ]
+    },
     "tidewave": {
       "type": "remote",
       "url": "http://localhost:4000/tidewave/mcp",
