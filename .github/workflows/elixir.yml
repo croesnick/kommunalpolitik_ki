@@ -9,13 +9,12 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: elixir-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   elixir:
     runs-on: ubuntu-latest
+    concurrency:
+      group: elixir-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout
