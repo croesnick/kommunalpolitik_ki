@@ -18,7 +18,7 @@ defmodule KommunalpolitikKi.MixProject do
 
   defp deps do
     [
-      {:workspace, "~> 0.2", only: :dev}
+      {:workspace, "~> 0.3", only: :dev}
     ]
   end
 end
