@@ -27,7 +27,7 @@ defmodule Ratsinfo.MixProject do
   defp deps do
     [
       {:shared, path: "../shared"},
-      {:req, "~> 0.5"},
+      {:req, "~> 0.6"},
       {:optimus, "~> 0.6"},
       {:jason, "~> 1.4"},
       {:ecto, "~> 3.12"},
