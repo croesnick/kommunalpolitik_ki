@@ -53,4 +53,5 @@ jobs:
 
       - name: pytest
         working-directory: tools/${{ matrix.tool }}
-        run: uv run pytest
+        # Exit code 5 = "no tests collected" (e.g. allgaeuer_zeitung_mcp has no tests yet)
+        run: uv run pytest || [ $? -eq 5 ]
