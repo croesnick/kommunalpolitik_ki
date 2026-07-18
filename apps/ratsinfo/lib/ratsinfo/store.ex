@@ -4,6 +4,64 @@ defmodule Ratsinfo.Store do
 
   Speichert Sitzungen, TOPs, Textblöcke und Dokument-Metadaten.
   Bietet Volltextsuche (FTS5) über alle extrahierten Texte.
+
+  ## FTS5-Konfiguration
+
+  Die Volltextsuche läuft über eine SQLite-FTS5-virtual-table (`texte`),
+  angelegt in der initialen Migration mit dem Tokenizer
+  `unicode61 remove_diacritics 2` (siehe
+  `priv/repo/migrations/20250711000001_initial_schema.exs`).
+
+  ### Tokenizer-Verhalten
+
+  - `unicode61` normalisiert Nicht-ASCII-Zeichen gemäß Unicode-Regeln.
+  - `remove_diacritics 2` entfernt Diakritika so aggressiv wie möglich:
+    `ä/ö/ü` werden zu `a/o/u` normalisiert, ebenso `é/è/ê` → `e`.
+  - **ß bleibt erhalten** (keine Auflösung zu `ss`). Eine Suche nach "Straße"
+    findet also nicht "Strasse" und umgekehrt.
+
+  ### Query-Builder (`build_fts_query/2`)
+
+  Jeder Suchterm wird über `quote_fts_term/1` in doppelte Anführungszeichen
+  gesetzt und mit `*` suffixt: `"Müll"*`. Das hat zwei Effekte:
+
+  1. **Quoting** — FTS5-Sonderzeichen (`OR`, `AND`, `NOT`, `*`, `(`, `)`)
+     werden nicht als Operatoren interpretiert. Eine Suche nach dem Wort
+     `OR` findet auch wirklich das Wort `OR` und wirft keinen SQL-Error.
+  2. **Präfix-Matching** — `"Müll"*` findet `Müll` und Komposita wie
+     `Müllabfuhr`, `Mülltonne`. Ohne `*` matcht FTS5 nur exakte Token.
+
+  Boolesche Verknüpfung der Terme (Default `:or`, siehe `search/2`):
+
+      Modus      Query "Bahnhofstraße Verkehr"
+      ---------  ----------------------------------
+      :or        "Bahnhofstraße"* OR "Verkehr"*
+      :and       "Bahnhofstraße"* AND "Verkehr"*
+      :phrase    "Bahnhofstraße Verkehr"*
+
+  ### Limitationen
+
+  - **Kein echtes deutsches Stemming.** `unicode61` ist kein Stemmer — es
+    normalisiert nur Zeichen, leitet aber keine Wortstämme ab. "Bezahlen"
+    findet nicht "Bezahlung", "Haus" nicht "Häuser". `remove_diacritics 2`
+    glättet zwar Umlaute, löst aber keine Flexionsformen auf.
+  - **Keine Fuzzy-Suche** (Levenshtein etc.) — FTS5 bietet das nicht an.
+  - **ß vs. ss** — siehe oben; ggf. Such-Query mit beiden Varianten stellen.
+
+  ### Mögliche Erweiterung: `trigram`-Tokenizer
+
+  SQLite bietet den `trigram`-Tokenizer, der Substring- und Fuzzy-Matches
+    ermöglicht (findet "Müll" in "Müllabfuhr" auch ohne `*`, toleriert
+    Tippfehler). Er wurde evaluiert, aber **nicht umgesetzt**:
+
+  - Höherer Index-Size-Aufwand (Trigramm pro Token statt Token selbst).
+  - Breaking-Change an der `texte`-Tabelle (Migration mit Rebuild).
+  - Substring-Suche ist über das bestehende `*`-Präfix-Matching bereits
+    für die häufigsten Use Cases (Komposita) abgedeckt.
+
+  Falls Stemming später gebraucht wird, ist der realistischere Weg ein
+  eigener Tokenizer via ICU oder portugiesische/portable Stemmer-Lib,
+  nicht `trigram`. Beides out-of-scope für den MVP.
   """
 
   alias Ratsinfo.Repo
@@ -128,10 +186,11 @@ defmodule Ratsinfo.Store do
   @spec search(String.t(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def search(query, opts \\ []) do
     limit = Keyword.get(opts, :limit, 50)
-    fts_query = build_fts_query(query)
+    mode = Keyword.get(opts, :mode, :or)
+    fts_query = build_fts_query(query, mode)
 
     sql = """
-    SELECT t.titel, t.nummer, t.sitzung_id, s.name as sitzung_name,
+    SELECT t.id as top_id, t.titel, t.nummer, t.sitzung_id, s.name as sitzung_name,
            s.datum, s.gremium, tx.caption,
            snippet(texte, 3, '>>>', '<<<', '...', 20) as snippet
     FROM texte tx
@@ -146,6 +205,7 @@ defmodule Ratsinfo.Store do
       {:ok, %{rows: rows}} ->
         results =
           Enum.map(rows, fn [
+                              top_id,
                               titel,
                               nummer,
                               sitzung_id,
@@ -156,6 +216,7 @@ defmodule Ratsinfo.Store do
                               snippet
                             ] ->
             %{
+              top_id: top_id,
               titel: titel,
               nummer: nummer,
               sitzung_id: sitzung_id,
@@ -190,6 +251,41 @@ defmodule Ratsinfo.Store do
   @spec list_tops(integer()) :: [TOP.t()]
   def list_tops(sitzung_id) do
     Repo.all(from(t in TOP, where: t.sitzung_id == ^sitzung_id, order_by: t.nummer))
+  end
+
+  @doc "Einzelnen TOP anhand seiner ID abrufen"
+  @spec get_top(String.t()) :: TOP.t() | nil
+  def get_top(top_id) do
+    Repo.get(TOP, top_id)
+  end
+
+  @doc """
+  Textblöcke eines TOPs abrufen.
+
+  Greift direkt via SQL auf die FTS5-virtual-table `texte` zu, da `Textblock`
+  ein FTS5-virtual-table-Schema ist und kein reguläres Repo.find über Ecto
+  erlaubt. Liefert Maps mit `:caption` und `:content`, sortiert nach `caption`.
+
+  Option B aus Issue #50: kein neues Schema, direktes SQL. Das passt zur
+  Unix-Prinzip-Vorgabe (FTS5 bleibt intern im Store, nach außen Maps).
+  """
+  @spec list_textbloecke(String.t()) :: [map()]
+  def list_textbloecke(top_id) do
+    sql = """
+    SELECT caption, content FROM texte
+    WHERE top_id = ?
+    ORDER BY caption
+    """
+
+    case Repo.query(sql, [top_id]) do
+      {:ok, %{rows: rows}} ->
+        Enum.map(rows, fn [caption, content] ->
+          %{caption: caption, content: content}
+        end)
+
+      {:error, _} ->
+        []
+    end
   end
 
   @doc "Dokumente eines TOPs abrufen"
@@ -228,24 +324,42 @@ defmodule Ratsinfo.Store do
   # --- Helpers ---
 
   # FTS5-Query bauen: jeden Term quoten, Präfix-Matching aktivieren (`*`),
-  # mehrere Terme mit OR verknüpfen.
+  # mehrere Terme mit dem gewählten Modus verknüpfen.
   #
-  # Beispiele:
+  # Beispiele (`:or`):
   #   "Gansbichl"         → `"Gansbichl"*`
   #   "Wasserschutzgebiet" → `"Wasserschutzgebiet"*`
   #   "Bahnhofstraße Verkehr" → `"Bahnhofstraße"* OR "Verkehr"*`
+  #
+  # Beispiele (`:and`):
+  #   "Bahnhofstraße Verkehr" → `"Bahnhofstraße"* AND "Verkehr"*`
+  #
+  # Beispiele (`:phrase`):
+  #   "Bahnhofstraße Verkehr" → `"Bahnhofstraße Verkehr"*`
   #
   # Präfix-Matching (`*` nach gequotetem Term) findet "Gansbichl" in
   # "Gansbichlstraße". Ohne `*` würde FTS5 nur exakte Token-Matches finden.
   # Quoting verhindert, dass FTS5-Sonderzeichen (OR, AND, NOT, *, etc.)
   # als Operatoren interpretiert werden.
-  defp build_fts_query(query) when is_binary(query) do
+  defp build_fts_query(query, mode)
+
+  defp build_fts_query(query, :or) when is_binary(query) do
     query
     |> String.split()
     |> Enum.map_join(" OR ", &quote_fts_term/1)
   end
 
-  defp build_fts_query(_), do: ""
+  defp build_fts_query(query, :and) when is_binary(query) do
+    query
+    |> String.split()
+    |> Enum.map_join(" AND ", &quote_fts_term/1)
+  end
+
+  defp build_fts_query(query, :phrase) when is_binary(query) do
+    quote_fts_term(query)
+  end
+
+  defp build_fts_query(_, _), do: ""
 
   defp quote_fts_term(term) do
     # Doppelte Quotes im Term escapen (FTS5: "" inside quoted string = literal ")

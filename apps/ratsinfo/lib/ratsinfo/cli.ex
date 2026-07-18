@@ -8,13 +8,18 @@ defmodule Ratsinfo.CLI do
     inspect-source   API-Verfügbarkeit prüfen
     sync             Sitzungen + Dokumente lokal speichern
     sessions         Sitzungen auflisten
-    search <query>   Lokale Volltextsuche
+    search <query>   Lokale Volltextsuche (Flags: --all=AND, --phrase=Phrase)
     show <id>        Sitzungsdetails anzeigen
+    show-top <id>    TOP-Details + Textblöcke + Dokumente (Flag: --full)
     open <id>        Dokument öffnen
     stats            Datenbank-Statistik
+    ris-search <q>   Volltextsuche direkt im RIS (authentifiziert)
   """
 
   alias Ratsinfo.{ApiClient, Auth, Store}
+
+  # Preview-Länge für Textblöcke in `show-top` (ohne --full).
+  @preview_length 300
 
   @spec main([String.t()]) :: :ok
   def main(args \\ System.argv()) do
@@ -136,6 +141,18 @@ defmodule Ratsinfo.CLI do
               help: "Maximale Anzahl Treffer",
               default: "20"
             ]
+          ],
+          flags: [
+            all: [
+              short: "a",
+              long: "all",
+              help: "Alle Terme müssen vorkommen (AND)"
+            ],
+            phrase: [
+              short: "p",
+              long: "phrase",
+              help: "Phrase-Matching (komplette Query als Begriff)"
+            ]
           ]
         ],
         show: [
@@ -147,6 +164,24 @@ defmodule Ratsinfo.CLI do
               help: "Sitzungs-ID",
               required: true,
               parser: :integer
+            ]
+          ]
+        ],
+        show_top: [
+          name: "show-top",
+          description: "TOP-Details anzeigen (Textblöcke + Dokumente)",
+          args: [
+            top_id: [
+              value_name: "TOP_ID",
+              help: "TOP-ID (z.B. 116018680-116283614, aus 'search'-Output)",
+              required: true
+            ]
+          ],
+          flags: [
+            full: [
+              short: "f",
+              long: "full",
+              help: "Vollständige Textblöcke anzeigen (nicht nur Preview)"
             ]
           ]
         ],
@@ -272,10 +307,20 @@ defmodule Ratsinfo.CLI do
     query = opts.args.query
     limit = String.to_integer(opts.options.limit)
 
-    case Store.search(query, limit: limit) do
+    mode =
+      cond do
+        opts.flags[:phrase] -> :phrase
+        opts.flags[:all] -> :and
+        true -> :or
+      end
+
+    case Store.search(query, limit: limit, mode: mode) do
       {:ok, []} ->
         IO.puts("Keine Treffer für '#{query}'")
-        IO.puts("Hinweis: Führe zuerst 'ratsinfo sync' aus um Texte zu indexieren")
+
+        if Store.stats().texte == 0 do
+          IO.puts("Hinweis: Führe zuerst 'ratsinfo sync' aus um Texte zu indexieren")
+        end
 
       {:ok, results} ->
         IO.puts("#{length(results)} Treffer für '#{query}':\n")
@@ -320,6 +365,24 @@ defmodule Ratsinfo.CLI do
 
       dokument ->
         download_and_open(dokument)
+    end
+
+    :ok
+  end
+
+  defp run_command(:show_top, opts) do
+    :ok = Store.init()
+
+    top_id = opts.args.top_id
+    full? = opts.flags[:full] || false
+
+    case Store.get_top(top_id) do
+      nil ->
+        IO.puts("TOP #{top_id} nicht gefunden.")
+        IO.puts("Tipp: 'ratsinfo search <query>' liefert die TOP-ID.")
+
+      top ->
+        print_top_detail(top, full?)
     end
 
     :ok
@@ -489,6 +552,7 @@ defmodule Ratsinfo.CLI do
   defp print_search_result(result) do
     IO.puts("  [#{result.nummer}] #{result.titel}")
     IO.puts("  #{result.sitzung_name} (#{result.datum}) — #{result.gremium}")
+    IO.puts("  TOP-ID: #{result.top_id}")
     IO.puts("  #{result.caption}: ...#{result.snippet}...")
     IO.puts("")
   end
@@ -514,6 +578,63 @@ defmodule Ratsinfo.CLI do
     Enum.each(tops, fn top ->
       marker = if top.restricted, do: "🔒", else: "  "
       IO.puts("  #{marker} [#{top.nummer}] #{top.titel}")
+    end)
+  end
+
+  defp print_top_detail(top, full?) do
+    sitzung = Store.get_sitzung(top.sitzung_id)
+    textbloecke = Store.list_textbloecke(top.id)
+    dokumente = Store.list_dokumente(top.id)
+
+    restricted_marker =
+      if top.restricted, do: "🔒 Nichtöffentlich", else: "🔓 Öffentlich"
+
+    IO.puts("TOP #{top.nummer}: #{top.titel}")
+
+    if sitzung do
+      IO.puts("Sitzung: #{sitzung.name} (#{sitzung.datum})")
+      IO.puts("Gremium: #{sitzung.gremium}")
+    end
+
+    IO.puts(restricted_marker)
+    IO.puts("")
+
+    if textbloecke == [] do
+      IO.puts("[Keine Textblöcke indexiert]")
+    else
+      Enum.each(textbloecke, fn tb -> print_textblock(tb, full?) end)
+    end
+
+    IO.puts("")
+
+    print_dokumente(dokumente)
+  end
+
+  defp print_textblock(%{caption: caption, content: content}, full?) do
+    IO.puts("[#{caption}]")
+
+    body =
+      if full? or byte_size(content) <= @preview_length do
+        content
+      else
+        String.slice(content, 0, @preview_length) <> "..."
+      end
+
+    IO.puts(body)
+    IO.puts("")
+  end
+
+  defp print_dokumente([]) do
+    IO.puts("Dokumente: (keine)")
+  end
+
+  defp print_dokumente(dokumente) do
+    IO.puts("Dokumente:")
+
+    Enum.each(dokumente, fn doc ->
+      marker = if doc.downloaded, do: "✓", else: " "
+      ext = doc.fileext || "?"
+      IO.puts("  #{marker} [#{ext}] #{doc.name || doc.id}")
     end)
   end
 
