@@ -25,6 +25,19 @@ MCP-Server und lädt Skills aus `skills/`. Die AI kann dann RIS durchsuchen, das
 Projekt-Dashboard lesen und Proposals einbringen, AZ-Artikel suchen, PDFs
 verarbeiten, den Vault durchsuchen und Fördermittel recherchieren.
 
+## Installation (ratsinfo CLI)
+
+`ratsinfo` ist als Escript gebaut und kann systemweit im PATH installiert
+werden:
+
+```bash
+make install           # baut das Escript und symlinkt nach /usr/local/bin/ratsinfo
+                       # ggf. sudo: sudo make install
+                       # alternativ ohne sudo: ln -sf "$PWD/apps/ratsinfo/ratsinfo" ~/.local/bin/ratsinfo
+```
+
+Danach ist `ratsinfo sync | search | show-top | stats ...` von überall aufrufbar.
+
 ## Tool-Übersicht
 
 | Tool | Sprache | Zweck | AI-Schnittstelle | Status |
@@ -34,12 +47,14 @@ verarbeiten, den Vault durchsuchen und Fördermittel recherchieren.
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | ✅ |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | ✅ |
 | `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (`opencode.json`) | ✅ |
+| `tools/nextcloud_ods_mcp` | Python | ODS-Dateien lesen (Sheets, Ranges, Zellen, Suche) | MCP (`opencode.json`) | ✅ |
 | `skills/foerdermittel_recherche` | Skill | Fördermittel-Recherche orchestrieren | Agent Skill | ✅ |
 | `skills/ratsprojekt_delta` | Skill | Neue Infos gegen Projektstand halten | Agent Skill | ✅ |
 | `skills/ratsprojekt_stand` | Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | ✅ |
 | `skills/ratsprojekt_proposal` | Skill | Proposal-Workflow: Vault → Gates → Proposal | Agent Skill | ✅ |
 | `skills/sitzungsvorbereitung` | Skill | Sitzungsmappe erstellen (WF 1) | Agent Skill | ✅ |
 | `skills/vault_suche` | Skill | Obsidian-Vault durchsuchen | Agent Skill | ✅ |
+| `skills/antrag_generieren` | Skill | Stadtratsantrag entwerfen (fraktionsneutral; fraktionsspezifische Vorlage via Vault-Tag `#antrag/vorlage/fraktion`) | Agent Skill | ✅ |
 
 ## Architektur-Prinzipien (Auszug)
 
@@ -64,6 +79,7 @@ kommunalpolitik_ki/
 │   └── shared/             # Geteilte Domain-Models
 ├── tools/                  # Nicht-Elixir
 │   ├── allgaeuer_zeitung_mcp/  # AZ-Artikel (AI: MCP)
+│   ├── nextcloud_ods_mcp/  # ODS-Reader (AI: MCP)
 │   └── pdf_ingest/         # PDF-Ingestion (AI: MCP)
 ├── skills/                 # AI-Harness-Skills
 │   ├── foerdermittel_recherche/
