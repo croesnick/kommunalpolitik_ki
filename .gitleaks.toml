@@ -1,0 +1,158 @@
+# gitleaks-Konfiguration für kommunalpolitik_ki
+#
+# Erweitert das gitleaks-Default-Ruleset (wird via `extend` eingeblendet)
+# um projektspezifische Secret-Patterns, die gitleaks out-of-the-box nicht
+# erkennt: LibreChat- und Ratsinfo-Credentials sowie Elixir-Source-Hardcodierung.
+#
+# Siehe https://github.com/gitleaks/gitleaks#configuration für Syntax.
+
+title = "kommunalpolitik_ki gitleaks config"
+
+[extend]
+# Das gitleaks-eigene Default-Regelwerk (~850 Patterns) wird eingeblendet.
+# So profitieren wir automatisch von neuen Rules in künftigen gitleaks-Versionen.
+useDefault = true
+
+#####################################################################
+# Projekt-spezifische ENV-Secrets (nicht in gitleaks-Defaults enthalten)
+#
+# WICHTIG: `=` wird ohne `\s*` geschrieben, sondern mit `[ \t]*`, damit
+# `\s` (das auch `\n` matcht) nicht den Value der nächsten Zeile erfasst.
+# Sonst würde `FOO=\nBAR=baz` als `FOO=BAR` gemeldet.
+#####################################################################
+
+[[rules]]
+id = "librechat-jwt-secret"
+description = "LibreChat JWT_SECRET (Session-Signing)"
+regex = '''JWT_SECRET[ \t]*=[ \t]*["']?[A-Za-z0-9/+=_\-]{16,}["']?'''
+secretGroup = 0
+entropy = 3.5
+keywords = ["JWT_SECRET"]
+
+[[rules]]
+id = "librechat-jwt-refresh-secret"
+description = "LibreChat JWT_REFRESH_SECRET (Session-Refresh)"
+regex = '''JWT_REFRESH_SECRET[ \t]*=[ \t]*["']?[A-Za-z0-9/+=_\-]{16,}["']?'''
+secretGroup = 0
+entropy = 3.5
+keywords = ["JWT_REFRESH_SECRET"]
+
+[[rules]]
+id = "librechat-creds-key"
+description = "LibreChat CREDS_KEY (Verschlüsselung der Credentials in DB)"
+regex = '''CREDS_KEY[ \t]*=[ \t]*["']?[A-Za-z0-9/+=_\-]{16,}["']?'''
+secretGroup = 0
+entropy = 3.5
+keywords = ["CREDS_KEY"]
+
+[[rules]]
+id = "librechat-meili-master-key"
+description = "LibreChat/Meilisearch MEILI_MASTER_KEY (Vollzugriff auf Suchindex)"
+regex = '''MEILI_MASTER_KEY[ \t]*=[ \t]*["']?[A-Za-z0-9/+=_\-]{16,}["']?'''
+secretGroup = 0
+entropy = 3.5
+keywords = ["MEILI_MASTER_KEY"]
+
+[[rules]]
+id = "librechat-admin-password"
+description = "LibreChat Admin-Password"
+regex = '''LIBRECHAT_ADMIN_PASSWORD[ \t]*=[ \t]*["']?[A-Za-z0-9_\-]{6,}["']?'''
+secretGroup = 0
+keywords = ["LIBRECHAT_ADMIN_PASSWORD"]
+
+[[rules]]
+id = "ris-password"
+description = "Ratsinfo-System RIS_PASSWORD (Login Ratsinformationssystem)"
+regex = '''RIS_PASSWORD[ \t]*=[ \t]*["']?[A-Za-z0-9_\-]{4,}["']?'''
+secretGroup = 0
+keywords = ["RIS_PASSWORD"]
+
+[[rules]]
+id = "az-password"
+description = "Allgäuer Zeitung AZ_PASSWORD (Login Abo-Bereich)"
+regex = '''AZ_PASSWORD[ \t]*=[ \t]*["']?[A-Za-z0-9_\-]{4,}["']?'''
+secretGroup = 0
+keywords = ["AZ_PASSWORD"]
+
+[[rules]]
+id = "nextcloud-password"
+description = "Nextcloud NEXTCLOUD_PASSWORD"
+regex = '''NEXTCLOUD_PASSWORD[ \t]*=[ \t]*["']?[A-Za-z0-9_\-]{4,}["']?'''
+secretGroup = 0
+keywords = ["NEXTCLOUD_PASSWORD"]
+
+[[rules]]
+id = "gribs-password"
+description = "gribs.net GRIBS_PASSWORD (Grünen-interne Plattform)"
+regex = '''GRIBS_PASSWORD[ \t]*=[ \t]*["']?[A-Za-z0-9_\-]{4,}["']?'''
+secretGroup = 0
+keywords = ["GRIBS_PASSWORD"]
+
+[[rules]]
+id = "custom-provider-api-key"
+description = "LibreChat Custom Provider API-Key"
+regex = '''CUSTOM_PROVIDER_API_KEY[ \t]*=[ \t]*["']?[A-Za-z0-9_\-]{10,}["']?'''
+secretGroup = 0
+entropy = 3.5
+keywords = ["CUSTOM_PROVIDER_API_KEY"]
+
+#####################################################################
+# Hardcoded Secrets in Elixir-Sourcecode (Module-Attribute)
+#
+# gitleaks' Default-Regeln sind auf ENV-Variablen-Syntax (`FOO=bar`)
+# kalibriert. Elixir nutzt aber `@password "..."`, `@api_key "..."` etc.
+# als Modul-Attribute. Diese Regeln schließen die Lücke.
+#
+# Wert muss in Double-Quotes stehen (Standard-Elixir-String-Literal).
+#####################################################################
+
+[[rules]]
+id = "elixir-hardcoded-password-attr"
+description = "Hardcoded password in Elixir module attribute"
+regex = '''@password[ \t]+"[^"]{6,}"'''
+secretGroup = 0
+keywords = ["@password"]
+
+[[rules]]
+id = "elixir-hardcoded-api-key-attr"
+description = "Hardcoded API key in Elixir module attribute"
+regex = '''@api_key[ \t]+"[^"]{10,}"'''
+secretGroup = 0
+keywords = ["@api_key"]
+
+[[rules]]
+id = "elixir-hardcoded-secret-attr"
+description = "Hardcoded secret in Elixir module attribute"
+regex = '''@secret[ \t]+"[^"]{10,}"'''
+secretGroup = 0
+keywords = ["@secret"]
+
+[[rules]]
+id = "elixir-hardcoded-token-attr"
+description = "Hardcoded token in Elixir module attribute"
+regex = '''@token[ \t]+"[^"]{10,}"'''
+secretGroup = 0
+keywords = ["@token"]
+
+#####################################################################
+# Allowlist: Platzhalter-Beispiele und Doku zulassen
+#####################################################################
+
+[allowlist]
+description = "Allowlist für Platzhalter-Beispiele und Metadaten"
+
+# Dateien, die bewusst leere Platzhalter enthalten — pauschal zulassen.
+paths = [
+  '''\.env\.example$''',
+  '''\.env\.template$''',
+  '''\.env\.dist$''',
+  '''librechat/librechat\.yaml\.example$''',
+]
+
+# Regex-Patterns, die auch in anderen Dateien als false positives auftreten:
+# 1. Leere Werte nach `=` (mit oder ohne Whitespace, bis Zeilenende) — nie echte Secrets.
+# 2. Doku-Hinweise wie `openssl rand -hex 32`.
+regexes = [
+  '''(?i)(JWT_SECRET|JWT_REFRESH_SECRET|CREDS_KEY|MEILI_MASTER_KEY|LIBRECHAT_ADMIN_PASSWORD|RIS_PASSWORD|AZ_PASSWORD|NEXTCLOUD_PASSWORD|GRIBS_PASSWORD|CUSTOM_PROVIDER_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY)[ \t]*=[ \t]*["']?[ \t]*$''',
+  '''(?i)openssl\s+rand''',
+]

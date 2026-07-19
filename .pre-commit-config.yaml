@@ -1,0 +1,37 @@
+# Pre-commit hooks für kommunalpolitik_ki
+#
+# Setup (einmalig pro Clone):
+#   brew install gitleaks pre-commit
+#   pre-commit install
+#
+# Manuelles Prüfen:
+#   pre-commit run --all-files        # ganzer Repo-Stand
+#   pre-commit run                    # nur gestagte Änderungen
+#
+# Im Notfall umgehen:
+#   git commit --no-verify -m "..."
+#
+# Hooks werden automatisch vor jedem `git commit` ausgeführt.
+
+repos:
+  # gitleaks: Hardcoded-Secrets-Scanner. Blockiert Commits, die Secrets
+  # enthalten (API-Keys, Private Keys, Tokens, Passwörter etc.).
+  # Nutzt die lokal installierte gitleaks-Binary (brew install gitleaks).
+  # Default-Ruleset abgedeckt: AWS, GitHub, GitLab, Slack, OpenAI, Anthropic,
+  # Private Keys, JWT-Tokens, Datenbank-URLs, etc. (~850 Patterns).
+  # Projektspezifische Erweiterungen: siehe .gitleaks.toml.
+  #
+  # Lokaler Hook statt `repo: https://github.com/gitleaks/gitleaks`, weil der
+  # offizielle `gitleaks-system`-Hook nicht mit pre-commit 4.x kompatibel ist
+  # (pass_filenames: false greift nicht, Dateinamen werden als Argumente
+  # übergeben → "accepts at most 1 arg").
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: Detect hardcoded secrets (gitleaks)
+        description: Scans staged changes for hardcoded secrets using gitleaks
+        entry: gitleaks git --pre-commit --redact --staged --verbose
+        language: system
+        pass_filenames: false
+        # Nur ausführen, wenn staged-Dateien existieren (sonst no-op).
+        always_run: false
