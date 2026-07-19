@@ -1,12 +1,17 @@
 # Workflows — Use Cases für die Ratsarbeit
 
 > **Zweck:** Dieses Dokument dokumentiert die typischen Workflows eines
-> Stadtrats / Gemeinderats und zeigt, wo das Tool-Setup unterstützt, wo
-> Lücken bestehen und was geplant ist. Es ist die fachliche Referenz für
-> Feature-Entwicklung und Priorisierung.
+> Stadtrats / Gemeinderats und zeigt, wo das Tool-Setup unterstützt und wo
+> Lücken bestehen. Es ist die fachliche Referenz für Feature-Entwicklung und
+> Priorisierung.
 >
 > **Prinzip:** Problem-first, nicht tool-first. Die Workflows entstehen aus
 > konkreten politischen Bedarfen, nicht aus Technik-Faszination.
+>
+> **Lücken-Tracking:** Offene Lücken sind als GitHub-Issues erfasst und in
+> diesem Dokument mit `#<nummer>` referenziert. Behobene Lücken werden aus
+> dem Dokument entfernt — die Issue-Historie in GitHub bleibt erhalten. Dieses
+> Dokument ist keine Todo-Liste.
 
 ## Begriffe
 
@@ -27,31 +32,15 @@ bündelt. Die Sitzungsmappe ist ein Vault-Tool, nicht Teil von ratsprojekte.
 | Schritt | Tool / Skill | Status |
 |---|---|---|
 | Agenda abrufen (Sitzungen + TOPs) | `ratsinfo sessions --remote` + `ratsinfo show <id>` | ✅ |
-| Vorlagen-PDFs lesen | `pdf_ingest ingest(path)` | ✅ Registriert in opencode.json |
-| Querverweis: hängt ein TOP an einem Ratsprojekt? | `ratsinfo search` + `ratsprojekte search_projekte` | ❌ Kein automatischer Link RIS-Sitzung ↔ Ratsprojekt |
+| Vorlagen-PDFs lesen | `pdf_ingest ingest(path)` | ✅ |
+| Querverweis: hängt ein TOP an einem Ratsprojekt? | `ratsinfo search` + `ratsprojekte search_projekte` | ❌ Kein automatischer Link RIS-Sitzung ↔ Ratsprojekt (#32) |
 | AZ-Artikel zum Thema finden | `allgaeuer_zeitung_mcp search_articles` | ✅ |
 | Vault-Notizen zum Thema | `vault_suche` | ✅ |
-| Sitzungsmappe im Vault erstellen | Vault-Write (externer Skill `obsidian-cli`) | ⚠️ Vault-Write via obsidian-cli möglich, Skill folgt |
+| Sitzungsmappe im Vault erstellen | `obsidian-cli` (externer Skill) | ✅ |
 
 ### Lücken
 
-- **~~pdf_ingest nicht als MCP registriert~~** — ✅ Behoben. pdf_ingest ist
-  jetzt in `opencode.json` eingetragen.
-- **Sitzungsvorbereitung-Skill fehlt noch** — Pipeline manuell getestet und
-  funktioniert (sync → show → AZ → vault_suche → obsidian create). Skill unter
-  `skills/sitzungsvorbereitung/` folgt.
-- **Kein RIS↔Ratsprojekt-Link** — TOPs und Projekte sind isoliert.
-- **Sitzungsmappe als Vault-Tool**: Für jede Sitzung soll eine Notiz im Vault
-  entstehen, die alle Vorbereitungsergebnisse bündelt. Dafür brauchen wir
-  Vault-Write-Fähigkeit (externer Skill `obsidian-cli` als Voraussetzung).
-
-**Test 15.07.2026:** Pipeline manuell durchgespielt für 3. Stadtratssitzung
-(21.07.2026). Sync: 2 neue Sitzungen gezogen (66→68). TOPs +
-Beschlussvorschläge via `ratsinfo show`. AZ-Artikel zur Gansbichlstraße
-gefunden und eingebunden. Vault-Suche lieferte Treffer zu Bahnhofstraße und
-KinderKram. Sitzungsmappe in Vault geschrieben via `obsidian eval` (Ordner +
-Datei erstellt). Bekannte Lücken: `ratsinfo sessions --remote` Bug,
-`ratsinfo open` Stub, RIS-Volltextsuche findet "Gansbichl" nicht.
+- **Kein RIS↔Ratsprojekt-Link** — TOPs und Projekte sind isoliert. → #32
 
 ### Datenfluss & Trust Boundaries
 
@@ -70,16 +59,15 @@ Vault-Suche     → obsidian CLI (Text)
                          ↓
                   obsidian write → Vault-Datei
                          ↓
-              ⚠ Validierung? (bisher: keine)
+              ⚠ Validierung (Single-Quote-Regel)
 ```
 
 **Bug-Klasse:** Deutsche typografische Anführungszeichen („...") in
 double-quoted YAML-Strings werden als String-Ende interpretiert →
 ungültiges YAML → Properties in Obsidian nicht sichtbar.
 
-**Gefunden am 15.07.2026:** AZ-Titel `„Völlig konsterniert" – Anwohner...`
-brach das Frontmatter der Sitzungsmappe. Gefixt durch Single-Quotes als
-YAML-Wrapper. Validierung in Skill `sitzungsvorbereitung` dokumentiert.
+**Mitigation:** Single-Quote-Regel als Pflicht in Skills mit strukturiertem
+Vault-Write. Post-Write-Validierung via `pyyaml`. Siehe #53.
 
 > **Abgrenzung:** Anträge und Änderungsanträge formulieren ist *nicht* Teil
 > der Sitzungsvorbereitung. Das ist ein nachgelagerter Schritt, der auf der
@@ -101,20 +89,15 @@ der Stadtrat denkt "das könnte ein Ratsprojekt werden".
 | Lokalberichterstattung | `allgaeuer_zeitung_mcp` | ✅ |
 | RIS-Recherche | `ratsinfo search` | ✅ |
 | Web-Recherche | `web_search` / `web_fetch` | ✅ |
-| Konsolidierte Notiz in Vault schreiben | `obsidian-cli` (externer Skill) | ❌ Nicht in Workflow integriert |
+| Konsolidierte Notiz in Vault schreiben | `obsidian-cli` (externer Skill) | ✅ |
 | Gates prüfen (Antragsreife) | `ratsprojekt_proposal` Skill | ✅ |
 | Proposal einbringen | `propose_projekt` MCP | ✅ |
 | GO erteilen | `decide_proposal` MCP | ✅ |
 
-### Lücken
-
-- **Vault-Write-Gap:** Der `ratsprojekt_proposal`-Skill schreibt vor:
-  "Pflicht: konsolidierte Notiz zurück in den Vault". Aber kein Projekt-Tool
-  kann in den Vault schreiben. Der externe Skill `obsidian-cli` existiert
-  global, ist aber nicht als Voraussetzung im Workflow verankert.
-- **Externe Skill-Abhängigkeit:** Wie referenzieren wir `obsidian-cli` als
-  Voraussetzung, ohne ihn ins Repo zu clonen? Siehe
-  [`docs/prerequisites.md`](./prerequisites.md) (geplant).
+> **Hinweis:** Der `ratsprojekt_proposal`-Skill schreibt vor: "Pflicht:
+> konsolidierte Notiz zurück in den Vault". Der `obsidian-cli`-Skill ist als
+> Voraussetzung in [`docs/prerequisites.md`](./prerequisites.md)
+> dokumentiert.
 
 ---
 
@@ -128,11 +111,11 @@ und Realisierungsstränge sich ändern würden.
 
 | Schritt | Tool / Skill | Status |
 |---|---|---|
-| Neue Info aufnehmen (Email, Artikel, PDF) | Copy-Paste / `allgaeuer_zeitung_mcp` / `pdf_ingest` | ⚠️ Keine Email-Ingestion |
+| Neue Info aufnehmen (Email, Artikel, PDF) | Copy-Paste / `allgaeuer_zeitung_mcp` / `pdf_ingest` | ⚠️ Keine Email-Ingestion (#35) |
 | Projekt-Stand abrufen | `ratsprojekt_stand` / `show_projekt` MCP | ✅ |
 | Delta produzieren | `ratsprojekt_delta` Skill | ✅ |
 | AZ-Artikel lesen | `allgaeuer_zeitung_mcp` | ✅ |
-| PDF verarbeiten | `pdf_ingest` | ⚠️ Nicht als MCP registriert |
+| PDF verarbeiten | `pdf_ingest` | ✅ |
 | RIS-Sitzung nachschlagen | `ratsinfo search` | ✅ |
 | Vault-Divergenz prüfen | `vault_suche` | ✅ |
 
@@ -142,8 +125,7 @@ und Realisierungsstränge sich ändern würden.
   kopiert werden. Ein read-only Email-MCP wäre eine starke Ergänzung.
   Herausforderung: Konfiguration (IMAP-Zugang, mehrere Konten, Privatsphäre).
   Möglicher Ansatz: ein Skill, der bei Bedarf die Email-Konfiguration in die
-  lokale `opencode.json` schreibt — aber nur mit explizitem GO.
-- **pdf_ingest** (wieder): nicht als MCP registriert.
+  lokale `opencode.json` schreibt — aber nur mit explizitem GO. → #35
 
 ---
 
@@ -159,27 +141,27 @@ RIS-Entwicklungen, die Ratsprojekte betreffen.
 |---|---|---|
 | Beschluss in RIS finden | `ratsinfo search` | ✅ |
 | Projekt-Status checken | `ratsprojekte show_projekt` | ✅ |
-| Beschluss mit Projekt verlinken | — | ❌ Kein Feld in ratsprojekte für RIS-Sitzung/TOP/Beschluss-ID |
-| Frist-Tracking (Beschlussfrist abgelaufen?) | — | ❌ Keine Fristen-Tabelle, keine Alerts |
-| RIS-Sync → "was ist neu zu meinen Projekten?" | — | ❌ Kein Diff bei Sync |
+| Beschluss mit Projekt verlinken | — | ❌ Kein Feld in ratsprojekte für RIS-Sitzung/TOP/Beschluss-ID (#32) |
+| Frist-Tracking (Beschlussfrist abgelaufen?) | — | ❌ Keine Fristen-Tabelle, keine Alerts (#34) |
+| RIS-Sync → "was ist neu zu meinen Projekten?" | — | ❌ Kein Diff bei Sync (#33) |
 
 ### Lücken
 
 - **RIS↔Ratsprojekt-Link:** Ein Ratsprojekt kann nicht auf eine konkrete
   Sitzung/TOP/Beschlussnummer verweisen. Man kann nicht fragen "welcher
-  Beschluss gehört zu Projekt X?"
+  Beschluss gehört zu Projekt X?" → #32
 - **Frist-Tracking:** Beschlüsse haben oft Fristen ("umsetzen bis Q4"). Kein
-  Tool erinnert daran. Relevant für die politische Nachbereitung.
+  Tool erinnert daran. Relevant für die politische Nachbereitung. → #34
 - **RIS-Sync mit ratsprojekte-Cross-Check:** Der RIS-Sync läuft unabhängig
-  von ratsprojekte (wie bisher). Aber ratsprojekte sollte einen Sync-Trigger
-  haben, der nach einem RIS-Sync prüft: "gibt es seit dem letzten Sync neue
+  von ratsprojekte. Aber ratsprojekte sollte einen Sync-Trigger haben, der
+  nach einem RIS-Sync prüft: "gibt es seit dem letzten Sync neue
   Sitzungen/TOPs, die für eines meiner Projekte relevant sind?" — basierend
-  auf Schlagwörtern, Projekt-Titeln oder verlinkten RIS-IDs.
+  auf Schlagwörtern, Projekt-Titeln oder verlinkten RIS-IDs. → #33
 
 > **Architektur:** RIS-Sync und ratsprojekte-Sync sind getrennte Operationen.
 > RIS-Sync lädt rohe Sitzungsdaten. Der ratsprojekte-Sync ist ein
 > nachgelagerter Schritt, der die frischen RIS-Daten gegen die
-  Projekt-Datenbank hält und Treffer meldet.
+> Projekt-Datenbank hält und Treffer meldet.
 
 ---
 
@@ -205,20 +187,19 @@ Vault-Notiz des jeweiligen Ratsprojekts gespeichert wird.
 |---|---|---|
 | 5-Strang-Recherche (Finanzierung, Programme, Stand, Best-Practices, Recht) | `foerdermittel_recherche` Skill | ✅ |
 | Quellen mit URLs + Abrufdatum | Skill fordert es | ✅ |
-| Fristen extrahieren | Skill macht TODO-Liste | ⚠️ Nur Markdown-TODOs, kein Tracking-Tool |
-| Report an Vault-Notiz des Projekts anhängen | `obsidian-cli` (extern) | ❌ Nicht integriert |
+| Fristen extrahieren | Skill macht TODO-Liste | ⚠️ Nur Markdown-TODOs, kein Tracking-Tool (#34) |
+| Report an Vault-Notiz des Projekts anhängen | `obsidian-cli` (extern) | ❌ Nicht integriert (#36) |
 | Kumulierungsrechnung | Manuell im Report | ⚠️ |
 
 ### Lücken
 
-- **Jedes Ratsprojekt hat eine eigene Notiz im Vault.** Fördermittel-Recherchen
-  werden als Anhang/Unterseite dieser Notiz gespeichert. Dafür braucht es
-  Vault-Write (wie bei WF 2).
+- **Förderrecherche-Persistenz:** Jedes Ratsprojekt hat eine eigene Notiz im
+  Vault. Fördermittel-Recherchen werden als Anhang/Unterseite dieser Notiz
+  gespeichert. Die Integration des `obsidian-cli` in den
+  `foerdermittel_recherche`-Skill fehlt noch. → #36
 - **Fristen sind tote Markdown-Checkboxen** — kein Tool tracked sie. Wenn eine
   Förderfrist in 6 Wochen abläuft, erinnert niemand. Mögliche Integration mit
-  Todoist (globaler `todoist-triage`-Skill vorhanden).
-- **Forschungsberichte sind nicht persistent:** Jede Recherche startet von
-  null. Kein Speichern/Verlinken mit Ratsprojekt als Quelle.
+  Todoist (globaler `todoist-triage`-Skill vorhanden). → #34
 
 ---
 
@@ -228,20 +209,17 @@ Vault-Notiz des jeweiligen Ratsprojekts gespeichert wird.
 
 | Schritt | Tool / Skill | Status |
 |---|---|---|
-| PDF herunterladen | `ratsinfo show <id>` zeigt Dokumente | ⚠️ `ratsinfo open <id>` ist Stub |
-| PDF ingesten (Text + Annotationen) | `pdf_ingest ingest(path)` | ⚠️ Nicht als MCP registriert |
-| Mit RIS-Sitzung verlinken | — | ❌ Keine Pipeline |
-| Highlights/Annotationen extrahieren | `pdf_ingest extract_annotations` | ⚠️ Nicht registriert |
+| PDF herunterladen | `ratsinfo show <id>` zeigt Dokumente, `ratsinfo open <id>` lädt herunter | ✅ |
+| PDF ingesten (Text + Annotationen) | `pdf_ingest ingest(path)` | ✅ |
+| Mit RIS-Sitzung verlinken | — | ❌ Keine Pipeline (siehe WF 4, #32) |
+| Highlights/Annotationen extrahieren | `pdf_ingest extract_annotations` | ✅ |
 
 ### Lücken
 
-- **pdf_ingest ist der größte akute Blocker:** Code ist da, funktioniert, aber
-  die AI kann ihn nicht nutzen, weil er nicht in `opencode.json` steht.
-- **`ratsinfo open` ist Stub** — kann keine PDFs direkt
-  öffnen/herunterladen.
 - **Keine ratsinfo→pdf_ingest Pipeline:** ratsinfo sync lädt Metadaten,
   pdf_ingest verarbeitet PDFs, aber es gibt keinen automatischen Flow
-  "sync → neue PDFs → ingest".
+  "sync → neue PDFs → ingest". Pragmatisch lösbar durch Skill-Orchestrierung;
+  ein dediziertes Tool ist nicht zwingend nötig.
 
 ---
 
@@ -260,8 +238,8 @@ Vorstandssitzungen verlinkt, damit es dort besprochen wird.
 | Schritt | Tool / Skill | Status |
 |---|---|---|
 | Recherche (RIS, AZ, Vault) | Einzelne Tools | ✅ |
-| Anliegen im Vault erfassen | `obsidian-cli` (extern) | ❌ Nicht integriert |
-| Mit Fraktionssitzung / Vorstandssitzung verlinken | Vault (Wikilinks) | ⚠️ Manuell |
+| Anliegen im Vault erfassen | `obsidian-cli` (extern) | ❌ Nicht integriert (#38) |
+| Mit Fraktionssitzung / Vorstandssitzung verlinken | Vault (Wikilinks) | ⚠️ Manuell (#38) |
 | Anliegen → Ratsprojekt eskalieren | `ratsprojekt_proposal` Skill | ✅ (über Umweg) |
 | Antwort formulieren (Brief/Email) | — | ❌ Kein Draft-Tool |
 
@@ -269,7 +247,7 @@ Vorstandssitzungen verlinkt, damit es dort besprochen wird.
 
 - **Bürgeranliegen-Tracking im Vault:** Eigene Notizen pro Anliegen, getaggt
   z.B. mit `#buergeranliegen/{datum-schlagwort}`. Verlinkt mit der nächsten
-  Fraktionssitzung / Vorstandssitzung, wo es besprochen wird.
+  Fraktionssitzung / Vorstandssitzung, wo es besprochen wird. → #38
 - **Kein Brief-/Email-Draft-Tool.**
 
 ---
@@ -288,25 +266,18 @@ Sitzungsvorbereitung einbeziehen.
 
 | Schritt | Tool / Skill | Status |
 |---|---|---|
-| ODS/Excel-Sheet aus Nextcloud lesen | `nextcloud_mcp` (geplant) | ❌ Kein MCP |
-| Geteilte Dokumente lesen | `nextcloud_mcp` | ❌ |
-| Dateien hochladen (z.B. Sitzungsmappe) | `nextcloud_mcp` (write) | ❌ |
-| Nextcloud-Kondensat gegen ratsprojekte halten | ad-hoc / `ratsprojekt_delta` | ❌ Keine Pipeline |
-| Kalender-Termine abrufen | `nextcloud_mcp` (CalDAV) | ❌ |
+| ODS/Excel-Sheet aus Nextcloud lesen | `nextcloud` (WebDAV) + `nextcloud_ods_mcp` (Parser) | ✅ |
+| Geteilte Dokumente lesen | `nextcloud` (`nc_webdav_read_file`) | ✅ |
+| Dateien hochladen (z.B. Sitzungsmappe) | `nextcloud` (`nc_webdav_write_file`) | ✅ |
+| Nextcloud-Kondensat gegen ratsprojekte halten | ad-hoc / `ratsprojekt_delta` | ⚠️ Keine Pipeline (#54) |
+| Kalender-Termine abrufen | `nextcloud` (`nc_calendar_list_events`) | ✅ |
 
 ### Lücken
 
-- **Nextcloud-MCP fehlt komplett.** Entweder gibt es einen fertigen
-  Open-Source-Nextcloud-MCP (zu prüfen), oder er muss gebaut werden.
-  Use cases: Dateien lesen/schreiben (WebDAV), ODS/Excel parsen,
-  Kalender (CalDAV), ggf. Nextcloud Talk.
-- **Konfiguration:** Wie bei der Email-MCP — Nextcloud-URL und
-  Zugangsdaten sind privat. Konfiguration in `config.local.yml` oder
-  lokale `opencode.json`, nicht im Repo. Skill-basierte Einrichtung mit
-  GO als Option.
-- **ODS-Parsing:** ODS-Dateien aus Nextcloud lesen und als strukturierte
-  Daten verarbeiten (für das Projekt-Kondensat). Python: `pandas` oder
-  `pyexcel-ods3`.
+- **Nextcloud-Kondensat gegen ratsprojekte:** Noch keine Pipeline. Workflow
+  wäre: ODS herunterladen via `nextcloud`, parsen via `nextcloud_ods_mcp`,
+  gegen `ratsprojekte`-Stand halten via `ratsprojekt_delta`. Bausteine da,
+  Pipeline fehlt. → #54
 
 > **Parteiübergreifend:** Andere Parteien und Fraktionen nutzen ähnliche
 > Kollaborationsplattformen. Der Workflow ist nicht parteispezifisch —
@@ -327,8 +298,8 @@ nach der Sitzung (basierend auf Beschlüssen) einen Nachbericht.
 
 | Schritt | Tool / Skill | Status |
 |---|---|---|
-| Vorbericht generieren (aus TOPs + Positionen) | Template + `sitzungsvorbereitung` (WF 1) | ❌ Kein Template-Tool |
-| Nachbericht generieren (aus Beschlüssen) | Template + `ratsinfo show` / RIS-Daten | ❌ Kein Template-Tool |
+| Vorbericht generieren (aus TOPs + Positionen) | Template + `sitzungsvorbereitung` (WF 1) | ❌ Kein Template-Tool (#41) |
+| Nachbericht generieren (aus Beschlüssen) | Template + `ratsinfo show` / RIS-Daten | ❌ Kein Template-Tool (#41) |
 | Nachricht in Kanal posten | WhatsApp / Social Media API | ❌ Keine Integration |
 | Nachricht im Vault archivieren | Vault-Write | ❌ |
 
@@ -336,7 +307,7 @@ nach der Sitzung (basierend auf Beschlüssen) einen Nachbericht.
 
 - **Kein Template-Tool für Öffentlichkeitsarbeit.** Die AI kann
   Sitzungsdaten lesen, aber es gibt keinen Skill, der daraus eine
-  kanal-gerechte Nachricht (kurz, sachlich, verständlich) generiert.
+  kanal-gerechte Nachricht (kurz, sachlich, verständlich) generiert. → #41
 - **Keine Kanal-Integration:** WhatsApp hat keine offizielle API für
   Communities. Alternativen: Signal, Threema, E-Mail-Verteiler, Website.
   Die AI generiert die Nachricht, das Posten bleibt beim Stadtrat (GO).
@@ -350,34 +321,87 @@ nach der Sitzung (basierend auf Beschlüssen) einen Nachbericht.
 
 ---
 
-## Lückenübersicht nach Priorität
+## WF 11: Bericht aus dem Stadtrat
 
-### 🔴 Akute Blocker (Quick Wins)
+**Situation:** Ein Termin steht an, bei dem als TOP "Bericht aus dem
+Stadtrat" vorgesehen ist (Stammtisch, Fraktionssitzung, Vorstand,
+Bürgerinfo, Podium). Der Stadtrat braucht einen kompakten Rückblick auf
+alle Sitzungen und Themen seit dem letzten Bericht — verdichtet für ein
+Laien-Publikum, nicht TOP-für-TOP, sondern nach thematischen Schwerpunkten.
 
-| # | Lücke | Fix | Workflow |
-|---|---|---|---|
-| ~~1~~ | ~~pdf_ingest nicht als MCP registriert~~ (erledigt) | ✅ In `opencode.json` eingetragen | WF 1, 3, 7 |
-| 2 | `ratsinfo open` ist Stub | Implementieren: PDF-Download + Öffnen | WF 7 |
-| 3 | Vault-Write-Gap | `obsidian-cli` erfolgreich getestet (Ordner + Datei via `obsidian eval`), Vault-Write funktioniert — Integration in Skill folgt | WF 1, 2, 6, 8 |
+**Ziel:** Eine **Berichtsnotiz** im Vault, die alle Sitzungen
+seit dem letzten Bericht thematisch bündelt, Beschlüsse erwähnt,
+optionale AZ-Artikel beilegt und Diskussionsthemen für den Termin
+vorschlägt. Direkt als Vortragsgrundlage nutzbar.
 
-### 🟡 Workflow-Skills fehlen
+| Schritt | Tool / Skill | Status |
+|---|---|---|
+| Letzten Bericht ermitteln (Vault-Suche nach Tag/Typ/Titel) | `obsidian-cli` search / tags | ✅ (Fallback: nutzende Person fragen) |
+| RIS-Sync (lokalen Cache aktualisieren) | `ratsinfo sync` | ✅ |
+| Sitzungen im Zeitraum filtern (Datum >= letzter Bericht, <= heute) | `ratsinfo sessions` | ✅ (manuelle Filterung nach Datum) |
+| TOPs pro Sitzung abrufen | `ratsinfo show <id>` | ✅ |
+| Vault-Notizen zu TOPs sammeln | `obsidian search` / `vault_suche` | ✅ (Fallback: nachfragen falls keine Treffer) |
+| AZ-Artikel (optional, nur Top-Themen) | `allgaeuer_zeitung_mcp` | ✅ |
+| Bericht im Vault persistieren | `obsidian-cli` write | ✅ |
+| YAML-Frontmatter validieren | pyyaml-Check | ✅ (analog sitzungsvorbereitung) |
 
-| # | Skill / Feature | Beschreibung | Workflow |
-|---|---|---|---|
-| 4 | sitzungsvorbereitung | in Arbeit — Pipeline getestet, Skill folgt | WF 1 |
-| 5 | beschluss_tracking | RIS-Beschluss-ID in ratsprojekt + Fristen-Tracking | WF 4 |
-| 6 | ris_sync_cross_check | RIS-Sync → "was ist neu zu meinen Projekten?" | WF 4 |
+### Lücken
 
-### 🟢 Datenmodell / Integration
+- **Bericht-Termine/Stichtage nicht persistent im Vault.** Es gibt keine
+  Kalender-Notiz oder Termin-Liste der vergangenen Berichte. Jeder
+  Bericht muss den letzten Bericht neu suchen (Tag `#bericht-aus-dem-stadtrat`,
+  Frontmatter `type: bericht-aus-dem-stadtrat`) oder bei der nutzenden Person
+  erfragen. Zukünftig: eigener Bericht-Kalender im Vault (Tabelle) oder
+  Anbindung an Nextcloud-Kalender (WF 9, `nc_calendar_list_events`).
+- **Kein automatischer Filter nach Zeitraum in `ratsinfo sessions`.** Die
+  CLI listet alle lokal gespeicherten Sitzungen. Die Filterung nach
+  "seit letztem Bericht" passiert manuell durch die AI anhand der
+  Datums-Ausgabe.
+- **Keine automatische Themen-Clusterung.** Die TOPs kommen chronologisch
+  aus dem RIS. Die thematische Bündelung (Klima, Mobilität, Bauen, etc.)
+  muss von der AI ad-hoc anhand der TOP-Titel passieren — kein Tool
+  unterstützt hierbei strukturell.
 
-| # | Lücke | Beschreibung | Workflow |
-|---|---|---|---|
-| 7 | RIS↔Ratsprojekt-Link | Feld in ratsprojekte für `ris_sitzung_id` / `ris_top` / `beschluss_nr` | WF 1, 4, 7 |
-| 8 | Fristen-Tracking | Eigene Tabelle oder Todoist-Integration | WF 4, 6 |
-| 9 | Email-MCP (read-only) | IMAP-Zugang, Body-Extraktion, ggf. Skill-basierte Konfiguration | WF 3 |
-| 10 | Förderrecherche-Persistenz | Reports als Vault-Notiz am Ratsprojekt speichern | WF 6 |
-| 11 | value_proposition + success_metrics als DB-Felder | Roadmap #9, noch policy-level | alle |
-| 12 | Bürgeranliegen im Vault | Notiz-Template + Tag-Konvention + Link zu Fraktionssitzungen | WF 8 |
-| 13 | Nextcloud-MCP | WebDAV/CalDAV-Anbindung, ODS-Parsing, Datei-Read/Write | WF 9 |
-| 14 | Öffentlichkeitsarbeit-Template-Tool | Vorbericht/Nachbericht aus Sitzungsdaten generieren | WF 10 |
-| 15 | YAML-Frontmatter-Validierung nach Vault-Write | Single-Quote-Regel + Post-Write-Validierung in allen Skills mit strukturiertem Vault-Write (aktuell nur `sitzungsvorbereitung`, potenziell `ratsprojekt_proposal` bei Vault-Konsolidierung) | WF 1, 2, 6 |
+> **Abgrenzung:** Der Bericht ist *rückblickend* und *verdichtet*. Die
+> vorwärtsgerichtete **Sitzungsvorbereitung** für eine konkrete kommende
+> Sitzung ist WF 1. **Anträge / Positionen / Fraktionsmappe** sind WF 10.
+> **Detail-Beschlussnachverfolgung** (Fristen, Umsetzungsstand) ist WF 4 —
+> hier werden nur Beschlüsse erwähnt, nicht nachverfolgt.
+
+**Skill:** `bericht_aus_dem_stadtrat` — orchestriert RIS-Sync, Vault-Suche,
+optional AZ und schreibt eine strukturierte Berichtsnotiz.
+
+---
+
+## Lückenübersicht
+
+Alle offenen Lücken sind als GitHub-Issues erfasst. Diese Sektion listet sie
+thematisch mit Issue-Nummer und primär betroffenem Workflow. Detaillierte
+Beschreibungen stehen in den jeweiligen Issues unter
+https://github.com/croesnick/kommunalpolitik_ki/issues.
+
+### Datenmodell / Integration
+
+| Issue | Lücke | Workflow |
+|---|---|---|
+| #32 | RIS↔Ratsprojekt-Link: Feld für `ris_sitzung_id` / `ris_top` / `beschluss_nr` | WF 1, 4, 7 |
+| #34 | Fristen-Tracking: Beschluss- und Förderfristen (Tabelle oder Todoist-Integration) | WF 4, 6 |
+| #37 | `value_proposition` + `success_metrics` als DB-Felder in ratsprojekte | alle |
+| #22 | `propose_projekt_update`: `beschlussvorschlag` + `adressat` fehlen | ratsprojekte |
+
+### Externe Tools / MCP-Anbindungen
+
+| Issue | Lücke | Workflow |
+|---|---|---|
+| #35 | Email-MCP (read-only): IMAP-Zugang, Body-Extraktion | WF 3 |
+
+### Skills / Workflow-Orchestrierung
+
+| Issue | Lücke | Workflow |
+|---|---|---|
+| #33 | RIS-Sync Cross-Check: "was ist neu zu meinen Projekten?" | WF 4 |
+| #36 | Förderrecherche-Persistenz: Reports an Vault-Notiz anhängen | WF 6 |
+| #38 | Bürgeranliegen-Tracking: Notiz-Template + Tag-Konvention | WF 8 |
+| #41 | Öffentlichkeitsarbeit: Vorbericht/Nachbericht aus Sitzungsdaten generieren | WF 10 |
+| #53 | YAML-Frontmatter-Validierung nach Vault-Write | WF 1, 2, 6, 8 |
+| #54 | Nextcloud-Kondensat-Pipeline: ODS gegen ratsprojekte halten | WF 9 |
