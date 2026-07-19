@@ -27,7 +27,8 @@
         "python",
         "-m",
         "pdf_ingest"
-      ]
+      ],
+      "timeout": 300
     },
     "tidewave": {
       "type": "remote",

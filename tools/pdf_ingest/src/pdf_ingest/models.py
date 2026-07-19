@@ -32,8 +32,22 @@ class IngestResult(BaseModel):
     """Full result of ingesting a PDF: text, annotations, and OCR flag."""
 
     path: str
-    pages: int
-    text: str = Field(..., description="Fulltext of all pages (may be long)")
+    pages: int = Field(..., description="Number of pages in the extracted range")
+    pages_total: int = Field(
+        ...,
+        description="Total pages in the PDF (independent of range)",
+    )
+    page_start: int | None = Field(
+        None,
+        description="1-based start page if a range was requested, else None",
+    )
+    page_end: int | None = Field(
+        None,
+        description="1-based end page if a range was requested, else None",
+    )
+    text: str = Field(
+        ..., description="Fulltext of the requested page range (may be long)"
+    )
     annotations: list[Annotation]
     ocr_used: bool = Field(
         False, description="True if OCR was performed on the document"
