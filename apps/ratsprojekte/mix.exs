@@ -40,7 +40,7 @@ defmodule Ratsprojekte.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
-      {:tidewave, "~> 0.6", only: :dev},
+      {:tidewave, "~> 0.8", only: :dev},
       {:anubis_mcp, "~> 1.6", only: [:dev, :test]},
       {:lazy_html, ">= 0.1.0", only: [:dev, :test]},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
