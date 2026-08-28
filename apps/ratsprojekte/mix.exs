@@ -32,7 +32,7 @@ defmodule Ratsprojekte.MixProject do
       {:phoenix, "~> 1.8.3"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.12"},
-      {:ecto_sqlite3, "~> 0.18"},
+      {:ecto_sqlite3, "~> 0.24"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.1.0"},
