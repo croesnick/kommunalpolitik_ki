@@ -1,0 +1,25 @@
+{
+  "blockers": [
+    {
+      "binding": "buergerfall-4711@1",
+      "code": "binding_condition_false",
+      "condition": "input_in_approved_case_scope"
+    }
+  ],
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "decision": "deny",
+  "identity": "carsten",
+  "intent_ref": "intent-admit-oeffentlich-a-praezedenz",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-oeffentlich-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "rule": "admit",
+  "snapshot_ref": "snap-fall-4711-praezedenz",
+  "workspace": "ws-fall-4711"
+}

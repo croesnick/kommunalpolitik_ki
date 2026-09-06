@@ -1,0 +1,18 @@
+{
+  "blockers": null,
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "decision": "permit",
+  "identity": "carsten",
+  "intent_ref": "intent-admit-oeffentlich-a",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-oeffentlich-a",
+    "version": "v1"
+  },
+  "registry_ref": "reg-fall-4711-test",
+  "rule": "admit",
+  "snapshot_ref": "snap-fall-4711-permit",
+  "workspace": "ws-fall-4711"
+}

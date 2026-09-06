@@ -1,0 +1,7 @@
+{
+  "schema": "komki-intent/1",
+  "intent_id": "intent-admit-lizenziert-a-fremd",
+  "operation": "admit",
+  "object": "obj-lizenziert-a@v1",
+  "workspace": "ws-fall-4711"
+}

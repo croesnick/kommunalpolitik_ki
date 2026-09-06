@@ -1,0 +1,77 @@
+{
+  "schema": "komki-registry/1",
+  "registry_id": "reg-fall-4711-test",
+  "observers": [
+    "carsten",
+    "eigene-rz-analyse",
+    "lokale-fallverarbeitung",
+    "webdienst-x"
+  ],
+  "fact_fields": {
+    "input_in_approved_case_scope": "boolean",
+    "purpose": "string"
+  },
+  "environments": {
+    "lokale-fallverarbeitung@1": {
+      "observers": [
+        "carsten",
+        "lokale-fallverarbeitung"
+      ]
+    },
+    "recherche-webdienst@1": {
+      "observers": [
+        "carsten",
+        "webdienst-x"
+      ]
+    }
+  },
+  "bindings": {
+    "buergerfall-4711@1": {
+      "readers": [
+        "carsten",
+        "lokale-fallverarbeitung"
+      ],
+      "operations": {
+        "admit": {
+          "all": [
+            {
+              "eq": [
+                "purpose",
+                "antwort-fall-4711"
+              ]
+            },
+            {
+              "eq": [
+                "input_in_approved_case_scope",
+                true
+              ]
+            }
+          ]
+        }
+      },
+      "relaxation_authorities": []
+    },
+    "lizenz-namensnennung@1": {
+      "readers": [
+        "carsten",
+        "eigene-rz-analyse",
+        "lokale-fallverarbeitung",
+        "webdienst-x"
+      ],
+      "operations": {
+        "admit": true
+      },
+      "relaxation_authorities": []
+    },
+    "nur-start-test@1": {
+      "readers": [
+        "carsten",
+        "lokale-fallverarbeitung"
+      ],
+      "operations": {
+        "start": true
+      },
+      "relaxation_authorities": []
+    }
+  }
+}

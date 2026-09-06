@@ -1,0 +1,25 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "object_quarantine",
+      "condition": null
+    }
+  ],
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "decision": "deny",
+  "identity": "carsten",
+  "intent_ref": "intent-admit-unklassifiziert-q",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-unklassifiziert-q",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "rule": "admit",
+  "snapshot_ref": "snap-fall-4711-quarantaene",
+  "workspace": "ws-fall-4711"
+}
