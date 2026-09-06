@@ -120,6 +120,25 @@ defmodule KomkiPolicy.JSONTest do
     test "Literalfortsetzungen mit Ziffern wie true1 sind unterminated_literal (MIN-7-Kosmetik)" do
       assert {:error, %{code: :unterminated_literal}} = JSON.parse("true1")
     end
+
+    test "U+FE0F (Lead 0xEF) ist valides, druckbares UTF-8 inkl. Canonical-Roundtrip" do
+      # Variation Selector-16: Lead 0xEF mit zwei Continuation-Bytes, kein
+      # Sonderbereich. Vor dem Gate wurde das fälschlich als invalid_utf8
+      # abgewiesen (Lane-B-Befund).
+      value = <<0xEF, 0x83, 0x8F>>
+      assert JSON.parse(<<34, value::binary, 34>>) == {:ok, value}
+
+      assert JSON.canonical(value) == <<34, value::binary, 34, 10>>
+      assert {:ok, ^value} = JSON.parse(JSON.canonical(value))
+    end
+
+    test "U+E100 (Lead 0xEE, Private Use Area) ist valides UTF-8 inkl. Canonical-Roundtrip" do
+      value = <<0xEE, 0x84, 0x80>>
+      assert JSON.parse(<<34, value::binary, 34>>) == {:ok, value}
+
+      assert JSON.canonical(value) == <<34, value::binary, 34, 10>>
+      assert {:ok, ^value} = JSON.parse(JSON.canonical(value))
+    end
   end
 
   # ======================================================================

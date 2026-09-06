@@ -390,6 +390,12 @@ defmodule KomkiPolicy.JSON do
   defp utf8_seq(lead, <<lead, b, c, _rest::binary>>)
        when lead == 0xE1 and b in 0x80..0xBF and c in 0x80..0xBF, do: {:ok, 3}
 
+  # U+E000 bis U+EFFF und U+F000 bis U+FFFF: RFC 8259 erlaubt jede
+  # wohlgeformte UTF-8-Folge; nur Continuation-Bytes pruefen (keine
+  # Sonderbereiche).
+  defp utf8_seq(lead, <<lead, b, c, _rest::binary>>)
+       when lead in 0xEE..0xEF and b in 0x80..0xBF and c in 0x80..0xBF, do: {:ok, 3}
+
   defp utf8_seq(lead, <<lead, b, c, _rest::binary>>)
        when lead == 0xED and b in 0x80..0x9F and c in 0x80..0xBF, do: {:ok, 3}
 
