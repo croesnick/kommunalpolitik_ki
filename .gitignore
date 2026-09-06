@@ -5,6 +5,8 @@ _build/
 *.ez
 apps/ratsinfo/ratsinfo
 apps/komki_policy/komki-policy
+cover/
+apps/*/cover/
 
 # Python
 __pycache__/
