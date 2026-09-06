@@ -122,7 +122,10 @@ jobs:
       # -t dialyzer" crasht mit dialyxir im Workspace-Pattern (bekanntes
       # dialyxir-Umbrella-Problem). komki_policy ist aktuell die erste
       # App mit Dialyzer-Pflicht; die PLT liegt unter apps/komki_policy/
-      # _build/dev.
+      # _build/dev. dialyzer: [no_umbrella: true] in mix.exs verhindert
+      # den Umbrella-Child-Bootstrap, der auf frischem Runner ebenfalls
+      # crasht (dialyxir haelt die App fuer ein Umbrella-Child, weil das
+      # Lockfile "../workspace.lock" heisst).
       - name: Dialyzer (komki_policy)
         working-directory: apps/komki_policy
         run: mix dialyzer

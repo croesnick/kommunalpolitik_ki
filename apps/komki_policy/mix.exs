@@ -19,6 +19,13 @@ defmodule KomkiPolicy.MixProject do
       # Mix-Version liest mix test den Schwellwert aus :summary, ein
       # Top-Level :threshold wird ignoriert.
       test_coverage: [summary: [threshold: 85]],
+      # dialyxir haelt diese App wegen lockfile "../workspace.lock" fuer
+      # ein Umbrella-Child und versucht auf frischem Runner zuerst einen
+      # Parent-PLT zu bauen (dialyxir dialyzer.ex:241-255). Das
+      # Root-Projekt hat kein dialyxir als Dep, der Bootstrap crasht
+      # deshalb. no_umbrella schaltet auf das normale PLT-Verhalten
+      # dieser App um.
+      dialyzer: [no_umbrella: true],
       deps: deps()
     ]
   end
