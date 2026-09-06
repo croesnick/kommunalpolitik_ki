@@ -61,11 +61,15 @@ jobs:
           restore-keys: |
             mix-${{ runner.os }}-ex19.5-otp28-
 
-      # AGENTS.md: "mix deps.get". Läuft im Root und wird für jedes
-      # Workspace-Projekt ausgeführt. Geteilte Lockdateien bleiben
-      # byte-identisch.
+      # Bootstrap wie in elixir.yml: erst Root-deps.get, denn das holt das
+      # workspace-Werkzeug selbst nach artifacts/deps. mix workspace.run
+      # ist eine Hex-Dep und ist auf einem frischen Runner noch nicht
+      # verfuegbar. Der erste CI-Lauf scheiterte genau hier, weil der
+      # Dispatch ohne Bootstrap lief.
       - name: Dependencies holen
-        run: mix workspace.run -t deps.get
+        run: |
+          mix deps.get
+          mix workspace.run -t deps.get
 
       # Root .formatter.exs deckt die Apps ab:
       # apps/*/mix.exs und apps/*/{config,lib,test}/**/*.{ex,exs}.
