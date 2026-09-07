@@ -32,7 +32,7 @@ defmodule Ratsinfo.MixProject do
       {:jason, "~> 1.4"},
       {:ecto, "~> 3.12"},
       {:ecto_sql, "~> 3.12"},
-      {:ecto_sqlite3, "~> 0.18"},
+      {:ecto_sqlite3, "~> 0.24"},
       {:html_entities, "~> 0.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
