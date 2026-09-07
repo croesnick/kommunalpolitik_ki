@@ -9,6 +9,18 @@
 
 > **Unter welchen Bedingungen darf ein Datenobjekt in einem Arbeitsraum verarbeitet und anschließend übergeben werden?**
 
+## Kontext
+
+Mit `kommunalpolitik_ki` soll KI die kommunalpolitische Arbeit unterstützen: Unterlagen aus dem Ratsinformationssystem zu einer Sitzungsmappe aufbereiten, aus Sitzungsnotizen Berichte für Parteimitglieder erstellen und zu Fraktionsprojekten recherchieren, um Anträge vorzubereiten. Dafür sollen Agenten vorhandene Datenquellen und Werkzeuge nutzen können, mit lokal betriebener KI, selbst betriebener Inferenz im Rechenzentrum oder zugelassenen externen Modelldiensten.
+
+Dabei treffen unterschiedliche Informationen aufeinander: öffentliche Ratsunterlagen und Webquellen, lizenzierte Inhalte aus Abonnements, nichtöffentliche Vorlagen, interne Partei- und Fraktionsunterlagen sowie persönliche Notizen. **Bevor KI diese Daten verarbeitet, muss geklärt sein, welchen Schutzbedarf sie haben und welche Bedingungen für ihre Nutzung gelten.** Wer darf sie erhalten, zu welchem Zweck dürfen sie verarbeitet werden und welche Betreiber- und Laufzeitumgebungen sind dafür zugelassen? Öffentlich zugänglich bedeutet dabei nicht automatisch frei von Nutzungsbedingungen.
+
+Diese Anforderungen enden nicht beim Lesen einer Quelle. Auch Zusammenfassungen, Suchanfragen und Berichte können geschützte Informationen enthalten. Schon ein Rechercheauftrag kann ein vertrauliches Vorhaben verraten. Deshalb muss nachvollziehbar bleiben, welche Bedingungen bei der Weiterverarbeitung, Speicherung und Weitergabe gelten. Ein Bericht für Parteimitglieder ist beispielsweise nicht allein deshalb zulässig, weil sein Verfasser die zugrunde liegenden Ratsunterlagen lesen darf.
+
+Außerdem muss das System damit umgehen, dass eingelesene Inhalte den Agenten zu unerlaubten Aktionen verleiten können (Prompt Injection). Die Sicherheit darf daher nicht davon abhängen, dass die KI solche Anweisungen erkennt oder sich freiwillig an Vorgaben hält.
+
+Ziel ist möglichst vielseitige KI-Unterstützung, ohne unberechtigte Offenlegung zuzulassen. Dieser RFC beschreibt dafür ein Modell mit ausdrücklichen Bedingungen, technischen Durchsetzungsanforderungen und überprüfbaren Sicherheitsgarantien unter klar benannten Annahmen. Die anschließend eingeführten Begriffe beschreiben die Daten, ihre fortgeltenden Bedingungen, die abgegrenzte Verarbeitung und die kontrollierte Weitergabe.
+
 ## Zusammenfassung
 
 Vier Begriffe tragen das Modell: **Datenobjekt, Bindung, Arbeitsraum und Übergabe**. Daten tragen Bindungen. Ein Arbeitsraum erfüllt alle seine Bindungen. Seine Eingaben müssen dazu passen; seine Ausgaben behalten mindestens seine Bindungen. Eine Lockerung ist eine ausdrücklich autorisierte Ausnahme, keine Entscheidung des Agenten.
