@@ -1,0 +1,119 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "reasons": [],
+        "result": "valid"
+      },
+      "intent": "case_permit/intent.json",
+      "proof": "case_permit/proof_valid.json",
+      "snapshot": "case_permit/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "missing_required_premise"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_permit/intent.json",
+      "proof": "proofs/proof_missing_binding_condition.json",
+      "snapshot": "case_permit/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "checked_label_mismatch"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_permit/intent.json",
+      "proof": "proofs/proof_checked_label_shortened.json",
+      "snapshot": "case_permit/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "condition_false",
+          "conclusion_mismatch"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_deny/intent.json",
+      "proof": "proofs/proof_false_condition.json",
+      "snapshot": "case_deny/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "condition_unknown",
+          "conclusion_mismatch"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_indeterminate/intent.json",
+      "proof": "proofs/proof_missing_fact_condition.json",
+      "snapshot": "case_indeterminate/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "snapshot_mismatch"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_permit/intent.json",
+      "proof": "proofs/proof_foreign_snapshot.json",
+      "snapshot": "case_permit/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "fact_value_mismatch",
+          "conclusion_mismatch"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_deny_no_basis/intent.json",
+      "proof": "proofs/proof_false_fact_value.json",
+      "snapshot": "case_deny_no_basis/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "expression_mismatch",
+          "fact_refs_mismatch",
+          "conclusion_mismatch"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_permit/intent.json",
+      "proof": "proofs/proof_easier_expression.json",
+      "snapshot": "case_permit/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "unknown_premise"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_deny_label_not_included/intent.json",
+      "proof": "proofs/proof_disguised_label_inclusion.json",
+      "snapshot": "case_deny_label_not_included/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "expression_mismatch",
+          "conclusion_mismatch"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_deny_missing_rule/intent.json",
+      "proof": "proofs/proof_admitless_condition.json",
+      "snapshot": "case_deny_missing_rule/snapshot.json"
+    }
+  ],
+  "schema": "komki-verify-expectations/1"
+}

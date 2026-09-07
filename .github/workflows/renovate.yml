@@ -25,6 +25,9 @@ jobs:
           # Self-hosted config via env — the action does NOT auto-detect the
           # current repo. Root renovate.json is picked up automatically as
           # per-repo config.
+          # Erforderliche Token-Rechte: docs/prerequisites.md, Abschnitt
+          # "Renovate-PAT". Fehlendes PR/Issues-Schreibrecht = gruener
+          # Lauf ohne PRs.
           RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
           RENOVATE_PLATFORM: github
           RENOVATE_REPOSITORIES: ${{ github.repository }}

@@ -1,0 +1,89 @@
+{
+  "checked_label": [
+    "nur-start-test@1"
+  ],
+  "conclusion": "permit",
+  "intent_ref": "intent-admit-oeffentlich-a-start",
+  "premises": [
+    {
+      "classification": "classified",
+      "kind": "object_check",
+      "name": "not_quarantine",
+      "object": "obj-oeffentlich-a@v1",
+      "value": true
+    },
+    {
+      "fact": "workspace_contract_valid",
+      "kind": "fact",
+      "name": "workspace_contract_valid",
+      "source": "workspace.valid",
+      "value": true
+    },
+    {
+      "fact": "has_operation_right",
+      "kind": "fact",
+      "name": "has_operation_right",
+      "source": "rechte-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    {
+      "fact": "has_object_access_right",
+      "kind": "fact",
+      "name": "has_object_access_right",
+      "source": "objekt-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    {
+      "fact": "audit_path_ready",
+      "kind": "fact",
+      "name": "audit_path_ready",
+      "source": "journal-verwaltung",
+      "source_kind": "technical",
+      "value": true
+    },
+    {
+      "fact": "environment_observers_complete",
+      "kind": "fact",
+      "name": "environment_observers_complete",
+      "source": "umgebungs-verwaltung",
+      "source_kind": "assumption",
+      "value": true
+    },
+    {
+      "checked_label": [
+        "nur-start-test@1"
+      ],
+      "kind": "computed",
+      "name": "label_inclusion",
+      "object_labels": [],
+      "value": true
+    },
+    {
+      "actual_recipients": [
+        "carsten",
+        "lokale-fallverarbeitung"
+      ],
+      "allowed_recipients": [
+        "carsten",
+        "lokale-fallverarbeitung"
+      ],
+      "kind": "computed",
+      "name": "recipient_inclusion",
+      "value": true
+    },
+    {
+      "binding": "nur-start-test@1",
+      "expression": true,
+      "fact_refs": [],
+      "kind": "condition",
+      "name": "binding_condition",
+      "value": true
+    }
+  ],
+  "registry_ref": "reg-fall-4711-test",
+  "rule": "admit",
+  "schema": "komki-proof/1",
+  "snapshot_ref": "snap-start-test-ohne-admit"
+}

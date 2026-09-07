@@ -4,6 +4,9 @@ _build/
 .elixir/
 *.ez
 apps/ratsinfo/ratsinfo
+apps/komki_policy/komki-policy
+cover/
+apps/*/cover/
 
 # Python
 __pycache__/
@@ -41,3 +44,6 @@ config.local.yml
 vault_suche-workspace/iteration-1/eval-*/
 vault_suche-workspace/iteration-1/review.html
 vault_suche-workspace/iteration-1/benchmark.md
+
+# Deepwork orchestrator state (local progress files)
+.slim/deepwork/

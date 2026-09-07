@@ -1,0 +1,47 @@
+{
+  "schema": "komki-snapshot/1",
+  "snapshot_id": "snap-fall-4711-praezedenz",
+  "registry_ref": "reg-fall-4711-test",
+  "identity": "carsten",
+  "workspace": {
+    "workspace_id": "ws-fall-4711",
+    "bindings": [
+      "buergerfall-4711@1"
+    ],
+    "valid": true,
+    "environment": "lokale-fallverarbeitung@1"
+  },
+  "object": {
+    "object_id": "obj-oeffentlich-a",
+    "version": "v1",
+    "classification": "classified",
+    "labels": []
+  },
+  "facts": {
+    "audit_path_ready": {
+      "source": "journal-verwaltung",
+      "source_kind": "technical",
+      "value": true
+    },
+    "environment_observers_complete": {
+      "source": "umgebungs-verwaltung",
+      "source_kind": "assumption",
+      "value": true
+    },
+    "has_object_access_right": {
+      "source": "objekt-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    "input_in_approved_case_scope": {
+      "source": "fall-verwaltung",
+      "source_kind": "administered",
+      "value": false
+    },
+    "purpose": {
+      "source": "auftrags-verwaltung",
+      "source_kind": "administered",
+      "value": "antwort-fall-4711"
+    }
+  }
+}
