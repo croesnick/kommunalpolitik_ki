@@ -38,7 +38,7 @@ jobs:
       # Volle Historie: der Test-Task braucht einen Base-Commit für
       # --affected (siehe Testschritte).
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -52,7 +52,7 @@ jobs:
       # unter artifacts/deps, App-Builds und Dialyzer-PLTs unter
       # apps/*/_build. Key hashed aus beiden Lockdateien und allen mix.exs.
       - name: Mix- und Build-Cache
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.1.0, Node 24
         with:
           path: |
             artifacts/deps
@@ -81,11 +81,14 @@ jobs:
       - name: Kompilieren (warnings as errors)
         run: mix workspace.run -t compile -- --warnings-as-errors
 
-      # Credo ist nur in apps/komki_policy als :dev dep. Root hat keinen
-      # credo-Task. Diese App ist die einzige mit .credo-Konfiguration.
-      - name: Credo strict (komki_policy)
-        working-directory: apps/komki_policy
-        run: mix credo --strict
+      # Credo strict ueber den Workspace-Dispatch (konsolidiert aus
+      # elixir.yml). ratsprojekte ist bewusst ausgeklammert: Sein
+      # credo-Lauf schlaegt mit vorbestehenden Funden fehl, dieser PR
+      # heilt keine Altschulden. ratsinfo und shared hatten bislang
+      # credo-Pflicht (elixir.yml), komki_policy laeuft neu mit im
+      # Dispatch statt app-lokal; lokal verifiziert, exit 0.
+      - name: Credo strict (ratsinfo, shared, komki_policy)
+        run: mix workspace.run -t credo -p ratsinfo -p shared -p komki_policy -- --strict
 
       # Tests ueber den Workspace, ohne --cover. Abweichung von AGENTS.md
       # ("-- --cover"): Mix' Default-Schwellwert fuer Coverage ist 90 %.
