@@ -1,0 +1,30 @@
+{
+  "blockers": null,
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "decision": "indeterminate",
+  "identity": "carsten",
+  "intent_ref": "intent-admit-oeffentlich-a-multi-evidenz",
+  "missing_evidence": [
+    {
+      "binding": null,
+      "code": "missing_fact",
+      "fact": "has_operation_right"
+    },
+    {
+      "binding": null,
+      "code": "missing_fact",
+      "fact": "audit_path_ready"
+    }
+  ],
+  "object": {
+    "object_id": "obj-oeffentlich-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "rule": "admit",
+  "snapshot_ref": "snap-fall-4711-multi-evidenz",
+  "workspace": "ws-fall-4711"
+}

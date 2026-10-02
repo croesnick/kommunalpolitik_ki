@@ -1,0 +1,5 @@
+# OpenCode/agent ignore overrides — keep deepwork progress files readable
+# for the agent while git ignores them (see .gitignore).
+!.slim/
+!.slim/deepwork/
+!.slim/deepwork/**

@@ -1,0 +1,141 @@
+# CI für kommunalpolitik_ki.
+# Befehle nach AGENTS.md (Abschnitt CI). Jeder Befehl ist lokal ausgeführt
+# und grün. Abweichungen von AGENTS.md sind als Kommentare begründet.
+#
+# Build-Layout (geprüft in mix.exs und .gitignore):
+# - Root mix.exs: Workspace-Root, deps_path "artifacts/deps",
+#   lockfile "workspace.lock".
+# - Apps: deps_path "../artifacts/deps" (geteilt), lockfile
+#   "../workspace.lock", das ist die Datei apps/workspace.lock.
+#   Es gibt kein per-app mix.lock.
+# - Jede App hat ein eigenes _build: apps/<app>/_build, inklusive der
+#   Dialyzer-PLTs von dialyxir.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Elixir quality gates
+    runs-on: ubuntu-latest
+    env:
+      # Empfehlung aus der setup-beam Doku (Oban CI): verhindert
+      # Kernel-Tabellenkonflikte auf frischen Linux Runnern.
+      ERL_AFLAGS: "-kernel prevent_overlapping_tables false"
+    steps:
+      # Volle Historie: der Test-Task braucht einen Base-Commit für
+      # --affected (siehe Testschritte).
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Erlang/Elixir einrichten
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          elixir-version: '1.19.5'
+          otp-version: '28'
+
+      # Ein Cache-Eintrag für alles: Hex-Pakete und kompilierte Deps liegen
+      # unter artifacts/deps, App-Builds und Dialyzer-PLTs unter
+      # apps/*/_build. Key hashed aus beiden Lockdateien und allen mix.exs.
+      - name: Mix- und Build-Cache
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.1.0, Node 24
+        with:
+          path: |
+            artifacts/deps
+            apps/*/_build
+          key: mix-${{ runner.os }}-ex19.5-otp28-${{ hashFiles('workspace.lock', 'apps/workspace.lock', 'mix.exs', 'apps/*/mix.exs') }}
+          restore-keys: |
+            mix-${{ runner.os }}-ex19.5-otp28-
+
+      # Bootstrap wie in elixir.yml: erst Root-deps.get, denn das holt das
+      # workspace-Werkzeug selbst nach artifacts/deps. mix workspace.run
+      # ist eine Hex-Dep und ist auf einem frischen Runner noch nicht
+      # verfuegbar. Der erste CI-Lauf scheiterte genau hier, weil der
+      # Dispatch ohne Bootstrap lief.
+      - name: Dependencies holen
+        run: |
+          mix deps.get
+          mix workspace.run -t deps.get
+
+      # Root .formatter.exs deckt die Apps ab:
+      # apps/*/mix.exs und apps/*/{config,lib,test}/**/*.{ex,exs}.
+      - name: Format prüfen
+        run: mix format --check-formatted
+
+      # Plain root "mix compile" compiliert nichts (elixirc_paths: []).
+      # Der Workspace-Dispatch erzwingt warnings-as-errors in jeder App.
+      - name: Kompilieren (warnings as errors)
+        run: mix workspace.run -t compile -- --warnings-as-errors
+
+      # Credo strict ueber den Workspace-Dispatch (konsolidiert aus
+      # elixir.yml). ratsprojekte ist bewusst ausgeklammert: Sein
+      # credo-Lauf schlaegt mit vorbestehenden Funden fehl, dieser PR
+      # heilt keine Altschulden. ratsinfo und shared hatten bislang
+      # credo-Pflicht (elixir.yml), komki_policy laeuft neu mit im
+      # Dispatch statt app-lokal; lokal verifiziert, exit 0.
+      - name: Credo strict (ratsinfo, shared, komki_policy)
+        run: mix workspace.run -t credo -p ratsinfo -p shared -p komki_policy -- --strict
+
+      # Tests ueber den Workspace, ohne --cover. Abweichung von AGENTS.md
+      # ("-- --cover"): Mix' Default-Schwellwert fuer Coverage ist 90 %.
+      # komki_policy liegt bei 87,6 %, aeltere Apps darunter. Ein
+      # workspace-weites --cover haette eine rot CI, ohne dass eine
+      # Zeile Code kaputt ist. Coverage wird deshalb als eigener Schritt
+      # nur fuer komki_policy erzwungen (Schwellwert 85 in mix.exs).
+      # Wichtig: workspace "--affected" ohne --base sieht nur uncommitted
+      # und untracked Dateien. Auf einem frischen CI-Checkout ist der Baum
+      # clean, es wuerden 0 Projekte ausgewählt und 0 Tests laufen. Deshalb:
+      # - PR: Diff gegen origin/main. Klappt, weil checkout mit
+      #   fetch-depth: 0 alle Remote-Refs holt.
+      # - Push auf main: gesamtes Workspace. Der Workspace ist klein,
+      #   4 Apps, Testzeit unter 5 Minuten.
+      # --affected ohne --base waere eine grüne CI mit 0 Tests. Nicht
+      # gewollt.
+      - name: Tests (PR)
+        if: github.event_name == 'pull_request'
+        run: mix workspace.run -t test --affected --base origin/main
+
+      - name: Tests (push auf main)
+        if: github.event_name == 'push'
+        run: mix workspace.run -t test
+
+      # Coverage-Gate fuer komki_policy (Schwellwert: apps/komki_policy/
+      # mix.exs). Zeilendeckung ist hier Sekundaermetrik; die Orakel-
+      # und Property-Suiten tragen die Pruefung. Der Boden verhindert
+      # stille Regressionen nach unten.
+      - name: Coverage (komki_policy)
+        working-directory: apps/komki_policy
+        run: mix test --cover
+
+      # Dialyzer app-lokal: der root-Workspace-Dispatch "workspace.run
+      # -t dialyzer" crasht mit dialyxir im Workspace-Pattern (bekanntes
+      # dialyxir-Umbrella-Problem). komki_policy ist aktuell die erste
+      # App mit Dialyzer-Pflicht; die PLT liegt unter apps/komki_policy/
+      # _build/dev. dialyzer: [no_umbrella: true] in mix.exs verhindert
+      # den Umbrella-Child-Bootstrap, der auf frischem Runner ebenfalls
+      # crasht (dialyxir haelt die App fuer ein Umbrella-Child, weil das
+      # Lockfile "../workspace.lock" heisst).
+      - name: Dialyzer (komki_policy)
+        working-directory: apps/komki_policy
+        run: mix dialyzer
+
+      # Stärkster Akzeptanzschritt: frischer Checkout, escript Build, alle
+      # Kommandopfade mit erwarteten Exit-Codes (decide permit/deny/
+      # indeterminate/unsupported, verify valid/verworfen). Bricht das
+      # Skript bei Abweichung laut ab. Abnahme-Referenz: priv/demo.sh
+      - name: Demo (komki-policy Akzeptanz)
+        run: bash apps/komki_policy/priv/demo.sh

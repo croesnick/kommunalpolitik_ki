@@ -1,0 +1,28 @@
+{
+  "schema": "komki-snapshot/1",
+  "snapshot_id": "snap-fall-4711-unbekannte-referenz",
+  "registry_ref": "reg-fall-4711-test",
+  "identity": "carsten",
+  "workspace": {
+    "workspace_id": "ws-fall-4711",
+    "bindings": [
+      "buergerfall-4711@1",
+      "unbekannte-bindung@9"
+    ],
+    "valid": true,
+    "environment": "lokale-fallverarbeitung@1"
+  },
+  "object": {
+    "object_id": "obj-oeffentlich-a",
+    "version": "v1",
+    "classification": "classified",
+    "labels": []
+  },
+  "facts": {
+    "purpose": {
+      "source": "auftrags-verwaltung",
+      "source_kind": "administered",
+      "value": "antwort-fall-4711"
+    }
+  }
+}
