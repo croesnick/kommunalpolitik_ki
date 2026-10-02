@@ -1,60 +1,404 @@
-# RFC 0001: Vertrauliche KI-Arbeit durch gebundene Arbeitsräume
+# RFC 0003: Vertrauliche KI-Arbeit durch gebundene Arbeitsräume
 
 | Feld | Wert |
 |---|---|
-| Status | Superseded. Abgelöst durch [RFC0003](0003-vertrauliche-ki-arbeitsraeume.md) |
-| Historischer Revisionsstand | Draft, Revision 4: Audit-Journal und unabhängiger Betriebsnachweis |
-| Stand | 2026-09-06 |
-| Gegenstand | Sicherheitsmodell, Kalkül, Inferenz-Engine, Simulation und Audit |
+| Status | Draft, Revision 1 |
+| Stand | 2026-10-02 |
+| Ersetzt | [RFC0001 Revision4](0001-vertrauliche-ki-arbeitsraeume.md) |
+| Gegenstand | Didaktische Erklärung und vollständige normative Referenz des Sicherheitsmodells, Kalküls und Audits |
 | Umsetzung | Bauanleitung und Abnahmekriterien; keine Freigabe für produktive Verarbeitung geschützter Daten |
 
-> **Unter welchen Bedingungen darf ein Datenobjekt in einem Arbeitsraum verarbeitet und anschließend übergeben werden?**
+Diese Fassung ordnet die Erklärung neu, ohne eine neue Sicherheitspolitik einzuführen.
+Sie enthält die didaktischen Erklärungen und Beispiele sowie die vollständige normative Referenz.
+Für die projektweiten Begriffe gilt die [kanonische Nomenklatur](../nomenklatur.md).
 
-## Kontext
+## Leseweg und Verbindlichkeit
 
-Mit `kommunalpolitik_ki` soll KI die kommunalpolitische Arbeit unterstützen: Unterlagen aus dem Ratsinformationssystem zu einer Sitzungsmappe aufbereiten, aus Sitzungsnotizen Berichte für Parteimitglieder erstellen und zu Fraktionsprojekten recherchieren, um Anträge vorzubereiten. Dafür sollen Agenten vorhandene Datenquellen und Werkzeuge nutzen können, mit lokal betriebener KI, selbst betriebener Inferenz im Rechenzentrum oder zugelassenen externen Modelldiensten.
+Ein Kurzüberblick verbindet [das Ratsarbeitsbeispiel](#1-ratsarbeit-ohne-ungewollte-offenlegung), [den
+Arbeitsraum](#5-der-arbeitsraum-und-sein-fester-vertrag) und [die
+Freigaben](#10-freigaben-für-konkrete-ereignisse). Für das grundlegende Verständnis werden zuerst die Abschnitte
+1–5 in ihrer Reihenfolge gelesen. Der übrige Hauptteil erklärt die Zusammenhänge. Für Umsetzung
+und Prüfung führt der Weg zur [normativen Referenz](#normative-referenz) und zu den Bauanleitungen in
+[B](#anhang-b-bauanleitung-für-die-inferenz-engine), [C](#anhang-c-bauanleitung-für-das-simulationstool) und
+[F](#anhang-f-bauanleitung-für-audit-journal-und-verifier).
 
-Dabei treffen unterschiedliche Informationen aufeinander: öffentliche Ratsunterlagen und Webquellen, lizenzierte Inhalte aus Abonnements, nichtöffentliche Vorlagen, interne Partei- und Fraktionsunterlagen sowie persönliche Notizen. **Bevor KI diese Daten verarbeitet, muss geklärt sein, welchen Schutzbedarf sie haben und welche Bedingungen für ihre Nutzung gelten.** Wer darf sie erhalten, zu welchem Zweck dürfen sie verarbeitet werden und welche Betreiber- und Laufzeitumgebungen sind dafür zugelassen? Öffentlich zugänglich bedeutet dabei nicht automatisch frei von Nutzungsbedingungen.
+Der Hauptteil 1–12 ist eine nichtnormative Erklärung. Maßgeblich sind R.1–R.11 und die vollständigen Anhänge
+A–F. Sie übernehmen RFC0001 Revision4. Bei einem Widerspruch gilt die Referenz, nicht die vereinfachte
+Erklärung. Alte Abschnittsnummern N.M werden hier zu R.N.M; die Anhangsnummern bleiben erhalten. Historische
+Revisions- und Quellenangaben beziehen sich weiterhin auf RFC0001.
 
-Diese Anforderungen enden nicht beim Lesen einer Quelle. Auch Zusammenfassungen, Suchanfragen und Berichte können geschützte Informationen enthalten. Schon ein Rechercheauftrag kann ein vertrauliches Vorhaben verraten. Deshalb muss nachvollziehbar bleiben, welche Bedingungen bei der Weiterverarbeitung, Speicherung und Weitergabe gelten. Ein Bericht für Parteimitglieder ist beispielsweise nicht allein deshalb zulässig, weil sein Verfasser die zugrunde liegenden Ratsunterlagen lesen darf.
+## 1. Ratsarbeit ohne ungewollte Offenlegung
 
-Außerdem muss das System damit umgehen, dass eingelesene Inhalte den Agenten zu unerlaubten Aktionen verleiten können (Prompt Injection). Die Sicherheit darf daher nicht davon abhängen, dass die KI solche Anweisungen erkennt oder sich freiwillig an Vorgaben hält.
+Eine KI soll nichtöffentliche RIS-Vorlagen für eine Sitzungsmappe zusammenfassen. In einer Anlage steht die
+Anweisung, einen Absatz an eine Websuche zu senden. Es wäre riskant, den Schutz davon abhängig zu machen, ob der
+Agent diese Anweisung erkennt. Auch eine Suchfrage ohne wörtliches Zitat kann das vertrauliche Vorhaben
+verraten.
 
-Ziel ist möglichst vielseitige KI-Unterstützung, ohne unberechtigte Offenlegung zuzulassen. Dieser RFC beschreibt dafür ein Modell mit ausdrücklichen Bedingungen, technischen Durchsetzungsanforderungen und überprüfbaren Sicherheitsgarantien unter klar benannten Annahmen. Die anschließend eingeführten Begriffe beschreiben die Daten, ihre fortgeltenden Bedingungen, die abgegrenzte Verarbeitung und die kontrollierte Weitergabe.
+Das Modell begrenzt deshalb die möglichen Wirkungen eines beliebig handelnden Agenten. Es beschreibt vier Typen:
+Objekte sind die verarbeiteten Inhalte, Bindungen ihre Umgangsregeln, Beobachter die Stellen mit möglichem
+Zugriff und Arbeitsräume die abgegrenzten Verarbeitungseinheiten. Die folgenden Abschnitte führen diese Begriffe
+ein. Isolation ist eine nachzuweisende Eigenschaft der Umsetzung, keine Folge guter Prompts.
 
-## Zusammenfassung
+Im Beispiel darf der Agent einen Recherchevorschlag erstellen. Ob dieser Vorschlag an einen Suchdienst gelangt,
+entscheidet ein vom Agenten getrennter Ausführungsweg. Eine authentische Quelle macht enthaltene Anweisungen
+nicht vertrauenswürdig. Die genaue Reichweite steht in [R.1](#r1-geltung-und-sicherheitsziel).
 
-Vier Begriffe tragen das Modell: **Datenobjekt, Bindung, Arbeitsraum und Übergabe**. Daten tragen Bindungen. Ein Arbeitsraum erfüllt alle seine Bindungen. Seine Eingaben müssen dazu passen; seine Ausgaben behalten mindestens seine Bindungen. Eine Lockerung ist eine ausdrücklich autorisierte Ausnahme, keine Entscheidung des Agenten.
+## 2. Registry, Objekte und Bindungen
 
-Für eine Eingabe $x$, einen Arbeitsraum $W$ und eine dort erzeugte Ausgabe $y$ gilt ohne Lockerung:
+Ein Dateiname wie `vertraulich.pdf` reicht nicht als Schutz. Der Agent könnte ihn ändern. Die Registry ist die
+geschützte, tatsächlich geführte Datenbasis für registrierte Bindungen, Sicherheitsmetadaten, Befugnisse und
+Freigabefakten. Sie liegt außerhalb der Schreibhoheit des Agenten. Ein Regelstand Γ ist ein fester, geprüfter
+Snapshot dieser Registry für eine Entscheidung; aktuelle Prüffakten werden dazu passend aufgelöst.
+
+Eine Bindung ist eine benannte, versionierte Umgangsregel. Die Kennung `ratsarbeit@1` bezeichnet eine bestimmte
+Regelversion. Die Definition nennt ihre Grundlage und verantwortliche Stelle, zulässige Empfänger,
+Operationsbedingungen, Auflagen und Lockerungsbefugnisse. Ohne eingetragene Lockerungsbefugnis gibt es keine
+zulässige Lockerung. Ratsarbeit und Parteiarbeit sind verschiedene Bindungen, keine Stufen einer Rangliste.
+
+Ein Datenobjekt ist ein bestimmter, versionierter Inhalt mit getrennten Sicherheitsmetadaten. Sein Label ist die
+Menge seiner Bindungen. Herkunft, Inhaltsversion und Klassifikationsentscheidung bleiben nachvollziehbar. Auch
+der Arbeitsauftrag ist ein Objekt, weil schon die Themenauswahl ein geschütztes Vorhaben erkennen lassen kann.
+
+Eine Vorlage zu TOP 3 kann beispielsweise aus einem authentifizierten RIS stammen, die Inhaltsversion `v42`
+besitzen und das Label `{ratsarbeit@1}` tragen. Umbenennen oder die Behauptung „anonymisiert“ verändert dieses
+Label nicht. Neue Bindungen und Versionen können zwischen Entscheidungen registriert werden. Γ bleibt während
+jeder Entscheidung fest; ein laufender Arbeitsraum übernimmt Änderungen nicht still. Die Definitionen stehen in
+[R.2](#r2-datenobjekte-und-bindungen) und [B.3](#b3-datenverträge).
+
+## 3. Empfänger, Bedingungen und ungeklärtes Material
+
+Ein Fraktionskollege darf eine Notiz lesen. Daraus folgt weder ein Recht zum Versand an Parteimitglieder noch
+die Zulässigkeit jedes KI-Dienstes. Das Modell trennt den zulässigen Empfängerkreis von den Bedingungen einer
+konkreten Operation. Die Bedingungen können den Empfängerkreis weiter beschränken, aber nicht erweitern.
+Objektbezogene Zugriffsrechte, etwa eine Lese-ACL, werden zusätzlich geprüft. Eine Beschränkung, die für
+Ableitungen weitergelten soll, gehört ins Label.
+
+Öffentlicher Zugang, Weiterverwendungsrecht und Nutzung ohne Auflagen sind verschiedene Aussagen. Eine
+Lizenzbindung kann alle Empfänger zulassen und trotzdem Quellenangaben verlangen. Eine Veröffentlichung erfüllt
+dann die Bindung, statt sie zu entfernen. Fehlende Lizenzangaben sind keine allgemeine Erlaubnis. Diese
+Unterscheidung stützt sich auf die übernommenen Quellen zu DCAT, OParl und der Datenlizenz
+Deutschland.[^dcat][^oparl][^govdata]
+
+Unklassifiziertes Material bleibt in Quarantäne, einem abgesonderten Eingang ohne reguläres Label. Es wird nicht
+als leere Bindungsmenge behandelt. Eine berechtigte Person oder eine freigegebene Importregel entscheidet im
+gesondert autorisierten Einordnungsverfahren. Ein Agent kann dort eine Einordnung vorschlagen, aber nicht
+verbindlich festlegen. Die Erstklassifikation erlaubt keine vorherige Übermittlung an eine unzugelassene externe
+KI.
+
+So bleibt eine neu eingegangene Bürgermail zunächst außerhalb regulärer Arbeitsräume. Erst die autorisierte
+Einordnung schafft einen regulären Eingang. Unbekannte Kennungen, Empfänger oder Voraussetzungen führen
+ebenfalls nicht zu günstigen Defaults. Die vollständigen Regeln stehen in
+[R.2.3–R.2.5](#r23-empfängerkreis-und-operationsbedingungen).
+
+## 4. Beobachter und der tatsächliche Verarbeitungsweg
+
+„Das Modell läuft lokal“ beschreibt noch nicht, wer auf die Arbeit zugreifen kann. Ein synchronisierter Verlauf
+oder ein Diagnosedienst kann zusätzliche Empfänger schaffen. Ein Beobachter ist hier jeder modellierte Kontext
+mit potenziellem Zugriff auf Inhalte oder geschützte Metadaten. Nachgewiesenes Lesen ist nicht erforderlich.
+
+Die Betreiber- und Laufzeitumgebung beschreibt den konkreten Verarbeitungsweg. Er umfasst die lokale Seite, den
+Zielendpunkt und mitverarbeitende Stellen. Neben Anfrage und Antwort gehören auch Abzweigungen zu Logs,
+Vorschauen, Hilfsmodellen, Sicherungen und Sync dazu. Ein Weg ist daher nicht bloß eine lineare Stationsliste.
+Seine dokumentierte Beschreibung und die tatsächlich laufende Konfiguration müssen zusammenpassen.
+
+Ein synthetisches Beispiel vergleicht eine lokale Analyse ohne Cloud-Sync mit einem externen Dienst Z. Bei Z
+könnten Administration, ein Unterauftragnehmer und eine Logablage Zugriff haben. Das sind illustrative Annahmen,
+keine Befunde über reale Verträge. Die Prüfung vergleicht alle für den geplanten Schritt aufgelösten Beobachter
+mit den durch das Label zugelassenen Empfängern. Potenzieller Zugriff bedeutet nicht Zulassung.
+
+Identität und Rolle bleiben unterscheidbar. Carsten wird durch einen Wechsel von der Ratsrolle zur Parteirolle
+nicht zu zwei Menschen mit getrenntem Gedächtnis. Das Modell berücksichtigt reale Zugriffsmöglichkeiten, keine
+künstlich getrennten Rollenpersonen. Es beweist keine Vertragstreue angenommener Betreiber und verhindert keine
+Weitergabe durch bereits berechtigte Menschen außerhalb des Systems. Auch ein Ausfall erlaubt keinen stillen
+Provider-Fallback. Einzelheiten stehen in [R.3](#r3-betreibervertrauen-und-laufzeitumgebung).
+
+## 5. Der Arbeitsraum und sein fester Vertrag
+
+Ein Chatfenster sammelt Verlauf, während die Aufgabe wechseln kann. Es beantwortet nicht verlässlich, welche
+Regeln für die gesamte Arbeit gelten. Ein Arbeitsraum W ist dagegen eine abgeschlossene Verarbeitungseinheit mit
+eigenem Zustand und unveränderlichem Startvertrag. Er ist nicht die Betreiber- und Laufzeitumgebung. Diese
+beschreibt, wo und durch wen der Raum umgesetzt wird, und ist ein Feld seines Vertrags.
+
+Der Vertrag legt Identität und Rolle, Auftrag und Zweck, feste Bindungsmenge B_W, konkrete Betreiber- und
+Laufzeitumgebung, Eingangsrechte und Befugnisse fest. Hinzu kommen Zustand, Nachweise, Gültigkeit und der
+zugelassene Auditweg. Raumgrenze und Vertrag werden außerhalb des Agenten durchgesetzt. Ein aktiver Raum
+vergrößert oder verkleinert B_W nicht.
+
+λ bezeichnet die Zuordnung eines klassifizierten Datenobjekts zu seinem Label.
+
+Für jede aufgenommene Eingabe x und jede dort erzeugte Ausgabe y gilt ohne Lockerung:
 
 $$
 \lambda(x)\subseteq B_W\subseteq\lambda(y).
 $$
 
-**Alle Raumbindungen werden bei der Aufnahme geprüft, auch wenn die eingehende Datei öffentlich ist.** Jede Bindung bezeichnet außerdem einen zulässigen Empfängerkreis. Gewöhnliche Operationsregeln dürfen diesen Kreis nur weiter beschränken, nicht heimlich erweitern.
+λ(x) ist das Label des Eingangs, λ(y) das Label der Ausgabe. Dem Raum darf keine Bindung einer Eingabe fehlen.
+Seine Ausgaben tragen mindestens alle Raumbindungen. Ein Raum hat viele Eingänge und Ausgänge, nicht nur ein
+Paar x und y. Jede Ausgabe wird so behandelt, als könnte sie von jedem Eingang abhängen.
 
-Das Modell unterstellt einen vollständig fehlgesteuerten Agenten. Modellqualität, fachliche Eignung und Prompt-Injection-Erkennung sind keine Sicherheitsgrößen. Für KI zählt ausschließlich die konkrete **Betreiber- und Laufzeitumgebung**. Die Wahl von nono, bubblewrap, einer virtuellen Maschine oder einer anderen Umsetzung bleibt außerhalb des Kalküls.
+Ein Sitzungsmappenraum kann `{ratsarbeit@1, auftrag-sitzung-S@1}` tragen. Ein zusätzlicher Abo-Artikel mit
+`abo-A@3` passt nicht automatisch hinein. Ein neuer, passend gebundener Raum muss die bisherige Arbeit und den
+Artikel geprüft aufnehmen. Auch öffentliche Dateien brauchen passende Eingangsrechte und müssen sämtliche
+Raumbedingungen erfüllen. Der Vertrag steht in [R.4.1](#r41-startvertrag), die Aufnahme in
+[R.5.4](#r54-aufnahme).
 
-Drei Werkzeuge machen das Modell nutzbar:
+## 6. Ausgaben sind ganze Ereignisse
 
-- Die **Inferenz-Engine** leitet aus autoritativen Fakten und Regeln eine begründete Entscheidung ab. Sie ist eine symbolische Regelmaschine, kein LLM-Inferenzserver.
-- Das **Simulationstool** erzeugt und vergleicht Ausführungen, sucht Gegenbeispiele und liefert reproduzierbare Spuren. Eine erfolglose Suche ist kein unbeschränkter Sicherheitsbeweis.
-- Der **Audit-Verifier** prüft ein geschütztes, append-only geführtes Journal gegen historische Regeln, Fakten und Ausführungsbelege. Er trennt nachgewiesene Verstöße, offene Vorgänge und fehlende Evidenz.
+Eine Anlage fordert den Agenten auf, nur beim Wort „Klage“ einen leeren Webrequest zu senden. Der Request
+enthält keinen geheimen Satz. Sein Auftreten verrät trotzdem ein Merkmal der Vorlage. Deshalb erfasst das Modell
+das ganze Ereignis: Nutzlast, Auswahl, Ziel, relevante Metadaten und tatsächliches Auftreten. Die beobachtbare
+Folge umfasst auch die Reihenfolge.
 
-Drei **kanonische Ende-zu-Ende-Workflows** verbinden den Kalkül mit der täglichen kommunalpolitischen Arbeit und dienen zugleich als normative Integrationstests.
+Alle vom Raum veranlassten Ausgaben tragen mindestens B_W, bereits ab dem Start. Das System muss dafür keine
+tatsächlichen Lesepunkte oder inneren Abhängigkeiten des LLM rekonstruieren. Wählt ein geschützter Raum eine
+unveränderte öffentliche Datei aus, ist auch diese Auswahl eine gebundene Ausgabe. Das öffentliche Original
+behält im Quellspeicher sein Label.
 
-Eine Engine-Entscheidung führt selbst nichts aus. Ihre verbindliche Durchsetzung liegt bei einem getrennten, prüfbaren Vermittler. Vor jedem auditpflichtigen Effekt muss dessen aktuelle Autorisierung dauerhaft festgehalten sein. Ein solcher Eintrag beweist noch nicht, dass der Effekt eingetreten ist. Simulator und Audit-Verifier besitzen keine Ausführungs- oder Freigabebefugnis.
+Der Vermittler ist eine vom Agenten unabhängige Komponente, die Operationen prüft und ausführt.
+[Abschnitt 7](#7-zuständigkeiten-und-connectoren) erklärt seine Zuständigkeit genauer.
+Beim Request ordnet der Vermittler das Raumlabel zu und prüft den geplanten Empfängerweg vor der Wirkung. Liegt
+der Webserver außerhalb des zulässigen Empfängerkreises, findet der Request nicht statt. Ob eine Injection
+erkannt wurde, ist dafür unerheblich. Private Entwürfe können im zugelassenen Schreibbereich autonom entstehen.
+Änderungen an maßgeblichen Beständen, auf die sich andere verlassen, und externe Wirkungen brauchen die dafür
+geltende Autorisierung. Das erläutert [R.4.2](#r42-konservative-ausgaben).
 
-Bei Veröffentlichungen unterscheiden wir zwei Zusagen: **exakte Ausführung eines menschlich freigegebenen Inhalts** und **Offenlegung ausschließlich vorab bestimmter Informationen**. Die zweite Zusage ist stärker und benötigt zusätzliche Nachweise. Der bevorzugte Ablauf dafür ist: **geschützt analysieren, Fakten freigeben, danach öffentlich formulieren**.
+## 7. Zuständigkeiten und Connectoren
 
-### Leseweg
+Eine positive Prüfung ist noch kein Versand. Die Inferenz-Engine leitet ein Urteil aus Regeln und autoritativen
+Fakten ab. Sie ist eine symbolische Regelmaschine, kein LLM-Inferenzserver. Der Vermittler löst den aktuellen
+Kontext auf, verwendet die Engine und führt nur passend autorisierte Operationen aus. Urteil und Vollzug sind
+getrennt, wie in einem rechtsstaatlichen Verfahren.
 
-Der Haupttext definiert das System. [Anhang A](#anhang-a-formale-präzisierung-und-beweise) präzisiert die Beweise. [Anhang B](#anhang-b-bauanleitung-für-die-inferenz-engine) ist der Bauauftrag für die Engine; [Anhang C](#anhang-c-bauanleitung-für-das-simulationstool) der Bauauftrag für den Simulator. [Anhang D](#anhang-d-beispiele-und-verbindlicher-regressionskorpus) enthält Beispiele und die gemeinsamen Abnahmetests. [Anhang E](#anhang-e-änderungen-herkunft-und-quellen) dokumentiert die Revisionen. [Abschnitt 11](#11-audit-journal-nachweisbare-vermittlung-im-betrieb) erklärt den Audit-Entwurf; [Anhang F](#anhang-f-bauanleitung-für-audit-journal-und-verifier) spezifiziert Journal, Verifier und zusätzliche Tests.
+Der getrennt berechtigte Journal-Writer hält auditpflichtige Schritte dauerhaft fest. Seine Bestätigung belegt
+Speicherung, nicht die Zulässigkeit oder Wahrheit einer Wirkung. Der Freigabedienst autorisiert und vermittelt
+konkrete Ausnahmen außerhalb der Agentenhoheit. Die Registry führt dafür Regeln und autoritative Fakten; ein
+gespeicherter Freigabefakt ändert nicht automatisch die Regeln. Das Diagramm zeigt Zuständigkeiten, kein
+vollständiges Ausführungsprotokoll.
 
-## 1. Geltung und Sicherheitsziel
+```mermaid
+flowchart LR
+    A["Agent im Arbeitsraum"] -->|Operationsvorschlag| V["Vermittler / Ausführer"]
+    V -->|aktuelle Prüfung| E["Inferenz-Engine"]
+    E -->|Urteil und Ableitung| V
+    G[("Registry: Regeln und autoritative Fakten")] -.->|Snapshot und Kontext| E
+    G -.->|aktuelle Fakten| V
+    A -->|Freigabeantrag| F["Freigabedienst"]
+    M["Berechtigte Stelle"] -->|konkretes GO| F
+    G -.->|Regeln und Befugnisse| F
+    F -->|Freigabefakt und Offenlegungsstand| G
+    F -->|autorisierter Ausnahmeweg| V
+    V -->|auditpflichtige Schritte| J["Journal-Writer"]
+    J -->|dauerhafter Vorbeleg| V
+    V -->|geprüfte Operation| C["Connector"]
+    C --> Z["Quelle oder Ziel"]
+    V -->|Label und Objektversion| S["Dauerhafter Speicher"]
+```
 
-### 1.1 Ziel
+Connectoren bieten begrenzte Operationen an Quellen und Zielen. Credentials bleiben dort und gelangen weder als
+Datei noch über Antworten, Fehler oder Logs zum Agenten. Ein Abruf hat zwei Prüfungsrichtungen. Auswärts sind
+Suchtext, Dokumentkennung und Aufrufentscheidung Ausgaben. Einwärts ist die klassifizierte Antwort ein neuer
+Eingang. Leseberechtigung für die Antwort ist keine beliebige Sendeberechtigung für die Anfrage.
+
+Ein RIS-Snapshot kann vor Beginn der geschützten Analyse beschafft werden. Spätere externe Nachrecherche braucht
+eine konkrete Freigabe und einen geprüften Rückweg. Vault, Indizes, Historien und Sicherungen behalten Labels
+und prüfen spätere Zugriffe erneut. Gemischte Bestände brauchen nachgewiesene Trennung einschließlich Suche und
+Metadaten. Tooling, Skills und Konfiguration benötigen eine gesonderte Laufzeitfreigabe. Die genauen
+Anforderungen stehen in [R.4.3–R.4.4](#r43-connectoren) und
+[B.8](#b8-verbindliche-ausführung-außerhalb-des-kerns).
+
+## 8. Die Erlaubnisprüfung in Mengen und Prädikaten
+
+Ein zugelassener Empfänger reicht nicht, wenn der Raum abgelaufen ist. Ein gültiger Raum reicht nicht, wenn eine
+öffentliche Datei außerhalb des genehmigten Bürgerfalls liegt. Die Erlaubnisprüfung verbindet deshalb
+Basisrechte, Empfängergrenze und Bindungsbedingungen. Die Symbole bezeichnen folgende Größen für einen festen
+Snapshot Γ:
+
+| Symbol | Bedeutung |
+|---|---|
+| Γ | Fester, geprüfter Regelstand der Registry für diese Entscheidung. |
+| 𝓑 und b | Menge der registrierten versionierten Bindungen und eine einzelne Bindung daraus. |
+| 𝓞 | Menge der modellierten Beobachterkontexte. |
+| X_klass | Menge der klassifizierten Datenobjekte. |
+| λ und L | Funktion vom klassifizierten Objekt zu seinem Label und eine Variable für ein Label. |
+| B_W | Feste Bindungsmenge des Arbeitsraums W. |
+| R_b und R_Γ(L) | Zulässige Empfänger einer Bindung und gemeinsamer Empfängerkreis eines Labels. |
+| c und ρ_Γ(c) | Konkrete Verarbeitungssituation und alle darin aufgelösten Beobachter mit potenziellem Zugriff. |
+| P_b | Prädikat der Operationsbedingungen einer Bindung b. |
+
+Die Potenzmenge 𝒫(𝓑) enthält alle möglichen Bindungsmengen. Damit gilt:
+
+$$
+\lambda:X_{\mathrm{klass}}\longrightarrow\mathcal P(\mathcal B),
+\qquad R_\Gamma(L)=\bigcap_{b\in L}R_b,
+\qquad R_\Gamma(\varnothing)=\mathcal O.
+$$
+
+Für Quarantäneobjekte ist λ nicht definiert, nicht leer. Die Ordnung L₁ ≼ L₂ bedeutet L₁ ⊆ L₂: L₂ ist mindestens
+so streng wie L₁. Der Join L₁ ⊔ L₂ ist ihre Vereinigung. Mehr Bindungen schränken den gemeinsamen Empfängerkreis
+ein. Gleich klingende Kennungen oder Versionen sind nicht austauschbar.
+
+Die Situation c enthält authentisierte handelnde Identität, tatsächliche Rolle, Zweck, Operation,
+Objektversionen, Raum, vollständigen Weg, Gültigkeit und Nachweise. Identität bezeichnet den Handelnden, Rolle
+dessen konkrete Befugnis, nicht einen Modellnamen oder die Betreiber- und Laufzeitumgebung. Objekt-ACLs regeln
+zusätzlich, ob diese Identität auf genau diese Datei oder Notiz zugreifen darf. Der Vermittler löst c
+autoritativ auf; Agentenbehauptungen ersetzen die Fakten nicht.
+
+Basis_Γ(c) ist wahr, wenn die vorhandenen Operations- und Objektzugriffsrechte, die aktuelle Raumgültigkeit und
+die erforderliche Bestätigung des tatsächlichen Wegs vorliegen. Bei Auditpflicht gehört auch der zugelassene
+Journal- und Belegweg dazu. Die Basis ist kein Platzhalter für ungenannte Schutzmechanismen. Gewöhnliche
+zusätzliche ACL-Beschränkungen und explizite Konfiguration werden dadurch nicht verboten.
+
+P ist eine Familie von Prädikaten, eines je registrierter Bindung.
+P_b(c) ist wahr genau dann, wenn die Situation c jede Auflage der Bindung b erfüllt.
+Gemeint sind die für diesen Schritt geltenden, jetzt prüfbaren Anforderungen.
+R_b sagt, wer es sehen darf. P_b sagt, wozu, wie und bis wann.
+Zukünftige Pflichten wie Löschung bleiben verbindlich und brauchen späteren verantwortlichen Vollzug und
+Nachweis; eine heutige Erlaubnis bestätigt nicht bereits ihre Erfüllung.
+
+$$
+\operatorname{Erlaubt}_\Gamma(c,L)=
+\operatorname{Basis}_\Gamma(c)
+\land\rho_\Gamma(c)\subseteq R_\Gamma(L)
+\land\bigwedge_{b\in L}P_b(c).
+$$
+
+Alle drei Prüfungen müssen bestehen. Auch bei leerem L bleiben Basis und ACLs notwendig. P_b kann den
+Empfängertest nicht überschreiben und hängt bei festem c nicht von zufällig mitgeprüften Bindungen ab. Fehlende
+Nachweise ergeben kein `permit`. `deny` und `indeterminate` verhindern beide die Ausführung. Der vollständige
+Kalkül steht in [R.5](#r5-der-kalkül), seine Beweise in [A](#anhang-a-formale-präzisierung-und-beweise).
+
+## 9. Start, Aufnahme und Ausgang
+
+Ein Raumstart kann bereits Verlauf oder Betriebsdaten zugänglich machen. Eine öffentliche Datei kann zwar zum
+Raumlabel passen, aber am erlaubten Zweck scheitern. Die einzelnen Schritte verwenden die Erlaubnisprüfung mit
+jeweils passender Situation und passendem Prüflabel.
+
+| Schritt | Prüfung oder Zuordnung |
+|---|---|
+| Start | Der Vertrag ist gültig; der gesamte Startweg ist unter B_W erlaubt. |
+| Aufnahme | λ(x) ⊆ B_W; der Raum ist gültig; die Aufnahme ist unter allen Raumbindungen B_W erlaubt. |
+| Erzeugen | Der Vermittler ordnet λ(y) ⊇ B_W zu, auch undurchsichtigen Bytes. Der Agent setzt keine Labels. |
+| Übergabe | Die Übergabe ist unter dem Ausgabelabel erlaubt; ein Zielraum erfüllt zusätzlich seine Aufnahmeregel. |
+| Speicherung | Objektversion und Label bleiben erhalten; spätere Zugriffe werden erneut geprüft. |
+| Lockerung | Eine konkrete Freigabe deckt jede entfernte Bindung, den Ereignisplan und die erlaubte Zielübergabe. |
+
+Die Aufnahme erfasst auch Auftrag, Historie, geladene Anweisungen, Unteragentenergebnisse und wiederverwendeten
+Modellzustand. Ein fremdgesteuerter Raumstart ist zusätzlich eine Ausgabe des auftraggebenden Raums,
+einschließlich seines Auftretens. Ein leerer Auftrag macht diesen Steuerungseingang nicht öffentlich. Neu
+erkannte Bindungen können einen Stopp oder einen neuen Raum erfordern. Original und laufender Raum behalten bei
+einer Lockerung ihre Labels. Details und Formeln stehen in [R.5.3–R.5.7](#r53-start).
+
+## 10. Freigaben für konkrete Ereignisse
+
+Eine Mappe soll intern abgelegt oder als Bericht an einen anderen Empfängerkreis versandt werden. Das sind
+verschiedene Befugnisse. Eine Aktionsfreigabe erlaubt eine bestimmte verbindliche Wirkung. Eine
+Offenlegungsfreigabe erlaubt zusätzlich das Entfernen von Bindungen für eine neue Ausgabe. Für jede entfernte
+Bindung muss ausreichende Zuständigkeit vorliegen. Eine Freigabe kann mehrere entfernte Bindungen abdecken, wenn
+ihre Autorität dafür ausreicht.
+
+Autorisiert wird das exakte Ereignis mit Inhalt, Version, Metadaten, Ziel, Zweck, Operation, Weg, Labels und
+Gültigkeit. Auswahl, Auftreten und relevante Reihenfolge gehören dazu. Zwei freigegebene Nachrichten erlauben
+keine geheimnisabhängige Vertauschung. In einem synthetischen Beispiel sendet der Agent zwei bereits freigegebene
+Nachrichten A und B in der Reihenfolge A, B, wenn eine geschützte Beschwerde vorliegt, sonst in der Reihenfolge B, A.
+Diese Wahl verrät die Existenz der Beschwerde, obwohl beide Nachrichteninhalte einzeln erlaubt sind.
+Der Agent erhält keine wiederverwendbare Herabstufungsbefugnis; die
+geprüfte Ausgabe geht an das bestimmte Ziel. Ein GO zu dieser Erklärung akzeptiert keine produktiven
+Beispielbindungen. Ein gesondert autorisiertes Session-Review kann neue Regeln registrieren. Die
+Einzelfallfreigabe wird niemals stillschweigend zur allgemeinen Regel.
+
+Der versionierte Offenlegungsstand umfasst veranlasste und ausstehende Offenlegungen in einem festgelegten
+Geltungsbereich. Der Agent darf diesen Bereich nicht so verengen, dass frühere Freigaben verschwinden.
+Reservierung bindet eine Freigabe an den konkreten Versuch und verhindert parallele Nutzung. Verbrauch hält ihre
+verbindliche Verwendung fest. Fortschreibung aktualisiert den gemeinsamen Stand. Diese lokalen Entscheidungen
+erfolgen atomar. Sie beweisen keine atomare Zustellung an einen beliebigen externen Dienst.
+Gemeinsame Offenlegung birgt ein anderes Risiko als die Vertauschung: Zwei genehmigte Summen können gemeinsam
+einen individuellen Betrag offenlegen; eine Liste gültiger GOs ersetzt keine gemeinsame
+fachliche Prüfung.
+
+Bei manueller Inhaltsfreigabe prüft eine berechtigte Stelle einen konkreten Kandidaten. Die Zusage betrifft
+dessen unveränderte autorisierte Ausführung, nicht die Abwesenheit verdeckter Kodierung. Ein Akrostichon ist ein
+solches Risiko; die menschliche Prüfung wird hier nicht als automatische Erkennungsgarantie dargestellt. Bei
+begrenzter Faktenfreigabe werden Quelle, Version, Fakten, Auswahl und Veröffentlichungsweise unabhängig vom
+geschützten Agenten festgelegt. Ein neuer öffentlicher Schreibraum erhält nur diese Fakten und seine
+öffentlichen Vorgaben, keine geschützte Historie oder Rückkanäle. Er kann weiterhin freigegebene Fakten
+ausdrücken und kodieren, erhält aber unter den genannten Voraussetzungen keinen zusätzlichen Zugriff auf nicht
+freigegebene Information. Die stärkere Zusage und ihre Grenzen stehen in
+[R.6](#r6-freigaben-konkrete-ereignisse-und-gemeinsame-offenlegung) und
+[A.6](#a6-begrenzte-nicht-interaktive-faktenfreigabe).[^delimited][^robust]
+
+## 11. Arbeitsabläufe, Angriffstests und Grenzen
+
+Die Regeln sollen nutzbare Ratsarbeit ermöglichen. Drei kanonische Abläufe sind zugleich normative
+Integrationstests, nicht bloß illustrative Geschichten:
+
+1. Die [Sitzungsmappe](#r71-kanonischer-workflow-a-sitzungsmappe-aus-ris-unterlagen) verbindet autorisierte Beschaffung, gebundene Synthese und geschützte interne Ablage.
+2. Der [Parteibericht](#r72-kanonischer-workflow-b-sitzungsnotizen-zu-einem-bericht-für-parteimitglieder) trennt manuelle Inhaltsfreigabe von begrenzter Faktenfreigabe.
+3. Die [Fraktionsrecherche](#r73-kanonischer-workflow-c-recherche-zu-fraktionsprojekten-zur-vorbereitung-von-anträgen) trennt geschützte Planung, konkret freigegebene externe Recherche und geprüfte Rückführung.
+
+Ein fehlsteuerbarer Raum kennt entweder die betreffende geschützte Projektinformation nicht oder besitzt keinen
+unkontrollierten Außenkanal zu unzulässigen Empfängern. Das ist eine Folge der Regeln, keine zusätzliche
+primitive Sicherheitsregel. Beispielrollen und Provider sind keine realen Zulassungen.
+
+Positive Abläufe und absichtlich fehlerhafte Varianten werden gemeinsam geprüft. Bei gemischter Suche entsteht
+zuerst die berechtigte Sicht, danach das Ranking. Ein öffentlich lesbarer Zähler „Anfragen heute“ darf durch
+einen verweigerten geschützten Request nicht steigen. Sonst verrät er dessen Auftreten. Die geschützte Auditspur
+kann den Versuch erfassen; die öffentliche Ablehnung verrät keine verborgene Objektexistenz.
+
+Der Angreifer darf das gesamte Agentenverhalten bestimmen, nicht aber die vertrauenswürdige Basis kontrollieren.
+Richtige Einordnung, Isolation, Identitätsprüfung, Registry, Engine, Vermittler, Freigabedienst und Journal samt
+Belegquellen brauchen Nachweise oder ausdrücklich benannte Annahmen. Feingranulare Zeit-, Ressourcen-, Verkehrs-
+und Hardwareseitenkanäle sind zusätzlich zu behandeln oder auszunehmen. Der Kalkül beweist weder rechtliche
+Richtigkeit noch Vertragstreue oder die Qualität menschlicher Inhaltsprüfung.
+[R.8](#r8-bedrohungsmodell-und-garantien) benennt die Zusagen; [A](#anhang-a-formale-präzisierung-und-beweise)
+enthält bedingte Beweise.[^sel4]
+
+## 12. Werkzeuge, Audit und Baufolge
+
+Zulässigkeit, tatsächlich eingetretene Wirkung und historischer Nachweis sind getrennte Fragen. Die Engine
+liefert Entscheidungen und prüfbare Ableitungen. Der Simulator sucht mit synthetischen Daten nach
+Gegenbeispielen, auch durch den Vergleich zweier Ausführungen. Er beobachtet tatsächliche simulierte Wirkungen
+und verwendet unabhängige Sicherheitsorakel. Der Audit-Verifier prüft historische Regeln, Fakten und
+Ausführungsbelege, ohne auszuführen. Eine begrenzte erfolglose Suche ist kein unbeschränkter Sicherheitsbeweis.
+
+Das geschützte Audit-Journal trennt drei Ereignisse:
+
+| Ereignis | Aussage |
+|---|---|
+| `DecisionRecorded` | Dieser Vorschlag wurde unter bezeichneten Regeln und Fakten bewertet. |
+| `ExecutionCommitted` | Die aktuelle Autorisierung und der konkrete Ausführungsauftrag sind vor der Wirkung dauerhaft und zustandskonsistent festgehalten. |
+| `OutcomeRecorded` | Eine benannte Quelle belegt den Ausgang oder hält ihn als unklar fest. |
+
+Beim Versand eines Parteiberichts kann nach dem dauerhaften Vorbeleg ein Timeout auftreten. Der Ausgang bleibt
+offen oder `uncertain`, nicht „nicht gesendet“. Eine sichere Fortsetzung braucht passende Evidenz oder
+nachgewiesene Idempotenz, keinen blinden Wiederholungsversuch. Fällt der Journalpfad aus, sind neue
+auditpflichtige Wirkungen gesperrt. Korrekturen ergänzen die Geschichte, statt alte Einträge umzuschreiben.
+
+Eine Hash-Kette allein beweist weder einen vollständigen Schlussstand noch die Wahrheit einer signierten
+Wirkungsmeldung. Auditberichte nennen Umfang, Integrität, damalige Regelkonformität, belegte Ausgänge, Abdeckung
+und Annahmen. Journal und Berichte tragen selbst Bindungen. Ein bestandener Audit einer Einzelspur beweist keine
+Nichtinterferenz. Die Details stehen in [R.11](#r11-audit-journal-nachweisbare-vermittlung-im-betrieb),
+[A.8](#a8-auditkonformität-und-ihre-vollständigkeitsannahme) und
+[F](#anhang-f-bauanleitung-für-audit-journal-und-verifier).
+
+Die Umsetzung beginnt mit Schemas, reinen Bibliotheken und lokaler CLI mit synthetischen Fixtures. Danach folgen
+Adapter und schließlich verbindliche Isolation und Connectoren. Die [Abnahme](#r10-umsetzung-und-abnahme)
+verlangt funktionierende positive Abläufe, erkannte Fehlvarianten und ehrlich ausgewiesene Evidenzlücken. Alles
+zu verweigern reicht nicht. Dieser RFC beauftragt keine Implementierung und gibt keine produktive Installation
+frei.
+
+## Normative Referenz
+
+Die folgenden R.1–R.11 übernehmen vollständig die Abschnitte 1–11 von RFC0001 Revision4.
+Angepasst sind die strukturelle Nummerierung, zugehörige Querverweise und die
+Bezeichnung „Registry“ für die dort so genannte geschützte Verwaltung.
+Die Anhänge A–F folgen vollständig mit ihren bisherigen Unterabschnittsnummern und Quellen.
+R.9.4 präzisiert die Verwendung des Engine-Kerns ausschließlich in der simulierten Welt.
+F.5 erläutert „offen“ als Beschreibung eines ungeklärten Versuchs, nicht als zusätzlichen
+Ausgangswert. Diese Klarstellungen führen keine neuen Befugnisse oder Zustandsklassen ein.
+Anhang E dokumentiert historische Änderungen von RFC0001, keine neue Recherche für RFC0003.
+## R.1 Geltung und Sicherheitsziel
+
+### R.1.1 Ziel
 
 **Geschützte Informationen dürfen nur an dafür zugelassene Empfänger und Verarbeitungsumgebungen gelangen.** Das umfasst innerhalb des erklärten Beobachtungsmodells Inhalte, Metadaten, Auswahlentscheidungen, Nachrichtenexistenz und Reihenfolge.
 
@@ -62,7 +406,7 @@ Ein Agent darf keine Berechtigungen erzeugen, keine Sicherheitsregeln verändern
 
 Wir wollen nicht beweisen, dass der Agent vernünftig handelt. Wir wollen begrenzen, was auch ein beliebig handelnder Agent bewirken kann.
 
-### 1.2 Gegenstand und Abgrenzung
+### R.1.2 Gegenstand und Abgrenzung
 
 Die gesetzten Anwendungen und Quellen bleiben verwendbar: OpenCode, LibreChat, Ratsinformationssysteme, Partei- und Fraktionssysteme einschließlich gribs, Abonnements, Vault, Projektverwaltung und öffentliches Repository. Ein Produktname begründet keine Berechtigung.
 
@@ -72,15 +416,15 @@ Fachliche Richtigkeit, politische Zweckmäßigkeit, semantische Rechtmäßigkeit
 
 **Der Arbeitsraum ist das Sicherheitskonzept. Isolation ist eine nachzuweisende Eigenschaft seiner Umsetzung.**
 
-### 1.3 Normative Aussagen
+### R.1.3 Normative Aussagen
 
 „MUSS“ und „DARF NICHT“ bezeichnen Anforderungen an eine konforme Umsetzung. Beispiele verwenden synthetische Daten und illustrative Berechtigungen. Sie erlauben keine reale Datenverarbeitung.
 
 Der Mengenkalkül ist ein eigener Entwurf, keine vollständige Implementierung eines externen Standards. Seine Grundlagen und die übernommenen Review-Erkenntnisse sind in Anhang E ausgewiesen. Neue Schnittstellen und Bauanleitungen dieser Revision sind Entwurfsentscheidungen dieses RFC.
 
-## 2. Datenobjekte und Bindungen
+## R.2 Datenobjekte und Bindungen
 
-### 2.1 Datenobjekt
+### R.2.1 Datenobjekt
 
 Ein Datenobjekt ist ein bestimmter, versionierter Inhalt mit geschützten Sicherheitsmetadaten. Beispiele sind Dokumente, E-Mails, Anhänge, Arbeitsaufträge, Suchanfragen, Tabellen, Werkzeugargumente, Entwürfe, Verläufe und Indizes.
 
@@ -92,7 +436,7 @@ Wird eine bisher fehlende Bindung erkannt, wird die betroffene Verarbeitung gesp
 
 Labels liegen außerhalb der Schreibhoheit des Agenten. Ein anderer Dateiname, fehlender YAML-Header oder die Behauptung „bereits anonymisiert“ verändert kein Label.
 
-### 2.2 Bindung
+### R.2.2 Bindung
 
 Eine Bindung ist eine benannte, versionierte Umgangsregel. Es gibt keine Rangfolge zwischen „Nichtöffentliche Ratsarbeit“, „Interne Parteiarbeit“ und „Bürgeranliegen Fall 4711“.
 
@@ -108,7 +452,7 @@ Mehrere Bindungen gelten gemeinsam. Ihre Empfängerkreise werden geschnitten; ih
 
 Eine Leseberechtigung am Original ersetzt keine weiterwirkende Bindung. Soll eine Einschränkung auch für Ableitungen gelten, MUSS sie im Label repräsentiert sein. Unterschiedliche vertrauliche Leserkreise benötigen entsprechend unterscheidbare Bindungen.
 
-### 2.3 Empfängerkreis und Operationsbedingungen
+### R.2.3 Empfängerkreis und Operationsbedingungen
 
 Diese Unterscheidung ist verbindlich:
 
@@ -118,7 +462,7 @@ Eine Operationsbedingung darf eine Übertragung an einen Empfänger außerhalb d
 
 Die Prüfung zusätzlicher objektbezogener Zugriffsrechte bleibt notwendig. Der Vertraulichkeitsbeweis erfasst jedoch die im Label erklärten Geheimhaltungsgrenzen, nicht unausgesprochene Beschränkungen hinter einer lokalen Lese-ACL.
 
-### 2.4 Öffentliche und lizenzierte Daten
+### R.2.4 Öffentliche und lizenzierte Daten
 
 „Öffentlich zugänglich“, „weiterverwendbar“ und „ohne zusätzliche Bedingungen“ sind verschiedene Aussagen. DCAT trennt Zugang, Lizenz und sonstige Rechte; OParl berücksichtigt auch objektspezifische Lizenzangaben.[^dcat][^oparl]
 
@@ -126,7 +470,7 @@ Vorhandene Angaben werden auf der richtigen Ebene übernommen. Fehlende Angaben 
 
 Eine Lizenzbindung kann alle Empfänger zulassen und trotzdem Quellenangaben verlangen. Eine Veröffentlichung darf diese Bindung erfüllen, ohne sie zu entfernen. „Veröffentlichbar“ bedeutet daher nicht „leeres Label“.
 
-### 2.5 Quarantäne
+### R.2.5 Quarantäne
 
 Unklassifiziertes Material hat **kein reguläres Label**. Es bleibt in einem abgesonderten Eingang und ist nicht als leere Bindungsmenge zu behandeln.
 
@@ -134,7 +478,7 @@ Nur ein gesondert autorisiertes Einordnungsverfahren darf es regulär einordnen.
 
 Ein Agent darf eine Klassifikation vorschlagen. Eine berechtigte Person oder eine freigegebene Importregel entscheidet. Herkunft oder Selbstauszeichnung allein reichen nicht.
 
-## 3. Betreibervertrauen und Laufzeitumgebung
+## R.3 Betreibervertrauen und Laufzeitumgebung
 
 Die Zulassung betrifft eine **konkrete Betreiber- und Laufzeitumgebung**, nicht einen Modellnamen oder einen numerischen Vertrauenswert.
 
@@ -154,9 +498,9 @@ Umgebungsbeschreibungen, ihre zugänglichen Empfänger und ihre Nachweise sind v
 
 **Zulässige Identitäten sind nicht beliebig austauschbare Rollenetiketten.** Wenn dieselbe Person Informationen in zwei Rollen erhält, besitzt sie kein technisch getrenntes Gedächtnis. Die Modellierung muss tatsächliche Zugriffsmöglichkeiten berücksichtigen; Weitergabe durch bereits berechtigte Menschen außerhalb des Systems bleibt eine benannte Grenze.
 
-## 4. Arbeitsräume und Systemrollen
+## R.4 Arbeitsräume und Systemrollen
 
-### 4.1 Startvertrag
+### R.4.1 Startvertrag
 
 Ein Arbeitsraum ist eine abgeschlossene Verarbeitungseinheit mit eigenem Zustand und einem unveränderlichen Startvertrag. Ein Chatfenster allein ist kein Arbeitsraum.
 
@@ -176,7 +520,7 @@ Die Raumgrenze und der Vertrag werden außerhalb des Agenten durchgesetzt. Fehle
 
 Ein aktiver Raum vergrößert oder verkleinert seine Bindungsmenge nicht. Eine geänderte Aufgabe benötigt einen neuen Raum. Die Übernahme alter Daten ist eine neue, normale Übergabe.
 
-### 4.2 Konservative Ausgaben
+### R.4.2 Konservative Ausgaben
 
 Alle vom Arbeitsraum veranlassten Ausgaben werden so behandelt, als könnten sie von jedem seiner Eingänge abhängen. Das gilt ab dem Start, auch vor dem ersten tatsächlichen Lesen eines geschützten Dokuments.
 
@@ -184,7 +528,7 @@ Erfasst sind Inhalt, Auswahl, Ziel, Existenz, Reihenfolge und modellierte Metada
 
 Ein privater Entwurf darf automatisch entstehen. Eine Änderung am maßgeblichen Bestand oder eine externe Wirkung braucht die dafür geltende Autorisierung.
 
-### 4.3 Connectoren
+### R.4.3 Connectoren
 
 Connectoren vermitteln begrenzte Operationen an Quellen und Zielen. Credentials bleiben beim Connector. Sie werden dem Agenten weder als Datei noch als Werkzeugantwort, Fehler oder Log zugänglich gemacht.
 
@@ -192,19 +536,19 @@ Jeder Abruf hat zwei Richtungen. Suchtext, Dokumentkennung und Aufrufentscheidun
 
 Geschützte Arbeit kann deshalb mit vorher beschafften Datenständen beginnen. Spätere externe Nachrecherche erfolgt über eine gesonderte Freigabe. Ein neu auftretendes Quellenlabel darf nicht stillschweigend in einen laufenden Raum aufgenommen werden.
 
-### 4.4 Vermittler, Freigabedienst und dauerhafte Speicher
+### R.4.4 Vermittler, Freigabedienst und dauerhafte Speicher
 
 Ein verbindlicher Vermittler prüft und führt Operationen aus. Er verwendet die Inferenz-Engine, ist aber nicht mit ihr gleichzusetzen. Nur dieser kontrollierte Weg darf tatsächliche Außenwirkungen erzeugen. Seine auditpflichtigen Schritte werden durch einen getrennt berechtigten Journal-Writer festgehalten. Dessen Bestätigung ist ein Speicherbeleg, keine Erlaubnis zur Operation.
 
-Der Freigabedienst autorisiert und vermittelt die eng begrenzten Ausnahmen aus Abschnitt 6. Er liegt außerhalb der Agentenhoheit.
+Der Freigabedienst autorisiert und vermittelt die eng begrenzten Ausnahmen aus Abschnitt [R.6](#r6-freigaben-konkrete-ereignisse-und-gemeinsame-offenlegung). Er liegt außerhalb der Agentenhoheit.
 
 Vault, Projektverwaltung, Indizes, Historien und Sicherungen sind zukünftige Quellen. Sie erhalten Labels und setzen sie bei späteren Zugriffen erneut durch. Gemischte Speicher brauchen nachgewiesene Trennung einschließlich Suche und Metadaten; andernfalls wird der gemeinsam zugängliche Bestand konservativ gemeinsam gebunden.
 
 Tooling, Skills und Konfiguration sind gesondert freizugebende Laufzeitbestandteile. Eine Veröffentlichung im Repository ist keine Softwarefreigabe für geschützte Arbeitsräume.
 
-## 5. Der Kalkül
+## R.5 Der Kalkül
 
-### 5.1 Regelstand und Mengen
+### R.5.1 Regelstand und Mengen
 
 Für einen festen, geprüften Regelstand $\Gamma$ seien $\mathcal B$ die registrierten versionierten Bindungen und $\mathcal O$ die modellierten Beobachterkontexte.
 
@@ -226,9 +570,9 @@ $$
 
 „Öffentlichkeit“ darf symbolisch einen unbeschränkten Empfängerkreis bezeichnen. Sie ist nicht als leere Menge tatsächlich anwesender Nutzer auszulegen. Unbekannte Empfänger bedeuten fehlende Evidenz, nicht $\varnothing$.
 
-### 5.2 Erlaubnis
+### R.5.2 Erlaubnis
 
-Eine Verarbeitungssituation $c$ enthält Identität, Rolle, Zweck, Operation, Objekte, Raum, vollständigen Weg, aktuelle Gültigkeit und nötige Nachweise. Diese Angaben stammen aus geschützter Verwaltung.
+Eine Verarbeitungssituation $c$ enthält Identität, Rolle, Zweck, Operation, Objekte, Raum, vollständigen Weg, aktuelle Gültigkeit und nötige Nachweise. Diese Angaben stammen aus der Registry.
 
 $\rho_\Gamma(c)$ bezeichnet alle Beobachter, denen der Schritt nach der aufgelösten Umgebung Information zugänglich macht. Dazu gehören die mitverarbeitenden Stellen, nicht nur der adressierte Endpunkt.
 
@@ -243,7 +587,7 @@ $$
 }
 $$
 
-Die Basisprüfung umfasst ausdrücklich die vorhandenen Operations- und Objektzugriffsrechte, die aktuelle Gültigkeit beteiligter Räume und die erforderliche Bestätigung des tatsächlichen Verarbeitungswegs. Für auditpflichtige Vorgänge muss auch der vorgesehene Journal- und Belegweg zugelassen sein. Die dauerhafte Journalisierung ist zusätzlich eine Ausführungsbedingung aus Abschnitt 11; sie wird nicht durch ein behauptetes `audit_ready=true` im Agentenauftrag ersetzt. Die Basis ist kein Platzhalter für beliebige ungenannte Schutzmechanismen.
+Die Basisprüfung umfasst ausdrücklich die vorhandenen Operations- und Objektzugriffsrechte, die aktuelle Gültigkeit beteiligter Räume und die erforderliche Bestätigung des tatsächlichen Verarbeitungswegs. Für auditpflichtige Vorgänge muss auch der vorgesehene Journal- und Belegweg zugelassen sein. Die dauerhafte Journalisierung ist zusätzlich eine Ausführungsbedingung aus Abschnitt [R.11](#r11-audit-journal-nachweisbare-vermittlung-im-betrieb); sie wird nicht durch ein behauptetes `audit_ready=true` im Agentenauftrag ersetzt. Die Basis ist kein Platzhalter für beliebige ungenannte Schutzmechanismen.
 
 Der Empfängertest ist ein fester Teil der Engine. Eine objektabhängige Ausnahme in $P_b$ kann ihn nicht überschreiben. Auswertung erfolgt bei festem Kontext; ein Prädikat darf nicht davon abhängen, welche weiteren Bindungen zufällig ebenfalls geprüft werden.
 
@@ -251,7 +595,7 @@ Eine fehlende Voraussetzung ist nicht wahr. Die technische Engine unterscheidet 
 
 Zweckangabe und rechtliche Tragfähigkeit bleiben sachliche Voraussetzungen. Zukünftige Pflichten wie Löschung werden nicht durch ein einmaliges `permit` als erfüllt ausgewiesen.
 
-### 5.3 Start
+### R.5.3 Start
 
 Ein Raum darf starten, wenn sein Vertrag gültig ist und der Start in seiner gesamten Umgebung unter allen Raumbindungen erlaubt ist:
 
@@ -263,7 +607,7 @@ $$
 
 Der Start umfasst auch vorhersehbare Empfänger von Verlauf und Betriebsdaten. Eine durch einen anderen Raum gesteuerte Startentscheidung ist außerdem eine Ausgabe dieses auftraggebenden Raums. Dieser Steuerungseingang muss zum neuen Raum passen: Auch ein inhaltlich leerer Startauftrag darf keinen weniger gebundenen Raum geheimnisabhängig aktivieren. Ohne gesonderte Freigabe gelten die Aufnahmebedingungen für diesen Auftrag einschließlich seines Auftretens.
 
-### 5.4 Aufnahme
+### R.5.4 Aufnahme
 
 $$
 \boxed{
@@ -284,7 +628,7 @@ Quellzugriff und Aufnahme werden beide geprüft, wenn sie getrennte Operationen 
 
 Diese Regel gilt auch für Auftrag, Historie, geladene Anweisungen, Unteragentenergebnisse und wiederverwendeten Modellzustand. Quarantänematerial erfüllt ihre Voraussetzungen nicht.
 
-### 5.5 Erzeugen
+### R.5.5 Erzeugen
 
 $$
 W\text{ erzeugt }y
@@ -296,7 +640,7 @@ Die normale Zuordnung ist $\lambda(y)=B_W$. Zusätzliche Bindungen kommen nur au
 
 Der Agent darf Labels weder vorschreiben noch weglassen. Der Vermittler ordnet auch undurchsichtigen Bytes das Raumlabel zu. „Dieses Ergebnis verwendet die geheimen Eingaben nicht“ ist keine Ausnahme.
 
-### 5.6 Übergabe und Speicherung
+### R.5.6 Übergabe und Speicherung
 
 $$
 \frac{
@@ -310,7 +654,7 @@ Bei einem Zielarbeitsraum gilt zusätzlich dessen Aufnahmeregel. Ein Speicher er
 
 Wird eine schon existierende Datei von einem Raum ausgewählt, betrifft die Prüfung nicht nur das ursprüngliche Dateilabel: Das Übergabeereignis trägt mindestens auch $B_W$. Eine unveränderte öffentliche Nutzlast kann eine vertrauliche Auswahlentscheidung transportieren.
 
-### 5.7 Lockerung
+### R.5.7 Lockerung
 
 Eine gewöhnliche Operation entfernt keine Bindung. Eine Lockerung von $L$ nach $L'$ braucht eine konkrete Freigabe $g$:
 
@@ -319,19 +663,19 @@ $$
 \operatorname{BerechtigtZurLockerung}_\Gamma(g,b).
 $$
 
-Hinzu kommen die vollständige Ereignisbindung aus Abschnitt 6 und die Zulässigkeit der Übergabe unter $L'$. Auch das Ersetzen einer Bindung durch eine freiere Version gilt als Entfernung der alten Bindung.
+Hinzu kommen die vollständige Ereignisbindung aus Abschnitt [R.6](#r6-freigaben-konkrete-ereignisse-und-gemeinsame-offenlegung) und die Zulässigkeit der Übergabe unter $L'$. Auch das Ersetzen einer Bindung durch eine freiere Version gilt als Entfernung der alten Bindung.
 
 Die neue Ausgabe ist gesondert freigegeben. Original, Arbeitsraum und übriger Zustand behalten ihre Labels. Eine Inhaltsausnahme darf die Lockerungsregel nicht umgehen, indem sie trotz gleichem Label einen bisher unzulässigen Empfänger zulässt.
 
-## 6. Freigaben: konkrete Ereignisse und gemeinsame Offenlegung
+## R.6 Freigaben: konkrete Ereignisse und gemeinsame Offenlegung
 
-### 6.1 Aktionsfreigabe und Offenlegungsfreigabe
+### R.6.1 Aktionsfreigabe und Offenlegungsfreigabe
 
 Eine **Aktionsfreigabe** erlaubt eine bestimmte verbindliche Wirkung. Eine **Offenlegungsfreigabe** erlaubt zusätzlich die Lockerung von Bindungen. Eine geschützte interne Übernahme kann nur die erste benötigen.
 
 Beide können in einer Transaktion vorliegen. Der allgemeine Systembetreiber ist nicht automatisch zur Aufhebung fremder Bindungen befugt.
 
-### 6.2 Autorisiert wird ein Ereignis, nicht nur ein Text
+### R.6.2 Autorisiert wird ein Ereignis, nicht nur ein Text
 
 Die Freigabe MUSS den exakten Inhalt einschließlich relevanter Anhänge und Metadaten, die Version, Ziel, Zweck, Übergabeweg, Operation, Ausgangs- und Ziellabel, zuständige Stellen und Gültigkeit festlegen.
 
@@ -339,7 +683,7 @@ Darüber hinaus umfasst sie **Auswahl, Auftreten und relevante Reihenfolge**. Zw
 
 Ein Agent erhält keine wiederverwendbare Herabstufungsbefugnis. Der Dienst liefert die geprüfte Ausgabe direkt an das bestimmte Ziel. Eine Vorschau wird nur in einer für das Ausgangslabel zugelassenen Umgebung angezeigt.
 
-### 6.3 Gemeinsamer Offenlegungsstand
+### R.6.3 Gemeinsamer Offenlegungsstand
 
 Zusammengehörige Freigaben werden gegen einen versionierten **Offenlegungsstand** geprüft. Dieser hält für einen festgelegten Geltungsbereich die bereits veranlassten und noch ausstehenden Offenlegungen fest. Der Agent darf den Geltungsbereich nicht selbst so verengen, dass frühere Freigaben verschwinden.
 
@@ -347,7 +691,7 @@ Zwei gleichzeitig geprüfte Freigaben dürfen nicht beide einen veralteten Stand
 
 Eine vollständige Liste früherer Freigaben ist noch kein semantischer Datenschutzbeweis. Zwei Summen können gemeinsam einen individuellen Wert offenlegen. Bei solchen Zielen braucht es eine gemeinsame fachliche Prüfung oder eine gesondert nachgewiesene Freigabepolitik.
 
-### 6.4 Zwei Veröffentlichungsmodi
+### R.6.4 Zwei Veröffentlichungsmodi
 
 **Manuelle Inhaltsfreigabe.** Eine berechtigte Stelle prüft einen konkreten Kandidaten. Garantiert wird dessen autorisierte, unveränderte Ausführung innerhalb des freigegebenen Ereignisplans. Nicht garantiert wird, dass ein manipulierter, sachlich richtiger Text keine unbeabsichtigte Kodierung enthält.
 
@@ -357,7 +701,7 @@ Die zweite Variante erlaubt freie KI-Textarbeit nach einem kleineren, genauer pr
 
 Die Engine kann die Anwendung einer registrierten Freigaberegel prüfen. Sie kann nicht aus „anonymisiert“ oder „synthetisch“ automatisch die semantische Unbedenklichkeit ableiten. Forschung zu begrenzter und robuster Deklassierung motiviert diese Trennung; der RFC übernimmt keine pauschale Sicherheitsgarantie daraus.[^delimited][^robust]
 
-### 6.5 Ausführung und Widerruf
+### R.6.5 Ausführung und Widerruf
 
 Im abstrakten Modell ist eine bestätigte Freigabeausführung ein autorisierter Schritt. Die Implementierung darf daraus keine unbegründete Behauptung über eine atomare Transaktion mit beliebigen externen Diensten ableiten.
 
@@ -365,7 +709,7 @@ Vor einer irreversiblen Übergabe werden Objektversion, aktuelle Gültigkeit, Zi
 
 Ablauf oder Widerruf verhindert weitere noch nicht verbindlich ausgelöste Wirkungen. Bereits offenbarte Information wird nicht zurückgerufen. Auch Statusmeldungen, Wiederholungen und Abbruchsignale unterliegen dem Beobachtungsmodell.
 
-## 7. Typische Arbeitsabläufe
+## R.7 Typische Arbeitsabläufe
 
 | Aufgabe | Arbeitsraum und Übergaben | Entscheidende Grenze |
 |---|---|---|
@@ -382,11 +726,11 @@ Ablauf oder Widerruf verhindert weitere noch nicht verbindlich ausgelöste Wirku
 | Archivierung | Labels, Herkunft und Aufbewahrung bleiben am gespeicherten Bestand. | Ein einmaliges `permit` beweist weder künftige Löschung noch unbegrenzte Fortnutzungsrechte. |
 
 Die Arbeitsabläufe definieren keine realen Rollen- oder Providerzulassungen. Konkrete Regeln sind vor Nutzung zu hinterlegen. Die folgenden drei kanonischen Workflows sind dagegen normative Referenzabläufe; Anhang D macht sie zu reproduzierbaren Integrations- und Angriffstests.
-### 7.1 Kanonischer Workflow A: Sitzungsmappe aus RIS-Unterlagen
+### R.7.1 Kanonischer Workflow A: Sitzungsmappe aus RIS-Unterlagen
 
 Dieser Workflow ist der Referenzfall für **geschützte Beschaffung, Synthese und interne Ablage ohne Offenlegungsfreigabe**. Er MUSS von einer konformen Implementierung vollständig modelliert und durch Engine und Simulator reproduzierbar geprüft werden.
 
-#### 7.1.1 Ausgangslage und Objekte
+#### R.7.1.1 Ausgangslage und Objekte
 
 Für eine konkrete Sitzung `S` existieren ein Arbeitsauftrag `a_S`, öffentliche und nichtöffentliche RIS-Unterlagen `d_1, ..., d_n` sowie optional vorher separat beschaffte öffentliche Recherche `r_1, ..., r_k`.
 
@@ -410,7 +754,7 @@ $$
 
 Eine öffentliche RIS-Datei ist nicht deshalb eine autorisierte Eingabe. Sie muss zusätzlich zum genehmigten Sitzungsscope gehören und alle Raumbindungen für ihre Aufnahme erfüllen.
 
-#### 7.1.2 Arbeitsraumvertrag
+#### R.7.1.2 Arbeitsraumvertrag
 
 Der Sitzungsmappenraum `W_mappe` wird konservativ mit allen erwartbaren weiterwirkenden Bindungen gestartet:
 
@@ -430,7 +774,7 @@ handoffs:
   - geschuetzter-sitzungsmappen-speicher
 ```
 
-Der konkrete YAML-Name ist nicht normativ. Normativ sind die in Abschnitt 4.1 verlangten Vertragsinhalte und ihre geschützte Herkunft.
+Der konkrete YAML-Name ist nicht normativ. Normativ sind die in Abschnitt [R.4.1](#r41-startvertrag) verlangten Vertragsinhalte und ihre geschützte Herkunft.
 
 Für jede Eingabe `x` MUSS die Engine mindestens prüfen:
 
@@ -447,7 +791,7 @@ $$
 
 Der RIS-Connector prüft den Quellzugriff separat. Eine Leseberechtigung am RIS ersetzt nicht die Aufnahmeentscheidung des Arbeitsraums.
 
-#### 7.1.3 Erzeugte Mappe
+#### R.7.1.3 Erzeugte Mappe
 
 Aus den aufgenommenen Unterlagen erzeugt der Raum die Sitzungsmappe `m_S`, Zwischenzusammenfassungen, Indizes und gegebenenfalls eine Aufgabenliste. Für jedes vom Raum erzeugte Objekt `y` gilt:
 
@@ -457,7 +801,7 @@ $$
 
 Die Mappe wird daher nicht dadurch weniger gebunden, dass einzelne Abschnitte ausschließlich öffentliche Tatsachen wiedergeben. Eine Übernahme in einen entsprechend geschützten Vault oder Sitzungsspeicher ist eine Aktionsfreigabe beziehungsweise vorab autorisierte interne Übergabe, aber keine Offenlegungslockerung.
 
-#### 7.1.4 Adversariale Variante: direkte Prompt Injection
+#### R.7.1.4 Adversariale Variante: direkte Prompt Injection
 
 Eine authentische RIS-Anlage enthält eine Anweisung wie:
 
@@ -478,11 +822,11 @@ $$
 
 Die Sicherheitsentscheidung hängt nicht davon ab, ob die Injection erkannt wurde.
 
-#### 7.1.5 Adversariale Variante: Kontrollfluss-Leak
+#### R.7.1.5 Adversariale Variante: Kontrollfluss-Leak
 
 Das geheime Dokument veranlasst den Agenten, nur dann einen inhaltlich harmlosen öffentlichen Request auszulösen, wenn ein bestimmtes Merkmal enthalten ist. Auch das **Auftreten des Requests** ist eine Ausgabe des geschützten Raums. Der Simulator MUSS deshalb zwei Welten vergleichen, die sich nur in diesem Merkmal unterscheiden, und einen sichtbaren Request in nur einer Welt als Gegenbeispiel melden.
 
-#### 7.1.6 Endzustand und erforderliche Tests
+#### R.7.1.6 Endzustand und erforderliche Tests
 
 Erfolgreicher Endzustand:
 
@@ -493,11 +837,11 @@ Erfolgreicher Endzustand:
 
 Verbindliche Gegenproben: fremde öffentliche RIS-Datei trotz passendem Dateilabel, Prompt-Injection-Webrequest, geheimnisabhängiger leerer Request, nicht zugelassener Provider-Fallback, ungebundener Verlauf aus einer alten Sitzung.
 
-### 7.2 Kanonischer Workflow B: Sitzungsnotizen zu einem Bericht für Parteimitglieder
+### R.7.2 Kanonischer Workflow B: Sitzungsnotizen zu einem Bericht für Parteimitglieder
 
 Dieser Workflow ist der Referenzfall für **kontrollierte Offenlegung**. Er MUSS die schwächere manuelle Inhaltsfreigabe und die stärkere begrenzte Faktenfreigabe klar unterscheiden.
 
-#### 7.2.1 Ausgangslage
+#### R.7.2.1 Ausgangslage
 
 Die Sitzungsnotizen `n` können mehrere Bindungen tragen, beispielsweise:
 
@@ -513,7 +857,7 @@ $$
 
 Das Schreiben eines Berichts im geschützten Raum entfernt keine Bindung.
 
-#### 7.2.2 Modus A: manuelle Inhaltsfreigabe
+#### R.7.2.2 Modus A: manuelle Inhaltsfreigabe
 
 Ein geschützter Raum `W_bericht_intern` erzeugt einen konkreten Kandidaten `r`. Konservativ gilt:
 
@@ -529,7 +873,7 @@ Garantiert wird in diesem Modus ausschließlich:
 
 Nicht garantiert wird, dass ein vollständig fehlgesteuerter Agent nicht durch gleichwertige Wortwahl, Reihenfolge, Zeichensetzung oder andere Auswahlentscheidungen zusätzliche Information in den freigegebenen Text kodiert hat.
 
-#### 7.2.3 Modus B: begrenzte Faktenfreigabe
+#### R.7.2.3 Modus B: begrenzte Faktenfreigabe
 
 Der bevorzugte starke Ablauf trennt Analyse und Formulierung:
 
@@ -571,7 +915,7 @@ $$
 
 Damit kann ein beliebig handelnder Berichtsagent nur von den tatsächlich freigegebenen Fakten und seinen öffentlichen Vorgaben abhängen.
 
-#### 7.2.4 Simulator-Orakel für begrenzte Faktenfreigabe
+#### R.7.2.4 Simulator-Orakel für begrenzte Faktenfreigabe
 
 Für zwei zulässige geheime Ausgangszustände `s` und `t` mit gleicher freigegebener Information
 
@@ -589,7 +933,7 @@ $$
 
 Ein Unterschied im Bericht, seiner Existenz, Reihenfolge oder anderen modellierten Metadaten ist ein Gegenbeispiel zur stärkeren Zusage, sofern er nicht selbst Bestandteil von `E` beziehungsweise des autorisierten Ereignisplans ist.
 
-#### 7.2.5 Adversariale Varianten
+#### R.7.2.5 Adversariale Varianten
 
 Der Simulator MUSS mindestens folgende Varianten enthalten:
 
@@ -598,15 +942,15 @@ Der Simulator MUSS mindestens folgende Varianten enthalten:
 - **Reihenfolgekanal:** zwei freigegebene Meldungen werden geheimnisabhängig vertauscht. Der Ereignisplan muss die relevante Reihenfolge unabhängig festlegen.
 - **Kompositionsleck:** zwei einzeln genehmigte Statistiken erlauben gemeinsam die Rekonstruktion einer geschützten Einzelinformation. Der Offenlegungsstand muss diesen Fall dem zuständigen semantischen Freigabeverfahren zuführen; eine Liste einzeln gültiger GOs genügt nicht.
 
-#### 7.2.6 Endzustand
+#### R.7.2.6 Endzustand
 
 Im starken Modus kennt der Bericht-Raum keine nicht freigegebenen Sitzungsinformationen. Sein Bericht kann daher unter den Modellannahmen keine zusätzlichen Informationen daraus übertragen. Fortbestehende Empfänger-, Partei- oder Nutzungsbindungen bleiben erhalten.
 
-### 7.3 Kanonischer Workflow C: Recherche zu Fraktionsprojekten zur Vorbereitung von Anträgen
+### R.7.3 Kanonischer Workflow C: Recherche zu Fraktionsprojekten zur Vorbereitung von Anträgen
 
 Dieser Workflow ist der Referenzfall für **vertrauliche politische Planung mit aggressiver externer Recherche**. Er demonstriert die zentrale Architekturregel: Kein fehlsteuerbarer Raum erhält gleichzeitig geschützte Projektinformationen und einen unkontrollierten Außenkanal.
 
-#### 7.3.1 Ausgangslage
+#### R.7.3.1 Ausgangslage
 
 Eine interne Projektidee `p`, ergänzende Fraktionsunterlagen `f_i` und gegebenenfalls parteiinterne Vorarbeiten tragen beispielsweise:
 
@@ -620,7 +964,7 @@ $$
 
 Ziel ist zunächst **nicht** die Veröffentlichung des Projekts, sondern die Vorbereitung eines Antrags durch externe Tatsachenrecherche.
 
-#### 7.3.2 Geschützter Planungsraum
+#### R.7.3.2 Geschützter Planungsraum
 
 Ein Raum `W_plan` nimmt die internen Projektunterlagen auf und darf daraus Forschungsbedarf und Recherchevorschläge erzeugen. Für jede erzeugte Frage `q_i` gilt zunächst:
 
@@ -630,7 +974,7 @@ $$
 
 Eine scheinbar harmlose Frage wird nicht dadurch öffentlich, dass sie keinen wörtlichen internen Satz enthält. Schon Themenwahl, Suchparameter oder das Auftreten der Anfrage können die vertrauliche politische Absicht verraten.
 
-#### 7.3.3 Freigabe konkreter Rechercheaufträge
+#### R.7.3.3 Freigabe konkreter Rechercheaufträge
 
 Ein vorgeschlagener Rechercheauftrag kann beispielsweise lauten:
 
@@ -644,13 +988,13 @@ Die Offenlegungsfreigabe bezieht sich auf genau diesen Rechercheauftrag, seine E
 
 Nach der autorisierten Lockerung entsteht ein getrenntes Eingangsobjekt `q_i'` für einen Recherchearbeitsraum `W_research`.
 
-#### 7.3.4 Externer Recherchearbeitsraum
+#### R.7.3.4 Externer Recherchearbeitsraum
 
 `W_research` darf je nach seinen eigenen Bindungen Websuche, öffentliche RIS-Systeme, zugelassene externe KI und gegebenenfalls lizenzierte Quellen verwenden. Er hat keine Eingangsrechte auf die Fraktionsdaten und keinen unkontrollierten Rückfragenkanal in `W_plan`.
 
 Ein Prompt-Injection-Text aus einer Webseite kann den Agenten auffordern, interne Projektdaten nachzuladen. Der Versuch scheitert bereits an den Eingangsrechten beziehungsweise der Aufnahmeregel des Recherche-Raums. Der Recherche-Agent besitzt kein Recht, die interne Quelle mit fremder Identität zu öffnen.
 
-#### 7.3.5 Rückführung der Recherche
+#### R.7.3.5 Rückführung der Recherche
 
 Rechercheergebnisse `r_i` werden mit Herkunft, Version und ihren eigenen Bindungen gespeichert. Öffentliche Ergebnisse können ungebunden sein; lizenzierte Volltexte können beispielsweise `abo-A@3` tragen.
 
@@ -670,9 +1014,9 @@ B_{W_{antrag}}
 \{\text{fraktionsprojekt-P@1},\text{fraktionsarbeit@1},\text{abo-A@3}\}.
 $$
 
-Der daraus erzeugte Antrag ist zunächst ein interner Entwurf und trägt mindestens diese Bindungen. Seine spätere öffentliche Fassung ist ein eigener Veröffentlichungsworkflow nach Abschnitt 6.4.
+Der daraus erzeugte Antrag ist zunächst ein interner Entwurf und trägt mindestens diese Bindungen. Seine spätere öffentliche Fassung ist ein eigener Veröffentlichungsworkflow nach Abschnitt [R.6.4](#r64-zwei-veröffentlichungsmodi).
 
-#### 7.3.6 Adversariale Varianten
+#### R.7.3.6 Adversariale Varianten
 
 Der Simulator MUSS mindestens prüfen:
 
@@ -683,7 +1027,7 @@ Der Simulator MUSS mindestens prüfen:
 - **Neue Quellenbindung:** ein Abo-Ergebnis soll in einen laufenden Raum ohne `abo-A@3` aufgenommen werden. Der Vertrag darf nicht wachsen; die Aufnahme wird verweigert und ein passender neuer Raum ist erforderlich.
 - **Rechercheauswahl als Leak:** das bloße Starten einer bestimmten öffentlichen Recherche hängt von einem internen Projektmerkmal ab. Ohne entsprechende Offenlegungsfreigabe ist schon dieses Auftreten verboten.
 
-#### 7.3.7 Sicherheitsinvariante des Workflows
+#### R.7.3.7 Sicherheitsinvariante des Workflows
 
 Für jeden fehlsteuerbaren Arbeitsraum soll mindestens eine der folgenden Aussagen gelten:
 
@@ -692,9 +1036,9 @@ Für jeden fehlsteuerbaren Arbeitsraum soll mindestens eine der folgenden Aussag
 
 Diese Aussage ist keine zusätzliche primitive Regel des Kalküls, sondern eine unmittelbar prüfbare Architekturfolge aus Aufnahme-, Empfänger- und Übergaberegel. Engine und Simulator sollen sie als erklärende Workflow-Invariante ausgeben können.
 
-### 7.4 Auditspuren der drei Referenzworkflows
+### R.7.4 Auditspuren der drei Referenzworkflows
 
-Die nachstehenden Bezeichner sind normalisierte Ereignisse, keine Protokollierung jedes internen Rechenschritts. Vor einer Wirkung steht `ExecutionCommitted`, danach ein belegter Ausgang oder ein ausdrücklich offener Vorgang. Details stehen in Abschnitt 11 und Anhang F.
+Die nachstehenden Bezeichner sind normalisierte Ereignisse, keine Protokollierung jedes internen Rechenschritts. Vor einer Wirkung steht `ExecutionCommitted`, danach ein belegter Ausgang oder ein ausdrücklich offener Vorgang. Details stehen in Abschnitt [R.11](#r11-audit-journal-nachweisbare-vermittlung-im-betrieb) und Anhang F.
 
 | Workflow | Zu belegende Schritte | Zusätzliche Gegenprobe |
 |---|---|---|
@@ -706,9 +1050,9 @@ Ein Snapshot-Manifest bindet Objektidentitäten, Versionen und Labels. Eine nach
 
 Für jeden Workflow MUSS eine positive Ende-zu-Ende-Spur einschließlich Journal und Auditor funktionieren. Zusätzlich werden mindestens ein Audit-Ausfall vor Ausführung, ein Absturz mit unklarem Ausgang und eine verschwiegene tatsächliche Wirkung simuliert. Letztere wird gegen den getrennten Effektstrom des Simulators geprüft, nicht aus dem Journal selbst erraten.
 
-### 7.5 Kanonische Workflows als normative Integrationsprüfung
+### R.7.5 Kanonische Workflows als normative Integrationsprüfung
 
-Die drei Workflows 7.1 bis 7.3 sind keine bloßen Beispiele. Eine Implementierung des Kommunalpolitik-Harness gilt für diesen RFC erst dann als integrationsfähig, wenn sie für alle drei:
+Die drei Workflows [R.7.1](#r71-kanonischer-workflow-a-sitzungsmappe-aus-ris-unterlagen) bis [R.7.3](#r73-kanonischer-workflow-c-recherche-zu-fraktionsprojekten-zur-vorbereitung-von-anträgen) sind keine bloßen Beispiele. Eine Implementierung des Kommunalpolitik-Harness gilt für diesen RFC erst dann als integrationsfähig, wenn sie für alle drei:
 
 1. die angegebenen positiven Pfade mit synthetischen Fixtures ausführen kann,
 2. alle genannten negativen Varianten reproduzierbar verweigert oder als Gegenbeispiel erkennt,
@@ -716,12 +1060,12 @@ Die drei Workflows 7.1 bis 7.3 sind keine bloßen Beispiele. Eine Implementierun
 4. die tatsächlichen Simulator-Beobachtungen einschließlich Existenz und Reihenfolge externer Ereignisse erfasst,
 5. keine reale Rollen-, Provider- oder Freigabeentscheidung aus den illustrativen Beispielwerten ableitet.
 
-Die Workflows sind damit **ausführbare Referenzspezifikationen**: Abschnitt 5 definiert die Einzelregeln, Abschnitt 6 die Freigaben, und Abschnitt 7 zeigt, wie daraus reale kommunalpolitische Arbeit zusammengesetzt wird.
+Die Workflows sind damit **ausführbare Referenzspezifikationen**: Abschnitt [R.5](#r5-der-kalkül) definiert die Einzelregeln, Abschnitt [R.6](#r6-freigaben-konkrete-ereignisse-und-gemeinsame-offenlegung) die Freigaben, und Abschnitt [R.7](#r7-typische-arbeitsabläufe) zeigt, wie daraus reale kommunalpolitische Arbeit zusammengesetzt wird.
 
 
-## 8. Bedrohungsmodell und Garantien
+## R.8 Bedrohungsmodell und Garantien
 
-### 8.1 Angreifer
+### R.8.1 Angreifer
 
 Der Angreifer darf Daten und Antworten präparieren und das gesamte Verhalten eines Agenten einschließlich seiner Programme innerhalb des Arbeitsraums bestimmen.
 
@@ -729,7 +1073,7 @@ Er darf Labels fälschen, Ziele wechseln, Nutzlasten kodieren, Fehler auslösen 
 
 Nicht angenommen wird seine Kontrolle über die vertrauenswürdige Basis: Isolation, Regelverwaltung, Identitätsprüfung, Sicherheitsmetadaten, Engine-Kern, Ausführer, Freigabedienst sowie Journalisierung und deren authentische Belegquellen. Jede dieser Komponenten braucht einen benannten Nachweis oder eine ausdrückliche Annahme. Ein kompromittierbarer Parser außerhalb des Arbeitsraums vergrößert diese Basis.
 
-### 8.2 Voraussetzungen
+### R.8.2 Voraussetzungen
 
 | Voraussetzung | Nachweispflicht |
 |---|---|
@@ -741,7 +1085,7 @@ Nicht angenommen wird seine Kontrolle über die vertrauenswürdige Basis: Isolat
 
 Ein zugelassenes Dokument über die Umgebung ersetzt nicht den Nachweis, dass die aktuelle Umgebung diesem Dokument entspricht.
 
-### 8.3 Zusagen
+### R.8.3 Zusagen
 
 **Bindungserhaltung:** Ohne Lockerung gehen auf modellierten Abhängigkeitspfaden keine Bindungen verloren.
 
@@ -755,7 +1099,7 @@ Ein zugelassenes Dokument über die Umgebung ersetzt nicht den Nachweis, dass di
 
 **Begrenzte Faktenfreigabe:** Für einen eng definierten, nicht interaktiven Modus kann die Beobachtung auf vorab bestimmte freigegebene Information zurückgeführt werden. Anhang A nennt die stärkeren Voraussetzungen. Eine allgemeine Aussage über beliebige interaktive menschliche Freigaben wird nicht behauptet.
 
-### 8.4 Lokale Pflichten der Vermittler
+### R.8.4 Lokale Pflichten der Vermittler
 
 Ein Suchdienst MUSS bei gleichen sichtbaren Daten gleiche sichtbare Suchergebnisse liefern. Erst Top-k über alle Dokumente und danach ACL-Filterung genügt nicht. Gleiches gilt für globale Rankingstatistiken und geteilte Vorschlagsdaten.
 
@@ -763,20 +1107,20 @@ Ein verweigerter geschützter Aufruf darf keinen öffentlichen Zähler veränder
 
 Zustände von Modellservern, Caches und späteren Agenten müssen entsprechend getrennt bleiben. Eine vollständige Nichtinterferenzzusage verlangt außerdem unabhängige sichtbare Ablaufsteuerung.
 
-### 8.5 Grenzen
+### R.8.5 Grenzen
 
 Feingranulare Laufzeit-, Ressourcen-, Verkehrs- und Hardwareseitenkanäle sind nicht automatisch vom Mengenkalkül erfasst. Sie sind zusätzlich zu behandeln oder ausdrücklich auszunehmen. Formale Sicherheitsnachweise benötigen ein solches erklärtes Annahmen- und Beobachtungsmodell.[^sel4]
 
 Nicht bewiesen werden rechtliche Bewertungen, menschliche Inhaltsprüfung, Vertragstreue nur angenommener Betreiber oder semantische Zwecktreue beliebiger interner Berechnungen. Bereits berechtigte Menschen können Information außerhalb der technischen Grenzen weitergeben.
 
-## 9. Drei Werkzeuge um den Harness
+## R.9 Drei Werkzeuge um den Harness
 
-### 9.1 Inferenz-Engine: Entscheidungen und begründete Pläne
+### R.9.1 Inferenz-Engine: Entscheidungen und begründete Pläne
 
 Die Engine beantwortet beispielsweise:
 
-> „Darf dieser Raum dieses Objekt aufnehmen?“  
-> „Welche Bindungen braucht ein neuer Raum für diese festgelegten Eingaben?“  
+> „Darf dieser Raum dieses Objekt aufnehmen?“\
+> „Welche Bindungen braucht ein neuer Raum für diese festgelegten Eingaben?“\
 > „Welche konkrete Regel verhindert diesen Übergabeplan?“
 
 Sie berechnet mit einer kleinen, deterministischen Regelsprache. Sie verändert keine Rechte und führt keine Connector-Operation aus.
@@ -785,7 +1129,7 @@ Ein positives Ergebnis enthält eine überprüfbare Ableitung, gebunden an Regel
 
 Die Engine prüft Einzelschritte und vorgeschlagene Pläne. Sie beweist weder den guten Willen eines Betreibers noch automatisch Nichtinterferenz des ganzen Systems.
 
-### 9.2 Simulator: systematisch nach Gegenbeispielen suchen
+### R.9.2 Simulator: systematisch nach Gegenbeispielen suchen
 
 Der Simulator stellt dieselben Schritte mit synthetischen Daten nach. Er prüft einzelne Ausführungsspuren und vergleicht zwei Ausführungen, die sich nur in geschützten Informationen unterscheiden.
 
@@ -793,21 +1137,21 @@ Er kann alternative Vermittler, Scheduler und absichtlich fehlerhafte Varianten 
 
 **Seine Beobachtung richtet sich nach tatsächlich simulierten Ausgaben an Empfänger, nicht danach, ob deren Labels die Ausgabe erlaubt hätten.** Sonst würde ein falsch beschriftetes Leck aus dem Test verschwinden.
 
-### 9.3 Audit-Verifier: historische Entscheidungen und Wirkungen prüfen
+### R.9.3 Audit-Verifier: historische Entscheidungen und Wirkungen prüfen
 
 Der Audit-Verifier beantwortet: „Welche Operationen sind im bezeichneten Zeitraum belegt, waren sie damals autorisiert und welche Aussagen sind mangels Evidenz offen?“ Er verwendet den unabhängigen Ableitungsprüfer und rekonstruiert relevante historische Verwaltungsstände. Heutige Rechte ersetzen nicht die damaligen Rechte.
 
 Er prüft eine geschlossene, authentisch abgegrenzte Journalstrecke samt Belegen. Ein `permit` ohne verbindliche Reservierung, eine Reservierung ohne Ausgang und ein bestätigter Ausgang sind unterschiedliche Tatsachen. Das Journal ist ein geschützter Bestand; der Verifier erhält keine Ausführungsbefugnis. Anhang F enthält den Bauauftrag.
 
-### 9.4 Gemeinsamer Kern, unabhängige Gegenprüfung
+### R.9.4 Gemeinsamer Kern, unabhängige Gegenprüfung
 
-Alle drei Werkzeuge verwenden dieselbe normative Semantik. Der Simulator darf Produktionsentscheidungen über den Engine-Kern ausführen.
+Alle drei Werkzeuge verwenden dieselbe normative Semantik. Der Simulator darf denselben Engine-Kern wie die Produktion zur Auswertung von Entscheidungen in der simulierten Welt verwenden.
 
 Seine Sicherheitsorakel, Beobachtungsprojektion und ausgewählte Referenzentscheidungen dürfen jedoch nicht bloß dieselbe `decide`-Funktion erneut aufrufen. Sonst könnten beide Seiten denselben Fehler bestätigen.
 
 Entscheidungsbäume, Simulationsdaten und Gegenbeispiele sind ihrerseits Datenobjekte. Bei realen oder realitätsnahen Konfigurationen können sie Schutzbindungen tragen. Ein Diagnosebericht ist kein öffentlicher Nebenkanal.
 
-## 10. Umsetzung und Abnahme
+## R.10 Umsetzung und Abnahme
 
 Zunächst entstehen reine Bibliotheken und eine lokale Kommandozeile mit synthetischen Fixtures. Danach folgen gebundene API- beziehungsweise Harness-Adapter. Erst anschließend wird die verbindliche Durchsetzung mit tatsächlicher Isolation und Connectoren integriert.
 
@@ -826,9 +1170,9 @@ Ein grünes Testergebnis ohne positive Kontrollfälle, nachgewiesene Prämissen 
 Die Bauanleitungen in Anhang B, C und F sind agententaugliche Arbeitsaufträge. Sie ersetzen weder die gesonderte Beauftragung der Implementierung noch die Freigabe einer produktiven Installation. Kein Agent darf fehlende reale Regeln aus den Beispielen erfinden.
 
 
-## 11. Audit-Journal: nachweisbare Vermittlung im Betrieb
+## R.11 Audit-Journal: nachweisbare Vermittlung im Betrieb
 
-### 11.1 Zweck und Reichweite
+### R.11.1 Zweck und Reichweite
 
 Das **Audit-Journal** ist eine geschützte Folge sicherheitsrelevanter Entscheidungen, verbindlicher Ausführungsaufträge und belegter Ausgänge. Während des festgelegten Aufbewahrungszeitraums wird sie ausschließlich ergänzt. Korrekturen erfolgen durch neue, verknüpfte Einträge, nicht durch Umschreiben der Vergangenheit.
 
@@ -836,7 +1180,7 @@ Der Auditor prüft **historische Konformität im festgelegten Geltungsbereich**.
 
 Ein Log kann eine fehlende Aufnahme nicht aus sich selbst entdecken. Ebenso beweist ein vom Ausführer signiertes „erfolgreich“ nur die Herkunft dieser Behauptung, nicht deren Wahrheit. Vollständige Vermittlung, korrekte Effektzuordnung und glaubwürdige Belegquellen bleiben ausdrückliche Nachweispflichten. Das Journal macht sie prüfbar; es ersetzt sie nicht.
 
-### 11.2 Granularität und geschützter Auditweg
+### R.11.2 Granularität und geschützter Auditweg
 
 Auditpflichtig sind die modellierten Grenzen: Start und Wiederaufnahme, Quellzugriff, Aufnahme, relevante Ausgabe und Übergabe, verbindliche Speicherung, Freigabe, Rechte- und Regeländerung, Widerruf sowie Audit-Zugriff, Export und Lebenszyklusänderung. Abgewiesene und unentscheidbare reguläre Anfragen werden ebenfalls erfasst. Vorprüfungen werden als solche kenntlich gemacht; sie sind keine ausgeführten Operationen.
 
@@ -846,7 +1190,7 @@ Der Agent schreibt weder Journalereignisse noch Ausführungsbestätigungen selbs
 
 Jeder Auditweg wird bereits im Startvertrag zugelassen. Er erfasst seine Writer, Belegablagen, Prüfer, Sicherungen und gegebenenfalls Kontrollpunkt-Zeugen. Gibt es keinen gemeinsamen zulässigen Verarbeitungsweg, darf der Arbeitsraum nicht starten. Audit ist keine allgemeine Ausnahme von Vertraulichkeit oder Zweckbindung.
 
-### 11.3 Entscheidung, verbindlicher Auftrag, belegter Ausgang
+### R.11.3 Entscheidung, verbindlicher Auftrag, belegter Ausgang
 
 | Ereignis | Bedeutung | Bedeutet ausdrücklich nicht |
 |---|---|---|
@@ -864,7 +1208,7 @@ Im lokalen Modell können Zustandsänderung und Journalfortschreibung eine gemei
 
 Ist der Journalpfad nicht dauerhaft schreibbar, werden keine neuen auditpflichtigen Wirkungen zugelassen. Bestehende Schutzgrenzen bleiben aktiv. Für laufende Vorgänge muss die Umsetzung ausreichend geschützte Kapazität vorsehen oder ihren ungeklärten Zustand konservativ erhalten. Logausfall darf kein „weiter ohne Audit“ aktivieren.
 
-### 11.4 Append-only und Manipulationsnachweis
+### R.11.4 Append-only und Manipulationsnachweis
 
 Append-only ist eine durchgesetzte Schreibregel. Manipulationsnachweis ist eine weitere Eigenschaft: kanonisch kodierte, verkettete Einträge und authentisierte Kontrollpunkte binden eine konkrete Historie. Herkunftsschutz, Reihenfolge und Erkennung fehlender Nachrichten sind auch Gegenstand signierter Protokolle wie RFC 5848; dessen unveränderte Implementierung wird hier nicht verlangt.[^signed-log]
 
@@ -872,7 +1216,7 @@ Append-only ist eine durchgesetzte Schreibregel. Manipulationsnachweis ist eine 
 
 Der RFC legt die Nachweisziele fest, nicht ein Speicherprodukt oder eine Blockchain. Gegen einen kompromittierten Agenten kann eine geschützte lokale Journalinstanz ausreichen. Gegen nachträgliche Manipulation dieser Instanz braucht es getrennt verwahrte Evidenz. Sind sämtliche Belegquellen und Vertrauensanker kompromittiert, entsteht durch Verkettung keine Wahrheit.
 
-### 11.5 Das Journal darf kein neuer Abfluss sein
+### R.11.5 Das Journal darf kein neuer Abfluss sein
 
 Journalereignisse, Snapshots, Beweise, Kontrollpunkte und Auditberichte sind selbst gebundene Daten. Sie können mehr verraten als die sichtbare Nutzlast: geheime Objektexistenz, Recherchezweck, abgewiesene Suchanfragen oder ursprüngliche Bindungen einer freigegebenen Ausgabe.
 
@@ -882,7 +1226,7 @@ Ein Auditor erhält nicht allein wegen seiner Rolle Zugriff auf alle Daten. Sein
 
 Append-only gilt innerhalb der autorisierten Aufbewahrung, nicht als Pflicht zur unbegrenzten Speicherung. Aufbewahrung, rechtmäßige Aussonderung und Belegverfügbarkeit werden im Audit-Vertrag festgelegt. Werden Belege gelöscht, muss die Reichweite späterer Prüfung entsprechend eingeschränkt werden. Eine verbliebene Prüfsumme ersetzt keinen fehlenden Inhalt.
 
-### 11.6 Ergebnis statt pauschalem grünen Haken
+### R.11.6 Ergebnis statt pauschalem grünen Haken
 
 Ein Auditbericht nennt den geprüften Bereich und trennt mindestens **Journalintegrität, Regelkonformität, belegte Ausgänge, Abdeckung und verbleibende Annahmen**. Fehlende Fakten, ein unbekannter Schlussstand oder offene Ausgänge werden nicht in „kein Verstoß“ umgedeutet. Bestätigte Verstöße bleiben auch bei anderen offenen Fragen sichtbar.
 
@@ -1102,7 +1446,7 @@ Definiere versionierte, geschlossene Schemas. Unbekannte Felder, doppelte Schlü
 | `Binding` | Kennung einschließlich Version, `readers`, Operationsregeln, Auflagen, Lockerungszuständigkeiten. |
 | `Environment` | Versionierte Identität, vollständige zugängliche Beobachter, zugelassene Fähigkeiten und relevante Nachweise. |
 | `Object` | Unveränderliche Inhaltsreferenz und Version, Klassifikationsstatus, Label, Herkunft und gesonderte Zugriffsrechte. |
-| `Workspace` | Unveränderlicher Vertrag aus Abschnitt 4.1, Zustand und aktuell geprüfte Gültigkeit. |
+| `Workspace` | Unveränderlicher Vertrag aus Abschnitt [R.4.1](#r41-startvertrag), Zustand und aktuell geprüfte Gültigkeit. |
 | `Intent` | Vom Agenten vorgeschlagene Operation mit Objekt- und Zielreferenzen; keine selbst attestierten Rechte. |
 | `ContextSnapshot` | Für genau diese Entscheidung aufgelöste Fakten mit Quelle, Version, Gültigkeit und Nachweisart. |
 | `Release` | Konkretes Ereignis beziehungsweise Ereignisplan, Objektstand, Labels, Autoritäten, Geltungsbereich und erwarteter Offenlegungsstand. |
@@ -1182,7 +1526,7 @@ Die Auswertung erfolgt in dieser Reihenfolge:
 3. **Basis und Datenzugriff prüfen.** Identität, aktuelle Vertragsgültigkeit, konkrete Operations- und Objektzugriffsrechte sowie erforderliche Nachweise.
 4. **Labelbedingungen prüfen.** Aufnahmeinklusion, außerhalb des Agenten zugeordnetes Ausgabelabel und gegebenenfalls Zielaufnahme.
 5. **Empfänger und Bedingungen prüfen.** Vollständiges $\rho_\Gamma(c)$, dessen Inklusion in $R_\Gamma(L)$ und alle $P_b(c)$ für das vollständige Prüflabel.
-6. **Freigabe prüfen, falls beantragt.** Niemals als stiller Fallback einer abgelehnten normalen Übergabe; eigener Regelzweig mit allen Bedingungen aus Abschnitt 6.
+6. **Freigabe prüfen, falls beantragt.** Niemals als stiller Fallback einer abgelehnten normalen Übergabe; eigener Regelzweig mit allen Bedingungen aus Abschnitt [R.6](#r6-freigaben-konkrete-ereignisse-und-gemeinsame-offenlegung).
 7. **Entscheidung erzeugen.** Ableitung oder begründete Blockade, mit exakt beschriebenem möglichem Effekt und seinen aktuellen Zustandsbedingungen.
 
 Ein bekannter verbietender Befund führt zu `deny`; fehlen andernfalls notwendige Fakten, lautet das Ergebnis `indeterminate`. Nur vollständig nachgewiesene Prämissen führen zu `permit`. Ein nicht auswertbarer oder ressourcenbedingt abgebrochener Aufruf darf niemals auf `permit` zurückfallen.
@@ -1271,7 +1615,7 @@ Bei Freigaben werden erwarteter Offenlegungsstand und einmalige Verwendung gemei
 
 Zwischen Prüfung und Außenwirkung darf der Agent weder Nutzlast noch Ziel austauschen. Inhaltsreferenzen müssen sich auf unveränderliche, tatsächlich verwendete Daten beziehen; ein Dateipfad allein genügt nicht.
 
-Ein technisch notwendiger Versanddienst führt eine kontrollierte Folge aus. Seine Zustände sind auf `DecisionRecorded`, `ExecutionCommitted` und `OutcomeRecorded` aus Abschnitt 11 abzubilden. Der dauerhafte Vorbeleg und die aktuelle Zustandsprüfung sind Pflicht, nicht eine unverbindliche Telemetrie nach der Wirkung. Ein Ausfall nach dem verbindlichen Punkt bleibt ohne belastbaren Ausgang offen. Die konkrete Umsetzung dieses Protokolls bleibt Implementierungsarbeit; seine Sicherheitsbedingungen aus Abschnitt 6 und 11 sind verbindlich.
+Ein technisch notwendiger Versanddienst führt eine kontrollierte Folge aus. Seine Zustände sind auf `DecisionRecorded`, `ExecutionCommitted` und `OutcomeRecorded` aus Abschnitt [R.11](#r11-audit-journal-nachweisbare-vermittlung-im-betrieb) abzubilden. Der dauerhafte Vorbeleg und die aktuelle Zustandsprüfung sind Pflicht, nicht eine unverbindliche Telemetrie nach der Wirkung. Ein Ausfall nach dem verbindlichen Punkt bleibt ohne belastbaren Ausgang offen. Die konkrete Umsetzung dieses Protokolls bleibt Implementierungsarbeit; seine Sicherheitsbedingungen aus Abschnitt [R.6](#r6-freigaben-konkrete-ereignisse-und-gemeinsame-offenlegung) und [R.11](#r11-audit-journal-nachweisbare-vermittlung-im-betrieb) sind verbindlich.
 
 Eine Sandbox wird durch die Engine nicht ersetzt. Ohne vollständige Vermittlung ist sie lediglich ein beratendes Prüfwerkzeug.
 
@@ -1560,12 +1904,12 @@ Nicht ausreichend sind eine bloße Anzahl grüner Tests, zufällige Stichproben 
 
 ### D.7 Ende-zu-Ende-Regression der kanonischen Workflows
 
-Der Simulator MUSS die Workflows 7.1 bis 7.3 nicht nur als Sammlung isolierter Einzelschritte, sondern jeweils als vollständige Spur ausführen. Zu jeder Spur werden Startvertrag, Eingangsversionen, Engine-Entscheidungen, tatsächliche Übergaben, Offenlegungsstand und beobachtbare Ereignisfolge gespeichert.
+Der Simulator MUSS die Workflows [R.7.1](#r71-kanonischer-workflow-a-sitzungsmappe-aus-ris-unterlagen) bis [R.7.3](#r73-kanonischer-workflow-c-recherche-zu-fraktionsprojekten-zur-vorbereitung-von-anträgen) nicht nur als Sammlung isolierter Einzelschritte, sondern jeweils als vollständige Spur ausführen. Zu jeder Spur werden Startvertrag, Eingangsversionen, Engine-Entscheidungen, tatsächliche Übergaben, Offenlegungsstand und beobachtbare Ereignisfolge gespeichert.
 
-Für jeden Workflow existieren mindestens drei Grundvarianten; die Auditvarianten aus 7.4 und F.9 kommen hinzu:
+Für jeden Workflow existieren mindestens drei Grundvarianten; die Auditvarianten aus [R.7.4](#r74-auditspuren-der-drei-referenzworkflows) und F.9 kommen hinzu:
 
 1. **positive Referenz:** der beabsichtigte kommunalpolitische Arbeitsablauf funktioniert,
-2. **adversariale Mutation:** mindestens eine aus Abschnitt 7 benannte Injection-, Kontrollfluss- oder Freigabemanipulation wird aktiv eingebaut,
+2. **adversariale Mutation:** mindestens eine aus Abschnitt [R.7](#r7-typische-arbeitsabläufe) benannte Injection-, Kontrollfluss- oder Freigabemanipulation wird aktiv eingebaut,
 3. **fehlerhafte Vermittlerimplementierung:** der Simulator ersetzt gezielt eine korrekte lokale Pflicht durch die historisch oder theoretisch unsichere Variante und MUSS ein minimales Gegenbeispiel finden.
 
 Ein bestandener Ende-zu-Ende-Test erfordert sowohl Nutzbarkeit als auch Abwehr: Ein System, das die gesamte Sitzungsmappe, jeden Parteibericht oder jede externe Recherche pauschal verweigert, erfüllt den Referenzworkflow nicht.
@@ -1575,6 +1919,8 @@ Ein bestandener Ende-zu-Ende-Test erfordert sowohl Nutzbarkeit als auch Abwehr: 
 Die in F.9 aufgeführten Audit-Testfamilien ergänzen diesen Korpus verbindlich. Für jeden dort behaupteten Integritäts- oder Konformitätsbefund ist ein Gegenstück ohne Angriff nötig. Ein korrekt als offen erkannter Absturz ist kein gescheiterter Positivtest. Ein nicht nachweisbarer Schlussstand darf niemals als vollständiger Tagesaudit bestehen.
 
 ## Anhang E: Änderungen, Herkunft und Quellen
+
+Dieser Anhang ist aus RFC0001 Revision4 übernommen. „Diese Revision“ und die historischen Revisionsnummern beziehen sich hier auf RFC0001, nicht auf RFC0003. Die damaligen Quellenprüfungen und Begleitpaketangaben werden nicht als neue Prüfung bestätigt. Die in E.2 genannten Pfade `evidence/audit-model-results.json` und `README.md` bezeichnen das historische Begleitpaket; sie werden hier weder ersetzt noch als neu vorhandene Evidenz ausgegeben.
 
 ### E.1 Änderungen gegenüber den vorausgehenden Revisionen
 
@@ -1588,7 +1934,7 @@ Die in F.9 aufgeführten Audit-Testfamilien ergänzen diesen Korpus verbindlich.
 | Gewünscht waren Werkzeuge um den Harness. | Getrennte Inferenz-Engine und Simulator mit Baufolge, Schnittstellen, Orakeln und Abnahme. | Anhänge B bis D. |
 | Ein positives Modellurteil kann mit Laufzeitbefugnis verwechselt werden. | Entscheidungsableitung, aktuelle Reservierung und tatsächliche Ausführung werden getrennt. | Snapshotwechsel, Replay und konkurrierende Freigaben. |
 | Die zentralen kommunalpolitischen Arbeitsabläufe waren nur tabellarisch skizziert. | Sitzungsmappe, Parteibericht und Fraktionsrecherche sind als vollständige normative Ende-zu-Ende-Workflows modelliert. | `workflow-sitzungsmappe`, `workflow-parteibericht`, `workflow-fraktionsrecherche`; D.7. |
-| Betriebsentscheidungen sollten nachträglich prüfbar werden. | Geschütztes Audit-Journal, historischer Verifier, ausdrücklicher Audit-Vertrag. | Abschnitt 11, A.8 und Anhang F. |
+| Betriebsentscheidungen sollten nachträglich prüfbar werden. | Geschütztes Audit-Journal, historischer Verifier, ausdrücklicher Audit-Vertrag. | Abschnitt [R.11](#r11-audit-journal-nachweisbare-vermittlung-im-betrieb), A.8 und Anhang F. |
 | Hash-Kette und `executed`-Behauptung wurden zu weit interpretiert. | Kontrollpunkte, abgegrenzte Integrität, echte Abdeckungsannahme und Quellen von Wirkungsbelegen. | Präfix, Fork, Neuberechnung, falsche Bestätigung und verschwiegener Effekt. |
 | Abstürze, Widerruf und Journal selbst können Sicherheitslücken schaffen. | Dauerhafter Vorbeleg, Zustandsprotokoll, offene Ausgänge, getrennte Journalbereiche und begrenzte Aufbewahrung. | Crash-Grenzen, Replay, alte Entscheidungen und Audit-Nebenkanäle. |
 
@@ -1614,7 +1960,7 @@ Falsifikationsreview:
 01470d60ace13e8a6d2462bc74dec03aea5dd7055a06822d961ce1c92e94c7c3
 ```
 
-Revision 2 führte Toolarchitektur, Ausdruckssprache, Datenverträge und Baufolgen ein; Revision 3 ergänzte die kanonischen Workflows. Die Auditarchitektur in Abschnitt 11, A.8 und Anhang F ist eine neue Entwurfsentscheidung der Revision 4. Sie erweitert das Modell, ohne Betreiber- oder Laufzeitannahmen als bereits bewiesen auszugeben.
+Revision 2 führte Toolarchitektur, Ausdruckssprache, Datenverträge und Baufolgen ein; Revision 3 ergänzte die kanonischen Workflows. Die Auditarchitektur in Abschnitt [R.11](#r11-audit-journal-nachweisbare-vermittlung-im-betrieb), A.8 und Anhang F ist eine neue Entwurfsentscheidung der Revision 4. Sie erweitert das Modell, ohne Betreiber- oder Laufzeitannahmen als bereits bewiesen auszugeben.
 
 Die neuen Primärquellen zu signierten Logs, Konsistenzprüfung, kanonischem JSON und Logging wurden am 2026-09-06 geprüft. Sie begründen einzelne technische Unterscheidungen, nicht die Korrektheit dieses eigenen Auditprotokolls. Historische Quellen und Testergebnisse bleiben mit ihrer bisherigen Reichweite erhalten.
 
@@ -1787,6 +2133,8 @@ committed -- belastbarer Beleg --> confirmed | no_effect
 committed -- Timeout/Absturz/fehlender Beleg --> offen oder uncertain
 uncertain -- spaeterer belastbarer Beleg --> confirmed | no_effect
 ```
+
+„Offen“ beschreibt einen Versuch ohne abschließend belegten Ausgang, keinen zusätzlichen Wert von `OutcomeRecorded`. Auch ein mit `uncertain` erfasster Versuch bleibt offen. Spätere belastbare Evidenz kann beide Fälle aufklären.
 
 Eine spätere Aufklärung ist ein neuer Eintrag. Sie tilgt das frühere `uncertain` nicht. Widersprüchliche bestätigte Ausgänge sind ein Befund; sie werden nicht durch „der letzte gewinnt“ aufgelöst.
 
