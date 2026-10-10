@@ -1,0 +1,7 @@
+{
+  "schema": "komki-intent/1",
+  "intent_id": "intent-admit-oeffentlich-a",
+  "operation": "admit",
+  "object": "obj-oeffentlich-a@v2",
+  "workspace": "ws-fall-4711"
+}

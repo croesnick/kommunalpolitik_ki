@@ -3,11 +3,17 @@
     %{
       name: "default",
       strict: true,
+      # Entfernt (2026-10): IoPuts, ExpensiveEmptyStringCheck, MapMixing,
+      # NegatedConditionInUnless (Tippfehler neben der korrekten Pluralform)
+      # und TailTrailingNewline existierten in der installierten
+      # Credo-Version nicht — sie liefen nie ("Ignoring an undefined check"-
+      # Rauschen) und wurden aus der Allowlist entfernt. Der strict-Dispatch
+      # verpflichtet jede App auf alle verbleibenden Checks; Ausnahmen nur
+      # als begründeter --exclude (aktuell: ratsprojekte).
       checks: [
         {Credo.Check.Consistency.TabsOrSpaces, []},
         {Credo.Check.Consistency.SpaceAroundOperators, []},
         {Credo.Check.Consistency.SpaceInParentheses, []},
-        {Credo.Check.Consistency.TailTrailingNewline, []},
         {Credo.Check.Readability.ModuleDoc, []},
         {Credo.Check.Readability.FunctionNames, []},
         {Credo.Check.Readability.ModuleAttributeNames, []},
@@ -22,18 +28,14 @@
         {Credo.Check.Refactor.FunctionArity, []},
         {Credo.Check.Refactor.LongQuoteBlocks, []},
         {Credo.Check.Refactor.MatchInCondition, []},
-        {Credo.Check.Refactor.NegatedConditionInUnless, []},
         {Credo.Check.Refactor.NegatedConditionsInUnless, []},
         {Credo.Check.Refactor.Nesting, []},
         {Credo.Check.Refactor.PipeChainStart, []},
         {Credo.Check.Refactor.UnlessWithElse, []},
         {Credo.Check.Warning.IoInspect, []},
-        {Credo.Check.Warning.IoPuts, []},
         {Credo.Check.Warning.OperationOnSameValues, []},
         {Credo.Check.Warning.BoolOperationOnSameValues, []},
-        {Credo.Check.Warning.ExpensiveEmptyStringCheck, []},
         {Credo.Check.Warning.IExPry, []},
-        {Credo.Check.Warning.MapMixing, []},
         {Credo.Check.Warning.UnsafeToAtom, []},
         {Credo.Check.Warning.UnusedEnumOperation, []},
         {Credo.Check.Warning.UnusedKeywordOperation, []},

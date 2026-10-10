@@ -149,6 +149,37 @@ Commit nicht wieder knallt.
 
 ---
 
+## KomKI-CLI (`apps/komki_cli`)
+
+**Zweck:** Lokal gesandboxte KI-Arbeitsfläche (`komki`): Seatbelt-Profil,
+llama-server, pi-Session, tmux. Läuft nur unter macOS (Seatbelt). Details:
+[`apps/komki_cli/README.md`](../apps/komki_cli/README.md).
+
+**Install:**
+
+```bash
+brew install llama.cpp tmux      # Inferenz-Server (gepinnt 0.5.0), Session-Host
+brew install fd ripgrep          # optional: pi's Such-Tools (aktiviert find/grep)
+# node via asdf, Homebrew oder nvm; pi-Bundle global:
+npm install -g @earendil-works/pi-coding-agent
+```
+
+**Modell:** Das gepinnte GGUF (Gemma 4 26B-A4B-it, unsloth UD-Q4_K_XL) wird
+nicht heruntergeladen — `komki init` übernimmt es SHA-256-geprüft aus dem
+Staging-Verzeichnis (`~/.local/share/komki/models-staging/`).
+
+**Benötigt von:**
+
+| Tool / Workflow | Anmerkung |
+|---|---|
+| `komki init/doctor/up/down/status/run/session` | `init` entdeckt node/pi/llama-server selbst und pinnt die aufgelösten Pfade in die config.json |
+
+**Fallback:** Fehlt ein Pflicht-Werkzeug (node, pi-Bundle, llama-server),
+verweigert `init` mit klarer Meldung. Fehlen fd/ripgrep, verzichtet pi auf
+Dateisuche (Start-Warnung; `find`/`grep` bleiben weg).
+
+---
+
 ## Hinzufügen einer neuen Abhängigkeit
 
 1. Abhängigkeit in diesem Dokument eintragen (Zweck, Install, Konfiguration,
@@ -225,6 +256,53 @@ cp librechat.yaml.example librechat.yaml   # ggf. Custom Provider aktivieren
 
 - [`librechat/README.md`](../librechat/README.md) — Setup-Details, Agent-Einrichtung, opencode-vs-LibreChat-Entscheidungshilfe
 - [`AGENTS.md`](../AGENTS.md) § „Zwei AI-Harnesses" — Architektur-Prinzip 5
+
+---
+
+## Renovate-PAT (self-hosted Dependency-Updates)
+
+**Zweck:** `.github/workflows/renovate.yml` betreibt Renovate self-hosted
+(renovatebot GitHub-Action, alle 6 Stunden). Authentifizierung gegen die
+GitHub-API über einen Fine-grained Personal Access Token, der im
+Actions-Secret `RENOVATE_TOKEN` liegt (Repo-Settings → Secrets and
+variables → Actions).
+
+**Erforderliche Rechte** (Fine-grained PAT, Repository Access nur auf
+`croesnick/kommunalpolitik_ki`):
+
+| Recht | Stufe | Wofür |
+|---|---|---|
+| Contents | Read and write | `renovate/*`-Branches pushen |
+| Workflows | Read and write | Commits auf `.github/workflows/*` (Actions-Bumps); GitHub lehnt solche Pushes ohne dieses Recht ab |
+| Pull requests | Read and write | Update-PRs erstellen und pflegen |
+| Issues | Read and write | Dependency-Dashboard pflegen |
+| Metadata | Read-only | Pflichtrecht, GitHub setzt es automatisch |
+| Administration | Read-only, optional | Branch-Protection-Regeln lesen; ohne dieses Recht nur ein 403 im Log, nicht fatal |
+
+**Fehlerbild:** Fehlt ein Schreibrecht, bricht der Workflow nicht ab. Der
+Lauf ist grün, Renovate pusht Branches, aber PR-Erstellung und
+Dashboard-Pflege schlagen still mit HTTP 403 fehl. Symptom: `renovate/*`-
+Branches im Remote, nie ein PR. So geschehen vom 16.07. bis 07.09.2026:
+„Pull requests" und „Issues" hatten nur Leserechte.
+
+**Verifikation nach Setup oder Token-Änderung:**
+
+```bash
+gh workflow run Renovate --repo croesnick/kommunalpolitik_ki -f log_level=debug
+# Lauf abwarten, dann im Log nach "statusCode=403" suchen
+gh pr list --repo croesnick/kommunalpolitik_ki --state open
+```
+
+**Token pflegen:** GitHub → Settings → Developer settings → Personal access
+tokens → Fine-grained tokens. Rechte am bestehenden Token ändern wirkt
+sofort, das Secret bleibt unverändert. Bei einem neuen Token `RENOVATE_TOKEN`
+im Secret aktualisieren.
+
+**Quelle:** Empirisch verifiziert am 2026-09-07, Debug-Lauf 34079212967
+(`git push` erfolgreich, `POST /pulls` und `PATCH /issues/49` mit 403
+abgewiesen).
+
+---
 
 ## Querverweise
 
