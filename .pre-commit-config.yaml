@@ -35,3 +35,33 @@ repos:
         pass_filenames: false
         # Nur ausführen, wenn staged-Dateien existieren (sonst no-op).
         always_run: false
+
+      # mix format: gleiche Pruefung wie CI (Root-.formatter.exs deckt alle
+      # Apps ab). Faengt unformatierten Code vor dem Push statt erst in CI.
+      - id: mix-format-check
+        name: mix format --check-formatted (Elixir)
+        entry: mix format --check-formatted
+        language: system
+        pass_filenames: false
+        files: \.(ex|exs)$
+
+      # Compile-Gate: warnings-as-errors ueber den Workspace-Dispatch. Faengt
+      # die Fehlerklasse (nichtexistente Funktionen, veraltete API-Namen) in
+      # Sekunden am Commit statt Minuten spaeter in der CI-Runde.
+      - id: mix-compile-warnings
+        name: mix workspace compile --warnings-as-errors
+        entry: mix workspace.run -t compile -- --warnings-as-errors
+        language: system
+        pass_filenames: false
+        files: \.(ex|exs)$
+
+      # Credo strict wie CI (Ausschlussliste statt Erlaubnisliste: jede neue
+      # App rutscht automatisch in die Pruefplicht; ratsprojekte bewusst
+      # ausgenommen). Faengt Stil- und Readability-Funde in Sekunden am
+      # Commit — Live-Fund: drei Stil-Zyklen, die erst im Gate-Lauf auffielen.
+      - id: mix-credo-strict
+        name: mix credo --strict (alle Apps ausser deklarierte Ausnahmen)
+        entry: mix workspace.run -t credo --exclude ratsprojekte -- --strict
+        language: system
+        pass_filenames: false
+        files: \.(ex|exs)$

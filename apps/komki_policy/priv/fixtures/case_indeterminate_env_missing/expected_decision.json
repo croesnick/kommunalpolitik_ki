@@ -1,0 +1,25 @@
+{
+  "blockers": null,
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "decision": "indeterminate",
+  "identity": "carsten",
+  "intent_ref": "intent-admit-oeffentlich-a-env-fehlt",
+  "missing_evidence": [
+    {
+      "binding": null,
+      "code": "recipients_unproven",
+      "fact": "environment_observers_complete"
+    }
+  ],
+  "object": {
+    "object_id": "obj-oeffentlich-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "rule": "admit",
+  "snapshot_ref": "snap-fall-4711-env-fehlt",
+  "workspace": "ws-fall-4711"
+}

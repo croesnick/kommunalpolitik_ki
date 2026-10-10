@@ -1,0 +1,25 @@
+{
+  "blockers": [
+    {
+      "binding": "nur-start-test@1",
+      "code": "missing_operation_rule",
+      "condition": null
+    }
+  ],
+  "checked_label": [
+    "nur-start-test@1"
+  ],
+  "decision": "deny",
+  "identity": "carsten",
+  "intent_ref": "intent-admit-oeffentlich-a-start",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-oeffentlich-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "rule": "admit",
+  "snapshot_ref": "snap-start-test-ohne-admit",
+  "workspace": "ws-start-test"
+}
