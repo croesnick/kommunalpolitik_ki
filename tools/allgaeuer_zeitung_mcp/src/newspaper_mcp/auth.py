@@ -7,6 +7,7 @@ HTTP-only requests to search/section pages.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import time
@@ -86,10 +87,8 @@ def save_cookies(cookies: list[dict]) -> None:
 
 def clear_cookies() -> None:
     """Remove cached cookies (forces re-login on next call)."""
-    try:
+    with contextlib.suppress(keyring.errors.PasswordDeleteError):
         keyring.delete_password(KEYRING_SERVICE, COOKIE_KEY)
-    except keyring.errors.PasswordDeleteError:
-        pass
 
 
 async def ensure_cookies() -> list[dict]:

@@ -3,9 +3,7 @@
 # uv-Projekte unter tools/: Jedes tools/*/pyproject.toml trägt eine eigene
 # [tool.ruff]-Sektion, ruff nimmt pro Datei die nächstgelegene Config,
 # deshalb greift diese Datei nicht in die Tools hinein. Line-length und
-# Rule-Select folgen pdf_ingest und nextcloud_ods_mcp; die anderen drei
-# Tools pinnen bewusst die Ruff-Defaults (E4,E7,E9,F) — Angleich ans
-# strenge Set als Folgeticket zu Issue #77.
+# Rule-Select sind über alle fünf Tools vereinheitlicht.
 line-length = 88
 target-version = "py311"
 
