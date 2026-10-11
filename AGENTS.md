@@ -119,6 +119,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `skills/bericht_aus_dem_stadtrat` | Markdown-Skill | Bericht aus dem Stadtrat: Sitzungen seit letztem Bericht sammeln und verdichten | Agent Skill | Funktionsfähig |
 | `skills/vault_suche` | Markdown-Skill | Obsidian-Vault durchsuchen | Agent Skill | Funktionsfähig |
 | `skills/antrag_generieren` | Markdown-Skill | Stadtratsantrag entwerfen (fraktionsneutral; fraktionsspezifische Vorlage via Vault-Tag) | Agent Skill | Funktionsfähig |
+| `skills/terminal_screenshot` | Markdown-Skill + Python-Skripte | Terminal-Sitzung als Screenshot für READMEs (tmux-Capture → SVG, Browser-verifiziert) | Agent Skill | Funktionsfähig |
 
 ### Externe Abhängigkeiten (nicht im Repo)
 
