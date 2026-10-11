@@ -96,6 +96,27 @@ die Auswahl, `Enter` übernimmt).
 Unter `~/.local/share/komki` liegen die Instanzdaten, überschreibbar via
 `KOMKI_HOME`.
 
+## So sieht eine Session aus
+
+Aufgezeichnet aus einer echten Session: Der Prompt bittet um eine kleine
+Checkliste, pi schreibt `notiz.md` in den Arbeitsraum, das Modell fasst den
+Inhalt zusammen. Im Footer stehen das Arbeitsverzeichnis, der Kontextverbrauch
+und mit `local-model` der Hinweis, dass nichts das Gerät verlassen hat.
+
+![komki-Session in tmux: Prompt, eingeklappte Thinking-Blöcke, write notiz.md, Antwort, Footer mit local-model](assets/session-beispiel.svg)
+
+Nachvollziehen:
+
+```sh
+./komki session
+```
+
+Dann im Eingabefeld von pi:
+
+```text
+Erstelle notiz.md mit einer kurzen Checkliste für eine Spielplatzbegehung (fiktive Inhalte).
+```
+
 ## Ehrliche Grenzen
 
 Das Modell ist leistungsfähig, aber lokal: Antworten erscheinen ohne
