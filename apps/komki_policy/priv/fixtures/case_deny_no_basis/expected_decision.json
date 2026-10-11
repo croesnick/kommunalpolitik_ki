@@ -1,0 +1,23 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "basis_right_false",
+      "condition": "has_operation_right"
+    }
+  ],
+  "checked_label": [],
+  "decision": "deny",
+  "identity": "carsten",
+  "intent_ref": "intent-admit-oeffentlich-a-ohne-basis",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-oeffentlich-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "rule": "admit",
+  "snapshot_ref": "snap-oeffentlich-ohne-basis",
+  "workspace": "ws-oeffentlich"
+}

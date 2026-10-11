@@ -1,0 +1,61 @@
+# Build artifacts
+artifacts/
+_build/
+.elixir/
+.elixir_ls/
+*.ez
+apps/ratsinfo/ratsinfo
+apps/komki_policy/komki-policy
+apps/komki_cli/komki
+apps/komki_cli/.build-report.md
+/docs/rfcs/0001-scratchpad.md
+cover/
+apps/*/cover/
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+
+# OS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp
+
+# Skill eval workspace (temporary artifacts)
+skills/*-workspace/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Erlang crash dumps
+erl_crash.dump
+
+# Screenshots
+*.png
+
+# UI prototype HTML files (root level)
+/ui-*.html
+
+# Local config (vault names, personal settings) — not tracked
+config.local.yml
+*.local.yml
+
+# PDFs — Sitzungsunterlagen/Downloads gehören nie ins Repo
+# (ratsinfo lädt PDFs in seinen Cache; pdf_ingest legt .txt/.meta.json daneben)
+*.pdf
+
+# Skill eval workspace (local only — enthaelt reale Vault-Referenzen, nie tracken)
+vault_suche-workspace/
+
+# Internes Threat-Modell (private Infrastruktur-Topologie, bleibt lokal)
+/docs/rfcs/0000-sandbox-threat-modell.md
+
+# Interne Seed-Datensätze (echte Ratsprojekte, bleiben lokal)
+/apps/ratsprojekte/priv/repo/seeds.exs
+
+# Deepwork orchestrator state (local progress files)
+.slim/deepwork/

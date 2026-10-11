@@ -1,0 +1,25 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "label_not_included",
+      "condition": null
+    }
+  ],
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "decision": "deny",
+  "identity": "carsten",
+  "intent_ref": "intent-admit-lizenziert-a-fremd",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-lizenziert-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "rule": "admit",
+  "snapshot_ref": "snap-fall-4711-label-fremd",
+  "workspace": "ws-fall-4711"
+}

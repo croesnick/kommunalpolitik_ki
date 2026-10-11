@@ -1,0 +1,106 @@
+{
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "conclusion": "permit",
+  "intent_ref": "intent-admit-lizenziert-a-fremd",
+  "premises": [
+    {
+      "classification": "classified",
+      "kind": "object_check",
+      "name": "not_quarantine",
+      "object": "obj-lizenziert-a@v1",
+      "value": true
+    },
+    {
+      "fact": "workspace_contract_valid",
+      "kind": "fact",
+      "name": "workspace_contract_valid",
+      "source": "workspace.valid",
+      "value": true
+    },
+    {
+      "fact": "has_operation_right",
+      "kind": "fact",
+      "name": "has_operation_right",
+      "source": "rechte-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    {
+      "fact": "has_object_access_right",
+      "kind": "fact",
+      "name": "has_object_access_right",
+      "source": "objekt-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    {
+      "fact": "audit_path_ready",
+      "kind": "fact",
+      "name": "audit_path_ready",
+      "source": "journal-verwaltung",
+      "source_kind": "technical",
+      "value": true
+    },
+    {
+      "fact": "environment_observers_complete",
+      "kind": "fact",
+      "name": "environment_observers_complete",
+      "source": "umgebungs-verwaltung",
+      "source_kind": "assumption",
+      "value": true
+    },
+    {
+      "fact": "input_in_approved_case_scope",
+      "kind": "fact",
+      "name": "label_inclusion",
+      "source": "fall-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    {
+      "actual_recipients": [
+        "carsten",
+        "lokale-fallverarbeitung"
+      ],
+      "allowed_recipients": [
+        "carsten",
+        "lokale-fallverarbeitung"
+      ],
+      "kind": "computed",
+      "name": "recipient_inclusion",
+      "value": true
+    },
+    {
+      "binding": "buergerfall-4711@1",
+      "expression": {
+        "all": [
+          {
+            "eq": [
+              "purpose",
+              "antwort-fall-4711"
+            ]
+          },
+          {
+            "eq": [
+              "input_in_approved_case_scope",
+              true
+            ]
+          }
+        ]
+      },
+      "fact_refs": [
+        "input_in_approved_case_scope",
+        "purpose"
+      ],
+      "kind": "condition",
+      "name": "binding_condition",
+      "value": true
+    }
+  ],
+  "registry_ref": "reg-fall-4711-test",
+  "rule": "admit",
+  "schema": "komki-proof/1",
+  "snapshot_ref": "snap-fall-4711-label-fremd"
+}

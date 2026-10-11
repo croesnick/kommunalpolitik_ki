@@ -1,0 +1,41 @@
+{
+  "schema": "komki-registry/1",
+  "registry_id": "reg-fall-4711-test",
+  "observers": [
+    "carsten",
+    "lokale-fallverarbeitung"
+  ],
+  "fact_fields": {
+    "input_in_approved_case_scope": "boolean",
+    "purpose": "string"
+  },
+  "environments": {
+    "lokale-fallverarbeitung@1": {
+      "observers": [
+        "carsten",
+        "lokale-fallverarbeitung"
+      ]
+    }
+  },
+  "bindings": {
+    "buergerfall-4711@1": {
+      "readers": [
+        "carsten",
+        "lokale-fallverarbeitung"
+      ],
+      "operations": {
+        "admit": {
+          "not": [
+            {
+              "eq": [
+                "purpose",
+                "antwort-fall-4711"
+              ]
+            }
+          ]
+        }
+      },
+      "relaxation_authorities": []
+    }
+  }
+}

@@ -1,0 +1,331 @@
+{
+  "cases": [
+    {
+      "expected": "true",
+      "expression": true,
+      "facts": {}
+    },
+    {
+      "expected": "false",
+      "expression": false,
+      "facts": {}
+    },
+    {
+      "expected": "true",
+      "expression": {
+        "all": []
+      },
+      "facts": {}
+    },
+    {
+      "expected": "false",
+      "expression": {
+        "any": []
+      },
+      "facts": {}
+    },
+    {
+      "expected": "unknown",
+      "expression": {
+        "all": [
+          {
+            "eq": [
+              "purpose",
+              "antwort-fall-4711"
+            ]
+          },
+          {
+            "eq": [
+              "input_in_approved_case_scope",
+              true
+            ]
+          }
+        ]
+      },
+      "facts": {
+        "purpose": {
+          "value": "antwort-fall-4711"
+        }
+      }
+    },
+    {
+      "expected": "false",
+      "expression": {
+        "all": [
+          {
+            "eq": [
+              "purpose",
+              "antwort-fall-4711"
+            ]
+          },
+          {
+            "eq": [
+              "purpose",
+              "geheimnisträger-anders"
+            ]
+          }
+        ]
+      },
+      "facts": {
+        "purpose": {
+          "value": "antwort-fall-4711"
+        }
+      }
+    },
+    {
+      "expected": "unknown",
+      "expression": {
+        "any": [
+          {
+            "eq": [
+              "input_in_approved_case_scope",
+              true
+            ]
+          },
+          {
+            "eq": [
+              "purpose",
+              "antwort-fall-4711"
+            ]
+          }
+        ]
+      },
+      "facts": {
+        "input_in_approved_case_scope": {
+          "value": false
+        }
+      }
+    },
+    {
+      "expected": "false",
+      "expression": {
+        "any": [
+          {
+            "eq": [
+              "purpose",
+              "antwort-fall-4711"
+            ]
+          }
+        ]
+      },
+      "facts": {
+        "purpose": {
+          "value": "recherche-anders"
+        }
+      }
+    },
+    {
+      "expected": "true",
+      "expression": {
+        "any": [
+          {
+            "eq": [
+              "input_in_approved_case_scope",
+              false
+            ]
+          },
+          {
+            "eq": [
+              "purpose",
+              "antwort-fall-4711"
+            ]
+          }
+        ]
+      },
+      "facts": {
+        "input_in_approved_case_scope": {
+          "value": false
+        },
+        "purpose": {
+          "value": "antwort-fall-4711"
+        }
+      }
+    },
+    {
+      "expected": "true",
+      "expression": {
+        "member": [
+          "kategorie",
+          [
+            "oeffentlich",
+            "verwaltung"
+          ]
+        ]
+      },
+      "facts": {
+        "kategorie": {
+          "value": "oeffentlich"
+        }
+      }
+    },
+    {
+      "expected": "false",
+      "expression": {
+        "member": [
+          "kategorie",
+          [
+            "oeffentlich",
+            "verwaltung"
+          ]
+        ]
+      },
+      "facts": {
+        "kategorie": {
+          "value": "intern"
+        }
+      }
+    },
+    {
+      "expected": "unknown",
+      "expression": {
+        "member": [
+          "kategorie",
+          [
+            "oeffentlich",
+            "verwaltung"
+          ]
+        ]
+      },
+      "facts": {}
+    },
+    {
+      "expected": "true",
+      "expression": {
+        "subset": [
+          "stellen",
+          [
+            "rat",
+            "verwaltung"
+          ]
+        ]
+      },
+      "facts": {
+        "stellen": {
+          "value": [
+            "verwaltung"
+          ]
+        }
+      }
+    },
+    {
+      "expected": "false",
+      "expression": {
+        "subset": [
+          "stellen",
+          [
+            "rat",
+            "verwaltung"
+          ]
+        ]
+      },
+      "facts": {
+        "stellen": {
+          "value": [
+            "verwaltung",
+            "extern"
+          ]
+        }
+      }
+    },
+    {
+      "expected": "unknown",
+      "expression": {
+        "subset": [
+          "stellen",
+          [
+            "rat",
+            "verwaltung"
+          ]
+        ]
+      },
+      "facts": {}
+    },
+    {
+      "expected": "true",
+      "expression": {
+        "at_most": [
+          "aufbewahrungsjahre",
+          10
+        ]
+      },
+      "facts": {
+        "aufbewahrungsjahre": {
+          "value": 5
+        }
+      }
+    },
+    {
+      "expected": "false",
+      "expression": {
+        "at_most": [
+          "aufbewahrungsjahre",
+          10
+        ]
+      },
+      "facts": {
+        "aufbewahrungsjahre": {
+          "value": 11
+        }
+      }
+    },
+    {
+      "expected": "unknown",
+      "expression": {
+        "at_most": [
+          "aufbewahrungsjahre",
+          10
+        ]
+      },
+      "facts": {}
+    },
+    {
+      "expected": "false",
+      "expression": {
+        "all": [
+          {
+            "eq": [
+              "purpose",
+              "antwort-fall-4711"
+            ]
+          },
+          {
+            "eq": [
+              "input_in_approved_case_scope",
+              true
+            ]
+          }
+        ]
+      },
+      "facts": {
+        "purpose": {
+          "value": "recherche-anders"
+        }
+      }
+    },
+    {
+      "expected": "true",
+      "expression": {
+        "any": [
+          {
+            "eq": [
+              "purpose",
+              "antwort-fall-4711"
+            ]
+          },
+          {
+            "eq": [
+              "input_in_approved_case_scope",
+              true
+            ]
+          }
+        ]
+      },
+      "facts": {
+        "purpose": {
+          "value": "antwort-fall-4711"
+        }
+      }
+    }
+  ],
+  "schema": "komki-expression-expectations/1"
+}

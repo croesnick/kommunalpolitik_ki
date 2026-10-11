@@ -1,0 +1,75 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "allgaeuer_zeitung_mcp": {
+      "type": "local",
+      "command": [
+        "uv",
+        "run",
+        "--directory",
+        "tools/allgaeuer_zeitung_mcp",
+        "python",
+        "-m",
+        "newspaper_mcp"
+      ],
+      "environment": {
+        "AZ_EMAIL": "${AZ_EMAIL}",
+        "AZ_PASSWORD": "${AZ_PASSWORD}"
+      }
+    },
+    "pdf_ingest": {
+      "type": "local",
+      "command": [
+        "uv",
+        "run",
+        "--directory",
+        "tools/pdf_ingest",
+        "python",
+        "-m",
+        "pdf_ingest"
+      ],
+      "timeout": 300
+    },
+    "nextcloud": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "nextcloud-mcp-server",
+        "run",
+        "--transport",
+        "stdio"
+      ],
+      "environment": {
+        "NEXTCLOUD_HOST": "${NEXTCLOUD_HOST}",
+        "NEXTCLOUD_USERNAME": "${NEXTCLOUD_USERNAME}",
+        "NEXTCLOUD_PASSWORD": "${NEXTCLOUD_PASSWORD}",
+        "MCP_DEPLOYMENT_MODE": "single_user_basic"
+      }
+    },
+    "nextcloud_ods_mcp": {
+      "type": "local",
+      "command": [
+        "uv",
+        "run",
+        "--directory",
+        "tools/nextcloud_ods_mcp",
+        "python",
+        "-m",
+        "nextcloud_ods_mcp"
+      ]
+    },
+    "tidewave": {
+      "type": "remote",
+      "url": "http://localhost:4000/tidewave/mcp",
+      "enabled": true
+    },
+    "ratsprojekte": {
+      "type": "remote",
+      "url": "http://localhost:4000/mcp",
+      "enabled": true
+    }
+  },
+  "skills": {
+    "paths": ["skills"]
+  }
+}

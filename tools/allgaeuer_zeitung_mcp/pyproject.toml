@@ -1,0 +1,34 @@
+[project]
+name = "allgaeuer-zeitung-mcp"
+version = "0.1.0"
+description = "MCP server for the Allgäuer Zeitung online newspaper"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.2.0",
+    "httpx>=0.27.0",
+    "playwright>=1.49.0",
+    "trafilatura>=1.12.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.2.0",
+    "pydantic>=2.9.0",
+    "keyring>=25.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+allgaeuer-zeitung-mcp = "newspaper_mcp.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/newspaper_mcp"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+]

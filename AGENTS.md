@@ -1,0 +1,290 @@
+# Kommunalpolitik KI
+
+Tools für die Stadtratsarbeit: RIS durchsuchen, PDFs ingesten, Fördermittel recherchieren, Lokalzeitung scrapen.
+
+## Kontext
+
+Dieses Repo bündelt CLI-Tools und MCP-Server, die die kommunalpolitische Arbeit erleichtern — ein AI-Harness für Ratsarbeit mit Quellenbindung, lokaler Datensouveränität und demokratischer Verantwortung.
+
+## Projekt-Verwaltung
+
+Zur Verwaltung dieses Projekts wird **GitHub Projects** genutzt. Das Board liegt unter https://github.com/users/croesnick/projects (Repo: `croesnick/kommunalpolitik_ki`). Aufgaben, Ideen und Meilensteine werden als Issues mit Labels organisiert, nicht in externen Tools.
+
+**Ticket-Disziplin:** Neue Erkenntnisse oder angepasste Anforderungen während der Arbeit werden entweder ins bestehende Ticket eingetragen oder als sinnvolles Folgeticket angelegt — nichts wird still am Ticket vorbei eingebaut.
+
+## Architektur-Prinzipien
+
+### 1. Elixir-first
+
+Wenn nichts Prinzipielles dagegen spricht, wird ein Tool in Elixir gebaut. „Prinzipielles dagegen" heißt: das Ökosystem einer anderen Sprache bietet eine Bibliothek, die in Elixir keine Entsprechung hat und nicht sinnvoll als CLI/NIF angebunden werden kann. Beispiele: `trafilatura` (Python, Artikel-Extraktion), `PyMuPDF` (Python, PDF-Annotation-Extraktion), `Playwright` (Node, Headless-Browser). Dogmatismus ist nicht das Ziel — aber der Default ist Elixir.
+
+### 2. Unix-Prinzip
+
+Ein Tool pro Aufgabe. Tools sind composable und orthogonal. `ratsinfo` lädt PDFs herunter, `pdf_ingest` verarbeitet sie — aber `pdf_ingest` weiß nichts vom RIS. Kein Tool kennt die Interna eines anderen. Pipes und Verzeichnisübergabe als Schnittstellen, nicht direkte Code-Kopplung.
+
+### 3. MVP vor Infrastruktur
+
+Nicht in Pipeline-/Infra-/RAG-Komplexität fallen, bevor der einfache Fall funktioniert. `riski` (München) war die Warnung: ein professioneller Stack, der für den persönlichen Use Case zu schwer ist. Erst `sync/search/show/open`, dann RAG/OCR/UI. Der MVP muss beweisen, dass ein Stadtrat vor einer Sitzung schnell etwas findet — nicht, dass ein KI-Stack betrieben werden kann.
+
+### 4. Problem-first, nicht tool-first
+
+Der Praxisfall war problem-first (konkretes politisches Problem → KI als Werkzeug) und funktionierte besser als der tool-first-Ansatz („ich baue ein CLI für RAG"). Neue Tools sollen aus konkreten Bedarfen entstehen, nicht aus Technik-Faszination.
+
+### 5. AI-Enabled: jedes Tool ist für den AI-Harness nutzbar
+
+Jedes Tool in diesem Repo muss AI-Enabled sein — das heißt, ein AI-Harness kann
+es nutzen. Mindestens eine der folgenden Schnittstellen pro Tool:
+
+- **CLI**: das Tool ist als Kommandozeilen-Tool aufrufbar (z.B. `ratsinfo search "Bahnhofstraße"`)
+- **MCP-Server**: das Tool stellt MCP-Tools bereit (z.B. `pdf_ingest.ingest(path)`)
+- **Agent Skill**: das Tool hat einen Skill im `skills/`-Verzeichnis, der beschreibt wie der AI-Harness es nutzt
+
+Ein Tool ohne AI-Schnittstelle gehört nicht in dieses Repo. Die AI-Schnittstelle
+wird von Anfang an mitgedacht, nicht nachträglich aufgesetzt.
+
+## Politische & ethische Guardrails
+
+### 6. Quellenpflicht (nicht optional)
+
+Jede Aussage, die ein Tool produziert und politisch relevant ist, braucht eine Quelle: URL, Abrufdatum, ggf. Paragraf. Ein Stadtrat ohne Quellen ist unglaubwürdig. Ein Stadtrat mit Quellen ist eine Bastion. Das gilt für den `foerdermittel_recherche`-Skill, `ratsinfo report`, und jeden anderen Output.
+
+### 7. GO-Prinzip: AI berät, Mensch entscheidet
+
+Die KI entscheidet nichts ohne GO. Keine Triage-Änderung, kein Vault-Eintrag, kein Task-Update ohne Bestätigung. Das ist nicht nur eine Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt beim Menschen. Tools sind read-only by design, wo immer möglich.
+
+GO kann in der AI-Session (Chat) erteilt werden — die AI führt die Entscheidung dann über das `decide_proposal`-MCP-Tool aus. Der Browser-Weg über die LiveView bleibt als Alternative, ist aber nicht der einzige Weg. Entscheidend ist das explizite GO durch den Menschen, nicht der Kanal.
+
+### 8. Datenschutz-Grenze
+
+Nur Zugriff auf das, was als Stadtrat bzw. öffentlich regulär abrufbar ist. Nicht-öffentliche Unterlagen bleiben lokal und kontrolliert. Keine Schreibzugriffe ins RIS. Keine öffentliche Bereitstellung ohne Prüfung.
+
+### 9. Politisches Framing
+
+Technische Tools nicht als „AI-Zugriff" oder „ich will RAG bauen" framen, sondern als „strukturierte öffentliche Ratsinformationen", „digitale Arbeitsfähigkeit", „Transparenz".
+
+### 10. Vault = Source of Truth, ratsprojekte = Distillat
+
+Der Obsidian-Vault ist das Gedächtnis — roh, unstrukturiert, alles. ratsprojekte ist das Distillat — konsolidiert, strukturiert, antragsreif, quellenbelegt. Der Datenfluss ist **strikt einseitig**: Vault → ratsprojekte. Nie umgekehrt.
+
+- **Vault** ist Source of Truth, nicht ratsprojekte.
+- **ratsprojekte** bekommt nur Distillate, nie Rohmaterial.
+- **Pflicht**: Alles, was in der OpenCode-Session entsteht, fließt als konsolidierte Notiz zurück in den Vault, *bevor* es als Proposal in ratsprojekte eingereicht wird.
+- **Kein Rückfluss**: ratsprojekte schreibt nie zurück in den Vault. ratsprojekte ist das Endprodukt, nicht der Input.
+
+Der `ratsprojekt_proposal`-Skill orchestriert diesen Workflow: sammeln → konsolidieren (in den Vault) → Gates prüfen → Proposal einbringen.
+
+### 11. Projektlebenszyklus (kanonisch)
+
+Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Abschluss/Archivierung ist in [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) als Mermaid-Chart dokumentiert. Dieses Dokument ist der **Single Source of Truth für den Projektlebenszyklus** — alle Skills, MCP-Tools und AI-Workflows richten sich nach ihm.
+
+**Pflicht**: Bei Änderungen am Lifecycle (neue States, Übergänge, Gates) wird zuerst das Lifecycle-Dokument aktualisiert, *bevor* Code oder Skills angepasst werden. Jede OpenCode-Sitzung, die Workflow-Änderungen vornimmt, prüft und aktualisiert das Dokument.
+
+### Kanonische Dokumentation unter `docs/`
+
+| Dokument | Zweck | Single Source of Truth für |
+|---|---|---|
+| [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) | Projektlebenszyklus (Mermaid-Chart) | Statuswerte, Übergänge, Gates |
+| [`docs/workflows.md`](docs/workflows.md) | Use Cases & Lückenanalyse für die Ratsarbeit | Workflows, Lücken, Priorisierung |
+| [`docs/nomenklatur.md`](docs/nomenklatur.md) | Fachbegriffe der Ratsarbeit | Begriffsdefinitionen (Sitzungsmappe, Ratsprojekt, Vault, etc.) |
+| [`docs/prerequisites.md`](docs/prerequisites.md) | Externe Abhängigkeiten (nicht im Repo) | Installationsanleitungen, Fallbacks, benötigt von |
+
+Diese vier Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows, Begriffen oder Voraussetzungen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
+
+## Lizenz-Bewusstsein
+
+Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder kommerziell von Artifex). Für ein persönliches/Open-Source-Projekt ist AGPL in Ordnung; bei proprietärer Nutzung Alternative evaluieren (`pdfplumber` MIT, `pdf.js` Apache-2.0). Pro Tool in der Tool-Doku dokumentieren.
+
+## Tool-Übersicht
+
+**Pflicht**: Bei neuer App, neuem Tool oder neuem Skill hier eine Zeile ergänzen — die Tabelle ist der Index, nicht `ls apps/`. Beschreibungen in verständlichem, klarem Deutsch: Fachjargon (Contract-Begriffe, CS-Vokabular) gehört in die Fachdokumente, nicht in diese Tabelle.
+
+| Tool | Sprache | Zweck | AI-Schnittstelle | Status |
+|---|---|---|---|---|
+| `apps/ratsinfo` | Elixir | RIS-Scraper + CLI + lokale Volltextsuche | CLI (`ratsinfo sync/search/show`) | Funktionsfähig |
+| `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard | LiveView + MCP (`/mcp`) | Funktionsfähig |
+| `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | Funktionsfähig |
+| `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi) | CLI (`komki init/doctor/up/down/status/run/session`) | Funktionsfähig |
+| `apps/komki_policy` | Elixir | Regel-Prüfkern: rechnet aus, ob eine Absicht nach den Regeln zulässig ist, und verifiziert die Begründung unabhängig nach; rein, führt selbst nichts aus | CLI (`komki-policy validate/decide/verify`) | Funktionsfähig |
+| `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | Bestehend |
+| `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (`opencode.json`) | Funktionsfähig |
+| `tools/nextcloud_ods_mcp` | Python | ODS-Dateien lesen (Sheets, Ranges, Zellen, Suche) | MCP (`opencode.json`) | Funktionsfähig |
+| `tools/obsidian_mcp` | Python | Obsidian-Vault nativ lesen/schreiben (keine `obsidian-cli`-Abhängigkeit) | MCP | Funktionsfähig |
+| `tools/ratsinfo_mcp` | Python | MCP-Wrapper um `ratsinfo`-CLI (search, show, sessions, sync, stats) | MCP | Funktionsfähig |
+| Nextcloud-MCP (`cbcoutinho/nextcloud-mcp-server`) | Python (extern) | Nextcloud: Files/WebDAV, CalDAV, Notes, Deck, Talk | MCP (`opencode.json`, `uvx`) | Eingebunden |
+| `skills/foerdermittel_recherche` | Markdown-Skill | Fördermittel-Recherche orchestrieren | Agent Skill | Funktionsfähig |
+| `skills/ratsprojekt_delta` | Markdown-Skill | Neue Infos gegen Projektstand halten, Delta produzieren | Agent Skill | Funktionsfähig |
+| `skills/ratsprojekt_stand` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Funktionsfähig |
+| `skills/ratsprojekt_proposal` | Markdown-Skill | Proposal-Workflow: sammeln → Vault → Gates → Proposal | Agent Skill | Funktionsfähig |
+| `skills/sitzungsvorbereitung` | Markdown-Skill | Sitzungsmappe erstellen (WF 1: sync → TOPs → AZ → Vault → Mappe) | Agent Skill | Funktionsfähig |
+| `skills/bericht_aus_dem_stadtrat` | Markdown-Skill | Bericht aus dem Stadtrat: Sitzungen seit letztem Bericht sammeln und verdichten | Agent Skill | Funktionsfähig |
+| `skills/vault_suche` | Markdown-Skill | Obsidian-Vault durchsuchen | Agent Skill | Funktionsfähig |
+| `skills/antrag_generieren` | Markdown-Skill | Stadtratsantrag entwerfen (fraktionsneutral; fraktionsspezifische Vorlage via Vault-Tag) | Agent Skill | Funktionsfähig |
+
+### Externe Abhängigkeiten (nicht im Repo)
+
+| Abhängigkeit | Rolle | Verwendung von |
+|---|---|---|
+| `obsidian` CLI | Vault-Read/Write (Obsidian-App muss laufen) | `vault_suche`, `sitzungsvorbereitung`, `ratsprojekt_proposal` |
+| `obsidian-cli` Skill | Anleitung für `obsidian` CLI (global installiert unter `~/.agents/skills/obsidian-cli/`) | alle Vault-Workflows |
+| `RENOVATE_TOKEN` (Fine-grained PAT) | Dependency-Updates via self-hosted Renovate (Rechte-Anforderungen: [`docs/prerequisites.md`](docs/prerequisites.md)) | `.github/workflows/renovate.yml` (CI, alle 6 h) |
+| `nextcloud-mcp-server` (`uvx`) | Nextcloud-MCP (WebDAV/CalDAV/Notes/Deck/Talk) via Subprocess | WF 9 (Nextcloud-Kollaborationsplattform) |
+
+> **Hinweis:** Der `obsidian` CLI ist eine externe Abhängigkeit, die lokal installiert sein muss. Vollständige Dokumentation (Install, Konfiguration, Fallbacks, Limitierungen) siehe [`docs/prerequisites.md`](docs/prerequisites.md).
+
+### Kanonische Vault-Tags
+
+Skills, die fraktionsneutral bleiben (wie `antrag_generieren`), verweisen auf fraktionsspezifische Inhalte im Vault der nutzenden Person über kanonische Tags statt über Pfade oder Parteinamen. Der Tag ist der stabile Vertrag zwischen Skill und Vault — Pfad und Titel können sich ändern, der Tag bleibt.
+
+| Tag | Zweck | Verbraucht von |
+|---|---|---|
+| `#antragsvorlage` | Fraktionsspezifische Antragsvorlage (Wording, Unterschriftenblock, Varianten). Pflegt die nutzende Person selbst im Vault; der Skill liest sie vor der Antragsgenerierung ein. | `antrag_generieren` (via `vault_suche`) |
+
+## ratsprojekte — Planungsstand
+
+### Konzept
+Rechtlich-inhaltliche Standortbestimmung für Stadtratsprojekte. Kein Task-Tracker, keine Todo-Liste. Sondern: welche Realisierungsstränge gibt es, welche rechtlichen Vorbedingungen stehen, welcher Weg kann gegangen werden — und welcher nicht. Die AI kann lesen und Vorschläge machen (GO-Prinzip). Langfristig: Antragsvorlagen aus Projektdaten generieren.
+
+### Architektur
+- Phoenix LiveView für Dashboard
+- `anubis_mcp` (LGPL-3.0) für AI-Zugriff — MCP-Endpoint unter `http://localhost:4000/mcp` (dev-only, read-only Tools)
+- Ecto + SQLite3 (geteilte DB mit ratsinfo)
+
+### Datenmodell
+```
+Projekt (titel, slug, beschreibung, status, prioritaet, beschlussvorschlag, adressat)
+  status: idee | aktiv | abgeschlossen | verworfen  (siehe docs/ratsprojekte-lifecycle.md)
+├── Realisierungsstrang (label A/B/C, titel, beschreibung, rechtliche_grundlage, bedingung, bedingung_erfuellt)
+│   ├── Vorbedingung (text, erfuellt, rechtliche_grundlage, typ)
+│   └── Schritt (text, frist) — geordnete Liste, keine Checkboxen
+└── Quelle (typ, titel, url, paragraf, abrufdatum)
+
+PendingProposal (projekt_id, typ, status)  — AI-Vorschläge, GO-Gate vor Mutation
+  typ:    add_projekt | add_realisierungsstrang | change_status
+  status: pending | approved | rejected
+```
+
+### Slug-Konvention
+
+Projekte werden über Slugs identifiziert, nicht über DB-IDs. Der Slug ist der stabile Vertrag zwischen ratsprojekte und dem Obsidian-Vault:
+
+- **Format**: kebab-case, lowercase, ASCII only (`^[a-z0-9]+(?:-[a-z0-9]+)*$`). Umlaute als ae/oe/ue/ss.
+- **ratsprojekte URL**: `/projekte/marktplatz-umgestalten` (Slug in der URL, nicht die ID)
+- **Vault-Tag**: `#ratsprojekt/marktplatz-umgestalten` (gleicher Slug als Obsidian-Tag)
+- **MCP-Tools**: alle projektbezogenen Tools nehmen `slug` als Parameter, nie `id`
+- **Intern**: DB-IDs bleiben als Primary Keys und Foreign Keys in `pending_proposals.projekt_id`. Slug→ID-Auflösung passiert an der Grenze (LiveView mount, MCP tool execute).
+- **Copy-Button**: auf der Projekt-Detailseite kopiert ein Button den Vault-Tag `#ratsprojekt/{slug}` in die Zwischenablage
+
+### Roadmap
+1. **MVP**: Datenmodell + Seed + LiveView — Issues #12, #13, #14 ✅
+2. **Projekt-Detailansicht**: Show-LiveView `/projekte/:id` — Issue #16 ✅
+3. **MCP-Server**: AI-Tools für lesen (GO-Prinzip) — Issue #17 ✅
+4. **AI-Skill**: „Frag den Projekt-Tracker" — `skills/ratsprojekt_stand/` ✅
+5. **Antragsvorlagen**: Markdown-Render aus Projektdaten — Issue #15
+6. **Ratsinfo-Integration**: Quellen verlinken mit Sitzung/TOP
+7. **Proposal-Workflow-Skill**: `skills/ratsprojekt_proposal/` ✅
+8. **Slug-basierte Projektrouten**: Slug statt ID in URLs, MCP-Tools, Vault-Tags ✅
+9. **Value Proposition + Success Metrics**: Projekt-Felder `value_proposition` + `success_metrics` als Hard Gates in `check_antragsreife` (Migration + Schema + MCP + LiveView). Bis dahin policy-level via Lifecycle-Dokument + Skills.
+
+## Tooling-Vorgaben
+
+### Elixir
+
+Achtung: `mix credo` und `mix dialyzer` sind **App-Tasks** — am Repo-Root existieren sie nicht („task could not be found"). Root-Aufrufe gehen über den Workspace-Dispatch:
+
+| Werkzeug | Rolle | Befehl |
+|---|---|---|
+| Credo | Linter | Root: `mix workspace.run -t credo --exclude ratsprojekte -- --strict`; App-lokal: `cd apps/<app> && mix credo --strict` |
+| Dialyzer | Static Type Checker | App-lokal: `cd apps/<app> && mix dialyzer` (Root-Dispatch crasht mit dialyxir im Workspace-Pattern) |
+| mix format | Formatter | `mix format --check-formatted` (Root, deckt alle Apps ab) |
+| mix test | Test-Runner | `mix workspace.run -t test --affected --base origin/main` |
+
+### Debugging (Phoenix-Apps mit Tidewave)
+
+Phoenix-Apps mit Tidewave-MCP (wie ratsprojekte) werden grundsätzlich über
+Tidewave gedebuggt, wenn sie lokal laufen. Der AI-Harness kann über den
+Tidewave-MCP-Endpoint (`http://localhost:4000/tidewave/mcp`) direkt auf die
+laufende App zugreifen: Evaluator ausführen, Logs inspizieren, Module
+inspizieren. Voraussetzung: App läuft mit `mix phx.server` und Tidewave ist
+in `endpoint.ex` als Plug eingetragen (nur `:dev`).
+
+### Python
+
+| Werkzeug | Rolle | Befehl |
+|---|---|---|
+| ruff | Linter + Formatter | `uv run ruff check` / `uv run ruff format --check` |
+| mypy | Static Type Checker | `uv run mypy src/` |
+| pytest | Test-Runner | `uv run pytest` |
+
+### CI
+
+**Maßgeblich ist [`/.github/workflows/ci.yml`](.github/workflows/ci.yml)** — dort stehen die exakten Dispatch-Befehle samt Begründungen. Kurzfassung (kein Ersatz für die Datei):
+
+```bash
+# Elixir (Root; credo/dialyzer siehe Tooling-Tabelle oben)
+mix deps.get && mix workspace.run -t deps.get
+mix format --check-formatted
+mix workspace.run -t compile -- --warnings-as-errors
+mix workspace.run -t credo --exclude ratsprojekte -- --strict
+mix workspace.run -t test --affected --base origin/main   # PR; lokal ohne --base
+
+# Python (pro Tool unter tools/)
+uv sync
+uv run ruff check
+uv run ruff format --check
+uv run mypy src/
+uv run pytest
+```
+
+CI-Status verlässlich prüfen: nach einem Push zuerst mit `gh run list --branch <branch> --limit 1` abgleichen, dass der Lauf zur eigenen Head-Short-SHA gehört — `gh pr checks --watch` zeigt unmittelbar nach einem Push sonst die Ergebnisse des vorherigen Heads als „pass".
+
+## Verzeichnisstruktur
+
+```
+kommunalpolitik_ki/
+├── apps/                   # Elixir-Apps (workspace-Pattern)
+│   ├── ratsinfo/           # RIS-Scraper + CLI (AI: CLI)
+│   ├── ratsprojekte/       # Projekt-Dashboard (AI: LiveView + MCP)
+│   ├── shared/             # Geteilte Domain-Models
+│   ├── komki_policy/       # Regel-Prüfkern für Zulässigkeits-Entscheidungen (AI: CLI)
+│   └── komki_cli/          # KomKI-CLI: gesandboxter Arbeitsraum (Seatbelt + llama + pi) (AI: CLI)
+├── tools/                  # Nicht-Elixir
+│   ├── allgaeuer_zeitung_mcp/  # AZ-Artikel (AI: MCP)
+│   ├── nextcloud_ods_mcp/  # ODS-Reader (AI: MCP)
+│   ├── obsidian_mcp/       # Vault nativ lesen/schreiben (AI: MCP)
+│   ├── pdf_ingest/         # PDF-Ingestion (AI: MCP)
+│   └── ratsinfo_mcp/       # MCP-Wrapper um ratsinfo-CLI (AI: MCP)
+├── skills/                 # AI-Harness-Skills
+│   ├── foerdermittel_recherche/  # Fördermittel-Recherche (AI: Agent Skill)
+│   ├── ratsprojekt_delta/      # Neue Infos gegen Projektstand halten (AI: Agent Skill)
+│   ├── ratsprojekt_stand/      # Projekt-Standortbestimmung (AI: Agent Skill)
+│   ├── ratsprojekt_proposal/   # Proposal-Workflow (AI: Agent Skill)
+│   ├── sitzungsvorbereitung/   # Sitzungsmappe erstellen (AI: Agent Skill)
+│   ├── bericht_aus_dem_stadtrat/ # Rückblick als Vault-Notiz (AI: Agent Skill)
+│   ├── antrag_generieren/      # Stadtratsantrag entwerfen (AI: Agent Skill)
+│   └── vault_suche/        # Vault-Volltextsuche (AI: Agent Skill)
+├── docs/                   # Kanonische Dokumentation
+│   ├── ratsprojekte-lifecycle.md  # Projektlebenszyklus (Mermaid-Chart)
+│   ├── workflows.md               # Use Cases & Lückenanalyse der Ratsarbeit
+│   ├── nomenklatur.md             # Fachbegriffe der Ratsarbeit
+│   ├── prerequisites.md           # Externe Abhängigkeiten
+│   ├── research/                  # Recherchen zu Architektur-Entscheidungen
+│   └── rfcs/                      # RFCs (Sandbox, vertrauliche KI-Arbeitsräume)
+├── artifacts/              # shared Elixir build output (gitignored)
+├── mix.exs                 # workspace root
+├── .workspace.exs
+├── .credo.exs
+├── .formatter.exs
+├── opencode.json
+├── AGENTS.md               # diese Datei
+└── Makefile
+```
+
+## RIS-Datenquelle
+
+Das Ratsinformationssystem der Verwaltungsgemeinschaft läuft unter:
+
+```
+https://ris.komuna.net/vgbuchloe/Meeting.mvc/Calendar?atDate=1.1.2025
+```
+
+Kein OParl, kein ICS gefunden → HTML-Scraping ist der realistische Weg. `riski` (it-at-m, München) dient als Referenzarchitektur, nicht als Codebasis.

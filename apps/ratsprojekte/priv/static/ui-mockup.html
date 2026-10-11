@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ratsprojekte — Projekt-Übersicht</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; padding: 24px; max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #64748b; margin-bottom: 24px; }
+
+  /* Project card */
+  .project { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 20px; overflow: hidden; }
+  .project-header { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: flex-start; }
+  .project-header h2 { font-size: 17px; font-weight: 700; margin-bottom: 2px; }
+  .project-header .desc { font-size: 13px; color: #64748b; }
+  .project-badges { display: flex; gap: 6px; flex-shrink: 0; }
+  .badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-aktiv { background: #dcfce7; color: #166534; }
+  .badge-idee { background: #dbeafe; color: #1e40af; }
+  .badge-hoch { background: #fee2e2; color: #991b1b; }
+  .badge-mittel { background: #fef9c3; color: #854d0e; }
+
+  /* Realisierungsstrang */
+  .strang { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; }
+  .strang:last-child { border-bottom: none; }
+  .strang-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .strang-label { font-size: 12px; font-weight: 700; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; }
+  .strang-label-A { background: #16a34a; }
+  .strang-label-B { background: #ca8a04; }
+  .strang-label-C { background: #2563eb; }
+  .strang-title { font-size: 15px; font-weight: 600; }
+  .strang-desc { font-size: 13px; color: #64748b; margin-bottom: 12px; line-height: 1.5; padding-left: 32px; }
+
+  /* Vorbedingungen */
+  .section-label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; padding-left: 32px; }
+  .vorbedingung { display: flex; align-items: flex-start; gap: 8px; padding: 6px 10px; margin-left: 32px; margin-bottom: 4px; border-radius: 6px; font-size: 13px; line-height: 1.5; }
+  .vorb-condition-met { background: #f0fdf4; }
+  .vorb-condition-unmet { background: #fef2f2; }
+  .vorb-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .vorb-text { color: #334155; }
+  .vorb-legal { font-size: 11px; color: #991b1b; background: #fee2e2; padding: 1px 6px; border-radius: 3px; margin-left: 6px; white-space: nowrap; }
+  .vorb-legal.met { color: #166534; background: #dcfce7; }
+
+  /* Schritte */
+  .schritt { padding: 4px 0 4px 44px; font-size: 13px; color: #475569; line-height: 1.5; position: relative; }
+  .schritt::before { content: '→'; position: absolute; left: 32px; color: #cbd5e1; }
+  .schritt .frist { font-size: 11px; color: #dc2626; font-weight: 600; margin-left: 6px; }
+
+  .oder-separator { text-align: center; font-size: 11px; font-weight: 700; color: #cbd5e1; letter-spacing: 2px; padding: 8px 0; }
+  .oder-separator::before { content: '— ODER —'; }
+</style>
+</head>
+
+<body>
+
+<h1>Stadtrats-Projekte Buchloe</h1>
+<p class="subtitle">Rechtlich-inhaltliche Standortbestimmung — welche Realisierungsstränge gibt es und stehen die Vorbedingungen?</p>
+<div id="app"></div>
+
+<script>
+const DATA = {
+  projekte: [
+    {
+      id: 1, titel: "Marktplatz umgestalten", status: "aktiv", prioritaet: "hoch",
+      beschreibung: "Marktplatz aufwerten — Aufenthaltsqualität, Begrünung, Sitzgelegenheiten.",
+      strang: [
+        {
+          label: "A", titel: "Über Städtebauförderung",
+          beschreibung: "Erneuerungsgebiet förmlich festlegen und Städtebauförderung beantragen. Bis 90% Förderung.",
+          vorbedingungen: [
+            { text: "Erneuerungsgebiet muss förmlich festgelegt sein", erfuellt: false, legal: "§ 136 BauGB" },
+            { text: "Mittelfristige Finanzierung muss gesichert sein", erfuellt: false, legal: null }
+          ],
+          schritte: [
+            "Gebietsfestlegung vorbereiten (Gemeinderatsbeschluss zur Aufstellung)",
+            "Bürgerbeteiligung zum Nutzungskonzept durchführen",
+            "Antrag beim Förderreferat einreichen"
+          ]
+        },
+        {
+          label: "B", titel: "Über Eigenleistung",
+          beschreibung: "Umbau aus regulärem Haushalt ohne Förderverfahren. Schneller, aber teurer.",
+          vorbedingungen: [
+            { text: "Haushaltsmittel müssen eingeplant sein", erfuellt: true, legal: "Art. 61 BayGO" },
+            { text: "Bauplanungsrecht muss geprüft sein", erfuellt: false, legal: null }
+          ],
+          schritte: [
+            "Haushaltsantrag vorbereiten",
+            "Bauamt mit vertiefter Planung beauftragen"
+          ]
+        },
+        {
+          label: "C", titel: "Sponsoring-Paket",
+          beschreibung: "Örtliche Wirtschaft trägt einen Teil der Möblierung. Sofort machbar, aber Abhängigkeit bei der Pflege.",
+          vorbedingungen: [
+            { text: "Sponsoren müssen gefunden sein", erfuellt: true, legal: null },
+            { text: "Gemeinderatsbeschluss über Sponsoring-Richtlinie", erfuellt: false, legal: null }
+          ],
+          schritte: [
+            "Sponsoring-Konzept mit Wirtschaftsförderung erstellen",
+            "Gemeinderatsbeschluss vorbereiten und einbringen"
+          ]
+        }
+      ]
+    },
+    {
+      id: 2, titel: "Bibliothek modernisieren", status: "aktiv", prioritaet: "hoch",
+      beschreibung: "Umbau der Stadtbibliothek mit Medienarbeit und Lernorten.",
+      strang: [
+        {
+          label: "A", titel: "Über Investpauschale",
+          beschreibung: "Modernisierung über die investive Pauschale des Freistaats. Bis 50% Förderung. Der klassische Weg.",
+          vorbedingungen: [
+            { text: "Mittelfreigabe muss vorliegen", erfuellt: false, legal: "BayFAG" },
+            { text: "Nutzungskonzept muss beschlossen sein", erfuellt: false, legal: null }
+          ],
+          schritte: [
+            "Nutzungskonzept von Verwaltung erarbeiten lassen",
+            "Mittelfreigabe beantragen",
+            "Architektenwettbewerb vorbereiten"
+          ]
+        },
+        {
+          label: "B", titel: "Über Landesförderprogramm Bibliotheksbau",
+          beschreibung: "Sonderprogramm des Landes für Bibliotheken. Bis 80% Förderung, schneller als die Pauschale.",
+          vorbedingungen: [
+            { text: "Antragsfrist 31.12.2026", erfuellt: true, legal: null },
+            { text: "Fläche muss im Eigentum der Stadt sein (Klärung nötig)", erfuellt: false, legal: null }
+          ],
+          schritte: [
+            "Klären: Ist das Gebäude im Stadt- oder Kreiseigentum?",
+            "Förderfähigkeit beim Ministerium prüfen",
+            "Antrag vorbereiten (Frist: 31.12.2026)"
+          ]
+        }
+      ]
+    },
+    {
+      id: 3, titel: "Sportplatz-Beleuchtung umstellen", status: "idee", prioritaet: "mittel",
+      beschreibung: "LED-Umrüstung mit Präsenzsteuerung auf dem Sportplatz.",
+      strang: [
+        {
+          label: "A", titel: "Bündel-Antrag LED-Umrüstung + Steuerung",
+          beschreibung: "Beide Themen über dieselbe Infrastruktur (Strom, Datenleitung). Ein Antrag für beide — effizienter als zwei Einzelanträge.",
+          vorbedingungen: [
+            { text: "Stadtratsbeschluss zur Prüfung und Beauftragung", erfuellt: false, legal: null },
+            { text: "Kosten-Nutzen-Analyse für das Steuerungssystem muss vorliegen", erfuellt: false, legal: null }
+          ],
+          schritte: [
+            "Kosten-Nutzen-Analyse von Verwaltung anfordern",
+            "Bündel-Antrag im Stadtrat einbringen",
+            "Bei Beschluss: Umsetzung durch Bauamt/Stadtwerke"
+          ]
+        }
+      ]
+    }
+  ]
+};
+
+function render() {
+  const app = document.getElementById('app');
+  let html = '';
+
+  DATA.projekte.forEach(p => {
+    html += `<div class="project">
+      <div class="project-header">
+        <div>
+          <h2>${p.titel}</h2>
+          <div class="desc">${p.beschreibung}</div>
+        </div>
+        <div class="project-badges">
+          <span class="badge badge-${p.status}">${p.status}</span>
+          <span class="badge badge-${p.prioritaet}">${p.prioritaet}</span>
+        </div>
+      </div>`;
+
+    p.strang.forEach((s, i) => {
+      if (i > 0) html += `<div class="oder-separator"></div>`;
+
+      html += `<div class="strang">
+        <div class="strang-header">
+          <span class="strang-label strang-label-${s.label}">${s.label}</span>
+          <span class="strang-title">${s.titel}</span>
+        </div>
+        <div class="strang-desc">${s.beschreibung}</div>
+
+        <div class="section-label">Rechtliche Vorbedingungen</div>`;
+
+      s.vorbedingungen.forEach(v => {
+        html += `<div class="vorbedingung ${v.erfuellt ? 'vorb-condition-met' : 'vorb-condition-unmet'}">
+          <span class="vorb-icon">${v.erfuellt ? '✓' : '⚠'}</span>
+          <span class="vorb-text">${v.text}</span>
+          ${v.legal ? `<span class="vorb-legal ${v.erfuellt ? 'met' : ''}">${v.legal}</span>` : ''}
+        </div>`;
+      });
+
+      html += `<div class="section-label" style="margin-top:12px;">Schritte auf diesem Weg</div>`;
+      s.schritte.forEach(step => {
+        const fristMatch = step.match(/\(Frist:\s*(.+?)\)/);
+        const cleanStep = fristMatch ? step.replace(/\(Frist:\s*.+?\)/, '') : step;
+        const frist = fristMatch ? `<span class="frist">⏰ ${fristMatch[1]}</span>` : '';
+        html += `<div class="schritt">${cleanStep}${frist}</div>`;
+      });
+
+      html += `</div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  app.innerHTML = html;
+}
+
+render();
+</script>
+</body>
+</html>

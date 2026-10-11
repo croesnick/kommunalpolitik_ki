@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.pyc
+
+# uv
+.venv/
+
+# Playwright MCP artifacts (not used here, but kept for parity)
+.playwright-mcp/

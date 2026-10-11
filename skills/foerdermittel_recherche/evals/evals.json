@@ -1,0 +1,23 @@
+{
+  "skill_name": "foerdermittel_recherche",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Welche Fördermittel gibt es für einen Verkehrsumbau einer innerörtlichen Hauptstraße in Buchloe? Wir wollen das Thema wieder aufgreifen und brauchen eine Übersicht der Förderkulisse.",
+      "expected_output": "Markdown-Report mit Förderkulisse (SUMP, Städtebauförderung, KommKlimaFöR, BayGVFG), Eigenanteilsberechnung, Kumulierungsregeln, Fristen, Best-Practices, und Quellen für jede Aussage.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Wir wollen einen Park im Süden von Buchloe umgestalten — Begrünung, Moor-Revitalisierung, eine interimistische Nutzung als Brücke zum Endausbau. Gibt es dafür Förderung?",
+      "expected_output": "Markdown-Report mit Förderkulisse für Grüninfrastruktur/Moor-Revitalisierung (Städtebauförderung Umweltbeitrag, KommKlimaFöR, BNE-Programme), Eigenanteil, Fristen, und Quellen. Sollte auch interimistische Nutzung als Brücke erwähnen.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Kann man Städtebauförderung und KommKlimaFöR gleichzeitig beantragen? Wir überlegen für ein Vorhaben beides zu kombinieren, um den Eigenanteil zu drücken. Beispielrechnung mit angenommenen Bruttokosten von 500.000 €.",
+      "expected_output": "Markdown-Report mit Kumulierungsregeln (SUMP-Bund + KommKlimaFöR-Bayern kumulierbar, Eigenanteil mind. 10%, Bundesförderung nachrangig), Berechnung des Eigenanteils bei 500.000 € (bei 90% Förderung: 50.000 €), Hinweis auf frühzeitige Abstimmung mit Fördermittelgeber, und Quellen.",
+      "files": []
+    }
+  ]
+}
