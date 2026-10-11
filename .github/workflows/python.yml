@@ -59,8 +59,9 @@ jobs:
   # Lose Python-Skripte (skills/*/scripts) haben kein uv-Projekt: kein
   # pyproject, kein eigener Ruff-Pin. ruff läuft daher als ephemerales
   # uvx-Tool; die Config kommt aus ruff.toml am Repo-Root. ruff entdeckt
-  # die Config pro Datei, deshalb bleibt tools/*/pyproject.toml für die
-  # Tools wirksam. Der Pin 0.15.21 entspricht der Untergrenze aus
+  # die Config pro Datei; alle Tools tragen eigene [tool.ruff]-Sektionen
+  # in tools/*/pyproject.toml, deshalb bleibt deren Lint-Umfang
+  # unberührt. Der Pin 0.15.21 entspricht der Untergrenze aus
   # pdf_ingest und nextcloud_ods_mcp. Renovate sieht Versionspins in
   # run:-Zeilen nicht — manuell mitpflegen (Issue #77).
   scripts-lint:

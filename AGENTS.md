@@ -129,6 +129,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `obsidian-cli` Skill | Anleitung für `obsidian` CLI (global installiert unter `~/.agents/skills/obsidian-cli/`) | alle Vault-Workflows |
 | `RENOVATE_TOKEN` (Fine-grained PAT) | Dependency-Updates via self-hosted Renovate (Rechte-Anforderungen: [`docs/prerequisites.md`](docs/prerequisites.md)) | `.github/workflows/renovate.yml` (CI, alle 6 h) |
 | `nextcloud-mcp-server` (`uvx`) | Nextcloud-MCP (WebDAV/CalDAV/Notes/Deck/Talk) via Subprocess | WF 9 (Nextcloud-Kollaborationsplattform) |
+| `lychee` CLI | Markdown-Links offline prüfen (CI nutzt die lychee-Action mit eigener Binary) | `docs-links`-Check der CI-Kurzfassung |
 
 > **Hinweis:** Der `obsidian` CLI ist eine externe Abhängigkeit, die lokal installiert sein muss. Vollständige Dokumentation (Install, Konfiguration, Fallbacks, Limitierungen) siehe [`docs/prerequisites.md`](docs/prerequisites.md).
 

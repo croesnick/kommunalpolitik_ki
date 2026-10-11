@@ -316,6 +316,35 @@ Commit nicht wieder knallt.
 
 ---
 
+## `lychee` CLI (Markdown-Link-Check)
+
+**Zweck:** Offline-Link-Check für Markdown-Dateien: verifiziert lokale
+Dateireferenzen (relative Pfade, Bilder, Repo-Dateien) ohne Netz-Requests.
+Config: [`lychee.toml`](../lychee.toml) am Repo-Root.
+
+**Install:**
+
+```bash
+brew install lychee
+```
+
+**Benötigt von:**
+
+| Skill / Workflow | Anmerkung |
+|---|---|
+| `docs-links`-Check aus der AGENTS.md-CI-Kurzfassung | Lokales Vorab-Prüfen vor dem Push (`lychee './**/*.md'`) |
+
+CI (`.github/workflows/docs-links.yml`) nutzt die lychee-Action mit eigener
+Binary; der CLI ist nur für lokale Läufe nötig.
+
+**Fallback (wenn `lychee` CLI nicht verfügbar):**
+
+Kein lokaler Check. Committen, pushen und den `docs-links`-Workflow laufen
+lassen. Der Offline-Modus macht den Job deterministisch — Flakiness durch
+externe URLs gibt es nicht.
+
+---
+
 ## KomKI-CLI (`apps/komki_cli`)
 
 **Zweck:** Lokal gesandboxte KI-Arbeitsfläche (`komki`): Seatbelt-Profil,
