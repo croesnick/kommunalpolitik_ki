@@ -2,8 +2,8 @@
 
 | Feld | Wert |
 |---|---|
-| Status | Draft, Revision 1 |
-| Stand | 2026-10-02 |
+| Status | Draft, Revision 2 |
+| Stand | 2026-10-11 |
 | Ersetzt | [RFC0001 Revision4](0001-vertrauliche-ki-arbeitsraeume.md) |
 | Gegenstand | Didaktische Erklärung und vollständige normative Referenz des Sicherheitsmodells, Kalküls und Audits |
 | Umsetzung | Bauanleitung und Abnahmekriterien; keine Freigabe für produktive Verarbeitung geschützter Daten |
@@ -396,6 +396,8 @@ R.9.4 präzisiert die Verwendung des Engine-Kerns ausschließlich in der simulie
 F.5 erläutert „offen“ als Beschreibung eines ungeklärten Versuchs, nicht als zusätzlichen
 Ausgangswert. Diese Klarstellungen führen keine neuen Befugnisse oder Zustandsklassen ein.
 Anhang E dokumentiert historische Änderungen von RFC0001, keine neue Recherche für RFC0003.
+
+Revision 2 von RFC0003 (Stand 2026-10-11) operationalisiert bestehende Nachweispflichten: D.9 ergänzt einen umsetzungsnahen Abnahmeblock, R.4.3 erweitert die Connector-Pflichten um die versionierte Fähigkeitsfläche, und R.7 ergänzt die Aufbauphase vor der Datenaufnahme. Für diese Stellen gilt die Vollständigkeitsübernahme aus RFC0001 nicht mehr. Die Änderungen führen keine neuen Befugnisse, Zustandsklassen oder Freigaben ein.
 ## R.1 Geltung und Sicherheitsziel
 
 ### R.1.1 Ziel
@@ -535,6 +537,8 @@ Connectoren vermitteln begrenzte Operationen an Quellen und Zielen. Credentials 
 Jeder Abruf hat zwei Richtungen. Suchtext, Dokumentkennung und Aufrufentscheidung sind Ausgaben; die Antwort ist ein neuer Eingang. Leseberechtigung für die Antwort erteilt keine beliebige Sendeberechtigung für die Anfrage.
 
 Geschützte Arbeit kann deshalb mit vorher beschafften Datenständen beginnen. Spätere externe Nachrecherche erfolgt über eine gesonderte Freigabe. Ein neu auftretendes Quellenlabel darf nicht stillschweigend in einen laufenden Raum aufgenommen werden.
+
+Die Fähigkeitsfläche eines Connectors ist die versionierte Menge seiner tatsächlich angebotenen Operationen samt deren Argumentformen. Sie ist als zugelassene Fähigkeiten im Environment-Datensatz aus B.3 festzuhalten. Weicht die tatsächliche Fläche vom eingetragenen Stand ab, lautet die betroffene Entscheidung `indeterminate`. Eine zugelassene spezialisierte Operation darf durch keine generischere Operation desselben Connectors mit denselben Berechtigungen umgangen werden. Selbstauskünfte des Connectors, etwa Hinweise auf Nur-Lese-Zugriff, begründen keine Befugnis.
 
 ### R.4.4 Vermittler, Freigabedienst und dauerhafte Speicher
 
@@ -724,8 +728,9 @@ Ablauf oder Widerruf verhindert weitere noch nicht verbindlich ausgelöste Wirku
 | Tool- und Skill-Entwicklung | Öffentlicher Entwicklungsraum mit synthetischen oder freigegebenen Daten. | Keine automatische Übernahme seiner Änderungen in geschützte Laufzeiten. |
 | KI-Wechsel und Wiederaufnahme | Neuer zulässiger Weg beziehungsweise neuer Startvertrag; Zustand als geprüfter Eingang. | Kein ungeprüfter Fallback und keine Entgiftung durch Neustart. |
 | Archivierung | Labels, Herkunft und Aufbewahrung bleiben am gespeicherten Bestand. | Ein einmaliges `permit` beweist weder künftige Löschung noch unbegrenzte Fortnutzungsrechte. |
+| Umgebungsaufbau | Netzoffener Aufbau-Raum mit synthetischen oder ausdrücklich zugelassenen öffentlichen Inhalten; Umgebungsbestandteile sind Datenobjekte und gehen als geprüfte Eingänge in den datentragenden Raum über. | Keine Beschaffung von Abhängigkeiten in einem Raum, der bereits geschützte Daten aufgenommen hat. |
 
-Die Arbeitsabläufe definieren keine realen Rollen- oder Providerzulassungen. Konkrete Regeln sind vor Nutzung zu hinterlegen. Die folgenden drei kanonischen Workflows sind dagegen normative Referenzabläufe; Anhang D macht sie zu reproduzierbaren Integrations- und Angriffstests.
+Die Arbeitsabläufe definieren keine realen Rollen- oder Providerzulassungen. Konkrete Regeln sind vor Nutzung zu hinterlegen. Der Umgebungsaufbau trennt Abhängigkeitsbeschaffung und Datenaufnahme, damit der Betrieb einer bereits datentragenden Verarbeitung kein Argument für eine breite Netzfreigabe erzeugt. Die folgenden drei kanonischen Workflows sind dagegen normative Referenzabläufe; Anhang D macht sie zu reproduzierbaren Integrations- und Angriffstests.
 ### R.7.1 Kanonischer Workflow A: Sitzungsmappe aus RIS-Unterlagen
 
 Dieser Workflow ist der Referenzfall für **geschützte Beschaffung, Synthese und interne Ablage ohne Offenlegungsfreigabe**. Er MUSS von einer konformen Implementierung vollständig modelliert und durch Engine und Simulator reproduzierbar geprüft werden.
@@ -1162,7 +1167,7 @@ Zunächst entstehen reine Bibliotheken und eine lokale Kommandozeile mit synthet
 | Simulator | Reproduzierbare Einzel- und Zwei-Ausführungs-Tests; Gegenbeispiele mit angegebenen Grenzen. |
 | Falsifikation | Jeder historische relevante Fehler wird in einer absichtlich fehlerhaften Variante gefunden und in der korrigierten Variante abgewehrt. |
 | Audit | Geschützter Journalpfad, dauerhafter Vorbeleg, unabhängige historische Prüfung, ehrlich behandelte offene Ausgänge und abgegrenzte Integritätsnachweise. |
-| Integration | Aktuelle Prüfung vor Außenwirkung, sichere Zustandsübergänge, kein alternativer Ausführungspfad und keine Simulationstokens im Produktivbetrieb. |
+| Integration | Aktuelle Prüfung vor Außenwirkung, sichere Zustandsübergänge, kein alternativer Ausführungspfad, keine Simulationstokens im Produktivbetrieb; der Abnahmeblock aus D.9 ist bestanden. |
 | Betrieb | Konkrete Bindungen, Umgebungszulassungen, Widerruf, Lebenszyklus und fortlaufende Nachweise. |
 
 Ein grünes Testergebnis ohne positive Kontrollfälle, nachgewiesene Prämissen und absichtlich fehlerhafte Gegenvarianten reicht nicht. „Alles verweigern“ ist kein erfolgreicher Funktionsnachweis.
@@ -1917,6 +1922,20 @@ Ein bestandener Ende-zu-Ende-Test erfordert sowohl Nutzbarkeit als auch Abwehr: 
 ### D.8 Audit-Regressionskorpus
 
 Die in F.9 aufgeführten Audit-Testfamilien ergänzen diesen Korpus verbindlich. Für jeden dort behaupteten Integritäts- oder Konformitätsbefund ist ein Gegenstück ohne Angriff nötig. Ein korrekt als offen erkannter Absturz ist kein gescheiterter Positivtest. Ein nicht nachweisbarer Schlussstand darf niemals als vollständiger Tagesaudit bestehen.
+
+### D.9 Umsetzungsnaher Abnahmeblock: Grenze, Identität, Credentials und Persistenz
+
+D.4 prüft den Kalkül, F.9 das Audit. Dieser Block prüft die Umsetzung: Eine konkrete Umgebung gilt erst dann als tragfähig im Sinne von R.8.2 und der Abnahmestufe Integration aus R.10, wenn sie die folgenden Familien mit je einer funktionierenden positiven Kontrolle besteht und den zugehörigen Angriff abwehrt oder als benannte Grenze ausweist. Die Prüfung gilt pro versioniertem Umgebungstand nach R.3; ein Wechsel der Umgebung erneuert sie.
+
+| Testfamilie | Positive Kontrolle | Angriff oder erwarteter Befund |
+|---|---|---|
+| `grenzdurchsetzung` | Alle für den Betrieb nötigen Verbindungen laufen über die zugelassene Vermittlungsstelle. | Raw Sockets, IPv6-, UDP- und DNS-Pfade, Redirect-Ketten, Host-Loopback und Cloud-Metadatenendpunkte werden blockiert oder als benannte Grenze dokumentiert. |
+| `identitaetsbindung` | Nur authentisierte Raum- und Auftragsidentitäten erreichen autorisierte Operationen. | Gefälschte oder wiederverwendete Identitäten und Auftragskennungen werden abgewiesen, ohne Rechte zu erweitern. |
+| `credential-exposition` | Credentials bleiben für die zugelassenen Operationen nutzbar und außerhalb der Agentensicht. | Umgebungs-, Prozess- und Dateidumps, Debug- und Fehlerausgaben, reflektierte Header und Ausweich-Authentifizierungswege führen nicht zur Offenlegung. |
+| `connector-bypass` | Die tatsächliche Fähigkeitsfläche stimmt mit dem Environment-Fakt aus R.4.3 überein. | Eine generischere Operation desselben Connectors umgeht die Beschränkung einer zugelassenen spezialisierten Operation; Oberflächendrift nach der Zulassung wird als Abweichung erkannt und sperrt die betroffene Verarbeitung. |
+| `persistenzflucht` | Exporte aus Arbeitsräumen landen nur in zugelassenen Bereichen und werden beim Wiedereingang als Quarantänematerial behandelt. | Symlink- und Pfad-Races, vergiftete Caches und Skill-Speicher sowie in Host-Konfiguration importierte Arbeitsraumausgaben werden erkannt; keine stille Aufnahme in die vertrauenswürdige Basis. |
+
+Feingranulare Ressourcen-, Verkehrs- und Hardwareseitenkanäle bleiben nach R.8.5 ausgenommen. Fehler-, Widerrufs- und Wiederholungsklassen sind bereits in D.4 (`widerruf`, `freigabe-replay`, `autorisierung`) und F.9 (`audit-logausfall`, `audit-crashfenster`) geprüft und werden hier nicht wiederholt. Das Ausbleiben eines Versuchs ist kein Nachweis. Ein bestandener Block ist Teil der Umgebungszulassung und keine Freigabe produktiver geschützter Verarbeitung.
 
 ## Anhang E: Änderungen, Herkunft und Quellen
 
