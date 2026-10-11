@@ -287,16 +287,18 @@ defmodule KomkiPolicy.DeriveTest do
     test "allowed_recipients: Durchschnitt der readers; leeres Prueflabel = ganzer Beobachterraum" do
       reg = registry()
 
-      assert ["carsten", "lokale-fallverarbeitung"] =
+      assert ["lokale-fallverarbeitung", "nutzende-person"] =
                Calculus.allowed_recipients(reg, ["buergerfall-4711@1"])
 
-      assert ["carsten", "eigene-rz-analyse", "lokale-fallverarbeitung", "webdienst-x"] =
+      assert ["eigene-rz-analyse", "lokale-fallverarbeitung", "nutzende-person", "webdienst-x"] =
                Calculus.allowed_recipients(reg, [])
     end
 
     test "actual_recipients und labels_subset?" do
       reg = registry()
-      assert ["carsten", "webdienst-x"] = Calculus.actual_recipients(reg, "recherche-webdienst@1")
+
+      assert ["nutzende-person", "webdienst-x"] =
+               Calculus.actual_recipients(reg, "recherche-webdienst@1")
 
       assert Calculus.labels_subset?(["lizenz-namensnennung@1"], [
                "buergerfall-4711@1",

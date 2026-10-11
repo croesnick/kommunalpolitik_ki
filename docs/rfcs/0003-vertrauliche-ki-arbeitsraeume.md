@@ -1496,7 +1496,7 @@ Auflagen werden als heute prüfbare Voraussetzungen oder als zukünftige Pflicht
 ```json
 {
   "id": "buergerfall-4711@1",
-  "readers": ["carsten", "lokale-fallverarbeitung"],
+  "readers": ["nutzende-person", "lokale-fallverarbeitung"],
   "operations": {
     "start": {
       "eq": ["purpose", "antwort-fall-4711"]
@@ -1803,11 +1803,11 @@ Dieser Fall ist der Regressionstest für die korrigierte Aufnahmeregel.
 |---|---|
 | Raumlabel | `{buergerfall-4711@1}` |
 | Eingangslabel | `{}` |
-| Identität und Zweck | `carsten`, `antwort-fall-4711` |
+| Identität und Zweck | `nutzende-person`, `antwort-fall-4711` |
 | Raum und Regelstand | gültig |
 | Grundlegendes Aufnahmerecht | vorhanden |
-| Tatsächliche Empfänger | `{carsten, lokale-fallverarbeitung}` |
-| Zulässiger Empfängerkreis der Fallbindung | `{carsten, lokale-fallverarbeitung}` |
+| Tatsächliche Empfänger | `{nutzende-person, lokale-fallverarbeitung}` |
+| Zulässiger Empfängerkreis der Fallbindung | `{nutzende-person, lokale-fallverarbeitung}` |
 | Zugehörigkeit der Datei zum genehmigten Fallumfang | **falsch** |
 | Operationsbedingung der Fallbindung für `admit` | Zweck passt **und** Datei gehört zum genehmigten Fallumfang |
 

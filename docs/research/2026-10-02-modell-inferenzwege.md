@@ -302,5 +302,5 @@ GET /api/tags, GET /health) — sie lagen über dem beauftragten Umfang.
 - pi-Doku (upstream main, Abruf 2026-10-02; installierte Version 1.0.0 lokal verifiziert):
   https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/models.md
 - Bericht „Vermittelte Agent-Netzwerkwege" (Rev 1):
-  https://github.com/croesnick/kommunalpolitik_ki/blob/6d3d1241d3660cbb53b781b2c1df41203ec5fb9b/docs/research/2026-10-02-vermittelte-agent-netzwerkwege.md
-  (Repopfad docs/research/2026-10-02-vermittelte-agent-netzwerkwege.md, Repo-Stand 2026-10-02).
+  https://github.com/croesnick/kommunalpolitik_ki/blob/main/docs/research/2026-10-02-vermittelte-agent-netzwerkwege.md
+  (Repopfad docs/research/2026-10-02-vermittelte-agent-netzwerkwege.md).

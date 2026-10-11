@@ -40,12 +40,12 @@ defmodule KomkiPolicy.RegistryTest do
     %{
       "schema" => "komki-registry/1",
       "registry_id" => "reg-test",
-      "observers" => ["carsten"],
+      "observers" => ["nutzende-person"],
       "fact_fields" => %{"purpose" => "string", "count" => "integer", "labels" => "string_set"},
-      "environments" => %{"lokale@1" => %{"observers" => ["carsten"]}},
+      "environments" => %{"lokale@1" => %{"observers" => ["nutzende-person"]}},
       "bindings" => %{
         "test@1" => %{
-          "readers" => ["carsten"],
+          "readers" => ["nutzende-person"],
           "operations" => %{"admit" => true},
           "relaxation_authorities" => []
         }
@@ -60,9 +60,9 @@ defmodule KomkiPolicy.RegistryTest do
       assert compiled.registry_id == "reg-fall-4711-test"
 
       assert compiled.observers == [
-               "carsten",
                "eigene-rz-analyse",
                "lokale-fallverarbeitung",
+               "nutzende-person",
                "webdienst-x"
              ]
 
@@ -123,7 +123,9 @@ defmodule KomkiPolicy.RegistryTest do
 
     test "Umgebungs- und Bindungskennungen folgen <kebab>@<nichtnegativ-Integer> ohne fuehrende Nullen (MIN-4)" do
       bad_env =
-        Map.put(base_registry(), "environments", %{"Lokale@1" => %{"observers" => ["carsten"]}})
+        Map.put(base_registry(), "environments", %{
+          "Lokale@1" => %{"observers" => ["nutzende-person"]}
+        })
 
       assert %{code: :invalid_reference_id} = compile_term_error(bad_env)
 
@@ -140,7 +142,9 @@ defmodule KomkiPolicy.RegistryTest do
     end
 
     test "readers muessen Teilmenge der observers sein" do
-      term = put_in(base_registry(), ["bindings", "test@1", "readers"], ["carsten", "fremd"])
+      term =
+        put_in(base_registry(), ["bindings", "test@1", "readers"], ["nutzende-person", "fremd"])
+
       assert %{code: :unknown_observer} = compile_term_error(term)
     end
 

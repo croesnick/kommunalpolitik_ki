@@ -8,7 +8,7 @@
   ],
   "checked_label": [],
   "decision": "deny",
-  "identity": "carsten",
+  "identity": "nutzende-person",
   "intent_ref": "intent-admit-oeffentlich-a-ohne-basis",
   "missing_evidence": null,
   "object": {

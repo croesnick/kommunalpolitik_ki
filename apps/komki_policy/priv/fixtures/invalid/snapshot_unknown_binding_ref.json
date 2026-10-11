@@ -2,7 +2,7 @@
   "schema": "komki-snapshot/1",
   "snapshot_id": "snap-fall-4711-unbekannte-referenz",
   "registry_ref": "reg-fall-4711-test",
-  "identity": "carsten",
+  "identity": "nutzende-person",
   "workspace": {
     "workspace_id": "ws-fall-4711",
     "bindings": [

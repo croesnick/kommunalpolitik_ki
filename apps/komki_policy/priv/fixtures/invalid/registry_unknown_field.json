@@ -2,7 +2,7 @@
   "schema": "komki-registry/1",
   "registry_id": "reg-fall-4711-test",
   "observers": [
-    "carsten",
+    "nutzende-person",
     "lokale-fallverarbeitung"
   ],
   "fact_fields": {
@@ -12,7 +12,7 @@
   "environments": {
     "lokale-fallverarbeitung@1": {
       "observers": [
-        "carsten",
+        "nutzende-person",
         "lokale-fallverarbeitung"
       ]
     }
@@ -20,7 +20,7 @@
   "bindings": {
     "buergerfall-4711@1": {
       "readers": [
-        "carsten",
+        "nutzende-person",
         "lokale-fallverarbeitung"
       ],
       "operations": {

@@ -61,12 +61,12 @@
     },
     {
       "actual_recipients": [
-        "carsten",
-        "lokale-fallverarbeitung"
+        "lokale-fallverarbeitung",
+        "nutzende-person"
       ],
       "allowed_recipients": [
-        "carsten",
-        "lokale-fallverarbeitung"
+        "lokale-fallverarbeitung",
+        "nutzende-person"
       ],
       "kind": "computed",
       "name": "recipient_inclusion",

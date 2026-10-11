@@ -58,13 +58,13 @@
     },
     {
       "actual_recipients": [
-        "carsten",
-        "lokale-fallverarbeitung"
+        "lokale-fallverarbeitung",
+        "nutzende-person"
       ],
       "allowed_recipients": [
-        "carsten",
         "eigene-rz-analyse",
         "lokale-fallverarbeitung",
+        "nutzende-person",
         "webdienst-x"
       ],
       "kind": "computed",

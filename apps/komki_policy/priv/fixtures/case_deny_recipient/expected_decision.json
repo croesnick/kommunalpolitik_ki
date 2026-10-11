@@ -11,7 +11,7 @@
     "lizenz-namensnennung@1"
   ],
   "decision": "deny",
-  "identity": "carsten",
+  "identity": "nutzende-person",
   "intent_ref": "intent-admit-lizenziert-a-web",
   "missing_evidence": null,
   "object": {

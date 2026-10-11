@@ -278,11 +278,11 @@ Exit-Codes: `0` Erfolg (auch `deny`/`indeterminate`/`invalid` sind legitime Erge
 
 ## 8. Erwartungsfälle (synthetisch; erwartete Prämissen unabhängig vom Produktionscode festgelegt)
 
-Alle Fälle nutzen `priv/fixtures/registry.json` (Bürgerfall-Bindung `buergerfall-4711@1` mit `admit`-Bedingung: Zweck passt **und** Datei gehört zum genehmigten Fallumfang; Lizenzbindung `lizenz-namensnennung@1` mit `admit: true` und weitem Empfängerkreis; Bindung `nur-start-test@1` **ohne** `admit`-Eintrag, nur `start`; Umgebungen `lokale-fallverarbeitung@1` mit Beobachtern `{carsten, lokale-fallverarbeitung}` und `recherche-webdienst@1` mit Beobachtern `{carsten, webdienst-x}`).
+Alle Fälle nutzen `priv/fixtures/registry.json` (Bürgerfall-Bindung `buergerfall-4711@1` mit `admit`-Bedingung: Zweck passt **und** Datei gehört zum genehmigten Fallumfang; Lizenzbindung `lizenz-namensnennung@1` mit `admit: true` und weitem Empfängerkreis; Bindung `nur-start-test@1` **ohne** `admit`-Eintrag, nur `start`; Umgebungen `lokale-fallverarbeitung@1` mit Beobachtern `{nutzende-person, lokale-fallverarbeitung}` und `recherche-webdienst@1` mit Beobachtern `{nutzende-person, webdienst-x}`).
 
 | Fall | Kurzfassung | Erwartung |
 |---|---|---|
-| `case_permit` | Öffentliche Datei (λ=∅), Scope-Fakt `true`, Zweck passt, Basis alles `true`, Empfänger `{carsten, lokale-fallverarbeitung}` = R_Γ(B_W) | **permit**, `checked_label` = `[buergerfall-4711@1]`, vollständiger Baum §4.3 |
+| `case_permit` | Öffentliche Datei (λ=∅), Scope-Fakt `true`, Zweck passt, Basis alles `true`, Empfänger `{nutzende-person, lokale-fallverarbeitung}` = R_Γ(B_W) | **permit**, `checked_label` = `[buergerfall-4711@1]`, vollständiger Baum §4.3 |
 | `case_deny` | Wie permit, aber Scope-Fakt `false` (D.1: Labelinklusion und Empfängertest erfüllt, Bedingung falsch) | **deny**, Blocker `binding_condition_false` (buergerfall-4711@1) |
 | `case_deny_licensed` | Objekt λ=`[lizenz-namensnennung@1]` (eigene Lizenzregel `true` erfüllt), B_W=`[buergerfall-4711@1, lizenz-namensnennung@1]`, Scope `false` — nur wer λ(x) statt B_W prüft, würde erlauben | **deny**, Blocker `binding_condition_false` (buergerfall-4711@1), `checked_label` = beide Bindungen |
 | `case_indeterminate` | Wie permit, Scope-Fakt fehlt (fehlende, nicht als falsch bekannte Evidenz, D.1) | **indeterminate**, `missing_evidence` → Fakt `input_in_approved_case_scope` (Bedingung `unknown`) |

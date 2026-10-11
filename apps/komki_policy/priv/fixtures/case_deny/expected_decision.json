@@ -10,7 +10,7 @@
     "buergerfall-4711@1"
   ],
   "decision": "deny",
-  "identity": "carsten",
+  "identity": "nutzende-person",
   "intent_ref": "intent-admit-oeffentlich-a-deny",
   "missing_evidence": null,
   "object": {
