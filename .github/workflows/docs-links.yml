@@ -1,0 +1,57 @@
+# Markdown-Link-Check für Docs, READMEs und Skills (Issue #77).
+# Offline-Modus (lychee.toml am Repo-Root): lychee prüft lokale
+# Dateireferenzen und stellt keine Netz-Requests. Ein Tippfehler in einem
+# relativen Pfad — etwa einer README-Bild-Einbettung — lässt den Job rot
+# laufen, obwohl die Elixir- und Python-Pipelines weiter grün wären.
+
+name: docs-links
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.md'
+      - 'lychee.toml'
+      - '.github/workflows/docs-links.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.md'
+      - 'lychee.toml'
+      - '.github/workflows/docs-links.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-links-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lychee:
+    name: Markdown-Links (lychee, offline)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Link-Check
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          # fail: true ist zwar Action-Default (trotz anderer Beispiele im
+          # Action-README), aber explizit gesetzt: Im Report-Modus
+          # (fail: false) liefe der Job trotz kaputter Links grün. lychee
+          # selbst beendet mit Exit-Code 2 bei kaputten Links, mit 3 bei
+          # Fehlern in der Config.
+          fail: true
+          # lychee-Version gepinnt auf den Recherche-Stand aus Issue #77.
+          # Renovate aktualisiert diesen Pin nicht; bei einem neuen
+          # lychee-Release von Hand anheben.
+          lycheeVersion: v0.24.2
+          # Offline-Modus, root_dir und extensions stehen in lychee.toml am
+          # Repo-Root und gelten automatisch. Die einfachen Anführungszeichen
+          # müssen die YAML-Auswertung überleben, weil das entrypoint.sh der
+          # Action die Args per eval übergibt. Nur so erreicht der Glob
+          # unexpandiert lychees eigene Glob-Engine und matcht auch
+          # tiefer verschachtelte Dateien.
+          args: "'./**/*.md'"

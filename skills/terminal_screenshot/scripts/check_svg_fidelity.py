@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check: SVG text content == cleaned capture text."""
+
 import re
 import sys
 
@@ -33,7 +34,9 @@ while out and out[-1].strip() == "":
 with open(svg, encoding="utf-8") as f:
     svg_text = f.read()
 
-text_blocks = re.findall(r'<text [^>]*xml:space="preserve">(.*?)</text>', svg_text, re.S)
+text_blocks = re.findall(
+    r'<text [^>]*xml:space="preserve">(.*?)</text>', svg_text, re.S
+)
 svg_lines = []
 for block in text_blocks:
     svg_lines.append("".join(re.findall(r"<tspan[^>]*>(.*?)</tspan>", block, re.S)))
@@ -44,10 +47,12 @@ ok = True
 if len(svg_lines) != len(out):
     ok = False
     print(f"LINE COUNT MISMATCH svg={len(svg_lines)} capture={len(out)}")
-for i, (a, b) in enumerate(zip(svg_lines, out)):
+# strict=False: Ein Längenunterschied wird oben gemeldet; hier zählt der
+# zeilenweise Diff, solange beide Seiten Zeilen haben.
+for i, (a, b) in enumerate(zip(svg_lines, out, strict=False)):
     if html.unescape(a) != b:
         ok = False
-        print(f"DIFF line {i+1}:\n  svg    : {a!r}\n  capture: {b!r}")
+        print(f"DIFF line {i + 1}:\n  svg    : {a!r}\n  capture: {b!r}")
 
 print("FIDELITY OK" if ok else "FIDELITY FAILED")
 sys.exit(0 if ok else 1)

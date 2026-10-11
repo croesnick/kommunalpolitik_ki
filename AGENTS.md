@@ -218,7 +218,7 @@ in `endpoint.ex` als Plug eingetragen (nur `:dev`).
 
 ### CI
 
-**Maßgeblich ist [`/.github/workflows/ci.yml`](.github/workflows/ci.yml)** — dort stehen die exakten Dispatch-Befehle samt Begründungen. Kurzfassung (kein Ersatz für die Datei):
+**Maßgeblich sind die Workflows unter [`.github/workflows/`](.github/workflows/)**: [`ci.yml`](.github/workflows/ci.yml) für Elixir, [`python.yml`](.github/workflows/python.yml) für die Python-Tools und die losen Skripte, [`docs-links.yml`](.github/workflows/docs-links.yml) für Markdown-Links. Dort stehen die exakten Befehle samt Begründungen. Kurzfassung (kein Ersatz für die Dateien):
 
 ```bash
 # Elixir (Root; credo/dialyzer siehe Tooling-Tabelle oben)
@@ -234,6 +234,13 @@ uv run ruff check
 uv run ruff format --check
 uv run mypy src/
 uv run pytest
+
+# Lose Python-Skripte (skills/*/scripts; Config: ruff.toml am Repo-Root)
+uvx ruff@0.15.21 check skills/*/scripts
+uvx ruff@0.15.21 format --check skills/*/scripts
+
+# Markdown-Links, offline (Config: lychee.toml am Repo-Root)
+lychee './**/*.md'
 ```
 
 CI-Status verlässlich prüfen: nach einem Push zuerst mit `gh run list --branch <branch> --limit 1` abgleichen, dass der Lauf zur eigenen Head-Short-SHA gehört — `gh pr checks --watch` zeigt unmittelbar nach einem Push sonst die Ergebnisse des vorherigen Heads als „pass".
