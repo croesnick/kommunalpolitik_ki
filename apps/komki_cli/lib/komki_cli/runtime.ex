@@ -56,6 +56,15 @@ defmodule KomkiCli.Runtime do
   @spec argv() :: [String.t()]
   def argv, do: Args.argv()
 
+  @doc """
+  Laufen wir unter der Burrito-Standalone-Binary? Der Zig-Wrapper setzt
+  `__BURRITO` fuer den BEAM (erlang_launcher.zig:84); im Escript-/mix-Kontext
+  fehlt die Variable. Entscheidet z.B., ob die Session-Kette ihr stdout auf
+  /dev/fd/0 umbiegen muss (Burrito-Regression #234, Pilot 2026-10-11).
+  """
+  @spec burrito?() :: boolean()
+  def burrito?, do: System.get_env("__BURRITO") != nil
+
   # ===========================================================================
   # Programmpfad (Pane-Einstieg der interaktiven Session)
   # ===========================================================================

@@ -602,6 +602,13 @@ defmodule KomkiCli.Steps do
   node bootet unter dem Profil nur als BEAM-Port-Kind, fork-geborene Ketten
   sterben beim Init mit SIGABRT (Crash-Analyse im Session-Smoke). Der
   Port-Env ersetzt die Umgebung komplett (`Pi.session_env/1`).
+
+  Unter Burrito (`KomkiCli.Runtime.burrito?/0`) leitet die Kette ihr stdout
+  zusaetzlich auf /dev/fd/0 um (Dup des lebenden stdin-PTY): Das BEAM-stdout
+  ist dort die Wrapper-Pipe, pi beendet sich ohne echtes Terminal sofort
+  (Pilot 2026-10-11, Issue-#234-Klasse). Das Profil erlaubt das Oeffnen von
+  /dev/fd/0 kontextfrei — Escript-Panels laufen unverändert ueber die
+  Direktkette.
   """
   @spec session_chain(%{String.t() => String.t()}) :: result()
   def session_chain(opts) do
@@ -623,7 +630,7 @@ defmodule KomkiCli.Steps do
     File.mkdir_p!(arbeit)
     Profile.write!(Pi.session_profile_path(cfg), Profile.generate(cfg, arbeit))
 
-    [program | args] = Pi.argv_session(cfg, continue?)
+    [program | args] = Pi.argv_session(cfg, continue?, KomkiCli.Runtime.burrito?())
 
     # Port-Env in Charlist-Form: die open_port-Spec fuer :env verlangt sie
     # (Dialyzer-Fund: Binär-Tupel lassen den Aufruf als fehlgeschlagen typisieren).

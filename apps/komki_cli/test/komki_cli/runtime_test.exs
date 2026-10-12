@@ -47,6 +47,21 @@ defmodule KomkiCli.RuntimeTest do
     end
   end
 
+  describe "burrito?/0 (Laufkontext Standalone-Binary)" do
+    test "__BURRITO gesetzt (Zig-Wrapper): true" do
+      System.put_env("__BURRITO", "1")
+      on_exit(fn -> System.delete_env("__BURRITO") end)
+
+      assert Runtime.burrito?()
+    end
+
+    test "ohne __BURRITO (Escript/mix): false" do
+      System.delete_env("__BURRITO")
+
+      refute Runtime.burrito?()
+    end
+  end
+
   describe "argv/0 (Burrito-argv-Aufruf, Ticket #75 ausgewiesen)" do
     test "ohne Burrito-Kontext: System.argv/0 (Dual-Sicherheit Escript/mix)" do
       assert Runtime.argv() == System.argv()

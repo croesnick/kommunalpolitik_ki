@@ -147,6 +147,14 @@ defmodule KomkiCli.ProfileTest do
     end
   end
 
+  describe "/dev/fd/0-Redirect (Burrito-Session-Fix, Pilot 2026-10-11)" do
+    test "Regeln vorhanden — kontextfrei im Profil, damit die Identitaet nicht vom Laufkontext abhaengt",
+         %{text: text} do
+      assert String.contains?(text, "(allow file-write* (literal \"/dev/fd/0\"))")
+      assert String.contains?(text, "(allow file-read-metadata (literal \"/dev/fd\"))")
+    end
+  end
+
   describe "Determinismus" do
     test "feste cfg -> byte-identisch", %{cfg: cfg, scratch: scratch} do
       assert Profile.generate(cfg, scratch) == Profile.generate(cfg, scratch)

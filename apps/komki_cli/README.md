@@ -89,11 +89,10 @@ Zwei Hinweise für die verteilte Datei:
   ersten Start den Gatekeeper-Dialog („Entwickler nicht verifiziert“) —
   einmalig `xattr -d com.apple.quarantine komki_macos_silicon` ausführen
   oder unter Systemeinstellungen › Datenschutz & Sicherheit freigeben.
-- **Interaktive Session:** `session` läuft derzeit nur unter dem Escript.
-  Unter der Standalone-Binary schließt die tmux-Pane sofort — die
-  Wrapper-Schicht leitet stdout als Pipe weiter, und pi beendet sich
-  ohne echtes Terminal darauf (Burrito-Regression #234; Analyse im
-  Pilot-Bericht). `run` und alle übrigen Befehle sind davon nicht betroffen.
+- **Bestehende Instanzen:** Das Seatbelt-Profil hat zwei Regeln für den
+  Session-Betrieb unter der Binary dazubekommen. Nach diesem Update einmalig
+  `komki init --force` ausführen — der Doctor meldet Profil-Drift, bis das
+  Profil neu geschrieben ist.
 
 ## Befehle
 
@@ -179,10 +178,10 @@ branchenweit auf neueren macOS-Builds beobachtete Klasse, siehe
 tmux-Pane der Session das komki-Programm als Mini-BEAM (Escript oder
 Standalone-Binary), das die pi-Kette als Port-Kind startet und die
 Pane-PTY durchreicht; der Headless-Lauf nutzt denselben Port-Weg ohnehin.
-Einschränkung der Standalone-Binary: die Wrapper-Schicht von Burrito reicht
-stdout als Pipe weiter, pi verlangt für die TUI aber ein echtes Terminal —
-die Pane schließt daher sofort. Interaktive Sessions bis auf Weiteres über
-den Escript starten; alle übrigen Befehle laufen auch mit der Binary.
+Unter der Standalone-Binary reicht die Burrito-Wrapper-Schicht stdout als
+Pipe weiter; die Session-Kette leitet stdout deshalb zusätzlich auf das
+lebende stdin-Terminal um (zwei Regeln im Profil, Analyse im Pilot-Bericht).
+Damit laufen interaktive Sessions unter Escript und Binary gleich.
 
 Der `--ctx`-Override beim `up` gilt nur für den jeweiligen Start; die
 gepinnte Konfiguration bleibt unangetastet.

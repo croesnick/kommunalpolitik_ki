@@ -71,19 +71,45 @@ defmodule KomkiCli.Pi do
   def session_profile_path(%Config{} = cfg),
     do: Path.join([cfg.base_dir, "tmp", "profile-session.sb"])
 
+  # Burrito-TTY-Redirect (Pilot 2026-10-11): $0/$1-Form wie beim Einmal-Lauf
+  # (argv_for), nur dass stdout auf das lebende stdin-PTY (fd 0) umbiegt —
+  # unter der Binary ist das BEAM-stdout die Wrapper-Pipe, pi beendet sich
+  # ohne echtes Terminal sofort (Issue-#234-Klasse).
+  @redirect_stdout_sh ~s(exec "$0" "$@" > /dev/fd/0)
+
   @doc """
   argv der interaktiven Session: sandbox-exec-Direktkette ohne `--print`
   und ohne stdin-Redirect (die tmux-Pty ist stdin — ein `/dev/null`-Redirect
   wuerde die TUI-Eingabe kappen). Fuer Doctor/Tests sichtbar.
+
+  `tty_redirect` (Burrito-Fix, Pilot 2026-10-11): Mit `true` laeuft die
+  Kette ueber `/bin/sh -c` und leitet stdout auf `/dev/fd/0` um (Dup des
+  lebenden stdin-PTY), weil unter der Standalone-Binary das BEAM-stdout
+  die Wrapper-Pipe ist. Der Escript-Pfad nutzt die Direktkette weiter
+  (dort ist stdout ohnehin die Pane-PTY); das passende Profil erlaubt das
+  Oeffnen von /dev/fd/0 kontextfrei.
   """
-  @spec argv_session(Config.t(), boolean()) :: [String.t()]
-  def argv_session(%Config{} = cfg, continue?)
-      when is_boolean(continue?) and Config.tools_ready(cfg) do
-    [cfg.sandbox_exec, "-f", session_profile_path(cfg), "--", cfg.node_bin, cfg.cli_js] ++
-      session_flags(cfg, continue?)
+  @spec argv_session(Config.t(), boolean(), boolean()) :: [String.t()]
+
+  # Header fuehrt den Default (Multi-Clause-Konvention): Escript-Pfad ruft
+  # argv_session/2 ohne Redirect-Angabe, session_chain gibt den Kontext mit.
+  def argv_session(cfg, continue?, tty_redirect \\ false)
+
+  def argv_session(%Config{} = cfg, continue?, tty_redirect)
+      when is_boolean(continue?) and is_boolean(tty_redirect) and Config.tools_ready(cfg) do
+    prefix = [cfg.sandbox_exec, "-f", session_profile_path(cfg), "--"]
+
+    chain =
+      if tty_redirect do
+        ["/bin/sh", "-c", @redirect_stdout_sh, cfg.node_bin, cfg.cli_js]
+      else
+        [cfg.node_bin, cfg.cli_js]
+      end
+
+    prefix ++ chain ++ session_flags(cfg, continue?)
   end
 
-  def argv_session(%Config{}, _continue?),
+  def argv_session(%Config{}, _continue?, _tty_redirect),
     do: raise(ArgumentError, message: @incomplete_tools_msg)
 
   @doc "Lauf-Umgebung als Key-Value-Paare (deterministisch sortiert)."

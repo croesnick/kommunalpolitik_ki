@@ -102,11 +102,12 @@ Stand. Pilot-Fund mit Folgen: Frühere Re-Pilot-Läufe in dieser Session waren
 teilweise vom ersten Bau; nach dem Uninstall wurde alles gegen den
 tatsächlichen Stand erneut gemessen. [D]
 
-## Interaktive Session unter der Binary (Negativbefund)
+## Interaktive Session unter der Binary (Negativbefund, per Fix abgeschlossen)
 
 `session` startet die tmux-Pane mit dem Programm-Pfad aus
-`KomkiCli.Runtime.self_path/0`, unter Burrito also korrekt die Binary. Die Pane
-stirbt jedoch sofort (Kette exit 0, keine TUI-Ausgabe). Ursachen-Kette:
+`KomkiCli.Runtime.self_path/0`, unter Burrito also korrekt die Binary. Der
+erste Pilot-Lauf endete negativ: Die Pane starb sofort (Kette exit 0, keine
+TUI-Ausgabe). Ursachen-Kette:
 
 - Escript-Kontrolle auf derselben Instanz, demselben Profil: pi bootet und
   rendert die volle TUI (Probe-Mitschnitt). [D]
@@ -116,20 +117,28 @@ stirbt jedoch sofort (Kette exit 0, keine TUI-Ausgabe). Ursachen-Kette:
   unter der Binary die Wrapper-Pipe (erlang_launcher.zig:111-117). pi braucht
   für die TUI ein echtes TTY auf stdout und beendet sofort, still, mit 0. [D]
 
-Das ist genau die dokumentierte #234-Klasse des Upstream. Der Ticket-Fall
-greift, dass bei einem Negativbefund Rückmeldung an den Menschen statt einer
-stillen Pfadänderung gilt, denn alle
-Abhilfen berühren die Trusted Base oder warten auf Upstream:
+Das ist die dokumentierte #234-Klasse des Upstream. Rückmeldung an den
+Menschen mit drei Optionen; das GO fiel am 12.10. auf Option 1 (Fix in
+eigener Regie). Umgesetzt und verifiziert:
 
-1. Chain-Redirect in eigener Regie: pi-stdout/-stderr auf `/dev/fd/0`
-   (Dup des lebenden stdin-PTY) umbiegen; das braucht zusätzliche
-   Seatbelt-Regeln (Öffnen von /dev/fd) und Änderungen an pane-Kommando
-   und session_chain. Profileingriff, darum GO nötig.
-2. Upstream-Fix für #234 abwarten (stdout nur pipen, wenn kein TTY).
-3. Status quo dokumentieren: Interaktive Sessions laufen über den Escript
-   (host OTP), die Binary deckt init/doctor/up/down/status/run vollständig.
+- `Pi.argv_session/3` biegt unter Burrito (`KomkiCli.Runtime.burrito?/0`)
+  stdout der Kette per `/bin/sh -c` auf `/dev/fd/0` um — Dup des lebenden
+  stdin-PTY. Der Escript-Pfad behält die Direktkette (stdout ist dort die
+  Pane-PTY); Unit-Tests pinnen beide Formen.
+- Zwei kontextfreie Seatbelt-Regeln erlauben das Öffnen von /dev/fd/0
+  (`tui_rules` in `KomkiCli.Profile`). Kontextfrei heißt: Die
+  Profil-Identität hängt nicht vom Laufkontext ab; bestehende Instanzen
+  driften einmalig und brauchen einmalig `init --force`.
+- Nachweis an der Binary: Pane bleibt offen, pi rendert die TUI,
+  Tasteneingabe kommt durch (Modell-Round-Trip), Teardown über tmux schließt
+  die Kette. [D, 12.10.]
+- Escript-Regression mit dem neuen Profil: Direktkette bootet pi wie bisher. [D]
 
-Bis zur Entscheidung gilt Option 3 (dokumentiert in README und hier).
+Der Fix bleibt vorwärtsverträglich: Sollte der Upstream #234 heilen, ist
+BEAM-stdout die echte Pane-PTY und der Redirect dupliziert dasselbe Gerät —
+kein Verhalten ändert sich. Ein Upstream-Beitrag (stdout nur pipen, wenn
+kein TTY; die isTty-Erkennung existiert im Wrapper schon für _IS_TTY) bleibt
+als Follow-up denkbar; für komki ist er nicht mehr nötig.
 
 ## Smoke-Matrix der Einzeldatei (alles ohne host-Elixir im PATH)
 
@@ -173,7 +182,8 @@ Störproben: Profil-Drift → doctor exit 3; absurd großer ctx
 
 ## Offene Punkte
 
-- Session unter der Binary: Entscheidung über Option 1-3 oben (GO).
+- Upstream-Beitrag zu #234 (stdout nur pipen, wenn kein TTY) als Follow-up
+  denkbar; für komki durch den eigenen Fix nicht mehr nötig.
 - Exit-Code-Verhalten bei EPIPE unter größeren Ausgaben (etwa sehr lange
   Doctor-Listen in Pipes) ungetestet; für komkis Ausgabegrößen ohne
   Belang. [U]
