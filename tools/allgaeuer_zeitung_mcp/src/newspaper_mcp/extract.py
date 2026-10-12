@@ -45,7 +45,7 @@ def _extract_jsonld(soup: BeautifulSoup) -> dict | None:
     for script in soup.find_all("script", type="application/ld+json"):
         try:
             data = json.loads(script.string or "")
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             continue
         items = data if isinstance(data, list) else [data]
         for item in items:

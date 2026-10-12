@@ -40,7 +40,7 @@ def _load_credentials() -> Credentials:
         try:
             data = json.loads(stored)
             return Credentials(email=data["email"], password=data["password"])
-        except (json.JSONDecodeError, KeyError):
+        except json.JSONDecodeError, KeyError:
             pass
 
     email = os.environ.get("AZ_EMAIL", "")
@@ -75,7 +75,7 @@ def load_cached_cookies() -> CookieJar | None:
         if jar.is_expired():
             return None
         return jar
-    except (json.JSONDecodeError, KeyError):
+    except json.JSONDecodeError, KeyError:
         return None
 
 

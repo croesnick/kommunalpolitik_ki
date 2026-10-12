@@ -5,7 +5,7 @@
 # deshalb greift diese Datei nicht in die Tools hinein. Line-length und
 # Rule-Select sind über alle fünf Tools vereinheitlicht.
 line-length = 88
-target-version = "py311"
+target-version = "py314"
 
 [lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
