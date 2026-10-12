@@ -101,10 +101,12 @@ defmodule KomkiCli.Pi do
 
   @doc """
   Pane-Kommando fuer `tmux new-session … <command>`: der Pfad des
-  komki-Escripts plus dem internen `session-chain`-Befehl.
+  komki-Programms (Escript oder Burrito-Standalone-Binary, vom Aufrufer
+  übergeben — `KomkiCli.Runtime.self_path/0`) plus dem internen
+  `session-chain`-Befehl.
 
   Statt die Sandbox-Kette direkt in die Pane zu legen, startet die Pane
-  einen eigenen Mini-BEAM (das Escript selbst). Hintergrund ist ein
+  einen eigenen Mini-BEAM (das komki-Programm selbst). Hintergrund ist ein
   macOS-27.2-Beta-Fund aus der Crash-Analyse: node crasht beim Init mit
   SIGABRT, sobald es aus einer gewoehnlichen fork-Kette geboren wird
   (Shell, tmux-Server), bootet aber problemlos als Port-Kind eines BEAM —

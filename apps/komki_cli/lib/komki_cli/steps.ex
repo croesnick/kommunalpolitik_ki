@@ -655,9 +655,11 @@ defmodule KomkiCli.Steps do
   @doc """
   Interaktive pi-Session in der tmux-Session `komki` (attach-or-create).
   Full doctor zuerst (Boot-Gate), llama muss laufen. Das Pane-Kommando
-  startet das komki-Escript als Mini-BEAM (`session-chain`), der die
-  Sandbox-Kette als Port-Kind spawnt — macOS-27.2-Beta: fork-geborenes
-  node stirbt beim Init, Port-Kind-boots laufen (Crash-Analyse).
+  startet das komki-Programm als Mini-BEAM (`session-chain`; Escript oder
+  Burrito-Standalone-Binary — der Pfad kommt aus
+  `KomkiCli.Runtime.self_path/0`), der die Sandbox-Kette als Port-Kind
+  spawnt — macOS-27.2-Beta: fork-geborenes node stirbt beim Init,
+  Port-Kind-boots laufen (Crash-Analyse).
   tmux-Aufrufe im Attach-Modus laufen als Port mit `:nouse_stdio`, damit
   der tmux-Client das echte Terminal erhaelt (System.cmd gäbe BEAM-Pipes:
   "open terminal failed: not a terminal"). `--continue` setzt die letzte
@@ -774,7 +776,7 @@ defmodule KomkiCli.Steps do
     case continue_precondition(cfg, continue?) do
       :ok ->
         prepare_session_assets(cfg)
-        pane = Pi.pane_command(escript_path!(), continue?)
+        pane = Pi.pane_command(KomkiCli.Runtime.self_path(), continue?)
 
         if detach?,
           do: create_detached(tmux, cfg, pane),
@@ -845,12 +847,6 @@ defmodule KomkiCli.Steps do
   end
 
   defp continue_precondition(_cfg, false), do: :ok
-
-  # Pfad des laufenden Escripts (fuer das Pane-Kommando der Session): absolut,
-  # damit die Pane unabhaengig von ihrem Startverzeichnis laeuft. Ausserhalb
-  # des Escript-Kontexts wirft :escript.script_name/0 — der session-Rescue
-  # fasst das mit einer klaren Meldung ab.
-  defp escript_path!, do: Path.expand(to_string(:escript.script_name()))
 
   defp session_started_message(true = _detach) do
     "tmux-session '" <>

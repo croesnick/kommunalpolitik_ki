@@ -87,4 +87,67 @@ defmodule KomkiCli.CLITest do
       assert out =~ "--force"
     end
   end
+
+  # Farb-Vertragsnaht (Ticket #75): unter Burrito erzwingt der Wrapper
+  # ansi_enabled und piped stdout (Regression #234) — _IS_TTY steuert.
+  # IO.ANSI.enabled?/0 allein wuerde unter der Binary auch beim Pipen
+  # Farbcodes in Dateien schreiben.
+  describe "Farb-Gate (_IS_TTY, Burrito-Kontext)" do
+    test "_IS_TTY=0: Fehler-Zeilen ohne ANSI-Sequenzen (piped unter Burrito)" do
+      System.put_env("_IS_TTY", "0")
+      on_exit(fn -> System.delete_env("_IS_TTY") end)
+
+      {out, 2} = CLI.run(["doctor"])
+
+      refute out =~ "\e["
+    end
+
+    test "_IS_TTY=1: Fehler-Zeilen farbig (Terminal unter Burrito)" do
+      System.put_env("_IS_TTY", "1")
+      on_exit(fn -> System.delete_env("_IS_TTY") end)
+
+      {out, 2} = CLI.run(["doctor"])
+
+      assert out =~ IO.ANSI.red()
+    end
+  end
+
+  # Optimus formatiert Parse-Fehler bedingungslos farbig (IO.ANSI.red/bright/
+  # reset ohne enabled?-Pruefung, siehe cli.ex format_errors/1 — Pilot-Fund
+  # 2026-10-11, identisch unter Escript und Burrito-Binary). Das eigene Gate
+  # haelt gepipete Ausgaben sauber, die farbige Form bleibt am Terminal.
+  describe "Error-Zeilen (Optimus-Farben durch eigenes Gate)" do
+    test "_IS_TTY=0: Parse-Fehler ohne ANSI, Meldungstext bleibt" do
+      System.put_env("_IS_TTY", "0")
+      on_exit(fn -> System.delete_env("_IS_TTY") end)
+
+      {out, 2} = CLI.run(["definitiv-nicht-ein-befehl"])
+
+      refute out =~ "\e["
+      assert out =~ "unrecognized arguments"
+    end
+
+    test "_IS_TTY=1: Parse-Fehler farbig wie bisher" do
+      System.put_env("_IS_TTY", "1")
+      on_exit(fn -> System.delete_env("_IS_TTY") end)
+
+      {out, 2} = CLI.run(["definitiv-nicht-ein-befehl"])
+
+      assert out =~ IO.ANSI.red()
+      assert out =~ IO.ANSI.bright()
+    end
+
+    test "Escript/mix-Kontext ohne Farben: Parse-Fehler ohne ANSI" do
+      # Deterministisch statt umgebungsabhaengig: :ansi_enabled explizit
+      # false (wie beim Pipen), _IS_TTY ungesetzt (Escript/mix-Fall).
+      Application.put_env(:elixir, :ansi_enabled, false)
+      on_exit(fn -> Application.delete_env(:elixir, :ansi_enabled) end)
+      System.delete_env("_IS_TTY")
+
+      {out, 2} = CLI.run(["definitiv-nicht-ein-befehl"])
+
+      refute out =~ "\e["
+      assert out =~ "unrecognized arguments"
+    end
+  end
 end
