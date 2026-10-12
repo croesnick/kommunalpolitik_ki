@@ -8,9 +8,37 @@ Dieses Repo bündelt CLI-Tools und MCP-Server, die die kommunalpolitische Arbeit
 
 ## Projekt-Verwaltung
 
-Zur Verwaltung dieses Projekts wird **GitHub Projects** genutzt. Das Board liegt unter https://github.com/users/croesnick/projects (Repo: `croesnick/kommunalpolitik_ki`). Aufgaben, Ideen und Meilensteine werden als Issues mit Labels organisiert, nicht in externen Tools.
+Zur Verwaltung dieses Projekts wird **GitHub Projects** genutzt. Das Board ist das private Projekt „Kommunalpolitik KI“ unter https://github.com/users/croesnick/projects/1 (Repo: `croesnick/kommunalpolitik_ki`). Aufgaben, Ideen und Meilensteine sind Issues mit Labels — das Board ist eine Sicht auf dieselben Issues, kein zweites System.
+
+**Auto-Add:** Neue Issues landen über den eingebauten Workflow „Auto-add to project“ automatisch auf dem Board. Bleibt ein Issue dort hängen, holt die Session ihn nach:
+
+```bash
+gh project item-add 1 --owner croesnick --url <issue-url>
+```
+
+Bot-Issues wie die Renovate Dependency Dashboard landen nicht auf dem Board.
+
+**Status führen:** Ein angefangenes Ticket auf `In Progress` setzen, nach Merge oder Close auf `Done`:
+
+```bash
+gh project item-edit 1 --owner croesnick --url <issue-url> --field Status --value "In Progress"
+```
 
 **Ticket-Disziplin:** Neue Erkenntnisse oder angepasste Anforderungen während der Arbeit werden entweder ins bestehende Ticket eingetragen oder als sinnvolles Folgeticket angelegt — nichts wird still am Ticket vorbei eingebaut.
+
+## Agent skills
+
+### Issue tracker
+
+Tickets und Specs leben als GitHub Issues in `croesnick/kommunalpolitik_ki` (`gh` CLI). Siehe `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Fünf kanonische Triage-Rollen als Labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Siehe `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` am Repo-Root (lazy), ADRs unter `docs/adr/` — ergänzt um die bestehende `docs/nomenklatur.md` (Ratsarbeit-Begriffe). Siehe `docs/agents/domain.md`.
 
 ## Architektur-Prinzipien
 
