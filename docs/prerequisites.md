@@ -333,6 +333,7 @@ brew install lychee
 | Skill / Workflow | Anmerkung |
 |---|---|
 | `docs-links`-Check aus der AGENTS.md-CI-Kurzfassung | Lokales Vorab-Prüfen vor dem Push (`lychee './**/*.md'`) |
+| Pre-commit-Hook `lychee-markdown-links` | Läuft vor jedem Commit automatisch über die gestagten Markdown-Dateien |
 
 CI (`.github/workflows/docs-links.yml`) nutzt die lychee-Action mit eigener
 Binary; der CLI ist nur für lokale Läufe nötig.
