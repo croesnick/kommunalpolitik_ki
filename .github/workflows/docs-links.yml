@@ -44,10 +44,6 @@ jobs:
           # selbst beendet mit Exit-Code 2 bei kaputten Links, mit 3 bei
           # Fehlern in der Config.
           fail: true
-          # lychee-Version gepinnt auf den Recherche-Stand aus Issue #77.
-          # Renovate aktualisiert diesen Pin nicht; bei einem neuen
-          # lychee-Release von Hand anheben.
-          lycheeVersion: v0.24.2
           # Offline-Modus, root_dir und extensions stehen in lychee.toml am
           # Repo-Root und gelten automatisch. Die einfachen Anführungszeichen
           # müssen die YAML-Auswertung überleben, weil das entrypoint.sh der
