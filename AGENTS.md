@@ -26,6 +26,8 @@ gh project item-edit 1 --owner croesnick --url <issue-url> --field Status --valu
 
 **Ticket-Disziplin:** Neue Erkenntnisse oder angepasste Anforderungen während der Arbeit werden entweder ins bestehende Ticket eingetragen oder als sinnvolles Folgeticket angelegt — nichts wird still am Ticket vorbei eingebaut.
 
+**Parallele Sessions:** Vor Edits an Dateien mit unstaged Änderungen aus einer laufenden Parallel-Session (anderes Worktree, anderes Terminal): `git status` und `git diff <datei>` der Zieldatei prüfen und kollidierende Bereiche meiden.
+
 ## Agent skills
 
 ### Issue tracker
@@ -209,15 +211,8 @@ Projekte werden über Slugs identifiziert, nicht über DB-IDs. Der Slug ist der 
 - **Copy-Button**: auf der Projekt-Detailseite kopiert ein Button den Vault-Tag `#ratsprojekt/{slug}` in die Zwischenablage
 
 ### Roadmap
-1. **MVP**: Datenmodell + Seed + LiveView — Issues #12, #13, #14 ✅
-2. **Projekt-Detailansicht**: Show-LiveView `/projekte/:id` — Issue #16 ✅
-3. **MCP-Server**: AI-Tools für lesen (GO-Prinzip) — Issue #17 ✅
-4. **AI-Skill**: „Frag den Projekt-Tracker" — `skills/ratsprojekt_stand/` ✅
-5. **Antragsvorlagen**: Markdown-Render aus Projektdaten — Issue #15
-6. **Ratsinfo-Integration**: Quellen verlinken mit Sitzung/TOP
-7. **Proposal-Workflow-Skill**: `skills/ratsprojekt_proposal/` ✅
-8. **Slug-basierte Projektrouten**: Slug statt ID in URLs, MCP-Tools, Vault-Tags ✅
-9. **Value Proposition + Success Metrics**: Projekt-Felder `value_proposition` + `success_metrics` als Hard Gates in `check_antragsreife` (Migration + Schema + MCP + LiveView). Bis dahin policy-level via Lifecycle-Dokument + Skills.
+
+Die Punkte 1 bis 4, 7 und 8 der ursprünglichen Roadmap sind abgeschlossen; der bisher hier stehende Detailstatus ist als veraltetes Duplikat des Boards weggefallen. Offen: Antragsvorlagen als Markdown-Render aus Projektdaten (Issue #15), Ratsinfo-Integration (Quellen verlinken mit Sitzung und TOP) sowie Value Proposition + Success Metrics als harte Gates in `check_antragsreife` (bis dahin policy-level über das Lifecycle-Dokument und die Skills). Status und laufende Arbeit stehen auf dem GitHub-Board (Feld „Status"), der Projektlebenszyklus in [docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md).
 
 ## Tooling-Vorgaben
 
