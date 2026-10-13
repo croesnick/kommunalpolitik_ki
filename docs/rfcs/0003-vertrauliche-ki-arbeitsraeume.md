@@ -3,14 +3,15 @@
 | Feld | Wert |
 |---|---|
 | Status | Draft, Revision 2 |
-| Stand | 2026-10-11 |
+| Stand | 2026-10-13 (Anhang-E-Ergänzung) |
 | Ersetzt | [RFC0001 Revision4](0001-vertrauliche-ki-arbeitsraeume.md) |
 | Gegenstand | Didaktische Erklärung und vollständige normative Referenz des Sicherheitsmodells, Kalküls und Audits |
 | Umsetzung | Bauanleitung und Abnahmekriterien; keine Freigabe für produktive Verarbeitung geschützter Daten |
 
-Diese Fassung ordnet die Erklärung neu, ohne eine neue Sicherheitspolitik einzuführen.
+Diese Fassung ist neu gegliedert, führt aber keine neuen Sicherheitsregeln ein.
 Sie enthält die didaktischen Erklärungen und Beispiele sowie die vollständige normative Referenz.
 Für die projektweiten Begriffe gilt die [kanonische Nomenklatur](../nomenklatur.md).
+Die Begriffe dieses Dokuments sind bei ihrer ersten Einführung fett hervorgehoben.
 
 ## Leseweg und Verbindlichkeit
 
@@ -35,9 +36,9 @@ Agent diese Anweisung erkennt. Auch eine Suchfrage ohne wörtliches Zitat kann d
 verraten.
 
 Das Modell begrenzt deshalb die möglichen Wirkungen eines beliebig handelnden Agenten. Es beschreibt vier Typen:
-Objekte sind die verarbeiteten Inhalte, Bindungen ihre Umgangsregeln, Beobachter die Stellen mit möglichem
-Zugriff und Arbeitsräume die abgegrenzten Verarbeitungseinheiten. Die folgenden Abschnitte führen diese Begriffe
-ein. Isolation ist eine nachzuweisende Eigenschaft der Umsetzung, keine Folge guter Prompts.
+**Objekte** sind die verarbeiteten Inhalte, **Bindungen** ihre Umgangsregeln, **Beobachter** die Stellen mit möglichem
+Zugriff und **Arbeitsräume** die abgegrenzten Verarbeitungseinheiten. Die folgenden Abschnitte führen diese Begriffe
+ein. **Isolation** ist eine nachzuweisende Eigenschaft der Umsetzung, keine Folge guter Prompts.
 
 Im Beispiel darf der Agent einen Recherchevorschlag erstellen. Ob dieser Vorschlag an einen Suchdienst gelangt,
 entscheidet ein vom Agenten getrennter Ausführungsweg. Eine authentische Quelle macht enthaltene Anweisungen
@@ -45,9 +46,9 @@ nicht vertrauenswürdig. Die genaue Reichweite steht in [R.1](#r1-geltung-und-si
 
 ## 2. Registry, Objekte und Bindungen
 
-Ein Dateiname wie `vertraulich.pdf` reicht nicht als Schutz. Der Agent könnte ihn ändern. Die Registry ist die
+Ein Dateiname wie `vertraulich.pdf` reicht nicht als Schutz. Der Agent könnte ihn ändern. Die **Registry** ist die
 geschützte, tatsächlich geführte Datenbasis für registrierte Bindungen, Sicherheitsmetadaten, Befugnisse und
-Freigabefakten. Sie liegt außerhalb der Schreibhoheit des Agenten. Ein Regelstand Γ ist ein fester, geprüfter
+Freigabefakten. Sie liegt außerhalb der Schreibhoheit des Agenten. Ein **Regelstand Γ** ist ein fester, geprüfter
 Snapshot dieser Registry für eine Entscheidung; aktuelle Prüffakten werden dazu passend aufgelöst.
 
 Eine Bindung ist eine benannte, versionierte Umgangsregel. Die Kennung `ratsarbeit@1` bezeichnet eine bestimmte
@@ -55,7 +56,7 @@ Regelversion. Die Definition nennt ihre Grundlage und verantwortliche Stelle, zu
 Operationsbedingungen, Auflagen und Lockerungsbefugnisse. Ohne eingetragene Lockerungsbefugnis gibt es keine
 zulässige Lockerung. Ratsarbeit und Parteiarbeit sind verschiedene Bindungen, keine Stufen einer Rangliste.
 
-Ein Datenobjekt ist ein bestimmter, versionierter Inhalt mit getrennten Sicherheitsmetadaten. Sein Label ist die
+Ein **Datenobjekt** ist ein bestimmter, versionierter Inhalt mit getrennten Sicherheitsmetadaten. Sein **Label** ist die
 Menge seiner Bindungen. Herkunft, Inhaltsversion und Klassifikationsentscheidung bleiben nachvollziehbar. Auch
 der Arbeitsauftrag ist ein Objekt, weil schon die Themenauswahl ein geschütztes Vorhaben erkennen lassen kann.
 
@@ -79,7 +80,7 @@ dann die Bindung, statt sie zu entfernen. Fehlende Lizenzangaben sind keine allg
 Unterscheidung stützt sich auf die übernommenen Quellen zu DCAT, OParl und der Datenlizenz
 Deutschland.[^dcat][^oparl][^govdata]
 
-Unklassifiziertes Material bleibt in Quarantäne, einem abgesonderten Eingang ohne reguläres Label. Es wird nicht
+Unklassifiziertes Material bleibt in **Quarantäne**, einem abgesonderten Eingang ohne reguläres Label. Es wird nicht
 als leere Bindungsmenge behandelt. Eine berechtigte Person oder eine freigegebene Importregel entscheidet im
 gesondert autorisierten Einordnungsverfahren. Ein Agent kann dort eine Einordnung vorschlagen, aber nicht
 verbindlich festlegen. Die Erstklassifikation erlaubt keine vorherige Übermittlung an eine unzugelassene externe
@@ -96,7 +97,7 @@ ebenfalls nicht zu günstigen Defaults. Die vollständigen Regeln stehen in
 oder ein Diagnosedienst kann zusätzliche Empfänger schaffen. Ein Beobachter ist hier jeder modellierte Kontext
 mit potenziellem Zugriff auf Inhalte oder geschützte Metadaten. Nachgewiesenes Lesen ist nicht erforderlich.
 
-Die Betreiber- und Laufzeitumgebung beschreibt den konkreten Verarbeitungsweg. Er umfasst die lokale Seite, den
+Die **Betreiber- und Laufzeitumgebung** beschreibt den konkreten Verarbeitungsweg. Er umfasst die lokale Seite, den
 Zielendpunkt und mitverarbeitende Stellen. Neben Anfrage und Antwort gehören auch Abzweigungen zu Logs,
 Vorschauen, Hilfsmodellen, Sicherungen und Sync dazu. Ein Weg ist daher nicht bloß eine lineare Stationsliste.
 Seine dokumentierte Beschreibung und die tatsächlich laufende Konfiguration müssen zusammenpassen.
@@ -116,15 +117,15 @@ Provider-Fallback. Einzelheiten stehen in [R.3](#r3-betreibervertrauen-und-laufz
 
 Ein Chatfenster sammelt Verlauf, während die Aufgabe wechseln kann. Es beantwortet nicht verlässlich, welche
 Regeln für die gesamte Arbeit gelten. Ein Arbeitsraum W ist dagegen eine abgeschlossene Verarbeitungseinheit mit
-eigenem Zustand und unveränderlichem Startvertrag. Er ist nicht die Betreiber- und Laufzeitumgebung. Diese
+eigenem Zustand und unveränderlichem **Startvertrag**. Er ist nicht die Betreiber- und Laufzeitumgebung. Diese
 beschreibt, wo und durch wen der Raum umgesetzt wird, und ist ein Feld seines Vertrags.
 
-Der Vertrag legt Identität und Rolle, Auftrag und Zweck, feste Bindungsmenge B_W, konkrete Betreiber- und
+Der Vertrag legt Identität und Rolle, Auftrag und Zweck, feste **Bindungsmenge B_W**, konkrete Betreiber- und
 Laufzeitumgebung, Eingangsrechte und Befugnisse fest. Hinzu kommen Zustand, Nachweise, Gültigkeit und der
 zugelassene Auditweg. Raumgrenze und Vertrag werden außerhalb des Agenten durchgesetzt. Ein aktiver Raum
 vergrößert oder verkleinert B_W nicht.
 
-λ bezeichnet die Zuordnung eines klassifizierten Datenobjekts zu seinem Label.
+**λ** bezeichnet die Zuordnung eines klassifizierten Datenobjekts zu seinem Label.
 
 Für jede aufgenommene Eingabe x und jede dort erzeugte Ausgabe y gilt ohne Lockerung:
 
@@ -146,7 +147,7 @@ Raumbedingungen erfüllen. Der Vertrag steht in [R.4.1](#r41-startvertrag), die 
 
 Eine Anlage fordert den Agenten auf, nur beim Wort „Klage“ einen leeren Webrequest zu senden. Der Request
 enthält keinen geheimen Satz. Sein Auftreten verrät trotzdem ein Merkmal der Vorlage. Deshalb erfasst das Modell
-das ganze Ereignis: Nutzlast, Auswahl, Ziel, relevante Metadaten und tatsächliches Auftreten. Die beobachtbare
+das ganze **Ereignis**: Nutzlast, Auswahl, Ziel, relevante Metadaten und tatsächliches Auftreten. Die beobachtbare
 Folge umfasst auch die Reihenfolge.
 
 Alle vom Raum veranlassten Ausgaben tragen mindestens B_W, bereits ab dem Start. Das System muss dafür keine
@@ -154,7 +155,7 @@ tatsächlichen Lesepunkte oder inneren Abhängigkeiten des LLM rekonstruieren. W
 unveränderte öffentliche Datei aus, ist auch diese Auswahl eine gebundene Ausgabe. Das öffentliche Original
 behält im Quellspeicher sein Label.
 
-Der Vermittler ist eine vom Agenten unabhängige Komponente, die Operationen prüft und ausführt.
+Der **Vermittler** ist eine vom Agenten unabhängige Komponente, die Operationen prüft und ausführt.
 [Abschnitt 7](#7-zuständigkeiten-und-connectoren) erklärt seine Zuständigkeit genauer.
 Beim Request ordnet der Vermittler das Raumlabel zu und prüft den geplanten Empfängerweg vor der Wirkung. Liegt
 der Webserver außerhalb des zulässigen Empfängerkreises, findet der Request nicht statt. Ob eine Injection
@@ -164,13 +165,13 @@ geltende Autorisierung. Das erläutert [R.4.2](#r42-konservative-ausgaben).
 
 ## 7. Zuständigkeiten und Connectoren
 
-Eine positive Prüfung ist noch kein Versand. Die Inferenz-Engine leitet ein Urteil aus Regeln und autoritativen
+Eine positive Prüfung ist noch kein Versand. Die **Inferenz-Engine** leitet ein Urteil aus Regeln und autoritativen
 Fakten ab. Sie ist eine symbolische Regelmaschine, kein LLM-Inferenzserver. Der Vermittler löst den aktuellen
 Kontext auf, verwendet die Engine und führt nur passend autorisierte Operationen aus. Urteil und Vollzug sind
 getrennt, wie in einem rechtsstaatlichen Verfahren.
 
-Der getrennt berechtigte Journal-Writer hält auditpflichtige Schritte dauerhaft fest. Seine Bestätigung belegt
-Speicherung, nicht die Zulässigkeit oder Wahrheit einer Wirkung. Der Freigabedienst autorisiert und vermittelt
+Der getrennt berechtigte **Journal-Writer** hält auditpflichtige Schritte dauerhaft fest. Seine Bestätigung belegt
+Speicherung, nicht die Zulässigkeit oder Wahrheit einer Wirkung. Der **Freigabedienst** autorisiert und vermittelt
 konkrete Ausnahmen außerhalb der Agentenhoheit. Die Registry führt dafür Regeln und autoritative Fakten; ein
 gespeicherter Freigabefakt ändert nicht automatisch die Regeln. Das Diagramm zeigt Zuständigkeiten, kein
 vollständiges Ausführungsprotokoll.
@@ -194,7 +195,7 @@ flowchart LR
     V -->|Label und Objektversion| S["Dauerhafter Speicher"]
 ```
 
-Connectoren bieten begrenzte Operationen an Quellen und Zielen. Credentials bleiben dort und gelangen weder als
+**Connectoren** bieten begrenzte Operationen an Quellen und Zielen. Credentials bleiben dort und gelangen weder als
 Datei noch über Antworten, Fehler oder Logs zum Agenten. Ein Abruf hat zwei Prüfungsrichtungen. Auswärts sind
 Suchtext, Dokumentkennung und Aufrufentscheidung Ausgaben. Einwärts ist die klassifizierte Antwort ein neuer
 Eingang. Leseberechtigung für die Antwort ist keine beliebige Sendeberechtigung für die Anfrage.
@@ -291,8 +292,8 @@ einer Lockerung ihre Labels. Details und Formeln stehen in [R.5.3–R.5.7](#r53-
 ## 10. Freigaben für konkrete Ereignisse
 
 Eine Mappe soll intern abgelegt oder als Bericht an einen anderen Empfängerkreis versandt werden. Das sind
-verschiedene Befugnisse. Eine Aktionsfreigabe erlaubt eine bestimmte verbindliche Wirkung. Eine
-Offenlegungsfreigabe erlaubt zusätzlich das Entfernen von Bindungen für eine neue Ausgabe. Für jede entfernte
+verschiedene Befugnisse. Eine **Aktionsfreigabe** erlaubt eine bestimmte verbindliche Wirkung. Eine
+**Offenlegungsfreigabe** erlaubt zusätzlich das Entfernen von Bindungen für eine neue Ausgabe. Für jede entfernte
 Bindung muss ausreichende Zuständigkeit vorliegen. Eine Freigabe kann mehrere entfernte Bindungen abdecken, wenn
 ihre Autorität dafür ausreicht.
 
@@ -306,19 +307,19 @@ geprüfte Ausgabe geht an das bestimmte Ziel. Ein GO zu dieser Erklärung akzept
 Beispielbindungen. Ein gesondert autorisiertes Session-Review kann neue Regeln registrieren. Die
 Einzelfallfreigabe wird niemals stillschweigend zur allgemeinen Regel.
 
-Der versionierte Offenlegungsstand umfasst veranlasste und ausstehende Offenlegungen in einem festgelegten
+Der versionierte **Offenlegungsstand** umfasst veranlasste und ausstehende Offenlegungen in einem festgelegten
 Geltungsbereich. Der Agent darf diesen Bereich nicht so verengen, dass frühere Freigaben verschwinden.
-Reservierung bindet eine Freigabe an den konkreten Versuch und verhindert parallele Nutzung. Verbrauch hält ihre
-verbindliche Verwendung fest. Fortschreibung aktualisiert den gemeinsamen Stand. Diese lokalen Entscheidungen
+**Reservierung** bindet eine Freigabe an den konkreten Versuch und verhindert parallele Nutzung. **Verbrauch** hält ihre
+verbindliche Verwendung fest. **Fortschreibung** aktualisiert den gemeinsamen Stand. Diese lokalen Entscheidungen
 erfolgen atomar. Sie beweisen keine atomare Zustellung an einen beliebigen externen Dienst.
 Gemeinsame Offenlegung birgt ein anderes Risiko als die Vertauschung: Zwei genehmigte Summen können gemeinsam
 einen individuellen Betrag offenlegen; eine Liste gültiger GOs ersetzt keine gemeinsame
 fachliche Prüfung.
 
-Bei manueller Inhaltsfreigabe prüft eine berechtigte Stelle einen konkreten Kandidaten. Die Zusage betrifft
+Bei **manueller Inhaltsfreigabe** prüft eine berechtigte Stelle einen konkreten Kandidaten. Die Zusage betrifft
 dessen unveränderte autorisierte Ausführung, nicht die Abwesenheit verdeckter Kodierung. Ein Akrostichon ist ein
 solches Risiko; die menschliche Prüfung wird hier nicht als automatische Erkennungsgarantie dargestellt. Bei
-begrenzter Faktenfreigabe werden Quelle, Version, Fakten, Auswahl und Veröffentlichungsweise unabhängig vom
+**begrenzter Faktenfreigabe** werden Quelle, Version, Fakten, Auswahl und Veröffentlichungsweise unabhängig vom
 geschützten Agenten festgelegt. Ein neuer öffentlicher Schreibraum erhält nur diese Fakten und seine
 öffentlichen Vorgaben, keine geschützte Historie oder Rückkanäle. Er kann weiterhin freigegebene Fakten
 ausdrücken und kodieren, erhält aber unter den genannten Voraussetzungen keinen zusätzlichen Zugriff auf nicht
@@ -355,12 +356,12 @@ enthält bedingte Beweise.[^sel4]
 ## 12. Werkzeuge, Audit und Baufolge
 
 Zulässigkeit, tatsächlich eingetretene Wirkung und historischer Nachweis sind getrennte Fragen. Die Engine
-liefert Entscheidungen und prüfbare Ableitungen. Der Simulator sucht mit synthetischen Daten nach
+liefert Entscheidungen und prüfbare Ableitungen. Der **Simulator** sucht mit synthetischen Daten nach
 Gegenbeispielen, auch durch den Vergleich zweier Ausführungen. Er beobachtet tatsächliche simulierte Wirkungen
-und verwendet unabhängige Sicherheitsorakel. Der Audit-Verifier prüft historische Regeln, Fakten und
+und verwendet unabhängige Sicherheitsorakel. Der **Audit-Verifier** prüft historische Regeln, Fakten und
 Ausführungsbelege, ohne auszuführen. Eine begrenzte erfolglose Suche ist kein unbeschränkter Sicherheitsbeweis.
 
-Das geschützte Audit-Journal trennt drei Ereignisse:
+Das geschützte **Audit-Journal** trennt drei Ereignisse:
 
 | Ereignis | Aussage |
 |---|---|
@@ -368,7 +369,7 @@ Das geschützte Audit-Journal trennt drei Ereignisse:
 | `ExecutionCommitted` | Die aktuelle Autorisierung und der konkrete Ausführungsauftrag sind vor der Wirkung dauerhaft und zustandskonsistent festgehalten. |
 | `OutcomeRecorded` | Eine benannte Quelle belegt den Ausgang oder hält ihn als unklar fest. |
 
-Beim Versand eines Parteiberichts kann nach dem dauerhaften Vorbeleg ein Timeout auftreten. Der Ausgang bleibt
+Beim Versand eines Parteiberichts kann nach dem dauerhaften **Vorbeleg** ein Timeout auftreten. Der Ausgang bleibt
 offen oder `uncertain`, nicht „nicht gesendet“. Eine sichere Fortsetzung braucht passende Evidenz oder
 nachgewiesene Idempotenz, keinen blinden Wiederholungsversuch. Fällt der Journalpfad aus, sind neue
 auditpflichtige Wirkungen gesperrt. Korrekturen ergänzen die Geschichte, statt alte Einträge umzuschreiben.
@@ -397,7 +398,9 @@ F.5 erläutert „offen“ als Beschreibung eines ungeklärten Versuchs, nicht a
 Ausgangswert. Diese Klarstellungen führen keine neuen Befugnisse oder Zustandsklassen ein.
 Anhang E dokumentiert historische Änderungen von RFC0001, keine neue Recherche für RFC0003.
 
-Revision 2 von RFC0003 (Stand 2026-10-11) operationalisiert bestehende Nachweispflichten: D.9 ergänzt einen umsetzungsnahen Abnahmeblock, R.4.3 erweitert die Connector-Pflichten um die versionierte Fähigkeitsfläche, und R.7 ergänzt die Aufbauphase vor der Datenaufnahme. Für diese Stellen gilt die Vollständigkeitsübernahme aus RFC0001 nicht mehr. Die Änderungen führen keine neuen Befugnisse, Zustandsklassen oder Freigaben ein.
+Revision 2 von RFC0003 (Stand 2026-10-11) operationalisiert bestehende Nachweispflichten: D.9 ergänzt einen umsetzungsnahen Abnahmeblock, R.4.3 verlangt zusätzlich, dass der Funktionsumfang jedes Connectors in einer festen Fassung festgehalten wird, und R.7 ergänzt die Aufbauphase vor der Datenaufnahme. Für diese Stellen gilt die Vollständigkeitsübernahme aus RFC0001 nicht mehr. Die Änderungen führen keine neuen Befugnisse, Zustandsklassen oder Freigaben ein.
+
+Eine Ergänzung vom 2026-10-13 erweitert ausschließlich Anhang E um Quellen und Einordnungen zu Agenten-Informationsflusskontrolle. Die normativen Abschnitte R, die didaktischen Abschnitte 1 bis 12 und die übrigen Anhänge bleiben unverändert. Die Ergänzung führt keine neuen Befugnisse, Zustandsklassen oder Freigaben ein.
 ## R.1 Geltung und Sicherheitsziel
 
 ### R.1.1 Ziel
@@ -538,7 +541,7 @@ Jeder Abruf hat zwei Richtungen. Suchtext, Dokumentkennung und Aufrufentscheidun
 
 Geschützte Arbeit kann deshalb mit vorher beschafften Datenständen beginnen. Spätere externe Nachrecherche erfolgt über eine gesonderte Freigabe. Ein neu auftretendes Quellenlabel darf nicht stillschweigend in einen laufenden Raum aufgenommen werden.
 
-Die Fähigkeitsfläche eines Connectors ist die versionierte Menge seiner tatsächlich angebotenen Operationen samt deren Argumentformen. Sie ist als zugelassene Fähigkeiten im Environment-Datensatz aus B.3 festzuhalten. Weicht die tatsächliche Fläche vom eingetragenen Stand ab, lautet die betroffene Entscheidung `indeterminate`. Eine zugelassene spezialisierte Operation darf durch keine generischere Operation desselben Connectors mit denselben Berechtigungen umgangen werden. Selbstauskünfte des Connectors, etwa Hinweise auf Nur-Lese-Zugriff, begründen keine Befugnis.
+Der Funktionsumfang eines Connectors — welche Operationen er tatsächlich anbietet und mit welchen Parametern sich jede Operation aufrufen lässt — wird in einer festen Fassung festgehalten. Ändert er sich, entsteht eine neue, gekennzeichnete Fassung, statt die alte still umzuschreiben. Diese Liste ist Teil des Environment-Datensatzes aus B.3. Bietet der Connector in Wirklichkeit mehr oder weniger als eingetragen, lautet die betroffene Entscheidung `indeterminate`. Eine eng begrenzte, zugelassene Operation darf nicht über eine weiter gefasste Operation desselben Connectors mit denselben Berechtigungen umgangen werden. Was der Connector über sich selbst mitteilt — etwa der Hinweis, er habe Nur-Lese-Zugriff — begründet keine Befugnis.
 
 ### R.4.4 Vermittler, Freigabedienst und dauerhafte Speicher
 
@@ -1449,7 +1452,7 @@ Definiere versionierte, geschlossene Schemas. Unbekannte Felder, doppelte Schlü
 |---|---|
 | `Registry` | Schema- und Regelversion, Bindungen, Beobachter, aufgelöste Umgebungen, Regeln und Gültigkeitsbereich. |
 | `Binding` | Kennung einschließlich Version, `readers`, Operationsregeln, Auflagen, Lockerungszuständigkeiten. |
-| `Environment` | Versionierte Identität, vollständige zugängliche Beobachter, zugelassene Fähigkeiten und relevante Nachweise. |
+| `Environment` | Versionierte Identität, vollständige zugängliche Beobachter, zugelassene Operationen und relevante Nachweise. |
 | `Object` | Unveränderliche Inhaltsreferenz und Version, Klassifikationsstatus, Label, Herkunft und gesonderte Zugriffsrechte. |
 | `Workspace` | Unveränderlicher Vertrag aus Abschnitt [R.4.1](#r41-startvertrag), Zustand und aktuell geprüfte Gültigkeit. |
 | `Intent` | Vom Agenten vorgeschlagene Operation mit Objekt- und Zielreferenzen; keine selbst attestierten Rechte. |
@@ -1932,7 +1935,7 @@ D.4 prüft den Kalkül, F.9 das Audit. Dieser Block prüft die Umsetzung: Eine k
 | `grenzdurchsetzung` | Alle für den Betrieb nötigen Verbindungen laufen über die zugelassene Vermittlungsstelle. | Raw Sockets, IPv6-, UDP- und DNS-Pfade, Redirect-Ketten, Host-Loopback und Cloud-Metadatenendpunkte werden blockiert oder als benannte Grenze dokumentiert. |
 | `identitaetsbindung` | Nur authentisierte Raum- und Auftragsidentitäten erreichen autorisierte Operationen. | Gefälschte oder wiederverwendete Identitäten und Auftragskennungen werden abgewiesen, ohne Rechte zu erweitern. |
 | `credential-exposition` | Credentials bleiben für die zugelassenen Operationen nutzbar und außerhalb der Agentensicht. | Umgebungs-, Prozess- und Dateidumps, Debug- und Fehlerausgaben, reflektierte Header und Ausweich-Authentifizierungswege führen nicht zur Offenlegung. |
-| `connector-bypass` | Die tatsächliche Fähigkeitsfläche stimmt mit dem Environment-Fakt aus R.4.3 überein. | Eine generischere Operation desselben Connectors umgeht die Beschränkung einer zugelassenen spezialisierten Operation; Oberflächendrift nach der Zulassung wird als Abweichung erkannt und sperrt die betroffene Verarbeitung. |
+| `connector-bypass` | Der tatsächlich angebotene Funktionsumfang stimmt mit dem Environment-Fakt aus R.4.3 überein. | Eine weiter gefasste Operation desselben Connectors umgeht die Beschränkung einer eng begrenzten, zugelassenen Operation; ein nach der Zulassung geänderter Funktionsumfang wird als Abweichung erkannt und sperrt die betroffene Verarbeitung. |
 | `persistenzflucht` | Exporte aus Arbeitsräumen landen nur in zugelassenen Bereichen und werden beim Wiedereingang als Quarantänematerial behandelt. | Symlink- und Pfad-Races, vergiftete Caches und Skill-Speicher sowie in Host-Konfiguration importierte Arbeitsraumausgaben werden erkannt; keine stille Aufnahme in die vertrauenswürdige Basis. |
 
 Feingranulare Ressourcen-, Verkehrs- und Hardwareseitenkanäle bleiben nach R.8.5 ausgenommen. Fehler-, Widerrufs- und Wiederholungsklassen sind bereits in D.4 (`widerruf`, `freigabe-replay`, `autorisierung`) und F.9 (`audit-logausfall`, `audit-crashfenster`) geprüft und werden hier nicht wiederholt. Das Ausbleiben eines Versuchs ist kein Nachweis. Ein bestandener Block ist Teil der Umgebungszulassung und keine Freigabe produktiver geschützter Verarbeitung.
@@ -1983,6 +1986,8 @@ Revision 2 führte Toolarchitektur, Ausdruckssprache, Datenverträge und Baufolg
 
 Die neuen Primärquellen zu signierten Logs, Konsistenzprüfung, kanonischem JSON und Logging wurden am 2026-09-06 geprüft. Sie begründen einzelne technische Unterscheidungen, nicht die Korrektheit dieses eigenen Auditprotokolls. Historische Quellen und Testergebnisse bleiben mit ihrer bisherigen Reichweite erhalten.
 
+Die Quellen zu Agenten-Informationsflusskontrolle (Fides, APPA, PACE, Prudentia, GAAP) und zur zweckbasierten Zugriffskontrolle wurden am 2026-10-13 geprüft. Ihre Dissektion und der Quellenscan liegen in [docs/research/2026-10-13-agent-policy-models-openappa-pace.md](../research/2026-10-13-agent-policy-models-openappa-pace.md). Die NeurIPS-Zugehörigkeit der APPA-Arbeit ist eine Angabe der Projektwebseite und wurde nicht gegen ein offizielles Programm verifiziert.
+
 Das Begleitpaket enthält neue ausführbare **endliche Audit-Gegenmodelle**, keine produktive Journalimplementierung und keine vollständige Engine. Ihre tatsächlichen Ergebnisse und Grenzen stehen in `evidence/audit-model-results.json` und `README.md`. Ein Implementierungsnachweis oder eine unbeschränkte maschinelle Verifikation wird nicht behauptet.
 
 ### E.3 Einordnung der Grundlagen
@@ -1995,7 +2000,25 @@ Das **Decentralized Label Model** motiviert unabhängige, gemeinsam einzuhaltend
 
 **CaMeL** ist eine Forschungsarbeit zur Durchsetzung von Sicherheitsgrenzen außerhalb des LLM. Dieser RFC wählt grobe, feste Arbeitsräume und beansprucht keine Übertragung der CaMeL-Ergebnisse auf eine eigene Implementierung.[^camel]
 
-**Begrenzte Deklassierung, robuste Deklassierung und Hyperproperties** erklären, warum Freigaben und der Vergleich mehrerer Ausführungen eigene Nachweise benötigen. Der Simulator implementiert zunächst konkrete endliche Fälle, keine vollständige Entscheidung aller solcher Eigenschaften.[^delimited][^robust][^hyper]
+**Fides** formalisiert die Informationsflusskontrolle für Agenten-Planner mit einer Regel für vertrauenswürdige Handlungen und einer Regel für erlaubte Flüsse, mit selektivem Verbergen und einer quarantänierten, werkzeuglosen Abfrage. Die Arbeit erklärt vollständige Nichtinterferenz für Vertraulichkeit als praktisch unerreichbar und begnügt sich mit expliziter Geheimhaltung. Dieser RFC behält die stärkere Zusage aus A.5, weil Freigaben bei ihm menschliche GO-Ereignisse mit Offenlegungsstand sind, keine stillen Datenflüsse.[^fides]
+
+**APPA** erzwingt deterministische Informationsflusskontrolle für Agenten außerhalb des Agenten-Loops über ein monotones Label-Kalkül und beweist, dass eine blockierte Operation nur über genau vier registrierte vertrauenswürdige Übergangstypen heilbar ist. Das bestätigt die Freigaben dieses RFC als einzigen regulären Heilweg. Beschlussrechte für LLM-Autoritäten werden nicht übernommen; sie widersprechen dem GO-Prinzip. Eine Ausgabe begrenzter legaler Fortsetzungen bei Ablehnung (im APPA-Papier: remedy plans) ist als eigener Revisionsentwurf vorgesehen.[^appa]
+
+**PACE** bindet deterministische Entscheidungsprotokolle kryptografisch an die exakten Ausführungsbytes und prüft sie am Ausführungsort erneut; Nonce und Gültigkeitsfenster verhindern Wiederverwendung. Das ist eine konkrete Mechanik für den Ausführer aus B.8 und F.5. Das Papier hat keine Vertraulichkeitskomponente. Ein untypisierter Eigentümer-Bypass jenseits der Vermittlung wird nicht übernommen.[^pace]
+
+**Prudentia** misst den menschlichen Einordnungsaufwand und ersetzt Modellfreigaben durch ein einmaliges menschliches Endorsement. Das stützt die Erstklassifikation aus R.2.5 und das GO-Prinzip mit Messungen.[^prudentia]
+
+**GAAP** führt ein Offenlegungsprotokoll über aufgabenübergreifende, zeitlich getrennte Flüsse und modelliert den Modellanbieter selbst als externen Empfänger. Das ist die bisher konkreteste externe Umsetzungssemantik des Offenlegungsstands aus R.6.3. Der Beitrag steht unter Begutachtung.[^gaap]
+
+**Zweckbasierte Zugriffskontrolle** liefert mit Zweckbäumen und ausdrücklichen Verboten die formale Literatur für die zweckgebundenen Operationsbedingungen P_b.[^pbac]
+
+**Cedar** ist eine formal in Lean mechanisierte Policy-Sprache mit bewiesenen Kerneigenschaften. Sie zeigt, wie die Ableitungsprüfpflicht aus A.7 zitierfähige Theoreme werden kann. Der RFC übernimmt keine Engine.[^cedar]
+
+**Einflussbasierte Lockerung** schwächt Labels auf Grundlage eines geschätzten Einflusses eines Eingangs auf eine Ausgabe. Das ist eine implizite, modellgetriebene Deklassifikation und wird ausdrücklich nicht übernommen.[^permissive-ifc]
+
+**Begrenzte Deklassierung, robuste Deklassierung und Hyperproperties** erklären, warum Freigaben und der Vergleich mehrerer Ausführungen eigene Nachweise benötigen. **Graduelle Freigabe** präzisiert, dass das Angreiferwissen zwischen Freigabeereignissen konstant bleibt; das ist die formale Grundlage der Offenlegungsstand-Invariante. Arbeiten zu kompositionaler Deklassifikation begründen die gemeinsame Prüfung mehrerer Freigaben aus D.5. Beweise über gepaarte Ausführungen machen den Zwei-Ausführungsvergleich des Simulators methodisch anschließbar. Der Simulator implementiert zunächst konkrete endliche Fälle, keine vollständige Entscheidung aller solcher Eigenschaften.[^delimited][^robust][^hyper][^gradual-release][^declassification-composition][^paired-execution]
+
+**Konvergenz 2026.** Zwei voneinander unabhängige, einander nicht zitierende Arbeiten des Jahres 2026, APPA und PACE, treffen sich in der Architektur dieses RFC: unzuverlässiger Vorschlagender, deterministische Entscheidung außerhalb des Modells, typisierte Absichten, Bindung der Entscheidung an die exakte Wirkung, versionierte Regelstände, Wiederverwendungsschutz und dauerhafter Vorbeleg vor der Wirkung. Beide enden dort, wo dieser RFC bereits Zustand spezifiziert: Offenlegungsstand, Beobachtermodell, Kompositionsprüfung, Ausgangsevidenz und Vertraulichkeit. Das ist die stärkste externe Bestätigung des gewählten Ansatzes.
 
 ### Quellen
 
@@ -2308,3 +2331,29 @@ Die folgenden Quellen wurden am 2026-09-06 geprüft. Der Entwurf verwendet ihre 
 [^canonical-json]: IETF RFC 8785, *JSON Canonicalization Scheme*, insbesondere 3.1 und 3.2. Erforderlich ist eine geprüfte eindeutige Darstellung; andere normierte Kodierungen sind möglich. [Primärquelle](https://www.rfc-editor.org/rfc/rfc8785.html).
 
 [^logging-practice]: OWASP, *Logging Cheat Sheet*, insbesondere zu sensiblen Logdaten, Zugriffsschutz, Ausfalltests und Aufbewahrung. Diese Anwendungshinweise sind keine formalen Nachweise unseres Protokolls. [Offizielle Dokumentation](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html).
+
+### Ergänzende Primärquellen der Anhang-E-Ergänzung (2026-10-13)
+
+Die folgenden Quellen wurden am 2026-10-13 geprüft. Der Anhang übernimmt ihre Begriffe und Unterscheidungen für die Einordnung; er beansprucht keine Konformität mit ihren vollständigen Systemen. Die zugehörigen Dissektionen liegen unter [docs/research/2026-10-13-agent-policy-models-openappa-pace.md](../research/2026-10-13-agent-policy-models-openappa-pace.md).
+
+[^fides]: Costa et al. (Microsoft Research): *Securing AI Agents with Information-Flow Control*, 2025. [Veröffentlichung](https://arxiv.org/abs/2505.23643).
+
+[^appa]: Arseny Kravchenko et al.: *APPA: Recoverable Information-Flow Control for Real-World LLM Agents*, arXiv:2607.24625v2, 2026. [Veröffentlichung](https://arxiv.org/abs/2607.24625).
+
+[^pace]: Rabimba Karanjai et al.: *PACE: Policy-Attested Contract Execution for Safe AI Agents in Decentralized Finance*, arXiv:2608.17220v1, 2026, unter Begutachtung. [Veröffentlichung](https://arxiv.org/abs/2608.17220).
+
+[^prudentia]: Kolluri, Sharma, Costa, Köpf und Nießen: *Optimizing Agent Planning for Security and Autonomy*, ICLR 2026. [Veröffentlichung](https://arxiv.org/abs/2602.11416).
+
+[^gaap]: Stanley, Verma, Tsai, Kallas und Kumar: *An AI Agent Execution Environment to Safeguard User Data*, 2026, unter Begutachtung. [Veröffentlichung](https://arxiv.org/abs/2604.19657).
+
+[^pbac]: Byun, Bertino und Li: *Purpose Based Access Control of Complex Data for Privacy Protection*, SACMAT 2005. Byun und Li: Ergänzungen im VLDB Journal, 2008.
+
+[^cedar]: *Cedar*: Policy-Sprache mit bewiesenen Kerneigenschaften, OOPSLA 2024, [10.1145/3649835](https://dl.acm.org/doi/10.1145/3649835); Lean-Theoreme im cedar-spec-Repository.
+
+[^permissive-ifc]: Siddiqui, Gaonkar, Köpf, Krueger und Paverd: *Permissive Information-Flow Analysis for Large Language Models*, TMLR 2025. [Veröffentlichung](https://arxiv.org/abs/2410.03055).
+
+[^gradual-release]: Aslan Askarov und Andrei Sabelfeld: *Gradual Release: Unifying Declassification, Encryption and Key Release Policies*, IEEE S&P, 2007.
+
+[^declassification-composition]: Menz, Hirsch, Li und Garg: kompositionelle Sicherheitsdefinitionen für Deklassifikation, OOPSLA (PACMPL), 2023.
+
+[^paired-execution]: Bichhawat, McCall und Jia: Zwei-Ausführungsnachweise über gepaarte Ausführungen, CSF 2021.
