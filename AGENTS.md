@@ -115,8 +115,9 @@ Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Ab
 | [`docs/workflows.md`](docs/workflows.md) | Use Cases & Lückenanalyse für die Ratsarbeit | Workflows, Lücken, Priorisierung |
 | [`docs/nomenklatur.md`](docs/nomenklatur.md) | Fachbegriffe der Ratsarbeit | Begriffsdefinitionen (Sitzungsmappe, Ratsprojekt, Vault, etc.) |
 | [`docs/prerequisites.md`](docs/prerequisites.md) | Externe Abhängigkeiten (nicht im Repo) | Installationsanleitungen, Fallbacks, benötigt von |
+| [`docs/release.md`](docs/release.md) | Release-Konzept: von „Code fertig“ bis „veröffentlicht“ | Release-Kette, Versionierung, Tags, Signierung, GO-Gates |
 
-Diese vier Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows, Begriffen oder Voraussetzungen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
+Diese fünf Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows, Begriffen oder Voraussetzungen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
 
 ## Lizenz-Bewusstsein
 
@@ -296,7 +297,9 @@ kommunalpolitik_ki/
 │   ├── workflows.md               # Use Cases & Lückenanalyse der Ratsarbeit
 │   ├── nomenklatur.md             # Fachbegriffe der Ratsarbeit
 │   ├── prerequisites.md           # Externe Abhängigkeiten
+│   ├── release.md                 # Release-Konzept (Kette, Tags, GO-Gates)
 │   ├── research/                  # Recherchen zu Architektur-Entscheidungen
+│   ├── adr/                       # ADRs (Entscheidungen mit Begründung)
 │   └── rfcs/                      # RFCs (Sandbox, vertrauliche KI-Arbeitsräume)
 ├── artifacts/              # shared Elixir build output (gitignored)
 ├── mix.exs                 # workspace root
@@ -305,6 +308,7 @@ kommunalpolitik_ki/
 ├── .formatter.exs
 ├── opencode.json
 ├── AGENTS.md               # diese Datei
+├── GLOSSARY.md             # Begriffsklärung des Projekts
 └── Makefile
 ```
 
