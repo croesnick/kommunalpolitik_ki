@@ -54,16 +54,18 @@ run_check "verify proofs/proof_missing_binding_condition (unvollständiger Bewei
 
 # advance: Verbrauchs-Vorschlag aus der Freigabe-Permit-Decision extrahieren
 # (release-Objekt als eigenständige Datei, CONTRACT § 7) und zweimal committen.
-proposal="$TMPDIR/komki-policy-advance-proposal.json"
-stand_next="$TMPDIR/komki-policy-stand-next.json"
+# Fallback /tmp: TMPDIR ist auf Linux-Runnern nicht gesetzt (macOS immer; set -u).
+work_dir="${TMPDIR:-/tmp}"
+proposal="$work_dir/komki-policy-advance-proposal.json"
+stand_next="$work_dir/komki-policy-stand-next.json"
 
 ./komki-policy decide --registry "$registry" --snapshot "$fix/case_release_permit/snapshot.json" \
   --intent "$fix/case_release_permit/intent.json" \
   --release "$fix/case_release_permit/release.json" \
-  --stand "$fix/case_release_permit/stand.json" > "$TMPDIR/komki-policy-release-decision.json"
+  --stand "$fix/case_release_permit/stand.json" > "$work_dir/komki-policy-release-decision.json"
 
 python3 -c 'import json,sys; json.dump(json.load(open(sys.argv[1]))["release"], open(sys.argv[2],"w"))' \
-  "$TMPDIR/komki-policy-release-decision.json" "$proposal"
+  "$work_dir/komki-policy-release-decision.json" "$proposal"
 
 # advance: erster Commit des GOs; das Ergebnis (neuer Stand) wird Vollzug
 # und Grundlage des CAS-Gegenversuchs.
