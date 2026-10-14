@@ -42,6 +42,16 @@ Fünf kanonische Triage-Rollen als Labels: `needs-triage`, `needs-info`, `ready-
 
 Single-context: `GLOSSARY.md` am Repo-Root (kanonische Nomenklatur aller Domänen — ersetzt die frühere `docs/nomenklatur.md`), ADRs unter `docs/adr/`. Siehe `docs/agents/domain.md`.
 
+### Γ-Datenorte (Policy-Prototyp, RFC 0003)
+
+Wer Γ erzeugt, prüft oder konsumiert, findet die verbindlichen Daten an drei Orten:
+
+- **Engine-Datenvertrag**: `apps/komki_policy/CONTRACT.md` mit den Γ-Konsumformaten (`komki-registry/1`, Snapshot, Intent, Decision, Proof). Der Vertrag gehört zur Engine, weil `KomkiPolicy.Registry.compile/1` die Formate durchsetzt; Änderungen nur durch den Integrator.
+- **Store-Importformat**: Moduledoc in `apps/komki_cli/lib/komki_cli/label_store.ex`, lebendes Beispiel in `apps/komki_cli/priv/fixtures/registry-seed.json`. Format `komki-label-store/1`: die Obermenge mit den R.2.2-Metadaten (Bezeichnung, Geltungsbereich, verantwortliche Stelle, Auflagen, Lockerungsbefugnis).
+- **Normative Basis**: `docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md` mit ≈ 2 400 Zeilen; Abschnitte per Anker-Grep (`R.N.M`, `B.N`) und gerangelte Reads statt Volltext.
+
+Regel am Γ-Übergang: Import und Export validieren immer über `KomkiPolicy.Registry.compile/1`; die Engine ist die Schemainstanz, kein Tool schreibt eigene Schema-Checks für engine-seitige Datenformate.
+
 ## Architektur-Prinzipien
 
 ### 1. Elixir-first
