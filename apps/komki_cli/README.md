@@ -108,6 +108,7 @@ Zwei Hinweise für die verteilte Datei:
 ./komki session --detach            # im Hintergrund; attach via 'tmux attach -t komki'
 ./komki down                        # llama-server stoppen
 ./komki status                      # Zustand (base, gguf, port, llama)
+./komki label …                     # SQLite-Registry: Bindungen, Labels, Γ-Export (siehe unten)
 ```
 
 Weitere Flags: `init --port N --ctx N --force`, `up --ctx N`,
@@ -128,6 +129,57 @@ die Auswahl, `Enter` übernimmt).
 
 Unter `~/.local/share/komki` liegen die Instanzdaten, überschreibbar via
 `KOMKI_HOME`.
+
+## Die Label-Registry (Bindungen, Labels und Γ)
+
+`komki label` führt die SQLite-Registry des RFC-0003-Sicherheitsmodells
+([RFC 0003](../../docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md)):
+`<base>/registry.db`, übersteuerbar per `--db`. Sie speichert Bindungen nach
+R.2.2 — Kennung mit Version, Empfängerkreis, Operationsbedingungen, Auflagen
+und Lockerungsbefugnis; ohne eingetragene Lockerungsbefugnis gibt es keine
+zulässige Lockerung — und dazu Objekt-Metadaten: Herkunft, Inhaltsversion
+und Klassifikationsentscheid, getrennt vom Inhalt.
+
+Drei Eigenschaften tragen das Design:
+
+- **Labels liegen außerhalb der Sandbox-Schreibhoheit** (R.2.1). Die
+  Registry-DB wohnt an der Basis-Wurzel, nicht unter `pi-home` und nicht
+  unter einem Lauf-Scratch. Die gesandboxte Session kann sie nicht
+  schreiben; Umbenennen oder die Behauptung „anonymisiert“ ändert kein
+  Label.
+- **Erstklassifikation ist ein menschlicher Akt** (R.2.5). `classify`
+  verlangt `--decided-by` (Beobachter-ID) und `--basis` (Begründung +
+  Quelle). Jeder Einordnungsschritt, Quarantäne eingeschlossen, landet als
+  unveränderlicher Klassifikationsentscheid in der Historie. Ein Agent
+  kann vorschlagen; setzen kann nur die nutzende Person.
+- **Quarantäne ist kein leeres Label** (R.2.5). Unklassifiziertes Material
+  liegt im abgesonderten Eingang, nicht als Bindungsmenge ∅. Ein
+  klassifiziertes Objekt ohne Bindungen (öffentlich) ist etwas anderes und
+  bleibt unterscheidbar.
+
+```sh
+./komki label import registry-seed.json        # Bindungen/Beobachter/Umgebungen füllen (Merge)
+./komki label quarantine brief-4711@v1 \
+           --content-ref PFAD --origin TEXT \
+           --decided-by ID --basis TEXT         # Eingang in Quarantäne
+./komki label classify brief-4711@v1 \
+           --label ratsarbeit@1 \
+           --decided-by ID --basis TEXT         # Erstklassifikation
+./komki label list                              # Übersicht
+./komki label show binding ratsarbeit@1        # volle Bindungsdefinition
+./komki label show object brief-4711@v1        # Metadaten + Entscheidungshistorie
+./komki label export --out gamma.json           # Γ-Export: komki-registry/1
+```
+
+Der Γ-Export ist der feste Regelstand für Entscheidungen. `komki-policy`
+konsumiert die Datei direkt (`validate`/`decide` mit `--registry`); der
+Store prüft Import und Export über den Engine-Kompiler
+(`KomkiPolicy.Registry.compile/1`) — was der Store annimmt, kann die
+Engine lesen. Ein synthetischer Seed liegt unter
+`priv/fixtures/registry-seed.json`. Die `label`-Befehle kennen nur
+Erfolg (Exit 0) und Eingabefehler (Exit 2), kein Boot-Gate. RFC 0003 ist
+Draft und gibt ausdrücklich keine Freigabe für produktive Verarbeitung
+geschützter Daten; alle Bezeichner des Seeds sind synthetisch.
 
 ## So sieht eine Session aus
 

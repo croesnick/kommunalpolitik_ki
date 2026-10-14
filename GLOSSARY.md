@@ -525,6 +525,36 @@ Objekt mit einem ausdrücklich leeren Label.
 
 ---
 
+### Quarantäne
+
+**Definition:** Der abgesonderte Eingang für unklassifiziertes Material. Ein
+Objekt in Quarantäne trägt kein reguläres Label und gilt nicht als leere
+Bindungsmenge. Herausholen kann es nur ein gesondert autorisiertes
+Einordnungsverfahren; im Minimum ist das die Erstklassifikation durch eine
+berechtigte Person. Ein Agent darf eine Einordnung nur vorschlagen.
+
+**Wo:** In der SQLite-Registry des `komki label`-CLI (apps/komki_cli); der
+Zustand wird über den Klassifikationsentscheid geführt.
+
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md), R.2.5.
+
+---
+
+### Klassifikationsentscheid
+
+**Definition:** Der nachvollziehbar festgehaltene Akt, der einem Datenobjekt
+sein Label zuordnet: wer entschieden hat, auf welcher Grundlage und wann.
+Erstklassifikation und Neuklassifikation sind menschliche Akte; jede
+Entscheidung wird unveränderlich an die Objektversion gehängt und getrennt vom
+Inhalt geführt.
+
+**Wo:** In der SQLite-Registry des `komki label`-CLI (apps/komki_cli) als
+append-only-Historie je Objektversion.
+
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md), R.2.1 und R.2.5.
+
+---
+
 ### Registry und Regelstand Γ
 
 **Definition:** Die Registry ist ein geschütztes Register für Regeln,

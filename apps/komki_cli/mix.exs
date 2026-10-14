@@ -69,17 +69,25 @@ defmodule KomkiCli.MixProject do
     ]
   end
 
-  # Runtime-Deps: optimus 0.6 (CLI-Layer) und burrito 1.6 (Ticket #75).
+  # Runtime-Deps: optimus 0.6 (CLI-Layer), burrito 1.6 (Ticket #75),
+  # exqlite 0.38 (SQLite-Registry des Label-Store, Ticket #91; direkt ohne
+  # Ecto via Exqlite.Sqlite3) und komki_policy (Γ-Validierung bei Import und
+  # Export: die Engine-Vertragsform `komki-registry/1` ist die alleinige
+  # Schemainstanz, siehe apps/komki_policy/CONTRACT.md § 2.1). Path-Dep auf
+  # die Workspace-Schwester ohne Hex-Lock-Eintrag.
   # :burrito ist bewusst RUNTIME — der dokumentierte Burrito-argv-Aufruf
   # (KomkiCli.Runtime.argv/0 → Burrito.Util.Args.argv/0) laeuft im Payload;
   # runtime:false wuerde ihn in der Standalone-Binary brechen. Benannter
   # Payload-Zusatz laut Ticket #75: Teile von :burrito landen in der
-  # verteilten Binary (Dokumentation: docs/research/, README).
+  # verteilten Binary (Dokumentation: docs/research/, README). Fuer
+  # Gate-Ticket #91 gilt dasselbe fuer :exqlite (NIF) und :komki_policy.
   # Build-Werkzeuge (credo/dialyxir) nur :dev, runtime false.
   defp deps do
     [
       {:optimus, "~> 0.6"},
       {:burrito, "~> 1.6"},
+      {:exqlite, "~> 0.38"},
+      {:komki_policy, path: "../komki_policy"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]
