@@ -25,11 +25,21 @@ defmodule KomkiCli.DoctorBootTest do
     # reine Wartezeit. Eigener Port: Der run-Fail-Fast-Fall muss
     # deterministisch "nicht aktiv" sehen, egal ob auf dem Host gerade ein
     # echter llama-server laeuft.
+    #
+    # Vermittler-Staging (Ticket #102): init entdeckt komki-mediator ueber
+    # PATH oder <base>/bin — da das echte Escript des Parallel-Lane hier
+    # nicht existiert, liegt fuer die presence-only-Doctor-Klasse eine
+    # Platshalter-Datei im Instanz-bin (doctor prueft Praesenz, nicht Leben;
+    # bei echten Launches verantwortet `up` die Binary).
     setup_all do
       home = TestSupport.tmp_area!("komki-boot")
       System.put_env("KOMKI_HOME", home)
 
       on_exit(fn -> System.delete_env("KOMKI_HOME") end)
+
+      fake_mediator = Path.join([home, "bin", "komki-mediator"])
+      File.mkdir_p!(Path.dirname(fake_mediator))
+      File.write!(fake_mediator, "komki-mediator-platzhalter ( teste-Instanz )")
 
       {init_out, 0} = CLI.run(["init", "--port", "59999"])
       {:ok, init_out: init_out}

@@ -156,7 +156,12 @@ defmodule KomkiCli.Pi do
   defp session_flags(cfg, continue?) do
     base = [
       "--offline",
+      # MCP-Vertrag (Ticket #102): `-ne` schaltet ALLE Extensions tot; das
+      # explizite `-e builtin:mcp` reaktiviert NUR die eingebaute Extension
+      # MCP für die Vermittler-Verbindung (pi >= 1.0; Issue #103: kein Pin).
       "--no-extensions",
+      "-e",
+      "builtin:mcp",
       "--no-skills",
       "--no-prompt-templates",
       "--no-themes",
@@ -207,7 +212,12 @@ defmodule KomkiCli.Pi do
       "--mode",
       Atom.to_string(mode),
       "--offline",
+      # MCP-Vertrag (Ticket #102): `-ne` schaltet ALLE Extensions tot; das
+      # explizite `-e builtin:mcp` reaktiviert NUR die eingebaute Extension
+      # MCP für die Vermittler-Verbindung (pi >= 1.0; Issue #103: kein Pin).
       "--no-extensions",
+      "-e",
+      "builtin:mcp",
       "--no-skills",
       "--no-prompt-templates",
       "--no-themes",

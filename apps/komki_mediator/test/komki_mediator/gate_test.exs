@@ -1,0 +1,264 @@
+defmodule KomkiMediator.GateTest do
+  use ExUnit.Case, async: false
+
+  alias KomkiMediator.{Gate, Room, TestHelpers}
+  alias KomkiPolicy.{Derive, JSON}
+
+  setup do
+    base = TestHelpers.provisioned_base()
+    env_map = TestHelpers.restart_env(base)
+
+    %{
+      base: base,
+      gamma: env_map.gamma,
+      room: env_map.room,
+      journal_path: env_map.journal_path,
+      env: env_map
+    }
+  end
+
+  # -----------------------------------------------------------------------
+  # Ping: Permit-Fluss mit PDR-Begleitdokument
+  # -----------------------------------------------------------------------
+
+  test "ping wird erlaubt: decision_id, labels, payload_hash", %{env: env} do
+    response = Gate.call(env, "ping", %{}, TestHelpers.ping_executor(env.gamma))
+
+    assert response["decision"] == "permit"
+    assert response["decision_id"] =~ "pdr-"
+    assert response["labels"] == ["mediator-ping@1"]
+    assert response["payload_hash"] =~ "sha256:"
+    assert response["tools"] == ["ping", "admit_document"]
+  end
+
+  test "PDR-Datensatz: Form, byte-kanonischer Chunk, abrufdatum ISO8601", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    response = Gate.call(env, "ping", %{}, TestHelpers.ping_executor(env.gamma))
+
+    [chunk] = TestHelpers.journal_chunks_raw(journal_path)
+    assert [pdr] = TestHelpers.journal_records(journal_path)
+
+    # Der Eintrag ist selbst byte-kanonisch.
+    assert JSON.canonical(pdr) == chunk
+
+    assert pdr["schema"] == "komki-pdr/1"
+    assert pdr["decision"] == "permit"
+    assert pdr["outcome"] == "admitted"
+    assert pdr["admitted"] == true
+    assert pdr["decision_id"] == response["decision_id"]
+    assert pdr["gamma"]["registry_id"] == "reg-komki-arbeitsraum"
+    assert pdr["gamma"]["gamma_hash"] =~ "sha256:"
+    assert pdr["intent_hash"] =~ "sha256:"
+    assert pdr["payload_hash"] =~ "sha256:"
+    assert pdr["intent_id"] =~ "intent-"
+    assert pdr["snapshot_id"] =~ "snap-"
+    assert pdr["fassung_id"] == "komki-mediator/1"
+
+    {:ok, _, _} = DateTime.from_iso8601(pdr["abrufdatum"])
+  end
+
+  # -----------------------------------------------------------------------
+  # admit_document: die drei Entscheidungspfade
+  # -----------------------------------------------------------------------
+
+  test "doc-oeffentlich -> Permit mit Inhalt; identischer Aufruf, gleicher intent_hash", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    executor = TestHelpers.admit_executor(env.room, "doc-oeffentlich")
+    params = %{"document_id" => "doc-oeffentlich"}
+
+    first = Gate.call(env, "admit_document", params, executor)
+    second = Gate.call(env, "admit_document", params, executor)
+
+    assert first["decision"] == "permit"
+    assert first["content"] != nil
+    assert first["content"] == File.read!(Path.join(env.room.documents_dir, "doc-oeffentlich.md"))
+    assert second["decision"] == "permit"
+
+    intent_hashes = intent_hashes_from_journal(journal_path)
+    assert Enum.count(intent_hashes) == 2
+    # Byte-Stabilitaet des gerenderten Aufrufs: gleicher Aufruf -> gleicher
+    # Hash (daher exakt eine uniq-Menge).
+    assert Enum.count(Enum.uniq(intent_hashes)) == 1
+  end
+
+  test "unterschiedliche Paramter heissen unterschiedliche intent_hash", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    Gate.call(env, "ping", %{}, TestHelpers.ping_executor(env.gamma))
+
+    Gate.call(
+      env,
+      "admit_document",
+      %{"document_id" => "doc-oeffentlich"},
+      TestHelpers.admit_executor(env.room, "doc-oeffentlich")
+    )
+
+    intent_hashes = intent_hashes_from_journal(journal_path)
+    assert Enum.count(intent_hashes) == 2
+    assert Enum.count(Enum.uniq(intent_hashes)) == 2
+  end
+
+  test "doc-vertraulich -> deny mit Remedy-Plan (kein nackter Fehler)", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    response =
+      Gate.call(
+        env,
+        "admit_document",
+        %{"document_id" => "doc-vertraulich"},
+        TestHelpers.admit_executor(env.room, "doc-vertraulich")
+      )
+
+    assert response["decision"] == "deny"
+    assert response["decision_id"] =~ "pdr-"
+    assert response["registry_id"] == "reg-komki-arbeitsraum"
+
+    assert [%{"type" => "provide_fact", "clears" => "purpose"}] = response["remedies"]
+    refute Map.has_key?(response, "content")
+
+    assert [pdr] = TestHelpers.journal_records(journal_path)
+    assert pdr["decision"] == "deny"
+    assert pdr["outcome"] == "not_admitted"
+  end
+
+  test "doc-pending-freigabe -> indeterminate mit provide_fact", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    response =
+      Gate.call(
+        env,
+        "admit_document",
+        %{"document_id" => "doc-pending-freigabe"},
+        TestHelpers.admit_executor(env.room, "doc-pending-freigabe")
+      )
+
+    assert response["decision"] == "indeterminate"
+
+    assert [
+             %{
+               "type" => "provide_fact",
+               "clears" => "vertraulich_freigabe",
+               "relaxation_authorities" => ["nutzende-person"]
+             }
+           ] =
+             response["remedies"]
+
+    assert [pdr] = TestHelpers.journal_records(journal_path)
+    assert pdr["decision"] == "indeterminate"
+    assert pdr["outcome"] == "not_admitted"
+  end
+
+  test "unbekanntes Dokument -> Entscheidungsfehler, PDR not_admitted, kein Crash", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    response =
+      Gate.call(
+        env,
+        "admit_document",
+        %{"document_id" => "doc-phantom"},
+        TestHelpers.admit_executor(env.room, "doc-phantom")
+      )
+
+    assert response["decision"] == "error"
+    assert response["detail"] == "unbekanntes Objekt: \"doc-phantom\""
+
+    assert [pdr] = TestHelpers.journal_records(journal_path)
+    assert pdr["outcome"] == "not_admitted"
+    assert pdr["intent_hash"] =~ "sha256:"
+  end
+
+  # -----------------------------------------------------------------------
+  # Tor 2 separat: Rueckhaltung bei verfaelschtem Beweis (Orakel)
+  # -----------------------------------------------------------------------
+
+  test "verfaelschter Beweis -> Rueckhaltung ohne Inhalt, PDR redacted", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    intent_hash = "sha256:" <> String.duplicate("ab", 32)
+    snapshot = build_snapshot(env, "doc-oeffentlich", intent_hash)
+    intent = build_intent(env, "doc-oeffentlich")
+    {:ok, decision} = Derive.decide(env.gamma.compiled, snapshot, intent)
+
+    # Beweis verfaelschen: ein Praemissenwert wird gekippt.
+    tampered = rewrite_first_fact_value(decision["proof"])
+
+    response =
+      Gate.admit_result(
+        env,
+        "admit_document",
+        intent_hash,
+        intent,
+        snapshot,
+        tampered,
+        {:ok, %{"content" => "geheim"}}
+      )
+
+    assert response["decision"] == "permit"
+    assert response["admitted"] == "redacted"
+    assert response["reason"] =~ "fehlgeschlagen"
+    refute Map.has_key?(response, "content")
+
+    {:ok, pdr} = journal_last_record(journal_path)
+    assert pdr["admitted"] == "redacted"
+    assert pdr["outcome"] == "redacted"
+  end
+
+  # -----------------------------------------------------------------------
+  # Fail-closed: stirbt der Journal-Prozess, wirft das Gate
+  # -----------------------------------------------------------------------
+
+  test "Journal tot -> Gate wirft (keine Antwort ohne Journal-Schreibzugriff)", %{env: env} do
+    GenServer.stop(KomkiMediator.Journal)
+
+    assert catch_exit(Gate.call(env, "ping", %{}, TestHelpers.ping_executor(env.gamma)))
+  end
+
+  # -----------------------------------------------------------------------
+  # Helfer
+  # -----------------------------------------------------------------------
+
+  # Eintraege sind multi-line-Kanons: hier ein einzelnes Orakeldokument.
+  defp journal_last_record(journal_path) do
+    chunk = List.last(TestHelpers.journal_chunks_raw(journal_path))
+    JSON.parse(chunk)
+  end
+
+  defp intent_hashes_from_journal(journal_path) do
+    journal_path
+    |> TestHelpers.journal_records()
+    |> Enum.map(fn pdr -> pdr["intent_hash"] end)
+  end
+
+  # Baustein wie im Gate, nur mit fixer digest12-Quelle (der intent_hash).
+  defp build_snapshot(env, document_id, intent_hash) do
+    {:ok, object} =
+      Room.object_for_call(env.room, "admit_document", %{"document_id" => document_id})
+
+    Room.snapshot_for(env.room, env.gamma, object, KomkiMediator.Hash.digest12(intent_hash))
+  end
+
+  defp build_intent(env, document_id) do
+    %{
+      "schema" => "komki-intent/1",
+      "intent_id" => "intent-gate-test",
+      "operation" => "admit",
+      "object" => document_id <> "@v1",
+      "workspace" => env.room.workspace_id
+    }
+  end
+
+  defp rewrite_first_fact_value(proof) do
+    [premise | rest] = proof["premises"]
+    mutated = Map.put(premise, "value", false)
+    Map.put(proof, "premises", [mutated | rest])
+  end
+end

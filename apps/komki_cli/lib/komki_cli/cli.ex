@@ -9,7 +9,8 @@ defmodule KomkiCli.CLI do
   Befehle (Vertrag):
 
       komki version
-      komki init  [--gguf-from PATH] [--port N] [--ctx N] [--force]
+      komki version
+      komki init  [--gguf-from PATH] [--port N] [--mediator-port N] [--ctx N] [--force]
       komki doctor
       komki up    [--ctx N]
       komki down
@@ -25,7 +26,7 @@ defmodule KomkiCli.CLI do
       | `0`  | Erfolg |
       | `2`  | Usage-/Konfigurationsfehler (unbekannter Befehl, fehlende/unbekannte Optionen, fehlende config.json, GGUF-SHA-Abweichung, nicht laufender llama-server bei `run`/`session`) |
       | `3`  | Doctor-/Boot-Gate-Fail (Profil-Drift oder sandbox-exec-Boot-Pleite; Weiterbetrieb verweigert) |
-      | `4`  | Runtime-Fail (llama-server oder pi beendet nicht erfolgreich) |
+      | `4`  | Runtime-Fail (llama-server, komki-mediator oder pi beendet nicht erfolgreich) |
 
   **CLI-Surface-Isolation:** argv-Parsing/Help/Validierung (optimus) UND alle
   menschlichen Ausgaben (Farben via IO.ANSI, Verdict-Zeilen, Spinner/Statuszeile)
@@ -101,6 +102,12 @@ defmodule KomkiCli.CLI do
               parser: :integer,
               help: "llama-server-Port (default 49524, gepinnt)"
             ],
+            mediator_port: [
+              value_name: "N",
+              long: "mediator-port",
+              parser: :integer,
+              help: "Vermittler-MCP-Port (default 49525)"
+            ],
             ctx: [
               value_name: "N",
               long: "ctx",
@@ -115,7 +122,8 @@ defmodule KomkiCli.CLI do
         doctor: [name: "doctor", description: "alle Checks; Boot-Gate ist Pflicht vor jedem Lauf"],
         up: [
           name: "up",
-          description: "llama-server starten (doctor-quick zuerst; Health-Poll nach)",
+          description:
+            "llama-server und Vermittler starten (doctor-quick zuerst; Health-Poll nach)",
           options: [
             ctx: [
               value_name: "N",
@@ -128,9 +136,12 @@ defmodule KomkiCli.CLI do
         down: [
           name: "down",
           description:
-            "llama-server stoppen (Aufraeumweg ohne Boot-Gate; nur eigener pidfile-Prozess)"
+            "Vermittler und llama-server stoppen (Aufraeumweg ohne Boot-Gate; nur eigener pidfile-Prozess)"
         ],
-        status: [name: "status", description: "Zustandsabfrage (base, gguf, port, llama)"],
+        status: [
+          name: "status",
+          description: "Zustandsabfrage (base, gguf, ports, llama, mediator)"
+        ],
         run: [
           name: "run",
           description: "pi-Einmallauf unter Profil (+ full doctor zuerst)",
@@ -323,26 +334,48 @@ defmodule KomkiCli.CLI do
   defp render({:inited, cfg, gguf_lines}), do: render_init(cfg, gguf_lines)
   defp render({:checks, checks, summary}), do: render_doctor(checks, summary)
 
-  defp render({:llama_up, pid}),
-    do: {green() <> "llama up: pid " <> to_string(pid) <> reset() <> " (health 200)\n", 0}
+  # Ticket #102: up startet llama-server UND den Vermittler (zwei
+  # Zustandszeilen); der Vermittler kann auch :already sein (healthz gruen,
+  # kein Neustart — Idempotenz).
+  defp render({:up, %{llama: pid, mediator: {:started, mediator_pid, health}}}),
+    do:
+      {green() <>
+         "llama up: pid " <>
+         to_string(pid) <>
+         reset() <>
+         " (health 200)\n" <>
+         green() <>
+         "mediator up: pid " <>
+         to_string(mediator_pid) <>
+         reset() <>
+         " (tools: " <>
+         mediator_tools_line(health) <> ")\n", 0}
 
-  defp render({:llama_down}),
-    do: {green() <> "llama down: pidfile entfernt, pid abwesend" <> reset() <> "\n", 0}
+  defp render({:up, %{llama: pid, mediator: {:already, health}}}),
+    do:
+      {green() <>
+         "llama up: pid " <>
+         to_string(pid) <>
+         reset() <>
+         " (health 200)\n" <>
+         green() <>
+         "mediator: bereits laufend (healthz ok, tools: " <>
+         mediator_tools_line(health) <> ")" <> reset() <> "\n", 0}
 
-  defp render({:llama_down, :already}),
-    do: {green() <> "llama: bereits gestoppt (kein pidfile)" <> reset() <> "\n", 0}
+  # Stoppreihenfolge wie up rueckwaerts: Vermittler-Zeile zuerst.
+  defp render({:down, %{llama: llama, mediator: mediator}}),
+    do: {down_line("mediator", mediator) <> "\n" <> down_line("llama", llama) <> "\n", 0}
 
-  defp render({:llama_down, :stale, reason}),
-    do: {green() <> "llama down: " <> reason <> reset() <> "\n", 0}
-
-  defp render({:status, cfg, llama_state}),
+  defp render({:status, cfg, %{llama: llama_state, mediator: mediator_state}}),
     do:
       {Enum.join(
          [
-           "base:   " <> cfg.base_dir,
-           "gguf:   " <> cfg.gguf_path,
-           "port:   " <> to_string(cfg.port),
-           "llama:  " <> render_llama_state(llama_state)
+           "base:          " <> cfg.base_dir,
+           "gguf:          " <> cfg.gguf_path,
+           "port:          " <> to_string(cfg.port),
+           "mediator-port: " <> to_string(cfg.mediator_port),
+           "llama:         " <> render_llama_state(llama_state),
+           "mediator:      " <> render_mediator_state(mediator_state)
          ],
          "\n"
        ) <> "\n", 0}
@@ -381,6 +414,7 @@ defmodule KomkiCli.CLI do
         "profile:    " <> cfg.profile_path,
         "pi-home:    " <> cfg.pi_home,
         "port:       " <> to_string(cfg.port),
+        "mediator-port: " <> to_string(cfg.mediator_port),
         "ctx:        " <> to_string(cfg.ctx)
       ] ++ gguf_lines
 
@@ -420,4 +454,27 @@ defmodule KomkiCli.CLI do
 
   defp render_llama_state(:stopped), do: "stopped"
   defp render_llama_state({:error, reason}), do: "error: " <> reason
+
+  # Vermittler-Zustandszeile (Ticket #102); Form spiegelt render_llama_state.
+  defp render_mediator_state({:running, pid}), do: "running (pid " <> to_string(pid) <> ")"
+
+  defp render_mediator_state({:health_only, :no_pidfile}),
+    do: "port antwortet /healthz aber kein pidfile (fremder Prozess?)"
+
+  defp render_mediator_state(:stopped), do: "stopped"
+  defp render_mediator_state({:error, reason}), do: "error: " <> reason
+
+  # Fassung-Tools im up-Output: kleine Ehrlichkeit der Schnittstelle — der
+  # Nutzer sieht, was pi per mcp.json freigeschaltet bekommt.
+  defp mediator_tools_line(%{"tools" => tools}) when is_list(tools), do: Enum.join(tools, ", ")
+  defp mediator_tools_line(_), do: "?"
+
+  defp down_line(component, :ok),
+    do: green() <> component <> " down: pidfile entfernt, pid abwesend" <> reset()
+
+  defp down_line(component, :already),
+    do: green() <> component <> ": bereits gestoppt (kein pidfile)" <> reset()
+
+  defp down_line(component, {:stale, reason}),
+    do: green() <> component <> " down: " <> reason <> reset()
 end

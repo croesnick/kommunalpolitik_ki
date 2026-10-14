@@ -1,12 +1,13 @@
 defmodule KomkiCli.Steps do
   @moduledoc """
-  Befehls-Orchestrierung fuer den `komki`-Escript (Ticket #74).
+  Befehls-Orchestrierung fuer den `komki`-Escript (Ticket #74; Vermittler-
+  Anbindung Ticket #102).
 
   **CLI-Surface-Isolation (API-Vertrag):** alle menschlichen Ausgaben
   (Verdict-Zeilen, Farben, Progress-Messaging) rendert ausschliesslich
   `KomkiCli.CLI`. Diese Orchestrierung liefert *strukturierte* Resultate —
   ein späteres CLI-Library-Retrofit (owl/optimus, in Forschung) berührt nur
-  die Render-Schicht in `KomkiCli.CLI`, nie Profile/Llama/Pi/Config.
+  die Render-Schicht in `KomkiCli.CLI`, nie Profile/Llama/Mediator/Pi/Config.
 
   Resultatformen:
 
@@ -14,33 +15,45 @@ defmodule KomkiCli.Steps do
       (Pfad + SHA), die CLI rendert sie.
     * `{:checks, [%{name, ok, reason}], summary_state}` — Doctor-Ergebnis;
       `summary_state` ∈ `:ok | :fail | :boot_gate_fail`.
-    * `{:llama_up, pid}` — llama-server running.
-    * `{:llama_down}` — sauber gestoppt; `{:llama_down, :already}` — war
-      bereits unten (Idempotenz); `{:llama_down, :stale, reason}` — stale
-      pidfile aufgeräumt, kein Prozess getötet.
-    * `{:status, cfg, llama_state}` — Status-Snapshot (`llama_state`
-      uebernimmt die Struktur aus `KomkiCli.Llama.status/1`).
+    * `{:up, %{llama: pid, mediator: mediator_state}}` — llama-server und
+      Vermittler laufen; `mediator_state` ist
+      `{:started, pid, health}` (frisch gespawnt) oder `{:already, health}`
+      (healthz war gruen, kein Neustart) — Struktur aus `KomkiCli.Mediator.up`.
+      `health` traegt die healthz-Vertrags-Keys (inkl. `tools`, aus denen
+      die mcp.json geschrieben wurde).
+    * `{:down, %{llama: down_state, mediator: down_state}}` — gestoppt;
+      `down_state` ∈ `:ok | :already | {:stale, reason}` pro Komponente
+      (`:already` = war bereits unten, Idempotenz; `:stale` = stale pidfile
+      aufgeräumt, kein Prozess getötet). Stoppreihenfolge: Vermittler zuerst
+      (gestartet zuletzt, gestoppt zuerst).
+    * `{:status, cfg, %{llama: llama_state, mediator: mediator_state}}` —
+      Status-Snapshot (`llama_state`/`mediator_state` uebernehmen die
+      Struktur aus `KomkiCli.Llama.status/1` bzw. `KomkiCli.Mediator.status/1`).
     * `{:run_ok, scratch, output}` / `{:run_error, scratch, output, pi_code}`.
     * `{:session, message}` — interaktive pi-Session gestartet oder beendet
       (tmux-Session `komki`; Exit 0).
     * `{:chain_exit, code}` — Ende des internen `session-chain`-Pane-Laufs.
     * `{:error, reason, exit_code}` — Reihenfolge: 2 = Usage/Konfig, 3 = Doctor/
-      Boot-Gate, 4 = Runtime (llama/pi).
+      Boot-Gate, 4 = Runtime (llama/mediator/pi).
   """
 
-  alias KomkiCli.{Config, Llama, Pi, Profile}
+  alias KomkiCli.{Config, Llama, Mediator, Pi, Profile}
   require Config
 
   @type check :: %{name: String.t(), ok: boolean(), reason: String.t()}
 
+  @type mediator_state ::
+          {:started, pos_integer(), Mediator.health()} | {:already, Mediator.health()}
+
+  @type down_state :: :ok | :already | {:stale, String.t()}
+
   @type result ::
           {:inited, Config.t(), [String.t()]}
           | {:checks, [check()], :ok | :fail | :boot_gate_fail}
-          | {:llama_up, pos_integer()}
-          | {:llama_down}
-          | {:llama_down, :already}
-          | {:llama_down, :stale, String.t()}
-          | {:status, Config.t(), term()}
+          | {:up, %{llama: pos_integer(), mediator: mediator_state()}}
+          | {:down, %{llama: down_state(), mediator: down_state()}}
+          | {:status, Config.t(),
+             %{llama: term(), mediator: Mediator.mediator_state() | {:error, String.t()}}}
           | {:run_ok, String.t(), String.t()}
           | {:run_error, String.t(), String.t(), integer()}
           | {:session, String.t()}
@@ -59,7 +72,12 @@ defmodule KomkiCli.Steps do
     if File.exists?(config_path) and not Map.has_key?(opts, "force") do
       {:error, "config.json bereits vorhanden: " <> config_path <> "; --force verwenden", 2}
     else
-      cfg = Config.defaults(base, port: parse_int!(opts, "port"), ctx: parse_int!(opts, "ctx"))
+      cfg =
+        Config.defaults(base,
+          port: parse_int!(opts, "port"),
+          ctx: parse_int!(opts, "ctx"),
+          mediator_port: parse_int!(opts, "mediator-port")
+        )
 
       case missing_tools(cfg) do
         [] -> create_instance(cfg, opts)
@@ -304,7 +322,8 @@ defmodule KomkiCli.Steps do
 
   defp all_checks(cfg, scope) do
     Enum.concat([
-      tools_checks(cfg),
+      tools_checks(cfg, scope),
+      pi_version_checks(cfg, scope),
       profile_checks(cfg),
       gguf_checks(cfg, scope),
       boot_gate(cfg),
@@ -313,7 +332,7 @@ defmodule KomkiCli.Steps do
     ])
   end
 
-  defp tools_checks(cfg) do
+  defp tools_checks(cfg, scope) do
     tools = [
       {"node", cfg.node_bin},
       {"cli.js", cfg.cli_js},
@@ -321,25 +340,108 @@ defmodule KomkiCli.Steps do
       {"sandbox-exec", cfg.sandbox_exec}
     ]
 
-    Enum.map(tools, fn {name, path} ->
-      cond do
-        is_nil(path) ->
-          %{name: name, ok: false, reason: "nicht entdeckt (Installation/init pruefen)"}
+    checks =
+      Enum.map(tools, fn {name, path} ->
+        cond do
+          is_nil(path) ->
+            %{name: name, ok: false, reason: "nicht entdeckt (Installation/init pruefen)"}
 
-        File.exists?(path) ->
-          %{name: name, ok: true, reason: path}
+          File.exists?(path) ->
+            %{name: name, ok: true, reason: path}
 
-        true ->
-          # Gepinnte Pfade koennen verblassen (z.B. brew-Upgrade verschiebt
-          # den Cellar-Realpath) — der Hinweis nennt den Wiederherstellungsweg.
-          %{
-            name: name,
-            ok: false,
-            reason: "missing: " <> path <> " — 'komki init --force' entdeckt neu"
-          }
-      end
-    end)
+          true ->
+            # Gepinnte Pfade koennen verblassen (z.B. brew-Upgrade verschiebt
+            # den Cellar-Realpath) — der Hinweis nennt den Wiederherstellungsweg.
+            %{
+              name: name,
+              ok: false,
+              reason: "missing: " <> path <> " — 'komki init --force' entdeckt neu"
+            }
+        end
+      end)
+
+    # Vermittler-Praesenz (Ticket #102) nur im vollen Doctor-Check: der
+    # profile_boot-Gate fuer `up` bleibt exakt die heutige Pflichtmenge —
+    # der Start enforce't die mediator-Binary selbst (Steps.up/2).
+    if scope == :full, do: checks ++ [mediator_check(cfg)], else: checks
   end
+
+  defp mediator_check(cfg) do
+    cond do
+      is_nil(cfg.mediator_bin) ->
+        %{
+          name: "komki-mediator",
+          ok: false,
+          reason:
+            "komki-mediator nicht entdeckt — init --force oder mix escript.build in apps/komki_mediator"
+        }
+
+      File.exists?(cfg.mediator_bin) ->
+        %{name: "komki-mediator", ok: true, reason: cfg.mediator_bin}
+
+      true ->
+        %{
+          name: "komki-mediator",
+          ok: false,
+          reason: "missing: " <> cfg.mediator_bin <> " — 'komki init --force' entdeckt neu"
+        }
+    end
+  end
+
+  # pi-Version (Ticket #103-Konsolidierung): KEIN Pin — der Check meldet die
+  # installierte Version und die zu erwartende Flag-Oberflaeche (Report, kein
+  # Gate). Nur im vollen Doctor-Check, wie der Vermittler-Praesenz-Check.
+  defp pi_version_checks(cfg, scope) do
+    if scope == :full, do: [pi_version_check(cfg)], else: []
+  end
+
+  defp pi_version_check(cfg) do
+    case pi_version(cfg) do
+      {:ok, version, major} when major >= 1 ->
+        %{
+          name: "pi version",
+          ok: true,
+          reason:
+            "pi " <>
+              version <>
+              ": erwartet -e builtin:mcp (>= 1.0); ab 1.0.4: --no-mcp + " <>
+              "mcp__-Patterns; ab 1.1.0: +/- in --tools"
+        }
+
+      {:ok, version, _major} ->
+        %{
+          name: "pi version",
+          ok: false,
+          reason:
+            "pi " <> version <> " (major < 1): MCP-Flags nicht unterstuetzt — pi aktualisieren"
+        }
+
+      {:error, reason} ->
+        %{name: "pi version", ok: false, reason: reason}
+    end
+  end
+
+  defp pi_version(cfg) when is_binary(cfg.node_bin) and is_binary(cfg.cli_js) do
+    case System.cmd(cfg.node_bin, [cfg.cli_js, "--version"], stderr_to_stdout: true) do
+      {out, 0} ->
+        case Regex.run(~r/\b(\d+\.\d+\.\d+)\b/, out) do
+          [version | _] ->
+            [major | _] = String.split(version, ".")
+            {:ok, version, String.to_integer(major)}
+
+          nil ->
+            {:error, "pi-Version unlesbar: " <> excerpt(out)}
+        end
+
+      {out, code} ->
+        {:error, "pi-Version unlesbar (exit " <> to_string(code) <> "): " <> excerpt(out)}
+    end
+  end
+
+  defp pi_version(_cfg),
+    do: {:error, "pi-Version unlesbar: node/cli.js fehlen in der config"}
+
+  defp excerpt(text), do: text |> String.trim_trailing() |> String.slice(0, 200)
 
   defp profile_checks(cfg) do
     if Config.tools_ready(cfg) do
@@ -506,8 +608,12 @@ defmodule KomkiCli.Steps do
       {:checks, _checks, :ok} ->
         cfg = override_ctx(load_cfg!(), opts)
 
-        case Llama.up(cfg) do
-          {:ok, pid} -> {:llama_up, pid}
+        with {:ok, pid} <- Llama.up(cfg),
+             {:ok, mediator} <- mediator_up(cfg) do
+          %{"tools" => tools} = health_of(mediator)
+          Mediator.write_mcp_config(cfg, tools)
+          {:up, %{llama: pid, mediator: mediator}}
+        else
           {:error, reason} -> {:error, reason, 4}
         end
 
@@ -517,6 +623,21 @@ defmodule KomkiCli.Steps do
   rescue
     e -> {:error, "up fehlgeschlagen: " <> exception_reason(e), 2}
   end
+
+  # Praesenz-Pflicht sitzt HIER (up), nicht in init: der Vermittler-Binary
+  # ist optional bei init, aber Pflicht zum Start (Ticket #102).
+  defp mediator_up(cfg) do
+    if is_binary(cfg.mediator_bin) do
+      Mediator.up(cfg)
+    else
+      {:error,
+       "komki-mediator nicht gefunden — mix escript.build in apps/komki_mediator" <>
+         " oder in PATH/<base>/bin ablegen ('komki init --force' entdeckt neu)"}
+    end
+  end
+
+  defp health_of({:started, _pid, health}), do: health
+  defp health_of({:already, health}), do: health
 
   defp override_ctx(cfg, opts) do
     case parse_int!(opts, "ctx") do
@@ -529,26 +650,43 @@ defmodule KomkiCli.Steps do
   # Starten von Arbeit (run/session), nie das Stoppen — sonst finge das CLI
   # seine Nutzer in einem Zustand ein, aus dem sie llama nicht mehr stoppen
   # koennten (git-stash-/compose-down-Schule). Die Sicherheit sitzt im
-  # Identitaetscheck: Llama.down toetet nur, wenn die Pidfile-Pid wirklich
-  # llama-server ist. Bereits unten ist Erfolg (Idempotenz), und stale
-  # pidfiles werden aufgeraeumt statt als Fehler stehen gelassen.
+  # Identitaetscheck: Llama.down/Mediator.down toeten nur, wenn die Pidfile-
+  # Pid wirklich der eigene Prozess ist. Bereits unten ist Erfolg
+  # (Idempotenz), und stale pidfiles werden aufgeraeumt statt als Fehler
+  # stehen gelassen.
+  #
+  # Stoppreihenfolge kompositorisch rueckwaerts (compose-down-Schule): der
+  # Vermittler wurde von up zuletzt gestartet, wird hier zuerst gestoppt.
   @spec down() :: result()
   def down do
-    case Llama.down(load_cfg!()) do
-      :ok -> {:llama_down}
-      :no_pidfile -> {:llama_down, :already}
-      {:stale, reason} -> {:llama_down, :stale, reason}
-      {:error, reason} -> {:error, reason, 4}
+    cfg = load_cfg!()
+
+    case Mediator.down(cfg) do
+      {:error, reason} ->
+        {:error, reason, 4}
+
+      mediator ->
+        case Llama.down(cfg) do
+          {:error, reason} -> {:error, reason, 4}
+          llama -> {:down, %{mediator: down_state(mediator), llama: down_state(llama)}}
+        end
     end
   rescue
     e -> {:error, "down fehlgeschlagen: " <> exception_reason(e), 2}
   end
 
+  defp down_state(:ok), do: :ok
+  defp down_state(:no_pidfile), do: :already
+  defp down_state({:stale, reason}), do: {:stale, reason}
+
   @spec status() :: result()
   def status do
     case Config.load(Config.config_path(Config.default_base())) do
-      {:error, reason} -> {:error, "config: " <> reason, 2}
-      {:ok, cfg} -> {:status, cfg, Llama.status(cfg)}
+      {:error, reason} ->
+        {:error, "config: " <> reason, 2}
+
+      {:ok, cfg} ->
+        {:status, cfg, %{llama: Llama.status(cfg), mediator: Mediator.status(cfg)}}
     end
   end
 

@@ -30,6 +30,20 @@ defmodule KomkiCli.PiTest do
       assert "--no-session" in argv
       assert List.last(argv) == "hallo"
     end
+
+    test "MCP-Vertrag (Ticket #102): -e builtin:mcp direkt nach --no-extensions", %{cfg: cfg} do
+      # Einmal-Lauf: die einzigen werksetzenden Aufrufe sind pi_flags/2
+      # hinter argv_for — der MCP-Vertrag gilt hier genauso wie in der Session.
+      argv = Pi.argv_for(cfg, "/scratch", :text, "hallo")
+      assert Enum.count(argv, &(&1 == "-e")) == 1
+
+      idx = Enum.find_index(argv, &(&1 == "--no-extensions"))
+      assert Enum.slice(argv, idx, 3) == ["--no-extensions", "-e", "builtin:mcp"]
+
+      # sonstige Flags unverändert (Tools-Allowlist bleibt, wie sie war)
+      idx_tools = Enum.find_index(argv, &(&1 == "--tools"))
+      assert Enum.at(argv, idx_tools + 1) == "write"
+    end
   end
 
   describe "Session (argv_session/2): interaktiv, echte Pty" do
@@ -39,6 +53,17 @@ defmodule KomkiCli.PiTest do
       refute "--print" in argv
       refute "--no-session" in argv
       refute Enum.any?(argv, &String.contains?(&1, "/dev/null"))
+    end
+
+    test "MCP-Vertrag (Ticket #102): -e builtin:mcp direkt nach --no-extensions", %{cfg: cfg} do
+      for continue? <- [false, true] do
+        argv = Pi.argv_session(cfg, continue?)
+
+        assert Enum.count(argv, &(&1 == "-e")) == 1
+
+        idx = Enum.find_index(argv, &(&1 == "--no-extensions"))
+        assert Enum.slice(argv, idx, 3) == ["--no-extensions", "-e", "builtin:mcp"]
+      end
     end
 
     test "Direktkette ohne sh-Hop; session-dir unter pi-home", %{cfg: cfg} do

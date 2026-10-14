@@ -6,6 +6,7 @@ _build/
 *.ez
 apps/ratsinfo/ratsinfo
 apps/komki_policy/komki-policy
+apps/komki_mediator/komki-mediator
 apps/komki_cli/komki
 apps/komki_cli/burrito_out/
 apps/komki_cli/.build-report.md
