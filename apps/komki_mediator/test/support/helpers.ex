@@ -70,7 +70,6 @@ defmodule KomkiMediator.TestHelpers do
   @doc "Stoppt benannte Prozesse (Env, Journal) und startet sie frisch am Basisraum."
   def restart_env(base) do
     stop_named(KomkiMediator.Env)
-    stop_named(KomkiMediator.Env)
     stop_named(KomkiMediator.Journal)
 
     journal_path = Path.join([base, "mediator", "journal", "pdr.jsonl"])

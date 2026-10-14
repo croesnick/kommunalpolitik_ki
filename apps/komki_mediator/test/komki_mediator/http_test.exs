@@ -1,7 +1,7 @@
 defmodule KomkiMediator.HTTPTest do
   use ExUnit.Case, async: false
 
-  alias KomkiMediator.{Supervisor, TestHelpers}
+  alias KomkiMediator.TestHelpers
 
   @test_ports [49_721, 49_722, 49_723]
   @setup_headers [
@@ -16,7 +16,7 @@ defmodule KomkiMediator.HTTPTest do
     TestHelpers.stop_named(KomkiMediator.Env)
     TestHelpers.stop_named(KomkiMediator.Journal)
 
-    {:ok, _} = Finch.start_link(name: KomkiMediatorTestFinch)
+    start_supervised!({Finch, name: KomkiMediatorTestFinch})
 
     case start_test_server() do
       {:ok, port, _base} ->
@@ -90,8 +90,13 @@ defmodule KomkiMediator.HTTPTest do
       base = TestHelpers.provisioned_base()
       {gamma, room} = TestHelpers.load_room_env(base)
 
-      case Supervisor.start_link(
-             {Path.join([base, "mediator", "journal", "pdr.jsonl"]), gamma, room, port}
+      # Besitz beim Test-Supervisor: der Vermittler-Baum trapt Exits und
+      # ueberlebt eine plain-link-Raeumung sonst in den naechsten Test
+      # hinein (benanntes Journal + Env, anubis-Registry, Bandit-Port).
+      # start_supervised reisst den Baum mit jedem Test deterministisch ab.
+      case start_supervised(
+             {KomkiMediator.Supervisor,
+              {Path.join([base, "mediator", "journal", "pdr.jsonl"]), gamma, room, port}}
            ) do
         {:ok, _pid} -> {:ok, port, base}
         {:error, _} -> nil

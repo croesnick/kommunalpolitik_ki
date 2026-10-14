@@ -5,6 +5,11 @@ defmodule KomkiMediator.JournalTest do
   alias KomkiPolicy.JSON
 
   setup do
+    # Ordnungsunabhaengig: ein frueherer Test (z. B. http_tests Supervisor-
+    # Baum, der Exits trapt und Test-Raeumung ueberlebt) kann den benannten
+    # Journal-Prozess hinterlassen haben. Erst stoppen, dann neu starten.
+    KomkiMediator.TestHelpers.stop_named(KomkiMediator.Journal)
+
     base = KomkiMediator.TestHelpers.provisioned_base()
     path = Path.join([base, "mediator", "journal", "pdr.jsonl"])
     %{path: path}
