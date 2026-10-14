@@ -46,7 +46,7 @@ jobs:
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: '1.19.5'
-          otp-version: '28'
+          otp-version: '29.1.2'
 
       # Ein Cache-Eintrag für alles: Hex-Pakete und kompilierte Deps liegen
       # unter artifacts/deps, App-Builds und Dialyzer-PLTs unter
