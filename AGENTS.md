@@ -157,6 +157,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `obsidian-cli` Skill | Anleitung für `obsidian` CLI (global installiert unter `~/.agents/skills/obsidian-cli/`) | alle Vault-Workflows |
 | `RENOVATE_TOKEN` (Fine-grained PAT) | Dependency-Updates via self-hosted Renovate (Rechte-Anforderungen: [`docs/prerequisites.md`](docs/prerequisites.md)) | `.github/workflows/renovate.yml` (CI, alle 6 h) |
 | `nextcloud-mcp-server` (`uvx`) | Nextcloud-MCP (WebDAV/CalDAV/Notes/Deck/Talk) via Subprocess | WF 9 (Nextcloud-Kollaborationsplattform) |
+| `lychee` CLI | Markdown-Links offline prüfen (CI nutzt die lychee-Action mit eigener Binary) | `docs-links`-Check der CI-Kurzfassung, Pre-commit-Hook `lychee-markdown-links` |
 
 > **Hinweis:** Der `obsidian` CLI ist eine externe Abhängigkeit, die lokal installiert sein muss. Vollständige Dokumentation (Install, Konfiguration, Fallbacks, Limitierungen) siehe [`docs/prerequisites.md`](docs/prerequisites.md).
 
@@ -244,9 +245,11 @@ in `endpoint.ex` als Plug eingetragen (nur `:dev`).
 | mypy | Static Type Checker | `uv run mypy src/` |
 | pytest | Test-Runner | `uv run pytest` |
 
+Die Python-Version steht zentral in `.tool-versions` am Repo-Root: asdf und uv lesen die Datei direkt, die CI parst sie für `setup-python` (python.yml). Änderungen dort greifen damit überall.
+
 ### CI
 
-**Maßgeblich ist [`/.github/workflows/ci.yml`](.github/workflows/ci.yml)** — dort stehen die exakten Dispatch-Befehle samt Begründungen. Kurzfassung (kein Ersatz für die Datei):
+**Maßgeblich sind die Workflows unter [`.github/workflows/`](.github/workflows/)**: [`ci.yml`](.github/workflows/ci.yml) für Elixir, [`python.yml`](.github/workflows/python.yml) für die Python-Tools und die losen Skripte, [`docs-links.yml`](.github/workflows/docs-links.yml) für Markdown-Links. Dort stehen die exakten Befehle samt Begründungen. Kurzfassung (kein Ersatz für die Dateien):
 
 ```bash
 # Elixir (Root; credo/dialyzer siehe Tooling-Tabelle oben)
@@ -262,6 +265,13 @@ uv run ruff check
 uv run ruff format --check
 uv run mypy src/
 uv run pytest
+
+# Lose Python-Skripte (skills/*/scripts; Config: ruff.toml am Repo-Root)
+uvx ruff@0.15.21 check skills/*/scripts
+uvx ruff@0.15.21 format --check skills/*/scripts
+
+# Markdown-Links, offline (Config: lychee.toml am Repo-Root)
+lychee './**/*.md'
 ```
 
 CI-Status verlässlich prüfen: nach einem Push zuerst mit `gh run list --branch <branch> --limit 1` abgleichen, dass der Lauf zur eigenen Head-Short-SHA gehört — `gh pr checks --watch` zeigt unmittelbar nach einem Push sonst die Ergebnisse des vorherigen Heads als „pass".

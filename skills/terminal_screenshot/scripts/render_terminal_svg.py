@@ -4,11 +4,12 @@
 Usage: render_terminal_svg.py <capture.txt> <out.svg> <title>
 Blank-line runs > 4 are collapsed to 2 (crops empty screen area, keeps content).
 """
+
 import html
 import re
 import sys
 
-CHAR_W = 8.1          # Menlo advance at 13.5px
+CHAR_W = 8.1  # Menlo advance at 13.5px
 FONT_SIZE = 13.5
 LINE_H = 20
 PAD_X = 26
@@ -21,13 +22,27 @@ TITLE_FG = "#6e7681"
 DIM_DEFAULT = "#6e7681"
 
 XTERM = [
-    "#000000", "#cd3131", "#0dbc79", "#e5e510",
-    "#2472c8", "#d670d6", "#29b8db", "#e5e5e5",
+    "#000000",
+    "#cd3131",
+    "#0dbc79",
+    "#e5e510",
+    "#2472c8",
+    "#d670d6",
+    "#29b8db",
+    "#e5e5e5",
 ]
 BRIGHT = [
-    "#666666", "#f14c4c", "#23d18b", "#f5f543",
-    "#3b8eea", "#d670d6", "#29b8db", "#ffffff",
+    "#666666",
+    "#f14c4c",
+    "#23d18b",
+    "#f5f543",
+    "#3b8eea",
+    "#d670d6",
+    "#29b8db",
+    "#ffffff",
 ]
+
+RESET_STYLE = {"fg": None, "bg": None, "bold": False, "dim": False, "rev": False}
 
 
 def build_256_palette():
@@ -36,10 +51,10 @@ def build_256_palette():
     for r in steps:
         for g in steps:
             for b in steps:
-                pal.append("#%02x%02x%02x" % (r, g, b))
+                pal.append(f"#{r:02x}{g:02x}{b:02x}")
     for i in range(24):
         v = 8 + i * 10
-        pal.append("#%02x%02x%02x" % (v, v, v))
+        pal.append(f"#{v:02x}{v:02x}{v:02x}")
     return pal
 
 
@@ -50,7 +65,7 @@ ANSI_RE = re.compile(r"\x1b\[([0-9;?]*)([a-zA-Z])")
 def parse_line(raw):
     """Return list of (text, style) segments for one line."""
     segs = []
-    style = {"fg": None, "bg": None, "bold": False, "dim": False, "rev": False}
+    style = dict(RESET_STYLE)
     pos = 0
     text_buf = []
 
@@ -60,7 +75,7 @@ def parse_line(raw):
             del text_buf[:]
 
     for m in ANSI_RE.finditer(raw):
-        text_buf.append(raw[pos:m.start()])
+        text_buf.append(raw[pos : m.start()])
         pos = m.end()
         if m.group(2) != "m":
             continue  # strip non-SGR escapes
@@ -71,7 +86,7 @@ def parse_line(raw):
         while i < len(codes):
             c = codes[i]
             if c == 0:
-                style = {"fg": None, "bg": None, "bold": False, "dim": False, "rev": False}
+                style = dict(RESET_STYLE)
             elif c == 1:
                 style["bold"] = True
             elif c == 2:
@@ -136,7 +151,7 @@ def esc(s):
 
 def main():
     src, dst, title = sys.argv[1], sys.argv[2], sys.argv[3]
-    with open(src, "r", encoding="utf-8") as f:
+    with open(src, encoding="utf-8") as f:
         raw_lines = f.read().split("\n")
     lines = collapse_blanks(raw_lines)
     n = len(lines)
@@ -147,8 +162,9 @@ def main():
 
     parts = []
     parts.append(
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width:.0f}" height="{height:.0f}" '
-        f'viewBox="0 0 {width:.0f} {height:.0f}" font-family="Menlo, Monaco, \'Courier New\', monospace">'
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width:.0f}" '
+        f'height="{height:.0f}" viewBox="0 0 {width:.0f} {height:.0f}" '
+        "font-family=\"Menlo, Monaco, 'Courier New', monospace\">"
     )
     parts.append(f'<rect width="{width:.0f}" height="{height:.0f}" fill="{BG}"/>')
     # window chrome
@@ -156,7 +172,8 @@ def main():
         f'<rect width="{width:.0f}" height="{height:.0f}" rx="10" fill="{BG}"/>'
     )
     parts.append(
-        f'<line x1="0" y1="{CHROME_H}" x2="{width:.0f}" y2="{CHROME_H}" stroke="#21262d" stroke-width="1"/>'
+        f'<line x1="0" y1="{CHROME_H}" x2="{width:.0f}" '
+        f'y2="{CHROME_H}" stroke="#21262d" stroke-width="1"/>'
     )
     for i, c in enumerate(["#ff5f57", "#febc2e", "#28c840"]):
         parts.append(f'<circle cx="{18 + i * 22}" cy="17" r="6" fill="{c}"/>')
@@ -178,7 +195,9 @@ def main():
             for ch in text:
                 if not (style["rev"] and ch == " "):
                     x = body_x + col * CHAR_W
-                    parts.append(f'<tspan x="{x:.1f}" fill="{fill}"{bold}{dim}>{esc(ch)}</tspan>')
+                    parts.append(
+                        f'<tspan x="{x:.1f}" fill="{fill}"{bold}{dim}>{esc(ch)}</tspan>'
+                    )
                 col += 1
         parts.append("</text>")
     # reversed-space cursor blocks (drawn after text so they sit on top)
@@ -190,8 +209,9 @@ def main():
                 for k, ch in enumerate(text):
                     if ch == " ":
                         parts.append(
-                            f'<rect x="{cursor_x + k * CHAR_W:.1f}" y="{y + 4}" width="{CHAR_W:.1f}" '
-                            f'height="15" rx="2" fill="{BASE_FG}"/>'
+                            f'<rect x="{cursor_x + k * CHAR_W:.1f}" y="{y + 4}" '
+                            f'width="{CHAR_W:.1f}" height="15" rx="2" '
+                            f'fill="{BASE_FG}"/>'
                         )
             cursor_x += len(text) * CHAR_W
     parts.append("</svg>")

@@ -7,6 +7,7 @@ HTTP-only requests to search/section pages.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import time
@@ -39,7 +40,7 @@ def _load_credentials() -> Credentials:
         try:
             data = json.loads(stored)
             return Credentials(email=data["email"], password=data["password"])
-        except (json.JSONDecodeError, KeyError):
+        except json.JSONDecodeError, KeyError:
             pass
 
     email = os.environ.get("AZ_EMAIL", "")
@@ -74,7 +75,7 @@ def load_cached_cookies() -> CookieJar | None:
         if jar.is_expired():
             return None
         return jar
-    except (json.JSONDecodeError, KeyError):
+    except json.JSONDecodeError, KeyError:
         return None
 
 
@@ -86,10 +87,8 @@ def save_cookies(cookies: list[dict]) -> None:
 
 def clear_cookies() -> None:
     """Remove cached cookies (forces re-login on next call)."""
-    try:
+    with contextlib.suppress(keyring.errors.PasswordDeleteError):
         keyring.delete_password(KEYRING_SERVICE, COOKIE_KEY)
-    except keyring.errors.PasswordDeleteError:
-        pass
 
 
 async def ensure_cookies() -> list[dict]:

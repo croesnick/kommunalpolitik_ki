@@ -19,11 +19,11 @@ log = logging.getLogger(__name__)
 
 _PROFILE_DIR = os.path.expanduser("~/.newspaper_mcp/browser_profile")
 _LOCK = asyncio.Lock()
-_context: "BrowserContext | None" = None
+_context: BrowserContext | None = None
 _logged_in = False
 
 
-async def _ensure_context() -> "BrowserContext":
+async def _ensure_context() -> BrowserContext:
     """Return the persistent browser context, creating it if needed."""
     global _context
 
@@ -52,7 +52,7 @@ async def _ensure_context() -> "BrowserContext":
         return _context
 
 
-async def _ensure_logged_in(page: "Page") -> bool:
+async def _ensure_logged_in(page: Page) -> bool:
     """Ensure the browser session is logged in. Returns True if logged in."""
     global _logged_in
 

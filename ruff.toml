@@ -1,0 +1,11 @@
+# Ruff-Config für die losen Python-Skripte ohne eigenes uv-Projekt
+# (skills/*/scripts). Gilt per Config-Discovery für alles außerhalb der
+# uv-Projekte unter tools/: Jedes tools/*/pyproject.toml trägt eine eigene
+# [tool.ruff]-Sektion, ruff nimmt pro Datei die nächstgelegene Config,
+# deshalb greift diese Datei nicht in die Tools hinein. Line-length und
+# Rule-Select sind über alle fünf Tools vereinheitlicht.
+line-length = 88
+target-version = "py314"
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

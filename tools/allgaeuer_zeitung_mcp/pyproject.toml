@@ -2,7 +2,7 @@
 name = "allgaeuer-zeitung-mcp"
 version = "0.1.0"
 description = "MCP server for the Allgäuer Zeitung online newspaper"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
     "mcp>=1.2.0",
     "httpx>=0.27.0",
@@ -29,6 +29,16 @@ packages = ["src/newspaper_mcp"]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
-    "ruff>=0.8.0",
+    "ruff>=0.15.21",
     "mypy>=1.13.0",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.14"

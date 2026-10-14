@@ -1,0 +1,20 @@
+# Konfiguration für den Markdown-Link-Check in CI
+# (.github/workflows/docs-links.yml). lychee lädt diese Datei automatisch
+# aus dem Arbeitsverzeichnis; lokal reicht `lychee './**/*.md'` vom
+# Repo-Root.
+
+# Offline-Modus: nur lokale Dateireferenzen prüfen, keine Netz-Requests.
+# Externe URLs werden übersprungen und nicht als Fehler gewertet. Ein Check
+# externer Links wäre ein eigener Scheduled-Job mit Cache und Report statt
+# eines PR-Gates (Issue #77).
+offline = true
+
+# Nur Markdown-Dateien als Eingabe parsen (ersetzt lychees Default-Liste,
+# die auch html, txt, xml umfasst). Der CI-Job übergibt zusätzlich den
+# Glob './**/*.md'.
+extensions = ["md"]
+
+# Root-relative Referenzen (z. B. /assets/bild.svg) gegen den Repo-Root
+# auflösen, statt sie als Fehler zu werten. Relative Pfade sind seit
+# lychee v0.23 erlaubt.
+root_dir = "."

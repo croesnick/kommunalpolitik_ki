@@ -1,7 +1,7 @@
 # Pre-commit hooks für kommunalpolitik_ki
 #
 # Setup (einmalig pro Clone):
-#   brew install gitleaks pre-commit
+#   brew install gitleaks lychee pre-commit
 #   pre-commit install
 #
 # Manuelles Prüfen:
@@ -65,3 +65,13 @@ repos:
         language: system
         pass_filenames: false
         files: \.(ex|exs)$
+
+      # lychee: Markdown-Link-Check wie der CI-Job docs-links.yml (lychee.toml
+      # am Repo-Root, Offline-Modus). Laeuft nur auf gestagte Markdown-Dateien.
+      # Lokal installierte Binary, gleiche Mechanik wie der gitleaks-Hook:
+      # Ohne Installation blockiert der Hook den Commit.
+      - id: lychee-markdown-links
+        name: Markdown-Link-Check (lychee, offline)
+        entry: lychee
+        language: system
+        types: [markdown]

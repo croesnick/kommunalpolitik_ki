@@ -60,7 +60,7 @@ tmux capture-pane -t <session> -p -e > capture.txt
 TUI-Screens am sichtbaren Rand — Früheres ist weg, also vor dem Senden prüfen,
 dass alles auf einen Screen passt).
 
-### 4. Rendern und auf Texttreue prüfen
+### 4. Rendern und auf Text- und Farbtreue prüfen
 
 ```sh
 python3 scripts/render_terminal_svg.py capture.txt out.svg "Fenstertitel"
@@ -71,7 +71,11 @@ Der Renderer arbeitet zeichenweise mit absoluten x-Koordinaten (8.1px-Raster
 bei 13.5px Font) — dadurch ist das Layout von den Font-Metriken des Betrachters
 unabhängig. Leerraum-Runs über 4 Zeilen werden auf 2 gecroppt (leerer
 Screen-Bereich, kein Inhalt), Reverse-Spaces (Eingabecursor) werden als
-Cursor-Block gezeichnet.
+Cursor-Block gezeichnet. Der Check liest das SVG strukturell per XML-Parser
+(kein Regex) und vergleicht Zeichen, Farben (fill), Bold/Dim-Marker und
+Cursor-Blöcke gegen den Capture. Die Bereinigungslogik importiert er direkt
+aus dem Renderer. Eine zweite Fassung dieser Logik, die auseinanderdriften
+kann, gibt es nicht mehr.
 
 **Erledigt, wenn**: der Fidelity-Check `FIDELITY OK` meldet.
 

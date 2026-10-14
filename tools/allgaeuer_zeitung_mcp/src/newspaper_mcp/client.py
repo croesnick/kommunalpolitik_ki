@@ -54,9 +54,7 @@ async def _is_auth_failure(response: httpx.Response) -> bool:
     if LOGIN_REDIRECT_FRAGMENT in str(response.url):
         return True
     text = response.text
-    if "Bitte anmelden" in text and "anmelden.allgaeuer-zeitung.de" in text:
-        return True
-    return False
+    return "Bitte anmelden" in text and "anmelden.allgaeuer-zeitung.de" in text
 
 
 async def fetch_html(url: str, *, force_relogin: bool = False) -> str:
