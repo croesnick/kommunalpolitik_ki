@@ -103,6 +103,52 @@ defmodule KomkiCli.PiTest do
                "'/tmp/komki' 'session-chain' '--continue'"
     end
 
+    # Burrito-Session-Fix (Pilot 2026-10-11): unter der Binary ist das
+    # BEAM-stdout die Wrapper-Pipe, pi braucht aber ein TTY auf stdout —
+    # deshalb biegt die Kette stdout auf /dev/fd/0 (Dup des lebenden
+    # stdin-PTY) um. Der Escript-Pfad (stdout = Pane-PTY) bleibt exakt
+    # wie vorher.
+    test "argv_session/3 ohne Redirect: identisch mit der 2-stelligen Form", %{cfg: cfg} do
+      assert Pi.argv_session(cfg, true) == Pi.argv_session(cfg, true, false)
+      assert Pi.argv_session(cfg, false) == Pi.argv_session(cfg, false, false)
+
+      refute "/bin/sh" in Pi.argv_session(cfg, false, false)
+    end
+
+    test "argv_session/3 mit tty_redirect: sh-c-Kette leitet stdout auf /dev/fd/0", %{cfg: cfg} do
+      argv = Pi.argv_session(cfg, false, true)
+
+      assert List.starts_with?(
+               argv,
+               [
+                 cfg.sandbox_exec,
+                 "-f",
+                 Pi.session_profile_path(cfg),
+                 "--",
+                 "/bin/sh",
+                 "-c",
+                 ~s(exec "$0" "$@" > /dev/fd/0)
+               ]
+             )
+
+      # $0 = node, $@ = cli.js + Flags; Direktkette bleibt der sh-Zweig
+      assert Enum.at(argv, 7) == cfg.node_bin
+      assert Enum.at(argv, 8) == cfg.cli_js
+
+      idx = Enum.find_index(argv, &(&1 == "--session-dir"))
+      assert Enum.at(argv, idx + 1) == Pi.session_dir(cfg)
+
+      refute Enum.any?(argv, &String.contains?(&1, "/dev/null"))
+      refute "--continue" in argv
+    end
+
+    test "argv_session/3 mit tty_redirect und --continue: Flag bleibt vor Provider", %{cfg: cfg} do
+      argv = Pi.argv_session(cfg, true, true)
+
+      assert Enum.find_index(argv, &(&1 == "--continue")) <
+               Enum.find_index(argv, &(&1 == "--provider"))
+    end
+
     test "env_list: deterministisch sortiert, Kernvariablen gesetzt", %{cfg: cfg} do
       env = Pi.env_list(cfg)
 

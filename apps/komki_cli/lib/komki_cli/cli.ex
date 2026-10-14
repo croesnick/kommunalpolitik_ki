@@ -1,7 +1,10 @@
 defmodule KomkiCli.CLI do
   @moduledoc """
-  Escript-Einstiegspunkt `komki` (Ticket #74): Launcher fuer die gepinnte
-  Modellkombination aus dem Ticket-#70-Beschluss.
+  CLI-Einstiegspunkt `komki` (Ticket #74): Launcher fuer die gepinnte
+  Modellkombination aus dem Ticket-#70-Beschluss. Dual-Betrieb (Ticket #75):
+  als Escript ruft der Starter `main/1` direkt auf; als Burrito-Release
+  startet `KomkiCli.Application.start/2` dieselbe Funktion mit
+  `KomkiCli.Runtime.argv/0`.
 
   Befehle (Vertrag):
 
@@ -193,9 +196,20 @@ defmodule KomkiCli.CLI do
   end
 
   defp error_line(errors) do
-    "Error: " <>
-      Enum.join(Optimus.Errors.format_errors(errors), ", ") <>
-      "; run \"komki --help\" fuer usage"
+    "Error: " <> Enum.join(format_errors(errors), ", ") <> "; run \"komki --help\" fuer usage"
+  end
+
+  # Optimus formatiert Parse-Fehler bedingungslos farbig (IO.ANSI.red/bright/
+  # reset ohne enabled?-Pruefung, siehe optimus/lib/optimus/errors.ex): Ohne
+  # eigenes Gate landen die Farbcodes auch in gepipeten Ausgaben — unter dem
+  # Escript genauso wie unter der Burrito-Binary (Pilot-Fund 2026-10-11).
+  # Der farblose Zweig haelt dieselbe "- msg"-Form.
+  defp format_errors(errors) do
+    if KomkiCli.Runtime.ansi_enabled?() do
+      Optimus.Errors.format_errors(errors)
+    else
+      Enum.map(errors, &("- " <> IO.iodata_to_binary(&1)))
+    end
   end
 
   # ===========================================================================
@@ -265,19 +279,25 @@ defmodule KomkiCli.CLI do
   # ===========================================================================
 
   defp up_with_progress(opts) do
-    # Eigenes Spinner-Miniwerkzeug (keine Library): schreibt Statusframes, während
-    # der blockierende Lauf (doctor-quick + llama Health-Poll) läuft.
-    spid = spawn(fn -> spin(0, "warte auf llama-server (doctor-quick + health) ...") end)
+    # Spinner nur mit aktivierten Farben (Terminal): gepipete Aufrufe bekämen
+    # sonst \r-Frame- und ANSI-Reste ins Log (gleiche Klasse wie der
+    # Optimus-Fehler-Fund aus dem Burrito-Pilot 2026-10-11; unter dem Escript
+    # identisch). Gepipet laeuft `up` stumm, das Health-Ergebnis kommt.
+    if KomkiCli.Runtime.ansi_enabled?() do
+      spid = spawn(fn -> spin(0, "warte auf llama-server (doctor-quick + health) ...") end)
 
-    result =
-      try do
-        KomkiCli.Steps.up(opts)
-      after
-        send(spid, :stop)
-        Process.sleep(150)
-      end
+      result =
+        try do
+          KomkiCli.Steps.up(opts)
+        after
+          send(spid, :stop)
+          Process.sleep(150)
+        end
 
-    result
+      result
+    else
+      KomkiCli.Steps.up(opts)
+    end
   end
 
   defp spin(i, msg) do
@@ -345,9 +365,12 @@ defmodule KomkiCli.CLI do
   defp render({:error, reason, code}),
     do: {red() <> String.trim_trailing(reason) <> reset() <> "\n", code}
 
-  defp green, do: if(IO.ANSI.enabled?(), do: IO.ANSI.green(), else: "")
-  defp red, do: if(IO.ANSI.enabled?(), do: IO.ANSI.red(), else: "")
-  defp reset, do: if(IO.ANSI.enabled?(), do: IO.ANSI.reset(), else: "")
+  # Farb-Gate: unter Burrito (stdout-Pipe des Wrappers, Regression #234)
+  # entscheidet das Wrapper-eigene _IS_TTY, sonst IO.ANSI.enabled?/0 —
+  # siehe KomkiCli.Runtime.ansi_enabled?/0.
+  defp green, do: if(KomkiCli.Runtime.ansi_enabled?(), do: IO.ANSI.green(), else: "")
+  defp red, do: if(KomkiCli.Runtime.ansi_enabled?(), do: IO.ANSI.red(), else: "")
+  defp reset, do: if(KomkiCli.Runtime.ansi_enabled?(), do: IO.ANSI.reset(), else: "")
 
   defp render_init(cfg, gguf_lines) do
     lines =

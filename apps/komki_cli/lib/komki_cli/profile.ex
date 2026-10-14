@@ -130,7 +130,14 @@ defmodule KomkiCli.Profile do
       "; hw.*/kern.proc.* versionsfest: neue OS-Versionen lesen neue Felder",
       "; (zsh-5.9-Regressionsklasse auf darwin25+)",
       "(allow sysctl-read (sysctl-name-prefix \"hw.\"))",
-      "(allow sysctl-read (sysctl-name-prefix \"kern.proc.\"))"
+      "(allow sysctl-read (sysctl-name-prefix \"kern.proc.\"))",
+      "; /dev/fd/0-Redirect unter Burrito (Pilot 2026-10-11): Das BEAM-stdout ist",
+      "; dort die Wrapper-Pipe; die Session-Kette leitet stdout auf das lebende",
+      "; stdin-PTY um (Pi.argv_session/3, tty_redirect). Kontextfrei im Profil, damit",
+      "; die Profil-Identitaet nicht vom Laufkontext abhaengt (Einmal-Drift fuer",
+      "; bestehende Instanzen: einmalig 'komki init --force').",
+      "(allow file-read-metadata (literal \"/dev/fd\"))",
+      "(allow file-write* (literal \"/dev/fd/0\"))"
     ]
   end
 

@@ -58,8 +58,41 @@ Dateisuche und warnt beim Start.
 Details und Fallbacks: [`docs/prerequisites.md`](../../docs/prerequisites.md).
 
 ```sh
-mix escript.build   # erzeugt ./komki
+mix escript.build   # erzeugt ./komki (Dev-Weg; braucht Elixir/OTP auf dem Host)
 ```
+
+## Verteilen: eine Datei statt Ordner (Burrito)
+
+Für Rechner ohne installiertes Elixir baut Burrito das Release in eine einzige
+ausführbare Datei mit eingebettetem Erlang-Runtime (macOS arm64):
+
+```sh
+PATH="$HOME/.local/opt/zig-aarch64-macos-0.16.0:$PATH" \
+  MIX_ENV=prod BURRITO_TARGET=macos_silicon mix release
+# → burrito_out/komki_macos_silicon (eine Datei, ~10 MB)
+```
+
+Beim ersten Start entpackt die Datei ihr Payload nach
+`~/Library/Application Support/.burrito/` und läuft danach ohne jede
+Elixir-Installation. Eingebaute Wartungsbefehle:
+`komki maintenance directory` (Entpackpfad), `maintenance meta`,
+`maintenance uninstall` (Payload löschen, mit y/n-Rückfrage).
+
+Bau-Voraussetzungen und Details: [`docs/prerequisites.md`](../../docs/prerequisites.md);
+Pilot-Bericht mit allen Messungen:
+[`docs/research/2026-10-11-komki-burrito-pilot.md`](../../docs/research/2026-10-11-komki-burrito-pilot.md).
+
+Zwei Hinweise für die verteilte Datei:
+
+- **Gatekeeper:** Die lokal gebaute Datei ist ad-hoc signiert und läuft ohne
+  Nachfrage. Wer sie aus einem GitHub-Release herunterlädt, bekommt beim
+  ersten Start den Gatekeeper-Dialog („Entwickler nicht verifiziert“) —
+  einmalig `xattr -d com.apple.quarantine komki_macos_silicon` ausführen
+  oder unter Systemeinstellungen › Datenschutz & Sicherheit freigeben.
+- **Bestehende Instanzen:** Das Seatbelt-Profil hat zwei Regeln für den
+  Session-Betrieb unter der Binary dazubekommen. Nach diesem Update einmalig
+  `komki init --force` ausführen — der Doctor meldet Profil-Drift, bis das
+  Profil neu geschrieben ist.
 
 ## Befehle
 
@@ -142,9 +175,13 @@ Eine Eigenheit auf diesem System (macOS 27.2 Beta): Unter dem Profil startet
 node aus gewöhnlichen fork-Ketten nicht zuverlässig (SIGABRT beim Init; eine
 branchenweit auf neueren macOS-Builds beobachtete Klasse, siehe
 `docs/research/2026-10-05-seatbelt-survey.md`). Deshalb läuft in der
-tmux-Pane der Session das komki-Escript als Mini-BEAM, das die pi-Kette
-als Port-Kind startet und die Pane-PTY durchreicht; der Headless-Lauf nutzt
-denselben Port-Weg ohnehin.
+tmux-Pane der Session das komki-Programm als Mini-BEAM (Escript oder
+Standalone-Binary), das die pi-Kette als Port-Kind startet und die
+Pane-PTY durchreicht; der Headless-Lauf nutzt denselben Port-Weg ohnehin.
+Unter der Standalone-Binary reicht die Burrito-Wrapper-Schicht stdout als
+Pipe weiter; die Session-Kette leitet stdout deshalb zusätzlich auf das
+lebende stdin-Terminal um (zwei Regeln im Profil, Analyse im Pilot-Bericht).
+Damit laufen interaktive Sessions unter Escript und Binary gleich.
 
 Der `--ctx`-Override beim `up` gilt nur für den jeweiligen Start; die
 gepinnte Konfiguration bleibt unangetastet.

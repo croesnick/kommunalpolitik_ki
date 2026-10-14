@@ -377,6 +377,56 @@ Dateisuche (Start-Warnung; `find`/`grep` bleiben weg).
 
 ---
 
+## Standalone-Bau der komki-Binary (Burrito, Ticket #75)
+
+**Zweck:** Die komki-CLI als EINE ausführbare Datei bauen (mit eingebettetem
+Erlang-Runtime, kein Elixir/OTP auf dem Zielsystem nötig). Nur für den
+Release-Bau; der Dev-Weg (`mix escript.build`) braucht keine dieser
+Werkzeuge.
+
+**Install:**
+
+```bash
+# zig EXAKT 0.16.0 — Burrito prüft die Version auf Gleichheit und bricht sonst ab.
+# Homebrew liefert eine neuere Version, deshalb der offizielle Tarball:
+curl -sO https://ziglang.org/download/0.16.0/zig-aarch64-macos-0.16.0.tar.xz
+tar -xJf zig-aarch64-macos-0.16.0.tar.xz -C ~/.local/opt/
+
+brew install xz      # xz ist im PATH nötig (ist es über Homebrew meist schon)
+```
+
+**Bau:**
+
+```bash
+cd apps/komki_cli
+PATH="$HOME/.local/opt/zig-aarch64-macos-0.16.0:$PATH" \
+  MIX_ENV=prod BURRITO_TARGET=macos_silicon mix release
+# → burrito_out/komki_macos_silicon
+```
+
+**Hinweise:**
+
+- `MIX_ENV=prod` ist Pflicht: nur prod-Builds nutzen das einmal entpackte
+  Payload wieder, dev-Builds entpacken bei jedem Lauf neu.
+- 7z/7zz wird nur für Windows-Ziele gebraucht (Burrito warnt, baut darwin
+  aber ohne weiter).
+- Beim Testen von Rebuilds derselben Version: zuerst
+  `./komki_macos_silicon maintenance uninstall` ausführen — der Wrapper
+  überspringt das Entpacken, wenn das Payload schon liegt, und man misst
+  sonst den alten Stand.
+- Gatekeeper: lokal gebaute Dateien laufen direkt; heruntergeladene tragen
+  Quarantäne und brauchen einmalig
+  `xattr -d com.apple.quarantine <datei>` (Details:
+  `docs/research/2026-10-11-komki-burrito-pilot.md`).
+
+**Benötigt von:**
+
+| Tool / Workflow | Anmerkung |
+|---|---|
+| komki-Standalone-Release (Ticket #75) | Nur der Release-Bau; die verteilte Datei selbst hat keine Runtime-Abhängigkeiten |
+
+---
+
 ## Hinzufügen einer neuen Abhängigkeit
 
 1. Abhängigkeit in diesem Dokument eintragen (Zweck, Install, Konfiguration,
