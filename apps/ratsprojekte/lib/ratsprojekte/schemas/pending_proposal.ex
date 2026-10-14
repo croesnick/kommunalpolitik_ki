@@ -23,7 +23,7 @@ defmodule Ratsprojekte.Schemas.PendingProposal do
     timestamps(type: :utc_datetime)
   end
 
-  # Changeset fuer neuen Vorschlag (von AI).
+  # Changeset fuer neuen Vorschlag (von der KI).
   # Schreibt nur in die Staging-Tabelle, nicht in realisierungsstraenge.
   # projekt_id ist fuer :add_realisierungsstrang, :change_status,
   # :update_projekt und :update_strang Pflicht, fuer :add_projekt optional

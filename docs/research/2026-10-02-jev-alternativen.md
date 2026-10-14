@@ -79,7 +79,7 @@ Das sind zwölf synthetische Titel, nicht 36 unabhängige Beispiele oder ein ext
 
 Als nächste kleinere Vergleichskandidaten priorisieren wir GLiClass-multilang-mini und GLiNER2.5-multi-Decide. Kev verdient ebenfalls einen deutschen Versuch, seine deutsche Eignung ist aber nicht belegt. Keiner dieser Kandidaten ist damit für unseren Produktionseinsatz validiert. SetFit passt, wenn eine feste Taxonomie und eigenes Training akzeptiert werden. Winnow und Cygnet liefern Benchmark-Referenzen, sind schwerer und im deutschen lokalen Einsatz ungeprüft.
 
-Ein neues deutsches Goldset mit zunächst 30 bis 50 Fällen und separatem Holdout wäre angemessener als weitere Aussagen aus denselben zwölf Titeln. Das verspricht keine statistische Sicherheit. Menschliches GO und deterministische Berechtigungen bleiben außerhalb der Klassifikatoren. Diese Recherche installiert nichts und ändert keinen RFC.
+Ein neuer deutscher Goldstandard-Datensatz mit zunächst 30 bis 50 Fällen und separatem Holdout wäre angemessener als weitere Aussagen aus denselben zwölf Titeln. Das verspricht keine statistische Sicherheit. Menschliches GO und deterministische Berechtigungen bleiben außerhalb der Klassifikatoren. Diese Recherche installiert nichts und ändert keinen RFC.
 
 ## Quellenmethode und reproduzierbare Sternzählung
 

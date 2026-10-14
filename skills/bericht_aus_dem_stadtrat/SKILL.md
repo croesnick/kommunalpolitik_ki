@@ -36,7 +36,7 @@ und ist auf Verdichtung, nicht auf Vollständigkeit optimiert: wenige
 Schwerpunkte statt TOP-für-TOP-Auflistung, kurze Sätze statt
 Verfahrensdetails.
 
-> **Definition:** Siehe [`docs/nomenklatur.md`](../../docs/nomenklatur.md)
+> **Definition:** Siehe [`GLOSSARY.md`](../../GLOSSARY.md)
 > — "Sitzungsmappe", "Ratsprojekt", "Vault". **Workflow:** WF 11 in
 > [`docs/workflows.md`](../../docs/workflows.md).
 
@@ -78,7 +78,7 @@ obsidian:
 
 Fehlt die Datei oder der `vault`-Eintrag, fragt der Skill die nutzende
 Person direkt nach dem Vault-Namen und speichert ihn *nicht* automatisch
-(GO-Prinzip: die AI schreibt keine Config, der Mensch entscheidet, was
+(GO-Prinzip: die KI schreibt keine Config, der Mensch entscheidet, was
 konfiguriert wird). Der Skill merkt sich den Vault-Namen für die restliche
 Session.
 
@@ -160,7 +160,7 @@ Sitzungs-IDs (`<sitzungs_id>`) für die folgenden Schritte merken.
 
 > **Lücke:** `ratsinfo sessions` kennt keinen Zeitraum-Filter. Die CLI
 > listet alle Sitzungen, die Filterung nach Datum passiert manuell durch
-> die AI. Bei vielen Sitzungen ggf. anhand der Ausgabe kennzeichnen, welche
+> die KI. Bei vielen Sitzungen ggf. anhand der Ausgabe kennzeichnen, welche
 > in den Zeitraum fallen.
 
 ### 5. TOPs pro Sitzung abrufen
@@ -409,16 +409,16 @@ könnten)
 2. ...
 ```
 
-## GO-Prinzip: AI sammelt, strukturiert, schreibt Vorschlag
+## GO-Prinzip: KI sammelt, strukturiert, schreibt Vorschlag
 
-Der Bericht ist ein **Vorschlag**. Die AI sammelt (Sitzungen, TOPs, AZ,
+Der Bericht ist ein **Vorschlag**. Die KI sammelt (Sitzungen, TOPs, AZ,
 Vault-Notizen), strukturiert thematisch und schlägt Diskussionsthemen vor.
 Der Stadtrat entscheidet, was er daraus macht.
 
 **Schreiben der Berichtsnotiz im Vault:** Die Notiz ist eine
 Vorbereitungsunterlage für den Termin, kein entscheidender Eingriff in
 ratsprojekte oder den RIS-Bestand. Daher ist **kein GO nötig fürs
-Schreiben der Berichtsnotiz** — die AI darf sie direkt im Vault erstellen
+Schreiben der Berichtsnotiz** — die KI darf sie direkt im Vault erstellen
 (analog `sitzungsvorbereitung`).
 
 **Aber — GO erforderlich für:**
@@ -434,7 +434,7 @@ Schreiben der Berichtsnotiz** — die AI darf sie direkt im Vault erstellen
 
 Jede politisch relevante Aussage im Bericht braucht eine Quelle. Der
 Skill kennzeichnet die Quellentypen konsistent (siehe §6 `AGENTS.md` und
-[`docs/nomenklatur.md`](../../docs/nomenklatur.md) "Quelle"):
+[`GLOSSARY.md`](../../GLOSSARY.md) "Quelle"):
 
 - **RIS-Quelle:** RIS-Sync-Datum im Frontmatter (`quellen`-Eintrag
   `typ: ris` mit URL + Abrufdatum). Im Text pro TOP: Sitzung + Datum
@@ -483,8 +483,8 @@ nutzenden Person.
 | 1 | `ratsinfo sessions --remote` wirft `FunctionClauseError` (Bug) | Remote-Sitzungsliste nicht abrufbar | `ratsinfo sync` laufen lassen, dann `ratsinfo sessions` lokal |
 | 2 | Kein automatischer RIS↔Bericht-Link | Berichtszeitraum muss anhand von Datum/Tags im Vault gesucht oder erfragt werden | Vault-Suche nach `#bericht-aus-dem-stadtrat` / `type: bericht-aus-dem-stadtrat` (bzw. `#stammtisch` / `type: stammtisch-bericht` für Legacy); Fallback: nutzende Person fragen |
 | 3 | Keine persistente Liste der Bericht-Termine/Stichtage im Vault | Termine müssen jedes Mal gesucht/erfragt werden | Zukünftig: eigener Bericht-Kalender im Vault (Notiz-Tabelle) oder in Nextcloud (WF 9, `nc_calendar_list_events`) |
-| 4 | Kein automatischer Zeitraum-Filter in `ratsinfo sessions` | CLI listet alle Sitzungen, Filterung nach Datum manuell | AI filtert die Ausgabe von `ratsinfo sessions` gegen `zeitraum_von`/`heute` |
-| 5 | Keine automatische Themen-Clusterung | TOPs werden chronologisch gelistet, thematische Bündelung muss ad-hoc passieren | AI clustert manuell nach Schwerpunkten (Klima, Mobilität, Bauen, etc.) |
+| 4 | Kein automatischer Zeitraum-Filter in `ratsinfo sessions` | CLI listet alle Sitzungen, Filterung nach Datum manuell | KI filtert die Ausgabe von `ratsinfo sessions` gegen `zeitraum_von`/`heute` |
+| 5 | Keine automatische Themen-Clusterung | TOPs werden chronologisch gelistet, thematische Bündelung muss ad-hoc passieren | KI clustert manuell nach Schwerpunkten (Klima, Mobilität, Bauen, etc.) |
 | 6 | YAML-Frontmatter kann durch externe Strings (deutsche Anführungszeichen in AZ-Titeln) brechen | Properties in Obsidian nicht sichtbar / kaputt | Single-Quotes für alle YAML-Strings mit externem Text; YAML nach Vault-Write re-validieren (siehe "Validierung nach dem Vault-Write") |
 
 Siehe auch [`docs/workflows.md`](../../docs/workflows.md) WF 11 "Lücken"

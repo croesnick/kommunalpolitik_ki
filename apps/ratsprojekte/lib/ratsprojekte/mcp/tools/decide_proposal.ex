@@ -4,10 +4,10 @@ defmodule Ratsprojekte.MCP.Tools.DecideProposal do
 
   **GO-Execution**: Dieses Tool ersetzt den Accept/Reject-Button der
   LiveView für den Chat-basierten Workflow. Der Stadtrat gibt GO im Chat
-  (z.B. „Vorschlag 42 annehmen, Kommentar: ..."), die AI führt es hiermit
+  (z.B. „Vorschlag 42 annehmen, Kommentar: ..."), die KI führt es hiermit
   atomar aus.
 
-  **Dürfen-Pflicht**: Die AI darf dieses Tool NIEMALS ohne explizites,
+  **Dürfen-Pflicht**: Die KI darf dieses Tool NIEMALS ohne explizites,
   unmissverständliches GO des Stadtrats aufrufen. Kein stillschweigendes
   Accept, kein „ich dachte, das ist gewollt". Nur weil der Vorschlag
   sinngemäß passt, ist das kein GO. Das GO muss vom Menschen kommen.
@@ -26,7 +26,7 @@ defmodule Ratsprojekte.MCP.Tools.DecideProposal do
     show_pending_proposal).
   - `aktion` — `"accept"` oder `"reject"`.
   - `kommentar` (optional) — Entscheidungskommentar des Stadtrats.
-    Bei Reject empfohlen (Lern-Effekt für die AI).
+    Bei Reject empfohlen (Lern-Effekt für die KI).
   """
 
   use Anubis.Server.Component, type: :tool
@@ -50,7 +50,7 @@ defmodule Ratsprojekte.MCP.Tools.DecideProposal do
     field(:kommentar, :string,
       description:
         "Kommentar des Stadtrats (optional bei Accept, empfohlen bei Reject — " <>
-          "Lern-Effekt für die AI)"
+          "Lern-Effekt für die KI)"
     )
   end
 

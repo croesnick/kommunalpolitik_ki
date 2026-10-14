@@ -9,7 +9,7 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdate do
   aktualisiert wird. Approve/Reject ist bewusst KEIN MCP-Tool — das
   ist das disziplinarische GO-Gate.
 
-  Die `begruendung` ist Pflichtfeld (Quellenpflicht): die AI muss
+  Die `begruendung` ist Pflichtfeld (Quellenpflicht): die KI muss
   nachvollziehbar begründen, warum sie diese Aktualisierung vorschlägt.
 
   Nach dem Aufruf liefert das Tool eine `review_url`, unter der der
@@ -68,7 +68,7 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdate do
           "beschreibung" => params[:beschreibung],
           "prioritaet" => params[:prioritaet]
         }
-        # Nur Felder aufnehmen, die die AI tatsächlich setzen will — keine
+        # Nur Felder aufnehmen, die die KI tatsächlich setzen will — keine
         # nil-Werte im Payload, sonst würde apply_projekt_update/3 Felder
         # aktiv leeren.
         |> Enum.reject(fn {_k, v} -> is_nil(v) end)

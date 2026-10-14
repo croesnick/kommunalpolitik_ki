@@ -5,7 +5,7 @@ description: >
   gegen den aktuellen Stand eines Stadtratsprojekts halten und ein strukturiertes
   Delta produzieren. Zeigt auf, welche Vorbedingungen sich ändern würden, welche
   neuen Quellen entstehen, und ob die Antragsreife steigt oder sinkt. Read-only —
-  die AI berät, der Mensch entscheidet (GO-Prinzip). Nutze diesen Skill immer, wenn
+  die KI berät, der Mensch entscheidet (GO-Prinzip). Nutze diesen Skill immer, wenn
   der Stadtrat neue Informationen zu einem bestehenden Projekt hat und wissen will, was
   sich dadurch ändert. Typische Trigger: „Hier ist eine Email von …", „Neue
   Förderrichtlinie ist raus", „Ich hab eine Notiz aus dem Vault", „Schau dir das
@@ -51,7 +51,7 @@ Der Stadtrat liefert neue Informationen. Mögliche Formate:
 - **Vault-Notiz** — `vault_suche`-Skill aufrufen, um die Notiz zu finden
 - **Ratsinfo-Sitzung** — `ratsinfo` CLI
 
-Die AI fasst die neue Info in 2–3 Sätzen zusammen und identifiziert die
+Die KI fasst die neue Info in 2–3 Sätzen zusammen und identifiziert die
 **Informationsart** (neue Quelle, neue Vorbedingung, Status-Änderung,
 Widerspruch, Bestätigung).
 
@@ -88,11 +88,11 @@ neue Info in ratsprojekte einflösse?*
 
 ### Phase 5: Delta-Report ausgeben
 
-Siehe Output-Format. Der Report ist **beratend** — die AI schlägt vor, was sich
+Siehe Output-Format. Der Report ist **beratend** — die KI schlägt vor, was sich
 ändern würde, aber sie ändert nichts. Die nutzende Person entscheidet, ob eine der
 Änderungen als Proposal eingbracht wird (→ `ratsprojekt_proposal`).
 
-## GO-Prinzip: AI vergleicht, Mensch entscheidet
+## GO-Prinzip: KI vergleicht, Mensch entscheidet
 
 Der Skill ist **read-only**. Er liest ratsprojekte (via MCP), liest den Vault
 (via `vault_suche`), liest die neue Info (von der nutzenden Person geliefert) und produziert
@@ -104,7 +104,7 @@ ethische Architektur: demokratische Verantwortung bleibt beim Stadtrat.
 
 Jede Behauptung im Delta-Report braucht eine Quelle. Wenn die neue Info eine
 Quelle ist (z.B. Email vom 14.07.2025), wird sie als solche identifiziert.
-Wenn die AI eine Behauptung aufstellt (z.B. „diese Info widerspricht Strang A"),
+Wenn die KI eine Behauptung aufstellt (z.B. „diese Info widerspricht Strang A"),
 muss sie auf den konkreten Strang/die konkrete Vorbedingung verweisen.
 
 - **Neue Info** als Quelle kennzeichnen (Typ, Datum, Absender/URL)

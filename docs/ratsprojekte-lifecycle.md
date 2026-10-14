@@ -27,7 +27,7 @@ stateDiagram-v2
     note right of Proposal_Pending
         pending_proposals (DB)
         typ: add_projekt | add_realisierungsstrang | change_status
-        AI schlägt vor, Mensch entscheidet (GO-Prinzip).
+        KI schlägt vor, Mensch entscheidet (GO-Prinzip).
     end note
 
     Proposal_Pending --> Vault_Idee: rejected → Rücklauf mit Begründung
@@ -129,7 +129,7 @@ nicht antragsreif, auch wenn alle anderen Hard Gates passieren.
 
 ### Enforcement-Status
 
-- **Policy-level (ab sofort verbindlich):** Die AI prüft VP+SM vor jedem
+- **Policy-level (ab sofort verbindlich):** Die KI prüft VP+SM vor jedem
   `propose_*`-Aufruf und trägt sie in die `begruendung` ein. Ein Proposal
   ohne VP+SM wird nicht vorgeschlagen.
 - **Code-level (Roadmap):** Die Felder `value_proposition` und
@@ -143,7 +143,7 @@ Obsidian-Vault (Source of Truth, roh)
     │
     │  ratsprojekt_proposal-Skill: sammeln → konsolidieren → Gates prüfen
     ▼
-ratsprojekte (Distillat, strukturiert, antragsreif)
+ratsprojekte (Destillat, strukturiert, antragsreif)
 ```
 
 - **Vault → ratsprojekte** ist strikt einseitig (AGENTS.md §10). Kein Rückfluss.
@@ -154,7 +154,7 @@ ratsprojekte (Distillat, strukturiert, antragsreif)
 
 ## Lifecycle-Pflicht für Skills und AI-Workflows
 
-Jeder Skill, jedes MCP-Tool und jede AI-Sitzung, die den Status eines
+Jeder Skill, jedes MCP-Tool und jede AI-Session, die den Status eines
 Projekts berührt (lesen, vorschlagen, ändern), **muss**:
 
 1. **Diesen Lifecycle kennen** — indem die Skill-Datei oder AGENTS.md auf dieses
@@ -169,9 +169,9 @@ Projekts berührt (lesen, vorschlagen, ändern), **muss**:
 
 ### GO über `decide_proposal`-MCP-Tool
 
-GO wird im Chat erteilt, die AI führt es über das `decide_proposal`-MCP-Tool
+GO wird im Chat erteilt, die KI führt es über das `decide_proposal`-MCP-Tool
 aus (`aktion: "accept" | "reject"`, mit Kommentar). Der Browser-Weg über die
-LiveView bleibt als Alternative. Die AI darf Proposals nicht selbst genehmigen
+LiveView bleibt als Alternative. Die KI darf Proposals nicht selbst genehmigen
 — sie braucht für jede `decide_proposal`-Ausführung ein vorheriges, explizites
 GO im Chat. Das `entschieden_von`-Feld zeigt "stadtrat-via-ai" anstelle von
 "stadtrat" bei Chat-basierten Entscheidungen, um den Audit-Trail klar zu

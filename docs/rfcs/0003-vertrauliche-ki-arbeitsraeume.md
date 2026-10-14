@@ -10,7 +10,7 @@
 
 Diese Fassung ist neu gegliedert, führt aber keine neuen Sicherheitsregeln ein.
 Sie enthält die didaktischen Erklärungen und Beispiele sowie die vollständige normative Referenz.
-Für die projektweiten Begriffe gilt die [kanonische Nomenklatur](../nomenklatur.md).
+Für die projektweiten Begriffe gilt die [kanonische Nomenklatur](../../GLOSSARY.md).
 Die Begriffe dieses Dokuments sind bei ihrer ersten Einführung fett hervorgehoben.
 
 ## Leseweg und Verbindlichkeit
@@ -20,7 +20,7 @@ Arbeitsraum](#5-der-arbeitsraum-und-sein-fester-vertrag) und [die
 Freigaben](#10-freigaben-für-konkrete-ereignisse). Für das grundlegende Verständnis werden zuerst die Abschnitte
 1–5 in ihrer Reihenfolge gelesen. Der übrige Hauptteil erklärt die Zusammenhänge. Für Umsetzung
 und Prüfung führt der Weg zur [normativen Referenz](#normative-referenz) und zu den Bauanleitungen in
-[B](#anhang-b-bauanleitung-für-die-inferenz-engine), [C](#anhang-c-bauanleitung-für-das-simulationstool) und
+[B](#anhang-b-bauanleitung-für-die-inferenz-engine), [C](#anhang-c-bauanleitung-für-den-simulator) und
 [F](#anhang-f-bauanleitung-für-audit-journal-und-verifier).
 
 Der Hauptteil 1–12 ist eine nichtnormative Erklärung. Maßgeblich sind R.1–R.11 und die vollständigen Anhänge
@@ -147,7 +147,7 @@ Raumbedingungen erfüllen. Der Vertrag steht in [R.4.1](#r41-startvertrag), die 
 
 Eine Anlage fordert den Agenten auf, nur beim Wort „Klage“ einen leeren Webrequest zu senden. Der Request
 enthält keinen geheimen Satz. Sein Auftreten verrät trotzdem ein Merkmal der Vorlage. Deshalb erfasst das Modell
-das ganze **Ereignis**: Nutzlast, Auswahl, Ziel, relevante Metadaten und tatsächliches Auftreten. Die beobachtbare
+das ganze **Ereignis**: Payload, Auswahl, Ziel, relevante Metadaten und tatsächliches Auftreten. Die beobachtbare
 Folge umfasst auch die Reihenfolge.
 
 Alle vom Raum veranlassten Ausgaben tragen mindestens B_W, bereits ab dem Start. Das System muss dafür keine
@@ -272,7 +272,7 @@ Kalkül steht in [R.5](#r5-der-kalkül), seine Beweise in [A](#anhang-a-formale-
 
 Ein Raumstart kann bereits Verlauf oder Betriebsdaten zugänglich machen. Eine öffentliche Datei kann zwar zum
 Raumlabel passen, aber am erlaubten Zweck scheitern. Die einzelnen Schritte verwenden die Erlaubnisprüfung mit
-jeweils passender Situation und passendem Prüflabel.
+jeweils passender Situation und passendem Validierungslabel.
 
 | Schritt | Prüfung oder Zuordnung |
 |---|---|
@@ -302,7 +302,7 @@ Gültigkeit. Auswahl, Auftreten und relevante Reihenfolge gehören dazu. Zwei fr
 keine geheimnisabhängige Vertauschung. In einem synthetischen Beispiel sendet der Agent zwei bereits freigegebene
 Nachrichten A und B in der Reihenfolge A, B, wenn eine geschützte Beschwerde vorliegt, sonst in der Reihenfolge B, A.
 Diese Wahl verrät die Existenz der Beschwerde, obwohl beide Nachrichteninhalte einzeln erlaubt sind.
-Der Agent erhält keine wiederverwendbare Herabstufungsbefugnis; die
+Der Agent erhält keine wiederverwendbare **Herabstufungsbefugnis**; die
 geprüfte Ausgabe geht an das bestimmte Ziel. Ein GO zu dieser Erklärung akzeptiert keine produktiven
 Beispielbindungen. Ein gesondert autorisiertes Session-Review kann neue Regeln registrieren. Die
 Einzelfallfreigabe wird niemals stillschweigend zur allgemeinen Regel.
@@ -350,7 +350,7 @@ Richtige Einordnung, Isolation, Identitätsprüfung, Registry, Engine, Vermittle
 Belegquellen brauchen Nachweise oder ausdrücklich benannte Annahmen. Feingranulare Zeit-, Ressourcen-, Verkehrs-
 und Hardwareseitenkanäle sind zusätzlich zu behandeln oder auszunehmen. Der Kalkül beweist weder rechtliche
 Richtigkeit noch Vertragstreue oder die Qualität menschlicher Inhaltsprüfung.
-[R.8](#r8-bedrohungsmodell-und-garantien) benennt die Zusagen; [A](#anhang-a-formale-präzisierung-und-beweise)
+[R.8](#r8-bedrohungsmodell-und-zusagen) benennt die Zusagen; [A](#anhang-a-formale-präzisierung-und-beweise)
 enthält bedingte Beweise.[^sel4]
 
 ## 12. Werkzeuge, Audit und Baufolge
@@ -541,7 +541,7 @@ Jeder Abruf hat zwei Richtungen. Suchtext, Dokumentkennung und Aufrufentscheidun
 
 Geschützte Arbeit kann deshalb mit vorher beschafften Datenständen beginnen. Spätere externe Nachrecherche erfolgt über eine gesonderte Freigabe. Ein neu auftretendes Quellenlabel darf nicht stillschweigend in einen laufenden Raum aufgenommen werden.
 
-Der Funktionsumfang eines Connectors — welche Operationen er tatsächlich anbietet und mit welchen Parametern sich jede Operation aufrufen lässt — wird in einer festen Fassung festgehalten. Ändert er sich, entsteht eine neue, gekennzeichnete Fassung, statt die alte still umzuschreiben. Diese Liste ist Teil des Environment-Datensatzes aus B.3. Bietet der Connector in Wirklichkeit mehr oder weniger als eingetragen, lautet die betroffene Entscheidung `indeterminate`. Eine eng begrenzte, zugelassene Operation darf nicht über eine weiter gefasste Operation desselben Connectors mit denselben Berechtigungen umgangen werden. Was der Connector über sich selbst mitteilt — etwa der Hinweis, er habe Nur-Lese-Zugriff — begründet keine Befugnis.
+Der Funktionsumfang eines Connectors — welche Operationen er tatsächlich anbietet und mit welchen Parametern sich jede Operation aufrufen lässt — wird in einer festen Fassung festgehalten. Ändert er sich, entsteht eine neue, gekennzeichnete Fassung, statt die alte still umzuschreiben. Diese Liste ist Teil des **Environment-Datensatzes** aus B.3. Bietet der Connector in Wirklichkeit mehr oder weniger als eingetragen, lautet die betroffene Entscheidung `indeterminate`. Eine eng begrenzte, zugelassene Operation darf nicht über eine weiter gefasste Operation desselben Connectors mit denselben Berechtigungen umgangen werden. Was der Connector über sich selbst mitteilt — etwa der Hinweis, er habe Nur-Lese-Zugriff — begründet keine Befugnis.
 
 ### R.4.4 Vermittler, Freigabedienst und dauerhafte Speicher
 
@@ -629,7 +629,7 @@ W\text{ darf }x\text{ aufnehmen}
 }
 $$
 
-**Das Prüflabel ist $B_W$, nicht bloß $\lambda(x)$.** Auch eine öffentliche Datei kann gegen eine zusätzliche Fall- oder Zweckbindung des Arbeitsraums verstoßen.
+**Das Validierungslabel ist $B_W$, nicht bloß $\lambda(x)$.** Auch eine öffentliche Datei kann gegen eine zusätzliche Fall- oder Zweckbindung des Arbeitsraums verstoßen.
 
 Quellzugriff und Aufnahme werden beide geprüft, wenn sie getrennte Operationen sind. Eine vom Raum erzeugte Anfrage an die Quelle ist zusätzlich eine Ausgabe unter seinen Bindungen. Die Aufnahmeprüfung erlaubt keinen ungeprüften Anfragekanal.
 
@@ -659,11 +659,11 @@ $$
 
 Bei einem Zielarbeitsraum gilt zusätzlich dessen Aufnahmeregel. Ein Speicher erhält Label und Objektversion und prüft spätere Zugriffe erneut. Zugelassene externe Empfänger müssen einschließlich ihrer weiteren Verarbeitung erfasst sein.
 
-Wird eine schon existierende Datei von einem Raum ausgewählt, betrifft die Prüfung nicht nur das ursprüngliche Dateilabel: Das Übergabeereignis trägt mindestens auch $B_W$. Eine unveränderte öffentliche Nutzlast kann eine vertrauliche Auswahlentscheidung transportieren.
+Wird eine schon existierende Datei von einem Raum ausgewählt, betrifft die Prüfung nicht nur das ursprüngliche Dateilabel: Das Übergabeereignis trägt mindestens auch $B_W$. Ein unveränderter öffentlicher Payload kann eine vertrauliche Auswahlentscheidung transportieren.
 
 ### R.5.7 Lockerung
 
-Eine gewöhnliche Operation entfernt keine Bindung. Eine Lockerung von $L$ nach $L'$ braucht eine konkrete Freigabe $g$:
+Eine gewöhnliche Operation entfernt keine Bindung. Eine **Lockerung** von $L$ nach $L'$ braucht eine konkrete Freigabe $g$:
 
 $$
 \forall b\in L\setminus L':
@@ -678,7 +678,7 @@ Die neue Ausgabe ist gesondert freigegeben. Original, Arbeitsraum und übriger Z
 
 ### R.6.1 Aktionsfreigabe und Offenlegungsfreigabe
 
-Eine **Aktionsfreigabe** erlaubt eine bestimmte verbindliche Wirkung. Eine **Offenlegungsfreigabe** erlaubt zusätzlich die Lockerung von Bindungen. Eine geschützte interne Übernahme kann nur die erste benötigen.
+Eine Aktionsfreigabe erlaubt eine bestimmte verbindliche Wirkung. Eine Offenlegungsfreigabe erlaubt zusätzlich die Lockerung von Bindungen. Eine geschützte interne Übernahme kann nur die erste benötigen.
 
 Beide können in einer Transaktion vorliegen. Der allgemeine Systembetreiber ist nicht automatisch zur Aufhebung fremder Bindungen befugt.
 
@@ -692,7 +692,7 @@ Ein Agent erhält keine wiederverwendbare Herabstufungsbefugnis. Der Dienst lief
 
 ### R.6.3 Gemeinsamer Offenlegungsstand
 
-Zusammengehörige Freigaben werden gegen einen versionierten **Offenlegungsstand** geprüft. Dieser hält für einen festgelegten Geltungsbereich die bereits veranlassten und noch ausstehenden Offenlegungen fest. Der Agent darf den Geltungsbereich nicht selbst so verengen, dass frühere Freigaben verschwinden.
+Zusammengehörige Freigaben werden gegen einen versionierten Offenlegungsstand geprüft. Dieser hält für einen festgelegten Geltungsbereich die bereits veranlassten und noch ausstehenden Offenlegungen fest. Der Agent darf den Geltungsbereich nicht selbst so verengen, dass frühere Freigaben verschwinden.
 
 Zwei gleichzeitig geprüfte Freigaben dürfen nicht beide einen veralteten Stand als aktuell behandeln. Reservierung beziehungsweise Verbrauch der Freigabe und Fortschreibung dieses Stands werden atomar entschieden.
 
@@ -1056,7 +1056,7 @@ Die nachstehenden Bezeichner sind normalisierte Ereignisse, keine Protokollierun
 
 Ein Snapshot-Manifest bindet Objektidentitäten, Versionen und Labels. Eine nachträglich veränderte Sammlung darf nicht unter derselben Aufnahmebestätigung weiterlaufen. Bei Abrufen wird die noch unbekannte Antwort nicht vorab erfunden: Anfrage und Aufnahme der anschließend klassifizierten Antwort sind zwei verschiedene Prüfungen.
 
-Für jeden Workflow MUSS eine positive Ende-zu-Ende-Spur einschließlich Journal und Auditor funktionieren. Zusätzlich werden mindestens ein Audit-Ausfall vor Ausführung, ein Absturz mit unklarem Ausgang und eine verschwiegene tatsächliche Wirkung simuliert. Letztere wird gegen den getrennten Effektstrom des Simulators geprüft, nicht aus dem Journal selbst erraten.
+Für jeden Workflow MUSS eine positive Ende-zu-Ende-Spur einschließlich Journal und Auditor funktionieren. Zusätzlich werden mindestens ein Audit-Ausfall vor Ausführung, ein Absturz mit unklarem Ausgang und eine verschwiegene tatsächliche Wirkung simuliert. Letztere wird gegen den getrennten Wirkungsstrom des Simulators geprüft, nicht aus dem Journal selbst erraten.
 
 ### R.7.5 Kanonische Workflows als normative Integrationsprüfung
 
@@ -1071,13 +1071,13 @@ Die drei Workflows [R.7.1](#r71-kanonischer-workflow-a-sitzungsmappe-aus-ris-unt
 Die Workflows sind damit **ausführbare Referenzspezifikationen**: Abschnitt [R.5](#r5-der-kalkül) definiert die Einzelregeln, Abschnitt [R.6](#r6-freigaben-konkrete-ereignisse-und-gemeinsame-offenlegung) die Freigaben, und Abschnitt [R.7](#r7-typische-arbeitsabläufe) zeigt, wie daraus reale kommunalpolitische Arbeit zusammengesetzt wird.
 
 
-## R.8 Bedrohungsmodell und Garantien
+## R.8 Bedrohungsmodell und Zusagen
 
 ### R.8.1 Angreifer
 
 Der Angreifer darf Daten und Antworten präparieren und das gesamte Verhalten eines Agenten einschließlich seiner Programme innerhalb des Arbeitsraums bestimmen.
 
-Er darf Labels fälschen, Ziele wechseln, Nutzlasten kodieren, Fehler auslösen und echte Freigaben durch manipulierte Vorschläge beeinflussen. Diese Versuche müssen ohne angenommene Gutartigkeit des LLM bewertet werden.
+Er darf Labels fälschen, Ziele wechseln, Payloads kodieren, Fehler auslösen und echte Freigaben durch manipulierte Vorschläge beeinflussen. Diese Versuche müssen ohne angenommene Gutartigkeit des LLM bewertet werden.
 
 Nicht angenommen wird seine Kontrolle über die vertrauenswürdige Basis: Isolation, Regelverwaltung, Identitätsprüfung, Sicherheitsmetadaten, Engine-Kern, Ausführer, Freigabedienst sowie Journalisierung und deren authentische Belegquellen. Jede dieser Komponenten braucht einen benannten Nachweis oder eine ausdrückliche Annahme. Ein kompromittierbarer Parser außerhalb des Arbeitsraums vergrößert diese Basis.
 
@@ -1149,7 +1149,7 @@ Er kann alternative Vermittler, Scheduler und absichtlich fehlerhafte Varianten 
 
 Der Audit-Verifier beantwortet: „Welche Operationen sind im bezeichneten Zeitraum belegt, waren sie damals autorisiert und welche Aussagen sind mangels Evidenz offen?“ Er verwendet den unabhängigen Ableitungsprüfer und rekonstruiert relevante historische Verwaltungsstände. Heutige Rechte ersetzen nicht die damaligen Rechte.
 
-Er prüft eine geschlossene, authentisch abgegrenzte Journalstrecke samt Belegen. Ein `permit` ohne verbindliche Reservierung, eine Reservierung ohne Ausgang und ein bestätigter Ausgang sind unterschiedliche Tatsachen. Das Journal ist ein geschützter Bestand; der Verifier erhält keine Ausführungsbefugnis. Anhang F enthält den Bauauftrag.
+Er prüft eine geschlossene, authentisch abgegrenzte Journalstrecke samt Belegen. Ein `permit` ohne verbindliche Reservierung, eine Reservierung ohne Ausgang und ein bestätigter Ausgang sind unterschiedliche Tatsachen. Das Journal ist ein geschützter Bestand; der Verifier erhält keine Ausführungsbefugnis. Anhang F enthält die Bauanleitung.
 
 ### R.9.4 Gemeinsamer Kern, unabhängige Gegenprüfung
 
@@ -1182,11 +1182,11 @@ Die Bauanleitungen in Anhang B, C und F sind agententaugliche Arbeitsaufträge. 
 
 ### R.11.1 Zweck und Reichweite
 
-Das **Audit-Journal** ist eine geschützte Folge sicherheitsrelevanter Entscheidungen, verbindlicher Ausführungsaufträge und belegter Ausgänge. Während des festgelegten Aufbewahrungszeitraums wird sie ausschließlich ergänzt. Korrekturen erfolgen durch neue, verknüpfte Einträge, nicht durch Umschreiben der Vergangenheit.
+Das Audit-Journal ist eine geschützte Folge sicherheitsrelevanter Entscheidungen, verbindlicher Ausführungsaufträge und belegter Ausgänge. Während des festgelegten Aufbewahrungszeitraums wird sie ausschließlich ergänzt. Korrekturen erfolgen durch neue, verknüpfte Einträge, nicht durch Umschreiben der Vergangenheit.
 
 Der Auditor prüft **historische Konformität im festgelegten Geltungsbereich**. Er unterscheidet vier Fragen: Ist die vorgelegte Geschichte authentisch und unverändert? Waren die Entscheidungen nach den damaligen Regeln zulässig? Welche Wirkungen sind tatsächlich belegt? Und wodurch wissen wir, dass relevante Wirkungen nicht am Journal vorbeigingen?
 
-Ein Log kann eine fehlende Aufnahme nicht aus sich selbst entdecken. Ebenso beweist ein vom Ausführer signiertes „erfolgreich“ nur die Herkunft dieser Behauptung, nicht deren Wahrheit. Vollständige Vermittlung, korrekte Effektzuordnung und glaubwürdige Belegquellen bleiben ausdrückliche Nachweispflichten. Das Journal macht sie prüfbar; es ersetzt sie nicht.
+Ein Log kann eine fehlende Aufnahme nicht aus sich selbst entdecken. Ebenso beweist ein vom Ausführer signiertes „erfolgreich“ nur die Herkunft dieser Behauptung, nicht deren Wahrheit. Vollständige Vermittlung, korrekte Wirkungszuordnung und glaubwürdige Belegquellen bleiben ausdrückliche Nachweispflichten. Das Journal macht sie prüfbar; es ersetzt sie nicht.
 
 ### R.11.2 Granularität und geschützter Auditweg
 
@@ -1196,17 +1196,17 @@ Interne Tokenberechnung und wiederholtes Lesen bereits aufgenommener Daten brauc
 
 Der Agent schreibt weder Journalereignisse noch Ausführungsbestätigungen selbst. Authentisierte Vermittler liefern strukturierte Ereignisse an einen begrenzten Writer. Nur dessen Append-Schnittstelle darf neue Einträge verbindlich machen; Agenten haben keine Änderungs-, Lösch- oder Signierrechte. Auditoren lesen ausschließlich ihre zugelassenen Bereiche.
 
-Jeder Auditweg wird bereits im Startvertrag zugelassen. Er erfasst seine Writer, Belegablagen, Prüfer, Sicherungen und gegebenenfalls Kontrollpunkt-Zeugen. Gibt es keinen gemeinsamen zulässigen Verarbeitungsweg, darf der Arbeitsraum nicht starten. Audit ist keine allgemeine Ausnahme von Vertraulichkeit oder Zweckbindung.
+Jeder Auditweg wird bereits im Startvertrag zugelassen. Er erfasst seine Writer, Belegablagen, Prüfer, Sicherungen und gegebenenfalls **Kontrollpunkt-Zeugen**. Gibt es keinen gemeinsamen zulässigen Verarbeitungsweg, darf der Arbeitsraum nicht starten. Audit ist keine allgemeine Ausnahme von Vertraulichkeit oder Zweckbindung.
 
 ### R.11.3 Entscheidung, verbindlicher Auftrag, belegter Ausgang
 
 | Ereignis | Bedeutung | Bedeutet ausdrücklich nicht |
 |---|---|---|
 | `DecisionRecorded` | Ein bestimmter Intent wurde relativ zu bezeichneten Regeln und Fakten mit `permit`, `deny` oder `indeterminate` bewertet. | Dass er ausgeführt wurde oder später noch erlaubt ist. |
-| `ExecutionCommitted` | Die aktuelle Autorisierung, der exakte Effektumfang und sein einmaliger Ausführungsauftrag sind dauerhaft festgehalten und zustandskonsistent verbindlich gemacht. | Dass der Empfänger die Wirkung bereits bestätigt hat. |
+| `ExecutionCommitted` | Die aktuelle Autorisierung, der exakte Wirkungsumfang und sein einmaliger Ausführungsauftrag sind dauerhaft festgehalten und zustandskonsistent verbindlich gemacht. | Dass der Empfänger die Wirkung bereits bestätigt hat. |
 | `OutcomeRecorded` | Eine benannte Quelle belegt den Ausgang: `confirmed`, `no_effect` oder `uncertain`, gegebenenfalls mit Teilwirkungen. | Dass fehlende Bestätigung automatisch „keine Wirkung“ bedeutet. |
 
-Der entscheidende Grundsatz lautet: **Kein auditpflichtiger Effekt ohne vorherigen dauerhaften Vorbeleg seiner aktuellen Autorisierung.** Ein bloßes `DecisionRecorded(permit)` genügt nicht. Vor dem verbindlichen Punkt werden Objektversion, Empfänger, Regel- und Faktenstand, Gültigkeit sowie bei Freigaben deren Verbrauch und Offenlegungsstand gemeinsam geprüft.
+Der entscheidende Grundsatz lautet: **Keine auditpflichtige Wirkung ohne vorherigen dauerhaften Vorbeleg ihrer aktuellen Autorisierung.** Ein bloßes `DecisionRecorded(permit)` genügt nicht. Vor dem verbindlichen Punkt werden Objektversion, Empfänger, Regel- und Faktenstand, Gültigkeit sowie bei Freigaben deren Verbrauch und Offenlegungsstand gemeinsam geprüft.
 
 `ExecutionCommitted` bezeichnet diesen festgelegten Punkt, nicht eine beliebig lange gültige Versandvollmacht. Eine später abgearbeitete Warteschlange benötigt vor dem tatsächlichen Auslösen die dann erforderliche Prüfung. Ein Widerruf vor diesem Punkt sperrt den Auftrag; bereits verbindlich ausgelöste Übertragungen lassen sich nicht rückwirkend verhindern.
 
@@ -1226,7 +1226,7 @@ Der RFC legt die Nachweisziele fest, nicht ein Speicherprodukt oder eine Blockch
 
 ### R.11.5 Das Journal darf kein neuer Abfluss sein
 
-Journalereignisse, Snapshots, Beweise, Kontrollpunkte und Auditberichte sind selbst gebundene Daten. Sie können mehr verraten als die sichtbare Nutzlast: geheime Objektexistenz, Recherchezweck, abgewiesene Suchanfragen oder ursprüngliche Bindungen einer freigegebenen Ausgabe.
+Journalereignisse, Snapshots, Beweise, Kontrollpunkte und Auditberichte sind selbst gebundene Daten. Sie können mehr verraten als der sichtbare Payload: geheime Objektexistenz, Recherchezweck, abgewiesene Suchanfragen oder ursprüngliche Bindungen einer freigegebenen Ausgabe.
 
 Es werden bevorzugt opake Referenzen und nur notwendige Prüffakten gespeichert, keine pauschalen Dokumentkopien, Prompts, Tokens oder Credentials. Auch Referenzen und Hashes sind nicht automatisch anonym. Getrennte Schutzbereiche erhalten getrennt zugreifbare Journalpartitionen; globale Zähler, fremde Kontrollpunkt-Hashes und gemeinsame Statusanzeigen dürfen keine geschützte Aktivität verraten. Signatur und Verschlüsselung beseitigen solche Metadatenkanäle nicht automatisch.[^signed-log][^logging-practice]
 
@@ -1251,7 +1251,7 @@ Ein Zustand $S$ enthält klassifizierte Objekte, feste Arbeitsraumverträge, pri
 
 Reguläre Schritte sind Start, Aufnahme, interne Verarbeitung, Erzeugen, Übergabe und Speicherung. Klassifikation, neue positive Autorisierung und Lockerung sind gesonderte vertrauenswürdige Schritte. Ein Agententext wird durch keinen regulären Schritt zu einer Autorisierung.
 
-Ein Ereignis umfasst Nutzlast, Auswahl, Ziel, relevante Metadaten und sein tatsächliches Auftreten. Die beobachtbare Folge erhält die Reihenfolge. Ein verworfenes Ereignis darf nicht schon als unzulässige Außenwirkung sichtbar geworden sein.
+Ein Ereignis umfasst Payload, Auswahl, Ziel, relevante Metadaten und sein tatsächliches Auftreten. Die beobachtbare Folge erhält die Reihenfolge. Ein verworfenes Ereignis darf nicht schon als unzulässige Außenwirkung sichtbar geworden sein.
 
 Die folgenden statischen Sätze gelten für denselben Regelstand $\Gamma$. Dieser fixiert Bindungsversionen, Empfängerkreise und die hierfür wesentlichen Umgebungsannahmen. Regelmigration, Widerruf und Änderung der Umgebung sind explizite administrative Übergänge. Alte Labels werden nicht automatisch auf eine neue „latest“-Version umgebogen.
 
@@ -1379,14 +1379,14 @@ $$
 \Gamma;S\vdash a\Longrightarrow e.
 $$
 
-Rechts steht die Ableitbarkeit nach den Regeln dieses RFC; $\pi$ ist die Begründung und $e$ ein beschriebener Effekt. Die Prüfung muss auch explizite Nebenbedingungen wie Objektversion, Empfängerkreis und vollständige Aufnahmebedingungen umfassen.
+Rechts steht die Ableitbarkeit nach den Regeln dieses RFC; $\pi$ ist die Begründung und $e$ eine beschriebene Wirkung. Die Prüfung muss auch explizite Nebenbedingungen wie Objektversion, Empfängerkreis und vollständige Aufnahmebedingungen umfassen.
 
 Dieser RFC spezifiziert den Algorithmus und die Nachweispflicht. Er behauptet nicht, dass eine noch zu bauende Engine bereits korrekt implementiert sei. Ein Ableitungsbaum ist ein prüfbarer Nachweis einer **Einzelentscheidung unter gegebenen Fakten**, kein Nachweis der Wahrheit dieser Fakten oder der vollständigen Systemisolation.
 
 
 ### A.8 Auditkonformität und ihre Vollständigkeitsannahme
 
-Ein **Autorisierungstupel** $a$ ist die normalisierte Darstellung der bereits definierten Verarbeitungssituation: Identität, Rolle, Zweck, Operation, Objektversionen, Raumvertrag, Prüflabel, Zielweg und vollständige Empfänger. Es führt keine neue Klasse ein. Eine Ableitung ist zusätzlich an $\Gamma_i$, einen authentischen Faktenstand $S_i$ und erforderliche Freigaben gebunden.
+Ein **Autorisierungstupel** $a$ ist die normalisierte Darstellung der bereits definierten Verarbeitungssituation: Identität, Rolle, Zweck, Operation, Objektversionen, Raumvertrag, Validierungslabel, Zielweg und vollständige Empfänger. Es führt keine neue Klasse ein. Eine Ableitung ist zusätzlich an $\Gamma_i$, einen authentischen Faktenstand $S_i$ und erforderliche Freigaben gebunden.
 
 Sei $J$ eine abgegrenzte Journalstrecke mit einem authentisch bestimmten Ausgangs- und Schlussstand. Ihre verbindlichen Aufträge seien $C(J)$. Die Prüfung eines Auftrags $k$ fordert:
 
@@ -1399,7 +1399,7 @@ $$
 
 `Verify` prüft den passenden Regelzweig: eine gewöhnliche Erlaubnis oder eine autorisierte Lockerung mit erlaubter Zielübergabe. `CurrentAtCommit` verlangt historische Gültigkeit am verbindlichen Punkt, nicht am heutigen Prüftag und nicht nur am Zeitpunkt einer Vorprüfung. `ValidProtocol` umfasst Einmaligkeit, Zustandsversionen, Freigabeverbrauch und Ereignisplan.
 
-Sei $E$ die **tatsächliche**, nicht aus dem Journal definierte Folge auditpflichtiger Wirkungen im untersuchten Bereich. `Match(e,k)` bedeutet, dass Inhalt, Objektversionen, Empfänger, Operation und relevante beobachtbare Wirkung von $e$ dem festgelegten Effektumfang von $k$ entsprechen. Bei Teilwirkungen muss jede erfasst sein. Zulässige Wiederholungen sind ausdrücklich modelliert, nicht aus mehrfach verwendeten Belegen abgeleitet.
+Sei $E$ die **tatsächliche**, nicht aus dem Journal definierte Folge auditpflichtiger Wirkungen im untersuchten Bereich. `Match(e,k)` bedeutet, dass Inhalt, Objektversionen, Empfänger, Operation und relevante beobachtbare Wirkung von $e$ dem festgelegten Wirkungsumfang von $k$ entsprechen. Bei Teilwirkungen muss jede erfasst sein. Zulässige Wiederholungen sind ausdrücklich modelliert, nicht aus mehrfach verwendeten Belegen abgeleitet.
 
 Die zusätzliche Abdeckungsannahme ist eine eindeutige Zuordnung:
 
@@ -1408,13 +1408,13 @@ $$
 \operatorname{DurableBefore}(k,e)\land\operatorname{Match}(e,k).
 $$
 
-Die Einzigkeit bezieht sich auf den tatsächlichen Ausführungsversuch mit eigener Kennung. Ein Auftrag darf nicht heimlich mehrere außerhalb seines Effektplans liegende Wirkungen decken. Ein offener Auftrag kann keine, eine oder nur teilweise bekannte Wirkung gehabt haben; er wird nicht nachträglich zur bestätigten Ausführung erklärt.
+Die Einzigkeit bezieht sich auf den tatsächlichen Ausführungsversuch mit eigener Kennung. Ein Auftrag darf nicht heimlich mehrere außerhalb seines Wirkungsplans liegende Wirkungen decken. Ein offener Auftrag kann keine, eine oder nur teilweise bekannte Wirkung gehabt haben; er wird nicht nachträglich zur bestätigten Ausführung erklärt.
 
-**Bedingter Satz.** Sind die historische Evidenz und ihre Herkunft korrekt, ist der Ableitungsprüfer sound, gilt `CommitValid` für alle relevanten Aufträge und gilt die genannte Abdeckungs- und Effektzuordnung für $E$, dann war jede Wirkung in $E$ nach ihrem zutreffenden historischen Regelzweig autorisiert.
+**Bedingter Satz.** Sind die historische Evidenz und ihre Herkunft korrekt, ist der Ableitungsprüfer sound, gilt `CommitValid` für alle relevanten Aufträge und gilt die genannte Abdeckungs- und Wirkungszuordnung für $E$, dann war jede Wirkung in $E$ nach ihrem zutreffenden historischen Regelzweig autorisiert.
 
-**Beweis.** Wähle eine beliebige Wirkung $e\in E$. Die Abdeckung liefert ihren vorausgehenden Auftrag $k$. Dessen gültige Ableitung belegt unter den authentischen, am verbindlichen Punkt geltenden Fakten den erlaubten Effektumfang. `Match` ordnet $e$ genau diesem Umfang zu; `ValidProtocol` verhindert Wiederverwendung außerhalb des Plans. Damit ist $e$ autorisiert. Wegen der beliebigen Wahl gilt dies für ganz $E$. $\square$
+**Beweis.** Wähle eine beliebige Wirkung $e\in E$. Die Abdeckung liefert ihren vorausgehenden Auftrag $k$. Dessen gültige Ableitung belegt unter den authentischen, am verbindlichen Punkt geltenden Fakten den erlaubten Wirkungsumfang. `Match` ordnet $e$ genau diesem Umfang zu; `ValidProtocol` verhindert Wiederverwendung außerhalb des Plans. Damit ist $e$ autorisiert. Wegen der beliebigen Wahl gilt dies für ganz $E$. $\square$
 
-Der Satz ist bewusst **kein aus dem Journal allein gewonnener Vollständigkeitsbeweis**. Eine gültige Signatur auf einer unwahren Ausführerbehauptung erfüllt seine Prämissen nicht. Ohne unabhängige Effektbelege oder einen benannten Vollständigkeitsnachweis prüft der Auditor nur die vorgelegten Aufträge und Behauptungen. Im Simulator kann $E$ separat erfasst und gegen $J$ verglichen werden; im Produktivbetrieb ist diese Verbindung eine Implementierungs- und Betreiber-Nachweispflicht.
+Der Satz ist bewusst **kein aus dem Journal allein gewonnener Vollständigkeitsbeweis**. Eine gültige Signatur auf einer unwahren Ausführerbehauptung erfüllt seine Prämissen nicht. Ohne unabhängige Wirkungsbelege oder einen benannten Vollständigkeitsnachweis prüft der Auditor nur die vorgelegten Aufträge und Behauptungen. Im Simulator kann $E$ separat erfasst und gegen $J$ verglichen werden; im Produktivbetrieb ist diese Verbindung eine Implementierungs- und Betreiber-Nachweispflicht.
 
 Journalfortschreibung ist eine zusätzliche Modelltransition $(S,J)\to(S',J')$ mit $J'=J\mathbin{\|}[j]$. Sie ändert keine vergangenen Einträge. Die Vertraulichkeitssätze A.5 und A.6 gelten für das erweiterte System nur, wenn Journalpfade, Berichte und sichtbare Audit-Metadaten dieselben Empfänger- und Lokalitätsbedingungen erfüllen. Eine bestandene Audit-Einzelspur ersetzt deren Zwei-Ausführungs-Nachweis nicht.
 
@@ -1440,7 +1440,7 @@ Die folgenden Namen beschreiben Zuständigkeiten, keine vorgeschriebene Paketstr
 | Regelkern | `start`, `admit`, `emit`, `transfer`, `store` und Freigabeentscheidungen ableiten. | Netz, Dateisystem oder Freigaberegister verändern. |
 | Ableitungsprüfer | Einen vorliegenden Beweisbaum anhand seiner konkreten Prämissen unabhängig nachprüfen. | Ein `permit` ungeprüft übernehmen oder dafür lediglich `derive` erneut aufrufen. |
 | Planer | Notwendige Labels für ausdrücklich vorgeschlagene neue Räume und Übergaben berechnen. | Aktive Verträge ändern oder Freigaben erfinden. |
-| Ausführer | Außerhalb des Kerns den aktuellen Zustand prüfen, einen Effekt verbindlich reservieren und ausführen. | Historische Entscheidungen ohne aktuelle Zustandsbindung wiederverwenden. |
+| Ausführer | Außerhalb des Kerns den aktuellen Zustand prüfen, eine Wirkung verbindlich reservieren und ausführen. | Historische Entscheidungen ohne aktuelle Zustandsbindung wiederverwenden. |
 
 Kontextauflösung und Ausführer gehören bei produktiver Nutzung zur vertrauenswürdigen Basis. Reine Simulation darf Ersatzadapter verwenden, deren Ergebnisse niemals produktive Autorität besitzen.
 
@@ -1458,7 +1458,7 @@ Definiere versionierte, geschlossene Schemas. Unbekannte Felder, doppelte Schlü
 | `Intent` | Vom Agenten vorgeschlagene Operation mit Objekt- und Zielreferenzen; keine selbst attestierten Rechte. |
 | `ContextSnapshot` | Für genau diese Entscheidung aufgelöste Fakten mit Quelle, Version, Gültigkeit und Nachweisart. |
 | `Release` | Konkretes Ereignis beziehungsweise Ereignisplan, Objektstand, Labels, Autoritäten, Geltungsbereich und erwarteter Offenlegungsstand. |
-| `Decision` | Ergebnis, normalisierte Operation, geprüfte Stände, Beweis oder Blocker, erforderliche Zustandsbedingungen und deklarativer Effekt. |
+| `Decision` | Ergebnis, normalisierte Operation, geprüfte Stände, Beweis oder Blocker, erforderliche Zustandsbedingungen und deklarative Wirkung. |
 
 `Object.classification = quarantine` hat kein Feld mit einem regulären leeren Label als Ersatz. Eine unbekannte Bindungskennung ist ebenfalls kein leeres Label.
 
@@ -1490,7 +1490,7 @@ Ein fehlendes Feld ergibt `unknown`, nicht einen passenden Default. Für `all` g
 
 Leere Konjunktion ist mathematisch wahr; leere Disjunktion falsch. Eine **fehlende Operationsregel** ist davon zu unterscheiden: Sie erlaubt die Operation nicht. Eine bewusst uneingeschränkte zulässige Operation wird ausdrücklich mit `true` eingetragen.
 
-Der Empfängertest, Labelerhaltung und die korrekte Wahl des Prüflabels sind fest im Regelkern implementiert. Sie sind keine austauschbaren Policy-Ausdrücke. Operationsregeln dürfen den eigenen Prüflabelsatz nicht beobachten, damit die Monotonie aus A.2 erhalten bleibt.
+Der Empfängertest, Labelerhaltung und die korrekte Wahl des Validierungslabels sind fest im Regelkern implementiert. Sie sind keine austauschbaren Policy-Ausdrücke. Operationsregeln dürfen den eigenen Validierungslabelsatz nicht beobachten, damit die Monotonie aus A.2 erhalten bleibt.
 
 Auflagen werden als heute prüfbare Voraussetzungen oder als zukünftige Pflichten mit verantwortlichem Vollzug eingeordnet. Eine künftig fällige Löschung ist nicht schon `true`, weil eine Frist im Vertrag steht.
 
@@ -1530,12 +1530,12 @@ Sie liest keine aktuellen Informationen „nebenbei“. Gleiche Eingaben erzeuge
 Die Auswertung erfolgt in dieser Reihenfolge:
 
 1. **Struktur und Bindung prüfen.** Schema, Referenzen, Objektversionen und Zusammengehörigkeit von Snapshot und Operation müssen stimmen.
-2. **Regel bestimmen.** Die Operation bestimmt ihre Prämissen und das Prüflabel. Bei `admit` ist dies immer `workspace.bindings`.
+2. **Regel bestimmen.** Die Operation bestimmt ihre Prämissen und das Validierungslabel. Bei `admit` ist dies immer `workspace.bindings`.
 3. **Basis und Datenzugriff prüfen.** Identität, aktuelle Vertragsgültigkeit, konkrete Operations- und Objektzugriffsrechte sowie erforderliche Nachweise.
 4. **Labelbedingungen prüfen.** Aufnahmeinklusion, außerhalb des Agenten zugeordnetes Ausgabelabel und gegebenenfalls Zielaufnahme.
-5. **Empfänger und Bedingungen prüfen.** Vollständiges $\rho_\Gamma(c)$, dessen Inklusion in $R_\Gamma(L)$ und alle $P_b(c)$ für das vollständige Prüflabel.
+5. **Empfänger und Bedingungen prüfen.** Vollständiges $\rho_\Gamma(c)$, dessen Inklusion in $R_\Gamma(L)$ und alle $P_b(c)$ für das vollständige Validierungslabel.
 6. **Freigabe prüfen, falls beantragt.** Niemals als stiller Fallback einer abgelehnten normalen Übergabe; eigener Regelzweig mit allen Bedingungen aus Abschnitt [R.6](#r6-freigaben-konkrete-ereignisse-und-gemeinsame-offenlegung).
-7. **Entscheidung erzeugen.** Ableitung oder begründete Blockade, mit exakt beschriebenem möglichem Effekt und seinen aktuellen Zustandsbedingungen.
+7. **Entscheidung erzeugen.** Ableitung oder begründete Blockade, mit exakt beschriebener möglicher Wirkung und ihren aktuellen Zustandsbedingungen.
 
 Ein bekannter verbietender Befund führt zu `deny`; fehlen andernfalls notwendige Fakten, lautet das Ergebnis `indeterminate`. Nur vollständig nachgewiesene Prämissen führen zu `permit`. Ein nicht auswertbarer oder ressourcenbedingt abgebrochener Aufruf darf niemals auf `permit` zurückfallen.
 
@@ -1621,7 +1621,7 @@ Er löst den tatsächlichen aktuellen Kontext auf und prüft mindestens Identit�
 
 Bei Freigaben werden erwarteter Offenlegungsstand und einmalige Verwendung gemeinsam geprüft und verbindlich fortgeschrieben. Zwei konkurrierende Ausführungen desselben GOs dürfen nicht beide erfolgreich reservieren. Eine geänderte Version oder widerrufene Zulassung erzwingt eine neue Entscheidung.
 
-Zwischen Prüfung und Außenwirkung darf der Agent weder Nutzlast noch Ziel austauschen. Inhaltsreferenzen müssen sich auf unveränderliche, tatsächlich verwendete Daten beziehen; ein Dateipfad allein genügt nicht.
+Zwischen Prüfung und Außenwirkung darf der Agent weder Payload noch Ziel austauschen. Inhaltsreferenzen müssen sich auf unveränderliche, tatsächlich verwendete Daten beziehen; ein Dateipfad allein genügt nicht.
 
 Ein technisch notwendiger Versanddienst führt eine kontrollierte Folge aus. Seine Zustände sind auf `DecisionRecorded`, `ExecutionCommitted` und `OutcomeRecorded` aus Abschnitt [R.11](#r11-audit-journal-nachweisbare-vermittlung-im-betrieb) abzubilden. Der dauerhafte Vorbeleg und die aktuelle Zustandsprüfung sind Pflicht, nicht eine unverbindliche Telemetrie nach der Wirkung. Ein Ausfall nach dem verbindlichen Punkt bleibt ohne belastbaren Ausgang offen. Die konkrete Umsetzung dieses Protokolls bleibt Implementierungsarbeit; seine Sicherheitsbedingungen aus Abschnitt [R.6](#r6-freigaben-konkrete-ereignisse-und-gemeinsame-offenlegung) und [R.11](#r11-audit-journal-nachweisbare-vermittlung-im-betrieb) sind verbindlich.
 
@@ -1644,7 +1644,7 @@ Führe die Tests aus Anhang D aus und liefere für jeden Regelnamen mindestens e
 Der abschließende Implementierungsbericht benennt den genauen Commit, Regelstand, ausgeführte Tests, Ergebnisse, Grenzen und noch angenommene Eigenschaften. Er darf nicht aus einem bestandenen Regelsatz auf eine ungeprüfte produktive Isolation schließen.
 
 
-## Anhang C: Bauanleitung für das Simulationstool
+## Anhang C: Bauanleitung für den Simulator
 
 ### C.1 Auftrag an den implementierenden Agenten
 
@@ -1666,7 +1666,7 @@ Ein Szenario enthält:
 | Akteure | Feste lokale Programme beziehungsweise explizit begrenzte Strategiemengen. |
 | Übergänge | Aktionen der Engine und modellierte administrative oder Umgebungsereignisse. |
 | Ausführer und Vermittler | Konforme Variante oder ausdrücklich bezeichnete Testmutation. |
-| Beobachtung | Tatsächliche Empfänger, sichtbare Nutzlasten, Metadaten, Reihenfolge, Zustand und gegebenenfalls Abschlussereignisse. |
+| Beobachtung | Tatsächliche Empfänger, sichtbare Payloads, Metadaten, Reihenfolge, Zustand und gegebenenfalls Abschlussereignisse. |
 | Prüfeigenschaft | Invariante, Nichtinterferenz, begrenzte Faktenfreigabe oder zeitliche Nachweispflicht. |
 | Grenzen | Maximale Schritte, Räume, Objekte, Zustände, Strategien und Zufallswerte. |
 | Erwartung | Gewünschtes Ergebnis und Einordnung eines absichtlich verletzten Modells. |
@@ -1684,11 +1684,11 @@ step(model, state, action)
     -> next_state, decision, actual_effects, observations
 ```
 
-Im konformen Modus nutzt `decision` den Engine-Kern. `actual_effects` entstehen durch den modellierten Ausführer. Das ist bewusst getrennt: Eine fehlerhafte Umsetzung kann trotz richtiger Entscheidung zusätzliche Effekte erzeugen.
+Im konformen Modus nutzt `decision` den Engine-Kern. `actual_effects` entstehen durch den modellierten Ausführer. Das ist bewusst getrennt: Eine fehlerhafte Umsetzung kann trotz richtiger Entscheidung zusätzliche Wirkungen erzeugen.
 
 Der Zustand enthält mindestens Objekte, Räume, private Zustände, Warteschlangen, Freigabeverbrauch, Offenlegungsstand, Gültigkeiten und simulierte Betriebsdaten. Dazu kommen flüchtige und dauerhafte Journalteile, Belege, Kontrollpunkte, Schlüssel-Epochen und offene Ausführungen. Speicherung, Absturz und Wiederaufnahme sind tatsächliche Übergänge, keine impliziten Rücksetzungen.
 
-Der Simulator hält `actual_effects` ausdrücklich außerhalb des vom simulierten Logger behaupteten Zustands. Eine Mutation darf einen echten Effekt auslassen oder falsch bestätigen. Das Abdeckungsorakel vergleicht beide Sichten; der Log-only-Verifier darf den verborgenen Effektstrom nicht als kostenloses Wissen erhalten. Crash-Tests unterscheiden dauerhaft bestätigte Appends von bloß im Speicher stehenden Einträgen.
+Der Simulator hält `actual_effects` ausdrücklich außerhalb des vom simulierten Logger behaupteten Zustands. Eine Mutation darf eine echte Wirkung auslassen oder falsch bestätigen. Das Abdeckungsorakel vergleicht beide Sichten; der Log-only-Verifier darf den verborgenen Wirkungsstrom nicht als kostenloses Wissen erhalten. Crash-Tests unterscheiden dauerhaft bestätigte Appends von bloß im Speicher stehenden Einträgen.
 
 Administrative Aktionen wie eine echte Freigabe oder ein Widerruf werden ausschließlich durch den vorgesehenen Verwaltungsakteur erzeugt. Ein Agentenereignis mit dem Text „GO“ ist nur Text.
 
@@ -1714,9 +1714,9 @@ Definiere die Beobachtung aus tatsächlich simulierten Zugriffsmöglichkeiten:
 observe(observer, actual_effects, state)
 ```
 
-**Verboten ist:** „Gib nur Effekte zurück, deren Label dem Beobachter Zugriff erlaubt.“ Ein fehlerhafter Ausführer, der geheime Bytes tatsächlich öffentlich ausgibt, würde dadurch scheinbar sicher.
+**Verboten ist:** „Gib nur Wirkungen zurück, deren Label dem Beobachter Zugriff erlaubt.“ Ein fehlerhafter Ausführer, der geheime Bytes tatsächlich öffentlich ausgibt, würde dadurch scheinbar sicher.
 
-Ereignisreihenfolge, Nutzlast, Ziel und relevante Metadaten bleiben erhalten. Keine Sortierung, die den Reihenfolgekanal beseitigt. Keine Entfernung sichtbarer Fehlerzähler, weil eine Übertragung „eigentlich abgelehnt“ wurde.
+Ereignisreihenfolge, Payload, Ziel und relevante Metadaten bleiben erhalten. Keine Sortierung, die den Reihenfolgekanal beseitigt. Keine Entfernung sichtbarer Fehlerzähler, weil eine Übertragung „eigentlich abgelehnt“ wurde.
 
 Mindestens folgende Orakel sind unabhängig von der normalen Entscheidungsfunktion zu implementieren:
 
@@ -1932,7 +1932,7 @@ D.4 prüft den Kalkül, F.9 das Audit. Dieser Block prüft die Umsetzung: Eine k
 
 | Testfamilie | Positive Kontrolle | Angriff oder erwarteter Befund |
 |---|---|---|
-| `grenzdurchsetzung` | Alle für den Betrieb nötigen Verbindungen laufen über die zugelassene Vermittlungsstelle. | Raw Sockets, IPv6-, UDP- und DNS-Pfade, Redirect-Ketten, Host-Loopback und Cloud-Metadatenendpunkte werden blockiert oder als benannte Grenze dokumentiert. |
+| `grenzdurchsetzung` | Alle für den Betrieb nötigen Verbindungen laufen über den zugelassenen Vermittler. | Raw Sockets, IPv6-, UDP- und DNS-Pfade, Redirect-Ketten, Host-Loopback und Cloud-Metadatenendpunkte werden blockiert oder als benannte Grenze dokumentiert. |
 | `identitaetsbindung` | Nur authentisierte Raum- und Auftragsidentitäten erreichen autorisierte Operationen. | Gefälschte oder wiederverwendete Identitäten und Auftragskennungen werden abgewiesen, ohne Rechte zu erweitern. |
 | `credential-exposition` | Credentials bleiben für die zugelassenen Operationen nutzbar und außerhalb der Agentensicht. | Umgebungs-, Prozess- und Dateidumps, Debug- und Fehlerausgaben, reflektierte Header und Ausweich-Authentifizierungswege führen nicht zur Offenlegung. |
 | `connector-bypass` | Der tatsächlich angebotene Funktionsumfang stimmt mit dem Environment-Fakt aus R.4.3 überein. | Eine weiter gefasste Operation desselben Connectors umgeht die Beschränkung einer eng begrenzten, zugelassenen Operation; ein nach der Zulassung geänderter Funktionsumfang wird als Abweichung erkannt und sperrt die betroffene Verarbeitung. |
@@ -1957,7 +1957,7 @@ Dieser Anhang ist aus RFC0001 Revision4 übernommen. „Diese Revision“ und di
 | Ein positives Modellurteil kann mit Laufzeitbefugnis verwechselt werden. | Entscheidungsableitung, aktuelle Reservierung und tatsächliche Ausführung werden getrennt. | Snapshotwechsel, Replay und konkurrierende Freigaben. |
 | Die zentralen kommunalpolitischen Arbeitsabläufe waren nur tabellarisch skizziert. | Sitzungsmappe, Parteibericht und Fraktionsrecherche sind als vollständige normative Ende-zu-Ende-Workflows modelliert. | `workflow-sitzungsmappe`, `workflow-parteibericht`, `workflow-fraktionsrecherche`; D.7. |
 | Betriebsentscheidungen sollten nachträglich prüfbar werden. | Geschütztes Audit-Journal, historischer Verifier, ausdrücklicher Audit-Vertrag. | Abschnitt [R.11](#r11-audit-journal-nachweisbare-vermittlung-im-betrieb), A.8 und Anhang F. |
-| Hash-Kette und `executed`-Behauptung wurden zu weit interpretiert. | Kontrollpunkte, abgegrenzte Integrität, echte Abdeckungsannahme und Quellen von Wirkungsbelegen. | Präfix, Fork, Neuberechnung, falsche Bestätigung und verschwiegener Effekt. |
+| Hash-Kette und `executed`-Behauptung wurden zu weit interpretiert. | Kontrollpunkte, abgegrenzte Integrität, echte Abdeckungsannahme und Quellen von Wirkungsbelegen. | Präfix, Fork, Neuberechnung, falsche Bestätigung und verschwiegene Wirkung. |
 | Abstürze, Widerruf und Journal selbst können Sicherheitslücken schaffen. | Dauerhafter Vorbeleg, Zustandsprotokoll, offene Ausgänge, getrennte Journalbereiche und begrenzte Aufbewahrung. | Crash-Grenzen, Replay, alte Entscheidungen und Audit-Nebenkanäle. |
 
 Der Falsifikationsreview widerlegte weder den Erhaltungssatz noch den Nichtinterferenzsatz unter sämtlichen dortigen Annahmen. Die Revision übernimmt diese Unterscheidung ausdrücklich: Nicht jedes Gegenbeispiel gegen eine schwächere Implementierung ist ein Gegenbeispiel gegen den vollständigen Kalkül.
@@ -2055,12 +2055,12 @@ Zuerst entstehen geschlossene Schemas, ein deterministischer Protokollinterprete
 
 | Komponente | Verantwortung | Grenze |
 |---|---|---|
-| Engine und Ableitungsprüfer | Autorisierungsentscheidung relativ zu ausdrücklichen Fakten. | Kein Nachweis, dass ein Effekt wirklich stattfand. |
-| Ausführer | Aktuelle Zustandsprüfung, eindeutiger Ausführungsversuch, unveränderlicher Effektplan, glaubwürdige Ausgangsbelege. | Darf keine Auditgeschichte umschreiben oder offene Zustellung als sicher gescheitert deklarieren. |
+| Engine und Ableitungsprüfer | Autorisierungsentscheidung relativ zu ausdrücklichen Fakten. | Kein Nachweis, dass eine Wirkung wirklich stattfand. |
+| Ausführer | Aktuelle Zustandsprüfung, eindeutiger Ausführungsversuch, unveränderlicher Wirkungsplan, glaubwürdige Ausgangsbelege. | Darf keine Auditgeschichte umschreiben oder offene Zustellung als sicher gescheitert deklarieren. |
 | Journal-Writer | Authentisierte Quellen, typgerechte Ereignisse, dauerhafte Reihenfolge, Append-Belege und Kontrollpunkte. | Kann eine falsch berichtete Realweltwirkung nicht durch Signieren wahr machen. |
 | Belegablage | Historische Registry, Fakten, Verträge, Freigaben und Belege unverändert und zugelassen verfügbar halten. | Eine Referenz ohne abrufbare, authentische Evidenz ist kein Prüfnachweis. |
 | Kontrollpunkt-Zeuge | Einen genau bezeichneten Journalstand unabhängig aufbewahren beziehungsweise widersprüchliche Stände vergleichbar machen. | Keine globale Beobachtungssicht oder Wahrheit allein durch seine Existenz. |
-| Audit-Verifier | Integrität, Ableitungen, historische Zustände und Effektbelege getrennt prüfen. | Keine Ausführung; fehlende Daten weder ergänzen noch als erfüllt behandeln. |
+| Audit-Verifier | Integrität, Ableitungen, historische Zustände und Wirkungsbelege getrennt prüfen. | Keine Ausführung; fehlende Daten weder ergänzen noch als erfüllt behandeln. |
 
 Agenten können einen zulässigen Auditbericht anfordern. Sie erhalten keine Writer-, Signier- oder Freigabeidentität. Der Writer akzeptiert nur die für eine authentisierte Quelle vorgesehenen Ereignistypen. Eine plausible JSON-Struktur allein verleiht keine Autorität.
 
@@ -2083,7 +2083,7 @@ Ein `AuditScope` für eine konkrete Prüfung nennt Anfang, Ende und alle einschl
 
 Alle regulären Anfragen am kontrollierten Eingang werden im vereinbarten Umfang erfasst, auch Ablehnungen. Unauthentisierter Netzwerkabfall und Grenzraten sind gesondert zu definieren. Eine Ressourcenbegrenzung darf Requests vor Annahme blockieren, aber keine angenommenen Vorgänge lautlos aus einer angeblich vollständigen Spur entfernen. Zusammengefasste Angriffsstatistik darf als solche geführt werden; sie ersetzt keinen Einzelnachweis.
 
-Nach einem Ausfall wird vor Wiederaufnahme ein geschützter Wiederanlaufbefund mit bekannten Kontrollständen, offenen Versuchen und erkennbaren Erfassungslücken festgehalten. Nicht rekonstruierbare Anfragen werden nicht erfunden. Auch wenn die Sperre unbelegte Wirkungen verhindert hat, kann die Anzahl zurückgewiesener oder nicht angenommener Anfragen für dieses Intervall unbekannt bleiben. Ein Bericht darf deshalb vollständige Wirkungsabdeckung und vollständige Anfrageerfassung nicht gleichsetzen.
+Nach einem Ausfall wird vor Wiederaufnahme ein geschützter **Wiederanlaufbefund** mit bekannten Kontrollständen, offenen Versuchen und erkennbaren Erfassungslücken festgehalten. Nicht rekonstruierbare Anfragen werden nicht erfunden. Auch wenn die Sperre unbelegte Wirkungen verhindert hat, kann die Anzahl zurückgewiesener oder nicht angenommener Anfragen für dieses Intervall unbekannt bleiben. Ein Bericht darf deshalb vollständige Wirkungsabdeckung und vollständige Anfrageerfassung nicht gleichsetzen.
 
 Ein gemischter Auditdienst darf nicht aufgrund seiner zentralen Stellung alle Schutzbereiche lesen. Zu jeder Partition werden korrekte Zuordnung und zulässige Verarbeitungsstellen nachgewiesen. Fehlt dies, ist der Startvertrag nicht erfüllbar.
 
@@ -2094,16 +2094,16 @@ Verwende geschlossene, versionierte Schemas wie in B.3. Unbekannte Felder, doppe
 | Datensatz | Wesentliche Daten |
 |---|---|
 | `AuditRecord` | Formatversion, Journal-ID, Epoche, Sequenz, Event-ID, Vorgängerbindung, authentisierte Quelle, Ereignistyp, Kausalreferenzen, Auditlabel und typisierte Ereignisdaten. |
-| `DecisionRecorded` | Logische Operation, normalisierter Intent, Raumvertrag, Registry- und Faktenreferenzen, geprüfte Labels und aufgelöste Empfänger, Entscheidung, Ableitung oder Blocker, Effektplan. |
-| `ExecutionCommitted` | Eigene Versuch-ID, zugehörige Entscheidung, aktueller Faktenstand, exakte Objekt- und Effektbindung, relevante Vor-/Nachrevisionen, Freigabe-/Ereignisplan und dessen verbindlicher Verbrauch beziehungsweise Reservierung. |
-| `OutcomeRecorded` | Versuch-ID, Zustand und tatsächlich belegter Effektumfang, Belegquelle, Belegreferenz und Evidenzart. Unklare Teilwirkungen bleiben ausdrücklich enthalten. |
+| `DecisionRecorded` | Logische Operation, normalisierter Intent, Raumvertrag, Registry- und Faktenreferenzen, geprüfte Labels und aufgelöste Empfänger, Entscheidung, Ableitung oder Blocker, Wirkungsplan. |
+| `ExecutionCommitted` | Eigene Versuch-ID, zugehörige Entscheidung, aktueller Faktenstand, exakte Objekt- und Wirkungsbindung, relevante Vor-/Nachrevisionen, Freigabe-/Ereignisplan und dessen verbindlicher Verbrauch beziehungsweise Reservierung. |
+| `OutcomeRecorded` | Versuch-ID, Zustand und tatsächlich belegter Wirkungsumfang, Belegquelle, Belegreferenz und Evidenzart. Unklare Teilwirkungen bleiben ausdrücklich enthalten. |
 | `AdministrationRecorded` | Authentisierte Änderung von Regeln, Rechten, Umgebung, Gültigkeit, Freigabe, Schlüsseln oder Lebenszyklus mit Vor-/Nachreferenzen. |
-| `AppendReceipt` | Journal, Epoche, Sequenz, gebundener Eintrag und geltende Haltbarkeitszusage. Kein Effektbeleg. |
+| `AppendReceipt` | Journal, Epoche, Sequenz, gebundener Eintrag und geltende Haltbarkeitszusage. Kein Wirkungsbeleg. |
 | `Checkpoint` | Journal, Epoche, Länge, gebundener Kopf, Protokoll-/Schlüsselstand und Herkunftsschutz. |
 | `AuditBundle` | Abgegrenzte Journale, Belege, Kontrollpunkte, historische Regeln und Fakten sowie ein autorisiert bezogenes Vertrauensmanifest. |
 | `AuditReport` | Geprüfter Umfang, Teilergebnisse, Befunde, offene Vorgänge, Evidenzarten, Annahmen und eigenes Schutzlabel. |
 
-Eine logische Operation kann mehrere Versuche haben, aber jeder Versuch braucht eine eigene Kennung und einen zulässigen Wiederholungsplan. Ein verlorenes Append-Acknowledgement wird anders behandelt: Derselbe Writer-Auftrag mit derselben Event-ID und identischem Inhalt darf idempotent denselben Append-Beleg liefern. Gleiche ID mit anderem Inhalt ist ein Konflikt. Append-Wiederholung autorisiert niemals Effekt-Wiederholung.
+Eine logische Operation kann mehrere Versuche haben, aber jeder Versuch braucht eine eigene Kennung und einen zulässigen Wiederholungsplan. Ein verlorenes Append-Acknowledgement wird anders behandelt: Derselbe Writer-Auftrag mit derselben Event-ID und identischem Inhalt darf idempotent denselben Append-Beleg liefern. Gleiche ID mit anderem Inhalt ist ein Konflikt. Append-Wiederholung autorisiert niemals Wirkungswiederholung.
 
 Ein schlanker Eintrag kann etwa so aussehen. Die Platzhalter stehen für abrufbare, authentische Belege, nicht für die Behauptung ihrer Existenz:
 
@@ -2163,7 +2163,7 @@ Die erste Umsetzung muss folgende Unterschiede sichtbar machen:
 
 Eine Append-Bestätigung wird erst nach Erreichen der deklarierten Haltbarkeit ausgegeben. Ein kurzer Systemaufruf-Erfolg ist nicht automatisch Ausfallsicherheit. Signiermaterial bleibt außerhalb der Agenten und normaler Werkzeugprozesse. Ein kompromittierter Writer kann dennoch falsche neue Aussagen beglaubigen; die Quelle und Wahrheit einer Wirkung werden dadurch nicht bewiesen.
 
-### F.5 Verbindlicher Ausführungsautomat
+### F.5 Verbindlicher Ausführer
 
 Das normative Protokoll betrachtet folgende Zustände pro Versuch:
 
@@ -2180,17 +2180,17 @@ uncertain -- spaeterer belastbarer Beleg --> confirmed | no_effect
 
 Eine spätere Aufklärung ist ein neuer Eintrag. Sie tilgt das frühere `uncertain` nicht. Widersprüchliche bestätigte Ausgänge sind ein Befund; sie werden nicht durch „der letzte gewinnt“ aufgelöst.
 
-Die Umsetzung muss **einen verbindlichen Auslösepunkt** nachweisen. Relevante Rechte-/Policyrevision, Freigabeverbrauch, Offenlegungsstand und unveränderliche Nutzlast werden konsistent festgelegt. Der Vorbeleg ist vor der ersten erfassten Wirkung dauerhaft. Bei getrennten Speichern ist dies eine zu implementierende Protokolleigenschaft, keine automatisch vorhandene verteilte Transaktion.
+Die Umsetzung muss **einen verbindlichen Auslösepunkt** nachweisen. Relevante Rechte-/Policyrevision, Freigabeverbrauch, Offenlegungsstand und unveränderlicher Payload werden konsistent festgelegt. Der Vorbeleg ist vor der ersten erfassten Wirkung dauerhaft. Bei getrennten Speichern ist dies eine zu implementierende Protokolleigenschaft, keine automatisch vorhandene verteilte Transaktion.
 
 Eine zulässige Umsetzung kann ihre Autorisierung bis zur Übergabe an den geschützten Effektor serialisieren oder gleichwertige Versions-/Reservierungsprüfungen verwenden. Ein alter positiver Snapshot plus späteres `send()` ohne solchen Zusammenhang ist nicht zulässig. Eine neu entdeckte Abweichung braucht eine neue Entscheidung; sie darf nicht durch Umschreiben des alten Snapshots verborgen werden.
 
-Der verbindliche Auftrag bindet nur den festgelegten Versuch und Effektplan. Der Kontext darf zwischen Kontrolle und Auslösung nicht durch den Agenten austauschbar sein. Wurde nur ein späterer Job eingeplant, ist diese Planung selbst die erste Wirkung; seine spätere Ausführung braucht den dann einschlägigen neuen Prüfpunkt. So wird aus dem Journalbeleg kein ewiger Freibrief.
+Der verbindliche Auftrag bindet nur den festgelegten Versuch und Wirkungsplan. Der Kontext darf zwischen Kontrolle und Auslösung nicht durch den Agenten austauschbar sein. Wurde nur ein späterer Job eingeplant, ist diese Planung selbst die erste Wirkung; seine spätere Ausführung braucht den dann einschlägigen neuen Prüfpunkt. So wird aus dem Journalbeleg kein ewiger Freibrief.
 
 | Ausfallpunkt | Erforderliches Verhalten |
 |---|---|
 | Vor dauerhaftem Vorbeleg | Keine auditpflichtige Wirkung; Anfrage bleibt verweigert oder unbearbeitet. |
-| Nach Vorbeleg, vor bekanntem Effekt | Nach Neustart offen behandeln, sofern keine belastbare No-Effect-Evidenz existiert. |
-| Nach tatsächlichem Effekt, vor Ausgangseintrag | Derselbe offene Zustand ist möglich; keine automatische Wiederholung. |
+| Nach Vorbeleg, vor bekannter Wirkung | Nach Neustart offen behandeln, sofern keine belastbare No-Effect-Evidenz existiert. |
+| Nach tatsächlicher Wirkung, vor Ausgangseintrag | Derselbe offene Zustand ist möglich; keine automatische Wiederholung. |
 | Nach bestätigtem Ausgang, vor Antwort an den Caller | Antwort kann verloren sein; Versuch nicht nochmals ausführen. |
 | Nach Restore eines alten Journals | Gegen bekannte Kontrollpunkte, Versuchs- und Verwaltungsstände abgleichen; bei Konflikt sperren. |
 
@@ -2209,7 +2209,7 @@ verify_journal(bundle, trusted_manifest, audit_scope) -> AuditReport
 verify_effect_coverage(actual_effects, checked_commits) -> CoverageReport
 ```
 
-Die zweite Funktion ist ein unabhängiges Simulations- beziehungsweise Abgleichwerkzeug. Ein produktiver Auditor verfügt nicht automatisch über den vollständigen Realwelt-Effektstrom. Vorhandene externe Belege und ihre Herkunft werden im Bericht ausgewiesen.
+Die zweite Funktion ist ein unabhängiges Simulations- beziehungsweise Abgleichwerkzeug. Ein produktiver Auditor verfügt nicht automatisch über den vollständigen Realwelt-Wirkungsstrom. Vorhandene externe Belege und ihre Herkunft werden im Bericht ausgewiesen.
 
 Prüfe in folgender Reihenfolge; alle Schritte behalten ihre eigenen Befunde:
 
@@ -2279,7 +2279,7 @@ Die Aussagen werden nach Angreiferumfang getrennt:
 
 **Nachträgliche Manipulation der Journalablage.** Mindestens ein relevanter früherer beziehungsweise abschließender Kontrollpunkt liegt außerhalb dieser Manipulationsmöglichkeit. Dann kann der Auditor gegen diesen Stand prüfen. Noch nicht verankerte Schlussabschnitte und nicht verglichene Forks bleiben benannte Grenzen.
 
-**Kompromittierte Vermittler oder Belegquellen.** Ein formal gültiges Journal kann falsche Behauptungen enthalten. Unabhängige Empfangs- oder Effektbelege können einzelne Widersprüche erkennen; sie liefern nicht automatisch eine vollständige Beobachtung aller Kanäle. Die allgemeine Zusage aus A.8 darf ohne passende Nachweise nicht beansprucht werden.
+**Kompromittierte Vermittler oder Belegquellen.** Ein formal gültiges Journal kann falsche Behauptungen enthalten. Unabhängige Empfangs- oder Wirkungsbelege können einzelne Widersprüche erkennen; sie liefern nicht automatisch eine vollständige Beobachtung aller Kanäle. Die allgemeine Zusage aus A.8 darf ohne passende Nachweise nicht beansprucht werden.
 
 Für die erste Implementierung genügen ein geschützter Writer je passend abgegrenztem Bereich, eine Belegablage, ein unabhängiger Offline-Verifier und synthetische Crash-/Manipulationstests. Welche Persistenz- und Signaturtechnik dies trägt, wird erst im Implementierungsnachweis entschieden. Eine Blockchain, ein verteilter Konsensdienst oder eine zentrale externe Telemetrieplattform ist keine Modellvoraussetzung.
 
@@ -2292,16 +2292,16 @@ Die Testnamen sind Szenariobezeichner. Sie erweitern Anhang D. Die im Begleitpak
 | `audit-regelentscheidung` | Aktuell erlaubter Versuch und passender Ausgang werden nachgeprüft. | `deny` oder `indeterminate` mit tatsächlicher Wirkung ist ein Verstoß. |
 | `audit-effektbindung` | Inhalt, Objektversion und Empfänger stimmen. | Austausch trotz gültigem Permit wird erkannt. |
 | `audit-vorbeleg` | Dauerhaftes Commit vor Wirkung. | Nur flüchtiger oder nachträglicher Logeintrag darf nicht genügen. |
-| `audit-crashfenster` | Vollständig belegter Abschluss. | Gleiche offene Journale vor/nach unbekanntem Effekt bleiben gleich offen. |
-| `audit-logausfall` | Funktionierender Writer ermöglicht reguläre Arbeit. | Kein unbelegter Effekt bei vollem Speicher, fehlender Berechtigung oder Append-Ausfall. |
-| `audit-append-idempotenz` | Gleiche Event-ID und Bytes liefern denselben Beleg. | Veränderte Bytes mit gleicher ID sind Konflikt; kein zusätzlicher Effekt durch Append-Retry. |
+| `audit-crashfenster` | Vollständig belegter Abschluss. | Gleiche offene Journale vor/nach unbekannter Wirkung bleiben gleich offen. |
+| `audit-logausfall` | Funktionierender Writer ermöglicht reguläre Arbeit. | Keine unbelegte Wirkung bei vollem Speicher, fehlender Berechtigung oder Append-Ausfall. |
+| `audit-append-idempotenz` | Gleiche Event-ID und Bytes liefern denselben Beleg. | Veränderte Bytes mit gleicher ID sind Konflikt; keine zusätzliche Wirkung durch Append-Retry. |
 | `audit-versuchsreplay` | Ein konkret erlaubter Versuch. | Doppelte Ausführung oder parallel doppelt konsumierte Freigabe wird erkannt. |
 | `audit-historie` | Damals gültige Operation bleibt nach späterem Widerruf historisch gültig. | Vor Ausführung widerrufene Vorprüfung erlaubt nichts; heutige Policy ersetzt keine damalige. |
 | `audit-kette` | Vollständige Kette zum bekannten Kopf. | Änderung, Umordnung, Einfügung, Entfernung und Neuberechnung widersprechen dem Anker. |
 | `audit-schluss` | Vertrauenswürdiger Schlussstand vorhanden. | Gültiger kürzerer Präfix ohne unabhängigen Schluss bleibt unvollständig. |
 | `audit-fork` | Vergleichbare Ansichten stimmen überein. | Zwei authentisierte unterschiedliche Köpfe gleicher Länge sind ein Konflikt; ein einzelner Blick beweist keine globale Konsistenz. |
-| `audit-quellenwahrheit` | Unabhängiger Beleg passt zum Bericht. | Signiertes „keine Wirkung“ trotz separatem simuliertem Effekt bleibt ein Widerspruch. |
-| `audit-abdeckung` | Jeder getrennt erfasste Effekt hat einen passenden Auftrag. | Der Log-only-Verifier kann einen komplett verschwiegenen Effekt nicht allein finden; das separate Orakel muss ihn finden. |
+| `audit-quellenwahrheit` | Unabhängiger Beleg passt zum Bericht. | Signiertes „keine Wirkung“ trotz separater simulierter Wirkung bleibt ein Widerspruch. |
+| `audit-abdeckung` | Jede getrennt erfasste Wirkung hat einen passenden Auftrag. | Der Log-only-Verifier kann eine komplett verschwiegene Wirkung nicht allein finden; das separate Orakel muss sie finden. |
 | `audit-evidenz` | Historische Prämissen und Manifest verfügbar. | Fehlender Snapshot, untrusted Registry oder nach Aussonderung fehlender Beleg verhindert Vollurteil. |
 | `audit-epochen` | Authentisierter Schlüssel-/Epochenwechsel. | Restore eines alten Präfixes, Sequenzreuse oder fremder Testschlüssel wird nicht akzeptiert. |
 | `audit-metadaten` | Getrennte Bereiche behalten gleiche erlaubte Sicht. | Globaler Zähler, fremder Root, Fehler oder Klartextreferenz verrät geschützte Aktivität. |
@@ -2314,7 +2314,7 @@ Zusätzlich sind Grenzwerte für große Einträge, kaputte Referenzen, ungültig
 
 ### F.10 Baufolge und Liefernachweis
 
-Beginne mit Datenschema, separatem Effektmodell und der historischen Prüfung einer kleinen festen Spur. Baue anschließend den unabhängigen Protokollprüfer und die Crash-Mutationen. Erst dann folgen persistenter Writer, Kontrollpunkte, Wiederanlauf und reale Belegadapter.
+Beginne mit Datenschema, separatem Wirkungsmodell und der historischen Prüfung einer kleinen festen Spur. Baue anschließend den unabhängigen Protokollprüfer und die Crash-Mutationen. Erst dann folgen persistenter Writer, Kontrollpunkte, Wiederanlauf und reale Belegadapter.
 
 Der Liefernachweis benennt Quellstand, unterstützte Ereignisse, Integritätsprofil, Annahmen, getestete Ausfallgrenzen, Ergebnisse und bewusst nicht implementierte Funktionen. Ein fehlender Adapter bleibt `unsupported` beziehungsweise eine fehlende Auditdimension `unestablished`; er wird nicht durch erfundene Belege ersetzt.
 

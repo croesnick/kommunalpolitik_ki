@@ -2,7 +2,7 @@
 name: vault_suche
 description: >
   Obsidian-Vault nach thematisch relevanten Notizen durchsuchen, Treffer mit
-  Kontext sammeln, dem Stadtrat zur Entscheidung vorlegen. Read-only — die AI
+  Kontext sammeln, dem Stadtrat zur Entscheidung vorlegen. Read-only — die KI
   berät, der Mensch entscheidet (GO-Prinzip). Nutze diesen Skill immer, wenn
   der Stadtrat bittet, im Vault nach etwas zu suchen, Notizen zu einem Thema zu
   finden, oder den Vault nach Infos zu durchsuchen, die dann für etwas anderes
@@ -48,7 +48,7 @@ obsidian:
 ```
 
 Fehlt die Datei oder der `vault`-Eintrag, fragt der Skill die nutzende Person direkt nach
-dem Vault-Namen und speichert ihn *nicht* automatisch (GO-Prinzip: die AI
+dem Vault-Namen und speichert ihn *nicht* automatisch (GO-Prinzip: die KI
 schreibt keine Config, der Mensch entscheidet, was konfiguriert wird).
 
 Der Skill merkt sich den Vault-Namen für die restliche Session.
@@ -139,7 +139,7 @@ Strukturierte Liste der relevanten Notizen:
 - Oder: „Die Notizen reichen nicht — soll ich woanders suchen (AZ, RIS, Web)?"
 ```
 
-## GO-Prinzip: AI sucht, Mensch entscheidet
+## GO-Prinzip: KI sucht, Mensch entscheidet
 
 Der Skill schreibt nichts in den Vault, legt keine Notizen an, ändert keine
 Properties. Er liest und präsentiert. Was mit den Treffern passiert, entscheidet

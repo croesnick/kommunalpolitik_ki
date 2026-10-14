@@ -40,7 +40,7 @@ Fünf kanonische Triage-Rollen als Labels: `needs-triage`, `needs-info`, `ready-
 
 ### Domain docs
 
-Single-context: `GLOSSARY.md` am Repo-Root (lazy), ADRs unter `docs/adr/` — ergänzt um die bestehende `docs/nomenklatur.md` (Ratsarbeit-Begriffe). Siehe `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` am Repo-Root (kanonische Nomenklatur aller Domänen — ersetzt die frühere `docs/nomenklatur.md`), ADRs unter `docs/adr/`. Siehe `docs/agents/domain.md`.
 
 ## Architektur-Prinzipien
 
@@ -78,11 +78,11 @@ wird von Anfang an mitgedacht, nicht nachträglich aufgesetzt.
 
 Jede Aussage, die ein Tool produziert und politisch relevant ist, braucht eine Quelle: URL, Abrufdatum, ggf. Paragraf. Ein Stadtrat ohne Quellen ist unglaubwürdig. Ein Stadtrat mit Quellen ist eine Bastion. Das gilt für den `foerdermittel_recherche`-Skill, `ratsinfo report`, und jeden anderen Output.
 
-### 7. GO-Prinzip: AI berät, Mensch entscheidet
+### 7. GO-Prinzip: KI berät, Mensch entscheidet
 
 Die KI entscheidet nichts ohne GO. Keine Triage-Änderung, kein Vault-Eintrag, kein Task-Update ohne Bestätigung. Das ist nicht nur eine Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt beim Menschen. Tools sind read-only by design, wo immer möglich.
 
-GO kann in der AI-Session (Chat) erteilt werden — die AI führt die Entscheidung dann über das `decide_proposal`-MCP-Tool aus. Der Browser-Weg über die LiveView bleibt als Alternative, ist aber nicht der einzige Weg. Entscheidend ist das explizite GO durch den Menschen, nicht der Kanal.
+GO kann in der AI-Session (Chat) erteilt werden — die KI führt die Entscheidung dann über das `decide_proposal`-MCP-Tool aus. Der Browser-Weg über die LiveView bleibt als Alternative, ist aber nicht der einzige Weg. Entscheidend ist das explizite GO durch den Menschen, nicht der Kanal.
 
 ### 8. Datenschutz-Grenze
 
@@ -92,12 +92,12 @@ Nur Zugriff auf das, was als Stadtrat bzw. öffentlich regulär abrufbar ist. Ni
 
 Technische Tools nicht als „AI-Zugriff" oder „ich will RAG bauen" framen, sondern als „strukturierte öffentliche Ratsinformationen", „digitale Arbeitsfähigkeit", „Transparenz".
 
-### 10. Vault = Source of Truth, ratsprojekte = Distillat
+### 10. Vault = Source of Truth, ratsprojekte = Destillat
 
-Der Obsidian-Vault ist das Gedächtnis — roh, unstrukturiert, alles. ratsprojekte ist das Distillat — konsolidiert, strukturiert, antragsreif, quellenbelegt. Der Datenfluss ist **strikt einseitig**: Vault → ratsprojekte. Nie umgekehrt.
+Der Obsidian-Vault ist das Gedächtnis — roh, unstrukturiert, alles. ratsprojekte ist das Destillat — konsolidiert, strukturiert, antragsreif, quellenbelegt. Der Datenfluss ist **strikt einseitig**: Vault → ratsprojekte. Nie umgekehrt.
 
 - **Vault** ist Source of Truth, nicht ratsprojekte.
-- **ratsprojekte** bekommt nur Distillate, nie Rohmaterial.
+- **ratsprojekte** bekommt nur Destillate, nie Rohmaterial.
 - **Pflicht**: Alles, was in der OpenCode-Session entsteht, fließt als konsolidierte Notiz zurück in den Vault, *bevor* es als Proposal in ratsprojekte eingereicht wird.
 - **Kein Rückfluss**: ratsprojekte schreibt nie zurück in den Vault. ratsprojekte ist das Endprodukt, nicht der Input.
 
@@ -115,7 +115,7 @@ Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Ab
 |---|---|---|
 | [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) | Projektlebenszyklus (Mermaid-Chart) | Statuswerte, Übergänge, Gates |
 | [`docs/workflows.md`](docs/workflows.md) | Use Cases & Lückenanalyse für die Ratsarbeit | Workflows, Lücken, Priorisierung |
-| [`docs/nomenklatur.md`](docs/nomenklatur.md) | Fachbegriffe der Ratsarbeit | Begriffsdefinitionen (Sitzungsmappe, Ratsprojekt, Vault, etc.) |
+| [`GLOSSARY.md`](GLOSSARY.md) (Repo-Root) | Kanonische Nomenklatur des Repos | Begriffsdefinitionen (Sitzungsmappe, Ratsprojekt, Vault, etc.) |
 | [`docs/prerequisites.md`](docs/prerequisites.md) | Externe Abhängigkeiten (nicht im Repo) | Installationsanleitungen, Fallbacks, benötigt von |
 
 Diese vier Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows, Begriffen oder Voraussetzungen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
@@ -178,7 +178,7 @@ Skills, die fraktionsneutral bleiben (wie `antrag_generieren`), verweisen auf fr
 ## ratsprojekte — Planungsstand
 
 ### Konzept
-Rechtlich-inhaltliche Standortbestimmung für Stadtratsprojekte. Kein Task-Tracker, keine Todo-Liste. Sondern: welche Realisierungsstränge gibt es, welche rechtlichen Vorbedingungen stehen, welcher Weg kann gegangen werden — und welcher nicht. Die AI kann lesen und Vorschläge machen (GO-Prinzip). Langfristig: Antragsvorlagen aus Projektdaten generieren.
+Rechtlich-inhaltliche Standortbestimmung für Stadtratsprojekte. Kein Task-Tracker, keine Todo-Liste. Sondern: welche Realisierungsstränge gibt es, welche rechtlichen Vorbedingungen stehen, welcher Weg kann gegangen werden — und welcher nicht. Die KI kann lesen und Vorschläge machen (GO-Prinzip). Langfristig: Antragsvorlagen aus Projektdaten generieren.
 
 ### Architektur
 - Phoenix LiveView für Dashboard
@@ -279,6 +279,7 @@ CI-Status verlässlich prüfen: nach einem Push zuerst mit `gh run list --branch
 
 ```
 kommunalpolitik_ki/
+├── GLOSSARY.md             # kanonische Nomenklatur aller Domänen
 ├── apps/                   # Elixir-Apps (workspace-Pattern)
 │   ├── ratsinfo/           # RIS-Scraper + CLI (AI: CLI)
 │   ├── ratsprojekte/       # Projekt-Dashboard (AI: LiveView + MCP)
@@ -303,7 +304,6 @@ kommunalpolitik_ki/
 ├── docs/                   # Kanonische Dokumentation
 │   ├── ratsprojekte-lifecycle.md  # Projektlebenszyklus (Mermaid-Chart)
 │   ├── workflows.md               # Use Cases & Lückenanalyse der Ratsarbeit
-│   ├── nomenklatur.md             # Fachbegriffe der Ratsarbeit
 │   ├── prerequisites.md           # Externe Abhängigkeiten
 │   ├── research/                  # Recherchen zu Architektur-Entscheidungen
 │   └── rfcs/                      # RFCs (Sandbox, vertrauliche KI-Arbeitsräume)

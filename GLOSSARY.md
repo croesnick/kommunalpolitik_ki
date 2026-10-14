@@ -1,13 +1,14 @@
-# Nomenklatur — Fachbegriffe der Ratsarbeit
+# GLOSSARY — Kanonische Nomenklatur des Repos
 
-> **Zweck:** Dieses Dokument definiert die Begriffe, die in Skills, Tools,
-> Doku und AI-Workflows konsistent verwendet werden. Es ist die
-> Single Source of Truth für die Sprache des Projekts.
+> **Zweck:** Dieses Dokument ist die kanonische Nomenklatur des Repos: die verbindlichen
+> Begriffe aller Domänen — Ratsarbeit, IT-Sicherheit, lokales ML, Harness und Werkzeuge.
+> Wer einen Begriff benutzt — Mensch oder AI-Harness — folgt hier der Definition.
+> Neue Begriffe werden bei ihrer Ersteinführung hierher eingetragen.
 >
-> Wenn ein Begriff in Code, Skills oder Doku auftaucht, muss er hier definiert
-> sein. Wenn ein neuer Begriff eingeführt wird, wird er hier ergänzt.
-
----
+> **Sprachregelung:** Etablierte englische Fachbegriffe bleiben englisch, etablierte
+> deutsche Begriffe werden deutsch verwendet, Neuprägungen werden bei Ersteinführung
+> definiert. Klassifikation, Quellenbelege und Entscheidungen stehen in
+> [`docs/sprachinventur.md`](docs/sprachinventur.md).
 
 ## Kernbegriffe
 
@@ -21,7 +22,7 @@ Positionen/Fragen.
 **Wo:** Im Vault. Pro Sitzung eine Notiz.
 
 **Tool:** Vault-Write (externer Skill `obsidian-cli`). Aktuell nicht
-integriert — siehe [`docs/workflows.md`](./workflows.md) WF 1.
+integriert — siehe [`docs/workflows.md`](docs/workflows.md) WF 1.
 
 **Verwandt:** *nicht* verwechseln mit Fraktionsmappe (nicht implementiert,
 nicht priorisiert).
@@ -85,23 +86,39 @@ Ratsprojekten.
 
 ---
 
-### Distillat
+### Destillat
 
 **Definition:** Das konsolidierte, strukturierte Ergebnis, das aus dem
 rohen Vault-Material destilliert wurde und in ratsprojekte einfließt. Ein
-Distillat ist quellenbelegt, antragsreif (oder explizit nicht) und auf
+Destillat ist quellenbelegt, antragsreif (oder explizit nicht) und auf
 einen Realisierungsstrang bezogen.
 
-**Beziehung:** Vault = Source of Truth (roh), ratsprojekte = Distillat
+**Beziehung:** Vault = Source of Truth (roh), ratsprojekte = Destillat
 (strukturiert).
+
+**Sprache:** Kanonisch „Destillat“ (Duden/DWDS); die frühere Schreibweise
+„Distillat“ ist eine Fehlform und wurde am 2026-10-14 im Korpus ersetzt.
+
+---
+
+### Kondensat
+
+**Definition:** Das projektdeskriptive ODS-Digest in der
+Nextcloud-Kollaborationsplattform („Projekt-Kondensat“), das
+`ratsprojekt_delta` gegen den ratsprojekte-Stand hält.
+
+**Abgrenzung:** Kondensat ≠ Destillat. Das Kondensat ist ein Zwischenstand
+aus geteilten Tabellen (Input für den Delta-Abgleich); das Destillat ist
+das konsolidierte Ergebnis, das aus dem Vault in ratsprojekte fließt. Das
+Kondensat liefert Vergleichsdaten, keine Projekte.
 
 ---
 
 ### Proposal
 
-**Definition:** Ein Vorschlag der AI, der in der
+**Definition:** Ein Vorschlag der KI, der in der
 `pending_proposals`-Tabelle von ratsprojekte liegt und auf GO
-(Genehmigung) durch den Stadtrat wartet. Die AI schlägt vor, der Mensch
+(Genehmigung) durch den Stadtrat wartet. Die KI schlägt vor, der Mensch
 entscheidet (GO-Prinzip).
 
 **Typen:** `add_projekt` | `add_realisierungsstrang` | `change_status` |
@@ -109,13 +126,23 @@ entscheidet (GO-Prinzip).
 
 **Status:** `pending` → `approved` | `rejected` (einmalig, irreversibel).
 
+**Abgrenzung:** Proposal ≠ Antrag. Das Proposal ist der interne
+ratsprojekte-Vorschlag mit GO-Gate (Tabelle `pending_proposals`); der
+Antrag ist der Stadtratsantrag ins Ratsinformationssystem. „Antragsreife“
+bewertet ein Ratsprojekt bzw. sein Proposal — nie den Stadtratsantrag.
+
+**Sprache:** Proposal bleibt der Repo-Term (Code-Vokabular: `PendingProposal`,
+`decide_proposal`). Der Nachbarbegriff der deutschen ITIL-Terminologie lautet
+„Change-Vorschlag“, ist aber ITIL-methodisch vorgeprägt. „Änderungsantrag“ ist
+tabu — kollidiert mit dem Stadtrats-Änderungsantrag.
+
 ---
 
 ### GO
 
 **Definition:** Das explizite Go (Genehmigung) des Stadtrats, ohne das die
-AI keine schreibenden oder entscheidenden Aktionen ausführt. GO kann im
-Chat erteilt werden — die AI führt es dann über das `decide_proposal`-MCP-
+KI keine schreibenden oder entscheidenden Aktionen ausführt. GO kann im
+Chat erteilt werden — die KI führt es dann über das `decide_proposal`-MCP-
 Tool aus. GO ist nicht nur Arbeitsregel, sondern ethische Architektur:
 demokratische Verantwortung bleibt beim Menschen.
 
@@ -169,6 +196,29 @@ vom `ratsprojekt_delta`-Skill. Read-only — beratend, nicht entscheidend.
 
 **Kategorien:** Neue Quelle, Vorbedingung erfüllt/neu, Strang-Relevanz,
 Status-Änderung, Antragsreife, Widerspruch, Vault-Divergenz.
+
+---
+
+### Standortbestimmung
+
+**Definition:** Die fachliche Lage- und Machbarkeitsbewertung eines
+Ratsprojekts: welche Realisierungsstränge existieren, welche rechtlichen
+Vorbedingungen stehen, welcher Weg ist gangbar — und welcher nicht.
+Erzeugt von `ratsprojekt_stand` (read-only, beratend).
+
+**Sprache:** Im Duden als Übertragung der „politischen Standortbestimmung“
+geführt; hier auf Projekte bezogen.
+
+---
+
+### Aktualitätsbezug
+
+**Definition:** Das Warum-jetzt-Argument einer Antragsbegründung:
+Gesetzesänderung, Krise, neue Studie, aktuelles Ereignis, Förderfrist.
+Bestandteil des Antragsmusters von `antrag_generieren`.
+
+**Sprache:** Kein belegter Fachterminus — bei Verwendung definieren oder
+als „Aktualität“ phrasen.
 
 ---
 
@@ -245,6 +295,17 @@ verlinkten RIS-IDs. **Geplant**, nicht implementiert.
 
 ---
 
+### Fördermittel-Recherche
+
+**Definition:** Strukturierte Recherche nach Finanzierungsmöglichkeiten
+kommunaler Projekte (Skill `foerdermittel_recherche`). Familienbegriffe:
+Förderrichtlinie, Förderfrist, Kumulierungsregeln, Eigenanteil.
+
+**Sprache:** Deutsch, Verwaltungsfachsprache — läuft nicht über die
+KI/ML-Sprachregel.
+
+---
+
 ## Kollaborations- und Kommunikationsbegriffe
 
 ### Kollaborationsplattform
@@ -270,7 +331,7 @@ ankündigt. Kurz, sachlich, verständlich — für einen Kommunikationskanal
 (WhatsApp, Social Media, Website) aufbereitet.
 
 **Erzeugung:** Aus der Sitzungsmappe (WF 1) und den TOPs. Template-basiert.
-Die AI generiert den Text, das Posten bleibt beim Stadtrat (GO).
+Die KI generiert den Text, das Posten bleibt beim Stadtrat (GO).
 
 ---
 
@@ -281,7 +342,7 @@ Stadtratssitzung, die die Ergebnisse und Beschlüsse zusammenfasst.
 Berichtet, was beschlossen wurde und wie die Fraktion positioniert war.
 
 **Erzeugung:** Aus den Beschlüssen (RIS-Daten / `ratsinfo show`).
-Template-basiert. Die AI generiert den Text, das Posten bleibt beim
+Template-basiert. Die KI generiert den Text, das Posten bleibt beim
 Stadtrat (GO).
 
 ---
@@ -303,7 +364,7 @@ Fine-Tuning-Genauigkeit.
 
 **Sprache:** Bleibt unübersetzt; keine akzeptierte deutsche Form bekannt.
 
-**Siehe:** [`RFC 0002`](./rfcs/0002-system-1-modelle.md), Abschnitt 1.1.
+**Siehe:** [`RFC 0002`](docs/rfcs/0002-system-1-modelle.md), Abschnitt 1.1.
 
 ---
 
@@ -317,7 +378,7 @@ Option, nicht Plan.
 **Sprache:** „Fine-Tuning“ ist die akzeptierte Form; „Nachtraining“ ist
 keine.
 
-**Siehe:** [`RFC 0002`](./rfcs/0002-system-1-modelle.md), E6 und 6.4.
+**Siehe:** [`RFC 0002`](docs/rfcs/0002-system-1-modelle.md), E6 und 6.4.
 
 ---
 
@@ -330,7 +391,7 @@ Im System-1-Pilot: 30 bis 50 echte Triage-Fälle.
 **Sprache:** „Goldstandard“ ist die etablierte deutsche Standardform der
 NLP-Community; keine Mischbildungen wie „Gold-Set“.
 
-**Siehe:** [`RFC 0002`](./rfcs/0002-system-1-modelle.md), Abschnitt 7.
+**Siehe:** [`RFC 0002`](docs/rfcs/0002-system-1-modelle.md), Abschnitt 7.
 
 ---
 
@@ -346,10 +407,91 @@ und „Overfetch-Grenze“. Keine Germanisierung wie „Überfetchen“.
 
 ---
 
+## Harness- und Werkzeugbegriffe
+
+> **Sprachregel:** Diese Begriffe bleiben englisch — die deutschsprachige
+> Fachdokumentation (Anthropic, GitHub, git-scm, heise) benutzt selbst die
+> englischen Formen; deutsche Eindeutschungen („Befähigungen“ für Skills,
+> „Tresor“ für Vault, „Anzeigetafel“ für Board) sind nicht etabliert.
+
+### Skill
+
+**Definition:** Dateisystembasierter Anweisungssatz für den AI-Harness
+(`SKILL.md` plus Skripte und Ressourcen), den das Modell bei Bedarf lädt.
+Format der Agent-Skills-Konvention.
+
+**Siehe:** [`AGENTS.md`](AGENTS.md) § „Agent skills“, `skills/`.
+
+---
+
+### Harness
+
+**Definition:** Die Laufzeitumgebung, die Modell, Tools und Skills
+orchestriert — im Repo meist „AI-Harness“. Das Wort „Orchestrierung“ ist
+durch die Duden-EDV-Bedeutung von „orchestrieren“ gedeckt.
+
+**Sprache:** Harness bleibt englisch; Komposita wie AI-Harness,
+AI-Enabled, AI-Schnittstelle sind Produktbegriffe und bleiben.
+
+---
+
+### Session
+
+**Definition:** Eine Instanz eines Harness-, Chat- oder CLI-Kontexts
+(OpenCode-Session, tmux-Session, AI-Session).
+
+**Abgrenzung:** Session ≠ Sitzung. Session gehört zum Harness; Sitzung ist
+die Ratsversammlung des Gremiums (Sitzungsmappe, Stadtratssitzung).
+„AI-Sitzung“ ist verboten — es heißt AI-Session.
+
+---
+
+### Ausführer
+
+**Definition:** Die Rolle aus RFC 0003, die geprüfte Operationen
+verbindlich ausführt (Rollen-Tabelle; Ausführungspfad des Vermittlers).
+
+**Sprache:** Eigenprägung des RFC, bewusst deutsch; bei Ersteinführung
+definiert.
+
+---
+
+### Regel-Prüfkern
+
+**Definition:** `komki_policy`: rechnet aus, ob eine Absicht nach den
+Regeln zulässig ist, und verifiziert die Begründung unabhängig nach. Rein
+rechnend — führt selbst nichts aus.
+
+**Siehe:** [`CONTRACT.md`](apps/komki_policy/CONTRACT.md).
+
+---
+
+### Gate
+
+**Definition:** Festlegungspunkt, an dem eine Freigabe an Bedingungen
+gekoppelt ist. Zulässige Bildungen des Repos: GO-Gate, Boot-Gate,
+Grenz-Gates, Antragsreife-Gates, Hard/Soft Gates.
+
+**Sprache:** Basis ist der etablierte Quality-Gate-Begriff (deutsche
+Fachtexte nutzen ihn); bei Ersteinführung definieren.
+
+---
+
+### Testorakel
+
+**Definition:** Informationsquelle zur Ermittlung der erwarteten
+Ergebnisse, die mit den tatsächlichen Ergebnissen eines Systems zu
+vergleichen sind (ISTQB-Glossar deutsch). Kanonische Form für test
+oracle; ersetzt die frühere Prägung „Auswerter-Orakel“.
+
+**Siehe:** `apps/komki_policy` (Fixture-Auswertung).
+
+---
+
 ## Sicherheitsmodell
 
 Die folgenden Begriffe beschreiben das Modell für vertrauliche
-KI-Arbeitsräume in [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+KI-Arbeitsräume in [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 Sie bezeichnen keine bereits implementierten Funktionen.
 
 ### Datenobjekt
@@ -358,7 +500,7 @@ Sie bezeichnen keine bereits implementierten Funktionen.
 zugehörigen Sicherheitsmetadaten. Diese Metadaten werden außerhalb des
 Agenten verwaltet und können nicht durch dessen Aussagen ersetzt werden.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -369,7 +511,7 @@ Autorität, zulässige Empfänger und Bedingungen benennt. Ihre Kennung, etwa
 `ratsarbeit@1`, identifiziert diese Regelfassung und ist nicht das Label
 eines Datenobjekts.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -379,7 +521,7 @@ eines Datenobjekts.
 einer Klassifikation. Ein Objekt ohne Label ist nicht dasselbe wie ein
 Objekt mit einem ausdrücklich leeren Label.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -390,7 +532,7 @@ Sicherheitsmetadaten und Berechtigungsdaten, unabhängig vom Agenten.
 Gemeint ist weder die kommunale Verwaltung noch der Vault. Der Regelstand
 Γ bezeichnet einen bestimmten Stand dieses Registers.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -401,7 +543,7 @@ ein Ereignis oder seine Auswirkungen zugreifen könnten. Der
 Empfängerkreis umfasst dagegen diejenigen, die die Information erhalten
 dürfen, und ist nicht mit einer technischen Zugriffsliste gleichzusetzen.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -411,7 +553,7 @@ dürfen, und ist nicht mit einer technischen Zugriffsliste gleichzusetzen.
 Betreibern, Logs und Backups. Die Umgebung ist vom Arbeitsraum zu
 unterscheiden und wird für jeden gewählten Verarbeitungszweig betrachtet.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -423,7 +565,7 @@ Startvertrag legt diese Bindungen, den Zweck, zulässige Operationen und den
 Lebenszyklus fest. Ein Chatfenster
 allein bildet noch keinen solchen Arbeitsraum.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -433,7 +575,7 @@ allein bildet noch keinen solchen Arbeitsraum.
 sein Nutzinhalt. Dazu gehören die Auswahl, das Ziel, Metadaten sowie das
 Auftreten und die Reihenfolge des Vorgangs.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -443,7 +585,7 @@ Auftreten und die Reihenfolge des Vorgangs.
 von Vorgängen. Die Inferenz-Engine entscheidet deterministisch anhand
 logischer Regeln über deren Zulässigkeit. Sie ist hier kein LLM-Server.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -453,7 +595,7 @@ logischer Regeln über deren Zulässigkeit. Sie ist hier kein LLM-Server.
 Ziel, deren Nutzung der Vermittler kontrolliert. Zugangsdaten bleiben
 außerhalb des Agenten. Auch eine Suchanfrage ist ein ausgehendes Ereignis.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -465,7 +607,7 @@ einer Aktion erlaubt nicht automatisch eine Offenlegung oder die Lockerung
 von Bindungen. Menschliches GO ist eine Zustimmung, ersetzt aber keine
 fehlende Befugnis der zustimmenden Person.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -475,7 +617,7 @@ fehlende Befugnis der zustimmenden Person.
 und bereits ausgelöster Offenlegungen. Er hält fest, welche Offenlegungen
 bei einer weiteren Entscheidung gemeinsam zu berücksichtigen sind.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
@@ -486,13 +628,38 @@ festgehaltenen Ausführungsaufträgen und zugehörigen Belegen. Ein Eintrag alle
 beweist weder die tatsächliche Ausführung noch das Ausbleiben von
 Auswirkungen.
 
-**Siehe:** [RFC 0003](./rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
 
+## Sprachregeln und Festlegungen
+
+Beschlossen in der Sprach-Session am 2026-10-14; Belege und
+Entscheidungsgrundlagen: [`docs/sprachinventur.md`](docs/sprachinventur.md).
+
+- **KI oder AI:** Im deutschen Fließtext: KI. Produktbegriffe bleiben
+  englisch: AI-Harness, AI-Enabled, AI-Schnittstelle, AI-Session.
+- **Session oder Sitzung:** Session = Harness-, Chat- oder CLI-Kontext;
+  Sitzung = Ratsversammlung des Gremiums. Nie mischen.
+- **GO-Formel (kanonisch):** „Die KI berät, der Mensch entscheidet.“
+  Abweichende Varianten in Skills werden auf diese Formel zurückgeführt.
+- **Beleg, Nachweis, Evidenz:** Beleg = einzelnes Quellenstück oder
+  Quittung (receipt). Nachweis = der erbrachte Nachweis einer Pflicht.
+  „Evidenz“ nur in wörtlichen englischen Zitaten; sonst Beleg oder
+  Nachweis wählen.
+- **Genus:** der Audit (der Duden erlaubt auch „das“; das Repo legt sich
+  auf „der“ fest).
+- **Provenance:** kanonisch „Provenienz“; „Provenanz“ ist eine Fehlform
+  (Duden/DWDS ohne Eintrag). „field provenance“ bleibt englisch — eine
+  deutsche Form ist nicht etabliert.
+- **Destillation:** deutsch „Wissens-/Modelldestillation“; die Schreibweise
+  „Distillat“ war eine Fehlform und ist ersetzt.
+- **Payload:** kanonisch „der Payload“ (maskulin); „Nutzlast“ ist im
+  Korpus ersetzt. Code-Bezeichner bleiben.
+
 ## Querverweise
 
-- [`docs/ratsprojekte-lifecycle.md`](./ratsprojekte-lifecycle.md) —
+- [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) —
   Projektlebenszyklus (States, Transitions, Gates)
-- [`docs/workflows.md`](./workflows.md) — Use Cases und Lückenanalyse
-- [`AGENTS.md`](../AGENTS.md) — Projekt-Prinzipien, Architektur, Guardrails
+- [`docs/workflows.md`](docs/workflows.md) — Use Cases und Lückenanalyse
+- [`AGENTS.md`](AGENTS.md) — Projekt-Prinzipien, Architektur, Guardrails

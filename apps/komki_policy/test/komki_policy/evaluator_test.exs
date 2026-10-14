@@ -19,7 +19,7 @@ defmodule KomkiPolicy.EvaluatorTest do
     Evaluator.evaluate(expr, facts)
   end
 
-  describe "Auswerter-Orakel (evaluate_expectations.json)" do
+  describe "Testorakel (evaluate_expectations.json)" do
     test "alle 20 Orakelfaelle ergeben das erwartete dreiwertige Resultat" do
       assert length(@expectations) == 20
 

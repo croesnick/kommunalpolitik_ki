@@ -42,7 +42,7 @@ Es gibt bereits ausgereifte Open-Source Nextcloud-MCP-Server:
 ## Lücke: ODS-Parsing
 
 Kein bestehender Server hat einen echten ODS-Reader. Optionen:
-1. `cbcoutinho` nutzen + ODS als Datei lesen (AI parst den Text-Content)
+1. `cbcoutinho` nutzen + ODS als Datei lesen (die KI parst den Text-Content)
 2. Eigenes Mini-Add-On `tools/nextcloud_ods_mcp` (~50 Zeilen Python, `odfpy`, Apache-2.0)
 
 Tools für das Add-On: `list_sheets(path)`, `read_sheet(path, sheet_name, range?)`, `read_cell(path, sheet_name, cell)`, `search_sheet(path, query)`
@@ -58,7 +58,7 @@ Nur Zugriff auf das, was als Stadtrat/Fraktionsmitglied regulaer abrufbar ist. S
 ## Referenz
 
 - `docs/workflows.md` WF 9
-- `docs/nomenklatur.md` — Kollaborationsplattform
+- `GLOSSARY.md` — Kollaborationsplattform
 - @librarian-Report (Session lib-2): vollstaendige Recherche mit allen Repos'
 
 echo "  -> Issue 13 erstellt"
@@ -90,7 +90,7 @@ Ein Template-basierter Workflow, der aus vorhandenen Daten kanal-gerechte Nachri
 - Template-Engine: Markdown-Templates mit Platzhaltern
 - Input: Sitzungsmappe (WF 1), RIS-Daten (`ratsinfo`), ggf. ratsprojekte
 - Output: Kanal-gerechte Nachricht (kurz, sachlich, verstaendlich)
-- **Das Posten bleibt beim Stadtrat (GO)** — die AI generiert nur den Text
+- **Das Posten bleibt beim Stadtrat (GO)** — die KI generiert nur den Text
 
 ## Abstraktion
 
@@ -104,7 +104,7 @@ Von konkreter Plattform (WhatsApp-Gruppen) abstrahiert: der Workflow ist "Sitzun
 ## Referenz
 
 - `docs/workflows.md` WF 10
-- `docs/nomenklatur.md` — Sitzungsankündigung/Vorbericht, Sitzungsnachbericht'
+- `GLOSSARY.md` — Sitzungsankündigung/Vorbericht, Sitzungsnachbericht'
 
 echo "  -> Issue 14 erstellt"
 

@@ -163,7 +163,7 @@ Die Vorlage ist über den kanonischen Tag `#antragsvorlage` im Vault auffindbar 
 **Workflow bei Anträgen mit fraktionsspezifischer Vorlage:**
 
 1. Dieser Skill liefert die kanonische Struktur + Qualitätskriterien.
-2. Die fraktionsspezifische Vorlage (im Vault der nutzenden Person, getagged mit `#antragsvorlage`, nicht in diesem Repo) liefert das Wording, den Unterschriftenblock und Varianten.
+2. Die fraktionsspezifische Vorlage (im Vault der nutzenden Person, getaggt mit `#antragsvorlage`, nicht in diesem Repo) liefert das Wording, den Unterschriftenblock und Varianten.
 3. Workflow: zuerst die eigene Vorlage via `vault_suche` (Tag-Suche nach `#antragsvorlage`) oder `obsidian` CLI einlesen, dann mit diesem Skill die Struktur-Gates prüfen, dann befüllen.
 
 ## Hinweise

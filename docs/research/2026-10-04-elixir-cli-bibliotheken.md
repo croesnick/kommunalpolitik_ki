@@ -7,7 +7,7 @@ aller Quellen: 2026-10-04. [D] = durch Primärquelle belegt. [U] = ungeklärt.
 
 Nutzt komki eine CLI- oder TUI-Bibliothek, oder bleibt es bei der
 Stdlib? Beantwortet werden: Was bietet owl konkret, wie wird es gepflegt,
-was kostet es an Dependencies, und welche Option hält die Trusted Base am
+was kostet es an Dependencies, und welche Option hält die vertrauenswürdige Basis am
 schmalsten?
 
 ## Kontext
@@ -22,10 +22,10 @@ Drei Output-Bedarfe sind real. Ein Spinner oder eine Statuszeile für den
 circa 60 Sekunden dauernden Health-Wait. Farbige Verdict-Zeilen. Einfache
 Tabellen für status.
 
-Der Trust-Base-Trade-off ist der Hauptpunkt. komki generiert das
+Der Trade-off der vertrauenswürdigen Basis ist der Hauptpunkt. komki generiert das
 Confinement-Profil. Jede Runtime-Dependency landet in dem Werkzeug, das die
 Sandbox erzeugt. Eine neue Bibliothek vergrößert den Supply-Chain-
-Angriffspunkt der Trusted Base und ist deshalb eine Sicherheitsfrage, nicht
+Angriffspunkt der vertrauenswürdigen Basis und ist deshalb eine Sicherheitsfrage, nicht
 nur eine Ergonomiefrage.
 
 ## Kandidatenprofile
@@ -170,13 +170,13 @@ Quellen: hex.pm-API und GitHub-API, alle abgerufen 2026-10-04. [D]
    ist mit IO.ANSI und Process in unter 100 Zeilen eigenbaubar. Farbige
    Verdict-Zeilen deckt IO.ANSI; einfache Tabellen lassen sich bei den
    paar status-Zeilen selbst rendern. Das ist die kleinste Vergrößerung
-   der Trusted Base.
+   der vertrauenswürdigen Basis.
 
 2. optimus plus owl. owl ist im ökosystem der einzige aktive Kandidat,
    der Spinner, Tabellen und Boxen auf einmal bietet. Er ist gepflegt
    (0 offene Issues, Release 0.13.1 im Juni 2026) und hat produktive
    Anwender wie igniter. Die Kosten sind: owl ist eine OTP-App mit
-   eigener Supervision und landet damit in der Trusted Base. Der
+   eigener Supervision und landet damit in der vertrauenswürdigen Basis. Der
    escript-Hauptmodul braucht Application.ensure_all_started(:owl).
    ucwidth bleibt optional und weglassbar, solange keine Emojis in den
    Tabellen landen. Die Risikostufe ist mittel, im Absolutwert aber
@@ -184,7 +184,7 @@ Quellen: hex.pm-API und GitHub-API, alle abgerufen 2026-10-04. [D]
    optional weglassbare Dependency ohne Transitivität.
 
 3. stdlib-only. OptionParser und IO.ANSI, auch ohne optimus. Das hält
-   die Trusted Base unverändert. Die Kosten sind: ratsinfo hat einen
+   die vertrauenswürdige Basis unverändert. Die Kosten sind: ratsinfo hat einen
    optimus-Präzedenz, komki würde mit einem zweiten Parser-Stil
    parsen; die Hilfe-Texte und die Argument-Validierung müssen
    für jedes Kommando manuell gepflegt werden. Der wiederkehrende

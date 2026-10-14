@@ -15,7 +15,7 @@
 
 ## Begriffe
 
-Siehe [`docs/nomenklatur.md`](./nomenklatur.md) für die Definition aller
+Siehe [`GLOSSARY.md`](../GLOSSARY.md) für die Definition aller
 Fachbegriffe (Sitzungsmappe, Ratsprojekt, Realisierungsstrang, Vault, etc.).
 
 ---
@@ -55,7 +55,7 @@ RIS-API (HTML)  → ratsinfo (SQLite) → CLI-Output (Text)
 AZ-MCP (JSON)   → Artikel-Titel (Strings)
 Vault-Suche     → obsidian CLI (Text)
                          ↓
-           AI komponiert → Markdown + YAML-Frontmatter
+           KI komponiert → Markdown + YAML-Frontmatter
                          ↓
                   obsidian write → Vault-Datei
                          ↓
@@ -259,7 +259,7 @@ Kollaborationsplattform (z.B. `cloud.example.org`). Dort liegen
 geteilte Dokumente, Planungen und Tabellen (z.B. ein ODS-Sheet mit einem
 Kondensat der Ratsprojekte).
 
-**Ziel:** Die AI kann Dokumente und Tabellen aus der Nextcloud lesen
+**Ziel:** Die KI kann Dokumente und Tabellen aus der Nextcloud lesen
 (read-only primär), um sie in Workflows einzubinden — z.B. das
 Projekt-Kondensat gegen ratsprojekte halten, geteilte Planungen in die
 Sitzungsvorbereitung einbeziehen.
@@ -305,12 +305,12 @@ nach der Sitzung (basierend auf Beschlüssen) einen Nachbericht.
 
 ### Lücken
 
-- **Kein Template-Tool für Öffentlichkeitsarbeit.** Die AI kann
+- **Kein Template-Tool für Öffentlichkeitsarbeit.** Die KI kann
   Sitzungsdaten lesen, aber es gibt keinen Skill, der daraus eine
   kanal-gerechte Nachricht (kurz, sachlich, verständlich) generiert. → #41
 - **Keine Kanal-Integration:** WhatsApp hat keine offizielle API für
   Communities. Alternativen: Signal, Threema, E-Mail-Verteiler, Website.
-  Die AI generiert die Nachricht, das Posten bleibt beim Stadtrat (GO).
+  Die KI generiert die Nachricht, das Posten bleibt beim Stadtrat (GO).
 - **Template-Variablen:** TOP-Liste, Datum, Positionen, Beschlüsse,
   Fraktionsname — alles soll aus vorhandenen Daten automatisch gefüllt
   werden.
@@ -355,11 +355,11 @@ vorschlägt. Direkt als Vortragsgrundlage nutzbar.
   Anbindung an Nextcloud-Kalender (WF 9, `nc_calendar_list_events`).
 - **Kein automatischer Filter nach Zeitraum in `ratsinfo sessions`.** Die
   CLI listet alle lokal gespeicherten Sitzungen. Die Filterung nach
-  "seit letztem Bericht" passiert manuell durch die AI anhand der
+  "seit letztem Bericht" passiert manuell durch die KI anhand der
   Datums-Ausgabe.
 - **Keine automatische Themen-Clusterung.** Die TOPs kommen chronologisch
   aus dem RIS. Die thematische Bündelung (Klima, Mobilität, Bauen, etc.)
-  muss von der AI ad-hoc anhand der TOP-Titel passieren — kein Tool
+  muss von der KI ad-hoc anhand der TOP-Titel passieren — kein Tool
   unterstützt hierbei strukturell.
 
 > **Abgrenzung:** Der Bericht ist *rückblickend* und *verdichtet*. Die

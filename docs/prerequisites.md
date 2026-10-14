@@ -441,4 +441,4 @@ abgewiesen).
 - [`AGENTS.md`](../AGENTS.md) § „Externe Abhängigkeiten“, Tabellen-Referenz
 - [`docs/workflows.md`](./workflows.md): Workflows mit Lücken, die externe
   Abhängigkeiten betreffen (WF 1, 2, 6, 8)
-- [`docs/nomenklatur.md`](./nomenklatur.md): Vault-Begriff
+- [`GLOSSARY.md`](../GLOSSARY.md): Vault-Begriff

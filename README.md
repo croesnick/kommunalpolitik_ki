@@ -2,15 +2,15 @@
 
 Werkzeuge für die Stadtratsarbeit: das Ratsinformationssystem lokal durchsuchen, Drucksachen auswerten, Fördermöglichkeiten prüfen, Sitzungsmappen anlegen, Projekte strukturieren, Anträge entwerfen. Gebaut für die Ratsarbeit in der Verwaltungsgemeinschaft Buchloe.
 
-Orchestriert wird alles von [OpenCode](https://opencode.ai). Die AI ruft die CLI-Tools und MCP-Server auf und folgt den Anleitungen aus `skills/`. Antworten stammen aus der lokal synchronisierten RIS-Datenbank, aus den ausgelesenen PDFs, aus dem Obsidian-Vault und aus dem Archiv der Lokalzeitung. Eine maschinenlesbare Schnittstelle wie OParl gibt es am Ratsinformationssystem der Verwaltungsgemeinschaft nicht. Deshalb synchronisiert `ratsinfo` die öffentlichen Seiten in eine lokale SQLite-Datenbank und macht Sitzungen, Drucksachen und Beschlüsse volltextdurchsuchbar.
+Orchestriert wird alles von [OpenCode](https://opencode.ai). Die KI ruft die CLI-Tools und MCP-Server auf und folgt den Anleitungen aus `skills/`. Antworten stammen aus der lokal synchronisierten RIS-Datenbank, aus den ausgelesenen PDFs, aus dem Obsidian-Vault und aus dem Archiv der Lokalzeitung. Eine maschinenlesbare Schnittstelle wie OParl gibt es am Ratsinformationssystem der Verwaltungsgemeinschaft nicht. Deshalb synchronisiert `ratsinfo` die öffentlichen Seiten in eine lokale SQLite-Datenbank und macht Sitzungen, Drucksachen und Beschlüsse volltextdurchsuchbar.
 
 ## Was dieses Setup anders macht
 
 **Quellen statt Behauptungen.** Jede politisch relevante Aussage aus diesen Tools nennt ihre Herkunft: URL, Abrufdatum, Sitzung und TOP oder Paragraf. In den Datenmodellen sind Quellen ein eigener Typ, die Recherche-Skills führen sie mit. Damit ist Belegen in jedes Werkzeug eingebaut.
 
-**Die AI berät, der Mensch entscheidet.** In ratsprojekte kann die AI Projekte nicht direkt ändern. Sie legt Vorschläge an, der Stadtrat nimmt an oder verwirft. Beides ist endgültig und wird protokolliert. Lesezugriffe sind frei, alle Schreibzugriffe laufen durch dieses GO-Gate. Die Entscheidung kann im Chat fallen und dort über das MCP-Werkzeug `decide_proposal` ausgeführt werden, oder gleich im Dashboard.
+**Die KI berät, der Mensch entscheidet.** In ratsprojekte kann die KI Projekte nicht direkt ändern. Sie legt Vorschläge an, der Stadtrat nimmt an oder verwirft. Beides ist endgültig und wird protokolliert. Lesezugriffe sind frei, alle Schreibzugriffe laufen durch dieses GO-Gate. Die Entscheidung kann im Chat fallen und dort über das MCP-Werkzeug `decide_proposal` ausgeführt werden, oder gleich im Dashboard.
 
-**Ein Gedächtnis, ein Distillat.** Der Obsidian-Vault ist das rohe Gedächtnis: Notizen, Mails, Artikel, Protokolle. ratsprojekte ist das Distillat: konsolidierte Projekte mit Realisierungssträngen, rechtlichen Vorbedingungen, Quellen und Beschlussvorschlag. Nur in eine Richtung läuft der Fluss, vom Vault nach ratsprojekte, nie zurück. Der Verbindungspunkt ist ein Slug, etwa `#ratsprojekt/marktplatz-umgestalten` im Vault und `/projekte/marktplatz-umgestalten` im Dashboard.
+**Ein Gedächtnis, ein Destillat.** Der Obsidian-Vault ist das rohe Gedächtnis: Notizen, Mails, Artikel, Protokolle. ratsprojekte ist das Destillat: konsolidierte Projekte mit Realisierungssträngen, rechtlichen Vorbedingungen, Quellen und Beschlussvorschlag. Nur in eine Richtung läuft der Fluss, vom Vault nach ratsprojekte, nie zurück. Der Verbindungspunkt ist ein Slug, etwa `#ratsprojekt/marktplatz-umgestalten` im Vault und `/projekte/marktplatz-umgestalten` im Dashboard.
 
 **Alles liegt lokal.** Die Datenbank ist SQLite auf dem eigenen Rechner, Drucksachen liegen als PDF vor Ort, der Vault ist ein lokales Verzeichnis. Zugriffe auf das RIS sind reine Lesezugriffe.
 
@@ -25,7 +25,7 @@ OpenCode lädt die Ablauf-Anleitungen aus `skills/`. Im Chat genügt die Aufgabe
 - **Fördermöglichkeiten prüfen.** `foerdermittel_recherche` recherchiert für ein konkretes Vorhaben, welche Programme infrage kommen, mit Eigenanteilen, Fristen und Kumulierungsregeln. Schwerpunkt Bayern: BayFAG, KommKlimaFöR, Städtebauförderung, SUMP. Jede Angabe mit Quelle.
 - **Neue Informationen einordnen.** `ratsprojekt_delta` hält eine Mail, einen Artikel oder eine geänderte Förderrichtlinie gegen den Stand eines Projekts und liefert ein strukturiertes Delta: was sich ändert, welche Quellen dazukommen, ob die Antragsreife steigt. `ratsprojekt_stand` liefert den Ist-Zustand.
 - **Projekt anlegen.** `ratsprojekt_proposal` konsolidiert das Material zu einer Vault-Notiz, prüft die Antragsreife-Gates und bringt den Vorschlag in ratsprojekte ein. Ob er angenommen wird, entscheidet der Stadtrat.
-- **Antrag entwerfen.** `antrag_generieren` schreibt einen fraktionsneutralen Entwurf, aufbauend auf einer Struktur aus realen Anträgen. Die Vorlage der eigenen Fraktion kommt über den Vault-Tag `#antragsvorlage`. Die AI formuliert, finalisiert wird von Hand.
+- **Antrag entwerfen.** `antrag_generieren` schreibt einen fraktionsneutralen Entwurf, aufbauend auf einer Struktur aus realen Anträgen. Die Vorlage der eigenen Fraktion kommt über den Vault-Tag `#antragsvorlage`. Die KI formuliert, finalisiert wird von Hand.
 - **Im Vault suchen.** `vault_suche` durchsucht die eigenen Notizen und liefert Treffer mit Kontext. Read-only.
 
 Daneben laufen die Einzelwerkzeuge direkt: `ratsinfo` für das RIS, `pdf_ingest` für Drucksachen, die AZ- und die ODS-Anbindung für Zeitung und Tabellen. Sie stehen auch ohne Skill im Chat bereit.
@@ -90,7 +90,7 @@ Ohne laufenden `obsidian` CLI legen die Vault-Skills ihre Notizen unter `artifac
 
 - [AGENTS.md](AGENTS.md) benennt Prinzipien, Architektur, Guardrails und Tooling-Vorgaben.
 - [docs/workflows.md](docs/workflows.md) ordnet die elf Rats-Workflows ihren Tools zu und führt die Lücken auf.
-- [docs/nomenklatur.md](docs/nomenklatur.md) definiert die Fachbegriffe der Ratsarbeit.
+- [GLOSSARY.md](GLOSSARY.md) definiert die kanonischen Fachbegriffe des Repos.
 - [docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md) beschreibt Status, Übergänge und Gates.
 - [docs/prerequisites.md](docs/prerequisites.md) listet externe Abhängigkeiten mit Installation und Fallbacks.
 - [GitHub Projects](https://github.com/users/croesnick/projects) sammelt Issues, Meilensteine und Priorisierung.

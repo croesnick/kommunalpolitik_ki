@@ -19,10 +19,10 @@ als escript mit `escript: [main_module: KomkiCli.CLI, name: "komki"]`
 status, run. Er erzeugt Seatbelt-Sandboxprofile und spawnt sandbox-exec-
 Kinder, startet und stoppt llama-server am Loopback und streamt Ausgaben.
 Runtime-Deps: nur optimus. [D apps/komki_cli/mix.exs] Die App ist Teil der
-Trusted Base des KomKI-CLIs, denn sie erzeugt das Confinement-Profil.
+vertrauenswürdige Basis des KomKI-CLIs, denn sie erzeugt das Confinement-Profil.
 Host: macOS 27.2 auf arm64 (M1 Max).
 
-Aus der Trusted-Base-Perspektive zählt, was am Ende in der verteilten
+Aus Sicht der vertrauenswürdigen Basis zählt, was am Ende in der verteilten
 Binary landet, nicht nur die im Mixfile deklarierte Abhängigkeit. Packaging
 darf keine neuen Runtime-Quellcode-Abhängigkeiten einführen.
 
@@ -39,7 +39,7 @@ Project Setup]
 Ablauf zur Laufzeit nach README [D]:
 
 1. Der Nutzer startet die Binary wie ein natives Programm.
-2. Nur beim ersten Start entpackt der Zig-Wrapper das Payload (BEAM-Code
+2. Nur beim ersten Start entpackt der Zig-Wrapper den Payload (BEAM-Code
    plus ERTS des Zielplatforms) in ein festes Verzeichnis.
 3. Der Wrapper startet die Erlang-VM aus dem entpackten Verzeichnis.
 4. Weitere Starts derselben Version nutzen das bereits entpackte Verzeichnis.
@@ -122,7 +122,7 @@ plus die Beispiele im Repo. [D Codesuche 2026-10-04]
 ### Dateigröße
 
 Keine belastbare Größenangabe in README oder Hexdocs. Belegt ist nur,
-dass das Payload BEAM-Code plus komplette ERTS enthält und gzip-komprimiert
+dass der Payload BEAM-Code plus komplette ERTS enthält und gzip-komprimiert
 wird. [D README] Die konkrete Größe eines komki-Bundles ist ungeprüft.
 [U]
 
@@ -142,7 +142,7 @@ liest (insoweit analog zu lib/util/args.ex), ist nicht dokumentiert und
 nicht getestet. [U]
 
 Im Ergebnis landet Burrito-Code in der verteilten komki-Binary. Das
-ist klein, aber nicht Null, und es ist eine Trusted-Base-Zugabe.
+ist klein, aber nicht Null, und es ist eine Zugabe zur vertrauenswürdigen Basis.
 
 ## Integrationspfad für komki
 
@@ -188,7 +188,7 @@ Ohne extra Dependency. Nach Mix-Doku [D mix.hexdocs.pm/Mix.Tasks.Release.html]:
 
 Für komki heißt das: dieselbe self-contained-Grundlage wie Burrito
 (BEAM plus ERTS), aber als Ordner oder tar.gz statt Einzeldatei, ohne
-Packager-Abhängigkeit und ohne neuen Code in der Trusted Base.
+Packager-Abhängigkeit und ohne neuen Code in der vertrauenswürdigen Basis.
 
 ### Bakeware
 
@@ -224,7 +224,7 @@ aus dem gebundenen Scan hervorgegangen.
 1. mix release mit optionaler :tar-Stufe, zum heutigen Stand die beste
    Balance: dieselbe self-contained-Basis wie Burrito (App plus ERTS),
    aber ohne extra Abhängigkeit und ohne neuen Code in der verteilten
-   Trusted-Base-Einheit. Einschränkung: Ordner bzw. tar.gz statt
+   Einheit der vertrauenswürdigen Basis. Einschränkung: Ordner bzw. tar.gz statt
    Einzeldatei, und für die komki-Kommandos muss ein eigener
    bin-Einstieg gebaut werden, denn der generierte bin-Wrapper ist auf
    Release-Kommandos ausgelegt. [D Mix-Doku]

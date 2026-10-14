@@ -66,7 +66,7 @@ direkt in Projekte oder Stränge.
 ### GO-Execution
 
 `decide_proposal` führt ein GO aus, das der Stadtrat im Chat gegeben hat.
-Die AI ruft dieses Tool nie ohne explizites GO auf. Der Audit-Trail
+Die KI ruft dieses Tool nie ohne explizites GO auf. Der Audit-Trail
 unterscheidet über `entschieden_von` die Herkunft: `"stadtrat-via-ai"`
 steht für ein GO aus dem Chat, `"stadtrat"` für eines aus dem Dashboard.
 Beide Wege nutzen `Ratsprojekte.ProposalApplier` als gemeinsame Apply-Logik.

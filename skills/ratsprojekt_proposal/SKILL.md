@@ -1,7 +1,7 @@
 ---
 name: ratsprojekt_proposal
 description: >
-  Leitfaden für die AI, um ein neues Stadtratsprojekt oder eine Projektänderung
+  Leitfaden für die KI, um ein neues Stadtratsprojekt oder eine Projektänderung
   vorzubereiten und als Proposal in ratsprojekte einzubringen. Nutze diesen
   Skill immer, wenn der Stadtrat ein neues Projekt vorschlagen will, eine Idee in
   ein ratsprojekt überführen will, oder einen Strang/Status zu einem
@@ -19,32 +19,32 @@ description: >
 Wenn der Stadtrat Material, Ideen oder Recherchen hat, die in ein ratsprojekt
 einfließen sollen — als neues Projekt, als neuer Realisierungsstrang, oder
 als Statusänderung. Der Skill ist der **Strukturierungs- und
-Qualitätssicherungsschritt** bevor der AI das `propose_projekt`- oder
+Qualitätssicherungsschritt** bevor die KI das `propose_projekt`- oder
 `propose_realisierungsstrang`-MCP-Tool aufruft.
 
 Der Skill aktiviert sich *nicht* bei reinen Standortabfragen (dafür:
 `ratsprojekt_stand`) oder Förderrecherchen (dafür: `foerdermittel_recherche`). Er
 greift, wenn das Ziel ein **Proposal** ist.
 
-## Architekturprinzip: Vault = Source of Truth, ratsprojekte = Distillat
+## Architekturprinzip: Vault = Source of Truth, ratsprojekte = Destillat
 
 ```
 Vault (Source of Truth — roh, unstrukturiert, alles)
-  ↓  Konsolidierung & Distillation (durch AI, in OpenCode-Session)
+  ↓  Konsolidierung & Destillation (durch KI, in OpenCode-Session)
   ↓  Pflicht: konsolidierte Notiz zurück in den Vault
   ↓
-ratsprojekte (Distillat — strukturiert, antragsreif, quellenbelegt)
+ratsprojekte (Destillat — strukturiert, antragsreif, quellenbelegt)
 ```
 
 - **Vault** ist das Gedächtnis, nicht ratsprojekte.
-- **ratsprojekte** ist das Distillat, nie die Datenquelle.
+- **ratsprojekte** ist das Destillat, nie die Datenquelle.
 - **Datenfluss ist einseitig**: Vault → ratsprojekte. Nie umgekehrt.
 - **Pflicht**: Alles, was in der OpenCode-Session entsteht, fließt als
   konsolidierte Notiz zurück in den Vault, *bevor* es als Proposal
   eingereicht wird. ratsprojekte ist das Endprodukt, nicht der Input.
 - **Vault-Tag**: Vault-Notizen zu einem Projekt werden mit
   `#ratsprojekt/{slug}` getaggt. Der Slug ist der gleiche wie in der
-  ratsprojekte-URL. So findet der AI über `vault_suche` alle Notizen
+  ratsprojekte-URL. So findet die KI über `vault_suche` alle Notizen
   zu einem Projekt und kann sie als Quellen in Proposals eintragen.
 
 ## Workflow: Idea → Vault-Notiz → Proposal
@@ -75,11 +75,11 @@ destilliert und in den Vault zurückgeschrieben. Das gilt auch für Material,
 das in der OpenCode-Session entstanden ist (z.B. ein `foerdermittel_recherche`-Report).
 
 Die Vault-Notiz ist die Voraussetzung für den Proposal — nicht optional.
-ratsprojekte bekommt nur Distillate, nie Rohmaterial.
+ratsprojekte bekommt nur Destillate, nie Rohmaterial.
 
 ### Phase 3: Gates prüfen (vor dem Proposal)
 
-Bevor das `propose_*`-MCP-Tool aufgerufen wird, muss die AI die Gates aus
+Bevor das `propose_*`-MCP-Tool aufgerufen wird, muss die KI die Gates aus
 `apps/ratsprojekte/priv/antragsreife_kriterien.md` durchgehen. Diese Gates
 sind die gleichen, die später `check_antragsreife` deterministisch prüft —
 aber *vor* dem Proposal, um sicherzustellen, dass der Proposal vollständig ist.
@@ -118,7 +118,7 @@ aber *vor* dem Proposal, um sicherzustellen, dass der Proposal vollständig ist.
 | `konsensfaehigkeit` | Ist der Antrag mehrheitsfähig? |
 | `widerspruch_fraktionsposition` | Widerspricht der Antrag der Fraktionsposition? |
 
-Die AI bewertet diese *nicht*. Sie weist die nutzende Person darauf hin, dass diese
+Die KI bewertet diese *nicht*. Sie weist die nutzende Person darauf hin, dass diese
 vor der finalen Einreichung geprüft werden müssen.
 
 ### Phase 4: Proposal einbringen
@@ -176,19 +176,19 @@ propose_status_change(
 )
 ```
 
-## Was die AI *nicht* tut
+## Was die KI *nicht* tut
 
-- **Kein `decide_proposal` ohne GO**: Die AI kann Proposals vorschlagen
+- **Kein `decide_proposal` ohne GO**: Die KI kann Proposals vorschlagen
   (`propose_*`-Tools) und — wenn der Stadtrat GO gibt — über
   `decide_proposal` ausführen. Aber sie ruft `decide_proposal` NIEMALS
   auf, ohne dass der Stadtrat im Chat explizit GO gegeben hat. Kein
   stillschweigendes Accept. Das GO muss vom Menschen kommen.
 - **Kein Schreiben in ratsprojekte ohne Proposal**: Alle Writes gehen
   durch `pending_proposals`. Nie direktes `Repo.insert`.
-- **Keine Vault-Änderung ohne GO**: Die AI schreibt nicht ungefragt in
+- **Keine Vault-Änderung ohne GO**: Die KI schreibt nicht ungefragt in
   den Vault. Sie schlägt die konsolidierte Notiz vor und die nutzende Person
   entscheidet, ob sie in den Vault kommt.
-- **Keine politische Bewertung**: Die AI bewertet nicht, ob ein Antrag
+- **Keine politische Bewertung**: Die KI bewertet nicht, ob ein Antrag
   mehrheitsfähig ist oder der Fraktionsposition widerspricht. Das
   bleibt bei der nutzenden Person.
 

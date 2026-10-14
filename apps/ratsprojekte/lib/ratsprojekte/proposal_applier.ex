@@ -4,7 +4,7 @@ defmodule Ratsprojekte.ProposalApplier do
 
   Wird von zwei Stellen aus aufgerufen:
   - `RatsprojekteWeb.ProposalLive.Show` — Browser-GO (Button in der LiveView)
-  - `Ratsprojekte.MCP.Tools.DecideProposal` — Chat-GO (AI führt GO aus)
+  - `Ratsprojekte.MCP.Tools.DecideProposal` — Chat-GO (die KI führt GO aus)
 
   Beide Wege laufen hier zusammen — dieselbe Transaktion, dieselbe Logik.
   Die einzige Differenz ist `entschieden_von`: "stadtrat" (Browser) vs.

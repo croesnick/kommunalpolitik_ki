@@ -11,11 +11,11 @@
 
 ## Zusammenfassung
 
-System-1-Modelle nehmen unstrukturierten Zustand auf (Snippet, Titel, Mail) und liefern typisierte Antworten statt frei generierter Prosa; Begründung und Quellenangabe fehlen bewusst.[^jev] Jev und Laya waren die Ausgangspunkte dieses RFC.[^laya] Die lokalen Versuche mit SemIf und Kev erweitern den Vergleich um eingefrorene LLM-Optionslogits und LoRA-Pointerheads (Anhang B). Typisierte Scores garantieren weder richtige noch kalibrierte oder wiederholbare Urteile.
+**System-1-Modelle** nehmen unstrukturierten Zustand auf (Snippet, Titel, Mail) und liefern typisierte Antworten statt frei generierter Prosa; Begründung und Quellenangabe fehlen bewusst.[^jev] Jev und Laya waren die Ausgangspunkte dieses RFC.[^laya] Die lokalen Versuche mit SemIf und Kev erweitern den Vergleich um eingefrorene LLM-Optionslogits und LoRA-Pointerheads (Anhang B). Typisierte Scores garantieren weder richtige noch kalibrierte oder wiederholbare Urteile.
 
-Der Befund für dieses Repo weicht vom Hype ab. Die Antragsreife-Spezifikation definiert seit Monaten eine dreistufige Entscheidungsarchitektur aus deterministischen Regeln, einer ausdrücklich modellbewerteten Mittelstufe und einer menschlichen Stufe. Nur ist die Mittelstufe mit der Tagesform eines frontier LLM besetzt: unkalibriert, nicht reproduzierbar, nicht protokolliert. Ein System-1-Modell ist deshalb hier kein Paradigmenwechsel, sondern die disziplinierte Besetzung eines vorhandenen Slots.
+Der Befund für dieses Repo weicht vom Hype ab. Die **Antragsreife-Spezifikation** definiert seit Monaten eine dreistufige Entscheidungsarchitektur aus deterministischen Regeln, einer ausdrücklich modellbewerteten Mittelstufe und einer menschlichen Stufe. Nur ist die Mittelstufe mit der Tagesform eines frontier LLM besetzt: unkalibriert, nicht reproduzierbar, nicht protokolliert. Ein System-1-Modell ist deshalb hier kein Paradigmenwechsel, sondern die disziplinierte Besetzung eines vorhandenen Slots.
 
-Wir entscheiden uns für lokale Inferenz statt externer API; die Backendwahl bleibt vorläufig offen. Vault-Ausschnitte und Emails sind nicht-öffentlich und dürfen die Datenschutz-Grenze nicht verlassen. Laya bleibt eine versionierte experimentelle Baseline, SemIf und Kev sind explorativ getestet, keine freigegebenen Produktionsbackends. Der Einstieg ist die Relevanz-Triage beim Sammeln, nicht die Antragsreife. GO-Kette, politische Kriterien und Quellenpflicht bleiben vollständig beim bisherigen Verfahren. Backendwahl und automatisches Gating brauchen workloadbezogene Validierung auf einem unangetasteten Holdout und ein separates explizites GO. Die zunächst 30 bis 50 echten handgelabelten Fälle sind ein Entwicklungsbudget, kein Kalibrierungsnachweis. Ein Abbruch deaktiviert den tatsächlichen Adapter; private Eingaben bleiben auch im Fallback lokal.
+Wir entscheiden uns für lokale Inferenz statt externer API; die Backendwahl bleibt vorläufig offen. Vault-Ausschnitte und Emails sind nicht-öffentlich und dürfen die Datenschutz-Grenze nicht verlassen. Laya bleibt eine versionierte experimentelle Baseline, SemIf und Kev sind explorativ getestet, keine freigegebenen Produktionsbackends. Der Einstieg ist die **Relevanz-Triage** beim Sammeln, nicht die Antragsreife. **GO-Kette**, politische Kriterien und Quellenpflicht bleiben vollständig beim bisherigen Verfahren. Backendwahl und automatisches Gating brauchen workloadbezogene Validierung auf einem unangetasteten **Holdout** und ein separates explizites GO. Die zunächst 30 bis 50 echten handgelabelten Fälle sind ein Entwicklungsbudget, kein Kalibrierungsnachweis. Ein Abbruch deaktiviert den tatsächlichen Adapter; private Eingaben bleiben auch im Fallback lokal.
 
 Eine Grenze gehört in diese Zusammenfassung. Frequenz, Latenz und Kosten, die üblichen Verkaufsargumente der Klasse, tragen bei einem einzelnen Stadtrat am wenigsten. Konsistente und workloadgerecht kalibrierte Urteile sind prüfbare Ziele für die Sammel-Workflows, keine Eigenschaft der Klasse. Hintergrundbetrieb ohne laufende Session bleibt eine spätere Option (Abschnitt 4.3).
 
@@ -23,7 +23,7 @@ Eine Grenze gehört in diese Zusammenfassung. Frequenz, Latenz und Kosten, die �
 
 ### 1.1 Was System-1-Modelle sind
 
-Der Name stammt von Daniel Kahneman: System 1 ist das schnelle, intuitive Urteil, System 2 das langsame, bewusste Schließen.[^jev] Hier bezeichnet er einen typisierten Readout gegen einen Eingangszustand, nicht bloß ein schnell antwortendes Sprachmodell. Dazu gehören Encoder mit Entscheidungsköpfen, eingefrorene LLMs mit Optionslogits und LoRA-Pointerheads.[^semif][^kev] Jev beschreibt den Dienst mit der Formel „unstructured state in, typed probabilistic decisions out“.[^jev] Frei generierte Prosa entfällt, Fehlklassifikationen bleiben möglich. Auch Begründung und fachlicher Quellenbeleg fehlen; Kalibrierung und Konsistenz müssen für die tatsächliche Konfiguration geprüft werden.
+Der Name stammt von Daniel Kahneman: System 1 ist das schnelle, intuitive Urteil, System 2 das langsame, bewusste Schließen.[^jev] Hier bezeichnet er einen typisierten **Readout** gegen einen Eingangszustand, nicht bloß ein schnell antwortendes Sprachmodell. Dazu gehören Encoder mit Entscheidungsköpfen, eingefrorene LLMs mit Optionslogits und LoRA-Pointerheads.[^semif][^kev] Jev beschreibt den Dienst mit der Formel „unstructured state in, typed probabilistic decisions out“.[^jev] Frei generierte Prosa entfällt, Fehlklassifikationen bleiben möglich. Auch Begründung und fachlicher Quellenbeleg fehlen; Kalibrierung und Konsistenz müssen für die tatsächliche Konfiguration geprüft werden.
 
 Der folgende Quellenvergleich ist auf Jev und Laya nach dem Abrufstand vom 2026-09-24 begrenzt. Die eigene lokale Vergleichsmessung weiterer Kandidaten steht in Anhang B.
 
@@ -43,7 +43,7 @@ Die damaligen Veröffentlichungen beschreiben RLCD (Reinforcement Learning for C
 
 Der AI-Harness fällt in jeder Session Dutzende kleiner Urteile. Ist dieser Vault-Treffer relevant? Passt dieser Artikel zu diesem Tagesordnungspunkt? Eignet sich diese Quelle für ein ratsprojekt? Heute beantwortet das frontier LLM diese Fragen nebenbei, in Prosa, ohne dass die Antwort gespeichert oder später verglichen werden könnte. Die Sammel-Workflows schreiben bereits Obergrenzen gegen Overfetching vor (höchstens 5–7 Vault-Notizen, höchstens 2–3 Artikel je TOP), aber die Grenzen hält Prosa-Disziplin, nicht ein Messwert (skills/vault_suche/SKILL.md:96–105; skills/sitzungsvorbereitung/SKILL.md:150–154).
 
-Gleichzeitig erzeugt das Projekt maschinenlesbare Entscheidungshistorie. Proposal-Annahme und -Ablehnung sind jedoch keine Relevanzlabels. Goldlabels entstehen nur durch menschliche Bewertung der tatsächlichen Triage-Frage in ihrem Kontext, etwa bei einer Korrektur von „ja/nein/vielleicht“. Bislang ist diese Historie nicht als Datensatz organisiert; Abschnitt 4.3 beschreibt eine spätere Möglichkeit.
+Gleichzeitig erzeugt das Projekt maschinenlesbare Entscheidungshistorie. Proposal-Annahme und -Ablehnung sind jedoch keine Relevanzlabels. **Goldlabels** entstehen nur durch menschliche Bewertung der tatsächlichen Triage-Frage in ihrem Kontext, etwa bei einer Korrektur von „ja/nein/vielleicht“. Bislang ist diese Historie nicht als Datensatz organisiert; Abschnitt 4.3 beschreibt eine spätere Möglichkeit.
 
 ## 2. Analyse
 
@@ -57,9 +57,9 @@ Die Antragsreife-Spezifikation ist faktisch bereits ein Decision-Model-Entwurf m
 | Modell | Soft Gates: Finanzierung angesprochen, rechtliche Grundlagen genannt, Fristen gesetzt | ausdrücklich „der LLM des AI-Harness“ | antragsreife_kriterien.md:35–46; check_antragsreife.ex:254–272 |
 | Mensch | Tonalität, Konsensfähigkeit, Widerspruch zur Fraktionsposition | Stadtrat; die KI bewertet sie nicht | check_antragsreife.ex:276–294 |
 
-Die Modellstufe ist der natürliche Anknüpfungspunkt dieses RFC. Sie ist spezifiziert, aber nicht diszipliniert: Das große LLM beantwortet sie beiläufig, ohne Konfidenzangabe, ohne Protokoll. Wer dieselbe Frage nächste Woche stellt, kann eine andere Antwort erhalten, ohne dass es jemand bemerkt.
+Die **Modellstufe** ist der natürliche Anknüpfungspunkt dieses RFC. Sie ist spezifiziert, aber nicht diszipliniert: Das große LLM beantwortet sie beiläufig, ohne Konfidenzangabe, ohne Protokoll. Wer dieselbe Frage nächste Woche stellt, kann eine andere Antwort erhalten, ohne dass es jemand bemerkt.
 
-Zwei der sieben spezifizierten Hard Gates sind Code-Wirklichkeit noch nicht. Value Proposition und Success Metrics prüft bis zur Umsetzung von Roadmap-Punkt 9 (Issue #37) der Skill policy-seitig (AGENTS.md:163; workflows.md:389; skills/ratsprojekt_proposal/SKILL.md:102–103). Der unscharfe Mittelbau ist damit heute größer als die drei Soft Gates. An der Reihenfolge dieses RFC ändert das nichts.
+Zwei der sieben spezifizierten **Hard Gates** sind Code-Wirklichkeit noch nicht. Value Proposition und Success Metrics prüft bis zur Umsetzung von Roadmap-Punkt 9 (Issue #37) der Skill policy-seitig (AGENTS.md:163; workflows.md:389; skills/ratsprojekt_proposal/SKILL.md:102–103). Der unscharfe Mittelbau ist damit heute größer als die drei **Soft Gates**. An der Reihenfolge dieses RFC ändert das nichts.
 
 Die Stufenarchitektur ist kein Einzelfall. Das gesamte Repo spricht typisierte Entscheidungen: `pass|fail|warn` im Antragsreife-Check, `pending` und `approved|rejected` im Proposal-Flow, `unchecked` für die politischen Kriterien, „ja/nein/vielleicht“ in den Triage-Skills, propose→decide als Eintrittspunkt für jedes menschliche GO. Ein System-1-Modell einzuziehen heißt daher, eine bestehende Schnittstelle anders zu besetzen. Es heißt nicht, eine neue Kategorie „KI-Entscheidung“ zu erfinden.
 
@@ -70,7 +70,7 @@ Das Verkaufsargument der Modellklasse lautet Massenfrequenz bei Millisekundenlat
 Die prüfbaren Ziele liegen woanders:
 
 - **Konsistenz.** Gleiche Eingaben sollen unter eingefrorener Konfiguration zu gleichen Urteilen führen. Runtime-, Präzisions- oder Schemawechsel erfordern neue Prüfungen.
-- **Kalibrierung.** Ein Score soll die Fehlerwahrscheinlichkeit im tatsächlichen Workload brauchbar abbilden. Ein typisierter Readout bedeutet nicht, dass das Modell „weiß nicht“ kennt. Eskalationsregeln brauchen eigene Validierung.
+- **Kalibrierung.** Ein **Score** soll die Fehlerwahrscheinlichkeit im tatsächlichen Workload brauchbar abbilden. Ein typisierter Readout bedeutet nicht, dass das Modell „weiß nicht“ kennt. Eskalationsregeln brauchen eigene Validierung.
 - **Protokoll.** Jedes Urteil ist ein Log-Eintrag statt einer vergessenen Prosa-Zeile. Aus dem Protokoll wächst die Label-Historie, die Abschnitt 6.4 als Option führt.
 
 Latenz ist im laufenden Session-Betrieb kein Erfolgskriterium, und die Kosten sind bei diesem Volumen ein Nebenposten. Wer den Pilot mit einem dieser beiden Posten begründet, begründet ihn falsch.
@@ -162,7 +162,7 @@ In den folgenden Regeln bezeichnen MUSS und DARF NICHT Anforderungen an jede kü
 
 ### 6.2 Konfidenz-Gating
 
-Das Muster lautet Modell, benannter Score, validierte Schwelle, Eskalation. Technische Abstention ist ein Fallback, kein GO. Unbekannte Konfiguration, fehlende Provenienz oder unvalidiertes Gating bedeutet: keine automatische Filterung, alle Treffer behalten und menschlich prüfen. Eine Gate-Policy braucht Workload, vollständiges Schema, Konfiguration und Scoredefinition als eingefrorene Version. Recall und sichtbare Verwerfungen bleiben vorrangig.
+Das Muster lautet Modell, benannter Score, validierte Schwelle, Eskalation. Technische Abstention ist ein Fallback, kein GO. Unbekannte Konfiguration, fehlende Provenienz oder unvalidiertes Gating bedeutet: keine automatische Filterung, alle Treffer behalten und menschlich prüfen. Eine **Gate-Policy** braucht Workload, vollständiges Schema, Konfiguration und Scoredefinition als eingefrorene Version. Recall und sichtbare Verwerfungen bleiben vorrangig.
 
 Für das Laya-Beispiel MUSS ein später validiertes Gate auf dessen entropiebasierter `confidence` = 1 − H(p)/log k beruhen, nicht auf `act_probability`. Die dokumentierten AUROC-Werte 0,77 und 0,30 sowie das im lokalen Versuch konstante `act_probability` = 1,0 sind Laya-spezifische Befunde, keine Eigenschaft aller Modelle.[^laya][^laya-pilot] SemIf liefert einen unkalibrierten bedingten Options-Softmax. Kev berechnet die Choice-Confidence als (K·p_max − 1)/(K − 1), wobei p_max der größte Optionsscore und K die Zahl der Optionen ist. Sein gespeichertes englisches T = 2,406050072164233 validiert deutsche Confidence nicht.[^semif][^kev-card] Gemeinsame Schwellen oder ein τ-Transfer sind unzulässig; n12 liefert kein Gate.
 
@@ -181,7 +181,7 @@ Für Laya sind falsche Urteile mit hoher Konfidenz dokumentiert: 0,952 Konfidenz
 
 Das Schema versioniert den vollständigen Fragetext samt Triage-Kontext, Label-IDs, Beschreibungen und Optionsreihenfolge. Laya reagierte auf Labelwörter. Bei SemIf wurden IDs nicht gerendert und ID-only-Scores blieben gleich; bei Kev stehen IDs im Optionstext und veränderten Scores. Orderwechsel änderten bei beiden Scores, auch wenn klare Kontrolllabels stabil blieben (Anhang B). Runtime-Ports erben daraus keine Wiederholungsgarantie.
 
-Ein kleines lokales Manifest samt JSONL-Log hält tatsächliche Source- und Modellrevisionen mit Datei-Hashes, geladenes Backend, Runtime, dtype oder Quantisierung, T beziehungsweise Kalibrierungsrevision, vollständige Schemaversion, Scoredefinition, p-Vektor, Cachepolicy und -zustand sowie Timerdefinition fest. Technische Modellprovenienz ersetzt keinen fachlichen Quellenbeleg nach R3. Layas Routing wird wie in A.1 geprüft; Kevs `kev-latest` ist nur ein Alias und braucht die geladenen Metadaten mit unveränderlicher Revision. Keine erfundene normalisierte Universal-Confidence und keine zusätzliche Infrastruktur.
+Ein kleines lokales **Manifest** samt JSONL-Log hält tatsächliche Source- und Modellrevisionen mit Datei-Hashes, geladenes Backend, Runtime, dtype oder Quantisierung, T beziehungsweise Kalibrierungsrevision, vollständige Schemaversion, Scoredefinition, p-Vektor, Cachepolicy und -zustand sowie Timerdefinition fest. Technische Modellprovenienz ersetzt keinen fachlichen Quellenbeleg nach R3. Layas Routing wird wie in A.1 geprüft; Kevs `kev-latest` ist nur ein Alias und braucht die geladenen Metadaten mit unveränderlicher Revision. Keine erfundene normalisierte Universal-Confidence und keine zusätzliche Infrastruktur.
 
 ### 6.4 Ausbaustufe
 
@@ -189,7 +189,7 @@ Zwei Möglichkeiten bleiben ausdrücklich Optionen. Ein backendbezogener Wrapper
 
 ## 7. Der Pilot
 
-Ein operativer Pilot läuft nach eigenem GO zwei bis vier Wochen in echten Sitzungsvorbereitungen (Workflow 1). Zunächst bleibt er im Shadow-Modus: alle Treffer behalten und menschlich prüfen, solange ein Gate nicht validiert ist. Er misst, ob weniger Overfetching ohne Recallverlust erreichbar ist. Die bereits eingesehenen zwölf synthetischen Titel aus Anhang B sind ausschließlich für Exploration und Regression verwendbar und vom finalen Test ausgeschlossen.
+Ein operativer **Pilot** läuft nach eigenem GO zwei bis vier Wochen in echten Sitzungsvorbereitungen (Workflow 1). Zunächst bleibt er im **Shadow-Modus**: alle Treffer behalten und menschlich prüfen, solange ein Gate nicht validiert ist. Er misst, ob weniger Overfetching ohne Recallverlust erreichbar ist. Die bereits eingesehenen zwölf synthetischen Titel aus Anhang B sind ausschließlich für Exploration und Regression verwendbar und vom finalen Test ausgeschlossen.
 
 Drei Auflagen sind Bestandteil des Starts:
 

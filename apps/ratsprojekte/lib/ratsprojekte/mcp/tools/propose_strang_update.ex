@@ -9,7 +9,7 @@ defmodule Ratsprojekte.MCP.Tools.ProposeStrangUpdate do
   Realisierungsstrang aktualisiert wird. Approve/Reject ist bewusst KEIN
   MCP-Tool — das ist das disziplinarische GO-Gate.
 
-  Die `begruendung` ist Pflichtfeld (Quellenpflicht): die AI muss
+  Die `begruendung` ist Pflichtfeld (Quellenpflicht): die KI muss
   nachvollziehbar begründen, warum sie diese Aktualisierung vorschlägt.
 
   Nach dem Aufruf liefert das Tool eine `review_url`, unter der der
@@ -112,7 +112,7 @@ defmodule Ratsprojekte.MCP.Tools.ProposeStrangUpdate do
           "rechtliche_grundlage" => params[:rechtliche_grundlage],
           "bedingung" => params[:bedingung]
         }
-        # Nur Felder aufnehmen, die die AI tatsächlich setzen will — keine
+        # Nur Felder aufnehmen, die die KI tatsächlich setzen will — keine
         # nil-Werte im Payload, sonst würde die Apply-Logik Felder aktiv
         # leeren. Das `label` wird immer gebraucht, um den Strang zu finden.
         |> Enum.reject(fn

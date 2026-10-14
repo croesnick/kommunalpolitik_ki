@@ -197,13 +197,13 @@ Expression :=
   - `member`: Feld unbekannt → `unknown`; sonst Wert ∈ Literalmenge.
   - `subset`: Feld unbekannt → `unknown`; sonst Wertmenge ⊆ Literalmenge.
   - `at_most`: Feld unbekannt → `unknown`; sonst Wert ≤ Literal.
-- Der Auswerter erhält ausschließlich (Fakten, Expression). Er hat **keinen Zugriff** auf das Prüflabel, andere Bindungen oder den Regelkontext — ein Prädikat darf nicht davon abhängen, welche weiteren Bindungen geprüft werden (RFC 5.2, B.4 Monotonie A.2).
+- Der Auswerter erhält ausschließlich (Fakten, Expression). Er hat **keinen Zugriff** auf das Validierungslabel, andere Bindungen oder den Regelkontext — ein Prädikat darf nicht davon abhängen, welche weiteren Bindungen geprüft werden (RFC 5.2, B.4 Monotonie A.2).
 
 ## 4. Regelzweig `admit` — Prämissen, Ordnung, Entscheidung
 
-### 4.1 Prüflabel
+### 4.1 Validierungslabel
 
-Das Prüflabel ist **immer** `workspace.bindings` (B_W). Auch eine öffentliche Datei (λ(x) = ∅) wird gegen **alle** Raumbindungen geprüft (RFC 5.4, D.1).
+Das Validierungslabel ist **immer** `workspace.bindings` (B_W). Auch eine öffentliche Datei (λ(x) = ∅) wird gegen **alle** Raumbindungen geprüft (RFC 5.4, D.1).
 
 ### 4.2 Basisfakten (durch den Vertrag festgelegt)
 
@@ -248,7 +248,7 @@ Der Prüfer **ruft `derive` niemals auf** und **glaubt kein `permit`**. Er prüf
 Prüfschritte (Befunde werden gesammelt, soweit die Prüfung nicht strukturell abbricht; ≥1 Befund → `invalid`):
 
 1. **Struktur:** Proof-Schema (falsches/fehlerhaftes Proof-Datensatzformat ist ein Eingabefehler, Exit 2 — kein `invalid`-Urteil), Referenzkohärenz (`registry_ref`, `snapshot_ref`, `intent_ref` müssen exakt den mitgeführten Eingaben entsprechen — fremder Snapshot → `snapshot_mismatch`, fremde Registry → `registry_mismatch`, fremder Intent → `intent_mismatch`), Regel = `admit` (andere → `unsupported_rule`).
-2. **Prüflabel:** `checked_label` muss **mengengleich** `workspace.bindings` sein (sortierter Vergleich). Verkürztes Prüflabel → `checked_label_mismatch`. Eine ausgelassene Raumbindung darf nicht durch einen verkürzten Baum verschwinden (RFC B.5).
+2. **Validierungslabel:** `checked_label` muss **mengengleich** `workspace.bindings` sein (sortierter Vergleich). Verkürztes Validierungslabel → `checked_label_mismatch`. Eine ausgelassene Raumbindung darf nicht durch einen verkürzten Baum verschwinden (RFC B.5).
 3. **Required-Set:** Die Prämissenmenge wird **aus dem Regeltyp gegen den Snapshot rekonstruiert** (RFC B.5): die acht festen Prämissen plus je `binding_condition` für jedes Element von `workspace.bindings` (nach Schritt 2 mengengleich `checked_label`). Eine Prämisse erfüllt ihren Slot **nur mit der zugeordneten Art aus §2.5** (name↔kind-Bindung; z. B. `label_inclusion` nur als `kind: "computed"`, `has_operation_right` nur als `kind: "fact"`); abweichende Art → `unknown_premise`. Fehlt eine → `missing_required_premise`; unbekannte zusätzliche Prämisse → `unknown_premise`. `binding_condition`-Slots werden nur aus `kind: "condition"`-Prämissen erfüllt.
 4. **Faktprämissen:** Der Fakt muss im Snapshot existieren (`fact_missing`) und der behauptete `value` muss mit dem Snapshot-Wert übereinstimmen (`fact_value_mismatch`). `workspace_contract_valid` wird gegen `workspace.valid` geprüft.
 5. **`not_quarantine`:** Klassifikation im Snapshot muss `classified` sein, sonst `object_quarantine`.
@@ -314,7 +314,7 @@ Manipulierte Beweise (alle von `verify` zu verwerfen):
 |---|---|---|
 | `case_permit/proof_valid.json` | case_permit | `valid` (Referenzbaum, handgeschrieben aus §4.3) |
 | `proofs/proof_missing_binding_condition.json` | case_permit | `invalid` → `missing_required_premise` (Raumbindung weglassen) |
-| `proofs/proof_checked_label_shortened.json` | case_permit | `invalid` → `checked_label_mismatch` (Prüflabel ∅, Baum „prüft" nur λ(x)) |
+| `proofs/proof_checked_label_shortened.json` | case_permit | `invalid` → `checked_label_mismatch` (Validierungslabel ∅, Baum „prüft" nur λ(x)) |
 | `proofs/proof_false_condition.json` | **case_deny** (Scope `false`) | `invalid` → `condition_false` + `conclusion_mismatch` (gefälschte Bedingung `true`) |
 | `proofs/proof_missing_fact_condition.json` | **case_indeterminate** (Scope fehlt) | `invalid` → `condition_unknown` + `conclusion_mismatch` (Beweis behauptet `true` ohne Fakt) |
 | `proofs/proof_foreign_snapshot.json` | case_permit | `invalid` → `snapshot_mismatch` (fremde Snapshot-Referenz) |
@@ -325,13 +325,13 @@ Manipulierte Beweise (alle von `verify` zu verwerfen):
 
 Die erwarteten Verify-Ergebnisse (Kontext-Snapshot/Intent je Beweis, `result` und **vollständige** `reasons`-Liste in fester Prüfordnung §5) liegen maschinenlesbar in `priv/fixtures/proofs/verify_expectations.json` (`komki-verify-expectations/1`). Pfade sind relativ zu `priv/fixtures/`.
 
-Auswerter-Orakel: `priv/fixtures/expressions/evaluate_expectations.json` (`komki-expression-expectations/1`) pinnt die dreiwertige Auswertung je B.4-Grammatikbaustein inklusive der Grenzfälle (leere `all` → `true`, leere `any` → `false`, unknown-Propagation in `all`/`any`, `member`/`subset`/`at_most` bei fehlendem Feld). Fakten dort sind reiner Auswerter-Input `{feld: {value}}` ohne Registry-Bindung; die Registry-Compile-Validierung wird separat über `invalid/` orakelt.
+Testorakel: `priv/fixtures/expressions/evaluate_expectations.json` (`komki-expression-expectations/1`) pinnt die dreiwertige Auswertung je B.4-Grammatikbaustein inklusive der Grenzfälle (leere `all` → `true`, leere `any` → `false`, unknown-Propagation in `all`/`any`, `member`/`subset`/`at_most` bei fehlendem Feld). Fakten dort sind reiner Auswerter-Input `{feld: {value}}` ohne Registry-Bindung; die Registry-Compile-Validierung wird separat über `invalid/` orakelt.
 
 Kopplung derive↔Beweis (RFC A.7): Der `proof` von `derive(case_permit)` muss strukturgleich (kanonisch, §6) mit `case_permit/proof_valid.json` sein, und `verify` muss diesen Baum als `valid` bestätigen. Die deny/indeterminate-Orakel tragen `"proof": null` gemäß §2.4.
 
 Testmanifeste (`expected_decision.json`, `expected_result.json`, `verify_expectations.json`, `evaluate_expectations.json`) sind test-only-Datensätze und unterliegen keiner der Laufzeit-Schemata aus §2.
 
-Eingabe-Fixtures (Registry, Snapshots, Intents, `invalid/`) sind **bewusst nicht byte-kanonisch** sortiert (menschenlesbare Schlüsselordnung); §6-Kanonisierung gilt für Ausgaben und für Vergleiche (`canonical(parse())`). Der Kanonitäts-Tripwire der Tests deckt entsprechend nur den byte-kanonisch gepinnten Teil des Korpus (Decision-, Proof- und Manifest-Dateien).
+Eingabe-Fixtures (Registry, Snapshots, Intents, `invalid/`) sind **bewusst nicht byte-kanonisch** sortiert (menschenlesbare Schlüsselordnung); §6-Kanonisierung gilt für Ausgaben und für Vergleiche (`canonical(parse())`). Der Kanonizitäts-Tripwire der Tests deckt entsprechend nur den byte-kanonisch gepinnten Teil des Korpus (Decision-, Proof- und Manifest-Dateien).
 
 ## 9. Explizite Nichtziele von Lieferung 1
 

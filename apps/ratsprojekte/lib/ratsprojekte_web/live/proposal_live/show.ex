@@ -267,7 +267,7 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
             @proposal.payload,
             "label"
           )}".
-          Doppelter Strang möglich — bewusst kein Unique-Index (Idempotenz, die AI darf es mit besseren Argumenten nochmal versuchen).
+          Doppelter Strang möglich — bewusst kein Unique-Index (Idempotenz, die KI darf es mit besseren Argumenten nochmal versuchen).
         </div>
       <% end %>
 
@@ -319,7 +319,7 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
         <.form for={@form} phx-submit="decide" id="decision-form" class="decision-form">
           <textarea
             name="kommentar"
-            placeholder="Kommentar (optional bei Accept, empfohlen bei Reject — Lern-Effekt für die AI)"
+            placeholder="Kommentar (optional bei Accept, empfohlen bei Reject — Lern-Effekt für die KI)"
             class="decision-textarea"
           ></textarea>
           <div class="decision-actions">

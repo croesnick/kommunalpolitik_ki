@@ -16,7 +16,7 @@ Zwei Klarstellungen vorab.
 
 Evidenzstufen in dieser Notiz.
 
-- [D] Dokumentiert. First-Party-Quelle namentlich benannt, Abrufdatum 2026-10-02.
+- [D] Dokumentiert. Primärquelle namentlich benannt, Abrufdatum 2026-10-02.
 - [S] Schluss. Abgeleitet aus [D]-Belegen, ohne eigene Ausfuehrung.
 - [V] Offen. Braucht spaeter ein Experiment, bevor ein Umgebungstand im Sinne von RFC 0003 R.3 und R.4.1 daraus zulaessig werden darf.
 
@@ -343,4 +343,4 @@ Ticket Q9 (Transversal): Wie bekommen Sandbox-Profil und Broker-Eintrag einen ve
 
 Alle [U]- und [V]-Felder sind Experimentzuweisungen: jedes braucht eine spaetere, freigegebene Session [S].
 
-Diese Notiz gibt keine produktive Betriebsfreigabe. Sie beschreibt moegliche Umgebungen und ihre dokumentierten Grenzen. Der Orchestrierer ist Validierungsbesitzer; vor der Tracker-Publikation braucht es ein GO.
+Diese Notiz gibt keine produktive Betriebsfreigabe. Sie beschreibt moegliche Umgebungen und ihre dokumentierten Grenzen. Der Orchestrator ist Validierungsbesitzer; vor der Tracker-Publikation braucht es ein GO.

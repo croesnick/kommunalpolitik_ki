@@ -29,7 +29,7 @@ Das Ergebnis ist eine **Sitzungsmappe** — eine Vault-Notiz pro Sitzung, die
 alle Vorbereitungsergebnisse bündelt. Die Mappe ist ein Vorschlag, kein
 Entscheid — der Stadtrat entscheidet, was er daraus macht.
 
-> **Definition:** Siehe [`docs/nomenklatur.md`](../../docs/nomenklatur.md) —
+> **Definition:** Siehe [`GLOSSARY.md`](../../GLOSSARY.md) —
 > "Sitzungsmappe". **Workflow:** WF 1 in
 > [`docs/workflows.md`](../../docs/workflows.md).
 
@@ -65,7 +65,7 @@ obsidian:
 
 Fehlt die Datei oder der `vault`-Eintrag, fragt der Skill die nutzende
 Person direkt nach dem Vault-Namen und speichert ihn *nicht* automatisch
-(GO-Prinzip: die AI schreibt keine Config, der Mensch entscheidet, was
+(GO-Prinzip: die KI schreibt keine Config, der Mensch entscheidet, was
 konfiguriert wird). Der Skill merkt sich den Vault-Namen für die restliche
 Session.
 
@@ -235,7 +235,7 @@ Schritt komplett** — die flache TOP-für-TOP-Erzählung reicht. Keine
 
 Eine **Graph-Repräsentation** der Sitzung als internen Zwischenschritt
 bevor die Mappe geschrieben wird. Der Graph ist **kein separates
-Artefakt** — er ist eine **Denk-Hilfe** der AI, um Querschnittsthemen,
+Artefakt** — er ist eine **Denk-Hilfe** der KI, um Querschnittsthemen,
 wiederkehrende Akteure, Klage-Risiken und Cross-TOP-Bezüge zu erkennen,
 die in der flachen TOP-für-TOP-Erzählung verdeckt bleiben.
 
@@ -246,12 +246,12 @@ File gespeichert. Er ist Teil der Mappe, nicht der Skill-Output.
 **Warum als Zwischenschritt (nicht als separates Tool):**
 
 Der Graph ersetzt das Lesen der Unterlagen nicht — er ist das Ergebnis
-des Lesens. Die AI liest die Unterlagen (Schritt 4+8), baut aus dem
+des Lesens. Die KI liest die Unterlagen (Schritt 4+8), baut aus dem
 Verständnis heraus eine Graph-Repräsentation auf, und schreibt die Mappe
-**basierend auf dieser Repräsentation**. Das zwingt die AI, Querverbindungen
+**basierend auf dieser Repräsentation**. Das zwingt die KI, Querverbindungen
 zu denken, statt TOP für TOP abzuhandeln.
 
-**Knoten des Graph (internes Modell der AI):**
+**Knoten des Graph (internes Modell der KI):**
 
 ```
 Sitzung          { datum, gremium, ort, ris_url }
@@ -311,7 +311,7 @@ TOP            -[bezug_zu]->           TOP      # z.B. ein Querschnitts-Akteur i
 
 1. `zeile_von/zeile_bis` auf **jedem** Knoten — löst die Quellenpflicht
    strukturell. Jede Aussage in der Mappe trägt ihre Zeile mit.
-2. `stellungnahme.typ` als Enum — zwingt die AI, bei jeder Stellungnahme
+2. `stellungnahme.typ` als Enum — zwingt die KI, bei jeder Stellungnahme
    zu klassifizieren: Behörde (§ 4 BauGB) | Öffentlichkeit (§ 3 Abs. 2
    BauGB) | verwaltungsintern | Anwohner. Das schließt
    Fehlklassifikationen (Briefkopf-Rätsel) aus oder macht sie korrigierbar.
@@ -415,7 +415,7 @@ stärker, weil sie ein Muster sichtbar machen. Der Stadtrat kann sie als
   überschaubare Unterlagen) entfällt Anhang B komplett.
 - Der Skill-Output muss proportioniert bleiben — keine Mermaid-Diagramme
   für eine Sitzung mit 3 formalen TOPs.
-- Bei mittleren Sitzungen kann der Graph intern im Kopf der AI bleiben,
+- Bei mittleren Sitzungen kann der Graph intern im Kopf der KI bleiben,
   ohne in die Mappe geschrieben zu werden — wenn es keine Querschnitts-
   Themen gibt, ist der Graph leer und wird weggelassen.
 
@@ -423,7 +423,7 @@ stärker, weil sie ein Muster sichtbar machen. Der Stadtrat kann sie als
 
 Wenn eine Stellungnahme auf Briefkopf einer anderen Behörde als dem
 Einreicher verfasst ist (z.B. Anwohner auf dem Briefkopf einer anderen
-Behörde), wird das im Knoten als `briefkopf_raetsel: true` markiert. Die AI soll die ursprüngliche Klassifikation nicht
+Behörde), wird das im Knoten als `briefkopf_raetsel: true` markiert. Die KI soll die ursprüngliche Klassifikation nicht
 überschreiben — sie dokumentiert das Rätsel und lässt die nutzende
 Person entscheiden (GO-Prinzip). Die ursprüngliche Klassifikation und
 die Korrektur bleiben beide sichtbar (Audit-Trail).
@@ -452,7 +452,7 @@ Priorisierungsvorhaben, ein Audit).
 Der Graph ist **nicht** ein Artefakt, das persistiert, in einer Graph-DB
 gespeichert, oder als separates Tool wiederverwendet wird. Er ist eine
 **Denk-Hilfe in dieser konkreten Sitzungsvorbereitung** — intern im Kopf
-der AI, exportiert als Mermaid in die Mappe. Ein separater Graph-Builder
+der KI, exportiert als Mermaid in die Mappe. Ein separater Graph-Builder
 wäre der `riski`-Fehler in Reinform (AGENTS.md §3: MVP vor
 Infrastruktur; §4: problem-first, nicht tool-first). Wenn sich der Graph
 in mehreren Sitzungen als wertvoll erweist, kann man immer noch über ein
@@ -756,16 +756,16 @@ Querschnitts-Anträge (Q1, Q2, Q3) formuliert werden — neben den TOP-spezifisc
 Stadtrat kann sie als „Anträge zur Struktur" über einzelne TOPs hinaus
 einbringen.
 
-## GO-Prinzip: AI sammelt und strukturiert, Mensch entscheidet
+## GO-Prinzip: KI sammelt und strukturiert, Mensch entscheidet
 
-Die Sitzungsmappe ist ein **Vorschlag**. Die AI sammelt (TOPs, AZ, Vault,
+Die Sitzungsmappe ist ein **Vorschlag**. Die KI sammelt (TOPs, AZ, Vault,
 PDFs), strukturiert und schlägt Fragen vor. Der Stadtrat entscheidet, was
 er daraus macht.
 
 **Schreiben der Mappe im Vault:** Die Mappe ist eine
 Vorbereitungsunterlage, kein entscheidender Eingriff in ratsprojekte oder
 den RIS-Bestand. Daher ist **kein GO nötig fürs Schreiben der
-Vorbereitungsmappe** — die AI darf sie direkt im Vault erstellen.
+Vorbereitungsmappe** — die KI darf sie direkt im Vault erstellen.
 
 **Aber — GO erforderlich für:**
 
@@ -778,7 +778,7 @@ Vorbereitungsmappe** — die AI darf sie direkt im Vault erstellen.
 
 Jede politisch relevante Aussage in der Mappe braucht eine Quelle. Der
 Skill kennzeichnet die Quellentypen konsistent (siehe
-[`docs/nomenklatur.md`](../../docs/nomenklatur.md) "Quelle"):
+[`GLOSSARY.md`](../../GLOSSARY.md) "Quelle"):
 
 - **RIS-Quelle:** `sitzung_id` + `sitzung_datum` + RIS-URL. Im Frontmatter
   unter `quellen` und im jeweiligen TOP unter "RIS".
@@ -828,7 +828,7 @@ nutzenden Person.
 | 4 | RIS-Volltextsuche findet nicht immer alle TOPs (ein konkretes TOP-Stichwort wurde trotz lokalem Cache nicht gefunden) | Cross-Ref kann TOPs verfehlen | Statt Suche immer `ratsinfo show <sitzungs_id>` für die konkrete Sitzung verwenden |
 | 5 | YAML-Frontmatter kann durch externe Strings (deutsche Anführungszeichen in AZ-Titeln) brechen | Properties in Obsidian nicht sichtbar / kaputt | Single-Quotes für alle YAML-Strings mit externem Text; YAML nach Vault-Write re-validieren (siehe "Validierung nach dem Vault-Write") |
 | 6 | Bei umfangreichen Sitzungsunterlagen (50+ Seiten, 10+ BVS pro TOP) verdeckt die flache TOP-für-TOP-Erzählung Querschnittsthemen, wiederkehrende Akteure, Klage-Risiken und Cross-TOP-Bezüge | Muster werden übersehen (z.B. mehrfach übergangene Forderungen desselben städtischen Gremiums in zwei TOPs); politisch starke Querschnitts-Anträge bleiben ungestellt | **Schritt 8b: Graph-Repräsentation als Zwischenschicht** bei umfangreichen Unterlagen. Mappe bekommt Anhang B mit Mermaid-Diagrammen + Synthese aus der Graph-Sicht + optional Q1/Q2/Q3-Querschnitts-Anträge. Trigger-Kriterien siehe Schritt 8b. Bei kleinen Sitzungen entfällt der Schritt. |
-| 7 | Fehlklassifikation von Stellungnahmen (Briefkopf-Rätsel: Anwohner auf Briefkopf einer anderen Behörde als Behördenstellungnahme nach § 4 BauGB fehlklassifiziert) | Politische Fehleinschätzung (Behörden-Ablehnung vs. Anwohner-Stellungnahme); ggf. unnötige Aufklärung in der Sitzung | `stellungnahme.typ` als Enum in Graph (Schritt 8b) zwingt zur Klassifikation; `briefkopf_raetsel: true` + Audit-Trail bei Abweichungen. GO-Prinzip: AI dokumentiert Rätsel, nutzende Person entscheidet. |
+| 7 | Fehlklassifikation von Stellungnahmen (Briefkopf-Rätsel: Anwohner auf Briefkopf einer anderen Behörde als Behördenstellungnahme nach § 4 BauGB fehlklassifiziert) | Politische Fehleinschätzung (Behörden-Ablehnung vs. Anwohner-Stellungnahme); ggf. unnötige Aufklärung in der Sitzung | `stellungnahme.typ` als Enum in Graph (Schritt 8b) zwingt zur Klassifikation; `briefkopf_raetsel: true` + Audit-Trail bei Abweichungen. GO-Prinzip: KI dokumentiert Rätsel, nutzende Person entscheidet. |
 
 Siehe auch [`docs/workflows.md`](../../docs/workflows.md) WF 1 "Lücken"
 für die strategische Einordnung.

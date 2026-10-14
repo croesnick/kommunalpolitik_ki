@@ -77,7 +77,7 @@ Jede Aussage über Fördermittel muss eine Quelle haben:
 - Abrufdatum
 - Ggf. Paragrafen (z.B. „Art. 13f BayFAG")
 
-Ein Stadtrat, der „es gibt Fördermittel" ohne Quelle behauptet, ist unglaubwürdig. Ein Stadtrat mit Quellen ist eine Bastion. Das ist nicht „AI generiert was", sondern „AI generiert was mit Beweisen". Bei jedem Förderprogramm, jedem %-Satz, jeder Frist: Quelle angeben. Wenn keine Quelle gefunden werden kann: explizit als „ohne bestätigte Quelle" markieren.
+Ein Stadtrat, der „es gibt Fördermittel" ohne Quelle behauptet, ist unglaubwürdig. Ein Stadtrat mit Quellen ist eine Bastion. Das ist nicht „KI generiert was", sondern „KI generiert was mit Beweisen". Bei jedem Förderprogramm, jedem %-Satz, jeder Frist: Quelle angeben. Wenn keine Quelle gefunden werden kann: explizit als „ohne bestätigte Quelle" markieren.
 
 ## Kumulierungsregeln prüfen
 
@@ -98,7 +98,7 @@ Extrahiere alle Fristen und markiere sie als TODO:
 
 Wenn eine Frist verstrichen ist (wie SUMP 1. Juni 2026), prüfe Alternativen.
 
-## GO-Prinzip: AI berät, Mensch entscheidet
+## GO-Prinzip: KI berät, Mensch entscheidet
 
 Dieser Skill berät, er entscheidet nicht. Kein Antrag wird automatisch gestellt. Keine Förderung wird beantragt. Der Output ist ein Recherche-Ergebnis, das der Stadtrat prüft, mit der Fraktion diskutiert und dann ggf. in einen Antrag oder eine Anfrage umwandelt.
 

@@ -8,7 +8,7 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjekt do
   angelegt wird. Approve/Reject ist bewusst KEIN MCP-Tool — das ist das
   disziplinarische GO-Gate.
 
-  Die `begruendung` ist Pflichtfeld (Quellenpflicht): die AI muss
+  Die `begruendung` ist Pflichtfeld (Quellenpflicht): die KI muss
   nachvollziehbar begründen, warum sie dieses Projekt vorschlägt.
 
   Nach dem Aufruf liefert das Tool eine `review_url`, unter der der

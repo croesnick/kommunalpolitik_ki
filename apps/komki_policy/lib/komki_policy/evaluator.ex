@@ -2,7 +2,7 @@ defmodule KomkiPolicy.Evaluator do
   @moduledoc """
   Dreiwertiger Auswerter der B.4-Prädikatsausdrücke (CONTRACT.md § 3).
 
-  Er erhält ausschließlich `(expression, facts)`: kein Prüflabel, kein
+  Er erhält ausschließlich `(expression, facts)`: kein Validierungslabel, kein
   Bindungskontext, keine anderen Bindungen (Monotonie, RFC 5.2). Ein
   fehlender Fakt ergibt `unknown` — niemals einen Default. Die Verknüpfungen
   folgen der festgelegten dreiwertigen Logik: bekanntes `false` schlägt in

@@ -50,9 +50,9 @@ Dieser Skill nutzt die ratsprojekte-MCP-Tools (read-only):
 3. **Standortbestimmung erstellen**: Aus den Daten eine strukturierte
    Standortbestimmung generieren (siehe Output-Format).
 
-## GO-Prinzip: AI berät, Mensch entscheidet
+## GO-Prinzip: KI berät, Mensch entscheidet
 
-Die AI entscheidet nichts. Sie liest die Projektdaten und erstellt eine
+Die KI entscheidet nichts. Sie liest die Projektdaten und erstellt eine
 Standortbestimmung — sie trägt nichts in die Datenbank ein, ändert keinen
 Status, markiert keine Vorbedingungen als erfüllt. Das ist nicht nur eine
 Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung
