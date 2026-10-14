@@ -1,0 +1,10 @@
+{
+  "as_of": 1050,
+  "consumed": {
+    "go-nonce-4711-a": "go-ausgabe-4711"
+  },
+  "schema": "komki-stand/1",
+  "scope": "bereich-fall-4711",
+  "stand_id": "stand-4711",
+  "version": 5
+}

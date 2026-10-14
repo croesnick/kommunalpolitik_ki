@@ -1,0 +1,42 @@
+{
+  "assigned_label": null,
+  "blockers": [
+    {
+      "binding": null,
+      "code": "release_call_mismatch",
+      "condition": null
+    }
+  ],
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "decision": "deny",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-case-emit-deny-purpose",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-ausgabe-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "release": null,
+  "remedies": [
+    {
+      "binding": null,
+      "code": "release_call_mismatch",
+      "condition": null,
+      "transitions": [
+        {
+          "call_hash": "23f55de809816fc8f84815c532739a2d1a8cd1ae655f08f943ab23be4225da3b",
+          "scope": "call",
+          "type": "aktionsfreigabe"
+        }
+      ]
+    }
+  ],
+  "rule": "emit",
+  "snapshot_ref": "snap-emit-4711-deny-purpose",
+  "workspace": "ws-fall-4711"
+}

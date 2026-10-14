@@ -1,13 +1,16 @@
 {
-  "schema": "komki-registry/1",
-  "registry_id": "reg-fall-4711-test",
-  "observers": [
-    "nutzende-person",
-    "lokale-fallverarbeitung"
-  ],
-  "fact_fields": {
-    "input_in_approved_case_scope": "boolean",
-    "purpose": "string"
+  "bindings": {
+    "buergerfall-4711@1": {
+      "beschreibung": "unbekanntes Feld",
+      "operations": {
+        "admit": true
+      },
+      "readers": [
+        "nutzende-person",
+        "lokale-fallverarbeitung"
+      ],
+      "relaxation_authorities": []
+    }
   },
   "environments": {
     "lokale-fallverarbeitung@1": {
@@ -17,17 +20,14 @@
       ]
     }
   },
-  "bindings": {
-    "buergerfall-4711@1": {
-      "readers": [
-        "nutzende-person",
-        "lokale-fallverarbeitung"
-      ],
-      "operations": {
-        "admit": true
-      },
-      "relaxation_authorities": [],
-      "beschreibung": "unbekanntes Feld"
-    }
-  }
+  "fact_fields": {
+    "input_in_approved_case_scope": "boolean",
+    "purpose": "string"
+  },
+  "observers": [
+    "nutzende-person",
+    "lokale-fallverarbeitung"
+  ],
+  "registry_id": "reg-fall-4711-test",
+  "schema": "komki-registry/2"
 }

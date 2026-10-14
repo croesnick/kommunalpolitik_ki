@@ -291,6 +291,271 @@ defmodule KomkiPolicy.CLITest do
   end
 
   # ---------------------------------------------------------------------
+  # decide: Freigabe-Zweig (CONTRACT § 4.6, § 7)
+  # ---------------------------------------------------------------------
+
+  defp release_dir(name), do: Path.join("case_release_#{name}", "")
+
+  defp run_release_decide(name) do
+    dir = release_dir(name)
+
+    CLI.run([
+      "decide",
+      "--registry",
+      fixture_path("registry.json"),
+      "--snapshot",
+      fixture_path(Path.join(dir, "snapshot.json")),
+      "--intent",
+      fixture_path(Path.join(dir, "intent.json")),
+      "--release",
+      fixture_path(Path.join(dir, "release.json")),
+      "--stand",
+      fixture_path(Path.join(dir, "stand.json"))
+    ])
+  end
+
+  test "decide case_release_permit -> Exit 0, permit mit release-Objekt (kein stiller Fallback)" do
+    {output, code} = run_release_decide("permit")
+
+    assert code == 0
+    parsed = assert_canonical(output)
+    assert parsed["decision"] == "permit"
+    assert parsed["rule"] == "emit"
+    assert is_nil(parsed["proof"])
+    assert is_nil(parsed["remedies"])
+    assert parsed["release"]["stand_ref"] == "stand-4711@5"
+    assert parsed["release"]["stand_version_after"] == 6
+    assert parsed["release"]["nonce"] == "go-nonce-4711-a"
+  end
+
+  test "decide case_release_swap -> Exit 0, deny release_call_mismatch (Inhaltstausch erkannt)" do
+    {output, code} = run_release_decide("swap")
+
+    assert code == 0
+    parsed = assert_canonical(output)
+    assert parsed["decision"] == "deny"
+
+    assert [%{"code" => "release_call_mismatch", "binding" => nil, "condition" => nil}] =
+             parsed["blockers"]
+
+    refute is_nil(parsed["remedies"])
+  end
+
+  test "decide case_release_replay -> deny release_nonce_consumed" do
+    {_, code} = run_release_decide("replay")
+    assert code == 0
+
+    {output, _} = run_release_decide("replay")
+    parsed = assert_canonical(output)
+    assert [%{"code" => "release_nonce_consumed"}] = parsed["blockers"]
+  end
+
+  test "decide Release-Fälle expired/not_yet_valid/scope/authority -> je deny mit korrektem Blocker" do
+    Enum.each(
+      %{
+        "expired" => "release_expired",
+        "not_yet_valid" => "release_not_yet_valid",
+        "scope" => "release_scope_mismatch",
+        "authority" => "release_authority_unknown"
+      },
+      fn {name, code} ->
+        {output, 0} = run_release_decide(name)
+        parsed = assert_canonical(output)
+        assert [%{"code" => ^code}] = parsed["blockers"], name
+      end
+    )
+  end
+
+  test "decide --release ohne --stand -> Exit 2, usage (nur paarweise gültig)" do
+    {output, code} =
+      CLI.run([
+        "decide",
+        "--registry",
+        fixture_path("registry.json"),
+        "--snapshot",
+        fixture_path("case_emit_permit/snapshot.json"),
+        "--intent",
+        fixture_path("case_emit_permit/intent.json"),
+        "--release",
+        fixture_path("case_release_permit/release.json")
+      ])
+
+    assert code == 2
+    parsed = assert_canonical(output)
+    assert parsed["code"] == "usage"
+  end
+
+  test "decide --stand ohne --release -> Exit 2, usage" do
+    {output, code} =
+      CLI.run([
+        "decide",
+        "--registry",
+        fixture_path("registry.json"),
+        "--snapshot",
+        fixture_path("case_emit_permit/snapshot.json"),
+        "--intent",
+        fixture_path("case_emit_permit/intent.json"),
+        "--stand",
+        fixture_path("case_release_permit/stand.json")
+      ])
+
+    assert code == 2
+    parsed = assert_canonical(output)
+    assert parsed["code"] == "usage"
+  end
+
+  test "decide Freigabe kind offenlegungsfreigabe -> Exit 3, unsupported (kein deny)" do
+    release = Map.put(fixture("case_release_permit/release.json"), "kind", "offenlegungsfreigabe")
+    path = Path.join(System.tmp_dir!(), "komki-policy-offenlegungsfreigabe.json")
+    File.write!(path, JSON.canonical(release))
+
+    {output, code} =
+      CLI.run([
+        "decide",
+        "--registry",
+        fixture_path("registry.json"),
+        "--snapshot",
+        fixture_path("case_release_permit/snapshot.json"),
+        "--intent",
+        fixture_path("case_release_permit/intent.json"),
+        "--release",
+        path,
+        "--stand",
+        fixture_path("case_release_permit/stand.json")
+      ])
+
+    assert code == 3
+    parsed = assert_canonical(output)
+    assert parsed["result"] == "unsupported"
+    assert parsed["rule"] == "offenlegungsfreigabe"
+  end
+
+  test "decide --release/--stand mit admit-Intent -> Exit 3, unsupported (nicht Exit 2 emit_digest_missing, Befund 17)" do
+    {output, code} =
+      CLI.run([
+        "decide",
+        "--registry",
+        fixture_path("registry.json"),
+        "--snapshot",
+        # admit-Snapshot ohne output_content_digest: die Reihenfolge § 4.6
+        # prüft die Operation VOR der Digest-Pflicht -> unsupported (Exit 3).
+        fixture_path("case_permit/snapshot.json"),
+        "--intent",
+        fixture_path("case_permit/intent.json"),
+        "--release",
+        fixture_path("case_release_permit/release.json"),
+        "--stand",
+        fixture_path("case_release_permit/stand.json")
+      ])
+
+    assert code == 3
+    parsed = assert_canonical(output)
+    assert parsed["result"] == "unsupported"
+    assert parsed["rule"] == "admit"
+  end
+
+  # ---------------------------------------------------------------------
+  # advance (CONTRACT § 2.7, § 7)
+  # ---------------------------------------------------------------------
+
+  defp proposal_from_decision(decision) do
+    {:ok, parsed} = JSON.parse(decision)
+    Map.fetch!(parsed, "release")
+  end
+
+  defp run_advance(stand_rel, proposal) do
+    path = Path.join(System.tmp_dir!(), "komki-policy-advance-proposal.json")
+    File.write!(path, JSON.canonical(proposal))
+
+    CLI.run([
+      "advance",
+      "--stand",
+      fixture_path(stand_rel),
+      "--proposal",
+      path
+    ])
+  end
+
+  test "advance Erfolg -> Exit 0, neuer Stand kanonisch (version+1, nonce verbraucht)" do
+    {permit_output, 0} = run_release_decide("permit")
+    proposal = proposal_from_decision(permit_output)
+
+    {output, code} = run_advance("case_release_permit/stand.json", proposal)
+
+    assert code == 0
+    parsed = assert_canonical(output)
+    assert parsed["schema"] == "komki-stand/1"
+    assert parsed["stand_id"] == "stand-4711"
+    assert parsed["version"] == 6
+    assert parsed["consumed"] == %{"go-nonce-4711-a" => "go-ausgabe-4711"}
+  end
+
+  test "advance CAS: zweiter Commit desselben GOs gegen stand@v+1 -> Exit 1, refused" do
+    {permit_output, 0} = run_release_decide("permit")
+    proposal = proposal_from_decision(permit_output)
+
+    {output, code} = run_advance("case_release_permit/stand.json", proposal)
+    assert code == 0
+    {:ok, advanced} = JSON.parse(output)
+    assert advanced["version"] == 6
+
+    # Vollzug außerhalb des Kerns: der fortgeschriebene Stand ist der neue
+    # Schlüsselstand; derselbe GO-Verbrauchsvorschlag wird dagegen verwirft.
+    next_stand_path = Path.join(System.tmp_dir!(), "komki-policy-stand-4711-v6.json")
+    File.write!(next_stand_path, JSON.canonical(advanced))
+
+    {output2, code2} =
+      CLI.run([
+        "advance",
+        "--stand",
+        next_stand_path,
+        "--proposal",
+        Path.join(System.tmp_dir!(), "komki-policy-advance-proposal.json")
+      ])
+
+    assert code2 == 1
+    parsed = assert_canonical(output2)
+    assert parsed["result"] == "refused"
+    assert parsed["code"] == "stand_version_conflict"
+  end
+
+  test "advance gegen verbrauchten Stand (nonce) -> Exit 1, refused (nonce_already_consumed)" do
+    {_, _} = run_release_decide("permit")
+
+    proposal = %{
+      "release_id" => "go-ausgabe-4711",
+      "nonce" => "go-nonce-4711-a",
+      "stand_ref" => "stand-4711@5",
+      "stand_version_after" => 6,
+      "call_hash" => "cafe"
+    }
+
+    {output, code} = run_advance("case_release_replay/stand.json", proposal)
+
+    assert code == 1
+    parsed = assert_canonical(output)
+    assert parsed["result"] == "refused"
+    assert parsed["code"] == "nonce_already_consumed"
+  end
+
+  test "advance ohne --proposal -> Exit 2, usage" do
+    {output, code} =
+      CLI.run(["advance", "--stand", fixture_path("case_release_permit/stand.json")])
+
+    assert code == 2
+    parsed = assert_canonical(output)
+    assert parsed["code"] == "usage"
+  end
+
+  test "usage-String erwähnt advance und die Freigabe-Flags" do
+    {output, code} = run_cli([])
+
+    assert code == 2
+    assert String.contains?(output, "advance --stand")
+    assert String.contains?(output, "--release <g.json> --stand <st.json>")
+  end
+
+  # ---------------------------------------------------------------------
   # plan / unbekannter Befehl
   # ---------------------------------------------------------------------
 

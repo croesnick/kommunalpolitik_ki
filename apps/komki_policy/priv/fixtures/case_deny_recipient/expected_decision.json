@@ -20,6 +20,25 @@
   },
   "proof": null,
   "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [
+            "lizenz-namensnennung@1"
+          ],
+          "required_recipients": [
+            "nutzende-person",
+            "webdienst-x"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
   "rule": "admit",
   "snapshot_ref": "snap-fall-4711-empfaenger",
   "workspace": "ws-fall-4711-web"

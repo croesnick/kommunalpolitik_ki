@@ -1,5 +1,6 @@
 defmodule KomkiPolicy.DeriveTest do
   use ExUnit.Case, async: true
+  use ExUnitProperties
 
   alias KomkiPolicy.{Calculus, Derive, JSON, Registry}
 
@@ -39,7 +40,17 @@ defmodule KomkiPolicy.DeriveTest do
         {:ok, snapshot} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
         {:ok, intent} = JSON.parse(File.read!(Path.join(dir, "intent.json")))
 
-        case Derive.decide(reg, snapshot, intent) do
+        result =
+          if File.exists?(Path.join(dir, "release.json")) do
+            {:ok, rel} = JSON.parse(File.read!(Path.join(dir, "release.json")))
+            {:ok, std} = JSON.parse(File.read!(Path.join(dir, "stand.json")))
+
+            Derive.decide_with_release(reg, snapshot, intent, rel, std)
+          else
+            Derive.decide(reg, snapshot, intent)
+          end
+
+        case result do
           {:ok, decision} ->
             oracle_path = Path.join(dir, "expected_decision.json")
             assert File.exists?(oracle_path), "#{name} liefert eine Decision ohne Decision-orakel"
@@ -148,6 +159,121 @@ defmodule KomkiPolicy.DeriveTest do
     defp canonical_result({:ok, decision}), do: JSON.canonical(decision)
     defp canonical_result({:unsupported, info}), do: JSON.canonical(info)
     defp canonical_result({:error, error}), do: JSON.canonical(error)
+  end
+
+  # ======================================================================
+  # emit (§ 4.5): Eingabepflichten, Zuordnung, Opazität
+  # ======================================================================
+
+  describe "emit-Eingabepflichten (§ 4.5)" do
+    test "Snapshot ohne output_content_digest -> Eingabefehler emit_digest_missing (Exit 2, keine Decision)" do
+      reg = registry()
+      snapshot = fixture("invalid/emit_digest_missing_snapshot.json")
+      intent = fixture("invalid/emit_digest_missing_intent.json")
+
+      assert {:error, %{code: :emit_digest_missing}} = Derive.decide(reg, snapshot, intent)
+    end
+
+    test "quarantine-Objekt bei emit -> Eingabefehler (kein object_quarantine auf emit)" do
+      reg = registry()
+
+      snapshot =
+        put_in(
+          fixture("case_emit_permit/snapshot.json"),
+          ["object", "classification"],
+          "quarantine"
+        )
+
+      intent = fixture("case_emit_permit/intent.json")
+
+      assert {:error, %{code: :emit_object_not_classified}} = Derive.decide(reg, snapshot, intent)
+    end
+  end
+
+  describe "emit-Zuordnung λ(y) := B_W (R.5.5)" do
+    test "Permit trägt assigned_label = B_W und content_digest-Echo (§ 2.4, § 4.5)" do
+      reg = registry()
+
+      {:ok, decision} =
+        Derive.decide(
+          reg,
+          fixture("case_emit_permit/snapshot.json"),
+          fixture("case_emit_permit/intent.json")
+        )
+
+      assert decision["decision"] == "permit"
+      assert decision["assigned_label"] == ["buergerfall-4711@1"]
+
+      digest =
+        fixture("case_emit_permit/snapshot.json")["facts"]["output_content_digest"]["value"]
+
+      assert decision["content_digest"] == digest
+    end
+
+    test "opaque case: zwei Snapshots, identisch bis auf den Digest — beide permit, Entscheidungen identisch modulo content_digest" do
+      reg = registry()
+      dir = Path.join(@fixtures_dir, "case_emit_opaque")
+
+      {:ok, snapshot_a} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
+      {:ok, snapshot_b} = JSON.parse(File.read!(Path.join(dir, "snapshot_alt.json")))
+      {:ok, intent} = JSON.parse(File.read!(Path.join(dir, "intent.json")))
+
+      {:ok, d_a} = Derive.decide(reg, snapshot_a, intent)
+      {:ok, d_b} = Derive.decide(reg, snapshot_b, intent)
+
+      assert d_a["decision"] == "permit"
+      assert d_b["decision"] == "permit"
+      assert d_a["content_digest"] != d_b["content_digest"]
+
+      # Entscheidungen identisch modulo content_digest und snapshot_ref
+      # (die Snapshot-Id ist im Snapshot-Datensatz, unvermeidlich verschieden)
+      strip = fn d ->
+        d
+        |> Map.delete("content_digest")
+        |> Map.delete("snapshot_ref")
+        |> Map.delete("proof")
+      end
+
+      assert Map.get(strip.(d_a), "assigned_label") == ["buergerfall-4711@1"]
+      assert JSON.canonical(strip.(d_a)) == JSON.canonical(strip.(d_b))
+    end
+
+    property "keine Eingabe kann assigned_label beeinflussen: Digest-Variation ändert die Zuordnung nicht" do
+      check all(
+              digest <- StreamData.string(~c"0123456789abcdef", min_length: 64, max_length: 64),
+              initial_seed: 20_261_014,
+              max_runs: 50
+            ) do
+        reg = registry()
+
+        snapshot =
+          put_in(
+            fixture("case_emit_permit/snapshot.json"),
+            ["facts", "output_content_digest"],
+            %{"value" => digest, "source" => "test", "source_kind" => "test"}
+          )
+
+        intent = fixture("case_emit_permit/intent.json")
+        {:ok, decision} = Derive.decide(reg, snapshot, intent)
+
+        assert decision["assigned_label"] == ["buergerfall-4711@1"]
+      end
+    end
+  end
+
+  describe "required_premises Regel-Dispatch (§ 5 Schritt 3 Basis)" do
+    test "admit: neun feste Prämissen in Ordnung; emit: sieben (+ label_assignment, ohne not_quarantine/label_inclusion)" do
+      admit = Derive.required_premises("admit")
+      emit = Derive.required_premises("emit")
+
+      assert Enum.count(admit) == 9
+      assert Enum.count(emit) == 7
+      assert "label_assignment" in emit
+      refute "label_assignment" in admit
+      refute "not_quarantine" in emit
+      refute "has_object_access_right" in emit
+      refute "label_inclusion" in emit
+    end
   end
 
   # ======================================================================

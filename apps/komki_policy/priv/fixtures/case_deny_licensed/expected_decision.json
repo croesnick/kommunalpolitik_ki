@@ -20,6 +20,31 @@
   },
   "proof": null,
   "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": "buergerfall-4711@1",
+      "code": "binding_condition_false",
+      "condition": "input_in_approved_case_scope",
+      "transitions": [
+        {
+          "facts": [
+            "input_in_approved_case_scope"
+          ],
+          "type": "fakt_nachreichen"
+        },
+        {
+          "required_bindings": [
+            "lizenz-namensnennung@1"
+          ],
+          "required_recipients": [
+            "lokale-fallverarbeitung",
+            "nutzende-person"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
   "rule": "admit",
   "snapshot_ref": "snap-fall-4711-lizenz",
   "workspace": "ws-fall-4711-lizenz"

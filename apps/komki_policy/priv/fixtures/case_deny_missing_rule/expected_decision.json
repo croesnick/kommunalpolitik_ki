@@ -19,6 +19,23 @@
   },
   "proof": null,
   "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": "nur-start-test@1",
+      "code": "missing_operation_rule",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "lokale-fallverarbeitung",
+            "nutzende-person"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
   "rule": "admit",
   "snapshot_ref": "snap-start-test-ohne-admit",
   "workspace": "ws-start-test"

@@ -3,10 +3,12 @@ defmodule KomkiPolicy.Registry do
   Registry-Compiler und -Validierer (CONTRACT.md § 2.1, § 3).
 
   Nimmt einen geparsten Registry-Term und validiert ihn als geschlossenes,
-  versioniertes Schema `komki-registry/1`: geschlossene Feldmengen,
-  Kennungsformate, Beobachterräume und die typgeprüfte Kompilierung aller
-  Operations-Ausdrücke (B.4-Sprachumfang). Compile-Fehler sind Eingabefehler
-  — die Sprachlücke wird nicht durch Annahmen verborgen.
+  versioniertes Schema `komki-registry/2`: geschlossene Feldmengen,
+  Kennungsformate, Beobachterräume, die typgeprüfte Kompilierung aller
+  Operations-Ausdrücke (B.4-Sprachumfang) und optional registrierte
+  Transformationen (§ 2.1: gepinnte Label-Transition `input_labels →
+  output_labels`). Compile-Fehler sind Eingabefehler — die Sprachlücke
+  wird nicht durch Annahmen verborgen.
   """
 
   @registry_fields [
@@ -15,10 +17,12 @@ defmodule KomkiPolicy.Registry do
     "observers",
     "fact_fields",
     "environments",
-    "bindings"
+    "bindings",
+    "transformations"
   ]
   @binding_fields ["readers", "operations", "relaxation_authorities"]
   @environment_fields ["observers"]
+  @transformation_fields ["input_labels", "output_labels"]
   @fact_types ["string", "boolean", "integer", "string_set"]
   @known_operations ["start", "admit", "emit", "transfer", "store"]
 
@@ -30,7 +34,13 @@ defmodule KomkiPolicy.Registry do
           required(:observers) => [String.t()],
           required(:fact_fields) => %{String.t() => String.t()},
           required(:environments) => %{String.t() => %{observers: [String.t()]}},
-          required(:bindings) => %{String.t() => %{readers: [String.t()], operations: %{}}}
+          required(:bindings) => %{String.t() => %{readers: [String.t()], operations: %{}}},
+          required(:transformations) => %{
+            String.t() => %{
+              input_labels: [String.t()],
+              output_labels: [String.t()]
+            }
+          }
         }
 
   @type error() :: %{
@@ -70,14 +80,17 @@ defmodule KomkiPolicy.Registry do
          {:ok, observers} <- validate_observers(term),
          {:ok, fact_fields} <- validate_fact_fields(term),
          {:ok, environments} <- validate_environments(term, observers),
-         {:ok, bindings} <- validate_bindings(term, fact_fields, observers) do
+         {:ok, bindings} <- validate_bindings(term, fact_fields, observers),
+         {:ok, transformations} <-
+           validate_transformations(term, Map.keys(bindings)) do
       {:ok,
        %{
          registry_id: term["registry_id"],
          observers: Enum.sort(observers),
          fact_fields: fact_fields,
          environments: environments,
-         bindings: bindings
+         bindings: bindings,
+         transformations: transformations
        }}
     end
   end
@@ -86,10 +99,10 @@ defmodule KomkiPolicy.Registry do
 
   defp fail(code, path, detail), do: {:error, {code, path, detail}}
 
-  defp require_schema(%{"schema" => "komki-registry/1"}), do: :ok
+  defp require_schema(%{"schema" => "komki-registry/2"}), do: :ok
 
   defp require_schema(%{"schema" => other}),
-    do: fail(:invalid_schema, "$.schema", "expected \"komki-registry/1\", got " <> inspect(other))
+    do: fail(:invalid_schema, "$.schema", "expected \"komki-registry/2\", got " <> inspect(other))
 
   defp require_schema(_term), do: fail(:invalid_schema, "$.schema", "missing field \"schema\"")
 
@@ -306,8 +319,103 @@ defmodule KomkiPolicy.Registry do
       observers: parts.observers,
       fact_fields: parts.fact_fields,
       environments: parts.environments,
-      bindings: parts.bindings
+      bindings: parts.bindings,
+      transformations: parts.transformations
     }
+  end
+
+  # ---------------------------------------------------------------------
+  # Registrierte Transformationen (§ 2.1, optional)
+  # ---------------------------------------------------------------------
+
+  defp validate_transformations(term, binding_ids) do
+    case Map.get(term, "transformations") do
+      nil ->
+        {:ok, %{}}
+
+      %{} = transformations ->
+        collect_transformations(
+          transformations,
+          Map.to_list(transformations),
+          binding_ids,
+          "$.transformations"
+        )
+
+      _other ->
+        fail(:invalid_transformations, "$.transformations", "expected an object")
+    end
+  end
+
+  defp collect_transformations(_map, [], _binding_ids, _path), do: {:ok, %{}}
+
+  defp collect_transformations(_map, entries, binding_ids, path) do
+    Enum.reduce_while(entries, {:ok, %{}}, fn {id, spec}, {:ok, acc} ->
+      result = transformation_part(id, spec, binding_ids, path)
+
+      case result do
+        {:ok, value} -> {:cont, {:ok, Map.put(acc, id, value)}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp transformation_part(id, spec, binding_ids, path) do
+    with :ok <- require_reference_id(id, path) do
+      do_transformation_part(spec, binding_ids, path <> "." <> id)
+    end
+  end
+
+  defp do_transformation_part(spec, binding_ids, path) do
+    with {:ok, _} <- require_map(spec, path),
+         :ok <- closed_fields(spec, @transformation_fields, path),
+         :ok <-
+           require_sorted_unique_bindings(
+             spec["input_labels"],
+             binding_ids,
+             path <> ".input_labels",
+             :input_labels
+           ),
+         :ok <-
+           require_sorted_unique_bindings(
+             spec["output_labels"],
+             binding_ids,
+             path <> ".output_labels",
+             :output_labels
+           ) do
+      {:ok,
+       %{
+         input_labels: Enum.sort(spec["input_labels"]),
+         output_labels: Enum.sort(spec["output_labels"])
+       }}
+    end
+  end
+
+  # input_labels: nichtleer, sortiert, eindeutig, ⊆ bindings (§ 2.1).
+  defp require_sorted_unique_bindings(list, binding_ids, path, :input_labels)
+       when is_list(list) do
+    with :ok <- require_nonempty(list, path),
+         :ok <- require_sorted_unique(list, path) do
+      unknown_binding(list, binding_ids, path)
+    end
+  end
+
+  # output_labels: sortiert, eindeutig, ⊆ bindings; darf leer sein (§ 2.1).
+  defp require_sorted_unique_bindings(list, binding_ids, path, :output_labels)
+       when is_list(list) do
+    with :ok <- require_sorted_unique(list, path) do
+      unknown_binding(list, binding_ids, path)
+    end
+  end
+
+  defp require_sorted_unique_bindings(_other, _binding_ids, path, _side) do
+    fail(:invalid_transformations, path, "expected an array of binding references")
+  end
+
+  defp unknown_binding(list, binding_ids, path) do
+    case Enum.reject(list, &(&1 in binding_ids)) do
+      [] -> :ok
+      [first | _] -> fail(:unknown_binding_reference, path, "unknown binding: " <> first)
+    end
   end
 
   # ---------------------------------------------------------------------
@@ -336,6 +444,12 @@ defmodule KomkiPolicy.Registry do
 
   defp require_nonempty([], path), do: fail(:empty_list, path, "must not be empty")
   defp require_nonempty(_list, _path), do: :ok
+
+  defp require_sorted_unique(list, path) do
+    if length(list) == length(Enum.uniq(list)) and list == Enum.sort(list),
+      do: :ok,
+      else: fail(:unsorted_references, path, "expected a sorted, duplicate-free reference list")
+  end
 
   defp all_strings?(list, path) do
     if Enum.all?(list, &is_binary/1) do

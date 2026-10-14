@@ -7,13 +7,19 @@ defmodule KomkiPolicy.Verify do
   NIEMALS auf und glaubt kein `permit` — die Prueflabel-, Praemissen-,
   Fakt-, Mengen- und Bedingungspraemissen werden neu berechnet:
 
-  * Sollmenge: `KomkiPolicy.Derive.required_premises/0` (§ 4.3) plus je
-    `binding_condition` fuer jedes Element von `workspace.bindings`.
+  * Sollmenge ist regelabhängig (§ 5 Schritt 3): für `admit` die neun
+    festen Prämissen (§ 4.3, `KomkiPolicy.Derive.required_premises/0`),
+    für `emit` die sieben festen Prämissen plus `label_assignment`-
+    Slot (§ 4.5); jeweils plus je `binding_condition` für jedes Element
+    von `workspace.bindings` — im `emit`-Fall werden die `emit`-Ausdrücke
+    geprüft.
   * Mengen: `KomkiPolicy.Calculus` (R_G / rho_G / l-Subset, § 4.3 Punkt 8).
   * Neu-Auswertung der Bedingungen: `KomkiPolicy.Evaluator.evaluate/2`.
   * Expression und `fact_refs` muessen exakt und strukturell dem
     Registry-AST entsprechen (`KomkiPolicy.Registry.expression_fact_refs/1`);
-    dem Baum wird nicht getraut.
+    dem Baum wird nicht getraut. Hat die Bindung keinen Eintrag für die
+    Regel, feuert `expression_mismatch`, bevor Neuauswertung oder
+    `fact_refs`-Vergleich greifen (kein Crash, § 5 Schritt 8).
 
   Pruefschritte laufen in fester Ordnung § 5; Befund-Reihenfolge ist die
   Pruefordnung. Struktur-Befunde aus Schritt 1–3 beenden die Pruefung
@@ -59,9 +65,14 @@ defmodule KomkiPolicy.Verify do
     "audit_path_ready" => "fact",
     "environment_observers_complete" => "fact",
     "label_inclusion" => "computed",
+    "label_assignment" => "computed",
     "recipient_inclusion" => "computed",
     "binding_condition" => "condition"
   }
+
+  # label_assignment (nur emit): computed mit den Shape-Keys
+  # assigned_label/checked_label (§ 2.5).
+  @label_assignment_shape_keys ["assigned_label", "checked_label", "kind", "name", "value"]
 
   # Kind-generische Schluesselformen für (Name, Art)-Paare außerhalb der
   # Tabelle (schließen Extra-Keys aus,MIN-1).
@@ -87,6 +98,7 @@ defmodule KomkiPolicy.Verify do
       "value"
     ],
     {"label_inclusion", "computed"} => ["checked_label", "kind", "name", "object_labels", "value"],
+    {"label_assignment", "computed"} => @label_assignment_shape_keys,
     {"recipient_inclusion", "computed"} => [
       "actual_recipients",
       "allowed_recipients",
@@ -412,7 +424,7 @@ defmodule KomkiPolicy.Verify do
       mismatch_if(proof["snapshot_ref"] != ctx.snapshot_id, "snapshot_mismatch"),
       mismatch_if(proof["registry_ref"] != registry.registry_id, "registry_mismatch"),
       mismatch_if(proof["intent_ref"] != auth.intent_id, "intent_mismatch"),
-      mismatch_if(proof["rule"] != "admit", "unsupported_rule")
+      mismatch_if(proof["rule"] not in ["admit", "emit"], "unsupported_rule")
     ]
 
     Enum.reject(findings, &is_nil/1)
@@ -433,13 +445,18 @@ defmodule KomkiPolicy.Verify do
 
   defp invalid_outcome(reasons), do: %{"result" => "invalid", "reasons" => reasons}
 
-  # Schritt 3: Required-Set — Name↔Art-Tabelle (§ 2.5): eine Prämisse erfüllt
-  # ihren Namens-Slot nur mit der zugeordneten Art; jede Tarnung (richtiger
-  # Name, falsche Art) ist eine unbekannte, strukturelle Prämisse und stoppt
-  # die Prüfung sofort. Bindungen für binding_condition-Slots kommen nur aus
-  # tatsächlich `kind: "condition"`-Prämissen.
+  # Schritt 3: Required-Set — regelabhängig aus dem Regeltyp rekonstruiert
+  # (§ 5 Schritt 3): admit (§ 4.3) bzw. emit (§ 4.5) plus je
+  # binding_condition-Slot für jede Raumbindung. Name↔Art-Tabelle (§ 2.5):
+  # eine Prämisse erfüllt ihren Namens-Slot nur mit der zugeordneten Art;
+  # jede Tarnung (richtiger Name, falsche Art) ist eine unbekannte,
+  # strukturelle Prämisse und stoppt die Prüfung sofort. Bindungen für
+  # binding_condition-Slots kommen nur aus tatsächlich
+  # `kind: "condition"`-Prämissen.
   defp required_set_reasons(ctx, proof) do
-    fixed = Derive.required_premises() -- ["binding_condition"]
+    rule = proof["rule"]
+    fixed = Derive.required_premises(rule) -- ["binding_condition"]
+    allowed_names = MapSet.new(Derive.required_premises(rule))
     bindings = ctx.workspace["bindings"]
     premises = proof["premises"]
     present_names = Enum.uniq(Enum.map(premises, &Map.fetch!(&1, "name")))
@@ -462,7 +479,13 @@ defmodule KomkiPolicy.Verify do
           b not in condition_bindings,
           do: reason("missing_required_premise", b, nil)
 
-    slippery = Enum.reject(premises, &fits_slot?/1)
+    # Unknown-Prämissen: alles, was weder einen festen Slot der Regel mit
+    # zugeordneter Art füllt noch ein binding_condition-Slot ist — auch
+    # fest-meist gestohlene Admit-Prämissen auf einem emit-Baum (§ 5 Schritt 3)
+    # und binding_condition-Prämissen für Bindungen außerhalb
+    # workspace.bindings (die Sollmenge wird je Element von
+    # workspace.bindings rekonstruiert; Extra-Slots sind unbekannte Prämissen).
+    slippery = Enum.reject(premises, &fits_slot_in_rule?(&1, allowed_names, bindings))
     unknown = Enum.map(slippery, &unexpected_reason/1)
 
     missing_fixed ++ missing_conditions ++ unknown
@@ -472,8 +495,28 @@ defmodule KomkiPolicy.Verify do
     Map.get(@premise_kinds_by_name, name)
   end
 
-  defp fits_slot?(premise) do
-    Map.fetch!(premise, "kind") == expected_kind(Map.fetch!(premise, "name"))
+  defp fits_slot_in_rule?(premise, allowed_names, bindings) do
+    if fits_slot?(premise, allowed_names) do
+      case Map.fetch!(premise, "name") do
+        # binding_condition-Slot nur für Bindungen der rekonstruierten
+        # Sollmenge (workspace.bindings, § 5 Schritt 3).
+        "binding_condition" -> Map.fetch!(premise, "binding") in bindings
+        _ -> true
+      end
+    else
+      false
+    end
+  end
+
+  defp fits_slot?(premise, allowed_names) do
+    name = Map.fetch!(premise, "name")
+    kind = Map.fetch!(premise, "kind")
+
+    cond do
+      name in allowed_names and kind == expected_kind(name) -> true
+      name == "binding_condition" and kind == "condition" -> true
+      true -> false
+    end
   end
 
   defp unexpected_reason(premise) do
@@ -486,13 +529,14 @@ defmodule KomkiPolicy.Verify do
     end
   end
 
-  # Steps 4–8: alles sammeln.
+  # Steps 4–8: alles sammeln (regelabhängig admit/emit).
   defp predicate_reasons(ctx, registry, proof) do
     premise_findings =
       List.flatten([
         fact_premise_reasons(ctx, proof),
         quarantine_reasons(ctx, proof),
         label_inclusion_reasons(ctx, proof),
+        label_assignment_reasons(ctx, proof),
         recipient_inclusion_reasons(ctx, registry, proof),
         condition_reasons(ctx, registry, proof)
       ])
@@ -561,6 +605,43 @@ defmodule KomkiPolicy.Verify do
     |> Enum.reject(&is_nil/1)
   end
 
+  defp label_assignment_reasons(ctx, proof) do
+    # § 5 Schritt 6 (nur emit): label_assignment wird neu berechnet —
+    # assigned_label muss mengengleich workspace.bindings (= checked_label)
+    # sein; behauptete Werte müssen übereinstimmen.
+    bindings = ctx.workspace["bindings"]
+
+    reasons =
+      if proof["rule"] != "emit" do
+        []
+      else
+        Enum.map(premises_for(proof, "label_assignment"), &reason_for_assign(&1, bindings))
+      end
+
+    Enum.reject(reasons, &is_nil/1)
+  end
+
+  defp premises_for(proof, name) do
+    Enum.filter(proof["premises"], fn p -> p["kind"] == "computed" and p["name"] == name end)
+  end
+
+  defp reason_for_assign(premise, bindings) do
+    if label_assignment_ok?(premise, bindings),
+      do: nil,
+      else: reason("label_assignment_false", nil, nil)
+  end
+
+  # § 5 Schritt 6 (nur emit): assigned_label muss mengengleich
+  # workspace.bindings (= checked_label) sein; behauptete Werte müssen
+  # übereinstimmen.
+  defp label_assignment_ok?(premise, bindings) do
+    claimed = Map.get(premise, "assigned_label")
+    claimed_checked = Map.get(premise, "checked_label")
+
+    is_list(claimed) and Enum.sort(Enum.uniq(claimed)) == bindings and
+      claimed_checked == bindings and premise["value"] == true
+  end
+
   defp recipient_inclusion_reasons(ctx, registry, proof) do
     for %{"kind" => "computed", "name" => "recipient_inclusion"} = premise <- proof["premises"] do
       rho = Calculus.actual_recipients(registry, ctx.workspace["environment"])
@@ -578,9 +659,11 @@ defmodule KomkiPolicy.Verify do
   end
 
   defp condition_reasons(ctx, registry, proof) do
+    rule = proof["rule"]
+
     for %{"kind" => "condition"} = premise <- proof["premises"] do
       binding = Map.fetch!(premise, "binding")
-      registry_expr = registry_admit_expression(registry, binding)
+      registry_expr = registry_rule_expression(registry, binding, rule)
 
       ([expression_check(premise, registry_expr, binding)] ++
          [fact_refs_check(premise, registry_expr, binding)] ++
@@ -592,9 +675,9 @@ defmodule KomkiPolicy.Verify do
     |> List.flatten()
   end
 
-  defp registry_admit_expression(registry, binding) do
+  defp registry_rule_expression(registry, binding, rule) do
     entry = Map.get(registry.bindings, binding)
-    entry && Map.get(entry.operations, "admit")
+    entry && Map.get(entry.operations, rule)
   end
 
   defp expression_check(premise, registry_expr, binding) do

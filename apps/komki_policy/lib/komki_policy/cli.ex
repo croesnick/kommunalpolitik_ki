@@ -7,7 +7,9 @@ defmodule KomkiPolicy.CLI do
   ```
   komki-policy validate --registry <registry.json>
   komki-policy decide   --registry <r.json> --snapshot <s.json> --intent <i.json>
+                        [--release <g.json> --stand <st.json>]        (Freigabe-Zweig § 4.6)
   komki-policy verify   --registry <r.json> --snapshot <s.json> --intent <i.json> --proof <p.json>
+  komki-policy advance  --stand <st.json> --proposal <p.json>         (atomarer Übergang § 2.7)
   komki-policy plan
   ```
 
@@ -15,10 +17,10 @@ defmodule KomkiPolicy.CLI do
 
   | Code | Bedeutung |
   |---|---|
-  | `0` | Erfolg; auch `deny`/`indeterminate` (decide) und `valid` (verify) sind legitime Ergebnisse |
-  | `1` | `verify` hat den vorgelegten Beweis verworfen (`invalid`) |
+  | `0` | Erfolg; auch `deny`/`indeterminate` (decide), `valid` (verify) und der erfolgreiche `advance` sind legitime Ergebnisse |
+  | `1` | `verify` hat den vorgelegten Beweis verworfen (`invalid`) **oder** `advance` hat den Standübergang abgelehnt (`refused`) |
   | `2` | Eingabefehler: Parse-/Schemaverstoß, Kohärenz, fehlende oder unerwartete Argumente, fehlende Datei, **unbekannter Befehl** — mit strukturiertem Fehlerdatensatz auf stdout |
-  | `3` | `unsupported`: nicht implementierter Regelzweig (und explizit `plan`) — niemals ein `deny` |
+  | `3` | `unsupported`: nicht implementierter Regelzweig (und explizit `plan`, Freigabe-`kind: offenlegungsfreigabe`, Nicht-`emit`-Operation) — niemals ein `deny` |
   | `4` | unerwarteter interner Fehler (Crash-Handler) — erzeugt niemals eine Decision und fällt nie auf `permit` zurück (§ 1) |
 
   Deterministische Wahl für Grenzfälle:
@@ -42,13 +44,15 @@ defmodule KomkiPolicy.CLI do
   Bibliothek bleibt pur.
   """
 
-  alias KomkiPolicy.{Derive, JSON, Registry, Verify}
+  alias KomkiPolicy.{Derive, JSON, Registry, Stand, Verify}
 
-  @flags ["registry", "snapshot", "intent", "proof"]
+  @flags ["registry", "snapshot", "intent", "proof", "release", "stand", "proposal"]
 
   @usage "usage: komki-policy validate --registry <r.json>; " <>
-           "komki-policy decide --registry <r.json> --snapshot <s.json> --intent <i.json>; " <>
+           "komki-policy decide --registry <r.json> --snapshot <s.json> --intent <i.json> " <>
+           "[--release <g.json> --stand <st.json>]; " <>
            "komki-policy verify --registry <r.json> --snapshot <s.json> --intent <i.json> --proof <p.json>; " <>
+           "komki-policy advance --stand <st.json> --proposal <p.json>; " <>
            "komki-policy plan (unsupported, Exit 3)"
 
   @type outcome :: {String.t(), non_neg_integer()}
@@ -107,6 +111,7 @@ defmodule KomkiPolicy.CLI do
   defp dispatch(["validate" | rest]), do: cmd_validate(rest)
   defp dispatch(["decide" | rest]), do: cmd_decide(rest)
   defp dispatch(["verify" | rest]), do: cmd_verify(rest)
+  defp dispatch(["advance" | rest]), do: cmd_advance(rest)
 
   # `plan`: nicht gelieferter Regelzweig, keine Bedienpanne -> Exit 3 (!!).
   # Zusätzliche Argumente nach `plan` werden deterministisch ignoriert.
@@ -145,7 +150,52 @@ defmodule KomkiPolicy.CLI do
          {:ok, registry} <- load_registry(Map.fetch!(opts, "registry")),
          {:ok, snapshot} <- load_json(Map.fetch!(opts, "snapshot")),
          {:ok, intent} <- load_json(Map.fetch!(opts, "intent")) do
-      output_decision(Derive.decide(registry, snapshot, intent))
+      run_decide(registry, snapshot, intent, opts)
+    else
+      {:error, detail} -> input_error(detail)
+    end
+  end
+
+  # `--release` und `--stand` sind nur gemeinsam gültig (einzeln: usage,
+  # Exit 2); mit beiden läuft der Freigabe-Zweig § 4.6.
+  defp run_decide(registry, snapshot, intent, opts) do
+    release = Map.fetch(opts, "release")
+    stand = Map.fetch(opts, "stand")
+
+    case {release, stand} do
+      {{:ok, release_path}, {:ok, stand_path}} ->
+        with {:ok, release} <- load_json(release_path),
+             {:ok, stand} <- load_json(stand_path) do
+          output_decision(Derive.decide_with_release(registry, snapshot, intent, release, stand))
+        else
+          {:error, detail} -> input_error(detail)
+        end
+
+      {:error, :error} ->
+        output_decision(Derive.decide(registry, snapshot, intent))
+
+      _ ->
+        input_error(usage_error("--release and --stand are only valid together; " <> @usage))
+    end
+  end
+
+  # Atomarer Standübergang (§ 2.7): Erfolg druckt den neuen Stand kanonisch
+  # (Exit 0); `refused` ist ein legitimes Ergebnis mit Exit 1.
+  @spec cmd_advance([binary()]) :: outcome()
+  defp cmd_advance(argv) do
+    with {:ok, opts} <- parse_opts(argv, ["stand", "proposal"]),
+         {:ok, stand} <- load_json(Map.fetch!(opts, "stand")),
+         {:ok, proposal} <- load_json(Map.fetch!(opts, "proposal")) do
+      case Stand.advance(stand, proposal) do
+        {:ok, new_stand} ->
+          emit(Stand.to_record(new_stand), 0)
+
+        {:refused, %{code: code}} ->
+          emit(%{"result" => "refused", "code" => Atom.to_string(code)}, 1)
+
+        {:error, detail} ->
+          input_error(detail)
+      end
     else
       {:error, detail} -> input_error(detail)
     end

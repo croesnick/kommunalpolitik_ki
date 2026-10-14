@@ -471,6 +471,131 @@ defmodule KomkiPolicy.PropertyTest do
     end
   end
 
+  # =====================================================================
+  # Remedy-Katalog und emit-Eigenschaften (Lieferung 2, CONTRACT § 2.8/§ 4.5)
+  # =====================================================================
+
+  describe "Remedy-Katalog-Eigenschaften (§ 2.8)" do
+    alias KomkiPolicy.Remedies
+
+    @gen_findings [
+      "object_quarantine",
+      "workspace_invalid",
+      "basis_right_false",
+      "audit_path_not_ready",
+      "label_not_included",
+      "recipient_not_allowed",
+      "missing_operation_rule",
+      "binding_condition_false"
+    ]
+
+    @evidence_findings ["missing_fact", "recipients_unproven"]
+
+    @order ["fakt_nachreichen", "registrierte_transformation", "neuer_raum", "aktionsfreigabe"]
+
+    test "FIXTURE-Korpus: remedies sind nicht leer auf jedem deny/indeterminate und null auf permit" do
+      reg = registry()
+      fixtures_dir = Path.expand("../../priv/fixtures", __DIR__)
+      dirs = fixtures_dir |> Path.join("case_*") |> Path.wildcard() |> Enum.sort()
+
+      Enum.each(dirs, fn dir ->
+        {:ok, snapshot} =
+          KomkiPolicy.JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
+
+        {:ok, intent} = KomkiPolicy.JSON.parse(File.read!(Path.join(dir, "intent.json")))
+
+        outcome =
+          if File.exists?(Path.join(dir, "release.json")) do
+            {:ok, rel} = KomkiPolicy.JSON.parse(File.read!(Path.join(dir, "release.json")))
+            {:ok, std} = KomkiPolicy.JSON.parse(File.read!(Path.join(dir, "stand.json")))
+
+            KomkiPolicy.Derive.decide_with_release(reg, snapshot, intent, rel, std)
+          else
+            KomkiPolicy.Derive.decide(reg, snapshot, intent)
+          end
+
+        case outcome do
+          {:ok, %{"decision" => "permit", "remedies" => remedies}} ->
+            assert is_nil(remedies), dir
+
+          {:ok, %{"remedies" => remedies}} ->
+            refute remedies in [nil, []], dir
+
+          # case_unsupported: unsupported ist keine Decision und trägt
+          # keinen Katalog (§ 2.4)
+          {:unsupported, _info} ->
+            assert true
+        end
+      end)
+    end
+
+    property "Ordnung: in jedem remedies-Eintrag gehen nicht-verletzende Typen VOR aktionsfreigabe" do
+      check all(
+              code <- StreamData.member_of(@gen_findings),
+              kind <- StreamData.member_of([:admit, :emit]),
+              initial_seed: @seed,
+              max_runs: 100
+            ) do
+        reg = registry()
+        ctx = merits_ctx(kind)
+        [remedy] = Remedies.catalog(reg, ctx, kind, [finding_of(code)])
+        types = Enum.map(remedy["transitions"], &Map.fetch!(&1, "type"))
+
+        case {code, types} do
+          # Erstklassifikation: das Objekt-Level-GO ist die Fortsetzung
+          # (keine nicht-verletzende Alternative, § 2.8-Anwendbarkeitstabelle)
+          {"object_quarantine", ["aktionsfreigabe"]} ->
+            assert true
+
+          {"object_quarantine", _} ->
+            flunk("quarantine trägt genau das Objekt-GO")
+
+          _ ->
+            # monoton nach Katalog-Ordnung
+            indices = Enum.map(types, fn t -> Enum.find_index(@order, &(&1 == t)) end)
+            assert indices == Enum.sort(indices)
+
+            case types do
+              ["aktionsfreigabe" | _] -> flunk("GO nie zuerst (§ 2.8): #{code}")
+              _ -> assert true
+            end
+        end
+      end
+    end
+
+    property "Indeterminate-Spur enthält nie aktionsfreigabe" do
+      check all(
+              code <- StreamData.member_of(@evidence_findings),
+              fact <-
+                StreamData.member_of(["environment_observers_complete", "has_operation_right"]),
+              kind <- StreamData.member_of([:admit, :emit]),
+              initial_seed: @seed,
+              max_runs: 100
+            ) do
+        reg = registry()
+        ctx = merits_ctx(kind)
+
+        [remedy] =
+          Remedies.catalog(reg, ctx, kind, [%{"code" => code, "fact" => fact, "binding" => nil}])
+
+        refute Enum.any?(remedy["transitions"], &(&1["type"] == "aktionsfreigabe"))
+      end
+    end
+
+    defp finding_of(code), do: %{"code" => code, "binding" => nil, "condition" => nil}
+
+    defp merits_ctx(kind) do
+      %{
+        rule: kind,
+        object_labels: ["lizenz-namensnennung@1"],
+        checked: ["buergerfall-4711@1", "lizenz-namensnennung@1"],
+        rho: ["nutzende-person", "lokale-fallverarbeitung"],
+        object_ref: "obj-p@v1",
+        call_hash: "korr-berechnet"
+      }
+    end
+  end
+
   defp corrupted_mutation_context do
     %{
       registry: registry(),

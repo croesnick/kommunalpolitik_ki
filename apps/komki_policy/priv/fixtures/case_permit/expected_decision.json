@@ -12,6 +12,7 @@
     "version": "v1"
   },
   "registry_ref": "reg-fall-4711-test",
+  "remedies": null,
   "rule": "admit",
   "snapshot_ref": "snap-fall-4711-permit",
   "workspace": "ws-fall-4711"

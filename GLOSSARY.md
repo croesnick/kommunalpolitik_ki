@@ -693,6 +693,59 @@ bei einer weiteren Entscheidung gemeinsam zu berücksichtigen sind.
 
 ---
 
+### Aktionsfreigabe und Offenlegungsfreigabe
+
+**Definition:** Eine Aktionsfreigabe erlaubt eine bestimmte verbindliche
+Wirkung (R.6.1) — eine Transaktion, nicht nur einen Text; sie wird an
+den exakten call hash gebunden, mit Frische-Fenster und einmalig
+verbrauchter Nonce (R.6.3). Eine Offenlegungsfreigabe erlaubt zusätzlich das
+Lockern von Bindungen (Herabstufungsbefugnis); sie ist in
+`komki_policy` bewusst nicht implementiert (`unsupported`).
+
+**Siehe:** RFC 0003 R.6.1–R.6.3; [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.6, § 4.6.
+
+---
+
+### call hash
+
+**Definition:** SHA-256 (Hex, kleingeschrieben) über die kanonische
+JSON-Darstellung des Objekts `{content_digest, object, operation,
+workspace}` inklusive des finalen Newlines — die verbindliche Bindung
+eines GO an den exakten Call (R.6.2: autorisiert wird ein Ereignis).
+
+**Siehe:** [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.6 (verbindliche Formel), § 6 (kanonische Darstellung).
+
+---
+
+### Erstklassifikation
+
+**Definition:** Das gesondert autorisierte Einordnungsverfahren nach
+R.2.5: nur ein reguläres Verfahren darf ein Quarantäne-Objekt einordnen;
+die Erstklassifikation darf nicht durch vorherige Übermittlung an eine
+nicht zugelassene externe KI erfolgen. In `komki_policy` als
+`aktionsfreigabe` scope `object` im Remedy-Katalog abgebildet:
+genau ein Objekt-Level-GO, danach laufende Aufnahmen ohne weiteres GO.
+
+**Siehe:** RFC 0003 R.2.5; [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.8.
+
+---
+
+### Remedy-Plan
+
+**Definition:** (engl. remedy plan, APPA Theorem 5) Der begrenzte Katalog
+legaler Fortsetzungen aus **genau vier Übergangstypen** — `fakt_nachreichen`,
+`aktionsfreigabe`, `registrierte_transformation`, `neuer_raum` — den die
+Engine zu jeder `deny`-/`indeterminate`-Entscheidung mitliefert. Der Katalog ist **beratend,
+erzeugt keine Autorität**: keine Eingabe akzeptiert ihn, keine Fortsetzung
+wird ausgeführt. Normative Ordnung: fakt < transformation < neuer Raum <
+aktionsfreigabe — ein GO steht nie an erster Stelle. Im Code als
+Remedy-Katalog (`KomkiPolicy.Remedies`, CONTRACT § 2.8).
+
+**Siehe:** [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.8; RFC 0003 R.6;
+`docs/research/2026-10-13-agent-policy-models-openappa-pace.md` (Move 1).
+
+---
+
 ### Audit-Journal
 
 **Definition:** Eine geschützte Historie von Entscheidungen, verbindlich

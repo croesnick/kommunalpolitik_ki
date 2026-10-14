@@ -1,22 +1,32 @@
 defmodule KomkiPolicy.Derive do
   @moduledoc """
-  Regelkern `derive` Lieferung 1 — Regelzweig `admit` (CONTRACT.md § 1, § 2, § 4).
+  Regelkern `derive` — Regelzweige `admit` (§ 4) und `emit` (§ 4.5),
+  Freigabe-Zweig `decide_with_release/5` (§ 4.6), Remedy-Katalog via
+  `KomkiPolicy.Remedies` (§ 2.8) (CONTRACT.md Lieferung 2).
 
   `decide/3` validiert Snapshot und Intent als geschlossene Schemas,
-  prüft die Referenzkohärenz und leitet dann in fester Prämissenordnung
-  (§ 4.3). Nicht implementierte Regelzweige ergeben `{:unsupported, info}`
-  — niemals ein `deny` (die fehlende Prüfung ist keine verbietende Prüfung).
-  Struktur- und Validierungsfehler sind Eingabefehler, keine Decisions.
+  prüft die Referenzkohärenz und leitet in fester Prämissenordnung.
+  Nicht implementierte Regelzweige ergeben `{:unsupported, info}` —
+  niemals ein `deny` (die fehlende Prüfung ist keine verbietende
+  Prüfung). Struktur- und Validierungsfehler sind Eingabefehler, keine
+  Decisions.
 
-  Bekannt-falsch schlägt Unknown (deny); andernfalls führt Unknown zu
-  `indeterminate`; nur bei vollständig bewiesenen Prämissen entsteht ein
-  kanonischer Beweisbaum (§ 2.5).
+  `emit` ordnet λ(y) := B_W zu (Vermittler-Zuordnung, R.5.5): keine
+  Eingabe kann `assigned_label` beeinflussen — der Intent trägt keine
+  Labels und der Kern liest `object.labels` für `emit` nicht. Fehlt der
+  technische Fakt `output_content_digest`, ist der Call nicht
+  identifizierbar: Eingabefehler `emit_digest_missing` (Exit 2).
+
+  Urteil und Vollzug getrennt (B.8): der Kern verbraucht keine
+  Freigabe — `decide_with_release/5` plant den Verbrauch als
+  deklaratives `release`-Objekt, der atomare Übergang liegt in
+  `KomkiPolicy.Stand.advance/2`.
   """
 
   alias KomkiPolicy.Calculus
-  alias KomkiPolicy.{Context, Evaluator, Registry}
+  alias KomkiPolicy.{Context, Evaluator, Registry, Release, Remedies, Stand}
 
-  @required_premises [
+  @admit_premises [
     "not_quarantine",
     "workspace_contract_valid",
     "has_operation_right",
@@ -28,12 +38,27 @@ defmodule KomkiPolicy.Derive do
     "binding_condition"
   ]
 
-  @unsupported_operations ["start", "emit", "transfer", "store"]
+  @emit_premises [
+    "workspace_contract_valid",
+    "has_operation_right",
+    "audit_path_ready",
+    "environment_observers_complete",
+    "recipient_inclusion",
+    "label_assignment",
+    "binding_condition"
+  ]
+
+  @unsupported_operations ["start", "transfer", "store"]
   @unsupported_detail "rule branch not implemented in delivery 1"
 
   @doc "§ 4.3-Prämissennamen in fester Reihenfolge (gemeinsame Sollmenge für derive-Baum und verify)."
   @spec required_premises() :: [String.t()]
-  def required_premises, do: @required_premises
+  def required_premises, do: @admit_premises
+
+  @doc "Regelabhängige Sollmengen (§ 4.3 für `admit`, § 4.5 für `emit`)."
+  @spec required_premises(String.t()) :: [String.t()]
+  def required_premises("admit"), do: @admit_premises
+  def required_premises("emit"), do: @emit_premises
 
   @type decision() :: %{required(String.t()) => term()}
   @type error() :: %{
@@ -47,7 +72,7 @@ defmodule KomkiPolicy.Derive do
   # =========================================================================
 
   @doc """
-  Leitet für den Regelzweig `admit` oder meldet `unsupported` (Lücke)
+  Leitet für den Regelzweig `admit` oder `emit` und meldet `unsupported`
   bzw. einen strukturierten Eingabefehler.
   """
   @spec decide(Registry.compiled(), term(), term()) ::
@@ -55,7 +80,38 @@ defmodule KomkiPolicy.Derive do
           | {:unsupported, %{required(String.t()) => String.t()}}
           | {:error, error()}
   def decide(registry, snapshot, intent) do
-    case decide_validated?(registry, snapshot, intent) do
+    decide_dispatched?(registry, snapshot, intent, &run_normal/2)
+  end
+
+  @doc """
+  Ausgabeshape für nicht unterstützte Regelzweige (L2: alle außer
+  `admit`, `emit` und dem Freigabe-Zweig).
+  """
+  def unsupported_info(operation) do
+    %{"result" => "unsupported", "rule" => operation, "detail" => @unsupported_detail}
+  end
+
+  @doc """
+  Aktionsfreigabe-Zweig (§ 4.6, B.5 Schritt 6): eigener Regelzweig mit
+  vorgelegter Aktionsfreigabe und Offenlegungsstand — nie ein stiller
+  Fallback der normalen Entscheidung. Nur `kind: aktionsfreigabe` mit
+  Operation `emit` ist entscheidbar; `offenlegungsfreigabe` und andere
+  Operationen ergeben `unsupported` (Exit 3).
+  """
+  @spec decide_with_release(Registry.compiled(), term(), term(), term(), term()) ::
+          {:ok, decision()}
+          | {:unsupported, %{required(String.t()) => String.t()}}
+          | {:error, error()}
+  def decide_with_release(registry, snapshot, intent, release_term, stand_term) do
+    with_release_validated?(registry, snapshot, intent, release_term, stand_term)
+  end
+
+  # =========================================================================
+  # Gemeinsame Validierung front-matter
+  # =========================================================================
+
+  defp decide_dispatched?(registry, snapshot, intent, continuation) do
+    case decide_validated?(registry, snapshot, intent, continuation) do
       {:ok, result} -> {:ok, result}
       {:unsupported, info} -> {:unsupported, info}
       {:error, %{} = error} -> {:error, error}
@@ -63,25 +119,36 @@ defmodule KomkiPolicy.Derive do
     end
   end
 
-  @doc "Ausgabeshape für nicht unterstützte Regelzweige (L1: alle außer `admit`)."
-  def unsupported_info(operation) do
-    %{"result" => "unsupported", "rule" => operation, "detail" => @unsupported_detail}
+  defp with_release_validated?(registry, snapshot, intent, release_term, stand_term) do
+    case release_validated?(registry, snapshot, intent, release_term, stand_term) do
+      {:ok, result} -> {:ok, result}
+      {:unsupported, info} -> {:unsupported, info}
+      {:error, %{} = error} -> {:error, error}
+      {:error, reason} -> wrap_reason(reason)
+    end
   end
 
   defp wrap_reason({code, path, detail}), do: {:error, %{code: code, path: path, detail: detail}}
 
   defp fail(code, path, detail), do: {:error, {code, path, detail}}
 
-  defp decide_validated?(registry, snapshot, intent) do
+  defp decide_validated?(registry, snapshot, intent, continuation) do
     with {:ok, auth} <- Context.validate_intent(intent),
          :ok <- ensure_supported(auth.operation),
          {:ok, ctx} <- Context.validate_snapshot(snapshot, registry),
          :ok <- Context.ensure_coherence(ctx, auth) do
-      run_admit(ctx, registry, auth)
+      continuation.(ctx, {registry, auth})
     end
   end
 
-  defp ensure_supported("admit"), do: :ok
+  defp run_normal(ctx, {registry, auth}) do
+    case auth.operation do
+      "admit" -> run_admit(ctx, registry, auth)
+      "emit" -> run_emit(ctx, registry, auth)
+    end
+  end
+
+  defp ensure_supported(operation) when operation in ["admit", "emit"], do: :ok
 
   defp ensure_supported(operation) when operation in @unsupported_operations do
     {:unsupported, unsupported_info(operation)}
@@ -91,19 +158,199 @@ defmodule KomkiPolicy.Derive do
     do: fail(:invalid_operation, "$.operation", "unknown operation: " <> Kernel.inspect(other))
 
   # =========================================================================
+  # Freigabe-Zweig (§ 4.6)
+  # =========================================================================
+
+  defp release_validated?(registry, snapshot, intent, release_term, stand_term) do
+    with {:ok, auth} <- Context.validate_intent(intent),
+         {:ok, ctx} <- Context.validate_snapshot(snapshot, registry),
+         :ok <- Context.ensure_coherence(ctx, auth),
+         {:ok, release} <- Release.validate(release_term),
+         {:ok, stand} <- Stand.validate(stand_term),
+         :ok <- require_supportable(auth, release) do
+      # § 4.6-Reihenfolge: erst die Freigabe-Entscheidung (kind/operation),
+      # dann die emit-Digest-Pflicht — ein nicht-unterstützter Zweig ist
+      # unsupported (Exit 3), auch wenn der Snapshot bereits den Digest
+      # vermissen lassen würde.
+      case require_emit_input(ctx) do
+        :ok -> run_release_branch(ctx, registry, auth, release, stand)
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  # § 4.6: nur `aktionsfreigabe` ist entscheidbar; `offenlegungsfreigabe`
+  # und Nicht-`emit`-Operationen ergeben `unsupported` (Exit 3) — kein deny.
+  defp require_supportable(auth, release) do
+    cond do
+      auth.operation != "emit" ->
+        {:unsupported, unsupported_info(auth.operation)}
+
+      release.kind != "aktionsfreigabe" ->
+        {:unsupported, unsupported_info(release.kind)}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp run_release_branch(ctx, registry, auth, release, stand) do
+    call_hash = emit_call_hash(ctx)
+
+    state =
+      ctx
+      |> shared_premises(registry)
+      |> premise_workspace_valid()
+      |> release_check_call_hash(release, call_hash)
+      |> release_check_window(release, stand)
+      |> release_check_nonce(release, stand)
+      |> release_check_scope(release, stand)
+      |> release_check_authority(registry, release)
+
+    conclude_release(state, ctx, registry, auth, release, stand, call_hash)
+  end
+
+  # Release-Prüfungen in fester Ordnung (§ 4.6 Schritt 3); jede Verletzung
+  # ein Blocker (binding: null, condition: null, § 2.4).
+  defp release_check_call_hash(state, release, correct) do
+    if release.call_hash == correct do
+      state
+    else
+      add_blocker(state, binder("release_call_mismatch", nil, nil))
+    end
+  end
+
+  defp release_check_window(state, release, stand) do
+    cond do
+      stand.as_of < release.valid_from ->
+        add_blocker(state, binder("release_not_yet_valid", nil, nil))
+
+      stand.as_of > release.valid_until ->
+        add_blocker(state, binder("release_expired", nil, nil))
+
+      true ->
+        state
+    end
+  end
+
+  defp release_check_nonce(state, release, stand) do
+    if Map.has_key?(stand.consumed, release.nonce) do
+      add_blocker(state, binder("release_nonce_consumed", nil, nil))
+    else
+      state
+    end
+  end
+
+  defp release_check_scope(state, release, stand) do
+    if release.scope == stand.scope do
+      state
+    else
+      add_blocker(state, binder("release_scope_mismatch", nil, nil))
+    end
+  end
+
+  defp release_check_authority(state, registry, release) do
+    if release.authority in registry.observers do
+      state
+    else
+      add_blocker(state, binder("release_authority_unknown", nil, nil))
+    end
+  end
+
+  defp conclude_release(state, ctx, registry, auth, release, stand, call_hash) do
+    if state.blockers == [] do
+      {:ok,
+       release_decision(ctx, auth, state.checked, %{
+         "decision" => "permit",
+         "blockers" => nil,
+         "missing_evidence" => nil,
+         "proof" => nil,
+         "remedies" => nil,
+         "assigned_label" => state.checked,
+         "content_digest" => digest_value(ctx),
+         "release" => %{
+           "release_id" => release.release_id,
+           "nonce" => release.nonce,
+           "stand_ref" => stand.stand_id <> "@" <> Integer.to_string(stand.version),
+           "stand_version_after" => stand.version + 1,
+           "call_hash" => call_hash
+         }
+       })}
+    else
+      remedy_ctx = release_remedies_context(state, registry, call_hash)
+      findings = Remedies.catalog(registry, remedy_ctx, :release, state.blockers)
+
+      {:ok,
+       release_decision(ctx, auth, state.checked, %{
+         "decision" => "deny",
+         "blockers" => state.blockers,
+         "missing_evidence" => nil,
+         "proof" => nil,
+         "remedies" => findings,
+         "assigned_label" => nil,
+         "content_digest" => digest_value(ctx),
+         "release" => nil
+       })}
+    end
+  end
+
+  defp release_decision(ctx, auth, checked, fields) do
+    Map.merge(base_decision(ctx, auth, checked), fields)
+  end
+
+  defp release_remedies_context(ctx, _registry, call_hash) do
+    %{
+      rule: :release,
+      object_labels: [],
+      checked: ctx.workspace["bindings"],
+      rho: ctx.rho,
+      object_ref: ctx.object["object_id"] <> "@" <> ctx.object["version"],
+      call_hash: call_hash
+    }
+  end
+
+  # =========================================================================
+  # emit-Eingabepflichten (§ 4.5): Digest-Pflicht, Klassifikationszustand
+  # =========================================================================
+
+  defp require_emit_input(ctx) do
+    with :ok <- require_emit_digest(ctx) do
+      require_emit_classification(ctx)
+    end
+  end
+
+  defp require_emit_digest(ctx) do
+    if Map.has_key?(ctx.facts, "output_content_digest") do
+      :ok
+    else
+      fail(
+        :emit_digest_missing,
+        "$.facts.output_content_digest",
+        "emit requires the technical fact output_content_digest (§ 4.5)"
+      )
+    end
+  end
+
+  defp require_emit_classification(ctx) do
+    if ctx.object["classification"] == "classified" do
+      :ok
+    else
+      fail(
+        :emit_object_not_classified,
+        "$.object.classification",
+        "emit requires classification \"classified\"; quarantine is an input state, not an output state"
+      )
+    end
+  end
+
+  # =========================================================================
   # admit-Kern (§ 4): Prämissen in fester Ordnung
   # =========================================================================
 
   defp run_admit(ctx, registry, auth) do
-    workspace = ctx.workspace
-    facts = ctx.facts
-    rho = actual_recipients(workspace, registry)
-    allowed = allowed_recipients(registry, workspace)
-
     state =
       ctx
-      |> Map.merge(%{checked: workspace["bindings"], rho: rho, allowed: allowed})
-      |> Map.merge(%{blockers: [], evidence: []})
+      |> shared_premises(registry)
       |> premise_quarantine()
       |> premise_workspace_valid()
       |> premise_basis_fact("has_operation_right")
@@ -112,9 +359,41 @@ defmodule KomkiPolicy.Derive do
       |> premise_env_flag()
       |> premise_label_inclusion()
       |> premise_recipient_inclusion()
-      |> premise_binding_conditions(registry)
+      |> premise_binding_conditions(registry, "admit")
 
-    conclude(state, ctx, registry, auth, facts)
+    conclude(state, ctx, registry, auth, "admit")
+  end
+
+  # =========================================================================
+  # emit-Kern (§ 4.5): Prämissen in fester Ordnung
+  # =========================================================================
+
+  defp run_emit(ctx, registry, auth) do
+    with :ok <- require_emit_input(ctx) do
+      state =
+        ctx
+        |> shared_premises(registry)
+        |> premise_workspace_valid()
+        |> premise_basis_fact("has_operation_right")
+        |> premise_basis_fact("audit_path_ready")
+        |> premise_env_flag()
+        |> premise_recipient_inclusion()
+        |> premise_binding_conditions(registry, "emit")
+
+      conclude(state, ctx, registry, auth, "emit")
+    end
+  end
+
+  defp shared_premises(ctx, registry) do
+    workspace = ctx.workspace
+
+    Map.merge(ctx, %{
+      checked: workspace["bindings"],
+      rho: Calculus.actual_recipients(registry, workspace["environment"]),
+      allowed: Calculus.allowed_recipients(registry, workspace["bindings"]),
+      blockers: [],
+      evidence: []
+    })
   end
 
   defp binder(code, binding, condition),
@@ -164,7 +443,8 @@ defmodule KomkiPolicy.Derive do
     end
   end
 
-  # P6: false/fehlt ist KEIN verbietender Befund, sondern fehlende Evidenz (§ 4.3).
+  # P4 (admit P6): false/fehlt ist KEIN verbietender Befund, sondern
+  # fehlende Evidenz (§ 4.3, § 4.5 — Empfänger-Beweisbarkeit).
   defp premise_env_flag(ctx) do
     if fact_state(ctx.facts, "environment_observers_complete") == true do
       ctx
@@ -194,10 +474,10 @@ defmodule KomkiPolicy.Derive do
     end
   end
 
-  defp premise_binding_conditions(ctx, registry) do
+  defp premise_binding_conditions(ctx, registry, rule_name) do
     Enum.reduce(ctx.checked, ctx, fn binding_id, acc ->
       binding = Map.get(registry.bindings, binding_id)
-      expr = binding && Map.get(binding.operations, "admit")
+      expr = binding && Map.get(binding.operations, rule_name)
 
       case expr do
         nil -> add_blocker(acc, binder("missing_operation_rule", binding_id, nil))
@@ -253,39 +533,118 @@ defmodule KomkiPolicy.Derive do
   end
 
   # =========================================================================
-  # Empfängermengen (§ 4.3 Punkt 8) — Kalkül lebt in KomkiPolicy.Calculus,
-  # damit verify (§ 5) dieselben Funktionen unabhaengig neu benutzt.
+  # Remedy-Kontext (§ 2.8): reine Funktion der Entscheidungslage
   # =========================================================================
 
-  defp actual_recipients(workspace, registry) do
-    Calculus.actual_recipients(registry, workspace["environment"])
+  defp remedies_context(ctx, rule_kind) do
+    object_labels = if rule_kind == "admit", do: ctx.object["labels"], else: []
+
+    %{
+      rule: admit_or_emit(rule_kind),
+      object_labels: object_labels,
+      checked: ctx.checked,
+      rho: ctx.rho,
+      object_ref: ctx.object["object_id"] <> "@" <> ctx.object["version"],
+      call_hash: if(rule_kind == "emit", do: emit_call_hash(ctx), else: nil)
+    }
   end
 
-  defp allowed_recipients(registry, workspace) do
-    Calculus.allowed_recipients(registry, workspace["bindings"])
+  defp admit_or_emit("admit"), do: :admit
+  defp admit_or_emit("emit"), do: :emit
+
+  defp emit_call_hash(ctx) do
+    Release.call_hash(
+      digest_value(ctx),
+      ctx.object["object_id"] <> "@" <> ctx.object["version"],
+      "emit",
+      ctx.workspace["workspace_id"]
+    )
+  end
+
+  defp digest_value(ctx) do
+    case Map.get(ctx.facts, "output_content_digest") do
+      %{"value" => value} -> value
+      _ -> nil
+    end
   end
 
   # =========================================================================
   # Entscheidung (§ 4.4): bekannt-falsch > unknown > permit
   # =========================================================================
 
-  defp conclude(state, ctx, registry, auth, facts) do
+  defp conclude(state, ctx, registry, auth, rule_kind) do
     cond do
       state.blockers != [] ->
-        {:ok, decision(ctx, auth, state.checked, "blockers", state.blockers)}
+        payload =
+          Remedies.catalog(
+            registry,
+            remedies_context(state, rule_kind),
+            string_to_kind(rule_kind),
+            state.blockers
+          )
+
+        decision =
+          Map.merge(base_decision(ctx, auth, state.checked), %{
+            "decision" => "deny",
+            "blockers" => state.blockers,
+            "missing_evidence" => nil,
+            "proof" => nil,
+            "remedies" => payload
+          })
+
+        {:ok, Map.merge(decision, emit_rule_fields(rule_kind, state, :deny))}
 
       state.evidence != [] ->
-        {:ok, decision(ctx, auth, state.checked, "missing_evidence", state.evidence)}
+        payload =
+          Remedies.catalog(
+            registry,
+            remedies_context(state, rule_kind),
+            string_to_kind(rule_kind),
+            state.evidence
+          )
+
+        decision =
+          Map.merge(base_decision(ctx, auth, state.checked), %{
+            "decision" => "indeterminate",
+            "blockers" => nil,
+            "missing_evidence" => state.evidence,
+            "proof" => nil,
+            "remedies" => payload
+          })
+
+        {:ok, Map.merge(decision, emit_rule_fields(rule_kind, state, :not_permit))}
 
       true ->
-        proof = build_proof(state, registry, auth, facts)
-        {:ok, decision(ctx, auth, state.checked, "proof", proof)}
+        proof = build_proof(state, registry, auth, rule_kind)
+
+        decision =
+          Map.merge(base_decision(ctx, auth, state.checked), %{
+            "decision" => "permit",
+            "blockers" => nil,
+            "missing_evidence" => nil,
+            "proof" => proof,
+            "remedies" => nil
+          })
+
+        {:ok, Map.merge(decision, emit_rule_fields(rule_kind, state, :permit))}
     end
   end
 
-  defp decision(ctx, auth, checked, value_key, value) do
+  defp string_to_kind("admit"), do: :admit
+  defp string_to_kind("emit"), do: :emit
+
+  defp emit_rule_fields("emit", state, :permit) do
+    %{"assigned_label" => state.checked, "content_digest" => digest_value(state)}
+  end
+
+  defp emit_rule_fields("emit", state, _not_permit) do
+    %{"assigned_label" => nil, "content_digest" => digest_value(state)}
+  end
+
+  defp emit_rule_fields("admit", _state, _value), do: %{}
+
+  defp base_decision(ctx, auth, checked) do
     %{
-      "decision" => decision_value(value_key),
       "rule" => auth.operation,
       "registry_ref" => ctx.registry_id,
       "snapshot_ref" => ctx.snapshot_id,
@@ -293,52 +652,50 @@ defmodule KomkiPolicy.Derive do
       "identity" => ctx.identity,
       "workspace" => ctx.workspace["workspace_id"],
       "object" => %{"object_id" => ctx.object["object_id"], "version" => ctx.object["version"]},
-      "checked_label" => checked,
-      "blockers" => value_of(value_key, value, "blockers"),
-      "missing_evidence" => value_of(value_key, value, "missing_evidence"),
-      "proof" => value_of(value_key, value, "proof")
+      "checked_label" => checked
     }
   end
 
-  defp decision_value("blockers"), do: "deny"
-  defp decision_value("missing_evidence"), do: "indeterminate"
-  defp decision_value("proof"), do: "permit"
-
-  defp value_of(key, value, wanted) do
-    if key == wanted, do: value, else: nil
-  end
-
   # =========================================================================
-  # Beweisbaum (§ 2.5, § 4.3 feste Prämissenordnung)
+  # Beweisbaum (§ 2.5): § 4.3 (admit) bzw. § 4.5 (emit) feste Prämissenordnung
   # =========================================================================
 
-  defp build_proof(state, registry, auth, facts) do
+  defp build_proof(state, registry, auth, rule_kind) do
+    premises =
+      if rule_kind == "admit" do
+        [
+          quarantine_premise(state),
+          workspace_premise(),
+          basis_fact_premise(state.facts, "has_operation_right"),
+          basis_fact_premise(state.facts, "has_object_access_right"),
+          basis_fact_premise(state.facts, "audit_path_ready"),
+          basis_fact_premise(state.facts, "environment_observers_complete"),
+          label_inclusion_premise(state),
+          recipient_premise(state),
+          binding_condition_premises(state, registry, "admit")
+        ]
+      else
+        [
+          workspace_premise(),
+          basis_fact_premise(state.facts, "has_operation_right"),
+          basis_fact_premise(state.facts, "audit_path_ready"),
+          basis_fact_premise(state.facts, "environment_observers_complete"),
+          recipient_premise(state),
+          binding_condition_premises(state, registry, "emit"),
+          label_assignment_premise(state)
+        ]
+      end
+
     %{
       "schema" => "komki-proof/1",
-      "rule" => "admit",
+      "rule" => rule_kind,
       "conclusion" => "permit",
       "registry_ref" => state.registry_id,
       "snapshot_ref" => state.snapshot_id,
       "intent_ref" => auth.intent_id,
       "checked_label" => state.checked,
-      "premises" => premises(state, registry, facts)
+      "premises" => List.flatten(premises)
     }
-  end
-
-  defp premises(state, registry, facts) do
-    premise_list = [
-      quarantine_premise(state),
-      workspace_premise(facts),
-      basis_fact_premise(facts, "has_operation_right"),
-      basis_fact_premise(facts, "has_object_access_right"),
-      basis_fact_premise(facts, "audit_path_ready"),
-      basis_fact_premise(facts, "environment_observers_complete"),
-      label_inclusion_premise(state),
-      recipient_premise(state),
-      binding_condition_premises(state, registry, facts)
-    ]
-
-    List.flatten(premise_list)
   end
 
   defp quarantine_premise(ctx) do
@@ -351,7 +708,7 @@ defmodule KomkiPolicy.Derive do
     }
   end
 
-  defp workspace_premise(_facts) do
+  defp workspace_premise do
     %{
       "name" => "workspace_contract_valid",
       "kind" => "fact",
@@ -384,6 +741,16 @@ defmodule KomkiPolicy.Derive do
     }
   end
 
+  defp label_assignment_premise(ctx) do
+    %{
+      "name" => "label_assignment",
+      "kind" => "computed",
+      "value" => true,
+      "assigned_label" => ctx.checked,
+      "checked_label" => ctx.checked
+    }
+  end
+
   defp recipient_premise(ctx) do
     %{
       "name" => "recipient_inclusion",
@@ -394,10 +761,10 @@ defmodule KomkiPolicy.Derive do
     }
   end
 
-  defp binding_condition_premises(ctx, registry, _facts) do
+  defp binding_condition_premises(ctx, registry, rule_name) do
     Enum.map(ctx.checked, fn binding_id ->
       binding = Map.fetch!(registry.bindings, binding_id)
-      expr = Map.fetch!(binding.operations, "admit")
+      expr = Map.fetch!(binding.operations, rule_name)
 
       %{
         "name" => "binding_condition",
@@ -405,12 +772,8 @@ defmodule KomkiPolicy.Derive do
         "binding" => binding_id,
         "expression" => expr,
         "value" => true,
-        "fact_refs" => fact_refs_from_registry(registry, binding_id, expr)
+        "fact_refs" => Registry.expression_fact_refs(expr)
       }
     end)
-  end
-
-  defp fact_refs_from_registry(_registry, _binding_id, expr) do
-    Registry.expression_fact_refs(expr)
   end
 end

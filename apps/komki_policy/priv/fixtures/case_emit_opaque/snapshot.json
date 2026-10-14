@@ -1,0 +1,52 @@
+{
+  "facts": {
+    "audit_path_ready": {
+      "source": "journal-verwaltung",
+      "source_kind": "technical",
+      "value": true
+    },
+    "environment_observers_complete": {
+      "source": "umgebungs-verwaltung",
+      "source_kind": "assumption",
+      "value": true
+    },
+    "has_operation_right": {
+      "source": "rechte-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    "input_in_approved_case_scope": {
+      "source": "fall-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    "output_content_digest": {
+      "source": "ausgabe-diagnose",
+      "source_kind": "technical",
+      "value": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2"
+    },
+    "purpose": {
+      "source": "auftrags-verwaltung",
+      "source_kind": "administered",
+      "value": "antwort-fall-4711"
+    }
+  },
+  "identity": "nutzende-person",
+  "object": {
+    "classification": "classified",
+    "labels": [],
+    "object_id": "obj-ausgabe-a",
+    "version": "v1"
+  },
+  "registry_ref": "reg-fall-4711-test",
+  "schema": "komki-snapshot/1",
+  "snapshot_id": "snap-emit-4711-opaque-a",
+  "workspace": {
+    "bindings": [
+      "buergerfall-4711@1"
+    ],
+    "environment": "lokale-fallverarbeitung@1",
+    "valid": true,
+    "workspace_id": "ws-fall-4711"
+  }
+}
