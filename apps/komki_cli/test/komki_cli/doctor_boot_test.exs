@@ -45,6 +45,10 @@ defmodule KomkiCli.DoctorBootTest do
       assert out_doctor =~ "doctor: ok"
       assert out_doctor =~ "boot /usr/bin/true"
       assert out_doctor =~ "boot /bin/sh"
+      assert out_doctor =~ "llama profile"
+      # bestehende pi-Probes + der neue llama-server-Boot-Probe unter seinem Profil
+      assert out_doctor =~ "boot "
+      assert out_doctor =~ "llama-server"
       refute out_doctor =~ "FAIL"
     end
 
