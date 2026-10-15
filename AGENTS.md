@@ -34,6 +34,10 @@ gh project item-edit 1 --owner croesnick --url <issue-url> --field Status --valu
 
 Tickets und Specs leben als GitHub Issues in `croesnick/kommunalpolitik_ki` (`gh` CLI). Siehe `docs/agents/issue-tracker.md`.
 
+### Lane-Protokoll
+
+Wie eine Session ein Wayfinder-Ticket bearbeitet, verifiziert und abschließt (Abnahmekriterien im Ticket statt im Dispatch-Prompt): [docs/agents/lane-protocol.md](docs/agents/lane-protocol.md).
+
 ### Triage labels
 
 Fünf kanonische Triage-Rollen als Labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Siehe `docs/agents/triage-labels.md`.
