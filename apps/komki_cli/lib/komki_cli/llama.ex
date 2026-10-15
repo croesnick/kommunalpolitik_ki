@@ -13,12 +13,14 @@ defmodule KomkiCli.Llama do
   (Quellenbindung: nur das lokale, SHA-verifizierte Artefakt).
 
   Confinement (Tickets #100/#111): llama-server laeuft unter der eigenen
-  deny-default-Grenze `profile/llama-server.sb` (loopback-bind/inbound,
-  kein outbound). GPU/Metal-Kette freigegeben (Ticket #111): iokit-Grants
+  deny-default-Grenze `profile/llama-server.sb` — bind auf localhost:PORT
+  gepinnt, Inbound nur lokal (die Enge traegt die bind-Regel), kein
+  outbound. GPU/Metal-Kette freigegeben (Ticket #111): iokit-Grants
   (AGX/IOSurface), MTLCompilerService-Shader-Kompilierung, System-Haeuser;
   Messung 14.10.2026 ~53 t/s Eval unter der Grenze ≈ ungesandboxete Baseline.
-  Evidenz: Experimentserie 14.10.2026 (llama-server 0.6.0, build 11429,
-  macOS 27.2 Build 26B5101f).
+  Belege: Experimentserie 14.10.2026 (llama-server 0.6.0, build 11429,
+  macOS 27.2 Build 26B5101f), konsolidiert in
+  `docs/research/2026-10-14-llama-server-confinement.md`.
   """
 
   alias KomkiCli.{Config, Profile}

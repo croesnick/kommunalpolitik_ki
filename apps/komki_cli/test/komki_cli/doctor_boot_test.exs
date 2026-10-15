@@ -41,14 +41,19 @@ defmodule KomkiCli.DoctorBootTest do
     end
 
     test "doctor: alle Checks gruen inklusive Boot-Gate" do
+      # cfg aus der Instanz der setup_all-Phase: der llama-Boot-Probe-Check
+      # heisst "boot " <> llama-server-Pfad (steps.ex: boot_l) — genau
+      # gepinnt statt Substring ("llama-server" matcht auch den Tools-Check,
+      # "boot " ist durch die pi-Probes subsumiert).
+      cfg = Config.load!(Config.config_path(Config.default_base()))
+
       {out_doctor, 0} = CLI.run(["doctor"])
       assert out_doctor =~ "doctor: ok"
       assert out_doctor =~ "boot /usr/bin/true"
       assert out_doctor =~ "boot /bin/sh"
       assert out_doctor =~ "llama profile"
       # bestehende pi-Probes + der neue llama-server-Boot-Probe unter seinem Profil
-      assert out_doctor =~ "boot "
-      assert out_doctor =~ "llama-server"
+      assert out_doctor =~ "boot " <> cfg.llama_server_bin
       refute out_doctor =~ "FAIL"
     end
 
