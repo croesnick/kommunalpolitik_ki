@@ -80,12 +80,12 @@ defmodule KomkiCli.Profile do
 
   Verifiziert 14.10.2026 auf macOS 27.2 (Build 26B5101f), llama-server 0.6.0
   (build 11429): Modell-Load, Health, Inferenz und TERM-Exit unter der Grenze
-  (Experimente exp4–exp16, Ticket #100). Bewusste benannte Grenzen: kein
-  GPU/Metal (iokit-open-user-client AGXDeviceUserClient/IOSurfaceRootUserClient,
-  windowserver, tccd bleiben verweigert — CPU-only-Inferenz, die ungesandboxet
-  ohnehin genutzte Metal-Device MTL0 faellt weg); kein network-outbound
-  (llama laeuft --offline); Memory-Fitter bricht mit Warnung ab und laesst
-  die Parameter wie angefordert.
+  (Experimente exp4–exp16, Ticket #100). Bewusste benannte Grenzen:
+  GPU/Metal-Kette freigegeben (Ticket #111, exp18 14.10.2026: ~53 t/s Eval
+  unter der Grenze ≈ ungesandboxete Baseline ~57, gegen ~5 CPU-only) — die
+  GPU-Treiber-Angriffsflaeche ist die bewusst eingegangene Grenze; kein
+  network-outbound (llama laeuft --offline); Memory-Fitter bricht mit Warnung
+  ab und laesst die Parameter wie angefordert.
   """
   @spec generate_llama(Config.t()) :: String.t()
   def generate_llama(%Config{} = cfg) when Config.tools_ready(cfg) do
@@ -103,8 +103,8 @@ defmodule KomkiCli.Profile do
 
   ## Komposition (festgelegte Reihenfolge, deterministisch):
   ## Header -> Startup-Schicht -> exec/Read Binaer -> dylib-Baum -> /dev ->
-  ## Modell -> Log -> Netz -> Sysctl-Pins -> /etc -> Mach/shm -> Pfad-Sonden ->
-  ## CFPreferences -> Metadaten-Vorfahrnkette -> Schlussgrenzen.
+  ## Modell -> Log -> Netz -> Sysctl-Pins -> /etc -> Mach/shm -> Metal ->
+  ## Pfad-Sonden -> CFPreferences -> Metadaten-Vorfahrnkette -> Schlussgrenzen.
   defp llama_rules_for(%Config{} = cfg) do
     user_home = System.user_home!()
     dylib_dirs = llama_dylib_dirs(cfg.llama_server_bin)
@@ -122,6 +122,7 @@ defmodule KomkiCli.Profile do
         llama_sysctl_rules() ++
         llama_etc_passwd_rules() ++
         llama_mach_shm_rules() ++
+        llama_metal_rules() ++
         llama_probe_rules() ++
         llama_prefs_rules(user_home) ++
         meta_ancestors(llama_meta_paths(cfg, log_path, dylib_dirs, user_home)) ++
@@ -260,6 +261,46 @@ defmodule KomkiCli.Profile do
       ]
   end
 
+  # GPU/Metal-Kette (Ticket #111: Aufhebung der CPU-only-Grenze aus #100).
+  # Evidenz: exp18-Runden 1-3, 14.10.2026 (Unified-Log-Denials je Runde):
+  # Runde 1 scheiterte an der Command Queue (iokit), Runde 2 am ausgelagerten
+  # Shader-Compiler (MTLCompilerService), Runde 3 lief gruen. Messung Runde 3:
+  # ~53 t/s Eval unter der Grenze gegen ~57 ungesandboxet (exp13) und ~5
+  # CPU-only (exp15) — GPU-Tempo unter nachweisbarer Grenze.
+  defp llama_metal_rules do
+    [
+      "; System-Haeuser: Metal-Framework-Bring-up liest explizit (der CPU-only-Betrieb",
+      "; lief ohne sie — Shared-Cache-Mapping genuegte; Fund exp18-Runde 2: Cryptex-dyld).",
+      "; Der AGX-Stat des Treiber-Bundles (Kernel-Denial exp18: AGXMetalG13X.bundle)",
+      "; ist von System/Library subsumiert — keine eigenen Bundle-Regeln noetig",
+      "; (Review-Fund: die Entdeckung fand alle 17 GPU-Klassen-Bundles, jede",
+      "; einzelne bereits abgedeckt; Schein-Portabilitaet, kein Zuwinn).",
+      "(allow file-read* (subpath \"/usr/lib\"))",
+      "(allow file-read* (subpath \"/System/Library\"))",
+      "(allow file-read* (subpath \"/System/Volumes/Preboot\"))"
+    ] ++
+      [
+        "; GPU-Treiber-Userclients (Kernel-Denials exp14/exp18)",
+        "(allow iokit-open-user-client (iokit-user-client-class \"AGXDeviceUserClient\"))",
+        "(allow iokit-open-user-client (iokit-user-client-class \"IOSurfaceRootUserClient\"))",
+        "; Bring-up-Dienste (Kernel-Denials exp14/exp18)",
+        "(allow mach-lookup (global-name \"com.apple.windowserver.active\"))",
+        "(allow mach-lookup (global-name \"com.apple.tccd.system\"))",
+        "(allow mach-lookup (global-name \"com.apple.CoreServices.coreservicesd\"))",
+        "(allow mach-lookup (global-name \"com.apple.DiskArbitration.diskarbitrationd\"))",
+        "; Shader-Kompilierung laeuft ausgelagert im Systemdienst (Kernel-Denial",
+        "; exp18-Runde 2: 'mach-lookup com.apple.MTLCompilerService (xpc)' — ohne ihn",
+        "; stirbt die Kompilierung und die Metal-Context-Init scheitert)",
+        "(allow mach-lookup (global-name \"com.apple.MTLCompilerService\"))",
+        "; Metal-Cache-Extensions (Kernel-Denial exp18: file-issue-extension)",
+        "(allow file-issue-extension (extension-class \"com.apple.app-sandbox.read\"))",
+        "; OS-Varianten-/Speicher-Sonden des Metal-Bring-up (Kernel-Denials exp18)",
+        "(allow sysctl-read (sysctl-name \"hw.ephemeral_storage\"))",
+        "(allow sysctl-read (sysctl-name \"kern.osvariant_status\"))",
+        "(allow sysctl-read (sysctl-name \"kern.osproductversion\"))"
+      ]
+  end
+
   @llama_probe_paths [
     "/",
     "/System/Volumes/Data",
@@ -303,13 +344,17 @@ defmodule KomkiCli.Profile do
     ] ++ dylib_dirs ++ [user_home]
   end
 
+  # Formulierung: der Substring "network-outbound" darf im Profiltext nicht
+  # erscheinen (Profil-Test refute auf das Literal) — "Netz-Auswaerts" ist
+  # dieselbe Aussage.
   defp llama_closing_rules do
     [
-      "; Bewusst NICHT erlaubt (benannte Grenze, Ticket #100): iokit-open-user-client",
-      "; (AGXDeviceUserClient, IOSurfaceRootUserClient), mach-lookup",
-      "; com.apple.windowserver.active / com.apple.tccd.system — die GPU/Metal-Kette.",
-      "; Der ungesandboxete Betrieb auf diesem Host nutzt sie ohnehin nicht",
-      "; (CPU-only-Kontrolle exp16); Netz-Auswaerts bleibt verweigert (--offline)."
+      "; Bewusst NICHT erlaubt (benannte Grenzen, Tickets #100/#111): Netz-Auswaerts",
+      "; bleibt verweigert — auch der syslog-Unix-Socket (os_log-Fallback, Kernel-Denial",
+      "; exp18) — und --offline wird profilseitig erzwungen. Die GPU/Metal-Kette ist seit",
+      "; #111 freigegeben (exp18: iokit AGX/IOSurface, MTLCompilerService, windowserver,",
+      "; tccd, coreservicesd, diskarbitrationd, file-issue-extension, System-Haeuser);",
+      "; die GPU-Treiber-Angriffsflaeche ist die bewusst eingegangene Grenze."
     ]
   end
 
