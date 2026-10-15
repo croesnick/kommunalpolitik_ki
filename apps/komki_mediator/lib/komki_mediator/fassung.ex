@@ -11,11 +11,6 @@ defmodule KomkiMediator.Fassung do
 
   @tools ["ping", "admit_document"]
 
-  # Exposure fuer das mcp.json-Rendering komki_clis: dieselbe Map wird
-  # zusaetzlich via /healthz ausgegeben, damit komki_cli die Tools baumartig
-  # ausliest und nie hartkodiert.
-  @mcp_tool_exposure %{"ping" => "direct", "admit_document" => "direct"}
-
   @doc "Versionskennung dieser Verbindungsauflage."
   @spec fassung_id() :: String.t()
   def fassung_id, do: @fassung_id
@@ -23,8 +18,4 @@ defmodule KomkiMediator.Fassung do
   @doc "Geordnete, festgedrehte Tool-Menge der Fassung."
   @spec tools() :: [String.t()]
   def tools, do: @tools
-
-  @doc "Exposure-Art je Tool (Layer-Abbildung fuer das mcp.json-Rendering komki_clis)."
-  @spec mcp_tool_exposure() :: %{String.t() => String.t()}
-  def mcp_tool_exposure, do: @mcp_tool_exposure
 end

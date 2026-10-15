@@ -39,4 +39,26 @@ defmodule KomkiMediator.GammaTest do
 
     assert {:error, {:gamma_read, :enoent}} = Gamma.load(path)
   end
+
+  # Relaxationsbefugnisse stehen nur im rohen Registry-Term; der Zugriff
+  # laeuft als Oeffnung ueber Gamma statt als Grab im Term fremden Modulen.
+  test "relaxation_authorities liest die Befugnis aus dem rohen Registry-Term", %{base: base} do
+    {:ok, gamma} = Gamma.load(Path.join([base, "mediator", "registry.json"]))
+
+    assert Gamma.relaxation_authorities(gamma, "doc-pending-freigabe@1") == ["nutzende-person"]
+  end
+
+  test "relaxation_authorities faellt fuer Bindung ohne Befugnis auf die leere Liste", %{
+    base: base
+  } do
+    {:ok, gamma} = Gamma.load(Path.join([base, "mediator", "registry.json"]))
+
+    assert Gamma.relaxation_authorities(gamma, "doc-oeffentlich@1") == []
+  end
+
+  test "relaxation_authorities faellt fuer unbekannte Bindung auf die leere Liste", %{base: base} do
+    {:ok, gamma} = Gamma.load(Path.join([base, "mediator", "registry.json"]))
+
+    assert Gamma.relaxation_authorities(gamma, "gibt-es-nicht@1") == []
+  end
 end

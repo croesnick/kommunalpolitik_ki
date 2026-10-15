@@ -90,21 +90,7 @@ defmodule KomkiMediator.Remedy do
     %{
       "type" => type,
       "clears" => clears,
-      "relaxation_authorities" => authorities(gamma, binding)
+      "relaxation_authorities" => Gamma.relaxation_authorities(gamma, binding)
     }
   end
-
-  # Die Relaxationsautoritaeten stehen nur im rohen Registry-Term (die
-  # kompilierte Form traegt sie nicht); eine unbekannte Bindung faellt auf
-  # die leere Liste zurueck.
-  defp authorities(gamma, binding) when is_binary(binding) do
-    term_binding = gamma.term && gamma.term["bindings"][binding]
-
-    case term_binding do
-      %{"relaxation_authorities" => authorities} -> List.wrap(authorities || [])
-      _ -> []
-    end
-  end
-
-  defp authorities(_gamma, _binding), do: []
 end

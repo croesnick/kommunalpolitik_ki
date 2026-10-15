@@ -21,6 +21,7 @@ defmodule KomkiMediator.ToolsTest do
 
     body = parse_json_body(response)
     assert body["decision"] == "permit"
+    assert body["object_id"] == "mediator-ping"
     assert body["tools"] == ["ping", "admit_document"]
     assert body["registry_id"] == "reg-komki-arbeitsraum"
     assert gamma.registry_id == "reg-komki-arbeitsraum"
@@ -36,6 +37,7 @@ defmodule KomkiMediator.ToolsTest do
 
     body = parse_json_body(response)
     assert body["decision"] == "permit"
+    assert body["object_id"] == "doc-oeffentlich"
     assert body["document_id"] == "doc-oeffentlich"
     assert body["content"] == content
     assert body["labels"] == ["doc-oeffentlich@1"]
@@ -51,6 +53,7 @@ defmodule KomkiMediator.ToolsTest do
 
     body = parse_json_body(response)
     assert body["decision"] == "deny"
+    refute Map.has_key?(body, "content")
     assert [%{"type" => "provide_fact", "clears" => "purpose"}] = body["remedies"]
   end
 

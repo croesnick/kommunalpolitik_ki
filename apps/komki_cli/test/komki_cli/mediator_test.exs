@@ -1,9 +1,10 @@
 defmodule KomkiCli.MediatorTest do
   @moduledoc """
-  Hermetische Unit-Tests der Vermittler-Vertragnaeh (Ticket #102): mcp.json-
-  Fuerum, Spawn-Zeile, healthz-Body-Parsen und vollstaendige write_mcp_config.
-  Kein echter Prozess wird gespawnt — der Lifecycle (up/down/status) ist wie
-  Llama.up/laeufe nicht in der Suite (echte Binaries, echte Ports).
+  Hermetische Unit-Tests der Vermittler-Vertragsnaehe (Ticket #102):
+  mcp.json-Aufbau, Spawn-Zeile, healthz-Body-Parsen und vollstaendige
+  write_mcp_config. Kein echter Prozess wird gespawnt — der Lifecycle
+  (up/down/status) ist wie Llama.up-Laeufe nicht in der Suite (echte
+  Binaries, echte Ports).
   """
 
   use ExUnit.Case, async: true

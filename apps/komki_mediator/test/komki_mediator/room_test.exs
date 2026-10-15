@@ -38,6 +38,15 @@ defmodule KomkiMediator.RoomTest do
     assert object.labels == ["doc-oeffentlich@1"]
   end
 
+  test "object_for_claim loest Objekt-Claims aus dem realisierten Payload auf", %{room: room} do
+    assert {:ok, object} = Room.object_for_claim(room, "doc-oeffentlich")
+    assert object.object_id == "doc-oeffentlich"
+    assert object.version == "v1"
+    assert object.labels == ["doc-oeffentlich@1"]
+
+    assert {:error, :unknown_object, "doc-phantom"} = Room.object_for_claim(room, "doc-phantom")
+  end
+
   # Der gebaute Snapshot muss durch die Eingabepruefung von Derive
   # (Schema, Referenzkohärenz) ankommen.
   test "Snapshot wird von Derive.decide akzeptiert (doc-oeffentlich)", %{gamma: gamma, room: room} do

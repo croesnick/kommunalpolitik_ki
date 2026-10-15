@@ -1,7 +1,7 @@
 defmodule KomkiMediator.Tools.Ping do
   @moduledoc """
   MCP-Tool `ping`: Liveness-Pruefung durch das Gate. Die Antwort traegt
-  Fassung, Gamma-Stand-Hash und die angebotene Tool-Menge — nach Tor 1
+  Fassung, Gamma-Stand-Hash und die angebotene Tool-Menge — nach Gate 1
   entschied und mit PDR belegt.
   """
 
@@ -19,8 +19,11 @@ defmodule KomkiMediator.Tools.Ping do
     gamma = env.gamma
 
     executor = fn ->
+      # Objekt-Claim der Antwort (Gate-2-Bindung): das Ergebnis kann dem
+      # entschiedenen Ping-Objekt zugeordnet werden.
       {:ok,
        %{
+         "object_id" => "mediator-ping",
          "fassung_id" => Fassung.fassung_id(),
          "registry_id" => gamma.registry_id,
          "gamma_hash" => gamma.gamma_hash,

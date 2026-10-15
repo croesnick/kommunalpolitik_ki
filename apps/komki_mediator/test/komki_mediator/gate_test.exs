@@ -223,6 +223,127 @@ defmodule KomkiMediator.GateTest do
   end
 
   # -----------------------------------------------------------------------
+  # Gate 2, zweiter Pruefschritt: Payload-Bindung gegen den Snapshot
+  # -----------------------------------------------------------------------
+
+  test "fremdes object_id im Result -> Rueckhaltung (payload_object_mismatch)", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    intent_hash = "sha256:" <> String.duplicate("ab", 32)
+    snapshot = build_snapshot(env, "doc-oeffentlich", intent_hash)
+    intent = build_intent(env, "doc-oeffentlich")
+    {:ok, decision} = Derive.decide(env.gamma.compiled, snapshot, intent)
+
+    # Die Entscheidung ist unverfaelscht, das Vollzugs-Ergebnis aber
+    # verdreht: es traegt den Claim eines anderen Raum-Objekts.
+    response =
+      Gate.admit_result(
+        env,
+        "admit_document",
+        intent_hash,
+        intent,
+        snapshot,
+        decision,
+        {:ok, %{"object_id" => "doc-vertraulich", "content" => "geheim"}}
+      )
+
+    assert response["decision"] == "permit"
+    assert response["admitted"] == "redacted"
+    assert response["verify"] == ["payload_object_mismatch"]
+    assert response["decision_id"] =~ "pdr-"
+    assert response["payload_hash"] =~ "sha256:"
+    refute Map.has_key?(response, "content")
+    refute Map.has_key?(response, "remedies")
+
+    {:ok, pdr} = journal_last_record(journal_path)
+    assert pdr["outcome"] == "redacted"
+    assert pdr["admitted"] == "redacted"
+  end
+
+  test "Result ohne object_id -> Rueckhaltung (payload_identity_missing)", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    intent_hash = "sha256:" <> String.duplicate("ab", 32)
+    snapshot = build_snapshot(env, "doc-oeffentlich", intent_hash)
+    intent = build_intent(env, "doc-oeffentlich")
+    {:ok, decision} = Derive.decide(env.gamma.compiled, snapshot, intent)
+
+    response =
+      Gate.admit_result(
+        env,
+        "admit_document",
+        intent_hash,
+        intent,
+        snapshot,
+        decision,
+        {:ok, %{"content" => "unbelegt"}}
+      )
+
+    assert response["admitted"] == "redacted"
+    assert response["verify"] == ["payload_identity_missing"]
+    refute Map.has_key?(response, "content")
+
+    {:ok, pdr} = journal_last_record(journal_path)
+    assert pdr["outcome"] == "redacted"
+  end
+
+  test "payload_hash bindet die Antwort ohne ihr eigenes payload_hash-Feld (beide Pfade)", %{
+    env: env
+  } do
+    # Admitted-Pfad: permit mit Vollzugsergebnis.
+    admitted = Gate.call(env, "ping", %{}, TestHelpers.ping_executor(env.gamma))
+
+    # Rueckhalte-Pfad: verfaelschter Beweis.
+    intent_hash = "sha256:" <> String.duplicate("cd", 32)
+    snapshot = build_snapshot(env, "doc-oeffentlich", intent_hash)
+    intent = build_intent(env, "doc-oeffentlich")
+    {:ok, decision} = Derive.decide(env.gamma.compiled, snapshot, intent)
+    tampered = rewrite_first_fact_value(decision["proof"])
+
+    redacted =
+      Gate.admit_result(
+        env,
+        "admit_document",
+        intent_hash,
+        intent,
+        snapshot,
+        tampered,
+        {:ok, %{"content" => "geheim"}}
+      )
+
+    for response <- [admitted, redacted] do
+      assert response["payload_hash"] =~ "sha256:"
+      # Die Antwort ohne das eigene payload_hash-Feld re-kanonisiert
+      # ergibt exakt den Hash (kein Selbstbezug).
+      base = Map.delete(response, "payload_hash")
+      assert response["payload_hash"] == KomkiMediator.Hash.sha256_hex(JSON.canonical(base))
+    end
+  end
+
+  test "Extra-Feld in den Parametern heisst neuer, unverwechselbarer intent_hash (exakter Call)",
+       %{
+         env: env,
+         journal_path: journal_path
+       } do
+    executor = TestHelpers.admit_executor(env.room, "doc-oeffentlich")
+
+    Gate.call(env, "admit_document", %{"document_id" => "doc-oeffentlich"}, executor)
+
+    Gate.call(
+      env,
+      "admit_document",
+      %{"document_id" => "doc-oeffentlich", "extra" => "feld"},
+      executor
+    )
+
+    intent_hashes = intent_hashes_from_journal(journal_path)
+    assert Enum.count(intent_hashes) == 2
+    assert Enum.count(Enum.uniq(intent_hashes)) == 2
+  end
+
+  # -----------------------------------------------------------------------
   # Helfer
   # -----------------------------------------------------------------------
 

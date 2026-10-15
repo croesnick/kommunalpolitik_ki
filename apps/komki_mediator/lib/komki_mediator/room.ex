@@ -119,6 +119,14 @@ defmodule KomkiMediator.Room do
   end
 
   @doc """
+  Loest einen Objekt-Claim aus dem realisierten Payload gegen room.json
+  auf: zum Claim eine Objektbelegung (Objekt-ID, Version, Labels).
+  """
+  @spec object_for_claim(t(), String.t()) ::
+          {:ok, Object.t()} | {:error, :unknown_object, String.t()}
+  def object_for_claim(room, object_id), do: entry(room, object_id)
+
+  @doc """
   Baut den vollstaendigen komki-Snapshot eines Aufrufs. `workspace.bindings`
   sind GENAU die Objekt-Labels — `checked_label` faellt damit mit den
   Prueflabels zusammen (Bedingung, die `Verify.check` an den Beweis stellt).

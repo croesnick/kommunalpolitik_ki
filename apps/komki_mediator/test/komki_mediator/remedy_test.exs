@@ -64,7 +64,7 @@ defmodule KomkiMediator.RemedyTest do
              "nutzende-person"
            ]
 
-    # Die kompilierte Form trgt sie bewusst nicht.
+    # Die kompilierte Form traegt sie bewusst nicht.
     refute Map.has_key?(
              gamma.compiled.bindings["doc-pending-freigabe@1"],
              "relaxation_authorities"

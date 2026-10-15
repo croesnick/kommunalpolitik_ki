@@ -29,7 +29,7 @@ defmodule KomkiCli.DoctorBootTest do
     # Vermittler-Staging (Ticket #102): init entdeckt komki-mediator ueber
     # PATH oder <base>/bin — da das echte Escript des Parallel-Lane hier
     # nicht existiert, liegt fuer die presence-only-Doctor-Klasse eine
-    # Platshalter-Datei im Instanz-bin (doctor prueft Praesenz, nicht Leben;
+    # Platzhalter-Datei im Instanz-bin (doctor prueft Praesenz, nicht Leben;
     # bei echten Launches verantwortet `up` die Binary).
     setup_all do
       home = TestSupport.tmp_area!("komki-boot")

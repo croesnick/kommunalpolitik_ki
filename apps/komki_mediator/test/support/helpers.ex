@@ -26,11 +26,12 @@ defmodule KomkiMediator.TestHelpers do
     {gamma, room}
   end
 
-  @doc "Ping-Executor wie das MCP-Tool ihn stellt (Vollzug nach Tor 1)."
+  @doc "Ping-Executor wie das MCP-Tool ihn stellt (Vollzug nach Gate 1)."
   def ping_executor(gamma) do
     fn ->
       {:ok,
        %{
+         "object_id" => "mediator-ping",
          "fassung_id" => KomkiMediator.Fassung.fassung_id(),
          "registry_id" => gamma.registry_id,
          "gamma_hash" => gamma.gamma_hash,
@@ -45,8 +46,11 @@ defmodule KomkiMediator.TestHelpers do
       path = Path.join(room.documents_dir, document_id <> ".md")
 
       case File.read(path) do
-        {:ok, content} -> {:ok, %{"document_id" => document_id, "content" => content}}
-        {:error, reason} -> {:error, reason}
+        {:ok, content} ->
+          {:ok, %{"object_id" => document_id, "document_id" => document_id, "content" => content}}
+
+        {:error, reason} ->
+          {:error, reason}
       end
     end
   end

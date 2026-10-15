@@ -374,8 +374,8 @@ defmodule KomkiCli.CLI do
            "gguf:          " <> cfg.gguf_path,
            "port:          " <> to_string(cfg.port),
            "mediator-port: " <> to_string(cfg.mediator_port),
-           "llama:         " <> render_llama_state(llama_state),
-           "mediator:      " <> render_mediator_state(mediator_state)
+           "llama:         " <> state_line(llama_state, "/health"),
+           "mediator:      " <> state_line(mediator_state, "/healthz")
          ],
          "\n"
        ) <> "\n", 0}
@@ -447,22 +447,17 @@ defmodule KomkiCli.CLI do
     {Enum.join(lines ++ [summary_line], "\n") <> "\n", if(summary == :ok, do: 0, else: 3)}
   end
 
-  defp render_llama_state({:running, pid}), do: "running (pid " <> to_string(pid) <> ")"
+  # Zustandszeilen (status): EINE parametrisierte Kaskade fuer llama und
+  # Vermittler — beide Zustandstypen (`KomkiCli.Llama.status/1` /
+  # `KomkiCli.Mediator.status/1`) sind strukturell identisch, der einzige
+  # Unterschied ist der Health-Pfad (Ticket #102/Vermittler-Zeile).
+  defp state_line({:running, pid}, _health_path), do: "running (pid " <> to_string(pid) <> ")"
 
-  defp render_llama_state({:health_only, :no_pidfile}),
-    do: "port antwortet /health aber kein pidfile (fremder Prozess?)"
+  defp state_line({:health_only, :no_pidfile}, health_path),
+    do: "port antwortet " <> health_path <> " aber kein pidfile (fremder Prozess?)"
 
-  defp render_llama_state(:stopped), do: "stopped"
-  defp render_llama_state({:error, reason}), do: "error: " <> reason
-
-  # Vermittler-Zustandszeile (Ticket #102); Form spiegelt render_llama_state.
-  defp render_mediator_state({:running, pid}), do: "running (pid " <> to_string(pid) <> ")"
-
-  defp render_mediator_state({:health_only, :no_pidfile}),
-    do: "port antwortet /healthz aber kein pidfile (fremder Prozess?)"
-
-  defp render_mediator_state(:stopped), do: "stopped"
-  defp render_mediator_state({:error, reason}), do: "error: " <> reason
+  defp state_line(:stopped, _health_path), do: "stopped"
+  defp state_line({:error, reason}, _health_path), do: "error: " <> reason
 
   # Fassung-Tools im up-Output: kleine Ehrlichkeit der Schnittstelle — der
   # Nutzer sieht, was pi per mcp.json freigeschaltet bekommt.

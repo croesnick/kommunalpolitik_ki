@@ -21,23 +21,29 @@ defmodule KomkiMediator.Tools.AdmitDocument do
   def execute(params, frame) do
     env = Env.fetch()
 
-    # Kanonisch gerendeter Aufruf: String-Schluessel sind der Vertrag
-    # zwischen MCP-Schicht und Gate (intent_hash).
-    gate_params = %{"document_id" => params.document_id}
-
+    # Der vollstaendige gerenderte Aufruf geht ans Gate (exakter Call als
+    # intent_hash-Basis); kuenftige Schema-Felder landen mechanisch mit im
+    # Hash. Der Executor liest direkt hier.
     executor = fn ->
-      path = Path.join(env.room.documents_dir, gate_params["document_id"] <> ".md")
+      path = Path.join(env.room.documents_dir, params.document_id <> ".md")
 
       case File.read(path) do
         {:ok, content} ->
-          {:ok, %{"document_id" => gate_params["document_id"], "content" => content}}
+          # Objekt-Claim der Antwort (Gate-2-Bindung): das Ergebnis kann
+          # dem entschiedenen Dokument-Objekt zugeordnet werden.
+          {:ok,
+           %{
+             "object_id" => params.document_id,
+             "document_id" => params.document_id,
+             "content" => content
+           }}
 
         {:error, reason} ->
           {:error, reason}
       end
     end
 
-    response = Gate.call(env, "admit_document", gate_params, executor)
+    response = Gate.call(env, "admit_document", params, executor)
     {:reply, Response.json(Response.tool(), response), frame}
   end
 end

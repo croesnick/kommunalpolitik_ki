@@ -40,6 +40,19 @@ defmodule KomkiMediator.Gamma do
     end
   end
 
+  @doc "Vereinigte Relaxationsbefugnisse einer Bindung aus dem rohen Registry-Term."
+
+  # Die Relaxationsbefugnisse stehen nur im rohen Registry-Term (die
+  # kompilierte Form traegt sie bewusst nicht); eine unbekannte Bindung
+  # faellt auf die leere Liste zurueck.
+  @spec relaxation_authorities(t(), String.t()) :: [String.t()]
+  def relaxation_authorities(%__MODULE__{term: term}, binding) do
+    case term["bindings"][binding] do
+      %{"relaxation_authorities" => authorities} -> List.wrap(authorities || [])
+      _ -> []
+    end
+  end
+
   defp read(path) do
     case File.read(path) do
       {:ok, raw} -> {:ok, raw}

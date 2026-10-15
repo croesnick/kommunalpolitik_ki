@@ -1,9 +1,11 @@
 defmodule KomkiCli.Mediator do
   @moduledoc """
-  Vermittler-Lebenszyklus (Ticket #102), gespiegelt auf
-  `KomkiCli.Llama`: der langlaufende Escript `komki-mediator`
-  (baubar aus `apps/komki_mediator`) wird von `komki up` gestartet, per
-  healthz gepinnt befragt und von `komki down` gestoppt.
+  Vermittler-Lebenszyklus (Ticket #102): die Prozesssteuerung teilt sich
+  mit `KomkiCli.Llama` die Mechanik in `KomkiCli.Proc` (Pidfile,
+  Identitaetscheck, Kill-Eskalation, Health-Poll) — der langlaufende
+  Escript `komki-mediator` (baubar aus `apps/komki_mediator`) wird von
+  `komki up` gestartet, per healthz gepinnt befragt und von `komki down`
+  gestoppt.
 
   Der Vertrag zwischen den Apps ist fix und wird hier nicht mehr geprüft
   als nötig (komki_cli liest statt zu raten):
@@ -28,12 +30,12 @@ defmodule KomkiCli.Mediator do
   Vermittler-Prozess selbst (Forschung ticket/102, R.4.3).
 
   Pidfile unter `base/tmp/komki-mediator.pid`, Log unter
-  `base/tmp/mediator.log`; der Identitätscheck vor jedem `kill` liest
-  die `ps`-Kommandozeile (nur echte komki-mediator-Prozesse empfangen
-  Signale — macOS-taugliche Self-Defense gegen_pidfile-Wiederverwendung).
+  `base/tmp/mediator.log`; der Identitätscheck vor jedem `kill` liest die
+  `ps`-Kommandozeile (nur echte komki-mediator-Prozesse empfangen
+  Signale — macOS-taugliche Self-Defense gegen pidfile-Wiederverwendung).
   """
 
-  alias KomkiCli.Config
+  alias KomkiCli.{Config, Proc}
   require Config
 
   @health_timeout_ms 10_000
@@ -70,15 +72,15 @@ defmodule KomkiCli.Mediator do
   """
   @spec down(Config.t()) :: :ok | :no_pidfile | {:stale, String.t()} | {:error, String.t()}
   def down(%Config{} = cfg) do
-    case read_pidfile(cfg) do
+    case Proc.read_pidfile(pidfile(cfg)) do
       {:ok, pid} -> down_pid(cfg, pid)
       :none -> :no_pidfile
     end
   end
 
-  # Identitaetscheck vor dem Toeten: Nur echte komki-mediator-Prozesse
-  # kriegen Signale; alles andere ist ein stale pidfile, das der
-  # Aufraeumweg entfernt.
+  # Identitaetscheck vor dem Toeten (Proc.kill_checked): Nur echte
+  # komki-mediator-Prozesse kriegen Signale; alles andere ist ein stale
+  # pidfile, das der Aufraeumweg entfernt.
   defp down_pid(cfg, pid) do
     if mediator_alive?(pid) do
       case kill_mediator(pid) do
@@ -101,7 +103,7 @@ defmodule KomkiCli.Mediator do
   @doc "Zustand: pidfile + Health."
   @spec status(Config.t()) :: mediator_state() | {:error, String.t()}
   def status(%Config{} = cfg) do
-    case read_pidfile(cfg) do
+    case Proc.read_pidfile(pidfile(cfg)) do
       {:ok, pid} ->
         if mediator_alive?(pid) do
           {:running, pid}
@@ -177,25 +179,34 @@ defmodule KomkiCli.Mediator do
   @doc """
   Spawn-Zeile fuer /bin/sh -c (nohup, Args, Log-Umleitung, pid-Ausgabe).
   Rein: Binary/Verzeichnis werden sh-gequotet, Port ist Integer —
-  testbar ohne echten Prozess.
+  testbar ohne echten Prozess. Scaffold in KomkiCli.Proc.spawn_line/3.
   """
   @spec spawn_line(Config.t()) :: String.t()
   def spawn_line(%Config{} = cfg) do
-    "nohup " <>
-      quote_bin(cfg.mediator_bin) <>
-      " --base" <>
-      " " <>
-      quote_bin(cfg.base_dir) <>
-      " --port" <>
-      " " <>
-      to_string(cfg.mediator_port) <>
-      " > " <> quote_bin(log_path(cfg)) <> " 2>&1 & echo $!"
+    Proc.spawn_line(
+      cfg.mediator_bin,
+      [
+        "--base",
+        Proc.quote_bin(cfg.base_dir),
+        "--port",
+        to_string(cfg.mediator_port)
+      ],
+      log_path(cfg)
+    )
   end
 
   defp wait_health(cfg, pid) do
     deadline = System.monotonic_time(:millisecond) + @up_timeout_ms
 
-    case poll_health(cfg, deadline) do
+    check = fn ->
+      case fetch_health(cfg) do
+        {:ok, "200", health} -> {:ok, health}
+        {:ok, code, _health} -> {:error, "healthz returned " <> code}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+
+    case Proc.poll_health(check, "komki-mediator", deadline) do
       {:ok, health} ->
         {:ok, {:started, pid, health}}
 
@@ -207,101 +218,21 @@ defmodule KomkiCli.Mediator do
     end
   end
 
-  defp poll_health(cfg, deadline) do
-    case fetch_health(cfg) do
-      {:ok, "200", health} ->
-        {:ok, health}
-
-      {:ok, code, _health} ->
-        retry(cfg, deadline, "healthz returned " <> code)
-
-      {:error, reason} ->
-        retry(cfg, deadline, reason)
-    end
-  end
-
-  defp retry(cfg, deadline, reason) do
-    now = System.monotonic_time(:millisecond)
-
-    if now >= deadline do
-      {:error, "komki-mediator health timeout (" <> reason <> ")"}
-    else
-      Process.sleep(500)
-      poll_health(cfg, deadline)
-    end
-  end
-
-  defp kill_mediator(pid) do
-    # Nur komki-mediator: der pid-Prozess wird zuerst per `ps` identifiziert
-    # (Pidfile-Wiederverwendungsschutz). kill liegt auf macOS in /bin/kill
-    # (llama.ex-Vorbild, Smoke-Fund 5f: rohes :enoent).
-    if mediator_alive?(pid) do
-      System.cmd("/bin/kill", ["-TERM", to_string(pid)])
-      Process.sleep(800)
-
-      if mediator_alive?(pid) do
-        System.cmd("/bin/kill", ["-KILL", to_string(pid)])
-        Process.sleep(300)
-      end
-
-      if mediator_alive?(pid) do
-        {:error, "komki-mediator pid " <> to_string(pid) <> " still alive after SIGKILL"}
-      else
-        :ok
-      end
-    else
-      {:error,
-       "pid " <> to_string(pid) <> " is not komki-mediator (pidfile stale); not sent any signal"}
-    end
-  end
+  # Kill-Eskalation TERM→KILL mit Identitaetscheck (Proc.kill_checked).
+  defp kill_mediator(pid), do: Proc.kill_checked(pid, "komki-mediator")
 
   @doc "Prueft, ob pid existiert und als komki-mediator laeuft (ps-Kontrolle)."
   @spec mediator_alive?(integer()) :: boolean()
-  def mediator_alive?(pid) when is_integer(pid) and pid > 0 do
-    case System.cmd("/bin/ps", ["-p", to_string(pid), "-o", "command="]) do
-      {out, 0} -> String.contains?(out, "komki-mediator")
-      _ -> false
-    end
-  end
-
-  def mediator_alive?(_), do: false
+  def mediator_alive?(pid), do: Proc.pid_alive?(pid, "komki-mediator")
 
   @doc "Log-Tail als Einzeiler kontrolliert fuer Fehlermeldungen."
   @spec log_tail(Config.t(), pos_integer()) :: String.t()
-  def log_tail(cfg, lines) do
-    path = log_path(cfg)
-
-    if File.exists?(path) do
-      path
-      |> File.stream!()
-      |> Stream.map(&String.trim_trailing/1)
-      |> Stream.take(-lines)
-      |> Enum.join(" | ")
-    else
-      "(no log)"
-    end
-  end
+  def log_tail(cfg, lines), do: Proc.log_tail(log_path(cfg), lines)
 
   # ---------------------------------------------------------------- Pipeline-Helfer
 
   defp log_path(cfg), do: Path.join([cfg.base_dir, "tmp", "mediator.log"])
   defp pidfile(cfg), do: Path.join([cfg.base_dir, "tmp", "komki-mediator.pid"])
-
-  defp read_pidfile(cfg) do
-    case File.read(pidfile(cfg)) do
-      {:ok, content} ->
-        case Integer.parse(String.trim_trailing(content)) do
-          {pid, ""} when pid > 0 -> {:ok, pid}
-          _ -> {:error, "corrupt pidfile: " <> Kernel.inspect(content)}
-        end
-
-      {:error, :enoent} ->
-        :none
-
-      {:error, posix} ->
-        {:error, "cannot read pidfile: " <> List.to_string(:file.format_error(posix))}
-    end
-  end
 
   @doc """
   GET /healthz via plain TCP; {:ok, status_code_string, body} oder
@@ -366,11 +297,6 @@ defmodule KomkiCli.Mediator do
     end
   end
 
-  ## Shell-Quote fuer Spawn-Zeile (keine Pfad-Injection).
-  defp quote_bin(bin) when is_binary(bin) do
-    "'" <> String.replace(bin, "'", "'\\''") <> "'"
-  end
-
   # ---------------------------------------------------------------- Fassung auf pi-Seite
 
   @doc """
@@ -384,8 +310,8 @@ defmodule KomkiCli.Mediator do
       {:ok, %{"status" => "ok"} = health} ->
         tools = Map.get(health, "tools")
 
-        # Tools-Liste als eigene Pruefung (Guards erlauben keine Enum-Funken);
-        # fehlt der Key, ist es nil undFaellt durch.
+        # Tools-Liste als eigene Pruefung (Guards erlauben keine Enum-Funk-
+        # tionen); fehlt der Key, ist es nil und faellt durch.
         if is_list(tools) and all_strings?(tools) do
           {:ok, health}
         else

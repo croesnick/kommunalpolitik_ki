@@ -6,7 +6,7 @@ defmodule KomkiMediator.Server do
   ergeben (D.9: angebotene Fassung gleich der Verbindungsaufflache).
 
   Die Tools entscheiden nichts selbst: jeder Aufruf laeuft durch das Gate
-  (Tor 1: Policy-Entscheid vor dem Vollzug, Tor 2: Beweispruefung vor der
+  (Gate 1: Policy-Entscheid vor dem Vollzug, Gate 2: Beweispruefung vor der
   Antwort), und jeder Ablauf geht mit einem PDR ins Journal.
   """
 

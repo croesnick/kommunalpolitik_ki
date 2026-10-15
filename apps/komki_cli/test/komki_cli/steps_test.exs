@@ -6,7 +6,7 @@ defmodule KomkiCli.StepsTest do
   # wie auch vom pi-home aus faendig werden.
   use ExUnit.Case, async: true
 
-  alias KomkiCli.{Config, Steps, TestSupport}
+  alias KomkiCli.{Config, Proc, Steps, TestSupport}
 
   describe "write_pi_home/1" do
     test "Trust-Schluessel ist das Instanz-Root (deckt arbeit und pi-home ab)" do
@@ -76,4 +76,60 @@ defmodule KomkiCli.StepsTest do
   end
 
   defp read_json(path), do: path |> File.read!() |> JSON.decode!()
+
+  # Vermittler-Liveness-Gate (Review-Fund zur Vertragsluecke): run und
+  # session muessen abbrechen, wenn der Vermittler tot oder das pidfile
+  # stale ist — pi startet sonst mit `-e builtin:mcp` gegen eine tote
+  # mcp.json. Muster wie das require_llama_up-Integrationsverhalten
+  # (doctor_boot_test): klare Meldung, Exit 2, Handlungs-Hinweis.
+  describe "require_mediator_up/1 (Liveness-Gate vor pi)" do
+    test "kein pidfile, stiller Port: Abbruch mit 'komki up'-Hinweis (Exit 2)" do
+      cfg = med_gate_cfg("komki-steps-med")
+
+      assert {:error, reason, 2} = Steps.require_mediator_up(cfg)
+      assert reason =~ "komki-mediator nicht aktiv"
+      assert reason =~ "'komki up' zuerst"
+    end
+
+    test "stale pidfile (toter Prozess): Abbruch statt pi gegen tote mcp.json (Exit 2)" do
+      cfg = med_gate_cfg("komki-steps-med-stale")
+      pidfile = Path.join([cfg.base_dir, "tmp", "komki-mediator.pid"])
+      File.mkdir_p!(Path.dirname(pidfile))
+
+      # Pid 99998 (macOS' hoechste normale Pid) existiert im Testumfeld nicht:
+      # der Identitaetscheck verweigert die Zuordnung, status meldet stale.
+      File.write!(pidfile, "99998\n")
+
+      assert {:error, reason, 2} = Steps.require_mediator_up(cfg)
+      assert reason =~ "stale pidfile"
+      assert reason =~ "is not komki-mediator"
+    end
+
+    test "lebender eigener Prozess mit pidfile: Durchlass ({:ok, pid})" do
+      cfg = med_gate_cfg("komki-steps-med-alive")
+
+      # Eigener Prozess fuer den ps-Identitaetscheck: die Marker-Form im
+      # sh-Argument taucht in der ps-Kommandozeile auf; Compound-Kommando
+      # (statt einzelner Befehl) verhindert das sh-exec, das die Argzeile
+      # durch den Kindprozess ersetzen wuerde.
+      ps_marker = "komki-mediator"
+      cmd = "while :; do sleep 1; done # " <> ps_marker
+      port = Port.open({:spawn_executable, "/bin/sh"}, args: ["-c", cmd])
+      {:os_pid, os_pid} = Port.info(port, :os_pid)
+
+      pidfile = Path.join([cfg.base_dir, "tmp", "komki-mediator.pid"])
+      File.mkdir_p!(Path.dirname(pidfile))
+      File.write!(pidfile, to_string(os_pid) <> "\n")
+
+      assert {:ok, ^os_pid} = Steps.require_mediator_up(cfg)
+
+      # Aufraeumweg ueber die eigene Eskalations-Mechanik (TERM → KILL mit
+      # Identitaetscheck): zugleich Regression fuer KomkiCli.Proc.kill_checked.
+      assert :ok = Proc.kill_checked(os_pid, ps_marker)
+    end
+  end
+
+  defp med_gate_cfg(prefix) do
+    %{TestSupport.fixture_cfg(TestSupport.tmp_area!(prefix)) | mediator_port: 1}
+  end
 end

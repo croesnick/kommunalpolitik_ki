@@ -154,39 +154,43 @@ defmodule KomkiCli.Pi do
   @komki_system_prompt "Antworte knapp und präzise, per Default auf Deutsch und durchgehend in der Du-Form. Du bist Assistent für kommunalpolitische Arbeit in einem lokalen, offline laufenden Arbeitsraum. Belege sachliche Aussagen mit Quellen, wo vorhanden, und markiere Unsicherheit offen."
 
   defp session_flags(cfg, continue?) do
-    base = [
-      "--offline",
-      # MCP-Vertrag (Ticket #102): `-ne` schaltet ALLE Extensions tot; das
-      # explizite `-e builtin:mcp` reaktiviert NUR die eingebaute Extension
-      # MCP für die Vermittler-Verbindung (pi >= 1.0; Issue #103: kein Pin).
-      "--no-extensions",
-      "-e",
-      "builtin:mcp",
-      "--no-skills",
-      "--no-prompt-templates",
-      "--no-themes",
-      # KEIN --no-approve hier: Der Flag erzwingt "untrusted" und uebersteuert
-      # den trust.json-Eintrag aus dem init — die Trust-Warnung waere die Folge.
-      # Headless-Laeufe (argv_for) behalten --no-approve: dort gibt es keinen
-      # Projekt-Kontext.
-      "--session-dir",
-      session_dir(cfg),
-      # ls ist reines Node (kein Binary noetig) — ohne es kann der Agent
-      # Verzeichnisse nicht sehen und rät dann zu read . (EISDIR-Live-Fund).
-      # find/grep brauchen fd/rg: init kopiert sie in pi's agent-bin-Fundus;
-      # fehlen sie auf dem Host, bleiben die Tools ehrlich weg.
-      "--tools",
-      tools_list(cfg),
-      "--system-prompt",
-      @komki_system_prompt,
-      "--provider",
-      "pi-local",
-      "--model",
-      "local-model"
-    ]
+    base =
+      [
+        "--offline"
+        | mcp_contract_flags()
+      ] ++
+        [
+          "--no-skills",
+          "--no-prompt-templates",
+          "--no-themes",
+          # KEIN --no-approve hier: Der Flag erzwingt "untrusted" und uebersteuert
+          # den trust.json-Eintrag aus dem init — die Trust-Warnung waere die Folge.
+          # Headless-Laeufe (pi_flags) behalten --no-approve: dort gibt es keinen
+          # Projekt-Kontext.
+          "--session-dir",
+          session_dir(cfg),
+          # ls ist reines Node (kein Binary noetig) — ohne es kann der Agent
+          # Verzeichnisse nicht sehen und rät dann zu read . (EISDIR-Live-Fund).
+          # find/grep brauchen fd/rg: init kopiert sie in pi's agent-bin-Fundus;
+          # fehlen sie auf dem Host, bleiben die Tools ehrlich weg.
+          "--tools",
+          tools_list(cfg),
+          "--system-prompt",
+          @komki_system_prompt,
+          "--provider",
+          "pi-local",
+          "--model",
+          "local-model"
+        ]
 
     if continue?, do: ["--continue" | base], else: base
   end
+
+  # MCP-Vertrag (Ticket #102, identisch in Session und Einmal-Lauf):
+  # `-ne` schaltet ALLE Extensions tot; das explizite `-e builtin:mcp`
+  # reaktiviert NUR die eingebaute Extension MCP fuer die Vermittler-
+  # Verbindung (pi >= 1.0; Issue #103: kein Pin).
+  defp mcp_contract_flags, do: ["--no-extensions", "-e", "builtin:mcp"]
 
   # ls ist immer dabei (reines Node); find/grep nur mit entdeckter Binary —
   # sonst scheitert der Tool-Aufruf erst zur Laufzeit.
@@ -207,31 +211,23 @@ defmodule KomkiCli.Pi do
   # ---------------------------------------------------------------- Helfer
 
   defp pi_flags(mode, scratch_dir) do
-    [
-      "--print",
-      "--mode",
-      Atom.to_string(mode),
-      "--offline",
-      # MCP-Vertrag (Ticket #102): `-ne` schaltet ALLE Extensions tot; das
-      # explizite `-e builtin:mcp` reaktiviert NUR die eingebaute Extension
-      # MCP für die Vermittler-Verbindung (pi >= 1.0; Issue #103: kein Pin).
-      "--no-extensions",
-      "-e",
-      "builtin:mcp",
-      "--no-skills",
-      "--no-prompt-templates",
-      "--no-themes",
-      "--no-approve",
-      "--no-session",
-      "--session-dir",
-      Path.join(scratch_dir, "pi-sessions"),
-      "--tools",
-      "write",
-      "--provider",
-      "pi-local",
-      "--model",
-      "local-model"
-    ]
+    ["--print", "--mode", Atom.to_string(mode), "--offline"] ++
+      mcp_contract_flags() ++
+      [
+        "--no-skills",
+        "--no-prompt-templates",
+        "--no-themes",
+        "--no-approve",
+        "--no-session",
+        "--session-dir",
+        Path.join(scratch_dir, "pi-sessions"),
+        "--tools",
+        "write",
+        "--provider",
+        "pi-local",
+        "--model",
+        "local-model"
+      ]
   end
 
   @doc "Lauf-Umgebung (validierte Konvention)."

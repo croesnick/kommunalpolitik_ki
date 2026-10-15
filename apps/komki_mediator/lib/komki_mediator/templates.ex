@@ -121,7 +121,7 @@ Sie ist nur mit dem passenden Zweck-Fakt zulaessig.
   def document_content("doc-pending-freigabe") do
     ~S(# Notiz in Freigabe-Pause
 Diese Notiz wartet auf die vertraulich_freigabe.
-Ohne Freigabe trennt das Tor den Inhalt zurueck.
+Ohne Freigabe trennt das Gate den Inhalt zurueck.
 )
   end
 

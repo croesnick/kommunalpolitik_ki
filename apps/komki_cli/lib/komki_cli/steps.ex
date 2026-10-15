@@ -727,22 +727,23 @@ defmodule KomkiCli.Steps do
   defp execute_run(opts, mode) do
     cfg = load_cfg!()
 
-    case require_llama_up(cfg) do
-      {:ok, _pid} ->
-        scratch = scratch_for(opts, cfg.base_dir)
-        File.mkdir_p!(scratch)
-        prompt = Map.fetch!(opts, "prompt")
+    # Fail-Fast vor der Sandbox-Kette: pi startet sonst mit `-e builtin:mcp`
+    # gegen eine tote mcp.json (Vertragsluecke nach Mediator-Crash).
+    with {:ok, _pid} <- require_llama_up(cfg),
+         {:ok, _pid} <- require_mediator_up(cfg) do
+      scratch = scratch_for(opts, cfg.base_dir)
+      File.mkdir_p!(scratch)
+      prompt = Map.fetch!(opts, "prompt")
 
-        case Pi.run(cfg, scratch, mode, prompt) do
-          {:ok, out} ->
-            {:run_ok, scratch, out}
+      case Pi.run(cfg, scratch, mode, prompt) do
+        {:ok, out} ->
+          {:run_ok, scratch, out}
 
-          {:error, out, pi_code} ->
-            {:run_error, scratch, out, pi_code}
-        end
-
-      {:error, reason, code} ->
-        {:error, reason, code}
+        {:error, out, pi_code} ->
+          {:run_error, scratch, out, pi_code}
+      end
+    else
+      {:error, reason, code} -> {:error, reason, code}
     end
   end
 
@@ -865,7 +866,10 @@ defmodule KomkiCli.Steps do
   defp execute_session(opts) do
     cfg = load_cfg!()
 
+    # Reihenfolge wie `up`: llama vor Vermittler; auch die Session startet
+    # pi mit `-e builtin:mcp` — ein toter Vermittler bricht hier ab.
     with {:ok, _pid} <- require_llama_up(cfg),
+         {:ok, _pid} <- require_mediator_up(cfg),
          {:ok, tmux} <- find_tmux() do
       if tmux_session_running?(tmux) do
         attach_or_refuse(tmux, opts)
@@ -890,6 +894,37 @@ defmodule KomkiCli.Steps do
 
       :stopped ->
         {:error, "llama-server nicht aktiv: 'komki up' zuerst", 2}
+
+      {:error, reason} ->
+        {:error, reason, 2}
+    end
+  end
+
+  @doc """
+  Vermittler-Liveness-Gate vor jedem pi-Start (`run` UND `session`,
+  Ticket #102; Review-Fund zur Vertragsluecke): pi startet mit
+  `-e builtin:mcp` gegen eine tote mcp.json, wenn der Vermittler
+  gestorben oder das pidfile stale ist (z. B. Mediator-Crash) — hier
+  bricht der Lauf vor der Sandbox-Kette ab und verweist auf `komki up`.
+  Mechanik wie require_llama_up: Pidfile + ps-Identitaet + healthz
+  (Struktur aus `KomkiCli.Mediator.status/1`). Public als Testnaeht:
+  Status-Fixturen statt echter Prozesse.
+  """
+  @spec require_mediator_up(Config.t()) :: {:ok, pos_integer()} | {:error, String.t(), 2}
+  def require_mediator_up(cfg) do
+    case Mediator.status(cfg) do
+      {:running, pid} ->
+        {:ok, pid}
+
+      {:health_only, :no_pidfile} ->
+        {:error,
+         "port " <>
+           to_string(cfg.mediator_port) <>
+           " antwortet healthz, aber pidfile fehlt (fremder Prozess?) — 'komki status' pruefen",
+         2}
+
+      :stopped ->
+        {:error, "komki-mediator nicht aktiv: 'komki up' zuerst", 2}
 
       {:error, reason} ->
         {:error, reason, 2}

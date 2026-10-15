@@ -2,10 +2,11 @@
 
 Vermittler (Ticket #102, MVP): der MCP-Layer zwischen pi (dem gesandboxten
 Coding-Agent) und den Connector-Operationen. pi bekommt Tool-Zugriff
-ausschliesslich durch diesen Vermittler: jeder Aufruf durchlaeuft Tor 1
+ausschliesslich durch diesen Vermittler: jeder Aufruf durchlaeuft Gate 1
 (eine Policy-Entscheidung durch komki_policy VOR dem Vollzug), jede Antwort
-durchlaeuft Tor 2 (Hash, Label und unabhaengige Beweispruefung, BEVOR sie
-zur MCP-Antwort wird). Fuer jeden Aufruf entsteht ein PDR-Auditdatensatz
+durchlaeuft Gate 2 (unabhaengige Beweispruefung und Pruefung des
+realisierten Payloads gegen den Regelstand Γ, BEVOR sie zur MCP-Antwort
+wird). Fuer jeden Aufruf entsteht ein PDR-Auditdatensatz
 im Journal.
 
 ## Bau und Lauf
@@ -43,27 +44,33 @@ mediator/
 Ein fehlender Raum wird beim Start provisioniert; ein vorhandener wird
 NIEMALS ueberschrieben (Idempotenz).
 
-## Tor 1 / Tor 2 / PDR
+## Gate 1 / Gate 2 / PDR
 
-* **Tor 1**: gerenderter Aufruf → canonische Bytes → `intent_hash`; Objekt,
-  Intent, Snapshot → `KomkiPolicy.Derive.decide`. Ein `deny`/`indeterminate`
-  ist kein nackter Fehler, sondern ein Remedy-Plan (behebbare Schritte,
+* **Gate 1**: exakt gerenderter Aufruf (Tool samt vollstaendigen Parametern)
+  → canonische Bytes → `intent_hash`; Objekt, Intent, Snapshot →
+  `KomkiPolicy.Derive.decide`. Ein `deny`/`indeterminate` ist kein nackter
+  Fehler, sondern ein Remedy-Plan (behebbare Schritte,
   Relaxationsbefugnisse inklusive).
-* **Tor 2**: nur nach einem `permit` vollzieht der Connector; das Ergebnis
-  wird gehasht und durch `KomkiPolicy.Verify.check` unabhaengig neu
-  geprueft. Faellt die Pruefung, wird der Inhalt zurueckgehalten
-  (`"admitted" => "redacted"`).
-* **PDR**: jeder Ablauf haengt einen Auditdatensatz an das Journal
+* **Gate 2**: nur nach einem `permit` vollzieht der Connector. Danach
+  laufen zwei unabhaengige Pruefungen: der Beweis durch
+  `KomkiPolicy.Verify.check`, und das realisierte Payload gegen den
+  Γ-Stand — das Executor-Ergebnis traegt einen `object_id`-Claim, der
+  gegen `room.json` aufgeloest und mit Objekt, Version und Labels des
+  Snapshots verglichen wird. Faellt eine der Pruefungen, wird der Inhalt
+  zurueckgehalten (`"admitted" => "redacted"`, kein `content`).
+* **PDR**: jeder Ablauf haengt einen Auditdatensatz an das Journal, der
+  `intent_hash`, `payload_hash` und Γ-Stand-Hash des Aufrufs bindet
   (separater Writer-Prozess; stirbt er, stirbt die Vermittlung — die
   Auditkette dunkelt nie still ab) und bettet die `decision_id` in die
-  Antwort ein.
+  Antwort ein. `payload_hash` ist der SHA-256 der kanonischen Antwortbasis
+  (Options-Recherche §5, nicht R.4.4).
 
 ## Komponenten
 
 | Modul | Aufgabe |
 |---|---|
 | `KomkiMediator.Fassung` | festgedrehte Tool-Auflage (R.4.3) |
-| `KomkiMediator.Gate` | Tor 1 + Tor 2 + PDR |
+| `KomkiMediator.Gate` | Gate 1 + Gate 2 + PDR |
 | `KomkiMediator.Gamma` | Registry-Snapshot + Stand-Hash |
 | `KomkiMediator.Room` | Raum-Zustand, Objekt-/Snapshot-Bildung |
 | `KomkiMediator.Remedy` | Abhilfeplaene aus Blockern/Evidenzen |

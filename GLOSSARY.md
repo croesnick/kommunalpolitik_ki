@@ -470,10 +470,12 @@ rechnend — führt selbst nichts aus.
 
 **Definition:** Festlegungspunkt, an dem eine Freigabe an Bedingungen
 gekoppelt ist. Zulässige Bildungen des Repos: GO-Gate, Boot-Gate,
-Grenz-Gates, Antragsreife-Gates, Hard/Soft Gates.
+Grenz-Gates, Antragsreife-Gates, Hard/Soft Gates, Vermittler-Gates
+(Gate 1/Gate 2).
 
 **Sprache:** Basis ist der etablierte Quality-Gate-Begriff (deutsche
-Fachtexte nutzen ihn); bei Ersteinführung definieren.
+Fachtexte nutzen ihn); bei Ersteinführung definieren. Verdeutschungen wie
+„Tor" sind Fehlformen.
 
 ---
 
@@ -589,6 +591,18 @@ logischer Regeln über deren Zulässigkeit. Sie ist hier kein LLM-Server.
 
 ---
 
+### Fassung
+
+**Definition:** Die fest versionierte Gestalt des Angebots eines Vermittlers:
+die Menge der Tools, die er bereitstellt. Jede Änderung erzeugt eine neue
+Fassung; ein Rollover auf eine „aktuelle" Fassung gibt es nicht. Der
+allgemeine Wortgebrauch (versionierte Fassung eines Datenobjekts) bleibt
+davon unberührt.
+
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+
+---
+
 ### Connector
 
 **Definition:** Eine begrenzte Schnittstelle zu einer Quelle oder einem
@@ -627,6 +641,15 @@ bei einer weiteren Entscheidung gemeinsam zu berücksichtigen sind.
 festgehaltenen Ausführungsaufträgen und zugehörigen Belegen. Ein Eintrag allein
 beweist weder die tatsächliche Ausführung noch das Ausbleiben von
 Auswirkungen.
+
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+
+---
+
+### PDR (Policy Decision Record)
+
+**Definition:** Der einzelne Entscheidungsnachweis eines Vermittlungsaufrufs
+im Audit-Journal: Intent-Hash, Payload-Hash und Γ-Stand-Hash des Aufrufs.
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 

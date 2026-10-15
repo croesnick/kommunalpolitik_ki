@@ -69,7 +69,7 @@ defmodule KomkiCli.Config do
   # Vermittler-MCP-Port (Ticket #102): eigener Loopback-Port neben dem
   # llama-Port; komki-mediator lauscht dort (healthz + POST /mcp).
   @default_mediator_port 49_525
-  # Nutzer-Präferenz «große Kontexte» bei 64 GB RAM: 128K ist derDefault;
+  # Nutzer-Präferenz «große Kontexte» bei 64 GB RAM: 128K ist der Default;
   # Gemma 4 hält den KV-Cache via SWA klein.
   @default_ctx 131_072
   @pi_bundle_rel "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"

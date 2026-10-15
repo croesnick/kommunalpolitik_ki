@@ -5,13 +5,6 @@ defmodule KomkiMediator.FassungTest do
     assert KomkiMediator.Fassung.tools() == ["ping", "admit_document"]
   end
 
-  test "mcp_tool_exposure deckt genau die Tool-Menge ab" do
-    exposure = KomkiMediator.Fassung.mcp_tool_exposure()
-
-    assert exposure == %{"ping" => "direct", "admit_document" => "direct"}
-    assert Enum.sort(Map.keys(exposure)) == Enum.sort(KomkiMediator.Fassung.tools())
-  end
-
   test "fassung_id ist die versionierte Kennung" do
     assert KomkiMediator.Fassung.fassung_id() == "komki-mediator/1"
   end
