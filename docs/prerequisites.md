@@ -355,11 +355,18 @@ llama-server, pi-Session, tmux. Läuft nur unter macOS (Seatbelt). Details:
 **Install:**
 
 ```bash
-brew install llama.cpp tmux      # Inferenz-Server (gepinnt 0.5.0), Session-Host
+brew install llama.cpp tmux      # Inferenz-Server, Session-Host
 brew install fd ripgrep          # optional: pi's Such-Tools (aktiviert find/grep)
 # node via asdf, Homebrew oder nvm; pi-Bundle global:
 npm install -g @earendil-works/pi-coding-agent
 ```
+
+**Versionen (llama-server, pi): keine exakten Pins.** komki läuft gegen die
+jeweils installierte Version, Tendenz zur neuesten (GOs aus #103 und #117).
+Ein Versionswechsel gilt als Fassungswechsel: `komki init` pinnt die
+aufgelösten Pfade in die config.json; die Experimentbelege für llama-server
+(Ticket #100) beziehen sich auf 0.6.0 (build 11429). Empfohlen: `komki doctor`
+meldet die installierte Version.
 
 **Modell:** Das gepinnte GGUF (Gemma 4 26B-A4B-it, unsloth UD-Q4_K_XL) wird
 nicht heruntergeladen. `komki init` übernimmt es SHA-256-geprüft aus dem
