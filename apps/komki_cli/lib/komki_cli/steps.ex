@@ -75,6 +75,8 @@ defmodule KomkiCli.Steps do
          {:ok, gguf_lines} <- place_gguf(cfg, opts) do
       write_pi_home(cfg)
       Profile.write!(cfg.profile_path, Profile.generate(cfg, Profile.check_scratch(cfg)))
+      # Ticket #100: llama-server-Profil neben dem pi-Profil schreiben
+      Profile.write!(Llama.llama_profile_path(cfg), Profile.generate_llama(cfg))
       Config.save(cfg)
       {:inited, cfg, gguf_lines}
     else
@@ -306,6 +308,7 @@ defmodule KomkiCli.Steps do
       profile_checks(cfg),
       gguf_checks(cfg, scope),
       boot_gate(cfg),
+      llama_boot_gate(cfg),
       [port_check(cfg)]
     ])
   end
@@ -340,7 +343,7 @@ defmodule KomkiCli.Steps do
 
   defp profile_checks(cfg) do
     if Config.tools_ready(cfg) do
-      profile_identity_checks(cfg)
+      profile_identity_checks(cfg) ++ llama_profile_identity_checks(cfg)
     else
       [%{name: "profile", ok: false, reason: "Werkzeugpfade fehlen (config.json unvollstaendig)"}]
     end
@@ -363,6 +366,29 @@ defmodule KomkiCli.Steps do
       end
     else
       [%{name: "profile", ok: false, reason: "missing (init first)"}]
+    end
+  end
+
+  # Identitaet des llama-Profils (Ticket #100): gleiche Prueffamilie wie das
+  # pi-Profil, aber gegen Profile.generate_llama und den llama-Profil-Pfad.
+  defp llama_profile_identity_checks(cfg) do
+    expected = Profile.generate_llama(cfg)
+    llama_profile_path = Llama.llama_profile_path(cfg)
+
+    if File.exists?(llama_profile_path) do
+      if File.read!(llama_profile_path) == expected do
+        [%{name: "llama profile", ok: true, reason: "regeneration byte-stabil"}]
+      else
+        [
+          %{
+            name: "llama profile",
+            ok: false,
+            reason: "drift: regenerierter llama-Profiltext weicht ab (init --force)"
+          }
+        ]
+      end
+    else
+      [%{name: "llama profile", ok: false, reason: "missing (init first)"}]
     end
   end
 
@@ -425,23 +451,29 @@ defmodule KomkiCli.Steps do
   @spec boot_gate(Config.t()) :: [check()]
   def boot_gate(cfg) do
     [
-      boot_l(cfg, "/usr/bin/true"),
-      boot_l(cfg, "/bin/sh", ["-c", "exit 0"])
+      boot_l(cfg, cfg.profile_path, "/usr/bin/true"),
+      boot_l(cfg, cfg.profile_path, "/bin/sh", ["-c", "exit 0"])
     ]
   end
 
-  @spec boot_l(Config.t(), String.t(), [String.t()]) :: check()
-  defp boot_l(cfg, binary, args \\ []) do
-    # Arbeitsverzeichnis in den erlaubten Bereich legen (pi-home, sonst base-dir):
-    # Erbt das Kind das Aufruferverzeichnis, scheitert getcwd() unter dem Profil
-    # und sh meldet "shell-init: error retrieving current directory" (Smoke-Fund).
-    cwd = if File.exists?(cfg.pi_home), do: cfg.pi_home, else: cfg.base_dir
+  # Ticket #100: llama-server boot-Gate — das Inferenz-Binary muss unter
+  # seinem eigenen Profil execbar sein (--version: kein Modell, kein Port,
+  # kein Netz). cwd "/" wie beim Spawn (llama-Profil erlaubt
+  # file-read-data "/" aus der Startup-Schicht; pi-home liegt ausserhalb
+  # seiner Grenze).
+  defp llama_boot_gate(%Config{} = cfg) do
+    [boot_l(cfg, Llama.llama_profile_path(cfg), cfg.llama_server_bin, ["--version"], "/")]
+  end
 
+  @spec boot_l(Config.t(), String.t(), String.t(), [String.t()], String.t() | nil) :: check()
+  defp boot_l(cfg, profile_path, binary, args \\ [], cwd \\ nil)
+
+  defp boot_l(cfg, profile_path, binary, args, cwd) do
     {ok, reason} =
       try do
-        case System.cmd(cfg.sandbox_exec, ["-f", cfg.profile_path, "--", binary] ++ args,
+        case System.cmd(cfg.sandbox_exec, ["-f", profile_path, "--", binary] ++ args,
                env: %{"PATH" => "/usr/bin:/bin"},
-               cd: cwd
+               cd: boot_cwd(cfg, cwd)
              ) do
           {_out, 0} -> {true, "rc0"}
           {out, code} -> {false, rc_reason(code, out)}
@@ -454,6 +486,17 @@ defmodule KomkiCli.Steps do
       end
 
     %{name: "boot " <> binary, ok: ok, reason: reason}
+  end
+
+  # Arbeitsverzeichnis in den erlaubten Bereich legen (pi-home, sonst
+  # base-dir): Erbt das Kind das Aufruferverzeichnis, scheitert getcwd()
+  # unter dem Profil und sh meldet "shell-init: error retrieving current
+  # directory" (Smoke-Fund). Explizit uebergebene cwds (llama-Probe: "/")
+  # gewinnen.
+  defp boot_cwd(_cfg, cwd) when is_binary(cwd), do: cwd
+
+  defp boot_cwd(cfg, nil) do
+    if File.exists?(cfg.pi_home), do: cfg.pi_home, else: cfg.base_dir
   end
 
   defp rc_reason(code, out) do

@@ -179,4 +179,72 @@ defmodule KomkiCli.ProfileTest do
       end)
     end
   end
+
+  describe "llama-server-Profil (Ticket #100)" do
+    # Ueberdeckt das :text aus dem globalen Setup (llama-Profiltext statt pi).
+    setup %{cfg: cfg} do
+      {:ok, text: Profile.generate_llama(cfg)}
+    end
+
+    test "deny-default-Basis, keine Broad-Formen", %{text: text} do
+      assert String.contains?(text, "(version 1)")
+      assert String.contains?(text, "(deny default)")
+      refute String.contains?(text, "(allow default)")
+      refute String.contains?(text, "localhost:*")
+      refute String.contains?(text, "(allow mach-lookup)\n")
+    end
+
+    test "kein network-outbound — Offline wird profilseitig erzwungen", %{text: text} do
+      refute String.contains?(text, "network-outbound")
+    end
+
+    test "Management-Port: genau eine bind-Regel, loopback+Port gepinnt", %{text: text, cfg: cfg} do
+      assert String.contains?(
+               text,
+               "(allow network-bind (local ip \"localhost:" <> to_string(cfg.port) <> "\"))"
+             )
+
+      assert String.contains?(text, "(allow network-inbound (local ip))")
+
+      bind_lines =
+        text |> String.split("\n") |> Enum.filter(&String.contains?(&1, "network-bind"))
+
+      assert bind_lines == [
+               "(allow network-bind (local ip \"localhost:" <> to_string(cfg.port) <> "\"))"
+             ]
+    end
+
+    test "exec/read fuer llama-server, Modell und Log", %{text: text, cfg: cfg} do
+      assert String.contains?(
+               text,
+               "(allow process-exec (literal \"" <> cfg.llama_server_bin <> "\"))"
+             )
+
+      assert String.contains?(text, "(allow file-read* (literal \"" <> cfg.gguf_path <> "\"))")
+
+      log = Path.join([cfg.base_dir, "tmp", "llama-server.log"])
+      assert String.contains?(text, "(allow file-write* (literal \"" <> log <> "\"))")
+    end
+
+    test "Write-Scope-Disziplin: file-write nur Log + dtracehelper", %{text: text, cfg: cfg} do
+      log = Path.join([cfg.base_dir, "tmp", "llama-server.log"])
+
+      text
+      |> String.split("\n")
+      |> Enum.filter(&String.contains?(&1, "file-write"))
+      |> Enum.each(fn line ->
+        in_scope = String.contains?(line, log) or String.contains?(line, "dtracehelper")
+        assert in_scope, "file-write line outside scope: " <> line
+      end)
+    end
+
+    test "kein pi-Home, keine pi-Regel-Schicht im llama-Profil", %{text: text, cfg: cfg} do
+      refute String.contains?(text, cfg.pi_home)
+      refute String.contains?(text, "asdf")
+    end
+
+    test "Determinismus: feste cfg -> byte-identisch", %{cfg: cfg} do
+      assert Profile.generate_llama(cfg) == Profile.generate_llama(cfg)
+    end
+  end
 end

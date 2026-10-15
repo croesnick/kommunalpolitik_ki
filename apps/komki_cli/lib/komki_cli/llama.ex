@@ -11,9 +11,14 @@ defmodule KomkiCli.Llama do
 
   `--offline` und die Nichtverwendung von `-mu/-hf/-dr` sind Pflicht
   (Quellenbindung: nur das lokale, SHA-verifizierte Artefakt).
+
+  Confinement (Ticket #100): llama-server laeuft unter der eigenen
+  deny-default-Grenze `profile/llama-server.sb` (loopback-bind/inbound,
+  kein outbound, CPU-only). Evidenz: Experimentserie 14.10.2026
+  (llama-server 0.6.0, build 11429, macOS 27.2 Build 26B5101f).
   """
 
-  alias KomkiCli.Config
+  alias KomkiCli.{Config, Profile}
   require Config
 
   @health_timeout_ms 10_000
@@ -104,6 +109,21 @@ defmodule KomkiCli.Llama do
     end
   end
 
+  # ---------------------------------------------------------------- Pfade
+
+  @doc "Log-Pfad des llama-server (tmp unter dem Instanz-Basisverzeichnis)."
+  @spec log_path(Config.t()) :: String.t()
+  def log_path(cfg), do: Path.join([cfg.base_dir, "tmp", "llama-server.log"])
+
+  @doc """
+  Profil-Pfad des llama-server (Ticket #100): eigene deny-default-Grenze neben
+  dem pi-Profil. Abgeleitet aus profile_path (kein config.json-Feld — keine
+  Migration noetig): <base>/profile/llama-server.sb.
+  """
+  @spec llama_profile_path(Config.t()) :: String.t()
+  def llama_profile_path(%Config{} = cfg),
+    do: Path.join(Path.dirname(cfg.profile_path), "llama-server.sb")
+
   # ---------------------------------------------------------------- Aufruf-Maschine
 
   defp spawn_llama(%Config{} = cfg) when Config.tools_ready(cfg) do
@@ -116,6 +136,10 @@ defmodule KomkiCli.Llama do
       to_string(port(cfg)),
       "--alias",
       "local-model",
+      # --device none: benannte CPU-Grenze unter dem Seatbelt-Profil (Ticket #100);
+      # ohne sie wuerde die Metal-Context-Init an der verweigerten iokit-Kette scheitern (exp15)
+      "--device",
+      "none",
       "--jinja",
       "--offline",
       "--no-webui",
@@ -135,14 +159,28 @@ defmodule KomkiCli.Llama do
     log_path = log_path(cfg)
     File.mkdir_p!(Path.dirname(log_path))
 
+    # Profil frisch regeneriert vor jedem Start — dasselbe Muster wie Pi.run;
+    # die Doctor-Identitaet prueft dieselbe Textquelle.
+    Profile.write!(llama_profile_path(cfg), Profile.generate_llama(cfg))
+
+    # sandbox-exec -f <llama-Profil> umschliesst ausschliesslich llama-server
+    # (das confine gilt dem Inferenz-Prozess); das aeussere sh behaelt die
+    # fd-Plumbing-Rolle.
     line =
       "nohup " <>
+        quote_bin(cfg.sandbox_exec) <>
+        " -f " <>
+        quote_bin(llama_profile_path(cfg)) <>
+        " -- " <>
         quote_bin(cfg.llama_server_bin) <>
         " " <>
         Enum.map_join(args, " ", &quote_bin/1) <>
         " > " <> quote_bin(log_path) <> " 2>&1 & echo $!"
 
-    case System.cmd("/bin/sh", ["-c", line]) do
+    # cwd "/" — getcwd unter der Grenze braucht nur file-read-data "/",
+    # das die Startup-Schicht erlaubt (exp14); ein ungeschuetztes Aufrufer-cwd
+    # wuerde den Metadaten-Walk blocken.
+    case System.cmd("/bin/sh", ["-c", line], cd: "/") do
       {out, 0} ->
         case Integer.parse(String.trim_trailing(out)) do
           {pid, ""} when pid > 0 ->
@@ -251,7 +289,6 @@ defmodule KomkiCli.Llama do
 
   defp port(cfg), do: cfg.port
 
-  defp log_path(cfg), do: Path.join([cfg.base_dir, "tmp", "llama-server.log"])
   defp pidfile(cfg), do: Path.join([cfg.base_dir, "tmp", "llama-server.pid"])
 
   defp read_pidfile(cfg) do
