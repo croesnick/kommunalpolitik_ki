@@ -5,7 +5,7 @@
 | Datum | Experimente 2026-10-14 (exp4–exp16, exp18 Runden 1–3); Konsolidierung 2026-10-15 |
 | Gegenstand | llama-server 0.6.0 (build 11429) unter der eigenen deny-default-Grenze `profile/llama-server.sb` auf macOS 27.2 (Build 26B5101f): Startup-Schicht, Execbarkeit, Modell-Load (mmap), Health, Inferenz und TERM-Exit — CPU-only-Pfad (Ticket [#100](https://github.com/croesnick/kommunalpolitik_ki/issues/100)) und GPU/Metal-Freigabe (Ticket [#111](https://github.com/croesnick/kommunalpolitik_ki/issues/111)). |
 | Entscheidung | Die Grants wurden menschlich in [#100](https://github.com/croesnick/kommunalpolitik_ki/issues/100) und [#111](https://github.com/croesnick/kommunalpolitik_ki/issues/111) entschieden (Wayfinder-Map [#89](https://github.com/croesnick/kommunalpolitik_ki/issues/89)). Dieser Bericht konsolidiert die beobachtete Beweislage; er trifft keine neue Entscheidung und stellt keine Isolationsbehauptung auf. |
-| Beweislabels | [B] beobachteter Einzelfall: lokal unter dem Profil gemessen. [E] Kernel-Beleg: `deny`-Zeile aus dem Unified Log (entspricht dem Label „Kernel-Evidenz" aus dem [Probebericht 2026-10-04](2026-10-04-probe-harness-sandbox.md)). [S] Schluss: aus Belegen abgeleitet. [U] offen/ungetestet. |
+| Beweislabels | [B] beobachteter Einzelfall: lokal unter dem Profil gemessen. [E] Kernel-Beleg: `deny`-Zeile aus dem Unified Log (entspricht dem Label „Kernel-Evidenz" aus dem [Probebericht 2026-10-04](2026-10-04-probe-harness-sandbox.md)). [D] dokumentiert: externe Quelle mit Abrufdatum. [S] Schluss: aus Belegen abgeleitet. [U] offen/ungetestet. |
 | Provenienz | Die Rohprotokolle der Serie sind nicht persistent konserviert [U]. Diese Konsolidierung bündelt drei schriftliche Träger, alle versioniert: die Commit-Messages [8910258](https://github.com/croesnick/kommunalpolitik_ki/commit/8910258) (Ticket #100) und [29b5dea](https://github.com/croesnick/kommunalpolitik_ki/commit/29b5dea) (Ticket #111), die Rationale-Kommentare der Regelblöcke in `apps/komki_cli/lib/komki_cli/profile.ex`, `llama.ex` und `steps.ex` (Mach-O-Scanner ab diesem PR: `KomkiCli.MachODeps`) sowie die Tickets #100 (0 Kommentare) und #111 (1 Kommentar), abgerufen 2026-10-15. |
 
 ## 1. Auftrag und Ausgangslage
@@ -59,7 +59,7 @@ Bewusst ungenutzt blieb die AGX-Bundle-Entdeckung (17 GPU-Klassen-Bundles): Jede
 ## 6. Bewusst benannte Grenzen
 
 - **GPU-Treiber-Angriffsfläche:** iokit-Userclients plus ausgelagerter Shader-Compiler-Service — die in #111 bewusst eingegangene Grenze (Commit 29b5dea, Regelblock `llama_metal_rules/0`).
-- **Netz-Auswärts:** bleibt verweigert, auch mit GPU-Grants — einschließlich des syslog-Unix-Sockets (os_log-Fallback; einziger beobachteter Outbound-Versuch, Kernel-Denial exp18) [E].
+- **Netz-Auswärts:** bleibt verweigert, auch mit GPU-Grants — einschließlich des syslog-Unix-Sockets (os_log-Fallback; einziger beobachteter Outbound-Versuch, Kernel-Denial exp18) [E]. Seatbelt zählt Unix-Socket-Verbindungen als `network-outbound`, nicht als File-Operation; File-Regeln auf dem Socket-Pfad blocken die Verbindung nicht [D]. Die Enge des pi-Profils (`remote tcp localhost:PORT` allein) erfasst Unix-Socket-Kanäle nicht; verweigert werden sie von der deny-default-Basis. Denselben Klassifikations-Befund zeigte bereits der Probebericht 2026-10-04: `deny(1) network-outbound /private/var/run/mDNSResponder`.
 - **Inbound-Breite:** siehe Abschnitt 5; die Pinning-Aussage trägt die bind-Regel, nicht die inbound-Regel [S].
 - **Umgebungsgebundene Byte-Identität:** gleiche cfg und gleiche Umgebung (HOME, otool-Verfügbarkeit, Dateisystemstand) erzeugen byte-identischen Profiltext; geänderte Umgebung erzeugt erwarteten Drift im Doctor — kein Profildefekt [S].
 
@@ -69,6 +69,20 @@ Bewusst ungenutzt blieb die AGX-Bundle-Entdeckung (17 GPU-Klassen-Bundles): Jede
 - Am Boot-Gate ist die Startschicht (Execbarkeit) belegt, nicht der Inferenzpfad. Den vollen Pfad — Modell-Load, Health, Inferenz, TERM-Exit — belegt die Experimentserie; im laufenden Betrieb belegt ihn der erfolgreiche `up` (Health 200 unter der Grenze) [S].
 - Keine Isolations- oder Nichtinterferenzbehauptung über die belegten Grants hinaus.
 
-## 8. Versionierung
+## 8. Externe Bestätigung [D]
+
+Die Seatbelt-Internals-Doku des nono-CLI ([alwaysfurther.mintlify.app/cli/internals/seatbelt](https://alwaysfurther.mintlify.app/cli/internals/seatbelt), Abruf 2026-10-15) dokumentiert fünf Befunde, die dieser Bericht aus [B]/[E] selbst ableitet — unabhängige Zweitquelle je Anker:
+
+| Unser Befund | Externe Aussage (nono-Doku) | Anker (Abschnitt) |
+|---|---|---|
+| Startup-Schicht-Pflicht, sonst SIGABRT rc=134 (Abschnitt 3) | „Abort (exit 134) → Missing system path" | „Common Issues" |
+| dyld-Kette im Profil (Abschnitt 3) | `(allow file-map-executable)` „required for dyld" | „Profile Structure" |
+| Unix-Socket-Verbindungen sind Netz-Operationen (Abschnitt 6) | „a file-read-data or file-write-data deny rule for the socket path will not block the connection" | „Unix Socket Connections" |
+| Pfadform-Cave, beide Richtungen (Abschnitt 3) | „rules written for `/Users/luke` might not match the kernel's resolved path" | „APFS Firmlinks" |
+| Grenzen-Permanenz (deny default lässt sich nicht aufheben) | „There is no `sandbox_remove()` or `sandbox_expand()` API" | „Irreversibility" |
+
+Zur Pfadform-Falle lösen nono und komki dieselbe Falle unterschiedlich: nono hält eine kuratierte Firmlink-Liste, komki hält je aufgelöster Dylib-Abhängigkeit die deklarierte und die kanonische Pfadform (`KomkiCli.MachODeps`). Die nono-Doku ist Produktdokumentation eines anderen CLI, keine Kernel-Quelle; als [D]-Anker bestätigt sie Befunde, die hier aus Belegen erster Hand hervorgehen.
+
+## 9. Versionierung
 
 R.3 (RFC 0003, Z. 502): „Umgebungsbeschreibungen, ihre zugänglichen Empfänger und ihre Nachweise sind versioniert.“ Die versionierten Träger sind dieser Bericht, die Regel-Kommentare im Profilgenerator und die Commits [8910258](https://github.com/croesnick/kommunalpolitik_ki/commit/8910258) und [29b5dea](https://github.com/croesnick/kommunalpolitik_ki/commit/29b5dea). Ein Wechsel des OS-Builds oder des llama-server-Builds erneuert die Prüfung (R.3, [RFC 0003](../rfcs/0003-vertrauliche-ki-arbeitsraeume.md)).
