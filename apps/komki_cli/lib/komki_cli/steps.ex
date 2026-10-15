@@ -349,47 +349,39 @@ defmodule KomkiCli.Steps do
     end
   end
 
-  defp profile_identity_checks(cfg) do
-    expected = Profile.generate(cfg, Profile.check_scratch(cfg))
-
-    if File.exists?(cfg.profile_path) do
-      if File.read!(cfg.profile_path) == expected do
-        [%{name: "profile", ok: true, reason: "regeneration byte-stabil"}]
+  # Gemeinsame Drei-Zweig-Kaskade der Profil-Identitaetschecks (missing /
+  # byte-stabil / drift); die Wrapper liefern name/Pfad/Erwartung —
+  # Reason-Strings byte-identisch gepinnt (Tippfehler "Profilttext" im
+  # pi-Drift-String ist Bestand).
+  defp identity_checks(name, path, expected, drift_reason) do
+    if File.exists?(path) do
+      if File.read!(path) == expected do
+        [%{name: name, ok: true, reason: "regeneration byte-stabil"}]
       else
-        [
-          %{
-            name: "profile",
-            ok: false,
-            reason: "drift: regenerierter Profilttext weicht ab (init --force)"
-          }
-        ]
+        [%{name: name, ok: false, reason: drift_reason}]
       end
     else
-      [%{name: "profile", ok: false, reason: "missing (init first)"}]
+      [%{name: name, ok: false, reason: "missing (init first)"}]
     end
   end
 
-  # Identitaet des llama-Profils (Ticket #100): gleiche Prueffamilie wie das
-  # pi-Profil, aber gegen Profile.generate_llama und den llama-Profil-Pfad.
-  defp llama_profile_identity_checks(cfg) do
-    expected = Profile.generate_llama(cfg)
-    llama_profile_path = Llama.llama_profile_path(cfg)
+  defp profile_identity_checks(cfg) do
+    identity_checks(
+      "profile",
+      cfg.profile_path,
+      Profile.generate(cfg, Profile.check_scratch(cfg)),
+      "drift: regenerierter Profilttext weicht ab (init --force)"
+    )
+  end
 
-    if File.exists?(llama_profile_path) do
-      if File.read!(llama_profile_path) == expected do
-        [%{name: "llama profile", ok: true, reason: "regeneration byte-stabil"}]
-      else
-        [
-          %{
-            name: "llama profile",
-            ok: false,
-            reason: "drift: regenerierter llama-Profiltext weicht ab (init --force)"
-          }
-        ]
-      end
-    else
-      [%{name: "llama profile", ok: false, reason: "missing (init first)"}]
-    end
+  # Identitaet des llama-Profils (Ticket #100): gemeinsame Kaskade in identity_checks/4.
+  defp llama_profile_identity_checks(cfg) do
+    identity_checks(
+      "llama profile",
+      Llama.llama_profile_path(cfg),
+      Profile.generate_llama(cfg),
+      "drift: regenerierter llama-Profiltext weicht ab (init --force)"
+    )
   end
 
   defp gguf_checks(cfg, :full) do
