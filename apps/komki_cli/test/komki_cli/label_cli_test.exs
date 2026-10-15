@@ -144,44 +144,13 @@ defmodule KomkiCli.LabelCLITest do
         "workspace" => "sitzungsraum"
       }
 
-      snapshot = %{
-        "schema" => "komki-snapshot/1",
-        "snapshot_id" => "probe-snapshot",
-        "registry_ref" => "komki-synth-demo",
-        "identity" => "nutzende-person",
-        "workspace" => %{
-          "workspace_id" => "sitzungsraum",
-          "bindings" => ["ratsarbeit@1"],
-          "valid" => true,
-          "environment" => "lokal@1"
-        },
-        "object" => %{
+      snapshot =
+        snapshot("probe-snapshot", %{
           "object_id" => "brief-4711",
           "version" => "v1",
           "classification" => "classified",
           "labels" => ["ratsarbeit@1"]
-        },
-        "facts" => %{
-          "purpose" => %{
-            "value" => "sitzungsvorbereitung",
-            "source" => "test",
-            "source_kind" => "test"
-          },
-          "workspace_scope_ok" => %{"value" => true, "source" => "test", "source_kind" => "test"},
-          "has_operation_right" => %{"value" => true, "source" => "test", "source_kind" => "test"},
-          "has_object_access_right" => %{
-            "value" => true,
-            "source" => "test",
-            "source_kind" => "test"
-          },
-          "audit_path_ready" => %{"value" => true, "source" => "test", "source_kind" => "test"},
-          "environment_observers_complete" => %{
-            "value" => true,
-            "source" => "test",
-            "source_kind" => "test"
-          }
-        }
-      }
+        })
 
       assert {:ok, decision} = Derive.decide(compiled, snapshot, intent)
       assert decision["decision"] == "permit"
@@ -220,44 +189,13 @@ defmodule KomkiCli.LabelCLITest do
         "workspace" => "sitzungsraum"
       }
 
-      snapshot = %{
-        "schema" => "komki-snapshot/1",
-        "snapshot_id" => "quarantine-snapshot",
-        "registry_ref" => "komki-synth-demo",
-        "identity" => "nutzende-person",
-        "workspace" => %{
-          "workspace_id" => "sitzungsraum",
-          "bindings" => ["ratsarbeit@1"],
-          "valid" => true,
-          "environment" => "lokal@1"
-        },
-        "object" => %{
+      snapshot =
+        snapshot("quarantine-snapshot", %{
           "object_id" => "protokoll-9",
           "version" => "v1",
           "classification" => "quarantine",
           "labels" => []
-        },
-        "facts" => %{
-          "purpose" => %{
-            "value" => "sitzungsvorbereitung",
-            "source" => "test",
-            "source_kind" => "test"
-          },
-          "workspace_scope_ok" => %{"value" => true, "source" => "test", "source_kind" => "test"},
-          "has_operation_right" => %{"value" => true, "source" => "test", "source_kind" => "test"},
-          "has_object_access_right" => %{
-            "value" => true,
-            "source" => "test",
-            "source_kind" => "test"
-          },
-          "audit_path_ready" => %{"value" => true, "source" => "test", "source_kind" => "test"},
-          "environment_observers_complete" => %{
-            "value" => true,
-            "source" => "test",
-            "source_kind" => "test"
-          }
-        }
-      }
+        })
 
       assert {:ok, decision} = Derive.decide(compiled, snapshot, intent)
       assert decision["decision"] == "deny"
@@ -268,6 +206,45 @@ defmodule KomkiCli.LabelCLITest do
   # ========================================================================
   # Helfer
   # ========================================================================
+
+  # Snapshot-Orakel (komki-snapshot/1): beide End-to-End-Tests teilen sich
+  # dieselbe Form und unterscheiden sich nur in snapshot_id und Objektstand
+  # (die beiden Argumente).
+  defp snapshot(snapshot_id, object) do
+    %{
+      "schema" => "komki-snapshot/1",
+      "snapshot_id" => snapshot_id,
+      "registry_ref" => "komki-synth-demo",
+      "identity" => "nutzende-person",
+      "workspace" => %{
+        "workspace_id" => "sitzungsraum",
+        "bindings" => ["ratsarbeit@1"],
+        "valid" => true,
+        "environment" => "lokal@1"
+      },
+      "object" => object,
+      "facts" => %{
+        "purpose" => %{
+          "value" => "sitzungsvorbereitung",
+          "source" => "test",
+          "source_kind" => "test"
+        },
+        "workspace_scope_ok" => %{"value" => true, "source" => "test", "source_kind" => "test"},
+        "has_operation_right" => %{"value" => true, "source" => "test", "source_kind" => "test"},
+        "has_object_access_right" => %{
+          "value" => true,
+          "source" => "test",
+          "source_kind" => "test"
+        },
+        "audit_path_ready" => %{"value" => true, "source" => "test", "source_kind" => "test"},
+        "environment_observers_complete" => %{
+          "value" => true,
+          "source" => "test",
+          "source_kind" => "test"
+        }
+      }
+    }
+  end
 
   defp export_registry_json(db) do
     with {:ok, json} <- KomkiCli.LabelStore.export(db) do

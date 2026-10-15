@@ -220,12 +220,12 @@ defmodule KomkiCli.CLI do
           subcommands: [
             import: [
               name: "import",
-              description: "Store aus Registry-Datei fuellen (komki-label-store/1, Merge)",
+              description: "Store aus Registry-Datei fuellen (komki-label-store/2, Merge)",
               args: [
                 file: [
                   value_name: "FILE",
                   required: true,
-                  help: "Pfad der komki-label-store/1-JSON-Datei"
+                  help: "Pfad der komki-label-store/2-JSON-Datei"
                 ]
               ],
               options: [db: db_opt()]
@@ -461,7 +461,7 @@ defmodule KomkiCli.CLI do
       value_name: "ID",
       long: "decided-by",
       required: true,
-      help: "Beobachter-ID der entscheidenden Person (R.2.5: menschlicher Akt)"
+      help: "Beobachter-ID der entscheidenden Person (R.2.5: nur Typ \"person\" entscheidet)"
     ]
   end
 
@@ -637,17 +637,17 @@ defmodule KomkiCli.CLI do
   end
 
   defp render({:label_show_binding, binding}) do
-    lines = [
-      "binding " <> binding.id,
-      "  bezeichnung:  " <> binding.bezeichnung,
-      "  bereich:      " <> binding.geltungsbereich,
-      "  verantwortlich: " <> binding.verantwortliche_stelle,
-      "  readers:      " <> Enum.join(binding.readers, ", "),
-      "  operations:   " <> JSON.encode!(binding.operations),
-      "  auflagen:     " <> JSON.encode!(binding.auflagen),
-      "  relaxation_authorities: " <> Enum.join(binding.relaxation_authorities, ", "),
-      "  registered_at: " <> binding.registered_at
-    ]
+    lines =
+      [
+        "binding " <> binding.id,
+        "  bezeichnung:  " <> binding.bezeichnung,
+        "  bereich:      " <> binding.geltungsbereich,
+        "  verantwortlich: " <> binding.verantwortliche_stelle,
+        "  readers:      " <> Enum.join(binding.readers, ", "),
+        "  operations:   " <> JSON.encode!(binding.operations),
+        "  auflagen:     " <> JSON.encode!(binding.auflagen),
+        "  registered_at: " <> binding.registered_at
+      ] ++ render_relaxation_authorities(binding.relaxation_authorities)
 
     {Enum.join(lines, "\n") <> "\n", 0}
   end
@@ -711,6 +711,29 @@ defmodule KomkiCli.CLI do
         to_string(object.classification) <>
         "  labels=" <> JSON.encode!(object.labels)
     end)
+  end
+
+  # Strukturierte Lockerungsbefugnis (R.2.2): je Eintrag eine Zeile —
+  # wer (authority) welche Einschraenkung (restriction) fuer welche Ausgabe
+  # (output) lockern darf.
+  defp render_relaxation_authorities([]),
+    do: ["  relaxation_authorities: [] (keine Lockerung zulaessig, R.2.2)"]
+
+  defp render_relaxation_authorities(entries) do
+    [
+      "  relaxation_authorities:"
+      | Enum.map(entries, fn
+          %{} = entry ->
+            "    " <>
+              entry["authority"] <>
+              " lockert '" <>
+              entry["restriction"] <>
+              "' fuer Ausgabe '" <> entry["output"] <> "'"
+
+          _flat ->
+            "    (unlesbarer Eintrag — Store-Stand vor Ticket #109)"
+        end)
+    ]
   end
 
   # Farb-Gate: unter Burrito (stdout-Pipe des Wrappers, Regression #234)
