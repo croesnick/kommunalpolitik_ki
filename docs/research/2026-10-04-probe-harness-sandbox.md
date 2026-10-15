@@ -6,7 +6,7 @@
 | Gegenstand | Lokale Seatbelt-Abgrenzungsprobe für eine gepinnte Harness-/Sandbox-Kombination im Lernbetrieb: Phase 1 (Profil-Reparatur und Gates), Phase 2 (Harness-Gates OpenCode vs. pi), Phase 3 (echte Inferenz über llama-server). |
 | Entscheidung | Die Auswahl wurde menschlich im Wayfinder-Ticket [Nr. 70](https://github.com/croesnick/kommunalpolitik_ki/issues/70) getroffen; dieser Bericht liefert die beobachtete Beweislage, keine Entscheidung und keine Isolationsbehauptung über die beobachteten Gates hinaus. |
 | Beweislabels | [B] beobachteter Einzelfall: lokal unter Profil gemessen (rc/errno). [E] Kernel-Evidenz: `deny`-Zeile aus dem Unified Log. [D] dokumentiert: externe Quelle mit Abrufdatum. [S] Schluss: aus Belegen abgeleitet. [U] offen/ungetestet. |
-| Provenienz | Die Rohbelege liegen im ephemeren Probebaum `$TMPDIR/open/probe-70` (Temp-Verzeichnis, nicht langlebig); alle entscheidenden Zahlen sind hier inline konsolidiert. Attempt-Wurzeln: `07-path-pin` und `08-harness-phase2` (run_id `2533a3f65e3444da`). |
+| Provenienz | Die Rohbelege liegen im ephemeren Probebaum `$TMPDIR/open/probe-70` (Temp-Verzeichnis, nicht langlebig); alle entscheidenden Zahlen sind hier inline konsolidiert. Attempt-Roots: `07-path-pin` und `08-harness-phase2` (run_id `2533a3f65e3444da`). |
 
 ## 1. Auftrag und GO-Basis
 
@@ -23,7 +23,7 @@ Maßgeblich ist das dokumentierte GO aus der Probe-Sitzung (Datei `probe-70-auth
 
 ### 2.1 Instabilitätsbefund (Overnight-Flip)
 
-Identische deny-default-Profile (SHA unverändert) booteten 2026-10-03 ca. 21:01 UTC `/usr/bin/true`, `/bin/sh`, `python3.9` sauber [B]; ab 2026-10-04 06:26 UTC starben alle Kinder mit instanter SIGABRT (ca. 10 ms, kein `.ips`-Report) [B]; Daemon-Startzeiten und Boot-Kontext in `artifacts/diagnostics.json`. `(allow default)`-Profile liefen unveränderlich weiter [B]. Kein Reboot seit 2026-09-25 [B]. Wurzelursache ungeklärt [U]; siehe Abschnitt 7.
+Identische deny-default-Profile (SHA unverändert) booteten 2026-10-03 ca. 21:01 UTC `/usr/bin/true`, `/bin/sh`, `python3.9` sauber [B]; ab 2026-10-04 06:26 UTC starben alle Kinder mit instanter SIGABRT (ca. 10 ms, kein `.ips`-Report) [B]; Daemon-Startzeiten und Boot-Kontext in `artifacts/diagnostics.json`. `(allow default)`-Profile liefen unveränderlich weiter [B]. Kein Reboot seit 2026-09-25 [B]. Root Cause ungeklärt [U]; siehe Abschnitt 7.
 
 ### 2.2 Klassen-Bisect (Attempt 06)
 
@@ -150,7 +150,7 @@ Beide Serverprozesse terminiert und verifiziert [B]: mock pid 49825 (SIGTERM, ke
 ## 9. Offene Punkte
 
 1. UDP/53 direkt, IPv6, Unix-Sockets über die resolver-Zeile hinaus, AppleEvents, Symlink-Kanonisierung, Protokoll-Scopes des localhost-Selektors — ungetestet [U].
-2. Wurzelursache des Overnight-Flips; Datierung eines möglichen Seed-Build-Wechsels (27.1 vs. 27.2) als Gegenprobe [U].
+2. Root Cause des Overnight-Flips; Datierung eines möglichen Seed-Build-Wechsels (27.1 vs. 27.2) als Gegenprobe [U].
 3. Produktionsartefakt (größeres Qwen-GGUF) und dessen Download-GO — erster Bauschritt nach der Harness-Entscheidung.
 4. Modellqualität jenseits der Sanity-Checks; keine Freigabe geschützter Verarbeitung; keine Isolationsbehauptung über die beobachteten Gates hinaus.
 5. Repo-Integration (Skills, MCP-Registrierung) ist OpenCode-ausgerichtet und muss für pi aufgebaut werden.

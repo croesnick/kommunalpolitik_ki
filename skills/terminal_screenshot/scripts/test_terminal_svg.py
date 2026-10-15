@@ -72,7 +72,7 @@ def parent_map(root):
 
 
 def mutate_svg(svg_path, fn):
-    """Lade das SVG, wende fn auf die Wurzel an, schreibe es zurück."""
+    """Lade das SVG, wende fn auf das Root-Element an, schreibe es zurück."""
     ET.register_namespace("", SVG_NS)
     root = ET.parse(svg_path).getroot()
     fn(root)

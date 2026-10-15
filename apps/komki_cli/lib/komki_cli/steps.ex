@@ -177,7 +177,7 @@ defmodule KomkiCli.Steps do
   @doc """
   Schreibt die pi-Konfiguration ins pi-home (models/auth/settings/trust;
   bei asdf-gemanagtem node zusaetzlich .tool-versions). Reine
-  cfg->Dateisystem-Funktion — Testnaeht fuer Trust-Wurzel und
+  cfg->Dateisystem-Funktion — Testnaeht fuer Trust-Root und
   Settings-Global.
   """
   def write_pi_home(cfg) do
@@ -203,9 +203,9 @@ defmodule KomkiCli.Steps do
     # Nutzer-Wunsch aus der Session-Erprobung).
     File.write!(Path.join(agent, "settings.json"), ~s({"hideThinkingBlock":true}) <> "\n")
 
-    # Instanz-Wurzel als vertraut markieren, damit keine "This project
+    # Instanz-Root als vertraut markieren, damit keine "This project
     # is not trusted"-Warnung leuchtet. pi's Trust-Store laeuft vom cwd die
-    # Elternkette hoch — die Wurzel deckt beide Orte ab: die Arbeitsflaeche
+    # Elternkette hoch — das Root deckt beide Orte ab: die Arbeitsflaeche
     # (arbeit, Session-cwd) und das pi-Home. Trust-Format: Map mit realpath
     # als Schluessel und Booleschem als Wert (aus pi's ProjectTrustStore).
     File.write!(

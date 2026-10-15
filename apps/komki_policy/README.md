@@ -93,4 +93,4 @@ mix dialyzer
 - Nur-lesen: die CLI schreibt nichts, sie produziert nur
   Datensätze. Freigaben/Ausführung sind explizite Nichtziele (CONTRACT § 9).
 - Lizenz: stdlib-only, keine Runtime-Deps; Build-Werkzeuge (credo/dialyxir)
-  nur `:dev`. Lizenzangaben des Projekts siehe Repo-Wurzel.
+  nur `:dev`. Lizenzangaben des Projekts siehe Repo-Root.

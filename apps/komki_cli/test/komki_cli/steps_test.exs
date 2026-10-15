@@ -1,7 +1,7 @@
 defmodule KomkiCli.StepsTest do
   # write_pi_home ist die Testnaeht fuer alles, was komki dem pi-home
   # vorgibt: Provider-Modelle, Settings-Global und der Trust-Store. Der
-  # Trust-Schluessel ist die Instanz-Wurzel — pi's Trust-Suche laeuft vom
+  # Trust-Schluessel ist das Instanz-Root — pi's Trust-Suche laeuft vom
   # Session-cwd (die Arbeitsflaeche) die Elternkette hoch und muss dort
   # wie auch vom pi-home aus faendig werden.
   use ExUnit.Case, async: true
@@ -9,7 +9,7 @@ defmodule KomkiCli.StepsTest do
   alias KomkiCli.{Config, Steps, TestSupport}
 
   describe "write_pi_home/1" do
-    test "Trust-Schluessel ist die Instanz-Wurzel (deckt arbeit und pi-home ab)" do
+    test "Trust-Schluessel ist das Instanz-Root (deckt arbeit und pi-home ab)" do
       cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-steps"))
 
       Steps.write_pi_home(cfg)

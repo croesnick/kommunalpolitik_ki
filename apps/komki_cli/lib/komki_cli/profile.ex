@@ -485,7 +485,7 @@ defmodule KomkiCli.Profile do
   defp meta_rules(cfg, scratch, node_install, node_modules_root, pi_pkg, asdf_root_dir, user_home) do
     # Install-Pfade (brew, asdf, nvm) entstehen hier NUR aus den entdeckten
     # Werkzeugpfaden (Vorfahr-Kette des jeweiligen Pfads) — keine hartkodierten
-    # Systemwurzeln (Portabilitaets-Regel).
+    # System-Roots (Portabilitaets-Regel).
     paths = [
       "/System",
       "/System/Volumes",
@@ -528,7 +528,7 @@ defmodule KomkiCli.Profile do
             Path.join([asdf_root_dir, "plugins"]),
             node_install
             # asdf-Binary (z.B. brew-installiert): Metadaten-Vorfahrn aus dem
-            # entdeckten Pfad statt hartkodierter brew-Wurzeln.
+            # entdeckten Pfad statt hartkodierter brew-Roots.
           ] ++ asdf_binary_paths()
 
         meta_ancestors(asdf_paths)

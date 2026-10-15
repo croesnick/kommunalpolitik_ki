@@ -97,7 +97,7 @@ defmodule KomkiCli.Config do
   end
 
   @doc """
-  pi-Bundle-Entdeckung (cli.js): globale node_modules-Wurzeln — zuerst die
+  pi-Bundle-Entdeckung (cli.js): globale node_modules-Roots — zuerst die
   zum entdeckten node gehoerige (asdf/nvm-Layout: `<install>/lib`),
   dann Homebrew ARM und Intel. nil, wenn das Bundle nirgends liegt.
   """
@@ -178,7 +178,7 @@ defmodule KomkiCli.Config do
   end
 
   # asdf/nvm-Layout: <install>/bin/node -> <install>/lib liegt der globale
-  # npm-Baum. Fremde Layouts liefern [] und die generischen Wurzeln greifen.
+  # npm-Baum. Fremde Layouts liefern [] und die generischen Roots greifen.
   defp install_lib_roots(nil), do: []
 
   defp install_lib_roots(node_bin) when is_binary(node_bin),
