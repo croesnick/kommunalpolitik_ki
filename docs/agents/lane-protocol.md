@@ -1,39 +1,43 @@
-# Lane-Protokoll: Wayfinder-Tickets bearbeiten, verifizieren und abschließen
+# Lane protocol: work and close a wayfinder ticket
 
-Stand: 2026-10-15. Dieses Protokoll legt fest, wie eine Session (Lane) ein Wayfinder-Ticket dieses Repos umsetzt und abschließt — mit selbst nachprüfbarem Abschluss statt Rückfrage. Es gilt für dispatched Lanes (herdr-Worktrees) und für Cold-Sessions, die ein Ticket vom Frontier nehmen. Ursprung: Lane-Review vom 2026-10-15 mit Oracle-Gegenprüfung — die Abnahmekriterien standen bisher in Dispatch-Prompts; künftig leben sie hier und im Ticket, für alle sichtbar.
+Updated: 2026-10-15. This protocol tells a session how to work a wayfinder ticket from claim to close: read the ticket, build the smallest slice that satisfies it, verify, and record the result. It covers two cases: a dispatched lane in a herdr worktree, and a cold session that takes a ticket from the frontier.
 
-## Ticket-Anatomie
+Acceptance criteria used to live in per-dispatch prompts, and a dispatch prompt dies with its session. The criteria now live in the ticket and in this protocol. If a line would have to appear in a dispatch prompt, put it in the ticket body or here.
 
-Ein Ticket dieser Map trägt sechs Abschnitte, die zusammen das Ziel tragen:
+## Read the ticket as a contract
 
-| Abschnitt | Inhalt |
+A ticket on this map carries six sections:
+
+| Section | What it holds |
 |---|---|
-| `## Question` | Was dieses Ticket entscheidet oder baut |
-| `## Erwartung` | Der messbare Endzustand in ein bis zwei Sätzen |
-| `## Zu messen / Zu verifizieren` | Die Abnahmeliste: Tests, Smoke-Kommandos, Negativkontrollen |
-| `## Bewusst offen (prä-deklariert)` | Nicht-Ziele bereits beim Charting; „fertig“ schließt sie nachweisbar aus |
-| `## Verträge & Stacking` | Geteilte Verträge: was dieses Ticket ändern darf, was eingefroren ist, der Basis-Branch |
-| `## Abhängigkeiten` | Entscheidungen aus anderen Tickets, die hier gelten |
+| `## Question` | What this ticket decides or builds. |
+| `## Erwartung` | The measurable end state, in one or two sentences. |
+| `## Zu messen / Zu verifizieren` | The acceptance list: tests, smoke commands, negative controls. |
+| `## Bewusst offen (prä-deklariert)` | Non-goals, declared at charting time. Done provably excludes them. |
+| `## Verträge & Stacking` | Shared contracts: what this ticket may change, what is frozen, and the base branch. |
+| `## Abhängigkeiten` | Decisions from other tickets that apply here. |
 
-Fehlt ein Abschnitt, ergänzt die Lane die Abnahme aus den im Ticket verlinkten Quellen (RFC-Kapitel, Forschungsdokumente) und schreibt die Ergänzung als Kommentar aufs Ticket. Nie still.
+The section headings are the charting terms of this map and stay in German.
 
-## Gates (Pflicht vor jedem Abschluss)
+If a section is missing, derive the acceptance criteria from the sources the ticket links (RFC chapters, research documents) and record the derivation as a comment on the ticket.
 
-Maßgeblich ist die Tooling-Tabelle in [AGENTS.md](../../AGENTS.md): im Root `mix format --check-formatted` und `mix workspace.run -t compile -- --warnings-as-errors`, credo strict, Tests; dialyzer app-lokal. Ein rotes Gate ist kein Abschluss, sondern ein Rest im Ticket-Kommentar.
+## Gates
 
-## Umgebungsfallen (kosten Fehlversuche, wenn unbekannt)
+Run the gates from the tooling table in [AGENTS.md](../../AGENTS.md) before you close a ticket: format, compile with warnings as errors, credo strict, dialyzer, and tests. A red gate means the ticket stays open. Record what failed and what remains in a comment on the ticket.
 
-- `gh` in herdr-Worktrees: immer `gh <Befehl> --repo croesnick/kommunalpolitik_ki`. Ohne `--repo` kommt still nichts zurück, auch bei `gh issue view` nicht.
-- Bash-Denyliste dieses Harness: `grep`, `cat`, `echo`, `sed`, `awk`, `rm` sind gesperrt. Dateiinhalte über die Read-, Grep-, Edit- und Write-Tools; Ausgaben über `printf`.
-- Γ-Konsum von komki_policy: `apps/komki_policy/CONTRACT.md` ist die verbindliche Grenze (Schemas, Basisfakten, Blocker-Codes). Die Engine ist die einzige Schemainstanz; der Store schreibt keine eigenen Prüfungen.
+## Traps that cost failed attempts
 
-## Abschluss-Protokoll
+- When you work in a herdr worktree, run every `gh` command with `--repo croesnick/kommunalpolitik_ki`. Without `--repo`, gh returns empty output without an error, even for `gh issue view`.
+- The bash deny-list of this harness blocks `grep`, `cat`, `echo`, `sed`, `awk`, and `rm`. Read and change files with the Read, Grep, Edit, and Write tools. Produce shell output with `printf`.
+- Treat `apps/komki_policy/CONTRACT.md` as the binding boundary for Γ consumption: schemas, base facts, and blocker codes live there. `KomkiPolicy.Registry.compile/1` is the only schema instance. A store writes no schema checks of its own.
 
-1. Commits auf dem Lane-Branch; die Ticket-Nummer steht in der Commit-Nachricht.
-2. Resolution-Kommentar auf dem Ticket mit drei Abschnitten: **Gebaut** (was, wo, welcher Commit), **Bewusst offen** (was nicht, mit Folge-Zeiger), **Verifiziert** (Gates, Smoke- und Testbefehle).
-3. Ticket schließen und den Board-Status auf Done setzen (Projektführung siehe AGENTS.md).
-4. Die Map (das `wayfinder:map`-Issue) pflegt die Orchestrator-Session. Lanes editieren sie nicht.
+## Close the ticket
 
-## Eskalation statt Stillentscheidung
+1. Commit on the lane branch. Reference the ticket number in the commit message.
+2. Post a resolution comment on the ticket with three parts. `Gebaut` states what you built, where, and in which commit. `Bewusst offen` states what you deliberately left out and where the follow-up lives. `Verifiziert` states the gates and the smoke and test commands you ran.
+3. Close the ticket and set its board status to Done. The project commands live in AGENTS.md under Projekt-Verwaltung.
+4. Leave the map alone. The `wayfinder:map` issue is maintained by the orchestrator session that charted it.
 
-Eine Lane deutet eine Anforderung nie still um. Steht der Ticket-Wortlaut gegen die Umsetzbarkeit: Kommentar aufs Ticket, das Ticket bleibt blockiert. Entscheidungen, die dem Menschen gehören — Pins, Freigaben, Grenz-Anhebungen — werden vorgeschlagen, nie vollzogen (GO-Prinzip, AGENTS.md).
+## Escalate instead of reinterpreting
+
+If the ticket's wording conflicts with what is implementable, comment on the ticket and leave it blocked. Decisions that belong to the human, such as pins, releases, and boundary raises, go into a comment as a proposal (GO-Prinzip, AGENTS.md). A lane proposes, the human decides.
