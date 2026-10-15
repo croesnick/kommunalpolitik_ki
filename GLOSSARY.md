@@ -492,7 +492,9 @@ oracle; ersetzt die frühere Prägung „Auswerter-Orakel“.
 
 Die folgenden Begriffe beschreiben das Modell für vertrauliche
 KI-Arbeitsräume in [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
-Sie bezeichnen keine bereits implementierten Funktionen.
+Einträge mit **Wo:**-Zeile verweisen auf die Stelle, an der der Begriff
+bereits implementiert ist; Einträge ohne **Wo:**-Zeile bezeichnen
+bisher nur das RFC-Modell, noch keine implementierte Funktion.
 
 ### Datenobjekt
 
@@ -534,13 +536,13 @@ Einordnungsverfahren; im Minimum ist das die Erstklassifikation durch eine
 berechtigte Person. Ein Agent darf eine Einordnung nur vorschlagen.
 
 **Wo:** In der SQLite-Registry des `komki label`-CLI (apps/komki_cli); der
-Zustand wird über den Klassifikationsentscheid geführt.
+Zustand wird über die Klassifikationsentscheidung geführt.
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md), R.2.5.
 
 ---
 
-### Klassifikationsentscheid
+### Klassifikationsentscheidung
 
 **Definition:** Der nachvollziehbar festgehaltene Akt, der einem Datenobjekt
 sein Label zuordnet: wer entschieden hat, auf welcher Grundlage und wann.
@@ -561,6 +563,10 @@ append-only-Historie je Objektversion.
 Sicherheitsmetadaten und Berechtigungsdaten, unabhängig vom Agenten.
 Gemeint ist weder die kommunale Verwaltung noch der Vault. Der Regelstand
 Γ bezeichnet einen bestimmten Stand dieses Registers.
+
+**Wo:** In der SQLite-Registry des `komki label`-CLI (apps/komki_cli);
+der Γ-Export als `komki-registry/1` übergibt den Regelstand an die
+Engine (`komki-policy`).
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 

@@ -135,10 +135,15 @@ Unter `~/.local/share/komki` liegen die Instanzdaten, überschreibbar via
 `komki label` führt die SQLite-Registry des RFC-0003-Sicherheitsmodells
 ([RFC 0003](../../docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md)):
 `<base>/registry.db`, übersteuerbar per `--db`. Sie speichert Bindungen nach
-R.2.2 — Kennung mit Version, Empfängerkreis, Operationsbedingungen, Auflagen
-und Lockerungsbefugnis; ohne eingetragene Lockerungsbefugnis gibt es keine
-zulässige Lockerung — und dazu Objekt-Metadaten: Herkunft, Inhaltsversion
-und Klassifikationsentscheid, getrennt vom Inhalt.
+R.2.2: Kennung mit Version, Empfängerkreis, Operationsbedingungen, Auflagen
+und Lockerungsbefugnis. Die Lockerungsbefugnis ist strukturiert — jeder
+Eintrag `authority`/`restriction`/`output` hält fest, wer welche Einschränkung
+für welche Ausgabe lockern darf. Ohne Eintrag ist keine Lockerung zulässig
+(R.2.2). Der Γ-Export gibt die Einträge derzeit nicht weiter und emittiert
+`[]` (Ticket #109). Dazu speichert die Registry Objekt-Metadaten: Herkunft,
+Inhaltsversion und Klassifikationsentscheidung, getrennt vom Inhalt. Als
+SQLite-Anbindung dient exqlite (MIT-Lizenz,
+[siehe Hex-Paket](https://hex.pm/packages/exqlite)), direkt ohne Ecto-Ebene.
 
 Drei Eigenschaften tragen das Design:
 
@@ -148,9 +153,11 @@ Drei Eigenschaften tragen das Design:
   schreiben; Umbenennen oder die Behauptung „anonymisiert“ ändert kein
   Label.
 - **Erstklassifikation ist ein menschlicher Akt** (R.2.5). `classify`
-  verlangt `--decided-by` (Beobachter-ID) und `--basis` (Begründung +
-  Quelle). Jeder Einordnungsschritt, Quarantäne eingeschlossen, landet als
-  unveränderlicher Klassifikationsentscheid in der Historie. Ein Agent
+  verlangt `--decided-by` (Beobachter-ID vom Typ „person“; die Typen stehen
+  als `observer_types` im Import, Verarbeitungsdomänen dürfen nur
+  vorschlagen) und `--basis` (Begründung + Quelle). Jeder
+  Einordnungsschritt, Quarantäne eingeschlossen, landet als
+  unveränderliche Klassifikationsentscheidung in der Historie. Ein Agent
   kann vorschlagen; setzen kann nur die nutzende Person.
 - **Quarantäne ist kein leeres Label** (R.2.5). Unklassifiziertes Material
   liegt im abgesonderten Eingang, nicht als Bindungsmenge ∅. Ein

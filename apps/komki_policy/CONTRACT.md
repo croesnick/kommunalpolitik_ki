@@ -52,6 +52,7 @@ Regeln:
 - `operations`: Map Regelname → Expression. Zulässige Regelnamen (geschlossene Menge): `start`, `admit`, `emit`, `transfer`, `store`. Nur die Engine-seitig implementierten Zweige sind entscheidbar (L1: `admit`); die übrigen dürfen deklariert, aber nicht entschieden werden.
 - `relaxation_authorities`: Array (L1: immer `[]`; nicht bewertet).
 - Eine Bindung ohne `admit`-Eintrag in `operations` erlaubt `admit` ausdrücklich **nicht** (RFC B.4: fehlende Operationsregel ≠ leere Konjunktion). Eine bewusst uneingeschränkte Operation wird ausdrücklich mit `true` eingetragen.
+- **Zulässige Bibliotheksoberfläche:** Konsumierende der Engine (z. B. der Label-Store in `apps/komki_cli`) validieren Registry-Daten ausschließlich über `KomkiPolicy.Registry.compile/1` und dürfen vorab die öffentlichen Kennungsprädikate nutzen: `KomkiPolicy.Registry.kebab_id?/1` (kebab-case, wie `registry_id`) und `KomkiPolicy.Registry.reference_id?/1` (`<kebab>@<nicht-negativer Integer>`, wie Bindungs- und Umgebungskennungen). Eigene Schema-Prüfungen für engine-seitige Datenformate schreiben Konsumierende nicht.
 
 ### 2.2 `ContextSnapshot` — `komki-snapshot/1`
 
