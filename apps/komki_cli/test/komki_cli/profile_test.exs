@@ -246,5 +246,27 @@ defmodule KomkiCli.ProfileTest do
     test "Determinismus: feste cfg -> byte-identisch", %{cfg: cfg} do
       assert Profile.generate_llama(cfg) == Profile.generate_llama(cfg)
     end
+
+    test "GPU/Metal-Kette (#111): iokit-Grants, Compiler-Service und Extensions gepinnt", %{
+      text: text
+    } do
+      assert String.contains?(
+               text,
+               "(allow iokit-open-user-client (iokit-user-client-class \"AGXDeviceUserClient\"))"
+             )
+
+      assert String.contains?(
+               text,
+               "(allow iokit-open-user-client (iokit-user-client-class \"IOSurfaceRootUserClient\"))"
+             )
+
+      assert String.contains?(text, "com.apple.MTLCompilerService")
+      assert String.contains?(text, "com.apple.windowserver.active")
+
+      assert String.contains?(
+               text,
+               "(allow file-issue-extension (extension-class \"com.apple.app-sandbox.read\"))"
+             )
+    end
   end
 end

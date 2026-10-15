@@ -12,10 +12,13 @@ defmodule KomkiCli.Llama do
   `--offline` und die Nichtverwendung von `-mu/-hf/-dr` sind Pflicht
   (Quellenbindung: nur das lokale, SHA-verifizierte Artefakt).
 
-  Confinement (Ticket #100): llama-server laeuft unter der eigenen
+  Confinement (Tickets #100/#111): llama-server laeuft unter der eigenen
   deny-default-Grenze `profile/llama-server.sb` (loopback-bind/inbound,
-  kein outbound, CPU-only). Evidenz: Experimentserie 14.10.2026
-  (llama-server 0.6.0, build 11429, macOS 27.2 Build 26B5101f).
+  kein outbound). GPU/Metal-Kette freigegeben (Ticket #111): iokit-Grants
+  (AGX/IOSurface), MTLCompilerService-Shader-Kompilierung, System-Haeuser;
+  Messung 14.10.2026 ~53 t/s Eval unter der Grenze ≈ ungesandboxete Baseline.
+  Evidenz: Experimentserie 14.10.2026 (llama-server 0.6.0, build 11429,
+  macOS 27.2 Build 26B5101f).
   """
 
   alias KomkiCli.{Config, Profile}
@@ -136,10 +139,9 @@ defmodule KomkiCli.Llama do
       to_string(port(cfg)),
       "--alias",
       "local-model",
-      # --device none: benannte CPU-Grenze unter dem Seatbelt-Profil (Ticket #100);
-      # ohne sie wuerde die Metal-Context-Init an der verweigerten iokit-Kette scheitern (exp15)
-      "--device",
-      "none",
+      # GPU unter der Grenze (Ticket #111): kein --device none mehr — die
+      # Metal-Kette traegt das Profil (auto-Offload auf MTL0); CPU-only waere
+      # ~Faktor 10 langsamer (exp15/16 gegen exp18: ~5 gegen ~53 t/s Eval).
       "--jinja",
       "--offline",
       "--no-webui",
