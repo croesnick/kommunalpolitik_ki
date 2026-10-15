@@ -10,11 +10,11 @@ A ticket on this map carries six sections:
 
 | Section | What it holds |
 |---|---|
-| `## Question` | What this ticket decides or builds. |
+| `## Ziel` | What this ticket decides or builds. |
 | `## Erwartung` | The measurable end state, in one or two sentences. |
 | `## Zu messen / Zu verifizieren` | The acceptance list: tests, smoke commands, negative controls. |
-| `## Bewusst offen (prä-deklariert)` | Non-goals, declared at charting time. Done provably excludes them. |
-| `## Verträge & Stacking` | Shared contracts: what this ticket may change, what is frozen, and the base branch. |
+| `## Bewusst offen` | Non-goals, declared at charting time. Done provably excludes them. |
+| `## Vereinbarungen` | Shared contracts: what this ticket may change, what is frozen, and the base branch. |
 | `## Abhängigkeiten` | Decisions from other tickets that apply here. |
 
 The section headings are the charting terms of this map and stay in German.
