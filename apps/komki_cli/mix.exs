@@ -70,7 +70,7 @@ defmodule KomkiCli.MixProject do
   end
 
   # Runtime-Deps: optimus 0.6 (CLI-Layer), burrito 1.6 (Ticket #75),
-  # exqlite 0.38 (SQLite-Registry des Label-Store, Ticket #91; direkt ohne
+  # exqlite 0.42 (SQLite-Registry des Label-Store, Ticket #91; direkt ohne
   # Ecto via Exqlite.Sqlite3) und komki_policy (Γ-Validierung bei Import und
   # Export: die Engine-Vertragsform `komki-registry/1` ist die alleinige
   # Schemainstanz, siehe apps/komki_policy/CONTRACT.md § 2.1). Path-Dep auf
@@ -86,7 +86,7 @@ defmodule KomkiCli.MixProject do
     [
       {:optimus, "~> 0.6"},
       {:burrito, "~> 1.6"},
-      {:exqlite, "~> 0.38"},
+      {:exqlite, "~> 0.42"},
       {:komki_policy, path: "../komki_policy"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
