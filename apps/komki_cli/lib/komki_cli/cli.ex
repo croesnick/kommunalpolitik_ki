@@ -731,7 +731,7 @@ defmodule KomkiCli.CLI do
               "' fuer Ausgabe '" <> entry["output"] <> "'"
 
           _flat ->
-            "    (unlesbarer Eintrag — Store-Stand vor Ticket #109)"
+            "    (unlesbarer Eintrag — Store-Stand vor komki-label-store/2)"
         end)
     ]
   end

@@ -468,6 +468,19 @@ defmodule KomkiCli.LabelStoreTest do
       assert {:error, reason} = LabelStore.import_registry(db, seed2)
       assert reason =~ ~s(erwartet "person" oder "processing_domain")
     end
+
+    test "Wechsel eines Beobachtertyps verweigert (Typen sind unveraenderlich)", %{
+      db: db,
+      seed: seed
+    } do
+      {:ok, _} = LabelStore.import_registry(db, seed)
+
+      seed2 = deep_put(seed, ["observer_types", "nutzende-person"], "processing_domain")
+
+      assert {:error, reason} = LabelStore.import_registry(db, seed2)
+      assert reason =~ "Beobachtertyp unveraenderlich"
+      assert reason =~ "person != processing_domain"
+    end
   end
 
   # ========================================================================
