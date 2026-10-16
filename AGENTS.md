@@ -167,6 +167,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `skills/sitzungsvorbereitung` | Markdown-Skill | Sitzungsmappe erstellen (WF 1: sync → TOPs → AZ → Vault → Mappe) | Agent Skill | Funktionsfähig |
 | `skills/bericht_aus_dem_stadtrat` | Markdown-Skill | Bericht aus dem Stadtrat: Sitzungen seit letztem Bericht sammeln und verdichten | Agent Skill | Funktionsfähig |
 | `skills/vault_suche` | Markdown-Skill | Obsidian-Vault durchsuchen | Agent Skill | Funktionsfähig |
+| `skills/sprachinventur` | Markdown-Skill | Fachbegriffe des Repos inventieren, mit Quellen belegen und einheitlich verwenden (Status: etabliertes Deutsch, nur Englisch, Eigenprägung, Fehlform) | Agent Skill | Funktionsfähig |
 | `skills/antrag_generieren` | Markdown-Skill | Stadtratsantrag entwerfen (fraktionsneutral; fraktionsspezifische Vorlage via Vault-Tag) | Agent Skill | Funktionsfähig |
 | `skills/terminal_screenshot` | Markdown-Skill + Python-Skripte | Terminal-Sitzung als Screenshot für READMEs (tmux-Capture → SVG, Browser-verifiziert) | Agent Skill | Funktionsfähig |
 | `skills/mermaid_vision_loop` | Markdown-Skill + Python-Skript | Mermaid-Diagramme rendern, vom Vision-Agenten bewerten lassen und refaktorieren, bis sie lesbar sind | Agent Skill | Funktionsfähig |

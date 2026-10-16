@@ -3,7 +3,7 @@
 Deterministischer Policy-Kern für Komki (Lieferung 2): Ableitung (`derive`)
 für die Regelzweige `admit` und `emit`, Remedy-Katalog (§ 2.8),
 Aktionsfreigabe-Mechanik (`decide_with_release`, `advance`), unabhängiger
-Beweisprüfer (`verify`) sowie eine reine Escript-CLI (`komki-policy`) ohne
+Ableitungsprüfer (`verify`) sowie eine reine Escript-CLI (`komki-policy`) ohne
 Runtime-Abhängigkeiten.
 
 **Maßgeblich ist [`CONTRACT.md`](CONTRACT.md) im App-Verzeichnis** — der

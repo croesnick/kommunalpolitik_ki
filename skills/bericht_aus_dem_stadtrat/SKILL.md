@@ -211,8 +211,8 @@ Vault-Notizen vorhanden" kennzeichnen.
 
 ### 7. AZ-Artikel (optional, nur bei Zeit / Öffentlichkeitsbezug)
 
-Nicht für jede Sitzung — nur für 2–3 Top-Themen mit klarer
-Öffentlichkeitsscheibe (Bauprojekte, Haushalt, Personal, Verkehr) via
+Nicht für jede Sitzung — nur für 2–3 Top-Themen mit klarem
+Öffentlichkeitsbezug (Bauprojekte, Haushalt, Personal, Verkehr) via
 `allgaeuer_zeitung_mcp` suchen:
 
 ```
@@ -484,7 +484,7 @@ nutzenden Person.
 | 2 | Kein automatischer RIS↔Bericht-Link | Berichtszeitraum muss anhand von Datum/Tags im Vault gesucht oder erfragt werden | Vault-Suche nach `#bericht-aus-dem-stadtrat` / `type: bericht-aus-dem-stadtrat` (bzw. `#stammtisch` / `type: stammtisch-bericht` für Legacy); Fallback: nutzende Person fragen |
 | 3 | Keine persistente Liste der Bericht-Termine/Stichtage im Vault | Termine müssen jedes Mal gesucht/erfragt werden | Zukünftig: eigener Bericht-Kalender im Vault (Notiz-Tabelle) oder in Nextcloud (WF 9, `nc_calendar_list_events`) |
 | 4 | Kein automatischer Zeitraum-Filter in `ratsinfo sessions` | CLI listet alle Sitzungen, Filterung nach Datum manuell | KI filtert die Ausgabe von `ratsinfo sessions` gegen `zeitraum_von`/`heute` |
-| 5 | Keine automatische Themen-Clusterung | TOPs werden chronologisch gelistet, thematische Bündelung muss ad-hoc passieren | KI clustert manuell nach Schwerpunkten (Klima, Mobilität, Bauen, etc.) |
+| 5 | Kein automatisches Themen-Clustering | TOPs werden chronologisch gelistet, thematische Bündelung muss ad-hoc passieren | KI clustert manuell nach Schwerpunkten (Klima, Mobilität, Bauen, etc.) |
 | 6 | YAML-Frontmatter kann durch externe Strings (deutsche Anführungszeichen in AZ-Titeln) brechen | Properties in Obsidian nicht sichtbar / kaputt | Single-Quotes für alle YAML-Strings mit externem Text; YAML nach Vault-Write re-validieren (siehe "Validierung nach dem Vault-Write") |
 
 Siehe auch [`docs/workflows.md`](../../docs/workflows.md) WF 11 "Lücken"

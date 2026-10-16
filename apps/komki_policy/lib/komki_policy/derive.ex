@@ -444,7 +444,7 @@ defmodule KomkiPolicy.Derive do
   end
 
   # P4 (admit P6): false/fehlt ist KEIN verbietender Befund, sondern
-  # fehlende Evidenz (§ 4.3, § 4.5 — Empfänger-Beweisbarkeit).
+  # fehlende Belege (§ 4.3, § 4.5 — Empfänger-Beweisbarkeit).
   defp premise_env_flag(ctx) do
     if fact_state(ctx.facts, "environment_observers_complete") == true do
       ctx

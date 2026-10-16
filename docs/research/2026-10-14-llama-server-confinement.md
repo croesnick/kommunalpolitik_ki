@@ -35,15 +35,15 @@ macOS 27.2 (Build 26B5101f); llama-server 0.6.0, build 11429; `sandbox-exec`/SBP
 | `--device none` (damals benannte CPU-Grenze): ohne sie scheitert die Metal-Context-Init an der verweigerten iokit-Kette | [E exp15] | damals `Llama.spawn_llama`; durch #111 ersetzt |
 | Kontrolle ungesandboxet: Der Host nutzt die Metal-Device MTL0; unter der Grenze CPU-only ~5 t/s Eval | [B exp15/exp16] | Commit 8910258 |
 
-Entwicklungs-Befunde innerhalb der Serie (jeweils im Code kommentiert, Quelle profile.ex/MachODeps): ein vorbelegtes `visited` übersprang die Wurzel des Dylib-Walks (leere Dep-Liste); otool rückt Dep-Zeilen mit Tab ein; der RPATH-Scan darf bei `cmdsize` nicht vorzeitig zurückspringen; `@rpath`-Werte sind selbst loader-relativ (`@loader_path/../lib`). `otool` fehlt → `[]` (CI-Linux; Profil bleibt generierbar).
+Entwicklungs-Befunde innerhalb der Serie (jeweils im Code kommentiert, Quelle profile.ex/MachODeps): ein vorbelegtes `visited` übersprang den Root des Dylib-Walks (leere Dep-Liste); otool rückt Dep-Zeilen mit Tab ein; der RPATH-Scan darf bei `cmdsize` nicht vorzeitig zurückspringen; `@rpath`-Werte sind selbst loader-relativ (`@loader_path/../lib`). `otool` fehlt → `[]` (CI-Linux; Profil bleibt generierbar).
 
 ## 4. GPU/Metal-Freigabe in exp18 (Ticket #111)
 
 Drei Runden mit Unified-Log-Denials je Runde [E], Quelle: Regelblock-Kommentar `KomkiCli.Profile.llama_metal_rules/0` und Commit 29b5dea:
 
 - **Runde 1** scheiterte an der Command Queue (iokit: AGXDeviceUserClient, IOSurfaceRootUserClient verweigert).
-- **Runde 2** scheiterte am ausgelagerten Shader-Compiler — `mach-lookup com.apple.MTLCompilerService (xpc)` verweigert; Fund: System-Häuser-Lektüre (Cryptex-dyld).
-- **Runde 3** lief grün unter der Grant-Kette: iokit-Userclients AGX/IOSurface; mach-lookup windowserver/tccd/coreservicesd/diskarbitrationd/MTLCompilerService; `file-issue-extension` (Metal-Caches); System-Häuser `/usr/lib`, `/System/Library`, `/System/Volumes/Preboot`; OS-Varianten-Sysctls (`hw.ephemeral_storage`, `kern.osvariant_status`, `kern.osproductversion`).
+- **Runde 2** scheiterte am ausgelagerten Shader-Compiler — `mach-lookup com.apple.MTLCompilerService (xpc)` verweigert; Fund: Lektüre der Systemverzeichnisse (Cryptex-dyld).
+- **Runde 3** lief grün unter der Grant-Kette: iokit-Userclients AGX/IOSurface; mach-lookup windowserver/tccd/coreservicesd/diskarbitrationd/MTLCompilerService; `file-issue-extension` (Metal-Caches); Systemverzeichnisse `/usr/lib`, `/System/Library`, `/System/Volumes/Preboot`; OS-Varianten-Sysctls (`hw.ephemeral_storage`, `kern.osvariant_status`, `kern.osproductversion`).
 
 Messung auf der echten Instanz (ctx 131072): 53,9 t/s Eval und 382 t/s Prompt-Eval unter der Grenze, gegen ~57 t/s ungesandboxet (exp13) und ~5 t/s CPU-only (exp15/16) [B]. Damit wurde die Erwartung aus #111 (~57 t/s) erreicht. `--device none` entfiel; der auto-Offload auf MTL0 läuft unter der Grenze.
 

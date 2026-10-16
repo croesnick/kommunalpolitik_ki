@@ -357,7 +357,7 @@ vorschlägt. Direkt als Vortragsgrundlage nutzbar.
   CLI listet alle lokal gespeicherten Sitzungen. Die Filterung nach
   "seit letztem Bericht" passiert manuell durch die KI anhand der
   Datums-Ausgabe.
-- **Keine automatische Themen-Clusterung.** Die TOPs kommen chronologisch
+- **Kein automatisches Themen-Clustering.** Die TOPs kommen chronologisch
   aus dem RIS. Die thematische Bündelung (Klima, Mobilität, Bauen, etc.)
   muss von der KI ad-hoc anhand der TOP-Titel passieren — kein Tool
   unterstützt hierbei strukturell.

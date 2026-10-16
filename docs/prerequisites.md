@@ -348,7 +348,7 @@ externe URLs gibt es nicht.
 
 ## KomKI-CLI (`apps/komki_cli`)
 
-**Zweck:** Lokal gesandboxte KI-Arbeitsfläche (`komki`): Seatbelt-Profil,
+**Zweck:** Lokal gesandboxter KI-Arbeitsraum (`komki`): Seatbelt-Profil,
 llama-server, pi-Session, tmux. Läuft nur unter macOS (Seatbelt). Details:
 [`apps/komki_cli/README.md`](../apps/komki_cli/README.md).
 
@@ -435,7 +435,7 @@ PATH="$HOME/.local/opt/zig-aarch64-macos-0.16.0:$PATH" \
   aber ohne weiter).
 - Beim Testen von Rebuilds derselben Version: zuerst
   `./komki_macos_silicon maintenance uninstall` ausführen — der Wrapper
-  überspringt das Entpacken, wenn das Payload schon liegt, und man misst
+  überspringt das Entpacken, wenn der Payload schon liegt, und man misst
   sonst den alten Stand.
 - Gatekeeper: lokal gebaute Dateien laufen direkt; heruntergeladene tragen
   Quarantäne und brauchen einmalig

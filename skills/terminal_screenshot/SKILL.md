@@ -15,13 +15,13 @@ description: >
 
 Screenshots von Terminal-Tools entstehen hier als **echter Capture einer
 laufenden Sitzung**, nicht als Nachbau: tmux-Pane mit ANSI-Farben sichern, mit
-`scripts/render_terminal_svg.py` in ein Terminal-SVG mit macOS-Fensterchrome
+`scripts/render_terminal_svg.py` in ein Terminal-SVG mit macOS-Fensterrahmen
 wandeln, per Browser-Render verifizieren, einbetten. Beispiel-Output:
 [`apps/komki_cli/assets/session-beispiel.svg`](../../apps/komki_cli/assets/session-beispiel.svg).
 
 ## Ablauf
 
-### 1. Zielgröße vor dem Sitzungsstart setzen
+### 1. Zielgröße vor dem Session-Start setzen
 
 TUI-Programme frieren ihren Viewport beim Boot ein — pi reagiert auf kein
 späteres `resize-window`, der Resize erzeugt nur Leerraum unter dem Footer.
@@ -117,7 +117,7 @@ humanizer-Audit für den neuen Abschnitt sauber ist.
 - `/exit` kann als Chat durchgehen: Das Modell interpretiert den Befehl als
   Abschiedsnachricht statt das TUI zu beenden. Session-Ende über `kill-session`
   ist zuverlässiger.
-- Sitzungsverläufe: Demo-Sessions landen als neueste unter `pi-home/sessions`
+- Session-Verläufe: Demo-Sessions landen als neueste unter `pi-home/sessions`
   und können bei `session --continue` die vorherige Arbeitssession verdrängen.
   Nebenwirkung beim Nutzer erwähnen.
 

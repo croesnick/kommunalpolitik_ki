@@ -9,7 +9,7 @@
 
 ## 1. Betriebsgrenzen
 
-Implementiert sind die Regelzweige `admit` (Lieferung 1) und `emit` (Lieferung 2) mit Ableitung (`derive`), Remedy-Katalog (§ 2.8), Aktionsfreigabe-Mechanik (§ 2.6, § 4.6), unabhängigem Beweisprüfer (`verify`) sowie CLI. `emit`-Entscheidungen mit vorgelegter Aktionsfreigabe laufen als eigener Regelzweig (B.5 Schritt 6), niemals als stiller Fallback der normalen Entscheidung.
+Implementiert sind die Regelzweige `admit` (Lieferung 1) und `emit` (Lieferung 2) mit Ableitung (`derive`), Remedy-Katalog (§ 2.8), Aktionsfreigabe-Mechanik (§ 2.6, § 4.6), unabhängigem Ableitungsprüfer (`verify`) sowie CLI. `emit`-Entscheidungen mit vorgelegter Aktionsfreigabe laufen als eigener Regelzweig (B.5 Schritt 6), niemals als stiller Fallback der normalen Entscheidung.
 
 - Nicht implementierte Regelzweige (`start`, `transfer`, `store`, Planer `infer_plan`, Offenlegungsfreigabe als Release-`kind`): `unsupported` — **keine** `Decision`, eigener Exit-Pfad (Exit 3). Sie werden niemals als `deny` ausgegeben (deny wäre die falsche Behauptung, der Zweig sei geprüft worden und verbiete).
 - Der Kern ist deterministisch und seiteneffektfrei: keine Uhr, kein Zufall, kein Netz, kein Dateizugriff, kein LLM-Aufruf, kein globales Zustandslesen. Alle Eingaben sind explizite Argumente. Logische Zeit (Offenlegungsstand `as_of`, Fenster) ist Eingabe über den vertrauenswürdigen Kontext, nie Engine-Zustand.
@@ -329,7 +329,7 @@ Der Ableitungsprüfer rekonstruiert **diese Menge aus dem Regeltyp** und akzepti
 3. `has_operation_right` — Fakt. `false` → verbietend (`basis_right_false`); fehlt → `unknown`.
 4. `has_object_access_right` — Fakt. `false` → verbietend (`basis_right_false`); fehlt → `unknown`.
 5. `audit_path_ready` — Fakt. `false` → verbietend (`audit_path_not_ready`); fehlt → `unknown`.
-6. `environment_observers_complete` — Fakt. `false`/fehlt → Empfänger nicht beweisbar → `unknown` (unbekannte Empfänger sind fehlende Evidenz, nicht ∅; RFC 5.1, D.4).
+6. `environment_observers_complete` — Fakt. `false`/fehlt → Empfänger nicht beweisbar → `unknown` (unbekannte Empfänger sind fehlende Belege, nicht ∅; RFC 5.1, D.4).
 7. `label_inclusion` — λ(x) ⊆ B_W. Verstoß → verbietend (`label_not_included`).
 8. `recipient_inclusion` — ρ_Γ(c) = `environments[workspace.environment].observers` ⊆ R_Γ(B_W) = ∩ readers(b) für b ∈ B_W. Bei B_W = ∅ ist R_Γ(B_W) = 𝒪 (alle Registry-Beobachter). Verstoß → verbietend (`recipient_not_allowed`). **Dieser Test ist fester Kernbestandteil; keine Operationsbedingung kann ihn erweitern oder ersetzen** (RFC 5.2).
 9. `binding_condition(b)` — für **jede** Bindung b ∈ B_W in sortierter Ordnung: Auswertung von `bindings[b].operations["admit"]` (fehlt → **verbietend**, `missing_operation_rule` — die Operation ist damit nicht erlaubt) gegen die Snapshot-Fakten dreiwertig.
@@ -427,7 +427,7 @@ Alle Fälle nutzen `priv/fixtures/registry.json` (Bürgerfall-Bindung `buergerfa
 | `case_permit` | Öffentliche Datei (λ=∅), Scope-Fakt `true`, Zweck passt, Basis alles `true`, Empfänger `{nutzende-person, lokale-fallverarbeitung}` = R_Γ(B_W) | **permit**, `checked_label` = `[buergerfall-4711@1]`, vollständiger Baum §4.3 |
 | `case_deny` | Wie permit, aber Scope-Fakt `false` (D.1: Labelinklusion und Empfängertest erfüllt, Bedingung falsch) | **deny**, Blocker `binding_condition_false` (buergerfall-4711@1) |
 | `case_deny_licensed` | Objekt λ=`[lizenz-namensnennung@1]` (eigene Lizenzregel `true` erfüllt), B_W=`[buergerfall-4711@1, lizenz-namensnennung@1]`, Scope `false` — nur wer λ(x) statt B_W prüft, würde erlauben | **deny**, Blocker `binding_condition_false` (buergerfall-4711@1), `checked_label` = beide Bindungen |
-| `case_indeterminate` | Wie permit, Scope-Fakt fehlt (fehlende, nicht als falsch bekannte Evidenz, D.1) | **indeterminate**, `missing_evidence` → Fakt `input_in_approved_case_scope` (Bedingung `unknown`) |
+| `case_indeterminate` | Wie permit, Scope-Fakt fehlt (fehlende, nicht als falsch bekannte Belege, D.1) | **indeterminate**, `missing_evidence` → Fakt `input_in_approved_case_scope` (Bedingung `unknown`) |
 | `case_quarantine` | Objekt `classification: quarantine`, λ=`[]` — Quarantäne ist kein leeres Label (RFC 2.5, D.4) | **deny**, Blocker `object_quarantine` |
 | `case_deny_no_basis` | Öffentlicher Raum B_W=∅, öffentliche Datei, `has_operation_right: false` (D.4 `leeres-label`: ohne Basisrechte erlaubt nichts) | **deny**, Blocker `basis_right_false` |
 | `case_unsupported` | Intent `operation: transfer` | **unsupported** (keine Decision, Exit 3) |
@@ -518,7 +518,7 @@ Eingabe-Fixtures (Registry, Snapshots, Intents, `invalid/`) sind **bewusst nicht
 - Keine Ausführung, kein Connector, kein Schreibzugriff, kein Journal, kein Simulator, keine Zwei-Ausführungs-Prüfung. Kein Freigabe-Register im Kern: der Offenlegungsstand ist Eingabe/Ausgabe, `advance` ist ein reiner Übergang — das Führen des aktuellen Standes ist Vollzug außerhalb des Kerns.
 - `plan`/`infer_plan`, `start`, `transfer`, `store`, Offenlegungsfreigabe (`kind`), Lockerungsprüfung/BerechtigtZurLockerung: `unsupported`. Die Aktionsfreigabe deckt in diesem Schnitt **nur `emit`** (verbindliche Wirkungen des Erzeugens); eine `admit`-Aktionsfreigabe ist bewusst nicht angeboten.
 - Der Remedy-Katalog erzeugt keine Autorität: er ist reine Ausgabe, wird von keiner Eingabe akzeptiert und führt keine Fortsetzung aus. Registrierte Transformationen werden aufgezählt, aber nicht angewendet.
-- Der Auswerter bewertet keine `source_kind`-Semantik (Herkunft ist Datenpflicht, nicht Tor).
+- Der Auswerter bewertet keine `source_kind`-Semantik (Herkunft ist Datenpflicht, nicht Gate).
 - Keine produktiven Registry-Stände; alle Bezeichner sind synthetisch. Die Portal-/AZ-/RIS-Welt wird nicht referenziert.
 - `verify` prüft nur Permit-Bäume der Zweige `admit` und `emit`; Freigabe-Permits tragen keinen Baum (§ 2.4); historische Audit-Prüfung (Anhang F) ist nicht Teil dieser Lieferung.
 - Der `neuer_raum`-Katalog-Eintrag nennt notwendige Bedingungen, keine Pläne: der vollständige Planer `infer_plan` (B.6/B.7) bleibt `unsupported`; die kleinste Zuweisung kann trotzdem unzulässig sein.

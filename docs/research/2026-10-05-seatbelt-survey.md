@@ -33,7 +33,7 @@ ist seit dem 05.10.2026 Teil von `KomkiCli.Profile`:
 (allow file-ioctl (literal "/dev/tty"))
 (allow file-ioctl (regex #"^/dev/ttys[0-9]+$"))
 (allow pseudo-tty)
-(allow process-info* (target same-sandbox))   ; nur innerhalb des eigenen Sandkastens
+(allow process-info* (target same-sandbox))   ; nur innerhalb der eigenen Sandbox
 (allow signal (target same-sandbox))
 (allow mach-priv-task-port (target same-sandbox))
 (allow user-preference-read)

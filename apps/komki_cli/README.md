@@ -118,7 +118,7 @@ Konfigurations- oder Bereitschaftsfehler (etwa: llama-server nicht aktiv),
 
 Interaktive Sessions laufen in der tmux-Session `komki`, jeweils eine
 gleichzeitig. Dateien aus der Session landen im Verzeichnis `arbeit`
-innerhalb der Instanz, die Sitzungsverläufe unter `pi-home/sessions` und
+innerhalb der Instanz, die Session-Verläufe unter `pi-home/sessions` und
 lassen sich mit `session --continue` fortsetzen. pi startet mit einem
 knappen deutschen System-Prompt (Deutsch als Default, durchgehende
 Du-Form), Thinking-Blöcke sind eingeklappt; liegen `fd`/`ripgrep` vor,
@@ -213,7 +213,7 @@ Erstelle notiz.md mit einer kurzen Checkliste für eine Spielplatzbegehung (fikt
 
 Das Modell ist leistungsfähig, aber lokal: Antworten erscheinen ohne
 Quellenbindung und ohne Gewähr — vor jeder Verwendung in Ratsarbeit gilt
-es, sie zu prüfen. Ein bekannter Gemma-4-Randfall: bei langen Tool-Sitzungen
+es, sie zu prüfen. Ein bekannter Gemma-4-Randfall: bei langen Tool-Sessions
 kann das Chat-Template Reasoning-Inhalte wiederholt einspeisen (Unsloth-
 Diskussion #43); fällt das auf, existiert ein dokumentierter Template-Fix
 ohne Neuquantisierung.

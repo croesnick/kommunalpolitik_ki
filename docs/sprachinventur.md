@@ -2,8 +2,8 @@
 
 | Feld | Wert |
 |---|---|
-| Status | Entwurf; Extraktion vollständig (3 Lanes, verifiziert), Verifikation Welle 2 läuft |
-| Stand | 2026-10-14 |
+| Status | Entwurf; Wellen 1–3 abgeschlossen; Welle 4 (K4-Cross-Check) extrahiert, Sweeps per GO 2026-10-15 ausgeführt, Verdikte teils GO-pending |
+| Stand | 2026-10-15 |
 | Zweck | Inventur aller Fachbegriffe und Phrasen des Korpus, Klassifikation mit Quellenbelegen, Entscheidungsgrundlage für konsistente Verwendung |
 | Korpus | Alle 39 Markdown-Dokumente des Repos (AGENTS.md, docs/, skills/, apps/, tools/). Code-Bezeichner (Funktionen, Module, CLI-Flags, MCP-Parameter) sind außen vor. RFC0001 ist historisch: es wird inventiert, Entscheidungen gelten nur für aktive Dokumente. |
 
@@ -167,6 +167,67 @@ Beleganker wie von der Verifikationslane gemeldet (Duden/DWDS-, ISTQB-, Obsidian
 **Nutzlast/Payload — Nutzerentscheidung (2026-10-14):** Kanonisch **„der Payload“** (maskulin), nicht „die Nutzlast“. Die Artikel-Fehler in den Research-Notizen („das Payload“) sind korrigiert; für die Angleichung von RFC0003 (neun Stellen, normativer Text) liegt das GO vor — Sweep läuft (fix-6).
 
 **AI→KI in Code-Kommentaren (2026-10-14):** 21 Ersetzungen in Elixir-Kommentaren, MCP-Docstrings und UI-Strings sowie im Shell-Script (fix-5, verifiziert: 0 verbliebene Fließtext-Treffer, `mix format` grün); Bindestrich-Komposita (AI-Harness, AI-Begründung, AI-Vorschläge, AI-Zugriff) bleiben regelkonform. GLOSSARY.md wurde als Grenzdatei nachträglich selbst angeglichen (5 Stellen).
+
+## Welle 4 — K4-Cross-Check und Sprach-Sweeps (2026-10-15)
+
+**Anlass und Methode:** Der Root-Sweep („Root“ statt „Wurzel“, Commit `92da34a`) deckte ein Muster auf, das die Wellen 1–3 nicht systematisch gesucht hatten: deutsche Pseudo-Übersetzungen etablierter englischer Fachbegriffe (Kategorie K4). Extraktion in sechs parallelen Lanes über den Markdown-Korpus (~13.500 Zeilen; docs/, skills/, apps/, tools/, Root-Dateien; Eval-Artefakte und englische Dokumente ausgenommen). Jede gemeldete Fundstelle wurde vor der Adjudikation einzeln per Datei-`rg` verifiziert.
+
+**GO-Runde 2026-10-15:** A-Verstöße gegen bereits beschlossene Regeln und B1-Ersetzungen komplett; RFC0001 angleichen; Root-Neufunde aus Ticket #123 fixen; Beleg-Welle für die kontroversen B2-Terme.
+
+**Ausgeführte Ersetzungen** (fix-1-Lane 59 Edits + 8 Orchestrator-Restfixe, doppelt gezählt per `rg`; alle Alt-Formen im getrackten Korpus danach null, `mix format` fehlerfrei):
+
+| Alt → Neu | Stellen |
+|---|---|
+| Nutzlast → der Payload | research/2026-10-02-vermittelte-agent-netzwerkwege 8×; RFC0001 8× |
+| „das/altes Payload“ → der/alter Payload | komki-burrito-pilot:27–28, 93; prerequisites:422 |
+| fehlende/bekannte Evidenz → Belege | komki_policy CONTRACT:230, 288; derive.ex:167 |
+| Tor → Gate | CONTRACT:340 |
+| Freigabepolitik → Freigabe-Policy | RFC0003:699; RFC0001:348 (Zwillings-Satz) |
+| Regelmaschine → Regel-Engine | RFC0003:169; RFC0001:41 |
+| Grenzraten → Rate-Limits | RFC0003:2084; RFC0001:1696 |
+| Zustandsfingerabdruck → Fingerprint | RFC0003:1738; RFC0001:1386 |
+| Startwert/Zufallsstartwert → Seed | RFC0003:1746 2×; RFC0001:1394 2× |
+| Heilweg/heilbar → Behebungsweg/behebbar | RFC0003:2005 |
+| Sitzungsverläufe/Tool-Sitzungen/Sitzungsstart → Session-Formen | komki_cli README:120, 157; probe-harness:140; terminal_screenshot:24, 120 |
+| Beweisprüfer → Ableitungsprüfer | komki_policy README:4; CONTRACT:12 |
+| Arbeitsfläche → Arbeitsraum | prerequisites:351 |
+| Clusterung → Clustering | workflows:360; bericht_aus_dem_stadtrat:487 |
+| Werkzeugkette → Toolchain | komki-burrito-pilot:19 |
+| Netzpolitik/Zielrichtlinie → Netz-/Ziel-Policy | vermittelte-agent-netzwerkwege 5× |
+| Sandkasten → Sandbox | seatbelt-survey:36 |
+| Rückfall → Fallback | probe-harness:16 |
+| Fensterchrome → Fensterrahmen | terminal_screenshot:18 |
+| Öffentlichkeitsscheibe → Öffentlichkeitsbezug | bericht_aus_dem_stadtrat:215 |
+| separates File → Datei | sitzungsvorbereitung:243–244 |
+| System-Häuser → Systemverzeichnisse | llama-server-confinement:45, 46 |
+| zurückgehaltene Beispiele → Holdout-Beispiele | jev-alternativen:54 |
+| „Reihenfolge matters“/„Recent Ereignis“ → deutsche Form | antrag_generieren:16, 64 |
+| Wurzel → Root (Neufunde aus #123) | macho_deps.ex:51, 150; llama-server-confinement:38 |
+
+**Welle-4-Verdikte** (Librarian-Beleg-Welle, Abruf 15.10.2026; Kernanker vom Orchestrator nachgeprüft):
+
+| Term | Statusvorschlag | Kernbeleg | Konsequenz |
+|---|---|---|---|
+| Verhungern | ETABLIERT_DE | de-Wikipedia „Verhungern (Informatik)“: „Als Verhungern (englisch Starvation) bezeichnet man …“ (Nachprüfung bestanden); Vorlesungsskripte HH Düsseldorf, TU Dresden, Uni Hamburg, ETH Zürich mit deutscher Erstform und englischer Klammer | behalten (RFC0003:1325, RFC0001:973) |
+| Seed | NUR_ENGLISCH | deutsche Python- und PyTorch-Doku nutzen „Seed“ unübersetzt; Duden/DWDS ohne Lemma (404) | Sweep ausgeführt (RFC0003 C.6 + RFC0001-Zwilling) |
+| Fingerprint | NUR_ENGLISCH; „Zustandsfingerabdruck“ FEHLFORM | de-Wikipedia „Fingerprinting (Trackingtechnik)“, BSI „JavaScript, Cookies & Fingerprints“, heise; „Fingerabdruck“ läuft nur als erklärende Glosse daneben | Sweep ausgeführt; „Zustandsfingerprint“ als Variante zulässig |
+| Bedrohungsmodell | ETABLIERT_DE (Empfehlung, GO ausstehend) | BSI-Leitfaden Webanwendungen 4.3.4: „Die Bedrohungsmodellierung (engl. Threat Modeling) ist eines der zentralen Konzepte …“ (Nachprüfung bestanden); BSI TR-03185 §3.2.3.3 „Das Bedrohungsmodell MUSS …“; Duden- und Wikipedia-Lemma 404; MDN deutsch ist maschinell übersetzt (schwacher Anker) | würde die Welle-2-Zuordnung threat model NUR_ENGLISCH ersetzen; die R.8-Überschrift bliebe dann korrekt |
+| Entscheidungskopf | FEHLFORM-Empfehlung; head NUR_ENGLISCH | Uni-Skripte (Würzburg, Düsseldorf) bleiben bei head/classification head; „Entscheidungskopf“ ist österreichischer Rechtsterm (RIS-Handbuch); einziger deutscher ML-Beleg Ultralytics „Klassifikationskopf“ (kommerziell) | GO ausstehend für RFC0002-Sweep (→ Head-Formen) |
+
+**Korrekturen zum Stand der Wellen 1–3:**
+
+1. Die Schlusszählung „Nutzlast, Prüflabel und Kanonität im aktiven Korpus je null“ (2026-10-14) war für Nutzlast falsch: Die Forschungsnotiz 2026-10-02-vermittelte-agent-netzwerkwege trug weiterhin acht Fließtext-Instanzen. Ursache: Die Zählung erfasste nur die je Sweep angefassten Dateien.
+2. Der „Grep-Werkzeug-Artefakt“ aus der Korrektur der Verifikationsgeschichte ist aufgeklärt: RFC0000 steht in `.gitignore` („private Infrastruktur-Topologie, bleibt lokal“). Rekursive rg- und Grep-Scans überspringen ignorierte Dateien, Einzel-Datei-Aufrufe nicht. Die Beobachtung bleibt gültig, die Ursache ist der Ignore-Mechanismus. Künftig pro Datei oder mit `rg -uu` zählen.
+3. Parallel-Drift: Commit `5e23152` (Confinement-Review, Tickets #100/#111) hat nach dem Root-Sweep drei neue „Wurzel“-Stellen eingebracht (macho_deps.ex:51, 150; llama-server-confinement:38) — im Welle-4-Sweep mitfixt. Beschlossene Kanons gelten sessionübergreifend; aktive Parallel-Sessions kennen sie nicht automatisch.
+
+**Offen nach Welle 4:**
+
+1. **Evidenz-Durchsetzung:** Die GLOSSARY-Regel „Evidenz nur in wörtlichen englischen Zitaten“ (2026-10-14) wurde nie korpusweit gesweept. Nachzählung 15.10.2026: rund 40 Stellen — RFC0003 21× (u. a. „fehlende Evidenz“ :578, :1542; „Evidenzlücken“ :386, :1104; „historische Evidenz“ :1413, :1546), research-Notizen ~8× („Evidenzstufen“, „Kernel-Evidenz“-Label, Überschrift „Evidenzstatus“), komki_cli ~13× (Kommentare und Profil-Strings „Probe-Evidenz“, „Evidenz <Timestamp>“; README:13) sowie komki_policy cli_test:130. Jede Stelle braucht die Beleg/Nachweis-Unterscheidung der GLOSSARY-Regel — eigener Sweep mit GO.
+2. Bedrohungsmodell-Reklassifikation (Empfehlung ETABLIERT_DE) und Entscheidungskopf-Sweep (RFC0002 → Head-Formen): GO-Runde folgt.
+3. K3-Verbkorreps unentschieden (Welle 1 hatte ingesten bereits offen): gesandboxt, gepinnt/pinnt, pollen, trackt/tracked/getrackt, gestagte, committeden.
+4. Schwache Grenzfälle belassen: Wegwerf-Sessions (terminal_screenshot:115), Vorschlagserzeuger (RFC0002:86), Netz-Auswärts (llama-server-confinement:62), einspeisen (komki_cli README:158).
+5. Adjudiziert behalten: eingefroren (RFC0002, K5-Präzidenz „eingefrorene Konfiguration“), Rollenetiketten (RFC0003:504, bewusste Etikett-Metapher, nicht der Label-Term), Vortraining, Aufnahme (RFC-5.4-Kernbegriff), Beweisbaum (etablierte Logik-Form), Arbeitsabläufe (generisches Deutsch, in RFC0003:736 bewusst von „kanonischen Workflows“ abgesetzt), Dissektion (Lehnwort, bei Ersteinführung definieren).
+6. RFC0000 (lokal, gitignored): Wurzel-Grenzen :422, Sitzung/Sitzungsgedächtnis :67, :91, :369, Lesemaschine :76, :457 — Inventar, historisch, bleibt lokal unkorrigiert.
 
 ## Bestätigte Korpus-Befunde (Extraktion Welle 1, per Grep verifiziert)
 

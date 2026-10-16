@@ -13,7 +13,7 @@
 Maßgeblich ist das dokumentierte GO aus der Probe-Sitzung (Datei `probe-70-authorizations.md`), Kerne:
 
 - Native Seatbelt-Proben mit synthetischen Fixtures; OpenCode und pi vergleichen, danach entscheidet der Mensch.
-- Lokale Inferenz über llama.cpp oder eine bereits vorhandene MLX-Laufzeit; Ollama ist einschließlich Rückfall ausgeschlossen.
+- Lokale Inferenz über llama.cpp oder eine bereits vorhandene MLX-Laufzeit; Ollama ist einschließlich Fallback ausgeschlossen.
 - Höchstens ein kleines öffentliches Modellartefakt (pinned GGUF), Herkunft und Integrität dokumentiert; keine Runtime-Pakete installieren.
 - Keine Vault-, RIS-, Obsidian- oder Credential-Zugriffe; keine Änderungen an Benutzerkonfiguration, Host-DNS oder fremden Diensten.
 - Externe Testbudgets: insgesamt höchstens zwei TCP-Verbindungsversuche zu `1.1.1.1:443` ohne Anwendungsdaten und höchstens zwei Systemresolver-Aufrufe für zufällige `probe-<nonce>.example.com`-Namen; je eine Kontrolle ohne Profil und ein Versuch mit Profil. Budget zählt API-Aufrufe, keine DNS-Pakete.
@@ -137,7 +137,7 @@ Phase 1 hatte DNS als unbelegt zurückgestellt (zwei EAI_NONAME-Rückgaben sind 
 
 Keine passende dokumentierte Regression zum Overnight-Flip gefunden [D, Abruf 2026-10-04]: Treffer in `openai/codex` (TIOCSTI-Parseklasse, #45330/#48780), `anthropics/sandbox-runtime` (#430: fehlendes `hw.optional.neon` → Qt-Abort auf Apple Silicon, gleiche Mechanismuskategorie ohne den Flip-Fingerprint), `google-gemini/gemini-cli` (#28598: deny-default-Migration ließ `/usr/bin/git`-xcrun-Shim mit SIGABRT sterben, PR #28424). Apple-Release-Notes rendern leer bzw. Foren sind botgesperrt [U].
 
-Einheitliches gepflegtes Muster aller drei Basen [D]: **`(deny default)` plus Start-Allowlist** (Codex seatbelt_base_policy gepinnt an `279b932`; srt main `9e93406`; gemini-cli PR #28424 vom 2026-07-17). Die nötige Start-Allowlist enthält prozesskritische Rechte (exec/fork/signal same-sandbox, sysctl-list, mach-lookups, ipc-posix-sem/shm, PTY/`/dev/*`-ioctls) — unser Probe-Befund [B] deckt sich mit dem Muster. **Konsequenz als Abnahmekriterium:** Boot-Re-Verifikation bei jedem Sitzungsstart; ein Boot-Erfolg allein bewertet nichts nachhaltig [S].
+Einheitliches gepflegtes Muster aller drei Basen [D]: **`(deny default)` plus Start-Allowlist** (Codex seatbelt_base_policy gepinnt an `279b932`; srt main `9e93406`; gemini-cli PR #28424 vom 2026-07-17). Die nötige Start-Allowlist enthält prozesskritische Rechte (exec/fork/signal same-sandbox, sysctl-list, mach-lookups, ipc-posix-sem/shm, PTY/`/dev/*`-ioctls) — unser Probe-Befund [B] deckt sich mit dem Muster. **Konsequenz als Abnahmekriterium:** Boot-Re-Verifikation bei jedem Session-Start; ein Boot-Erfolg allein bewertet nichts nachhaltig [S].
 
 ## 7. MLX-Verweis
 

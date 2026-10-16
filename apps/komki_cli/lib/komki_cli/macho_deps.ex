@@ -48,7 +48,7 @@ defmodule KomkiCli.MachODeps do
     else
       # queue = [bin], visited leer — das Bin wird beim ersten Durchlauf
       # verarbeitet und erst dann als besucht markiert (Seed-Fund: ein
-      # vorbelegtes visited skipped die Wurzel und leert die Queue sofort;
+      # vorbelegtes visited skipped den Root und leert die Queue sofort;
       # die Dep-Liste blieb leer). Accumulatoren als einfache Listen:
       # dialyzer sieht MapSet.t() in den rekursiven Positionen als opaken
       # Term mit auseinanderlaufenden Subtypen (call_without_opaque,
@@ -147,7 +147,7 @@ defmodule KomkiCli.MachODeps do
   # "@loader_path/../lib" (Review-Fund: ohne diese Expansion bleiben alle
   # @rpath-Deps unloesbar und der Eigenbau-Lib-Baum faellt aus dem Profil).
   # @loader_path bezieht sich auf das gerade geladene Mach-O, @executable_path
-  # auf die Wurzel-Binary; lexikalische Normalisierung via Path.expand.
+  # auf die Root-Binary; lexikalische Normalisierung via Path.expand.
   defp rpath_roots(rpath, macho, bin) do
     cond do
       String.starts_with?(rpath, "@loader_path/") ->

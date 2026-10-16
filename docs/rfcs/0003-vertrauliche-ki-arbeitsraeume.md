@@ -166,7 +166,7 @@ geltende Autorisierung. Das erläutert [R.4.2](#r42-konservative-ausgaben).
 ## 7. Zuständigkeiten und Connectoren
 
 Eine positive Prüfung ist noch kein Versand. Die **Inferenz-Engine** leitet ein Urteil aus Regeln und autoritativen
-Fakten ab. Sie ist eine symbolische Regelmaschine, kein LLM-Inferenzserver. Der Vermittler löst den aktuellen
+Fakten ab. Sie ist eine symbolische Regel-Engine, kein LLM-Inferenzserver. Der Vermittler löst den aktuellen
 Kontext auf, verwendet die Engine und führt nur passend autorisierte Operationen aus. Urteil und Vollzug sind
 getrennt, wie in einem rechtsstaatlichen Verfahren.
 
@@ -696,7 +696,7 @@ Zusammengehörige Freigaben werden gegen einen versionierten Offenlegungsstand g
 
 Zwei gleichzeitig geprüfte Freigaben dürfen nicht beide einen veralteten Stand als aktuell behandeln. Reservierung beziehungsweise Verbrauch der Freigabe und Fortschreibung dieses Stands werden atomar entschieden.
 
-Eine vollständige Liste früherer Freigaben ist noch kein semantischer Datenschutzbeweis. Zwei Summen können gemeinsam einen individuellen Wert offenlegen. Bei solchen Zielen braucht es eine gemeinsame fachliche Prüfung oder eine gesondert nachgewiesene Freigabepolitik.
+Eine vollständige Liste früherer Freigaben ist noch kein semantischer Datenschutzbeweis. Zwei Summen können gemeinsam einen individuellen Wert offenlegen. Bei solchen Zielen braucht es eine gemeinsame fachliche Prüfung oder eine gesondert nachgewiesene Freigabe-Policy.
 
 ### R.6.4 Zwei Veröffentlichungsmodi
 
@@ -1735,7 +1735,7 @@ Die Ausgangsäquivalenz muss wirklich geprüft werden. Wenn zwei Testwelten bere
 
 ### C.6 Suche nach Gegenbeispielen
 
-Für kleine Szenarien implementiere eine explizite Zustandsraumsuche. Beginne mit vollständiger Enumeration der angegebenen endlichen Werte und einer Breitensuche bis zur ausgewiesenen Grenze. Ein Zustandsfingerabdruck muss alle für weitere Wirkung und Beobachtung relevanten Bestandteile erhalten.
+Für kleine Szenarien implementiere eine explizite Zustandsraumsuche. Beginne mit vollständiger Enumeration der angegebenen endlichen Werte und einer Breitensuche bis zur ausgewiesenen Grenze. Ein Fingerprint muss alle für weitere Wirkung und Beobachtung relevanten Bestandteile erhalten.
 
 Für Zwei-Ausführungs-Prüfungen werden zwei Systemkopien kombiniert. Verborgene Schritte können getrennt fortschreiten; verglichen werden die tatsächlichen sichtbaren Folgen. Unterschiedliche Zahlen verborgener Schritte sind nicht allein ein Leck.
 
@@ -1743,7 +1743,7 @@ Ein fehlendes sichtbares Ereignis ist erst dann als Unterschied zu werten, wenn 
 
 Eine erschöpfende Suche gilt nur für die angegebenen Werte, Programme, Scheduler und Grenzen. Eine Sammlung festgelegter Angriffsprogramme ist nicht gleichbedeutend mit der Erfassung sämtlicher denkbarer Programme.
 
-Zufällige Tests ergänzen die Enumeration. Speichere Startwert, Generatorversion und Grenzen. Für probabilistische Eigenschaften müssen die **gemeinsamen Beobachtungsverteilungen** verglichen werden. Ein einzelner identischer Zufallsstartwert oder zwei Einzelverteilungen ersetzen diesen Vergleich nicht. Kleine Zufallsräume können exakt mit rationalen Wahrscheinlichkeiten ausgewertet werden.
+Zufällige Tests ergänzen die Enumeration. Speichere Seed, Generatorversion und Grenzen. Für probabilistische Eigenschaften müssen die **gemeinsamen Beobachtungsverteilungen** verglichen werden. Ein einzelner identischer Seed oder zwei Einzelverteilungen ersetzen diesen Vergleich nicht. Kleine Zufallsräume können exakt mit rationalen Wahrscheinlichkeiten ausgewertet werden.
 
 Beschleunigungen wie Zustandsreduktion sind erst zulässig, wenn sie die betroffene Beobachtungs- und Prüfeigenschaft erhalten. Eine Reduktion, die gerade Empfänger, Reihenfolge oder Freigabehistorie wegabstrahiert, ist keine gültige Optimierung.
 
@@ -2002,7 +2002,7 @@ Das **Decentralized Label Model** motiviert unabhängige, gemeinsam einzuhaltend
 
 **Fides** formalisiert die Informationsflusskontrolle für Agenten-Planner mit einer Regel für vertrauenswürdige Handlungen und einer Regel für erlaubte Flüsse, mit selektivem Verbergen und einer quarantänierten, werkzeuglosen Abfrage. Die Arbeit erklärt vollständige Nichtinterferenz für Vertraulichkeit als praktisch unerreichbar und begnügt sich mit expliziter Geheimhaltung. Dieser RFC behält die stärkere Zusage aus A.5, weil Freigaben bei ihm menschliche GO-Ereignisse mit Offenlegungsstand sind, keine stillen Datenflüsse.[^fides]
 
-**APPA** erzwingt deterministische Informationsflusskontrolle für Agenten außerhalb des Agenten-Loops über ein monotones Label-Kalkül und beweist, dass eine blockierte Operation nur über genau vier registrierte vertrauenswürdige Übergangstypen heilbar ist. Das bestätigt die Freigaben dieses RFC als einzigen regulären Heilweg. Beschlussrechte für LLM-Autoritäten werden nicht übernommen; sie widersprechen dem GO-Prinzip. Eine Ausgabe begrenzter legaler Fortsetzungen bei Ablehnung (im APPA-Papier: remedy plans) ist als eigener Revisionsentwurf vorgesehen.[^appa]
+**APPA** erzwingt deterministische Informationsflusskontrolle für Agenten außerhalb des Agenten-Loops über ein monotones Label-Kalkül und beweist, dass eine blockierte Operation nur über genau vier registrierte vertrauenswürdige Übergangstypen behebbar ist. Das bestätigt die Freigaben dieses RFC als einzigen regulären Behebungsweg. Beschlussrechte für LLM-Autoritäten werden nicht übernommen; sie widersprechen dem GO-Prinzip. Eine Ausgabe begrenzter legaler Fortsetzungen bei Ablehnung (im APPA-Papier: remedy plans) ist als eigener Revisionsentwurf vorgesehen.[^appa]
 
 **PACE** bindet deterministische Entscheidungsprotokolle kryptografisch an die exakten Ausführungsbytes und prüft sie am Ausführungsort erneut; Nonce und Gültigkeitsfenster verhindern Wiederverwendung. Das ist eine konkrete Mechanik für den Ausführer aus B.8 und F.5. Das Papier hat keine Vertraulichkeitskomponente. Ein untypisierter Eigentümer-Bypass jenseits der Vermittlung wird nicht übernommen.[^pace]
 
@@ -2081,7 +2081,7 @@ Jeder Einsatz legt vorab einen versionierten `AuditContract` fest:
 
 Ein `AuditScope` für eine konkrete Prüfung nennt Anfang, Ende und alle einschlägigen Partitionen sowie offene Vorgänge am Anfang und Ende. Ein Bericht mit „heute“ ohne begründete Zuordnung zu vollständigen Journalstrecken ist unzureichend. Uhrzeit ist ein annotierter Messwert mit Herkunft; Sequenz, Kausalität und Verwaltungsrevisionen entscheiden über die relevanten Ordnungen. Eine globale Gesamtordnung unabhängiger Journale wird nicht erfunden.
 
-Alle regulären Anfragen am kontrollierten Eingang werden im vereinbarten Umfang erfasst, auch Ablehnungen. Unauthentisierter Netzwerkabfall und Grenzraten sind gesondert zu definieren. Eine Ressourcenbegrenzung darf Requests vor Annahme blockieren, aber keine angenommenen Vorgänge lautlos aus einer angeblich vollständigen Spur entfernen. Zusammengefasste Angriffsstatistik darf als solche geführt werden; sie ersetzt keinen Einzelnachweis.
+Alle regulären Anfragen am kontrollierten Eingang werden im vereinbarten Umfang erfasst, auch Ablehnungen. Unauthentisierter Netzwerkabfall und Rate-Limits sind gesondert zu definieren. Eine Ressourcenbegrenzung darf Requests vor Annahme blockieren, aber keine angenommenen Vorgänge lautlos aus einer angeblich vollständigen Spur entfernen. Zusammengefasste Angriffsstatistik darf als solche geführt werden; sie ersetzt keinen Einzelnachweis.
 
 Nach einem Ausfall wird vor Wiederaufnahme ein geschützter **Wiederanlaufbefund** mit bekannten Kontrollständen, offenen Versuchen und erkennbaren Erfassungslücken festgehalten. Nicht rekonstruierbare Anfragen werden nicht erfunden. Auch wenn die Sperre unbelegte Wirkungen verhindert hat, kann die Anzahl zurückgewiesener oder nicht angenommener Anfragen für dieses Intervall unbekannt bleiben. Ein Bericht darf deshalb vollständige Wirkungsabdeckung und vollständige Anfrageerfassung nicht gleichsetzen.
 

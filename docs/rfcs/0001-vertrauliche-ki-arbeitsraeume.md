@@ -38,7 +38,7 @@ Das Modell unterstellt einen vollständig fehlgesteuerten Agenten. Modellqualit�
 
 Drei Werkzeuge machen das Modell nutzbar:
 
-- Die **Inferenz-Engine** leitet aus autoritativen Fakten und Regeln eine begründete Entscheidung ab. Sie ist eine symbolische Regelmaschine, kein LLM-Inferenzserver.
+- Die **Inferenz-Engine** leitet aus autoritativen Fakten und Regeln eine begründete Entscheidung ab. Sie ist eine symbolische Regel-Engine, kein LLM-Inferenzserver.
 - Das **Simulationstool** erzeugt und vergleicht Ausführungen, sucht Gegenbeispiele und liefert reproduzierbare Spuren. Eine erfolglose Suche ist kein unbeschränkter Sicherheitsbeweis.
 - Der **Audit-Verifier** prüft ein geschütztes, append-only geführtes Journal gegen historische Regeln, Fakten und Ausführungsbelege. Er trennt nachgewiesene Verstöße, offene Vorgänge und fehlende Evidenz.
 
@@ -308,7 +308,7 @@ $$
 
 Bei einem Zielarbeitsraum gilt zusätzlich dessen Aufnahmeregel. Ein Speicher erhält Label und Objektversion und prüft spätere Zugriffe erneut. Zugelassene externe Empfänger müssen einschließlich ihrer weiteren Verarbeitung erfasst sein.
 
-Wird eine schon existierende Datei von einem Raum ausgewählt, betrifft die Prüfung nicht nur das ursprüngliche Dateilabel: Das Übergabeereignis trägt mindestens auch $B_W$. Eine unveränderte öffentliche Nutzlast kann eine vertrauliche Auswahlentscheidung transportieren.
+Wird eine schon existierende Datei von einem Raum ausgewählt, betrifft die Prüfung nicht nur das ursprüngliche Dateilabel: Das Übergabeereignis trägt mindestens auch $B_W$. Ein unveränderter öffentlicher Payload kann eine vertrauliche Auswahlentscheidung transportieren.
 
 ### 5.7 Lockerung
 
@@ -345,7 +345,7 @@ Zusammengehörige Freigaben werden gegen einen versionierten **Offenlegungsstand
 
 Zwei gleichzeitig geprüfte Freigaben dürfen nicht beide einen veralteten Stand als aktuell behandeln. Reservierung beziehungsweise Verbrauch der Freigabe und Fortschreibung dieses Stands werden atomar entschieden.
 
-Eine vollständige Liste früherer Freigaben ist noch kein semantischer Datenschutzbeweis. Zwei Summen können gemeinsam einen individuellen Wert offenlegen. Bei solchen Zielen braucht es eine gemeinsame fachliche Prüfung oder eine gesondert nachgewiesene Freigabepolitik.
+Eine vollständige Liste früherer Freigaben ist noch kein semantischer Datenschutzbeweis. Zwei Summen können gemeinsam einen individuellen Wert offenlegen. Bei solchen Zielen braucht es eine gemeinsame fachliche Prüfung oder eine gesondert nachgewiesene Freigabe-Policy.
 
 ### 6.4 Zwei Veröffentlichungsmodi
 
@@ -725,7 +725,7 @@ Die Workflows sind damit **ausführbare Referenzspezifikationen**: Abschnitt 5 d
 
 Der Angreifer darf Daten und Antworten präparieren und das gesamte Verhalten eines Agenten einschließlich seiner Programme innerhalb des Arbeitsraums bestimmen.
 
-Er darf Labels fälschen, Ziele wechseln, Nutzlasten kodieren, Fehler auslösen und echte Freigaben durch manipulierte Vorschläge beeinflussen. Diese Versuche müssen ohne angenommene Gutartigkeit des LLM bewertet werden.
+Er darf Labels fälschen, Ziele wechseln, Payloads kodieren, Fehler auslösen und echte Freigaben durch manipulierte Vorschläge beeinflussen. Diese Versuche müssen ohne angenommene Gutartigkeit des LLM bewertet werden.
 
 Nicht angenommen wird seine Kontrolle über die vertrauenswürdige Basis: Isolation, Regelverwaltung, Identitätsprüfung, Sicherheitsmetadaten, Engine-Kern, Ausführer, Freigabedienst sowie Journalisierung und deren authentische Belegquellen. Jede dieser Komponenten braucht einen benannten Nachweis oder eine ausdrückliche Annahme. Ein kompromittierbarer Parser außerhalb des Arbeitsraums vergrößert diese Basis.
 
@@ -874,7 +874,7 @@ Der RFC legt die Nachweisziele fest, nicht ein Speicherprodukt oder eine Blockch
 
 ### 11.5 Das Journal darf kein neuer Abfluss sein
 
-Journalereignisse, Snapshots, Beweise, Kontrollpunkte und Auditberichte sind selbst gebundene Daten. Sie können mehr verraten als die sichtbare Nutzlast: geheime Objektexistenz, Recherchezweck, abgewiesene Suchanfragen oder ursprüngliche Bindungen einer freigegebenen Ausgabe.
+Journalereignisse, Snapshots, Beweise, Kontrollpunkte und Auditberichte sind selbst gebundene Daten. Sie können mehr verraten als der sichtbare Payload: geheime Objektexistenz, Recherchezweck, abgewiesene Suchanfragen oder ursprüngliche Bindungen einer freigegebenen Ausgabe.
 
 Es werden bevorzugt opake Referenzen und nur notwendige Prüffakten gespeichert, keine pauschalen Dokumentkopien, Prompts, Tokens oder Credentials. Auch Referenzen und Hashes sind nicht automatisch anonym. Getrennte Schutzbereiche erhalten getrennt zugreifbare Journalpartitionen; globale Zähler, fremde Kontrollpunkt-Hashes und gemeinsame Statusanzeigen dürfen keine geschützte Aktivität verraten. Signatur und Verschlüsselung beseitigen solche Metadatenkanäle nicht automatisch.[^signed-log][^logging-practice]
 
@@ -899,7 +899,7 @@ Ein Zustand $S$ enthält klassifizierte Objekte, feste Arbeitsraumverträge, pri
 
 Reguläre Schritte sind Start, Aufnahme, interne Verarbeitung, Erzeugen, Übergabe und Speicherung. Klassifikation, neue positive Autorisierung und Lockerung sind gesonderte vertrauenswürdige Schritte. Ein Agententext wird durch keinen regulären Schritt zu einer Autorisierung.
 
-Ein Ereignis umfasst Nutzlast, Auswahl, Ziel, relevante Metadaten und sein tatsächliches Auftreten. Die beobachtbare Folge erhält die Reihenfolge. Ein verworfenes Ereignis darf nicht schon als unzulässige Außenwirkung sichtbar geworden sein.
+Ein Ereignis umfasst Payload, Auswahl, Ziel, relevante Metadaten und sein tatsächliches Auftreten. Die beobachtbare Folge erhält die Reihenfolge. Ein verworfenes Ereignis darf nicht schon als unzulässige Außenwirkung sichtbar geworden sein.
 
 Die folgenden statischen Sätze gelten für denselben Regelstand $\Gamma$. Dieser fixiert Bindungsversionen, Empfängerkreise und die hierfür wesentlichen Umgebungsannahmen. Regelmigration, Widerruf und Änderung der Umgebung sind explizite administrative Übergänge. Alte Labels werden nicht automatisch auf eine neue „latest“-Version umgebogen.
 
@@ -1100,7 +1100,7 @@ Definiere versionierte, geschlossene Schemas. Unbekannte Felder, doppelte Schlü
 |---|---|
 | `Registry` | Schema- und Regelversion, Bindungen, Beobachter, aufgelöste Umgebungen, Regeln und Gültigkeitsbereich. |
 | `Binding` | Kennung einschließlich Version, `readers`, Operationsregeln, Auflagen, Lockerungszuständigkeiten. |
-| `Environment` | Versionierte Identität, vollständige zugängliche Beobachter, zugelassene Fähigkeiten und relevante Nachweise. |
+| `Environment` | Versionierte Identität, vollständige zugängliche Beobachter, zugelassene Operationen und relevante Nachweise. |
 | `Object` | Unveränderliche Inhaltsreferenz und Version, Klassifikationsstatus, Label, Herkunft und gesonderte Zugriffsrechte. |
 | `Workspace` | Unveränderlicher Vertrag aus Abschnitt 4.1, Zustand und aktuell geprüfte Gültigkeit. |
 | `Intent` | Vom Agenten vorgeschlagene Operation mit Objekt- und Zielreferenzen; keine selbst attestierten Rechte. |
@@ -1269,7 +1269,7 @@ Er löst den tatsächlichen aktuellen Kontext auf und prüft mindestens Identit�
 
 Bei Freigaben werden erwarteter Offenlegungsstand und einmalige Verwendung gemeinsam geprüft und verbindlich fortgeschrieben. Zwei konkurrierende Ausführungen desselben GOs dürfen nicht beide erfolgreich reservieren. Eine geänderte Version oder widerrufene Zulassung erzwingt eine neue Entscheidung.
 
-Zwischen Prüfung und Außenwirkung darf der Agent weder Nutzlast noch Ziel austauschen. Inhaltsreferenzen müssen sich auf unveränderliche, tatsächlich verwendete Daten beziehen; ein Dateipfad allein genügt nicht.
+Zwischen Prüfung und Außenwirkung darf der Agent weder Payload noch Ziel austauschen. Inhaltsreferenzen müssen sich auf unveränderliche, tatsächlich verwendete Daten beziehen; ein Dateipfad allein genügt nicht.
 
 Ein technisch notwendiger Versanddienst führt eine kontrollierte Folge aus. Seine Zustände sind auf `DecisionRecorded`, `ExecutionCommitted` und `OutcomeRecorded` aus Abschnitt 11 abzubilden. Der dauerhafte Vorbeleg und die aktuelle Zustandsprüfung sind Pflicht, nicht eine unverbindliche Telemetrie nach der Wirkung. Ein Ausfall nach dem verbindlichen Punkt bleibt ohne belastbaren Ausgang offen. Die konkrete Umsetzung dieses Protokolls bleibt Implementierungsarbeit; seine Sicherheitsbedingungen aus Abschnitt 6 und 11 sind verbindlich.
 
@@ -1314,7 +1314,7 @@ Ein Szenario enthält:
 | Akteure | Feste lokale Programme beziehungsweise explizit begrenzte Strategiemengen. |
 | Übergänge | Aktionen der Engine und modellierte administrative oder Umgebungsereignisse. |
 | Ausführer und Vermittler | Konforme Variante oder ausdrücklich bezeichnete Testmutation. |
-| Beobachtung | Tatsächliche Empfänger, sichtbare Nutzlasten, Metadaten, Reihenfolge, Zustand und gegebenenfalls Abschlussereignisse. |
+| Beobachtung | Tatsächliche Empfänger, sichtbare Payloads, Metadaten, Reihenfolge, Zustand und gegebenenfalls Abschlussereignisse. |
 | Prüfeigenschaft | Invariante, Nichtinterferenz, begrenzte Faktenfreigabe oder zeitliche Nachweispflicht. |
 | Grenzen | Maximale Schritte, Räume, Objekte, Zustände, Strategien und Zufallswerte. |
 | Erwartung | Gewünschtes Ergebnis und Einordnung eines absichtlich verletzten Modells. |
@@ -1364,7 +1364,7 @@ observe(observer, actual_effects, state)
 
 **Verboten ist:** „Gib nur Effekte zurück, deren Label dem Beobachter Zugriff erlaubt.“ Ein fehlerhafter Ausführer, der geheime Bytes tatsächlich öffentlich ausgibt, würde dadurch scheinbar sicher.
 
-Ereignisreihenfolge, Nutzlast, Ziel und relevante Metadaten bleiben erhalten. Keine Sortierung, die den Reihenfolgekanal beseitigt. Keine Entfernung sichtbarer Fehlerzähler, weil eine Übertragung „eigentlich abgelehnt“ wurde.
+Ereignisreihenfolge, Payload, Ziel und relevante Metadaten bleiben erhalten. Keine Sortierung, die den Reihenfolgekanal beseitigt. Keine Entfernung sichtbarer Fehlerzähler, weil eine Übertragung „eigentlich abgelehnt“ wurde.
 
 Mindestens folgende Orakel sind unabhängig von der normalen Entscheidungsfunktion zu implementieren:
 
@@ -1383,7 +1383,7 @@ Die Ausgangsäquivalenz muss wirklich geprüft werden. Wenn zwei Testwelten bere
 
 ### C.6 Suche nach Gegenbeispielen
 
-Für kleine Szenarien implementiere eine explizite Zustandsraumsuche. Beginne mit vollständiger Enumeration der angegebenen endlichen Werte und einer Breitensuche bis zur ausgewiesenen Grenze. Ein Zustandsfingerabdruck muss alle für weitere Wirkung und Beobachtung relevanten Bestandteile erhalten.
+Für kleine Szenarien implementiere eine explizite Zustandsraumsuche. Beginne mit vollständiger Enumeration der angegebenen endlichen Werte und einer Breitensuche bis zur ausgewiesenen Grenze. Ein Fingerprint muss alle für weitere Wirkung und Beobachtung relevanten Bestandteile erhalten.
 
 Für Zwei-Ausführungs-Prüfungen werden zwei Systemkopien kombiniert. Verborgene Schritte können getrennt fortschreiten; verglichen werden die tatsächlichen sichtbaren Folgen. Unterschiedliche Zahlen verborgener Schritte sind nicht allein ein Leck.
 
@@ -1391,7 +1391,7 @@ Ein fehlendes sichtbares Ereignis ist erst dann als Unterschied zu werten, wenn 
 
 Eine erschöpfende Suche gilt nur für die angegebenen Werte, Programme, Scheduler und Grenzen. Eine Sammlung festgelegter Angriffsprogramme ist nicht gleichbedeutend mit der Erfassung sämtlicher denkbarer Programme.
 
-Zufällige Tests ergänzen die Enumeration. Speichere Startwert, Generatorversion und Grenzen. Für probabilistische Eigenschaften müssen die **gemeinsamen Beobachtungsverteilungen** verglichen werden. Ein einzelner identischer Zufallsstartwert oder zwei Einzelverteilungen ersetzen diesen Vergleich nicht. Kleine Zufallsräume können exakt mit rationalen Wahrscheinlichkeiten ausgewertet werden.
+Zufällige Tests ergänzen die Enumeration. Speichere Seed, Generatorversion und Grenzen. Für probabilistische Eigenschaften müssen die **gemeinsamen Beobachtungsverteilungen** verglichen werden. Ein einzelner identischer Seed oder zwei Einzelverteilungen ersetzen diesen Vergleich nicht. Kleine Zufallsräume können exakt mit rationalen Wahrscheinlichkeiten ausgewertet werden.
 
 Beschleunigungen wie Zustandsreduktion sind erst zulässig, wenn sie die betroffene Beobachtungs- und Prüfeigenschaft erhalten. Eine Reduktion, die gerade Empfänger, Reihenfolge oder Freigabehistorie wegabstrahiert, ist keine gültige Optimierung.
 
@@ -1693,7 +1693,7 @@ Jeder Einsatz legt vorab einen versionierten `AuditContract` fest:
 
 Ein `AuditScope` für eine konkrete Prüfung nennt Anfang, Ende und alle einschlägigen Partitionen sowie offene Vorgänge am Anfang und Ende. Ein Bericht mit „heute“ ohne begründete Zuordnung zu vollständigen Journalstrecken ist unzureichend. Uhrzeit ist ein annotierter Messwert mit Herkunft; Sequenz, Kausalität und Verwaltungsrevisionen entscheiden über die relevanten Ordnungen. Eine globale Gesamtordnung unabhängiger Journale wird nicht erfunden.
 
-Alle regulären Anfragen am kontrollierten Eingang werden im vereinbarten Umfang erfasst, auch Ablehnungen. Unauthentisierter Netzwerkabfall und Grenzraten sind gesondert zu definieren. Eine Ressourcenbegrenzung darf Requests vor Annahme blockieren, aber keine angenommenen Vorgänge lautlos aus einer angeblich vollständigen Spur entfernen. Zusammengefasste Angriffsstatistik darf als solche geführt werden; sie ersetzt keinen Einzelnachweis.
+Alle regulären Anfragen am kontrollierten Eingang werden im vereinbarten Umfang erfasst, auch Ablehnungen. Unauthentisierter Netzwerkabfall und Rate-Limits sind gesondert zu definieren. Eine Ressourcenbegrenzung darf Requests vor Annahme blockieren, aber keine angenommenen Vorgänge lautlos aus einer angeblich vollständigen Spur entfernen. Zusammengefasste Angriffsstatistik darf als solche geführt werden; sie ersetzt keinen Einzelnachweis.
 
 Nach einem Ausfall wird vor Wiederaufnahme ein geschützter Wiederanlaufbefund mit bekannten Kontrollständen, offenen Versuchen und erkennbaren Erfassungslücken festgehalten. Nicht rekonstruierbare Anfragen werden nicht erfunden. Auch wenn die Sperre unbelegte Wirkungen verhindert hat, kann die Anzahl zurückgewiesener oder nicht angenommener Anfragen für dieses Intervall unbekannt bleiben. Ein Bericht darf deshalb vollständige Wirkungsabdeckung und vollständige Anfrageerfassung nicht gleichsetzen.
 
@@ -1790,7 +1790,7 @@ uncertain -- spaeterer belastbarer Beleg --> confirmed | no_effect
 
 Eine spätere Aufklärung ist ein neuer Eintrag. Sie tilgt das frühere `uncertain` nicht. Widersprüchliche bestätigte Ausgänge sind ein Befund; sie werden nicht durch „der letzte gewinnt“ aufgelöst.
 
-Die Umsetzung muss **einen verbindlichen Auslösepunkt** nachweisen. Relevante Rechte-/Policyrevision, Freigabeverbrauch, Offenlegungsstand und unveränderliche Nutzlast werden konsistent festgelegt. Der Vorbeleg ist vor der ersten erfassten Wirkung dauerhaft. Bei getrennten Speichern ist dies eine zu implementierende Protokolleigenschaft, keine automatisch vorhandene verteilte Transaktion.
+Die Umsetzung muss **einen verbindlichen Auslösepunkt** nachweisen. Relevante Rechte-/Policyrevision, Freigabeverbrauch, Offenlegungsstand und unveränderlicher Payload werden konsistent festgelegt. Der Vorbeleg ist vor der ersten erfassten Wirkung dauerhaft. Bei getrennten Speichern ist dies eine zu implementierende Protokolleigenschaft, keine automatisch vorhandene verteilte Transaktion.
 
 Eine zulässige Umsetzung kann ihre Autorisierung bis zur Übergabe an den geschützten Effektor serialisieren oder gleichwertige Versions-/Reservierungsprüfungen verwenden. Ein alter positiver Snapshot plus späteres `send()` ohne solchen Zusammenhang ist nicht zulässig. Eine neu entdeckte Abweichung braucht eine neue Entscheidung; sie darf nicht durch Umschreiben des alten Snapshots verborgen werden.
 

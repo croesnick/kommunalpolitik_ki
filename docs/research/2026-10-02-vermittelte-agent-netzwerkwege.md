@@ -25,7 +25,7 @@ der Orchestrator als **Befund (statisch)**.
 
 Basis: RFC 0003 Rev 1 im Repo, gelesen 2026-10-02. Beiträge, die für Netzwerkwege entscheiden:
 
-- **R.4.2** Eine Ausgabe ist ein ganzes Ereignis: Nutzlast, Auswahl, Ziel, Existenz, Reihenfolge,
+- **R.4.2** Eine Ausgabe ist ein ganzes Ereignis: Payload, Auswahl, Ziel, Existenz, Reihenfolge,
  modellierte Metadaten. Jede trägt mindestens B_W, auch ein harmloser Request (R.7.1.5).
 - **R.4.3** Suchtext und Kennung sind Ausgaben, die Antwort ein neuer Eingang mit eigenem Label.
  Leseberechtigung ist keine Sendeberechtigung. Credentials bleiben beim Connector.
@@ -60,7 +60,7 @@ Spezifikation 2025-11-25, alle Punkte **Doc**, Abruf 2026-10-02. Seiten stehen i
  Brokerendpunkt muss sich gegen jeden lokalen Prozess sichern, nicht nur den Agenten.
 - **SSRF und Egress-Proxy.** Security-Best-Practices beschreiben SSRF über manipulierte URLs,
  Redirect-Ketten, DNS-TOCTOU und Metadatenendpunkte. Für serverseitige Deployments empfehlen sie
- einen Egress-Proxy, der Netzpolitik gegen interne Ziele grundsätzlich verhindert, mit
+ einen Egress-Proxy, der Netz-Policy gegen interne Ziele grundsätzlich verhindert, mit
  Stripe Smokescreen als Beispiel. Anwendungsschicht-Zielprüfungen lassen sich durch Redirects
  und DNS unterwandern; Durchsetzung sitzt am Verbindungspunkt.
 - **Token-Passthrough verboten.** Ein Token, das nicht für den nachgelagerten Dienst ausgestellt
@@ -85,7 +85,7 @@ Spezifikation 2025-11-25, alle Punkte **Doc**, Abruf 2026-10-02. Seiten stehen i
 Eine Ziel-Allowlist beurteilt nur den Zielhost. Nach R.4.2 ist das Ereignis aber die ganze Situation.
 Sie prüft nicht:
 
-- ob die Nutzlast einen freigabepflichtigen Suchtext trägt (R.7.3.6 Query-Leak),
+- ob der Payload einen freigabepflichtigen Suchtext trägt (R.7.3.6 Query-Leak),
 - ob Existenz oder Timing der Anfrage Information über den Raumzustand sichtbar macht (R.7.1.5),
 - ob die Reihenfolge zugelassener Aufrufe Information transportiert (R.7.2.5),
 - ob die Antwort als neuer Eingang mit eigenem Label gedeckt ist (R.4.3).
@@ -103,7 +103,7 @@ HTTP_PROXY ist keine Durchsetzung, aus drei Gründen:
  Node-CLI-Doku und den release notes. Bun-Verhalten ist hier ungeprüft (**Test**), und ein
  Sicherheitsgewinn darf daraus nicht geschlossen werden.
 2. **TLS-Opacity ohne Termination.** Ohne Termination sieht der Proxy nur die Verbindung: kein
- Nutzlast-Kontrolle, keine Antwortinhalte, keine Labelzuordnung.
+ Payload-Kontrolle, keine Antwortinhalte, keine Labelzuordnung.
 3. **Verstellbar durch den Agenten.** Der Agent startet eigene Prozesse und kann Variablen in
  seinem Kontext setzen oder weglassen. Ein Enforcement, das von env-Variablen im Kontext eines
  beliebig handelnden Agenten abhängt, gehört nicht zur vertrauenswürdigen Basis (R.8). Der Proxy
@@ -145,15 +145,15 @@ Aufrufer und Arbeitsraum, unveränderliche Request-Bytes und Ziele sowie die Bin
 an den autoritativen aktuellen Zustand (RFC 0003 B.8, R.4.4). Loopback oder ein Socket-Pfadname sind
 keine Authentisierung; ein vom Agenten übermitteltes permit ersetzt diese Bindungen nicht (B.8).
 
-Ein Netzproxy kann diesen Vermittler unterstützen. Er erzwingt Zielrichtlinien und liefert
+Ein Netzproxy kann diesen Vermittler unterstützen. Er erzwingt Ziel-Policies und liefert
 Beobachtungen. Er entscheidet aber keine Labels und keinen Ereignisplan. Proxy allein ist kein
 R.4.4-Vermittler.
 
 **Konkrete Kandidaten** (kleine Auswahl, keine Architekturentscheidung):
 
 - Stripe Smokescreen: Egress-Proxy mit Ziel-ACLs; von der MCP-Security-Seite benannt. Stärke:
-  Zielrichtlinie am Verbindungspunkt. Grenze: keine Labelentscheidung, kein Vorbeleg.
-- mitmproxy: offener HTTPS-Proxy, kann Terminieren, Umleiten, Nutzlasten prüfen und verändern
+  Ziel-Policy am Verbindungspunkt. Grenze: keine Labelentscheidung, kein Vorbeleg.
+- mitmproxy: offener HTTPS-Proxy, kann Terminieren, Umleiten, Payloads prüfen und verändern
   (mitmdump mit Python-API). Stärke: belegt, dass ein Logging-Proxy mechanisch machbar ist.
   Grenze: kein RFC-Vermittler; Logs sind eigene gebundene Daten.
 - LiteLLM Proxy: Modell-Gateway mit Virtual Keys, Key-Blockierung und Log-Callbacks; eine
@@ -164,12 +164,12 @@ R.4.4-Vermittler.
   keine RFC-Pflicht.
 
 **Sichtbarkeit ist optional.** TLS-Termination ist eine Sichtbarkeitsoption, keine Pflicht. Wenn
-der Vermittler jeden Request vor dem Senden erzeugt und prüft, muss der Proxy die Nutzlast nicht
+der Vermittler jeden Request vor dem Senden erzeugt und prüft, muss der Proxy den Payload nicht
 lesen. Ein Logging-Proxy ist dann ein Werkzeug für Auditpfade, nicht eine Voraussetzung für die
 Kennzeichnung der Antworten.
 
 **Logs sind selbst gebundene Daten.** RFC 0003 R.11.5 verlangt minimale, geschützte Logs: keine
-pauschalen Dokumentkopien, Prompts, Tokens oder Credentials. Ein Proxylog mit vollen Nutzlasten ist
+pauschalen Dokumentkopien, Prompts, Tokens oder Credentials. Ein Proxylog mit vollen Payloads ist
 ein zusätzlicher Beobachter und damit selbst ein Prüfobjekt, kein Default. Redaktion und Schutz sind
 Teil des Entwurfs, keine Nachzusage.
 
@@ -261,14 +261,14 @@ coding-agent), Doku im Repo-Ordner docs/. Geprüft am 2026-10-02.
 ### 6.3 Hooks sind Vorprüfstellen, keine Enforcement-Grenze
 
 RFC 0003 B.8 trennt unverbindliche Vorprüfungen im Harness vom verbindlichen Ausführer. Ein in-process
-Hook kann Nutzlasten sehen und verändern, aber er garantiert nicht, dass nicht ein weiterer Pfad im
+Hook kann Payloads sehen und verändern, aber er garantiert nicht, dass nicht ein weiterer Pfad im
 Prozess denselben Aufruf direkt ins Netz schreibt.
 
 | Schicht | Ort | Rolle |
 |---|---|---|
 | OpenCode-Plugin-Hooks, pi-Extensions | im Agentprozess | Vorprüfung und Beobachtung |
 | Operationsvermittler (Broker) | eigener lokaler Prozess | Prüfung vor Außenwirkung, Labelentscheidungsvorbereitung, Credential-Halter |
-| Netzproxy | lokaler Prozess mit der einzigen Netzroute | Zielrichtlinie, Beobachtung, optional Effektbeleg |
+| Netzproxy | lokaler Prozess mit der einzigen Netzroute | Ziel-Policy, Beobachtung, optional Effektbeleg |
 | OS-Netzgrenze | Betriebssystemschicht | verhindert jeden Pfad außer zum Vermittler |
 | RFC-Vermittler | eigene Komponente | Labelentscheidung, Vorbeleg, Freigabeabwicklung (R.11, B.8) |
 
@@ -408,8 +408,8 @@ Alle Quellenabrufe: 2026-10-02.
 - Struktur statt: ein Operationsvermittler vor der Außenwirkung mit autoritativem B_W, Prüfungen
  für beabsichtigten Suchtext, Auswahl, Auftreten und Weg, fail-closed Verhalten, Credentials
  außerhalb des Agenten.
-- Ein Netzproxy unterstützt Zielrichtlinie und Beobachtung; er ist keine Vermittlungsentscheidung.
- TLS-Termination ist eine Sichtbarkeitsoption; minimale, geschützte Logs statt voller Nutzlasten
+- Ein Netzproxy unterstützt Ziel-Policy und Beobachtung; er ist keine Vermittlungsentscheidung.
+ TLS-Termination ist eine Sichtbarkeitsoption; minimale, geschützte Logs statt voller Payloads
  (R.11.5).
 - Proxy-Logs sind keine vollständige RFC-Auditstruktur. Als Effektbelegquelle sind sie nur bei
  nachgewiesener Authentizität, geschützter Speicherung, Zuordnung zum passenden Ausführungsversuch und

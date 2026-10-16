@@ -13,7 +13,7 @@ Dieser Skill destilliert die Muster aus der Analyse von ~25 realen Stadtratsantr
 
 ## Kanonische Antragsstruktur
 
-Jeder gute Stadtratsantrag folgt diesem Skelett (Reihenfolge matters):
+Jeder gute Stadtratsantrag folgt diesem Skelett (die Reihenfolge ist wichtig):
 
 ```
 1. Kopf / Einleitung
@@ -61,7 +61,7 @@ Patterns:
 Herzstück. Strukturiert nach:
 
 a) **Ausgangslage / Problem** — was ist der Status quo, was läuft schief?
-b) **Aktualitätsbezug** — warum *jetzt*? (Gesetzesänderung, Krise, neue Studie, Recent Ereignis, Förderprogramm-Frist)
+b) **Aktualitätsbezug** — warum *jetzt*? (Gesetzesänderung, Krise, neue Studie, aktuelles Ereignis, Förderprogramm-Frist)
 c) **Wirkung des Antrags** — was bewirkt er? (Wirkungsorientierung, nicht Meinungsbekundung)
 d) **Referenzkommunen** — Best-Practice anderer Städte (München, Freiburg, Tübingen wiederkehrend). Erzeugt Legitimation + Machbarkeitsbeweis.
 e) **Rechtliche Grundlage** — wenn anwendbar: Satzung, Paragraf, Programm

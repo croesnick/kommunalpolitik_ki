@@ -240,8 +240,8 @@ wiederkehrende Akteure, Klage-Risiken und Cross-TOP-Bezüge zu erkennen,
 die in der flachen TOP-für-TOP-Erzählung verdeckt bleiben.
 
 Der Graph wird **in die Sitzungsmappe selbst** eingebettet (als Anhang,
-siehe "Graph-Repräsentation in der Mappe" unten) — nicht als separates
-File gespeichert. Er ist Teil der Mappe, nicht der Skill-Output.
+siehe "Graph-Repräsentation in der Mappe" unten) — nicht als separate
+Datei gespeichert. Er ist Teil der Mappe, nicht der Skill-Output.
 
 **Warum als Zwischenschritt (nicht als separates Tool):**
 

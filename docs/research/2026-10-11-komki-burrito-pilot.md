@@ -16,7 +16,7 @@ komplette Smoke-Matrix aus Ticket #74 gegen die Einzeldatei.
 
 ## Bau
 
-- Werkzeugkette: zig exakt 0.16.0 (Burrito prüft die Version auf
+- Toolchain: zig exakt 0.16.0 (Burrito prüft die Version auf
   Gleichheit und bricht sonst ab, `lib/burrito.ex:5,49-61`), xz im PATH;
   7z wird für darwin-Ziele nicht gebraucht (nur Warnung). [D]
 - Der offene Punkt aus der Recherche vom 04.10. ist beantwortet: zig 0.16.0
@@ -24,8 +24,8 @@ komplette Smoke-Matrix aus Ticket #74 gegen die Einzeldatei.
   Link-Fehler). [D]
 - Aufruf: `MIX_ENV=prod BURRITO_TARGET=macos_silicon mix release` →
   `apps/komki_cli/burrito_out/komki_macos_silicon`, rund 9,6 MB, Mach-O
-  arm64. `MIX_ENV=prod` ist Pflicht: Nur prod-Builds nutzen das einmal
-  entpackte Payload wieder (dev re-extrahiert bei jedem Lauf). [D]
+  arm64. `MIX_ENV=prod` ist Pflicht: Nur prod-Builds nutzen den einmal
+  entpackten Payload wieder (dev re-extrahiert bei jedem Lauf). [D]
 - Burrito legt :burrito als benannten Payload-Bestandteil in die Binary
   (`Burrito.Util.Args` läuft zur Laufzeit mit); dokumentiert in mix.exs und
   `KomkiCli.Runtime`. Keine unbenannten Zusätze. [D]
@@ -90,7 +90,7 @@ nötig. [D]
 - `komki --help | head -2` → exit 0: Der EPIPE-Kill-Pfad des Wrappers wird
   bei unseren kleinen Ausgaben nicht erreicht. [D]
 
-## Gleiche Version, altes Payload
+## Gleiche Version, alter Payload
 
 Der Wrapper überspringt das Entpacken, sobald `_metadata.json` im
 Installationsverzeichnis liegt (wrapper.zig:73-102). Das Verzeichnis heißt
