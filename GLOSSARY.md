@@ -567,7 +567,7 @@ Gemeint ist weder die kommunale Verwaltung noch der Vault. Der Regelstand
 Γ bezeichnet einen bestimmten Stand dieses Registers.
 
 **Wo:** In der SQLite-Registry des `komki label`-CLI (apps/komki_cli);
-der Γ-Export als `komki-registry/1` übergibt den Regelstand an die
+der Γ-Export als `komki-registry/2` übergibt den Regelstand an die
 Engine (`komki-policy`).
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).

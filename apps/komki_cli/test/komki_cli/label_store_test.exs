@@ -252,17 +252,17 @@ defmodule KomkiCli.LabelStoreTest do
       assert {:ok, _compiled} = Registry.compile(JSON.decode!(json))
     end
 
-    # Unabhaengiges Orakel: das erwartete komki-registry/1 steht als Literal
+    # Unabhaengiges Orakel: das erwartete komki-registry/2 steht als Literal
     # hier (aus der Seed-Fixture abgeleitet und eingefroren), NICHT durch
     # erneute Anwendung der Store-Projektionslogik — das Exportergebnis
     # belegt sich also nicht selbst.
-    test "Export entspricht dem erwarteten komki-registry/1 (unabhaengiges Orakel)", %{db: db} do
+    test "Export entspricht dem erwarteten komki-registry/2 (unabhaengiges Orakel)", %{db: db} do
       {:ok, _} = import_seed(db)
 
       assert {:ok, json} = LabelStore.export(db)
 
       expected = %{
-        "schema" => "komki-registry/1",
+        "schema" => "komki-registry/2",
         "registry_id" => "komki-synth-demo",
         "observers" => ["fraktionskollege", "lokale-verarbeitung", "nutzende-person"],
         "fact_fields" => %{"purpose" => "string", "workspace_scope_ok" => "boolean"},

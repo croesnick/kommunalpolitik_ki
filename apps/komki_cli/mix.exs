@@ -72,7 +72,7 @@ defmodule KomkiCli.MixProject do
   # Runtime-Deps: optimus 0.6 (CLI-Layer), burrito 1.6 (Ticket #75),
   # exqlite 0.42 (SQLite-Registry des Label-Store, Ticket #91; direkt ohne
   # Ecto via Exqlite.Sqlite3) und komki_policy (Γ-Validierung bei Import und
-  # Export: die Engine-Vertragsform `komki-registry/1` ist die alleinige
+  # Export: die Engine-Vertragsform `komki-registry/2` ist die alleinige
   # Schemainstanz, siehe apps/komki_policy/CONTRACT.md § 2.1). Path-Dep auf
   # die Workspace-Schwester ohne Hex-Lock-Eintrag.
   # :burrito ist bewusst RUNTIME — der dokumentierte Burrito-argv-Aufruf
