@@ -40,8 +40,8 @@ defmodule KomkiCli.LabelStore do
     * R.2.1 — Datenobjekt: Inhalt, Herkunft, Version und
       Klassifikationsentscheidung werden getrennt gespeichert; Objekte sind
       unveraenderlich (neuer Inhalt = neue Objektversion). Labels liegen
-      ausserhalb der Schreibhoheit des Agenten: der Default-DB-Pfad liegt an
-      der Wurzel des Basisverzeichnisses — nicht unter pi-home und nicht
+      ausserhalb der Schreibhoheit des Agenten: der Default-DB-Pfad liegt am
+      Root des Basisverzeichnisses — nicht unter pi-home und nicht
       unter einem Lauf-Scratch, also ausserhalb aller file-write*-Scopes des
       Seatbelt-Profils (deny-default).
     * R.2.2 — Bindung: unveränderliche Kennung mit Version, Bezeichnung,

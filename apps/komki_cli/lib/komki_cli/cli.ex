@@ -437,7 +437,7 @@ defmodule KomkiCli.CLI do
   end
 
   # ===========================================================================
-  # label-Optionen (Ticket #91): Registry-DB default an der Wurzel des
+  # label-Optionen (Ticket #91): Registry-DB default am Root des
   # Basisverzeichnisses (NICHT unter pi-home/Scratch — auserhalb der
   # Sandbox-Schreibhoheit, R.2.1).
   # ===========================================================================

@@ -489,7 +489,7 @@ defmodule KomkiCli.LabelStoreTest do
   # ========================================================================
 
   describe "Sandbox-Schreibhoheit" do
-    test "Default-DB liegt an der Basis-Wurzel, nicht in pi-home/Scratch", %{} do
+    test "Default-DB liegt am Basis-Root, nicht in pi-home/Scratch", %{} do
       area = TestSupport.tmp_area!("komki-scope")
       System.put_env("KOMKI_HOME", area)
 

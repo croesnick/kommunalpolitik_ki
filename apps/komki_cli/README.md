@@ -148,7 +148,7 @@ SQLite-Anbindung dient exqlite (MIT-Lizenz,
 Drei Eigenschaften tragen das Design:
 
 - **Labels liegen außerhalb der Sandbox-Schreibhoheit** (R.2.1). Die
-  Registry-DB wohnt an der Basis-Wurzel, nicht unter `pi-home` und nicht
+  Registry-DB wohnt am Basis-Root, nicht unter `pi-home` und nicht
   unter einem Lauf-Scratch. Die gesandboxte Session kann sie nicht
   schreiben; Umbenennen oder die Behauptung „anonymisiert“ ändert kein
   Label.

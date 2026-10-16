@@ -202,4 +202,4 @@ NIEMALS ueberschrieben (Idempotenz).
 
 `anubis_mcp` ist LGPL-3.0 und wird als Runtime-Abhängigkeit eingebunden
 (dynamische Nutzung, kein Linken in ein verteiltes Produkt). Lizenzangaben
-des Projekts siehe Repo-Wurzel.
+des Projekts siehe Repo-Root.
