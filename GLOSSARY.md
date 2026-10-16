@@ -587,7 +587,29 @@ Auftreten und die Reihenfolge des Vorgangs.
 von Vorgängen. Die Inferenz-Engine entscheidet deterministisch anhand
 logischer Regeln über deren Zulässigkeit. Sie ist hier kein LLM-Server.
 
-**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Abgrenzung:** Kein Router — der leitet transparent weiter, ohne zu
+prüfen, zu filtern oder ein Journal zu schreiben. Kein Mediator im Sinn
+des Entwurfsmusters — das koordiniert Peers untereinander. Der Vermittler
+ist nicht umgehbar: Der Agent erreicht Operationen nur durch ihn,
+Zugangsdaten bleiben in seinem Prozess.
+
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md);
+implementiert als `apps/komki_mediator` (Modul `KomkiMediator`) —
+Codebezeichner englisch, Domänenbegriff deutsch wie bei `komki_policy`
+(„Regel-Prüfkern"). Im Rollenmodell ist der Vermittler der PEP.
+
+---
+
+### Policy Enforcement Point (PEP) und Policy Decision Point (PDP)
+
+**Definition:** Rollenpaar aus der Zugriffskontrolle. Der PDP entscheidet
+über die Zulässigkeit einer Anfrage; der PEP setzt die Entscheidung an der
+Ausführungsstelle durch und ist der einzige Weg dorthin. Im Modell ist die
+Inferenz-Engine der PDP, der Vermittler der PEP.
+
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md);
+im Repo entscheidet `komki_policy` (PDP), der Vermittler
+`apps/komki_mediator` setzt durch (PEP).
 
 ---
 
