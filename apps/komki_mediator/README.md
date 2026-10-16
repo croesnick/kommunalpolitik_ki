@@ -55,25 +55,27 @@ als Bild:
 flowchart TB
     subgraph host["komki-Host (alles Loopback)"]
         CLI["komki up / down / status / doctor"]
-        LL["llama-server<br/>127.0.0.1:49524<br/>eigene Seatbelt-Grenze"]
-        MED["komki-mediator (Escript)<br/>GET /healthz · POST /mcp<br/>127.0.0.1:49525"]
-        KOMKI_POLICY["komki_policy<br/>Derive · Verify<br/>(Bibliothek im selben BEAM)"]
-        JOURNAL["PDR-Journal<br/>mediator/journal/pdr.jsonl"]
-        RAUM["Raum unter base/mediator/<br/>registry.json (Gamma) · room.json · documents/"]
+        RAUM["Raum: registry.json · room.json · documents/"]
+        LL["llama-server<br/>127.0.0.1:49524<br/>(eigene Seatbelt-Grenze)"]
         subgraph SB["pi unter Seatbelt (deny default)"]
-            PI["pi-Session<br/>--no-extensions -e builtin:mcp"]
+            PI["pi-Session"]
         end
+        subgraph MEDBOX["komki-mediator: ein BEAM-Prozess · Loopback 49525"]
+            MED["GET /healthz · POST /mcp"]
+            KOMKI_POLICY["komki_policy<br/>Derive · Verify"]
+        end
+        JOURNAL["PDR-Journal<br/>mediator/journal/pdr.jsonl"]
     end
 
-    CLI -- "startet detached (nohup, pidfile)<br/>und healthz-Poll" --> MED
-    CLI -- "startet unter sandbox-exec" --> LL
-    CLI -- "schreibt Seatbelt-Profil<br/>und mcp.json (Tools aus healthz)" --> PI
+    CLI -- "startet (detached)" --> MED
+    CLI -- "startet (sandbox-exec)" --> LL
+    CLI -- "schreibt Profil + mcp.json" --> PI
     RAUM -- "liest beim Boot" --> MED
-    PI -- "MCP-Aufrufe<br/>(initialize · tools/list · tools/call)" --> MED
-    PI -- "Inferenz (local-model)" --> LL
-    MED -- "entscheidet und prueft<br/>(Prozessintern, kein Netz)" --> KOMKI_POLICY
-    MED -- "PDR-Datensatz je Aufruf" --> JOURNAL
-    MED -. "gelabelte Antwort<br/>mit decision_id" .-> PI
+    PI -- "MCP-Aufrufe" --> MED
+    PI -- "Inferenz" --> LL
+    MED -- "Gate 1 · Gate 2" --> KOMKI_POLICY
+    MED -- "PDR je Aufruf" --> JOURNAL
+    MED -. "Antwort + decision_id" .-> PI
 ```
 
 ### Ein Tool-Aufruf durch die Gates
@@ -95,7 +97,7 @@ sequenceDiagram
         M->>J: PDR (Entscheidung, intent_hash)
         M-->>P: isError=false + remedy plan
     else permit: Vollzug
-        M->>M: Connector vollzieht (z. B. Dokument einlesen)
+        M->>M: Connector vollzieht das Tool
         Note over M,K: Gate 2: zwei unabhaengige Pruefungen
         M->>K: Verify.check (Beweis) und payload gegen Γ (object_id-Claim)
         alt beide Pruefungen stehen
