@@ -19,6 +19,30 @@
   },
   "proof": null,
   "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "label_not_included",
+      "condition": null,
+      "transitions": [
+        {
+          "output_labels": [],
+          "transformation": "presse-auszug@1",
+          "type": "registrierte_transformation"
+        },
+        {
+          "required_bindings": [
+            "lizenz-namensnennung@1"
+          ],
+          "required_recipients": [
+            "lokale-fallverarbeitung",
+            "nutzende-person"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
   "rule": "admit",
   "snapshot_ref": "snap-fall-4711-label-fremd",
   "workspace": "ws-fall-4711"

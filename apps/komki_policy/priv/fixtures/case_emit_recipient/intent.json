@@ -1,0 +1,7 @@
+{
+  "intent_id": "intent-case-emit-recipient",
+  "object": "obj-ausgabe-a@v1",
+  "operation": "emit",
+  "schema": "komki-intent/1",
+  "workspace": "ws-fall-4711"
+}

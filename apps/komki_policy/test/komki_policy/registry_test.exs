@@ -38,7 +38,7 @@ defmodule KomkiPolicy.RegistryTest do
 
   defp base_registry do
     %{
-      "schema" => "komki-registry/1",
+      "schema" => "komki-registry/2",
       "registry_id" => "reg-test",
       "observers" => ["nutzende-person"],
       "fact_fields" => %{"purpose" => "string", "count" => "integer", "labels" => "string_set"},

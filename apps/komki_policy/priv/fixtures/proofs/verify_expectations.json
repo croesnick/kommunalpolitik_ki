@@ -113,6 +113,49 @@
       "intent": "case_deny_missing_rule/intent.json",
       "proof": "proofs/proof_admitless_condition.json",
       "snapshot": "case_deny_missing_rule/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [],
+        "result": "valid"
+      },
+      "intent": "case_emit_permit/intent.json",
+      "proof": "proofs/proof_emit_valid.json",
+      "snapshot": "case_emit_permit/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "missing_required_premise"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_emit_permit/intent.json",
+      "proof": "proofs/proof_emit_missing_label_assignment.json",
+      "snapshot": "case_emit_permit/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "unknown_premise"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_permit/intent.json",
+      "proof": "proofs/proof_extra_binding_condition.json",
+      "snapshot": "case_permit/snapshot.json"
+    },
+    {
+      "expected": {
+        "reasons": [
+          "label_assignment_false",
+          "conclusion_mismatch"
+        ],
+        "result": "invalid"
+      },
+      "intent": "case_emit_permit/intent.json",
+      "proof": "proofs/proof_emit_forged_assignment.json",
+      "snapshot": "case_emit_permit/snapshot.json"
     }
   ],
   "schema": "komki-verify-expectations/1"

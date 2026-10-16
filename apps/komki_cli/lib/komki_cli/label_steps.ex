@@ -20,7 +20,7 @@ defmodule KomkiCli.LabelSteps do
     * `{:label_show_binding, map}` — volle Bindungsdefinition (R.2.2).
     * `{:label_show_object, object, decisions}` — Metadaten + Historie
       (append-only Klassifikationsentscheidungen, aktuellster zuletzt).
-    * `{:label_export, out_path, json}` — Γ-Export (`komki-registry/1`);
+    * `{:label_export, out_path, json}` — Γ-Export (`komki-registry/2`);
       `out_path` nil heisst stdout.
     * `{:error, reason, exit_code}` — Exit 2 (Usage-/Konfig-/DB-/
       Registrierungs-Fehler).

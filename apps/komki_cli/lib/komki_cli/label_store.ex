@@ -65,13 +65,13 @@ defmodule KomkiCli.LabelStore do
       Policy-Sprache.
 
   Naht zur Engine (apps/komki_policy/CONTRACT.md, contract-frozen): der
-  Import ist `komki-label-store/2` (Obermenge von `komki-registry/1`) und
+  Import ist `komki-label-store/2` (Obermenge von `komki-registry/2`) und
   wird auf die Engine-Form § 2.1 herabprojiziert und mit
   `KomkiPolicy.Registry.compile/1` geprueft — die Engine ist die einzige
   Schemainstanz (Beobachterraum, B.4-Typen, Kennungsformate); die
   Store-Zusatzfelder (bezeichnung, geltungsbereich, verantwortliche_stelle,
   auflagen, Lockerungsbefugnis-Eintraege, observer_types) prueft dieses
-  Modul lokal. Beim Export wird der gebaute Γ-Term (`komki-registry/1`)
+  Modul lokal. Beim Export wird der gebaute Γ-Term (`komki-registry/2`)
   vor der Ausgabe kompiliert (fail-closed; nur bei Store-Korruption
   erreichbar).
 
@@ -227,7 +227,7 @@ defmodule KomkiCli.LabelStore do
   end
 
   @doc """
-  Γ-Export: baut `komki-registry/1` aus dem Store (Mengen sortiert,
+  Γ-Export: baut `komki-registry/2` aus dem Store (Mengen sortiert,
   key-deterministisch) und kompiliert den gebauten Term vor der Ausgabe
   (fail-closed). Gleicher Store-Inhalt liefert byte-identische Ausgabe.
   """
@@ -331,7 +331,7 @@ defmodule KomkiCli.LabelStore do
   # nicht ausdruecken, Ticket #109).
   defp engine_projection(term) do
     %{
-      "schema" => "komki-registry/1",
+      "schema" => "komki-registry/2",
       "registry_id" => term["registry_id"],
       "observers" => term["observers"],
       "fact_fields" => term["fact_fields"],
@@ -1173,7 +1173,7 @@ WHERE object_id = ? AND version = ? ORDER BY id",
   end
 
   # ========================================================================
-  # Γ-Export (komki-registry/1, deterministisch, fail-closed)
+  # Γ-Export (komki-registry/2, deterministisch, fail-closed)
   # ========================================================================
 
   defp build_export(conn, registry_id) do
@@ -1183,7 +1183,7 @@ WHERE object_id = ? AND version = ? ORDER BY id",
          {:ok, binding_rows} <-
            select(conn, "SELECT id, readers, operations FROM bindings") do
       term = %{
-        "schema" => "komki-registry/1",
+        "schema" => "komki-registry/2",
         "registry_id" => registry_id,
         "observers" => Enum.sort(List.flatten(observer_rows)),
         "fact_fields" => Map.new(fact_rows, fn [name, type] -> {name, type} end),

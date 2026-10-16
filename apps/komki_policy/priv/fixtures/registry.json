@@ -1,5 +1,5 @@
 {
-  "schema": "komki-registry/1",
+  "schema": "komki-registry/2",
   "registry_id": "reg-fall-4711-test",
   "observers": [
     "nutzende-person",
@@ -9,6 +9,7 @@
   ],
   "fact_fields": {
     "input_in_approved_case_scope": "boolean",
+    "output_content_digest": "string",
     "purpose": "string"
   },
   "environments": {
@@ -47,6 +48,22 @@
               ]
             }
           ]
+        },
+        "emit": {
+          "all": [
+            {
+              "eq": [
+                "purpose",
+                "antwort-fall-4711"
+              ]
+            },
+            {
+              "eq": [
+                "input_in_approved_case_scope",
+                true
+              ]
+            }
+          ]
         }
       },
       "relaxation_authorities": []
@@ -59,7 +76,8 @@
         "webdienst-x"
       ],
       "operations": {
-        "admit": true
+        "admit": true,
+        "emit": true
       },
       "relaxation_authorities": []
     },
@@ -72,6 +90,14 @@
         "start": true
       },
       "relaxation_authorities": []
+    }
+  },
+  "transformations": {
+    "presse-auszug@1": {
+      "input_labels": [
+        "lizenz-namensnennung@1"
+      ],
+      "output_labels": []
     }
   }
 }

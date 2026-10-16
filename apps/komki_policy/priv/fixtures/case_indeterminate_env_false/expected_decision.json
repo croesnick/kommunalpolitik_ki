@@ -19,6 +19,29 @@
   },
   "proof": null,
   "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "recipients_unproven",
+      "fact": "environment_observers_complete",
+      "transitions": [
+        {
+          "facts": [
+            "environment_observers_complete"
+          ],
+          "type": "fakt_nachreichen"
+        },
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "lokale-fallverarbeitung",
+            "nutzende-person"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
   "rule": "admit",
   "snapshot_ref": "snap-fall-4711-env-false",
   "workspace": "ws-fall-4711"

@@ -19,6 +19,29 @@
   },
   "proof": null,
   "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": "buergerfall-4711@1",
+      "code": "missing_fact",
+      "fact": "input_in_approved_case_scope",
+      "transitions": [
+        {
+          "facts": [
+            "input_in_approved_case_scope"
+          ],
+          "type": "fakt_nachreichen"
+        },
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "lokale-fallverarbeitung",
+            "nutzende-person"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
   "rule": "admit",
   "snapshot_ref": "snap-fall-4711-unbekannt",
   "workspace": "ws-fall-4711"

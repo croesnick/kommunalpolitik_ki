@@ -16,7 +16,7 @@ defmodule KomkiMediator.Templates do
   @doc "Registry-Term des Default-Arbeitsraums (Gamma der Aufstellung)."
   def registry do
     %{
-      "schema" => "komki-registry/1",
+      "schema" => "komki-registry/2",
       "registry_id" => "reg-komki-arbeitsraum",
       "observers" => ["nutzende-person", "pi-agent"],
       "fact_fields" => %{

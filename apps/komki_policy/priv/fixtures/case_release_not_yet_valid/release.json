@@ -1,0 +1,15 @@
+{
+  "authority": "lokale-fallverarbeitung",
+  "call_hash": "23f55de809816fc8f84815c532739a2d1a8cd1ae655f08f943ab23be4225da3b",
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "kind": "aktionsfreigabe",
+  "nonce": "go-nonce-4711-a",
+  "object": "obj-ausgabe-a@v1",
+  "operation": "emit",
+  "release_id": "go-ausgabe-4711",
+  "schema": "komki-release/1",
+  "scope": "bereich-fall-4711",
+  "valid_from": 1100,
+  "valid_until": 1200,
+  "workspace": "ws-fall-4711"
+}

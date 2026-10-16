@@ -1,0 +1,50 @@
+{
+  "assigned_label": null,
+  "blockers": null,
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "decision": "indeterminate",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-case-emit-indeterminate",
+  "missing_evidence": [
+    {
+      "binding": "buergerfall-4711@1",
+      "code": "missing_fact",
+      "fact": "input_in_approved_case_scope"
+    }
+  ],
+  "object": {
+    "object_id": "obj-ausgabe-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": "buergerfall-4711@1",
+      "code": "missing_fact",
+      "fact": "input_in_approved_case_scope",
+      "transitions": [
+        {
+          "facts": [
+            "input_in_approved_case_scope"
+          ],
+          "type": "fakt_nachreichen"
+        },
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "lokale-fallverarbeitung",
+            "nutzende-person"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
+  "rule": "emit",
+  "snapshot_ref": "snap-emit-4711-indet",
+  "workspace": "ws-fall-4711"
+}

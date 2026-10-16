@@ -24,6 +24,50 @@
   },
   "proof": null,
   "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "missing_fact",
+      "fact": "has_operation_right",
+      "transitions": [
+        {
+          "facts": [
+            "has_operation_right"
+          ],
+          "type": "fakt_nachreichen"
+        },
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "lokale-fallverarbeitung",
+            "nutzende-person"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    },
+    {
+      "binding": null,
+      "code": "missing_fact",
+      "fact": "audit_path_ready",
+      "transitions": [
+        {
+          "facts": [
+            "audit_path_ready"
+          ],
+          "type": "fakt_nachreichen"
+        },
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "lokale-fallverarbeitung",
+            "nutzende-person"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
   "rule": "admit",
   "snapshot_ref": "snap-fall-4711-multi-evidenz",
   "workspace": "ws-fall-4711"

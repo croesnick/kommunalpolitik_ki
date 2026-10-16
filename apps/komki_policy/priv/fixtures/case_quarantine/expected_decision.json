@@ -19,6 +19,20 @@
   },
   "proof": null,
   "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "object_quarantine",
+      "condition": null,
+      "transitions": [
+        {
+          "object": "obj-unklassifiziert-q@v1",
+          "scope": "object",
+          "type": "aktionsfreigabe"
+        }
+      ]
+    }
+  ],
   "rule": "admit",
   "snapshot_ref": "snap-fall-4711-quarantaene",
   "workspace": "ws-fall-4711"

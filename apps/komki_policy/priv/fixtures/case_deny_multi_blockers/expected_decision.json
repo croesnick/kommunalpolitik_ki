@@ -24,6 +24,35 @@
   },
   "proof": null,
   "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "object_quarantine",
+      "condition": null,
+      "transitions": [
+        {
+          "object": "obj-unklassifiziert-q@v1",
+          "scope": "object",
+          "type": "aktionsfreigabe"
+        }
+      ]
+    },
+    {
+      "binding": null,
+      "code": "workspace_invalid",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "lokale-fallverarbeitung",
+            "nutzende-person"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
   "rule": "admit",
   "snapshot_ref": "snap-fall-4711-multi-blocker",
   "workspace": "ws-fall-4711"

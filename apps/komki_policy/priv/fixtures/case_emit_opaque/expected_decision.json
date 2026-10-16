@@ -1,0 +1,23 @@
+{
+  "assigned_label": [
+    "buergerfall-4711@1"
+  ],
+  "blockers": null,
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "decision": "permit",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-case-emit-opaque",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-ausgabe-a",
+    "version": "v1"
+  },
+  "registry_ref": "reg-fall-4711-test",
+  "remedies": null,
+  "rule": "emit",
+  "snapshot_ref": "snap-emit-4711-opaque-a",
+  "workspace": "ws-fall-4711"
+}

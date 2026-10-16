@@ -17,6 +17,29 @@
   },
   "proof": null,
   "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "basis_right_false",
+      "condition": "has_operation_right",
+      "transitions": [
+        {
+          "facts": [
+            "has_operation_right"
+          ],
+          "type": "fakt_nachreichen"
+        },
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "lokale-fallverarbeitung",
+            "nutzende-person"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
   "rule": "admit",
   "snapshot_ref": "snap-oeffentlich-ohne-basis",
   "workspace": "ws-oeffentlich"

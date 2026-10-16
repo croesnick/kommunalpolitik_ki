@@ -35,7 +35,9 @@ defmodule KomkiPolicy.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
+      # :crypto ist Erlang/OTP-stdlib (sha256 für den call hash, § 2.6) —
+      # keine Hex-Abhängigkeit und keine Änderung an deps.
+      extra_applications: [:logger, :crypto]
     ]
   end
 

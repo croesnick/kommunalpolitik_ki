@@ -33,11 +33,11 @@ defmodule KomkiPolicy.VerifyTest do
 
   defp reason_codes(_other), do: :input_error
 
-  describe "Orakel-Schleife (verify_expectations.json, 10 Faelle)" do
+  describe "Orakel-Schleife (verify_expectations.json, 14 Faelle)" do
     test "Praeufschritte produzieren exakt die erwartete result/Befundordnung" do
       expectations = fixture(@expectations_path)
       cases = Map.fetch!(expectations, "cases")
-      assert length(cases) == 10
+      assert length(cases) == 14
 
       reg = registry()
 
@@ -228,19 +228,64 @@ defmodule KomkiPolicy.VerifyTest do
       assert length(Enum.uniq(snap_bytes)) == 1
     end
 
-    test "derive(case_permit)-Beweis bestaetigt verify als valid (keine Datei-Magnetisierung)" do
+    test "derive(case_emit_permit)-Beweis bestaetigt verify als valid (Kopplung A.7, emit)" do
       reg = registry()
-
-      {:ok, snapshot} =
-        JSON.parse(File.read!(Path.join(@fixtures_dir, "case_permit/snapshot.json")))
-
-      {:ok, intent} = JSON.parse(File.read!(Path.join(@fixtures_dir, "case_permit/intent.json")))
+      snapshot = fixture("case_emit_permit/snapshot.json")
+      intent = fixture("case_emit_permit/intent.json")
       {:ok, decision} = Derive.decide(reg, snapshot, intent)
 
       refute is_nil(decision["proof"])
 
       assert {:ok, %{"result" => "valid", "reasons" => []}} =
                Verify.check(reg, snapshot, intent, decision["proof"])
+    end
+
+    test "emit-Baum mit art-getaunter label_assignment bietet seinen Slot nicht an (BLOCKER-Seite)" do
+      reg = registry()
+      snapshot = fixture("case_emit_permit/snapshot.json")
+      intent = fixture("case_emit_permit/intent.json")
+      proof = fixture("proofs/proof_emit_valid.json")
+
+      forged =
+        put_in(proof, ["premises", Access.at(6)], %{
+          "kind" => "fact",
+          "name" => "label_assignment",
+          "fact" => "has_operation_right",
+          "source" => "test",
+          "source_kind" => "test",
+          "value" => true
+        })
+
+      assert {:ok, %{"result" => "invalid", "reasons" => reasons}} =
+               Verify.check(reg, snapshot, intent, forged)
+
+      # Der Slot ist durch die Art-Tarnung praesent, die Verfaelschung
+      # sichtbar — nur unknown_premise, kein doppelter Befund (§ 5 Schritt 3).
+      assert Enum.all?(reasons, &(&1["code"] == "unknown_premise"))
+    end
+
+    test "emit-Baum gegen admit-Slot vorbelegt: not_quarantine/label_inclusion als unbekannt (keine admit-Prämissen auf emit)" do
+      reg = registry()
+      snapshot = fixture("case_emit_permit/snapshot.json")
+      intent = fixture("case_emit_permit/intent.json")
+      proof = fixture("proofs/proof_emit_valid.json")
+
+      extra =
+        Map.put(proof, "premises", [
+          %{
+            "name" => "not_quarantine",
+            "kind" => "object_check",
+            "value" => true,
+            "object" => "obj-ausgabe-a@v1",
+            "classification" => "classified"
+          }
+          | proof["premises"]
+        ])
+
+      assert {:ok, %{"result" => "invalid", "reasons" => reasons}} =
+               Verify.check(reg, snapshot, intent, extra)
+
+      assert Enum.any?(reasons, &(&1["code"] == "unknown_premise"))
     end
   end
 end
