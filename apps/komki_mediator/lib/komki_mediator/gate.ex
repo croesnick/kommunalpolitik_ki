@@ -242,7 +242,7 @@ defmodule KomkiMediator.Gate do
 
   defp redact(env, tool, intent_hash, decision_id, reason, verify_output) do
     # Rueckhaltung: kein Ergebnisinhalt tritt raus, keine Remedies
-    # (Integritaetsfehler - es gibt keine nachreichbare Gamma-Evidenz).
+    # (Integritaetsfehler - es gibt keinen nachreichbaren Gamma-Beleg).
     # Der payload_hash bindet die Rueckhalte-Antwort jenseits seines
     # eigenen Feldes - genau die Bytes, die der Modellkontext zu sehen
     # bekommt.

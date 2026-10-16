@@ -190,7 +190,7 @@ NIEMALS ueberschrieben (Idempotenz).
 | `KomkiMediator.Gate` | Gate 1 + Gate 2 + PDR |
 | `KomkiMediator.Gamma` | Registry-Snapshot + Stand-Hash |
 | `KomkiMediator.Room` | Raum-Zustand, Objekt-/Snapshot-Bildung |
-| `KomkiMediator.Remedy` | Abhilfeplaene aus Blockern/Evidenzen |
+| `KomkiMediator.Remedy` | Abhilfeplaene aus Blockern/Belegen |
 | `KomkiMediator.Journal` | getrennter PDR-Writer (R.4.4) |
 | `KomkiMediator.Env` | geladene Umgebung fuer die Tools |
 | `KomkiMediator.Templates` | Default-Raum (idempotent provisioniert) |

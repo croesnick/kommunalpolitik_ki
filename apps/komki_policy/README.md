@@ -94,7 +94,7 @@ Payload-Formen): `fakt_nachreichen` (facts), `registrierte_transformation`
 Erstklassifikation). Ordnung normativ: fakt < transformation < neuer Raum <
 aktionsfreigabe. Bei `admit` erscheint kein call-GO (bewusste Lücke, § 9);
 bei `emit` zusätzlich das call-GO für die fünf weichen Blocker. Für
-`indeterminate` nie ein GO — ein GO kann keine Evidenz herstellen.
+`indeterminate` nie ein GO — ein GO kann keine Belege herstellen.
 
 ### Aktionsfreigabe trennt Urteil und Vollzug (§ 4.6)
 

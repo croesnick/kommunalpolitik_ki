@@ -20,7 +20,7 @@ macOS arm64, Apple M1 Max, 64 GiB für dokumentengebundene private Entwürfe in 
 tragfähig sind. Lokal ist bevorzugt, nicht zwingend; ein ausdrücklich wählbarer Remote-Weg bleibt
 möglich (Vermittlungspunkte im Bericht „Vermittelte Agent-Netzwerkwege", Rev 1, 2026-10-02).
 
-Evidenzstufen je Befund: **Doc** = offizielle Dokumentation (URL und Abrufdatum). **Fakt (lokal)** =
+Belegstufen je Befund: **Doc** = offizielle Dokumentation (URL und Abrufdatum). **Fakt (lokal)** =
 durch schreibgeschützte Diagnostik auf diesem Host verifiziert. **Est** = rechnerische Schätzung aus
 dokumentierten Parametern, kein Test. **Unbekannt** = nicht experimentell abgedeckt und nicht
 dokumentiert.
@@ -219,7 +219,7 @@ hat, ist hier nicht geprüft (**Test**). Konsequente Entwurfspunkte, unabhängig
   eine Raum- und Auswahlentscheidung, kein freier Requestparameter des Clients.
 - **Nicht beschriebene bzw. stille Cloud-Dispatch bleibt ausgeschlossen**: Wenn eine Anfrage an
   ein Modell weitergeleitet wird, ohne dass der Weg in der Umgebungszulassung beschrieben ist,
-  fehlt die Evidenz für den vollständigen Weg (R.3,R.8.2); sie wird fail-closed abgewiesen.
+  fehlt der Beleg für den vollständigen Weg (R.3,R.8.2); er wird fail-closed abgewiesen.
 - **Ein ausdrücklich beschriebener und autorisierter Remote-Weg bleibt Kandidat**: Der Auftrag
   lässt optionalen Remote-Modelleinsatz ausdrücklich zu. Ein Cloud-Dispatch, der als eigener Weg
   mit eigener Zulassung beschrieben ist, braucht eine eigene Umgebungszulassung (R.3), kein

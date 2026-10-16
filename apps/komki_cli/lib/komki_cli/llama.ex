@@ -3,7 +3,7 @@ defmodule KomkiCli.Llama do
   llama-server-Lebenszyklus (lokal, loopback-only, keine Remote-Load-Flags).
 
   Gepinnt: llama-server 0.5.0, build 11146 (Flags via `--help` nachgeprüft;
-  Evidenz: `docs/research/2026-10-04-probe-harness-sandbox.md` im Branch
+  Beleg: `docs/research/2026-10-04-probe-harness-sandbox.md` im Branch
   `research/probe-harness-sandbox`):
 
       -m <gguf> --host 127.0.0.1 --port <port> --alias local-model

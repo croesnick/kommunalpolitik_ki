@@ -52,7 +52,7 @@ defmodule KomkiCli.CLI do
 
   @type outcome :: {String.t(), non_neg_integer()}
 
-  # Evidenz fuer die Grenz-Gates: Probebericht im Beschluss zu Ticket #70
+  # Beleg fuer die Grenz-Gates: Probebericht im Beschluss zu Ticket #70
   # (Issue-Kommentar) und der Seatbelt-Survey im Repo.
   @probe_doc_hint "Nachweise: Ticket #70 (Probebericht im Beschluss), " <>
                     "docs/research/2026-10-05-seatbelt-survey.md"

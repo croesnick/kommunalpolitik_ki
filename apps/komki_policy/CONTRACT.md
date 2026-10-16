@@ -240,7 +240,7 @@ Regeln (R.6.2 — autorisiert wird ein Ereignis, nicht nur ein Text):
 
 ### 2.8 Remedy-Katalog (Legal Fortsetzungen statt nacktem `deny`)
 
-APPA Theorem 5 umgesetzt: zu jedem Blocker und jeder fehlenden Evidenz ein begrenzter, aufzählbarer Katalog legaler Fortsetzungen aus **genau vier Übergangstypen**. Der Katalog ist reine Ausgabe („der Katalog erzeugt keine Autorität“): keine Eingabe akzeptiert ihn, keine Fortsetzung wird ausgeführt.
+APPA Theorem 5 umgesetzt: zu jedem Blocker und jedem fehlenden Beleg ein begrenzter, aufzählbarer Katalog legaler Fortsetzungen aus **genau vier Übergangstypen**. Der Katalog ist reine Ausgabe („der Katalog erzeugt keine Autorität“): keine Eingabe akzeptiert ihn, keine Fortsetzung wird ausgeführt.
 
 - `remedies`-Eintrag bei `deny` (spiegelt das Blocker-Element in `blockers`-Ordnung): `{"code": ..., "binding": ..., "condition": ..., "transitions": [...]}`.
 - `remedies`-Eintrag bei `indeterminate` (spiegelt das `missing_evidence`-Element in dessen Ordnung): `{"code": ..., "fact": ..., "binding": ..., "transitions": [...]}`.
@@ -270,7 +270,7 @@ APPA Theorem 5 umgesetzt: zu jedem Blocker und jeder fehlenden Evidenz ein begre
 | `missing_operation_rule` | — | — | ✓ | — |
 | `binding_condition_false` | ✓ `facts: [condition]` | — | ✓ | — |
 
-**Anwendbarkeit (Zweig `emit`, normal):** wie `admit`, zusätzlich `aktionsfreigabe` scope `call` für `basis_right_false`, `audit_path_not_ready`, `recipient_not_allowed`, `missing_operation_rule`, `binding_condition_false` (die Aktionsfreigabe deckt verbindliche Wirkungen des Erzeugens; `workspace_invalid` bleibt unüberbrückbar — ein GO belebt keinen ungültigen Vertrag). Für `indeterminate` (`missing_fact`, `recipients_unproven`) gilt `fakt_nachreichen` + `neuer_raum`, **nie** `aktionsfreigabe` — ein GO kann keine Evidenz herstellen.
+**Anwendbarkeit (Zweig `emit`, normal):** wie `admit`, zusätzlich `aktionsfreigabe` scope `call` für `basis_right_false`, `audit_path_not_ready`, `recipient_not_allowed`, `missing_operation_rule`, `binding_condition_false` (die Aktionsfreigabe deckt verbindliche Wirkungen des Erzeugens; `workspace_invalid` bleibt unüberbrückbar — ein GO belebt keinen ungültigen Vertrag). Für `indeterminate` (`missing_fact`, `recipients_unproven`) gilt `fakt_nachreichen` + `neuer_raum`, **nie** `aktionsfreigabe` — ein GO kann keine Belege herstellen.
 
 **Aktionsfreigabe-Zweig (§ 4.6):** jeder Release-Blocker erhält genau einen `aktionsfreigabe`-scope-`call`-Eintrag mit dem **neu berechneten** korrekten `call_hash` (der Katalog sagt dem Menschen, woran ein gültiges GO gebunden sein muss). `workspace_invalid` behält seinen `neuer_raum`-Eintrag.
 
@@ -353,7 +353,7 @@ Der Vermittler ordnet jeder Ausgabe das Raumlabel zu, auch undurchsichtigen Byte
   1. `workspace_contract_valid` — Verstoß → `workspace_invalid`
   2. `has_operation_right` — `false` → `basis_right_false`; fehlt → `missing_fact` (kein `has_object_access_right`: Erzeugen liest kein Quell-Objekt)
   3. `audit_path_ready` — `false` → `audit_path_not_ready`; fehlt → `missing_fact`
-  4. `environment_observers_complete` — wie `admit` P6 (nur Evidenz)
+  4. `environment_observers_complete` — wie `admit` P6 (nur Beleg)
   5. `recipient_inclusion` — ρ_Γ(c) ⊆ R_Γ(B_W); Verstoß → `recipient_not_allowed`
   6. `binding_condition(b)` — für **jede** Bindung b ∈ B_W in sortierter Ordnung: Auswertung von `bindings[b].operations["emit"]` (fehlt → **verbietend**, `missing_operation_rule`; dreiwertig wie § 3)
   7. `label_assignment` — berechnet, immer wahr auf Permit: λ(y) := B_W (`assigned_label` = `checked_label` = B_W)

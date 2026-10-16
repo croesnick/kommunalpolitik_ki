@@ -127,7 +127,7 @@ defmodule KomkiPolicy.CLITest do
     assert is_nil(parsed["proof"])
   end
 
-  test "decide case_indeterminate -> Exit 0, decision indeterminate mit Evidenz" do
+  test "decide case_indeterminate -> Exit 0, decision indeterminate mit Belegen" do
     {output, code} = run_decide("case_indeterminate")
 
     assert code == 0

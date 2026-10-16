@@ -475,7 +475,7 @@ Grenz-Gates, Antragsreife-Gates, Hard/Soft Gates, Vermittler-Gates
 
 **Sprache:** Basis ist der etablierte Quality-Gate-Begriff (deutsche
 Fachtexte nutzen ihn); bei Ersteinführung definieren. Verdeutschungen wie
-„Tor" sind Fehlformen.
+„Tor“ sind Fehlformen.
 
 ---
 
@@ -632,7 +632,7 @@ Zugangsdaten bleiben in seinem Prozess.
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md);
 implementiert als `apps/komki_mediator` (Modul `KomkiMediator`) —
 Codebezeichner englisch, Domänenbegriff deutsch wie bei `komki_policy`
-(„Regel-Prüfkern"). Im Rollenmodell ist der Vermittler der PEP.
+(„Regel-Prüfkern“). Im Rollenmodell ist der Vermittler der PEP.
 
 ---
 
@@ -653,7 +653,7 @@ im Repo entscheidet `komki_policy` (PDP), der Vermittler
 
 **Definition:** Die fest versionierte Gestalt des Angebots eines Vermittlers:
 die Menge der Tools, die er bereitstellt. Jede Änderung erzeugt eine neue
-Fassung; ein Rollover auf eine „aktuelle" Fassung gibt es nicht. Der
+Fassung; ein Rollover auf eine „aktuelle“ Fassung gibt es nicht. Der
 allgemeine Wortgebrauch (versionierte Fassung eines Datenobjekts) bleibt
 davon unberührt.
 
@@ -790,6 +790,11 @@ Entscheidungsgrundlagen: [`docs/sprachinventur.md`](docs/sprachinventur.md).
   „Distillat“ war eine Fehlform und ist ersetzt.
 - **Payload:** kanonisch „der Payload“ (maskulin); „Nutzlast“ ist im
   Korpus ersetzt. Code-Bezeichner bleiben.
+- **Bedrohungsmodell:** kanonisch deutsch „Bedrohungsmodell(ierung)“
+  (BSI-Sprachgebrauch: Leitfaden Webanwendungen 4.3.4, TR-03185 §3.2.3.3);
+  bei Erstnennung Klammer „(engl. threat modeling)“ möglich; Methoden- und
+  Code-Bezeichner (STRIDE, `threat_model`) bleiben englisch. Ersetzt die
+  Welle-2-Zuordnung threat model NUR_ENGLISCH (GO 2026-10-16).
 
 ## Querverweise
 

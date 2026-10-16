@@ -2,8 +2,8 @@
 
 | Feld | Wert |
 |---|---|
-| Status | Entwurf; Wellen 1–3 abgeschlossen; Welle 4 (K4-Cross-Check) extrahiert, Sweeps per GO 2026-10-15 ausgeführt, Verdikte teils GO-pending |
-| Stand | 2026-10-15 |
+| Status | Entwurf; Wellen 1–3 abgeschlossen; Welle 4 (K4-Cross-Check) extrahiert, Sweeps und B2-Entscheidungen per GO 2026-10-16 ausgeführt |
+| Stand | 2026-10-16 |
 | Zweck | Inventur aller Fachbegriffe und Phrasen des Korpus, Klassifikation mit Quellenbelegen, Entscheidungsgrundlage für konsistente Verwendung |
 | Korpus | Alle 39 Markdown-Dokumente des Repos (AGENTS.md, docs/, skills/, apps/, tools/). Code-Bezeichner (Funktionen, Module, CLI-Flags, MCP-Parameter) sind außen vor. RFC0001 ist historisch: es wird inventiert, Entscheidungen gelten nur für aktive Dokumente. |
 
@@ -168,11 +168,11 @@ Beleganker wie von der Verifikationslane gemeldet (Duden/DWDS-, ISTQB-, Obsidian
 
 **AI→KI in Code-Kommentaren (2026-10-14):** 21 Ersetzungen in Elixir-Kommentaren, MCP-Docstrings und UI-Strings sowie im Shell-Script (fix-5, verifiziert: 0 verbliebene Fließtext-Treffer, `mix format` grün); Bindestrich-Komposita (AI-Harness, AI-Begründung, AI-Vorschläge, AI-Zugriff) bleiben regelkonform. GLOSSARY.md wurde als Grenzdatei nachträglich selbst angeglichen (5 Stellen).
 
-## Welle 4 — K4-Cross-Check und Sprach-Sweeps (2026-10-15)
+## Welle 4 — K4-Cross-Check und Sprach-Sweeps (2026-10-16)
 
 **Anlass und Methode:** Der Root-Sweep („Root“ statt „Wurzel“, Commit `92da34a`) deckte ein Muster auf, das die Wellen 1–3 nicht systematisch gesucht hatten: deutsche Pseudo-Übersetzungen etablierter englischer Fachbegriffe (Kategorie K4). Extraktion in sechs parallelen Lanes über den Markdown-Korpus (~13.500 Zeilen; docs/, skills/, apps/, tools/, Root-Dateien; Eval-Artefakte und englische Dokumente ausgenommen). Jede gemeldete Fundstelle wurde vor der Adjudikation einzeln per Datei-`rg` verifiziert.
 
-**GO-Runde 2026-10-15:** A-Verstöße gegen bereits beschlossene Regeln und B1-Ersetzungen komplett; RFC0001 angleichen; Root-Neufunde aus Ticket #123 fixen; Beleg-Welle für die kontroversen B2-Terme.
+**GO-Runde 2026-10-16:** A-Verstöße gegen bereits beschlossene Regeln und B1-Ersetzungen komplett; RFC0001 angleichen; Root-Neufunde aus Ticket #123 fixen; Beleg-Welle für die kontroversen B2-Terme. Zweite GO-Runde 2026-10-16: Bedrohungsmodell als ETABLIERT_DE festgelegt, Entscheidungskopf-Sweep auf Head-Formen, Evidenz-Durchsetzung mit Ausnahmen.
 
 **Ausgeführte Ersetzungen** (fix-1-Lane 59 Edits + 8 Orchestrator-Restfixe, doppelt gezählt per `rg`; alle Alt-Formen im getrackten Korpus danach null, `mix format` fehlerfrei):
 
@@ -204,15 +204,15 @@ Beleganker wie von der Verifikationslane gemeldet (Duden/DWDS-, ISTQB-, Obsidian
 | „Reihenfolge matters“/„Recent Ereignis“ → deutsche Form | antrag_generieren:16, 64 |
 | Wurzel → Root (Neufunde aus #123) | macho_deps.ex:51, 150; llama-server-confinement:38 |
 
-**Welle-4-Verdikte** (Librarian-Beleg-Welle, Abruf 15.10.2026; Kernanker vom Orchestrator nachgeprüft):
+**Welle-4-Verdikte** (Librarian-Beleg-Welle, Abruf 16.10.2026; Kernanker vom Orchestrator nachgeprüft):
 
 | Term | Statusvorschlag | Kernbeleg | Konsequenz |
 |---|---|---|---|
 | Verhungern | ETABLIERT_DE | de-Wikipedia „Verhungern (Informatik)“: „Als Verhungern (englisch Starvation) bezeichnet man …“ (Nachprüfung bestanden); Vorlesungsskripte HH Düsseldorf, TU Dresden, Uni Hamburg, ETH Zürich mit deutscher Erstform und englischer Klammer | behalten (RFC0003:1325, RFC0001:973) |
 | Seed | NUR_ENGLISCH | deutsche Python- und PyTorch-Doku nutzen „Seed“ unübersetzt; Duden/DWDS ohne Lemma (404) | Sweep ausgeführt (RFC0003 C.6 + RFC0001-Zwilling) |
 | Fingerprint | NUR_ENGLISCH; „Zustandsfingerabdruck“ FEHLFORM | de-Wikipedia „Fingerprinting (Trackingtechnik)“, BSI „JavaScript, Cookies & Fingerprints“, heise; „Fingerabdruck“ läuft nur als erklärende Glosse daneben | Sweep ausgeführt; „Zustandsfingerprint“ als Variante zulässig |
-| Bedrohungsmodell | ETABLIERT_DE (Empfehlung, GO ausstehend) | BSI-Leitfaden Webanwendungen 4.3.4: „Die Bedrohungsmodellierung (engl. Threat Modeling) ist eines der zentralen Konzepte …“ (Nachprüfung bestanden); BSI TR-03185 §3.2.3.3 „Das Bedrohungsmodell MUSS …“; Duden- und Wikipedia-Lemma 404; MDN deutsch ist maschinell übersetzt (schwacher Anker) | würde die Welle-2-Zuordnung threat model NUR_ENGLISCH ersetzen; die R.8-Überschrift bliebe dann korrekt |
-| Entscheidungskopf | FEHLFORM-Empfehlung; head NUR_ENGLISCH | Uni-Skripte (Würzburg, Düsseldorf) bleiben bei head/classification head; „Entscheidungskopf“ ist österreichischer Rechtsterm (RIS-Handbuch); einziger deutscher ML-Beleg Ultralytics „Klassifikationskopf“ (kommerziell) | GO ausstehend für RFC0002-Sweep (→ Head-Formen) |
+| Bedrohungsmodell | ETABLIERT_DE (GO 2026-10-16) | BSI-Leitfaden Webanwendungen 4.3.4: „Die Bedrohungsmodellierung (engl. Threat Modeling) ist eines der zentralen Konzepte …“ (Nachprüfung bestanden); BSI TR-03185 §3.2.3.3 „Das Bedrohungsmodell MUSS …“; Duden- und Wikipedia-Lemma 404; MDN deutsch ist maschinell übersetzt (schwacher Anker) | ersetzt die Welle-2-Zuordnung threat model NUR_ENGLISCH; R.8-Überschrift bleibt korrekt; GLOSSARY-Regel ergänzt |
+| Entscheidungskopf | FEHLFORM (GO 2026-10-16); head NUR_ENGLISCH | Uni-Skripte (Würzburg, Düsseldorf) bleiben bei head/classification head; „Entscheidungskopf“ ist österreichischer Rechtsterm (RIS-Handbuch); einziger deutscher ML-Beleg Ultralytics „Klassifikationskopf“ (kommerziell) | RFC0002 auf Head-Formen gesweept |
 
 **Korrekturen zum Stand der Wellen 1–3:**
 
@@ -222,8 +222,8 @@ Beleganker wie von der Verifikationslane gemeldet (Duden/DWDS-, ISTQB-, Obsidian
 
 **Offen nach Welle 4:**
 
-1. **Evidenz-Durchsetzung:** Die GLOSSARY-Regel „Evidenz nur in wörtlichen englischen Zitaten“ (2026-10-14) wurde nie korpusweit gesweept. Nachzählung 15.10.2026: rund 40 Stellen — RFC0003 21× (u. a. „fehlende Evidenz“ :578, :1542; „Evidenzlücken“ :386, :1104; „historische Evidenz“ :1413, :1546), research-Notizen ~8× („Evidenzstufen“, „Kernel-Evidenz“-Label, Überschrift „Evidenzstatus“), komki_cli ~13× (Kommentare und Profil-Strings „Probe-Evidenz“, „Evidenz <Timestamp>“; README:13) sowie komki_policy cli_test:130. Jede Stelle braucht die Beleg/Nachweis-Unterscheidung der GLOSSARY-Regel — eigener Sweep mit GO.
-2. Bedrohungsmodell-Reklassifikation (Empfehlung ETABLIERT_DE) und Entscheidungskopf-Sweep (RFC0002 → Head-Formen): GO-Runde folgt.
+1. **Evidenz-Durchsetzung:** Die GLOSSARY-Regel „Evidenz nur in wörtlichen englischen Zitaten“ (2026-10-14) war nie korpusweit durchgesetzt. GO 2026-10-16, mit Ausnahmen ausgeführt und per `rg` nachgezählt: 55 Ersetzungen Evidenz→Belege/Nachweis — RFC0003 22× (u. a. „fehlende Evidenz“→„fehlende Belege“ :578, :1542; „Evidenzlücken“→„Beleglücken“ :386, :1104; „No-Effect-Evidenz“→„No-Effect-Nachweis“ :1215, :2192), research-Notizen 6× („Belegstufen“, „Belegkennzeichnung“, Überschrift „Belegstatus“), RFC0002 1× (:337), komki_policy 8×, komki_mediator 4×, komki_cli 14× (u. a. Profil-Strings „Probe-Beleg“). Ausnahmen bleiben: historisches RFC0001 (18×, Inventar), die Beweislabel-Definitionen der Probeberichte („Kernel-Evidenz“ als [E]-Label) und Code-Bezeichner (`missing_evidence`). Schlusszählung 2026-10-16: null Fließtext-Instanzen außerhalb der Ausnahmen; `mix format` fehlerfrei.
+2. Bedrohungsmodell-Reklassifikation und Entscheidungskopf-Sweep: per GO 2026-10-16 entschieden und ausgeführt (siehe Verdikt-Tabelle).
 3. K3-Verbkorreps unentschieden (Welle 1 hatte ingesten bereits offen): gesandboxt, gepinnt/pinnt, pollen, trackt/tracked/getrackt, gestagte, committeden.
 4. Schwache Grenzfälle belassen: Wegwerf-Sessions (terminal_screenshot:115), Vorschlagserzeuger (RFC0002:86), Netz-Auswärts (llama-server-confinement:62), einspeisen (komki_cli README:158).
 5. Adjudiziert behalten: eingefroren (RFC0002, K5-Präzidenz „eingefrorene Konfiguration“), Rollenetiketten (RFC0003:504, bewusste Etikett-Metapher, nicht der Label-Term), Vortraining, Aufnahme (RFC-5.4-Kernbegriff), Beweisbaum (etablierte Logik-Form), Arbeitsabläufe (generisches Deutsch, in RFC0003:736 bewusst von „kanonischen Workflows“ abgesetzt), Dissektion (Lehnwort, bei Ersteinführung definieren).

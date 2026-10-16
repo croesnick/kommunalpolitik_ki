@@ -370,7 +370,7 @@ Das geschützte **Audit-Journal** trennt drei Ereignisse:
 | `OutcomeRecorded` | Eine benannte Quelle belegt den Ausgang oder hält ihn als unklar fest. |
 
 Beim Versand eines Parteiberichts kann nach dem dauerhaften **Vorbeleg** ein Timeout auftreten. Der Ausgang bleibt
-offen oder `uncertain`, nicht „nicht gesendet“. Eine sichere Fortsetzung braucht passende Evidenz oder
+offen oder `uncertain`, nicht „nicht gesendet“. Eine sichere Fortsetzung braucht passende Belege oder
 nachgewiesene Idempotenz, keinen blinden Wiederholungsversuch. Fällt der Journalpfad aus, sind neue
 auditpflichtige Wirkungen gesperrt. Korrekturen ergänzen die Geschichte, statt alte Einträge umzuschreiben.
 
@@ -383,7 +383,7 @@ Nichtinterferenz. Die Details stehen in [R.11](#r11-audit-journal-nachweisbare-v
 
 Die Umsetzung beginnt mit Schemas, reinen Bibliotheken und lokaler CLI mit synthetischen Fixtures. Danach folgen
 Adapter und schließlich verbindliche Isolation und Connectoren. Die [Abnahme](#r10-umsetzung-und-abnahme)
-verlangt funktionierende positive Abläufe, erkannte Fehlvarianten und ehrlich ausgewiesene Evidenzlücken. Alles
+verlangt funktionierende positive Abläufe, erkannte Fehlvarianten und ehrlich ausgewiesene Beleglücken. Alles
 zu verweigern reicht nicht. Dieser RFC beauftragt keine Implementierung und gibt keine produktive Installation
 frei.
 
@@ -518,7 +518,7 @@ Ein Arbeitsraum ist eine abgeschlossene Verarbeitungseinheit mit eigenem Zustand
 | Eingangsrechte | Erlaubte Objekte oder eindeutig begrenzte Objektmengen. |
 | Befugnisse | Erlaubte Operationen, private Schreibbereiche und Übergaben. |
 | Zustand | Verlauf, Arbeitsdaten, Protokolle, Aufbewahrung und spätere Wiederaufnahme. |
-| Nachweis und Gültigkeit | Regelstand, Implementierungsnachweis, benötigte Evidenz, Ablauf und Widerruf. |
+| Nachweis und Gültigkeit | Regelstand, Implementierungsnachweis, benötigte Belege, Ablauf und Widerruf. |
 | Audit-Vertrag | Erfasste Grenzen und Ereignisse, zugelassene Journalpartition und Belegablage, Haltbarkeitsanforderung, Aufbewahrung und Verhalten bei Ausfall. |
 
 Die Raumgrenze und der Vertrag werden außerhalb des Agenten durchgesetzt. Fehlende Voraussetzungen verhindern den Start beziehungsweise weitere betroffene Verarbeitung.
@@ -575,7 +575,7 @@ R_\Gamma(L)=\bigcap_{b\in L}R_b,
 \qquad R_\Gamma(\varnothing)=\mathcal O.
 $$
 
-„Öffentlichkeit“ darf symbolisch einen unbeschränkten Empfängerkreis bezeichnen. Sie ist nicht als leere Menge tatsächlich anwesender Nutzer auszulegen. Unbekannte Empfänger bedeuten fehlende Evidenz, nicht $\varnothing$.
+„Öffentlichkeit“ darf symbolisch einen unbeschränkten Empfängerkreis bezeichnen. Sie ist nicht als leere Menge tatsächlich anwesender Nutzer auszulegen. Unbekannte Empfänger bedeuten fehlende Belege, nicht $\varnothing$.
 
 ### R.5.2 Erlaubnis
 
@@ -1101,7 +1101,7 @@ Ein zugelassenes Dokument über die Umgebung ersetzt nicht den Nachweis, dass di
 
 **Konforme Einzelschritte:** Eine ausgeführte gewöhnliche Übergabe erfüllt Empfängergrenze, Operationsbedingungen und Basisrechte.
 
-**Auditierbare Vermittlung:** Für einen festgelegten Ausschnitt werden Integrität, historische Autorisierung, Ausführungsbelege und Evidenzlücken getrennt geprüft. Eine Aussage über alle tatsächlichen Wirkungen benötigt zusätzlich den Vollständigkeitsnachweis aus A.8. Ein bestandener Audit einer Einzelspur beweist keine Nichtinterferenz.
+**Auditierbare Vermittlung:** Für einen festgelegten Ausschnitt werden Integrität, historische Autorisierung, Ausführungsbelege und Beleglücken getrennt geprüft. Eine Aussage über alle tatsächlichen Wirkungen benötigt zusätzlich den Vollständigkeitsnachweis aus A.8. Ein bestandener Audit einer Einzelspur beweist keine Nichtinterferenz.
 
 **Nichtinterferenz ohne Lockerung:** Unter den zusätzlichen Lokalitätsannahmen aus Anhang A kann allein geschützte Information die Beobachtung eines dafür unberechtigten Beobachters nicht verändern.
 
@@ -1147,7 +1147,7 @@ Er kann alternative Vermittler, Scheduler und absichtlich fehlerhafte Varianten 
 
 ### R.9.3 Audit-Verifier: historische Entscheidungen und Wirkungen prüfen
 
-Der Audit-Verifier beantwortet: „Welche Operationen sind im bezeichneten Zeitraum belegt, waren sie damals autorisiert und welche Aussagen sind mangels Evidenz offen?“ Er verwendet den unabhängigen Ableitungsprüfer und rekonstruiert relevante historische Verwaltungsstände. Heutige Rechte ersetzen nicht die damaligen Rechte.
+Der Audit-Verifier beantwortet: „Welche Operationen sind im bezeichneten Zeitraum belegt, waren sie damals autorisiert und welche Aussagen sind mangels Belegen offen?“ Er verwendet den unabhängigen Ableitungsprüfer und rekonstruiert relevante historische Verwaltungsstände. Heutige Rechte ersetzen nicht die damaligen Rechte.
 
 Er prüft eine geschlossene, authentisch abgegrenzte Journalstrecke samt Belegen. Ein `permit` ohne verbindliche Reservierung, eine Reservierung ohne Ausgang und ein bestätigter Ausgang sind unterschiedliche Tatsachen. Das Journal ist ein geschützter Bestand; der Verifier erhält keine Ausführungsbefugnis. Anhang F enthält die Bauanleitung.
 
@@ -1212,7 +1212,7 @@ Der entscheidende Grundsatz lautet: **Keine auditpflichtige Wirkung ohne vorheri
 
 Im lokalen Modell können Zustandsänderung und Journalfortschreibung eine gemeinsame Transaktion bilden. Für einen beliebigen externen Dienst wird keine solche Atomarität unterstellt. Ein Absturz nach dem Vorbeleg, aber ohne belastbaren Ausgang, hinterlässt einen **offenen** Vorgang. Ein späterer Beleg ergänzt die Geschichte. Er darf sie nicht nachträglich passend machen.
 
-`no_effect` verlangt Evidenz dafür, dass im modellierten Umfang keine Wirkung stattfand. Ein HTTP-Fehler nach dem Senden oder ein Timeout reicht dafür nicht. Ein Transportbeleg „angenommen“ ist auch kein Beweis, dass ein Parteimitglied die Nachricht gelesen hat. Unklare Zustellung erlaubt keinen blinden Wiederholungsversuch; auch Wiederholung und Aufruf zur Zustandsaufklärung haben eigene Informationswirkungen.
+`no_effect` verlangt einen Nachweis dafür, dass im modellierten Umfang keine Wirkung stattfand. Ein HTTP-Fehler nach dem Senden oder ein Timeout reicht dafür nicht. Ein Transportbeleg „angenommen“ ist auch kein Beweis, dass ein Parteimitglied die Nachricht gelesen hat. Unklare Zustellung erlaubt keinen blinden Wiederholungsversuch; auch Wiederholung und Aufruf zur Zustandsaufklärung haben eigene Informationswirkungen.
 
 Ist der Journalpfad nicht dauerhaft schreibbar, werden keine neuen auditpflichtigen Wirkungen zugelassen. Bestehende Schutzgrenzen bleiben aktiv. Für laufende Vorgänge muss die Umsetzung ausreichend geschützte Kapazität vorsehen oder ihren ungeklärten Zustand konservativ erhalten. Logausfall darf kein „weiter ohne Audit“ aktivieren.
 
@@ -1222,7 +1222,7 @@ Append-only ist eine durchgesetzte Schreibregel. Manipulationsnachweis ist eine 
 
 **Eine Hash-Kette allein genügt nicht.** Ein nachträglich verkürzter gültiger Präfix kann intern konsistent sein. Ein Angreifer mit Schreibzugriff kann eine neue Kette berechnen. Der Auditor braucht deshalb einen unabhängig vertrauenswürdigen Bezug auf den erwarteten Stand. Ein alter Kontrollpunkt schützt nicht automatisch den danach entstandenen Schluss der Geschichte. Widersprüchliche, jeweils signierte Ansichten brauchen einen Vergleich außerhalb der kontrollierten Journalansicht. RFC 9162 unterscheidet entsprechende Konsistenzprüfungen und Grenzen bei widersprüchlichen Logansichten.[^log-consistency]
 
-Der RFC legt die Nachweisziele fest, nicht ein Speicherprodukt oder eine Blockchain. Gegen einen kompromittierten Agenten kann eine geschützte lokale Journalinstanz ausreichen. Gegen nachträgliche Manipulation dieser Instanz braucht es getrennt verwahrte Evidenz. Sind sämtliche Belegquellen und Vertrauensanker kompromittiert, entsteht durch Verkettung keine Wahrheit.
+Der RFC legt die Nachweisziele fest, nicht ein Speicherprodukt oder eine Blockchain. Gegen einen kompromittierten Agenten kann eine geschützte lokale Journalinstanz ausreichen. Gegen nachträgliche Manipulation dieser Instanz braucht es getrennt verwahrte Belege. Sind sämtliche Belegquellen und Vertrauensanker kompromittiert, entsteht durch Verkettung keine Wahrheit.
 
 ### R.11.5 Das Journal darf kein neuer Abfluss sein
 
@@ -1410,7 +1410,7 @@ $$
 
 Die Einzigkeit bezieht sich auf den tatsächlichen Ausführungsversuch mit eigener Kennung. Ein Auftrag darf nicht heimlich mehrere außerhalb seines Wirkungsplans liegende Wirkungen decken. Ein offener Auftrag kann keine, eine oder nur teilweise bekannte Wirkung gehabt haben; er wird nicht nachträglich zur bestätigten Ausführung erklärt.
 
-**Bedingter Satz.** Sind die historische Evidenz und ihre Herkunft korrekt, ist der Ableitungsprüfer sound, gilt `CommitValid` für alle relevanten Aufträge und gilt die genannte Abdeckungs- und Wirkungszuordnung für $E$, dann war jede Wirkung in $E$ nach ihrem zutreffenden historischen Regelzweig autorisiert.
+**Bedingter Satz.** Sind die historischen Belege und ihre Herkunft korrekt, ist der Ableitungsprüfer sound, gilt `CommitValid` für alle relevanten Aufträge und gilt die genannte Abdeckungs- und Wirkungszuordnung für $E$, dann war jede Wirkung in $E$ nach ihrem zutreffenden historischen Regelzweig autorisiert.
 
 **Beweis.** Wähle eine beliebige Wirkung $e\in E$. Die Abdeckung liefert ihren vorausgehenden Auftrag $k$. Dessen gültige Ableitung belegt unter den authentischen, am verbindlichen Punkt geltenden Fakten den erlaubten Wirkungsumfang. `Match` ordnet $e$ genau diesem Umfang zu; `ValidProtocol` verhindert Wiederverwendung außerhalb des Plans. Damit ist $e$ autorisiert. Wegen der beliebigen Wahl gilt dies für ganz $E$. $\square$
 
@@ -1539,11 +1539,11 @@ Die Auswertung erfolgt in dieser Reihenfolge:
 
 Ein bekannter verbietender Befund führt zu `deny`; fehlen andernfalls notwendige Fakten, lautet das Ergebnis `indeterminate`. Nur vollständig nachgewiesene Prämissen führen zu `permit`. Ein nicht auswertbarer oder ressourcenbedingt abgebrochener Aufruf darf niemals auf `permit` zurückfallen.
 
-Der Vergleich von erlaubter und tatsächlicher Umgebung muss auch weitere Empfänger erfassen. Ein unbekannter Teil des Wegs ist fehlende Evidenz, nicht der leere Empfängerkreis.
+Der Vergleich von erlaubter und tatsächlicher Umgebung muss auch weitere Empfänger erfassen. Ein unbekannter Teil des Wegs bedeutet fehlende Belege, nicht den leeren Empfängerkreis.
 
 Ein Beweisbaum enthält für jeden Schritt den stabilen Regelnamen, die konkrete Schlussfolgerung und alle Prämissen samt Faktreferenzen. Der Prüfer rekonstruiert die erforderlichen Prämissen aus dem Regeltyp; er akzeptiert nicht bloß die vom Erzeuger gewählte Teilmenge. Insbesondere darf eine ausgelassene Raumbindung nicht durch einen verkürzten Baum verschwinden.
 
-Eine Ableitung zu einem früheren Snapshot bleibt historische Evidenz. Sie berechtigt nicht automatisch zu einer späteren Operation.
+Eine Ableitung zu einem früheren Snapshot bleibt ein historischer Beleg. Sie berechtigt nicht automatisch zu einer späteren Operation.
 
 ### B.6 Schnittstellen und sichere Erläuterungen
 
@@ -1818,7 +1818,7 @@ Die Labelinklusion und der Empfängertest sind erfüllt. Die Aufnahmeregel muss 
 
 Eine absichtlich fehlerhafte Engine, die nur die Bindungen der Datei prüft, liefert `permit`. Der Regressionstest muss diese Variante erkennen. Wiederhole den Test mit einem nichtleeren Eingangslabel, dessen eigene Lizenzregel erfüllt ist; die zusätzliche Fallbindung muss weiterhin geprüft werden.
 
-Positiver Kontrollfall: Eine zweite, ausdrücklich zum Fall zugelassene Datei mit ansonsten passenden Daten wird aufgenommen. Eine fehlende, nicht als falsch bekannte Scope-Evidenz liefert dagegen `indeterminate`.
+Positiver Kontrollfall: Eine zweite, ausdrücklich zum Fall zugelassene Datei mit ansonsten passenden Daten wird aufgenommen. Ein fehlender, nicht als falsch bekannter Scope-Beleg liefert dagegen `indeterminate`.
 
 ### D.2 Gemeinsamer Raum und konkrete KI-Umgebung
 
@@ -1906,7 +1906,7 @@ Der reale Analogiefall sind zwei Summen, deren Differenz einen individuellen Bet
 
 ### D.6 Wann der Regressionskorpus als bestanden gilt
 
-Erforderlich sind funktionierende positive Abläufe, erkannte historische Fehler, korrekte Ergebnisarten bei fehlender Evidenz und reproduzierbare Gegenbeispiele der unsicheren Varianten.
+Erforderlich sind funktionierende positive Abläufe, erkannte historische Fehler, korrekte Ergebnisarten bei fehlenden Belegen und reproduzierbare Gegenbeispiele der unsicheren Varianten.
 
 Nicht ausreichend sind eine bloße Anzahl grüner Tests, zufällige Stichproben ohne Grenzen oder eine Suite, in der alle interessanten Operationen abgelehnt werden. Ebenfalls unzulässig ist, einen bewusst semantisch schwächeren manuellen Modus als robusten Faktenfreigabemodus auszugeben.
 
@@ -1942,7 +1942,7 @@ Feingranulare Ressourcen-, Verkehrs- und Hardwareseitenkanäle bleiben nach R.8.
 
 ## Anhang E: Änderungen, Herkunft und Quellen
 
-Dieser Anhang ist aus RFC0001 Revision4 übernommen. „Diese Revision“ und die historischen Revisionsnummern beziehen sich hier auf RFC0001, nicht auf RFC0003. Die damaligen Quellenprüfungen und Begleitpaketangaben werden nicht als neue Prüfung bestätigt. Die in E.2 genannten Pfade `evidence/audit-model-results.json` und `README.md` bezeichnen das historische Begleitpaket; sie werden hier weder ersetzt noch als neu vorhandene Evidenz ausgegeben.
+Dieser Anhang ist aus RFC0001 Revision4 übernommen. „Diese Revision“ und die historischen Revisionsnummern beziehen sich hier auf RFC0001, nicht auf RFC0003. Die damaligen Quellenprüfungen und Begleitpaketangaben werden nicht als neue Prüfung bestätigt. Die in E.2 genannten Pfade `evidence/audit-model-results.json` und `README.md` bezeichnen das historische Begleitpaket; sie werden hier weder ersetzt noch als neu vorhandene Belege ausgegeben.
 
 ### E.1 Änderungen gegenüber den vorausgehenden Revisionen
 
@@ -1964,7 +1964,7 @@ Der Falsifikationsreview widerlegte weder den Erhaltungssatz noch den Nichtinter
 
 Die festen vier Grundbegriffe, Quarantäne, Credentials bei Connectoren, unveränderliche Arbeitsräume und die Konzentration auf Betreiber- und Laufzeitumgebungen bleiben erhalten. Es werden keine numerischen Schutzklassen oder Modellqualitätswerte eingeführt.
 
-### E.2 Dokumentgrundlagen und Evidenzstand
+### E.2 Dokumentgrundlagen und Belegstand
 
 Grundlagen sind Revision 3 dieses RFC, die vorausgehenden Revisionen und **„Falsifikationsreview: Kommunalpolitik-Harness“**. Der historische Sandbox-RFC dient weiterhin als Komponenten- und Zielinventar, nicht als normative Klassen- oder Flussdefinition.
 
@@ -2058,7 +2058,7 @@ Zuerst entstehen geschlossene Schemas, ein deterministischer Protokollinterprete
 | Engine und Ableitungsprüfer | Autorisierungsentscheidung relativ zu ausdrücklichen Fakten. | Kein Nachweis, dass eine Wirkung wirklich stattfand. |
 | Ausführer | Aktuelle Zustandsprüfung, eindeutiger Ausführungsversuch, unveränderlicher Wirkungsplan, glaubwürdige Ausgangsbelege. | Darf keine Auditgeschichte umschreiben oder offene Zustellung als sicher gescheitert deklarieren. |
 | Journal-Writer | Authentisierte Quellen, typgerechte Ereignisse, dauerhafte Reihenfolge, Append-Belege und Kontrollpunkte. | Kann eine falsch berichtete Realweltwirkung nicht durch Signieren wahr machen. |
-| Belegablage | Historische Registry, Fakten, Verträge, Freigaben und Belege unverändert und zugelassen verfügbar halten. | Eine Referenz ohne abrufbare, authentische Evidenz ist kein Prüfnachweis. |
+| Belegablage | Historische Registry, Fakten, Verträge, Freigaben und Belege unverändert und zugelassen verfügbar halten. | Eine Referenz ohne abrufbare, authentische Belege ist kein Prüfnachweis. |
 | Kontrollpunkt-Zeuge | Einen genau bezeichneten Journalstand unabhängig aufbewahren beziehungsweise widersprüchliche Stände vergleichbar machen. | Keine globale Beobachtungssicht oder Wahrheit allein durch seine Existenz. |
 | Audit-Verifier | Integrität, Ableitungen, historische Zustände und Wirkungsbelege getrennt prüfen. | Keine Ausführung; fehlende Daten weder ergänzen noch als erfüllt behandeln. |
 
@@ -2096,12 +2096,12 @@ Verwende geschlossene, versionierte Schemas wie in B.3. Unbekannte Felder, doppe
 | `AuditRecord` | Formatversion, Journal-ID, Epoche, Sequenz, Event-ID, Vorgängerbindung, authentisierte Quelle, Ereignistyp, Kausalreferenzen, Auditlabel und typisierte Ereignisdaten. |
 | `DecisionRecorded` | Logische Operation, normalisierter Intent, Raumvertrag, Registry- und Faktenreferenzen, geprüfte Labels und aufgelöste Empfänger, Entscheidung, Ableitung oder Blocker, Wirkungsplan. |
 | `ExecutionCommitted` | Eigene Versuch-ID, zugehörige Entscheidung, aktueller Faktenstand, exakte Objekt- und Wirkungsbindung, relevante Vor-/Nachrevisionen, Freigabe-/Ereignisplan und dessen verbindlicher Verbrauch beziehungsweise Reservierung. |
-| `OutcomeRecorded` | Versuch-ID, Zustand und tatsächlich belegter Wirkungsumfang, Belegquelle, Belegreferenz und Evidenzart. Unklare Teilwirkungen bleiben ausdrücklich enthalten. |
+| `OutcomeRecorded` | Versuch-ID, Zustand und tatsächlich belegter Wirkungsumfang, Belegquelle, Belegreferenz und Belegart. Unklare Teilwirkungen bleiben ausdrücklich enthalten. |
 | `AdministrationRecorded` | Authentisierte Änderung von Regeln, Rechten, Umgebung, Gültigkeit, Freigabe, Schlüsseln oder Lebenszyklus mit Vor-/Nachreferenzen. |
 | `AppendReceipt` | Journal, Epoche, Sequenz, gebundener Eintrag und geltende Haltbarkeitszusage. Kein Wirkungsbeleg. |
 | `Checkpoint` | Journal, Epoche, Länge, gebundener Kopf, Protokoll-/Schlüsselstand und Herkunftsschutz. |
 | `AuditBundle` | Abgegrenzte Journale, Belege, Kontrollpunkte, historische Regeln und Fakten sowie ein autorisiert bezogenes Vertrauensmanifest. |
-| `AuditReport` | Geprüfter Umfang, Teilergebnisse, Befunde, offene Vorgänge, Evidenzarten, Annahmen und eigenes Schutzlabel. |
+| `AuditReport` | Geprüfter Umfang, Teilergebnisse, Befunde, offene Vorgänge, Belegarten, Annahmen und eigenes Schutzlabel. |
 
 Eine logische Operation kann mehrere Versuche haben, aber jeder Versuch braucht eine eigene Kennung und einen zulässigen Wiederholungsplan. Ein verlorenes Append-Acknowledgement wird anders behandelt: Derselbe Writer-Auftrag mit derselben Event-ID und identischem Inhalt darf idempotent denselben Append-Beleg liefern. Gleiche ID mit anderem Inhalt ist ein Konflikt. Append-Wiederholung autorisiert niemals Wirkungswiederholung.
 
@@ -2176,7 +2176,7 @@ committed -- Timeout/Absturz/fehlender Beleg --> offen oder uncertain
 uncertain -- spaeterer belastbarer Beleg --> confirmed | no_effect
 ```
 
-„Offen“ beschreibt einen Versuch ohne abschließend belegten Ausgang, keinen zusätzlichen Wert von `OutcomeRecorded`. Auch ein mit `uncertain` erfasster Versuch bleibt offen. Spätere belastbare Evidenz kann beide Fälle aufklären.
+„Offen“ beschreibt einen Versuch ohne abschließend belegten Ausgang, keinen zusätzlichen Wert von `OutcomeRecorded`. Auch ein mit `uncertain` erfasster Versuch bleibt offen. Spätere belastbare Belege können beide Fälle aufklären.
 
 Eine spätere Aufklärung ist ein neuer Eintrag. Sie tilgt das frühere `uncertain` nicht. Widersprüchliche bestätigte Ausgänge sind ein Befund; sie werden nicht durch „der letzte gewinnt“ aufgelöst.
 
@@ -2189,7 +2189,7 @@ Der verbindliche Auftrag bindet nur den festgelegten Versuch und Wirkungsplan. D
 | Ausfallpunkt | Erforderliches Verhalten |
 |---|---|
 | Vor dauerhaftem Vorbeleg | Keine auditpflichtige Wirkung; Anfrage bleibt verweigert oder unbearbeitet. |
-| Nach Vorbeleg, vor bekannter Wirkung | Nach Neustart offen behandeln, sofern keine belastbare No-Effect-Evidenz existiert. |
+| Nach Vorbeleg, vor bekannter Wirkung | Nach Neustart offen behandeln, sofern kein belastbarer No-Effect-Nachweis existiert. |
 | Nach tatsächlicher Wirkung, vor Ausgangseintrag | Derselbe offene Zustand ist möglich; keine automatische Wiederholung. |
 | Nach bestätigtem Ausgang, vor Antwort an den Caller | Antwort kann verloren sein; Versuch nicht nochmals ausführen. |
 | Nach Restore eines alten Journals | Gegen bekannte Kontrollpunkte, Versuchs- und Verwaltungsstände abgleichen; bei Konflikt sperren. |
@@ -2267,7 +2267,7 @@ Kontrollpunkte können Aktivität, Anzahl, Gleichheit oder erratbare Inhalte ver
 
 Belege werden bedarfsgerecht getrennt vom schmalen Journal gespeichert. Logs enthalten keine allgemeinen Authentisierungstoken, Connector-Credentials oder unnötigen Rohtexte. Auch eine gewählte Objektkennung kann ein vom Agenten formulierter Geheimtext sein; freie Zeichenketten werden weder als vertrauenswürdige Struktur noch als harmlose Lognachricht behandelt. Anzeige- und Exportpfade müssen Kontrollzeichen und aktive Inhalte sicher behandeln.[^logging-practice]
 
-**Aufbewahrung ist befristete Unveränderlichkeit, keine ewige Speicherung.** Geschlossene Segmente können nach autorisierter Lebenszyklusregel ausgesondert werden. Segmentgrenzen und zulässige Aussonderung werden mit geeigneter, ebenfalls begrenzter Rest-Evidenz dokumentiert. Noch benötigte Belege für offene Vorgänge werden nicht unbemerkt entfernt. Muss Evidenz trotzdem rechtmäßig entfallen, wird der Prüfbereich als eingeschränkt ausgewiesen; das System behauptet dann keine vollständige Rekonstruktion.
+**Aufbewahrung ist befristete Unveränderlichkeit, keine ewige Speicherung.** Geschlossene Segmente können nach autorisierter Lebenszyklusregel ausgesondert werden. Segmentgrenzen und zulässige Aussonderung werden mit geeigneten, ebenfalls begrenzten Rest-Belegen dokumentiert. Noch benötigte Belege für offene Vorgänge werden nicht unbemerkt entfernt. Müssen Belege trotzdem rechtmäßig entfallen, wird der Prüfbereich als eingeschränkt ausgewiesen; das System behauptet dann keine vollständige Rekonstruktion.
 
 Eine Prüfung nach Beleglöschung kann gegebenenfalls die Integrität eines verbliebenen Commitments oder eines früheren Auditberichts prüfen. Sie kann nicht die ursprüngliche Entscheidung vollständig neu berechnen. Schlüsselvernichtung beweist für sich weder die Löschung aller Kopien noch die Anonymität verbleibender Metadaten.
 

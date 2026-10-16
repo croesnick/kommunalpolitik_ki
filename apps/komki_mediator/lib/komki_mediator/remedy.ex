@@ -1,7 +1,7 @@
 defmodule KomkiMediator.Remedy do
   @moduledoc """
   Remedy-Plaene: Abhilfe statt nacktem `deny`. Aus den deterministischen
-  Blockern bzw. den fehlenden Evidenzen einer Ableitung entsteht eine
+  Blockern bzw. den fehlenden Belegen einer Ableitung entsteht eine
   geordnete Liste behebbarer Schritte (aufzaehlbare rechtliche
   Fortfuehrungen statt blanker Verbotskommunikation). Die Plaene entstehen
   NUR hier im Vermittler — komki_policy bleibt ein reiner Pruefkern ohne
@@ -45,7 +45,7 @@ defmodule KomkiMediator.Remedy do
   end
 
   # -------------------------------------------------------------------------
-  # Geschlossene Abbildung Blocker/Evidenz zu Abhilfe
+  # Geschlossene Abbildung Blocker/Belege zu Abhilfe
   # -------------------------------------------------------------------------
 
   defp remedy_for(

@@ -10,7 +10,7 @@ denn nichts verlässt das Gerät, und vor jedem Lauf prüft ein Boot-Gate, dass
 die Sandbox noch dicht ist.
 
 Entstanden ist das Tool aus der zugehörigen Recherche (GitHub-Tickets #70
-und #74). Die Sandbox-Evidenz der Grenz-Gates steht im Probebericht des
+und #74). Die Sandbox-Belege der Grenz-Gates stehen im Probebericht des
 #70-Beschlusses (Issue-Kommentar) und im Research-Report
 `docs/research/2026-10-05-seatbelt-survey.md`.
 

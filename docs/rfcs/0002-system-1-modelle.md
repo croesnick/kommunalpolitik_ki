@@ -23,7 +23,7 @@ Eine Grenze gehört in diese Zusammenfassung. Frequenz, Latenz und Kosten, die �
 
 ### 1.1 Was System-1-Modelle sind
 
-Der Name stammt von Daniel Kahneman: System 1 ist das schnelle, intuitive Urteil, System 2 das langsame, bewusste Schließen.[^jev] Hier bezeichnet er einen typisierten **Readout** gegen einen Eingangszustand, nicht bloß ein schnell antwortendes Sprachmodell. Dazu gehören Encoder mit Entscheidungsköpfen, eingefrorene LLMs mit Optionslogits und LoRA-Pointerheads.[^semif][^kev] Jev beschreibt den Dienst mit der Formel „unstructured state in, typed probabilistic decisions out“.[^jev] Frei generierte Prosa entfällt, Fehlklassifikationen bleiben möglich. Auch Begründung und fachlicher Quellenbeleg fehlen; Kalibrierung und Konsistenz müssen für die tatsächliche Konfiguration geprüft werden.
+Der Name stammt von Daniel Kahneman: System 1 ist das schnelle, intuitive Urteil, System 2 das langsame, bewusste Schließen.[^jev] Hier bezeichnet er einen typisierten **Readout** gegen einen Eingangszustand, nicht bloß ein schnell antwortendes Sprachmodell. Dazu gehören Encoder mit Heads, eingefrorene LLMs mit Optionslogits und LoRA-Pointerheads.[^semif][^kev] Jev beschreibt den Dienst mit der Formel „unstructured state in, typed probabilistic decisions out“.[^jev] Frei generierte Prosa entfällt, Fehlklassifikationen bleiben möglich. Auch Begründung und fachlicher Quellenbeleg fehlen; Kalibrierung und Konsistenz müssen für die tatsächliche Konfiguration geprüft werden.
 
 Der folgende Quellenvergleich ist auf Jev und Laya nach dem Abrufstand vom 2026-09-24 begrenzt. Die eigene lokale Vergleichsmessung weiterer Kandidaten steht in Anhang B.
 
@@ -145,7 +145,7 @@ In den folgenden Regeln bezeichnen MUSS und DARF NICHT Anforderungen an jede kü
 
 **R5. Modellfreiheit der Elixir-Apps.** `check_antragsreife` verspricht „Keine LLM-Calls in diesem Tool“ (check_antragsreife.ex:14). Sollte die Modellstufe je maschinell bewertet werden, MUSS der Harness die Bewertung gegen den Report des Tools ausführen. Das Tool selbst bleibt deterministisch und erfährt nichts von der Existenz eines Modells (Unix-Prinzip).
 
-**R6. Einzelfälle.** Seltene, kontextgesättigte Entscheidungen bleiben beim frontier LLM mit menschlichem GO: die Wahl des Proposal-Typs, Statuswechsel-Empfehlungen, die Antragsreife-Prognose. Ein typisierter Entscheidungskopf dafür wäre Technik-Faszination (Repo-Prinzip 4).
+**R6. Einzelfälle.** Seltene, kontextgesättigte Entscheidungen bleiben beim frontier LLM mit menschlichem GO: die Wahl des Proposal-Typs, Statuswechsel-Empfehlungen, die Antragsreife-Prognose. Ein typisierter Head dafür wäre Technik-Faszination (Repo-Prinzip 4).
 
 ## 6. Integration
 
@@ -172,7 +172,7 @@ Für nicht-öffentliche Vault- oder Mail-Eingaben MUSS die Eskalation menschlich
 
 Vier dokumentierte Laya-Schwächen gehen ins Risiko-Register; sie sind keine allgemeine Eigenschaft der Modellklasse:
 
-- Das `noul`-Problem: Das Modell folgt teils den Label-Wörtern statt dem Inhalt (Issue #156). Für ja/nein/vielleicht-Köpfe ist das eine direkt einschlägige Schwäche.
+- Das `noul`-Problem: Das Modell folgt teils den Label-Wörtern statt dem Inhalt (Issue #156). Für ja/nein/vielleicht-Heads ist das eine direkt einschlägige Schwäche.
 - Positions-Bias im mehrsprachigen `score` (Issue #131). Die Eingaben hier sind überwiegend kurze deutsche Titel, also genau das betroffene Profil.
 - `score` ist der schwächste Fragetyp der Benchmark.
 - Kalibrierung gilt pro Domäne. Eine auf Vault-Snippets validierte Schwelle überträgt sich nicht auf AZ-Schlagzeilen oder TOP-Titel; kurze Verwaltungstitel wie „Umbenennung Musterweg“ gehören deshalb absichtlich in den Goldstandard.
@@ -185,7 +185,7 @@ Ein kleines lokales **Manifest** samt JSONL-Log hält tatsächliche Source- und 
 
 ### 6.4 Ausbaustufe
 
-Zwei Möglichkeiten bleiben ausdrücklich Optionen. Ein backendbezogener Wrapper für Presets, Logging und Schemaschutz wird nur bei Bedarf relevant; CLI ist bereits zulässig, MCP keine Pflicht. Das Fine-Tuning eigener Entscheidungsköpfe nach dem stuntd-Muster (eingefrorener Encoder, kleiner trainierter Kopf auf eigenen Labels) hängt an echten Triage-Labels aus E6. Die referenzierte Verbesserung von 89,5 Prozent auf 100 Prozent stammt aus einer zwölf-Klassen-Aufgabe ohne veröffentlichte Zeilenzahl und ist daher als Richtung lesbar, nicht als Versprechen.[^stuntd]
+Zwei Möglichkeiten bleiben ausdrücklich Optionen. Ein backendbezogener Wrapper für Presets, Logging und Schemaschutz wird nur bei Bedarf relevant; CLI ist bereits zulässig, MCP keine Pflicht. Das Fine-Tuning eigener Heads nach dem stuntd-Muster (eingefrorener Encoder, kleiner trainierter Head auf eigenen Labels) hängt an echten Triage-Labels aus E6. Die referenzierte Verbesserung von 89,5 Prozent auf 100 Prozent stammt aus einer zwölf-Klassen-Aufgabe ohne veröffentlichte Zeilenzahl und ist daher als Richtung lesbar, nicht als Versprechen.[^stuntd]
 
 ## 7. Der Pilot
 
@@ -242,7 +242,7 @@ Die Skizze nimmt einen Vault-Treffer zur Anfrage „Bahnhofstraße“ an. Der ta
 }
 ```
 
-Der Request trägt drei Festlegungen. Erstens wählt `laya-multilingual` die Modellfamilie explizit statt per Router; der Selektor ist kein unveränderlicher Gewichtsrevision-Pin. Tatsächliche Artefaktrevision und Hash gehören künftig ins Manifest. Die Router-Falle ist reproduziert: Ohne Selektor landet „Umbenennung Musterweg“ still auf dem englischen Checkpoint, praktisch unentschieden bei Confidence 0,0015; explizit multilingual urteilt derselbe Text mit p(irrelevant) = 0,9456 bei Confidence 0,695.[^laya-pilot] Ein unbekannter `model`-Name schlägt nicht fehl, sondern autoroutet. Deshalb werden `routing.model` und `routing.reason` geprüft und geloggt; Fehlrouting kann einen zweiten Checkpoint in den Cache laden. Zweitens stehen Labels in der `criteria`-Map; ein „Kopf“ in E6 meint einen Fine-Tuning-Ausgang, kein Wire-Konzept. Gleiche Beschreibungen unter anderen Labelwörtern verschoben im Versuch die Verteilung um 0,17. Vollständige Frage, Kontext, IDs, Beschreibungen und Reihenfolge werden deshalb gemeinsam versioniert. Drittens teilen Labels und Eingabe das Token-Budget (damals 1024 Token Kontext, davon 256 für Labels laut ausgelieferter Config).[^laya] Der Versuch startet mit einer Frage.
+Der Request trägt drei Festlegungen. Erstens wählt `laya-multilingual` die Modellfamilie explizit statt per Router; der Selektor ist kein unveränderlicher Gewichtsrevision-Pin. Tatsächliche Artefaktrevision und Hash gehören künftig ins Manifest. Die Router-Falle ist reproduziert: Ohne Selektor landet „Umbenennung Musterweg“ still auf dem englischen Checkpoint, praktisch unentschieden bei Confidence 0,0015; explizit multilingual urteilt derselbe Text mit p(irrelevant) = 0,9456 bei Confidence 0,695.[^laya-pilot] Ein unbekannter `model`-Name schlägt nicht fehl, sondern autoroutet. Deshalb werden `routing.model` und `routing.reason` geprüft und geloggt; Fehlrouting kann einen zweiten Checkpoint in den Cache laden. Zweitens stehen Labels in der `criteria`-Map; ein „Head“ in E6 meint einen Fine-Tuning-Ausgang, kein Wire-Konzept. Gleiche Beschreibungen unter anderen Labelwörtern verschoben im Versuch die Verteilung um 0,17. Vollständige Frage, Kontext, IDs, Beschreibungen und Reihenfolge werden deshalb gemeinsam versioniert. Drittens teilen Labels und Eingabe das Token-Budget (damals 1024 Token Kontext, davon 256 für Labels laut ausgelieferter Config).[^laya] Der Versuch startet mit einer Frage.
 
 Die Antwort trägt je Frage `choice` (Top-Label), `probabilities` (String-Keys je Option) und `confidence` (0 bis 1), dazu `answer_confidence` (die Wahrscheinlichkeit des Top-Labels), einen `usage`-Block, dessen `output_tokens` in jedem beobachteten Call bei 0 lag (das Modell generiert nichts), und einen `routing`-Block für die Pin-Verifikation aus A.1. Das Antwortfeld `model` liefert die generische Kennung `laya-rl-agent`. Erst die tatsächliche Gewichtsrevision und Datei-Hashes im Manifest belegen zusammen mit der Routingprüfung die geladene Konfiguration (6.3). Dies ist die wörtliche, beobachtete Antwort auf den Request oben (Labbook E02):
 
@@ -334,7 +334,7 @@ Der Kev-Labbook-Footprint lag bei etwa 11,99 GiB für Umgebung, Modelle und Logs
 
 ### B.3 Nächster Nachweis, noch keine Betriebsfreigabe
 
-Die Folgen sind die Entwicklungs-/Holdout-Trennung aus Abschnitt 7, ein vollständiges lokales Manifest und backendbezogene Scores statt einer gemeinsamen Confidence-Schwelle. Zuerst echte kontextbezogene menschliche Labels sammeln, bevor neue Modellscores gesehen werden. Auf Entwicklungsdaten Schema und Backend wählen; danach unverändert auf disjunktem unangetastetem Holdout Recall, falsche Verwerfungen, Coverage und Unsicherheit prüfen. Nachjustieren verbraucht den Holdout und verlangt neue Testfälle. Bei zu wenig Evidenz bleiben alle Treffer im Shadow-Betrieb sichtbar.
+Die Folgen sind die Entwicklungs-/Holdout-Trennung aus Abschnitt 7, ein vollständiges lokales Manifest und backendbezogene Scores statt einer gemeinsamen Confidence-Schwelle. Zuerst echte kontextbezogene menschliche Labels sammeln, bevor neue Modellscores gesehen werden. Auf Entwicklungsdaten Schema und Backend wählen; danach unverändert auf disjunktem unangetastetem Holdout Recall, falsche Verwerfungen, Coverage und Unsicherheit prüfen. Nachjustieren verbraucht den Holdout und verlangt neue Testfälle. Bei zu wenigen Belegen bleiben alle Treffer im Shadow-Betrieb sichtbar.
 
 Vor jedem operativen Schritt bleiben Schnittstellenprüfung, kanonische Voraussetzungen und ein eigenes GO nötig. Die [Recherche-Notiz vom 2026-10-02](../research/2026-10-02-jev-alternativen.md) liefert Hintergrund zu Alternativen und ging dem Kev-Versuch voraus. Sie ist keine Quelle dieser Messwerte; Sterne und Benchmarkplätze begründen keine Backendwahl. Private Eingaben dürfen auch bei technischer Abstention nicht implizit an Cloudmodelle gehen. Menschliches GO, Quellenpflicht und deterministische Berechtigungen bleiben unverändert.
 
@@ -345,7 +345,7 @@ Die ursprünglichen externen Quellen wurden am 2026-09-24 abgerufen. SemIf-/Kev-
 [^jev]: TypeSafe AI, „Introducing System One Models & Jev“, 2026-09-15. https://typesafe.ai/blog/introducing-system-one-models-and-jev
 [^laya]: Laya, offene System-1-Entscheidungsmodelle (Apache-2.0): README, BENCHMARKS.md, Issues #131 und #156. https://github.com/NandhaKishorM/laya
 [^devto]: Nanda Kishor M, „I built non-autoregressive decision models a year ago. Then a frontier lab called it a“ (Prior-Art-Statement). https://dev.to/nandakishor_m_6cc0adfde9f/i-built-non-autoregressive-decision-models-a-year-ago-then-a-frontier-lab-called-it-a-18me
-[^stuntd]: stuntd, lokale Laya-Instanz hinter der Jev-API mit fine-tuned Entscheidungsköpfen; referenziert im Laya-README, Abschnitt Community Tools. https://github.com/bladedevoff/stuntd
+[^stuntd]: stuntd, lokale Laya-Instanz hinter der Jev-API mit fine-tuned Heads; referenziert im Laya-README, Abschnitt Community Tools. https://github.com/bladedevoff/stuntd
 [^layaserve]: stiermid/laya-serve, Jev-kompatibler HTTP-Server für Laya; vom stuntd-README als Wire-Format-Referenz benannt. https://github.com/stiermid/laya-serve
 [^hsjev]: getmissionctrl/hs-jev, Haskell-Client für die Jev-API; dokumentiert das Drei-Band-Routing auf Konfidenz. https://github.com/getmissionctrl/hs-jev
 [^semif]: SemIf, geprüfte Source-Revision 23cf1f39fc9534fe81437200959b6dfc7106e45a. https://github.com/TheoLeeCJ/SemIf-OpenJev/tree/23cf1f39fc9534fe81437200959b6dfc7106e45a . Abruf und lokale Quellenprüfung 2026-10-02.

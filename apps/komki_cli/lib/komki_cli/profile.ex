@@ -274,7 +274,7 @@ defmodule KomkiCli.Profile do
   end
 
   # GPU/Metal-Kette (Ticket #111: Aufhebung der CPU-only-Grenze aus #100).
-  # Evidenz: exp18-Runden 1-3, 14.10.2026 (Unified-Log-Denials je Runde):
+  # Belege: exp18-Runden 1-3, 14.10.2026 (Unified-Log-Denials je Runde):
   # Runde 1 scheiterte an der Command Queue (iokit), Runde 2 am ausgelagerten
   # Shader-Compiler (MTLCompilerService), Runde 3 lief gruen. Messung Runde 3:
   # ~53 t/s Eval unter der Grenze gegen ~57 ungesandboxet (exp13) und ~5
@@ -460,7 +460,7 @@ defmodule KomkiCli.Profile do
     [
       "(version 1)",
       "(deny default)",
-      "; Basis: validierter Kandidat aus Ticket #70 (Evidenz: Research-Report der Sandbox-Forschung).",
+      "; Basis: validierter Kandidat aus Ticket #70 (Beleg: Research-Report der Sandbox-Forschung).",
       "; Jede pi/node-Zusatzregel traegt ihre Rationale im Research-Report (Branch research/probe-harness-sandbox).",
       "(allow process-exec (literal \"/usr/bin/true\"))",
       "(allow process-exec (literal \"/bin/sh\"))",
@@ -569,7 +569,7 @@ defmodule KomkiCli.Profile do
 
   defp common_boot_rules do
     [
-      "; env/bash/asdf-Boot-Proben (Evidenz 10:52:46/56 UTC)",
+      "; env/bash/asdf-Boot-Proben (Beleg 10:52:46/56 UTC)",
       "(allow sysctl-read (sysctl-name \"security.mac.lockdown_mode_state\"))",
       "(allow file-read-metadata (literal \"/System/Cryptexes/Rosetta\"))",
       "(allow file-read-metadata (literal \"/System/Cryptexes/App\"))",
@@ -605,12 +605,12 @@ defmodule KomkiCli.Profile do
           "(allow file-read-metadata (subpath \"" <> shims_root <> "\"))",
           "(allow file-read* (subpath \"" <> plugins_root <> "\"))",
           "(allow file-read-metadata (subpath \"" <> plugins_root <> "\"))",
-          "; asdf-Go-Runtime CPU-Feature-Proben (Probe-Evidenz 10:52:46/56 UTC)",
+          "; asdf-Go-Runtime CPU-Feature-Proben (Probe-Beleg 10:52:46/56 UTC)",
           "(allow sysctl-read (sysctl-name \"hw.optional.armv8_1_atomics\"))",
           "(allow sysctl-read (sysctl-name \"hw.optional.armv8_crc32\"))",
           "(allow sysctl-read (sysctl-name \"hw.optional.arm.FEAT_DIT\"))",
           "(allow sysctl-read (sysctl-name \"hw.optional.arm.FEAT_SB\"))",
-          "; asdf-Start (Probe-Evidenz 10:41:13 UTC, pid 50429)",
+          "; asdf-Start (Probe-Beleg 10:41:13 UTC, pid 50429)",
           "(allow sysctl-read (sysctl-name \"kern.bootargs\"))",
           "(allow sysctl-read (sysctl-name \"kern.osvariant_status\"))",
           "(allow sysctl-read (sysctl-name \"hw.ephemeral_storage\"))",
@@ -625,7 +625,7 @@ defmodule KomkiCli.Profile do
 
   # asdf-Binary: zur Generierungszeit entdeckt (find_executable) — keine
   # hartkodierten Systempfade im Projekt (Portabilitaets-Regel). Zwei Formen
-  # wie in der Probe-Evidenz: die PATH-Form (Hop) und der Realpath.
+  # wie im Probe-Beleg: die PATH-Form (Hop) und der Realpath.
   defp asdf_exec_rules do
     case System.find_executable("asdf") do
       nil ->
@@ -661,7 +661,7 @@ defmodule KomkiCli.Profile do
   defp node_boot_rules(pi_pkg, node_modules_root, user_home) do
     Kernel.++(
       [
-        "; node-Runtime (Probe-Evidenz: Sandbox-Direktaufruf; os-Builtin-Assert rc134)",
+        "; node-Runtime (Probe-Beleg: Sandbox-Direktaufruf; os-Builtin-Assert rc134)",
         "(allow sysctl-read (sysctl-name \"hw.optional.armv8_2_sha512\"))",
         "(allow sysctl-read (sysctl-name \"hw.optional.armv8_2_sha3\"))",
         "(allow mach-lookup (global-name \"com.apple.system.opendirectoryd.libinfo\"))",
@@ -670,11 +670,11 @@ defmodule KomkiCli.Profile do
         "(allow file-read-metadata (literal \"/etc\"))",
         "(allow sysctl-read (sysctl-name \"kern.osrelease\"))",
         "(allow sysctl-read (sysctl-name \"hw.ncpu\"))",
-        "; libuv-Limits (Probe-Evidenz: kern.maxfilesperproc, diag-G1-pi)",
+        "; libuv-Limits (Probe-Beleg: kern.maxfilesperproc, diag-G1-pi)",
         "(allow sysctl-read (sysctl-name \"kern.maxfilesperproc\"))",
         "(allow sysctl-read (sysctl-name \"net.routetable.0.0.3.0\"))",
         "(allow mach-lookup (global-name \"com.apple.CoreServices.coreservicesd\"))",
-        "; uname(2)-Rueckgrat-Felder (Evidenz 10:51:07 UTC)",
+        "; uname(2)-Rueckgrat-Felder (Beleg 10:51:07 UTC)",
         "(allow sysctl-read (sysctl-name \"kern.ostype\"))",
         "(allow sysctl-read (sysctl-name \"kern.hostname\"))",
         "(allow sysctl-read (sysctl-name \"kern.version\"))",
@@ -684,7 +684,7 @@ defmodule KomkiCli.Profile do
         "(allow file-read-data (literal \"" <>
           Path.join([user_home, ".CFUserTextEncoding"]) <> "\"))",
         "(allow network-outbound (remote unix-socket (literal \"/private/var/run/syslog\")))",
-        "; ICU/tz-Zugriffe (Evidenz 10:37:40 UTC)",
+        "; ICU/tz-Zugriffe (Beleg 10:37:40 UTC)",
         "(allow file-read* (subpath \"/private/var/db/timezone\"))",
         "(allow file-read* (subpath \"/usr/share/icu\"))"
       ],
@@ -713,7 +713,7 @@ defmodule KomkiCli.Profile do
       "(allow file-write* (subpath \"" <> scratch <> "\"))",
       "; stdio/dev-Schreibscope (Phase-1-Ansatz)",
       "(allow file-write* (literal \"/dev/null\"))",
-      "; /private/var/select/sh: npm-Link-Aufloeser (Phase-1-Evidenz)",
+      "; /private/var/select/sh: npm-Link-Aufloeser (Phase-1-Beleg)",
       "(allow file-read-metadata (literal \"/private/var/select\"))",
       "(allow file-read* (literal \"/private/var/select/sh\"))"
     ]

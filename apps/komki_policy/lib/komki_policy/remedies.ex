@@ -2,7 +2,7 @@ defmodule KomkiPolicy.Remedies do
   @moduledoc """
   Remedy-Katalog (CONTRACT.md § 2.8, APPA Theorem 5).
 
-  Zu jedem Blocker und jeder fehlenden Evidenz ein begrenzter,
+  Zu jedem Blocker und jedem fehlenden Beleg ein begrenzter,
   aufzählbarer Katalog legaler Fortsetzungen aus **genau vier
   Übergangstypen** (Enum-Werte nach Ticketvorgabe deutsch):
   `fakt_nachreichen`, `registrierte_transformation`, `neuer_raum`,
@@ -19,7 +19,7 @@ defmodule KomkiPolicy.Remedies do
   zusätzlich `aktionsfreigabe` scope `call` für die fünf weichen Blocker
   (`workspace_invalid` bleibt unüberbrückbar — ein GO belebt keinen
   ungültigen Vertrag). Für `indeterminate` nur `fakt_nachreichen` +
-  `neuer_raum` — ein GO kann keine Evidenz herstellen. Freigabe-Zweig
+  `neuer_raum` — ein GO kann keine Belege herstellen. Freigabe-Zweig
   (§ 4.6): je Release-Blocker genau ein call-GO-Eintrag mit dem **neu
   berechneten** korrekten call_hash; `workspace_invalid` behält seinen
   `neuer_raum`-Eintrag.
@@ -157,7 +157,7 @@ defmodule KomkiPolicy.Remedies do
 
   # -------------------------------------------------------------------------
   # Anwendbarkeitstabelle (indeterminate, § 2.8): fakt nachreichen +
-  # neuer_raum — NIE aktionsfreigabe (ein GO kann keine Evidenz herstellen).
+  # neuer_raum — NIE aktionsfreigabe (ein GO kann keine Belege herstellen).
   # -------------------------------------------------------------------------
 
   defp regular_transitions(

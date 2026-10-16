@@ -16,7 +16,7 @@ der außerhalb der Agentenhoheit liegt? Arbeitskontext: erste Lerniteration mit 
 ausdrücklich autorisierten öffentlichen Daten, lokale Inferenz bevorzugt, optionaler Remote-Modellweg
 wählbar, OpenCode oder pi noch unentschieden, Laufzeiten sollen Netzwerkzugriff schneiden oder vermitteln.
 
-Evidenzkennzeichnung je Befund: **Doc** = offizielle Dokumentation, mit Quellenanker. **Quelle** =
+Belegkennzeichnung je Befund: **Doc** = offizielle Dokumentation, mit Quellenanker. **Quelle** =
 Quellcode-Beleg im offiziellen Repo, mit Dateipfad. **Test** = Mechanismus plausibel, Test an dieser
 Installation nötig. **Annahme** = ausdrücklich offene Annahme. Befunde aus dem lokalen Quellcode trägt
 der Orchestrator als **Befund (statisch)**.
@@ -120,7 +120,7 @@ passenden Ausführungsversuch und dokumentierter Beobachtungsumfang. Ein nicht i
 Proxy kann innerhalb dieses Umfangs eine Verbindung belegen, nicht die exakte Klartextnutzlast oder
 deren semantische Zustellung an die endgültige Domain. TLS-Termination ist für solche
 Verbindungsbelege nicht nötig und beweist ihrerseits keine vollständige Abdeckung. Weder ein
-separater Proxyprozess noch Namen geplanter Tests sind bereits Evidenz für diese Voraussetzungen
+separater Proxyprozess noch Namen geplanter Tests sind bereits Belege für diese Voraussetzungen
 oder vollständige Vermittlung.
 
 ### 4.5 Labels auf Antworten
@@ -337,7 +337,7 @@ Nur echte Entscheidungen, keine Nachschlagefakten (diese sind in Abschnitt 6 ver
 5. OS-Netzgrenze auf macOS/arm64: hinreichend und nachweisbar? Zuständigkeit Sibling-Auftrag;
  hier nur Abgrenzung, keine Sicherheitsbeurteilung.
 
-## 9. Evidenzstatus und Grenzen
+## 9. Belegstatus und Grenzen
 
 ### 9.1 Statische Befunde aus lokalem Quellcode
 

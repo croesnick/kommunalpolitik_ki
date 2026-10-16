@@ -14,7 +14,7 @@ Zwei Klarstellungen vorab.
 1. Zu RFC 0003 B.8: Eine reine Engine kann ohne vollstaendige Vermittlung tatsaechliche Wirkungen weder verbindlich autorisieren noch kontrollieren; sie bleibt ein beratendes Pruefwerkzeug und ersetzt keine Sandbox. Das RFC verlangt Isolation als nachzuweisende Eigenschaft (R.8.2, "Tragfaehige Umgebung"), schreibt aber keine konkrete Sandbox-Technologie vor. Die Vermittlung ist Bestandteil des Broker-Tracks.
 2. Zu den historischen Sandbox-Klassen: Sie sind laut RFC 0003 R.1.2 und Anhang E Zielinventar, nicht normatives Modell. Diese Notiz bewertet nicht danach.
 
-Evidenzstufen in dieser Notiz.
+Belegstufen in dieser Notiz.
 
 - [D] Dokumentiert. Primärquelle namentlich benannt, Abrufdatum 2026-10-02.
 - [S] Schluss. Abgeleitet aus [D]-Belegen, ohne eigene Ausfuehrung.
