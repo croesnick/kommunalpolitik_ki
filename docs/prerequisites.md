@@ -371,7 +371,8 @@ meldet die installierte Version.
 **Vermittler (`komki-mediator`, Ticket #102):** `komki up` startet zusätzlich
 den MCP-Vermittler auf einem eigenen Loopback-Port (Default 49525) und
 schreibt pi-seitig die zugehörige `mcp.json` (Server `komki`, nur die
-Fassungs-Tools). Das Binary ist ein Repo-eigenes Escript:
+festgelegten MCP-Werkzeuge `ping` und `admit_document`). Das Binary ist ein
+Repo-eigenes Escript:
 
 ```bash
 cd apps/komki_mediator && mix escript.build
