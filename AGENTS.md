@@ -46,6 +46,16 @@ Fünf kanonische Triage-Rollen als Labels: `needs-triage`, `needs-info`, `ready-
 
 Single-context: `GLOSSARY.md` am Repo-Root (kanonische Nomenklatur aller Domänen — ersetzt die frühere `docs/nomenklatur.md`), ADRs unter `docs/adr/`. Siehe `docs/agents/domain.md`.
 
+### Γ-Datenorte (Policy-Prototyp, RFC 0003)
+
+Wer Γ erzeugt, prüft oder konsumiert, findet die verbindlichen Daten an drei Orten:
+
+- **Engine-Datenvertrag**: `apps/komki_policy/CONTRACT.md` mit den Γ-Konsumformaten (`komki-registry/1`, Snapshot, Intent, Decision, Proof). Der Vertrag gehört zur Engine, weil `KomkiPolicy.Registry.compile/1` die Formate durchsetzt; Änderungen nur durch den Integrator.
+- **Store-Importformat**: Moduledoc in `apps/komki_cli/lib/komki_cli/label_store.ex`, lebendes Beispiel in `apps/komki_cli/priv/fixtures/registry-seed.json`. Format `komki-label-store/2`: die Obermenge mit den R.2.2-Metadaten (Bezeichnung, Geltungsbereich, verantwortliche Stelle, Auflagen, strukturierte Lockerungsbefugnis) und den Beobachtertypen (R.2.5).
+- **Normative Basis**: `docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md` mit ≈ 2 400 Zeilen; Abschnitte per Anker-Grep (`R.N.M`, `B.N`) und gerangelte Reads statt Volltext.
+
+Regel am Γ-Übergang: Import und Export validieren immer über `KomkiPolicy.Registry.compile/1`; die Engine ist die Schemainstanz, kein Tool schreibt eigene Schema-Checks für engine-seitige Datenformate.
+
 ## Architektur-Prinzipien
 
 ### 1. Elixir-first
@@ -141,7 +151,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `apps/ratsinfo` | Elixir | RIS-Scraper + CLI + lokale Volltextsuche | CLI (`ratsinfo sync/search/show`) | Funktionsfähig |
 | `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard | LiveView + MCP (`/mcp`) | Funktionsfähig |
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | Funktionsfähig |
-| `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi) | CLI (`komki init/doctor/up/down/status/run/session`) | Funktionsfähig |
+| `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi) + lokale Label-Registry mit Export an den Regel-Prüfkern (RFC 0003) | CLI (`komki init/doctor/up/down/status/run/session/label`) | Funktionsfähig |
 | `apps/komki_policy` | Elixir | Regel-Prüfkern: rechnet aus, ob eine Absicht nach den Regeln zulässig ist, und verifiziert die Begründung unabhängig nach; rein, führt selbst nichts aus | CLI (`komki-policy validate/decide/verify`) | Funktionsfähig |
 | `apps/komki_mediator` | Elixir | Vermittler: MCP-Server für pis Tool-Aufrufe — jede Operation wird vor der Ausführung von komki_policy entschieden (Gate 1), jede Antwort vor der Aufnahme in den Kontext geprüft und gelabelt (Gate 2), jede Entscheidung im PDR-Journal festgehalten | MCP (von `komki up` gestartet, Loopback-Port) | Funktionsfähig |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | Bestehend |

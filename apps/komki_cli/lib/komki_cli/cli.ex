@@ -18,15 +18,28 @@ defmodule KomkiCli.CLI do
       komki run "PROMPT" [--mode text|json] [--scratch PATH]
       komki session [--continue] [--detach]
       komki session-chain [--continue]   # intern: Pane-Einstieg der Session
+      komki label import FILE [--db PATH]
+      komki label quarantine OBJ@VER [--content-ref PATH] [--origin TEXT]
+                       --decided-by ID --basis TEXT [--db PATH]
+      komki label classify OBJ@VER [--label BINDUNG ...] --decided-by ID
+                      --basis TEXT [--db PATH]
+      komki label list [--db PATH]
+      komki label show binding BINDUNGS-ID [--db PATH]
+      komki label show object OBJ@VER [--db PATH]
+      komki label export [--out PATH] [--db PATH]
 
   Exit-Codes (Vertrag):
 
       | Code | Bedeutung |
       |------|-----------|
       | `0`  | Erfolg |
-      | `2`  | Usage-/Konfigurationsfehler (unbekannter Befehl, fehlende/unbekannte Optionen, fehlende config.json, GGUF-SHA-Abweichung, nicht laufender llama-server bei `run`/`session`) |
+      | `2`  | Usage-/Konfigurationsfehler (unbekannter Befehl, fehlende/unbekannte Optionen, fehlende config.json, GGUF-SHA-Abweichung, nicht laufender llama-server bei `run`/`session`; `label`: Registrierungs-, DB- und Store-Fehler — Ticket #91) |
       | `3`  | Doctor-/Boot-Gate-Fail (Profil-Drift oder sandbox-exec-Boot-Pleite; Weiterbetrieb verweigert) |
       | `4`  | Runtime-Fail (llama-server, komki-mediator oder pi beendet nicht erfolgreich) |
+
+  Die `label`-Befehle (Ticket #91, SQLite-Registry des RFC-0003-Modells)
+  kennen nur Erfolg (0) und Eingabefehler (2) — sie sind rein lokal und
+  ohne Boot-Gate.
 
   **CLI-Surface-Isolation:** argv-Parsing/Help/Validierung (optimus) UND alle
   menschlichen Ausgaben (Farben via IO.ANSI, Verdict-Zeilen, Spinner/Statuszeile)
@@ -51,9 +64,37 @@ defmodule KomkiCli.CLI do
   @doc false
   @spec main([binary()]) :: no_return()
   def main(argv) do
+    # NIF-Bootstrap (Muster aus ratsinfo/lib/ratsinfo/cli.ex, Ticket #91):
+    # Im Escript-Kontext sind NIF-priv-Verzeichnisse gezippt und koennen
+    # von dort nicht dlopen-geladen werden; daher das physische
+    # exqlite-ebin aus dem Build-Tree auf den Code-Pfad bringen. Im
+    # Mix-Kontext (dev/test) ist der Pfad bereits korrekt — No-Op.
+    for path <- exqlite_ebin_paths() do
+      Code.prepend_path(path)
+    end
+
     {output, code} = run(argv)
     IO.write(output)
     halt(code)
+  end
+
+  # Exqlite ist die einzige NIF-Abhaengigkeit (SQLite-Registry des
+  # Label-Store). `Application.app_dir(:exqlite)/ebin` schaut auf dem
+  # Code-Pfad; im Escript-Kontext ist exqlite im Zip und der Pfad zeigt in
+  # das Zip-Archiv — die NIF muss aber vom realen Dateisystem laden. Die
+  # Build-Tree-Pfade decken den Escript-Alltag ab (`mix escript.build`).
+  defp exqlite_ebin_paths do
+    base = Path.dirname(:escript.script_name())
+
+    paths = [
+      Path.join([base, "_build/dev/lib/exqlite/ebin"]),
+      Path.join([base, "../_build/dev/lib/exqlite/ebin"]),
+      Path.join([Application.app_dir(:exqlite), "ebin"])
+    ]
+
+    Enum.filter(paths, &File.dir?/1)
+  rescue
+    _ -> []
   end
 
   @doc false
@@ -182,13 +223,132 @@ defmodule KomkiCli.CLI do
           flags: [
             continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"]
           ]
+        ],
+        label: [
+          name: "label",
+          description:
+            "SQLite-Registry: Bindungen, Labels, Quarantäne und Γ-Export (Ticket #91; RFC 0003 R.2)",
+          subcommands: [
+            import: [
+              name: "import",
+              description: "Store aus Registry-Datei fuellen (komki-label-store/2, Merge)",
+              args: [
+                file: [
+                  value_name: "FILE",
+                  required: true,
+                  help: "Pfad der komki-label-store/2-JSON-Datei"
+                ]
+              ],
+              options: [db: db_opt()]
+            ],
+            quarantine: [
+              name: "quarantine",
+              description:
+                "Objekt in Quarantäne (Eingang eines neuen Objekts oder Rueckholung; R.2.5)",
+              args: [
+                object: [
+                  value_name: "OBJ@VER",
+                  required: true,
+                  help: "Objektreferenz OBJ@VER (Version kebab, z.B. v42)"
+                ]
+              ],
+              options: [
+                db: db_opt(),
+                content_ref: content_ref_opt(),
+                origin: origin_opt(),
+                decided_by: decided_by_opt(),
+                basis: basis_opt()
+              ]
+            ],
+            classify: [
+              name: "classify",
+              description:
+                "Erstklassifikation/Neuklassifikation (menschlicher Akt; Λ=∅ ist legitimes leeres Label)",
+              args: [
+                object: [
+                  value_name: "OBJ@VER",
+                  required: true,
+                  help: "Objektreferenz OBJ@VER"
+                ]
+              ],
+              options: [
+                db: db_opt(),
+                label: label_opt(),
+                decided_by: decided_by_opt(),
+                basis: basis_opt()
+              ]
+            ],
+            list: [
+              name: "list",
+              description: "Uebersicht: Bindungen und Objektstaende",
+              options: [db: db_opt()]
+            ],
+            show: [
+              name: "show",
+              description: "Einzelansichten (Binding R.2.2/Objekt-Historie)",
+              subcommands: [
+                binding: [
+                  name: "binding",
+                  description: "Volle Bindungsdefinition (alle R.2.2-Felder)",
+                  args: [
+                    binding: [
+                      value_name: "BINDUNGS-ID",
+                      required: true,
+                      help: "Bindungskennung <kebab>@<int>"
+                    ]
+                  ],
+                  options: [db: db_opt()]
+                ],
+                object: [
+                  name: "object",
+                  description: "Objekt-Metadaten + Entscheidungshistorie",
+                  args: [
+                    object: [
+                      value_name: "OBJ@VER",
+                      required: true,
+                      help: "Objektreferenz OBJ@VER"
+                    ]
+                  ],
+                  options: [db: db_opt()]
+                ]
+              ]
+            ],
+            export: [
+              name: "export",
+              description: "Γ-Export: komki-registry/1 JSON (stdout oder --out)",
+              options: [db: db_opt(), out: out_opt()]
+            ]
+          ]
         ]
       ]
     )
   end
 
   defp dispatch(argv) do
+    case trailing_help(argv) do
+      {:help, [_ | _] = prefix} ->
+        # Trailing "--help"/"-h" auf dem Subcommand-Pfad (`komki label
+        # --help`): Optimus behandelt nur das Top-Level ["--help"]-
+        # Special (optimus.ex parse_specials/2); der `help`-Einstieg
+        # liefert dieselbe usage-Ausgabe mit Exit 0.
+        dispatch(["help" | prefix])
+
+      _ ->
+        parse_dispatch(argv)
+    end
+  end
+
+  defp trailing_help(argv) do
+    case Enum.split(argv, -1) do
+      {prefix, token} when token in [["--help"], ["-h"]] -> {:help, prefix}
+      _ -> :none
+    end
+  end
+
+  defp parse_dispatch(argv) do
     case Optimus.parse(cli(), argv) do
+      {:ok, [:label | tail], result} -> dispatch_label_tail(tail, result)
+      # Top-Level-Befehle (Vertrag ab version bis session-chain):
       {:ok, [command], result} -> dispatch_command(command, result)
       {:ok, %Optimus.ParseResult{}} -> {"no command given; run \"komki --help\"\n", 2}
       {:error, errors} -> {error_line(errors) <> "\n", 2}
@@ -197,6 +357,14 @@ defmodule KomkiCli.CLI do
       {:help, path} -> help_text(path)
       :version -> {"komki " <> @version <> "\n", 0}
     end
+  end
+
+  defp dispatch_label_tail([sub], result) do
+    render(KomkiCli.LabelSteps.label_command(sub, label_opts(result)))
+  end
+
+  defp dispatch_label_tail([:show, which], result) do
+    render(KomkiCli.LabelSteps.label_show(which, label_opts(result)))
   end
 
   @doc false
@@ -259,6 +427,79 @@ defmodule KomkiCli.CLI do
     else
       render(KomkiCli.Steps.run(opts))
     end
+  end
+
+  # label-Subcommands: args (file/object/binding) mit String-Schluesseln
+  # mischen, dann an LabelSteps uebergeben.
+  defp label_opts(result) do
+    args = Map.new(result.args, fn {key, value} -> {Atom.to_string(key), value} end)
+    Map.merge(optimus_opts(result), args)
+  end
+
+  # ===========================================================================
+  # label-Optionen (Ticket #91): Registry-DB default an der Wurzel des
+  # Basisverzeichnisses (NICHT unter pi-home/Scratch — auserhalb der
+  # Sandbox-Schreibhoheit, R.2.1).
+  # ===========================================================================
+
+  defp db_opt do
+    [
+      value_name: "PATH",
+      long: "db",
+      default: KomkiCli.LabelStore.default_path(),
+      help: "Registry-DB-Pfad"
+    ]
+  end
+
+  defp content_ref_opt do
+    [
+      value_name: "PATH",
+      long: "content-ref",
+      help: "Inhaltsreferenz (Pfad/Hash; Pflicht bei neuem Objekt)"
+    ]
+  end
+
+  defp origin_opt do
+    [
+      value_name: "TEXT",
+      long: "origin",
+      help: "Herkunft des Objekts (Freitext; Pflicht bei neuem Objekt)"
+    ]
+  end
+
+  defp decided_by_opt do
+    [
+      value_name: "ID",
+      long: "decided-by",
+      required: true,
+      help: "Beobachter-ID der entscheidenden Person (R.2.5: nur Typ \"person\" entscheidet)"
+    ]
+  end
+
+  defp basis_opt do
+    [
+      value_name: "TEXT",
+      long: "basis",
+      required: true,
+      help: "Begruendung + Quelle (Quellenpflicht, AGENTS.md §6)"
+    ]
+  end
+
+  defp label_opt do
+    [
+      value_name: "BINDUNG",
+      long: "label",
+      multiple: true,
+      help: "Bindungslabel (wiederholbar; ohne Angabe = ausdruecklich leeres Label Λ=∅)"
+    ]
+  end
+
+  defp out_opt do
+    [
+      value_name: "PATH",
+      long: "out",
+      help: "Zieldatei (default: stdout)"
+    ]
   end
 
   defp optimus_opts(result) do
@@ -330,7 +571,7 @@ defmodule KomkiCli.CLI do
   # Render-Flaeche (alle menschlichen Ausgaben; ANSI nur hier)
   # ===========================================================================
 
-  @spec render(KomkiCli.Steps.result()) :: outcome()
+  @spec render(KomkiCli.Steps.result() | KomkiCli.LabelSteps.result()) :: outcome()
   defp render({:inited, cfg, gguf_lines}), do: render_init(cfg, gguf_lines)
   defp render({:checks, checks, summary}), do: render_doctor(checks, summary)
 
@@ -395,8 +636,138 @@ defmodule KomkiCli.CLI do
   defp render({:chain_exit, code}),
     do: {"pi exit " <> to_string(code) <> "\n", code}
 
+  # ----------------------------------------------------------------- label (#91)
+
+  defp render({:label_imported, counts}) do
+    {"label import ok: " <>
+       to_string(counts.bindings) <>
+       " Bindung(en), " <>
+       to_string(counts.environments) <>
+       " Umgebung(en), " <>
+       to_string(counts.observers) <>
+       " Beobachter, " <>
+       to_string(counts.fact_fields) <>
+       " Fakt-Feld(er) neu\n", 0}
+  end
+
+  defp render({:label_quarantine, state}),
+    do: {"label quarantine ok: " <> state.object <> " (classification quarantine)\n", 0}
+
+  defp render({:label_classify, state}) do
+    {"label classify ok: " <>
+       state.object <>
+       " (classification classified, labels: " <>
+       render_labels(state.labels) <> ")\n", 0}
+  end
+
+  defp render({:label_list, bindings, objects}) do
+    lines = [
+      section("Bindungen:", render_binding_summaries(bindings)),
+      section("Objekte:", render_object_summaries(objects))
+    ]
+
+    {Enum.join(lines, "\n") <> "\n", 0}
+  end
+
+  defp render({:label_show_binding, binding}) do
+    lines =
+      [
+        "binding " <> binding.id,
+        "  bezeichnung:  " <> binding.bezeichnung,
+        "  bereich:      " <> binding.geltungsbereich,
+        "  verantwortlich: " <> binding.verantwortliche_stelle,
+        "  readers:      " <> Enum.join(binding.readers, ", "),
+        "  operations:   " <> JSON.encode!(binding.operations),
+        "  auflagen:     " <> JSON.encode!(binding.auflagen),
+        "  registered_at: " <> binding.registered_at
+      ] ++ render_relaxation_authorities(binding.relaxation_authorities)
+
+    {Enum.join(lines, "\n") <> "\n", 0}
+  end
+
+  defp render({:label_show_object, object, decisions}) do
+    header = [
+      object.object_id <> "@" <> object.version,
+      "  content_ref:   " <> object.content_ref,
+      "  origin:        " <> object.origin
+    ]
+
+    history = [
+      "  Entscheidungen (" <> to_string(length(decisions)) <> "):"
+      | Enum.map(decisions, &render_decision/1)
+    ]
+
+    {Enum.join(header ++ history, "\n") <> "\n", 0}
+  end
+
+  defp render({:label_export, nil, json}), do: {json, 0}
+
+  defp render({:label_export, path, _json}),
+    do: {"Γ-Export geschrieben: " <> path <> "\n", 0}
+
   defp render({:error, reason, code}),
     do: {red() <> String.trim_trailing(reason) <> reset() <> "\n", code}
+
+  defp render_decision(decision) do
+    "  #" <>
+      to_string(decision.id) <>
+      " " <>
+      decision.classification <>
+      " labels=" <>
+      JSON.encode!(decision.labels) <>
+      " von " <>
+      decision.decided_by <>
+      " um " <>
+      decision.decided_at <>
+      " — basis: " <> decision.basis
+  end
+
+  defp render_labels([]), do: "(leer; ausdrueckliches Λ=∅)"
+
+  defp render_labels(labels), do: Enum.join(labels, ", ")
+
+  defp section(title, []), do: title <> " (keine)"
+
+  defp section(title, lines), do: Enum.join([title | lines], "\n")
+
+  defp render_binding_summaries(bindings) do
+    Enum.map(bindings, fn binding ->
+      "  " <> binding.id <> " — " <> binding.bezeichnung
+    end)
+  end
+
+  defp render_object_summaries(objects) do
+    Enum.map(objects, fn object ->
+      "  " <>
+        object.object <>
+        "  classification=" <>
+        to_string(object.classification) <>
+        "  labels=" <> JSON.encode!(object.labels)
+    end)
+  end
+
+  # Strukturierte Lockerungsbefugnis (R.2.2): je Eintrag eine Zeile —
+  # wer (authority) welche Einschraenkung (restriction) fuer welche Ausgabe
+  # (output) lockern darf.
+  defp render_relaxation_authorities([]),
+    do: ["  relaxation_authorities: [] (keine Lockerung zulaessig, R.2.2)"]
+
+  defp render_relaxation_authorities(entries) do
+    [
+      "  relaxation_authorities:"
+      | Enum.map(entries, fn
+          %{} = entry ->
+            "    " <>
+              entry["authority"] <>
+              " lockert '" <>
+              entry["restriction"] <>
+              "' fuer Ausgabe '" <> entry["output"] <> "'"
+
+          _flat ->
+            "    (unlesbarer Eintrag — Store-Stand vor komki-label-store/2)"
+        end)
+    ]
+  end
 
   # Farb-Gate: unter Burrito (stdout-Pipe des Wrappers, Regression #234)
   # entscheidet das Wrapper-eigene _IS_TTY, sonst IO.ANSI.enabled?/0 —

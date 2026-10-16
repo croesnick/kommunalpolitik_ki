@@ -1,0 +1,45 @@
+{
+  "schema": "komki-label-store/2",
+  "registry_id": "komki-synth-demo",
+  "observers": ["fraktionskollege", "lokale-verarbeitung", "nutzende-person"],
+  "observer_types": {
+    "nutzende-person": "person",
+    "fraktionskollege": "person",
+    "lokale-verarbeitung": "processing_domain"
+  },
+  "fact_fields": {"purpose": "string", "workspace_scope_ok": "boolean"},
+  "environments": {
+    "lokal@1": {"observers": ["lokale-verarbeitung", "nutzende-person"]}
+  },
+  "bindings": {
+    "ratsarbeit@1": {
+      "bezeichnung": "Nichtöffentliche Ratsarbeit",
+      "geltungsbereich": "Synthetische Demo-Registry für Sitzungsvorbereitung",
+      "verantwortliche_stelle": "nutzende-person",
+      "readers": ["fraktionskollege", "lokale-verarbeitung", "nutzende-person"],
+      "operations": {"admit": {"all": [{"eq": ["purpose", "sitzungsvorbereitung"]}, {"eq": ["workspace_scope_ok", true]}]}},
+      "auflagen": [],
+      "relaxation_authorities": [
+        {"authority": "nutzende-person", "restriction": "auflagen", "output": "sitzungsmappe"}
+      ]
+    },
+    "lizenz-namensnennung@1": {
+      "bezeichnung": "Lizenzbindung Namensnennung",
+      "geltungsbereich": "Weiterverwendbare öffentliche Unterlagen (synthetisch)",
+      "verantwortliche_stelle": "nutzende-person",
+      "readers": ["fraktionskollege", "lokale-verarbeitung", "nutzende-person"],
+      "operations": {"admit": true},
+      "auflagen": [{"art": "quellenangabe", "beschreibung": "Quellenangabe bei jeder Weiterverwendung", "nachweisart": "dokumentation"}],
+      "relaxation_authorities": []
+    },
+    "vorfaelle-archiv@1": {
+      "bezeichnung": "Archivbindung ohne admit-Regel",
+      "geltungsbereich": "Synthetische Negativ-Fixture (fehlende Operationsregel)",
+      "verantwortliche_stelle": "nutzende-person",
+      "readers": ["nutzende-person"],
+      "operations": {"start": true},
+      "auflagen": [],
+      "relaxation_authorities": []
+    }
+  }
+}
