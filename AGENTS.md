@@ -159,6 +159,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `skills/vault_suche` | Markdown-Skill | Obsidian-Vault durchsuchen | Agent Skill | Funktionsfähig |
 | `skills/antrag_generieren` | Markdown-Skill | Stadtratsantrag entwerfen (fraktionsneutral; fraktionsspezifische Vorlage via Vault-Tag) | Agent Skill | Funktionsfähig |
 | `skills/terminal_screenshot` | Markdown-Skill + Python-Skripte | Terminal-Sitzung als Screenshot für READMEs (tmux-Capture → SVG, Browser-verifiziert) | Agent Skill | Funktionsfähig |
+| `skills/mermaid_vision_loop` | Markdown-Skill + Python-Skript | Mermaid-Diagramme rendern, vom Vision-Agenten bewerten lassen und refaktorieren, bis sie lesbar sind | Agent Skill | Funktionsfähig |
 
 ### Externe Abhängigkeiten (nicht im Repo)
 
