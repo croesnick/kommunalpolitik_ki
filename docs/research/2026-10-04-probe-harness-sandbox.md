@@ -5,7 +5,7 @@
 | Datum | 2026-10-04 |
 | Gegenstand | Lokale Seatbelt-Abgrenzungsprobe für eine gepinnte Harness-/Sandbox-Kombination im Lernbetrieb: Phase 1 (Profil-Reparatur und Gates), Phase 2 (Harness-Gates OpenCode vs. pi), Phase 3 (echte Inferenz über llama-server). |
 | Entscheidung | Die Auswahl wurde menschlich im Wayfinder-Ticket [Nr. 70](https://github.com/croesnick/kommunalpolitik_ki/issues/70) getroffen; dieser Bericht liefert die beobachtete Beweislage, keine Entscheidung und keine Isolationsbehauptung über die beobachteten Gates hinaus. |
-| Beweislabels | [B] beobachteter Einzelfall: lokal unter Profil gemessen (rc/errno). [E] Kernel-Evidenz: `deny`-Zeile aus dem Unified Log. [D] dokumentiert: externe Quelle mit Abrufdatum. [S] Schluss: aus Belegen abgeleitet. [U] offen/ungetestet. |
+| Beweislabels | [B] beobachteter Einzelfall: lokal unter Profil gemessen (rc/errno). [E] Kernel-Beleg: `deny`-Zeile aus dem Unified Log. [D] dokumentiert: externe Quelle mit Abrufdatum. [S] Schluss: aus Belegen abgeleitet. [U] offen/ungetestet. |
 | Provenienz | Die Rohbelege liegen im ephemeren Probebaum `$TMPDIR/open/probe-70` (Temp-Verzeichnis, nicht langlebig); alle entscheidenden Zahlen sind hier inline konsolidiert. Attempt-Roots: `07-path-pin` und `08-harness-phase2` (run_id `2533a3f65e3444da`). |
 
 ## 1. Auftrag und GO-Basis
