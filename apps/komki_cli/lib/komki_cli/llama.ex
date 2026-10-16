@@ -21,9 +21,12 @@ defmodule KomkiCli.Llama do
   Belege: Experimentserie 14.10.2026 (llama-server 0.6.0, build 11429,
   macOS 27.2 Build 26B5101f), konsolidiert in
   `docs/research/2026-10-14-llama-server-confinement.md`.
+
+  Pidfile, Kill-Eskalation, Spawn-Zeile, Health-Poll und Log-Tail sind
+  mit `KomkiCli.Mediator` geteilt und liegen in `KomkiCli.Proc`.
   """
 
-  alias KomkiCli.{Config, Profile}
+  alias KomkiCli.{Config, Proc, Profile}
   require Config
 
   @health_timeout_ms 10_000
@@ -49,14 +52,15 @@ defmodule KomkiCli.Llama do
   """
   @spec down(Config.t()) :: :ok | :no_pidfile | {:stale, String.t()} | {:error, String.t()}
   def down(%Config{} = cfg) do
-    case read_pidfile(cfg) do
+    case Proc.read_pidfile(pidfile(cfg)) do
       {:ok, pid} -> down_pid(cfg, pid)
       :none -> :no_pidfile
     end
   end
 
-  # Identitaetscheck vor dem Toeten: Nur echte llama-server-Prozesse kriegen
-  # Signale; alles andere ist ein stale pidfile, das der Aufraeumweg entfernt.
+  # Identitaetscheck vor dem Toeten (Proc.kill_checked): Nur echte
+  # llama-server-Prozesse kriegen Signale; alles andere ist ein stale
+  # pidfile, das der Aufraeumweg entfernt.
   defp down_pid(cfg, pid) do
     if llama_alive?(pid) do
       case kill_llama(pid) do
@@ -79,7 +83,7 @@ defmodule KomkiCli.Llama do
   @doc "Zustand: pidfile + Health."
   @spec status(Config.t()) :: llama_state() | {:error, String.t()}
   def status(%Config{} = cfg) do
-    case read_pidfile(cfg) do
+    case Proc.read_pidfile(pidfile(cfg)) do
       {:ok, pid} ->
         if llama_alive?(pid) do
           {:running, pid}
@@ -169,17 +173,15 @@ defmodule KomkiCli.Llama do
 
     # sandbox-exec -f <llama-Profil> umschliesst ausschliesslich llama-server
     # (das confine gilt dem Inferenz-Prozess); das aeussere sh behaelt die
-    # fd-Plumbing-Rolle.
-    line =
-      "nohup " <>
-        quote_bin(cfg.sandbox_exec) <>
-        " -f " <>
-        quote_bin(llama_profile_path(cfg)) <>
-        " -- " <>
-        quote_bin(cfg.llama_server_bin) <>
-        " " <>
-        Enum.map_join(args, " ", &quote_bin/1) <>
-        " > " <> quote_bin(log_path) <> " 2>&1 & echo $!"
+    # fd-Plumbing-Rolle. Die Spawn-Zeile liegt kanonisch in Proc; llama
+    # quottet jeden Arg selbst (spawn_line nimmt Args wortgetreu).
+    sandbox_args =
+      Enum.map(
+        ["-f", llama_profile_path(cfg), "--", cfg.llama_server_bin | args],
+        &Proc.quote_bin/1
+      )
+
+    line = Proc.spawn_line(cfg.sandbox_exec, sandbox_args, log_path)
 
     # cwd "/" — getcwd unter der Grenze braucht nur file-read-data "/",
     # das die Startup-Schicht erlaubt (exp14); ein ungeschuetztes Aufrufer-cwd
@@ -209,8 +211,15 @@ defmodule KomkiCli.Llama do
   defp wait_health(cfg, pid) do
     deadline = System.monotonic_time(:millisecond) + @up_timeout_ms
 
-    case poll_health(cfg, deadline) do
-      :ok ->
+    check = fn ->
+      case health(cfg) do
+        :ok -> {:ok, :ok}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+
+    case Proc.poll_health(check, "llama-server", deadline) do
+      {:ok, :ok} ->
         {:ok, pid}
 
       {:error, reason} ->
@@ -221,95 +230,22 @@ defmodule KomkiCli.Llama do
     end
   end
 
-  defp poll_health(cfg, deadline) do
-    case health(cfg) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        now = System.monotonic_time(:millisecond)
-
-        if now >= deadline do
-          {:error, "llama-server health timeout (" <> reason <> ")"}
-        else
-          Process.sleep(500)
-          poll_health(cfg, deadline)
-        end
-    end
-  end
-
-  defp kill_llama(pid) do
-    # Nur llama-server: der pid-Prozess wird zuerst per `ps` identifiziert
-    # (Pidfile-Wiederverwendungsschutz). kill liegt auf macOS in /bin/kill
-    # (/usr/bin/kill existiert nicht — Smoke-Fund 5f: rohes :enoent).
-    if llama_alive?(pid) do
-      System.cmd("/bin/kill", ["-TERM", to_string(pid)])
-      Process.sleep(800)
-
-      if llama_alive?(pid) do
-        System.cmd("/bin/kill", ["-KILL", to_string(pid)])
-        Process.sleep(300)
-      end
-
-      if llama_alive?(pid) do
-        {:error, "llama-server pid " <> to_string(pid) <> " still alive after SIGKILL"}
-      else
-        :ok
-      end
-    else
-      {:error,
-       "pid " <> to_string(pid) <> " is not llama-server (pidfile stale); not sent any signal"}
-    end
-  end
+  # Kill-Eskalation TERM→KILL mit Identitaetscheck (Proc.kill_checked).
+  defp kill_llama(pid), do: Proc.kill_checked(pid, "llama-server")
 
   @doc "Prueft, ob pid existiert und als llama-server laeuft (ps-Kontrolle)."
   @spec llama_alive?(integer()) :: boolean()
-  def llama_alive?(pid) when is_integer(pid) and pid > 0 do
-    case System.cmd("/bin/ps", ["-p", to_string(pid), "-o", "command="]) do
-      {out, 0} -> String.contains?(out, "llama-server")
-      _ -> false
-    end
-  end
-
-  def llama_alive?(_), do: false
+  def llama_alive?(pid), do: Proc.pid_alive?(pid, "llama-server")
 
   @doc "Log-Tail als Einzeiler kontrolliert fuer Fehlermeldungen."
   @spec log_tail(Config.t(), pos_integer()) :: String.t()
-  def log_tail(cfg, lines) do
-    path = log_path(cfg)
-
-    if File.exists?(path) do
-      path
-      |> File.stream!()
-      |> Stream.map(&String.trim_trailing/1)
-      |> Stream.take(-lines)
-      |> Enum.join(" | ")
-    else
-      "(no log)"
-    end
-  end
+  def log_tail(cfg, lines), do: Proc.log_tail(log_path(cfg), lines)
 
   # ---------------------------------------------------------------- Pipeline-Helfer
 
   defp port(cfg), do: cfg.port
 
   defp pidfile(cfg), do: Path.join([cfg.base_dir, "tmp", "llama-server.pid"])
-
-  defp read_pidfile(cfg) do
-    case File.read(pidfile(cfg)) do
-      {:ok, content} ->
-        case Integer.parse(String.trim_trailing(content)) do
-          {pid, ""} when pid > 0 -> {:ok, pid}
-          _ -> {:error, "corrupt pidfile: " <> Kernel.inspect(content)}
-        end
-
-      {:error, :enoent} ->
-        :none
-
-      {:error, posix} ->
-        {:error, "cannot read pidfile: " <> List.to_string(:file.format_error(posix))}
-    end
-  end
 
   @doc "GET /health via plain TCP; {:ok, status_code_string} oder {:error, reason}."
   @spec http_get_200(pos_integer()) :: {:ok, String.t()} | {:error, String.t()}
@@ -365,10 +301,5 @@ defmodule KomkiCli.Llama do
       [_, codestr] -> {:ok, codestr}
       _ -> {:error, "unparseable /health response"}
     end
-  end
-
-  ## Shell-Quote fuer Spawn-Zeile (keine Pfad-Injection).
-  defp quote_bin(bin) when is_binary(bin) do
-    "'" <> String.replace(bin, "'", "'\\''") <> "'"
   end
 end

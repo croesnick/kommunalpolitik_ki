@@ -79,6 +79,31 @@ defmodule KomkiCli.ConfigTest do
       assert cfg.port == 49_999
       assert cfg.ctx == 4_096
     end
+
+    test "Vermittler-Pins (Ticket #102): mediator_port default 49525, mediator_bin optional" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-med"))
+      assert cfg.mediator_port == 49_525
+
+      # Entdeckung wird durchgereicht (nil bleibt optional — kein init-Gate;
+      # die Discovery-Logik selbst deckt config_test nicht ein, wie fd/rg).
+      assert cfg.mediator_bin == Config.resolve_mediator_bin(cfg.base_dir)
+
+      over = Config.defaults(TestSupport.tmp_area!("komki-cfg-med"), mediator_port: 49_999)
+      assert over.mediator_port == 49_999
+    end
+
+    test "mediator_port/mediator_bin roundtrip: Pflicht-Port, optionaler Binary-Pfad" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-med"), mediator_port: 49_998)
+      base = cfg.base_dir
+
+      no_bin = %{cfg | mediator_bin: nil}
+      Config.save(no_bin)
+      assert {:ok, no_bin} == Config.load(Config.config_path(base))
+
+      with_bin = %{cfg | mediator_bin: "/pfad/zu/komki-mediator"}
+      Config.save(with_bin)
+      assert {:ok, with_bin} == Config.load(Config.config_path(base))
+    end
   end
 
   describe "save/load-Roundtrip" do

@@ -34,15 +34,17 @@ defmodule KomkiCli.ProfileTest do
     end
   end
 
-  describe "Port-Exception (eine outbound-TCP-Regel)" do
-    test "loopback-Spezifik mit konfiguriertem Port", %{text: text, cfg: cfg} do
-      port = to_string(cfg.port)
+  describe "Netz-Exceptions (genau zwei outbound-TCP-Regeln, gepinnte Reihenfolge)" do
+    test "loopback-Spezifik: llama-Port zuerst, Vermittler-Port danach", %{text: text, cfg: cfg} do
+      llama_rule =
+        "(allow network-outbound (remote tcp \"localhost:" <> to_string(cfg.port) <> "\"))"
 
-      assert String.contains?(
-               text,
-               "(allow network-outbound (remote tcp \"localhost:" <> port <> "\"))"
-             )
+      mediator_rule =
+        "(allow network-outbound (remote tcp \"localhost:" <>
+          to_string(cfg.mediator_port) <> "\"))"
 
+      # Ticket #102: zweite Loopback-Exception für den Vermittler-MCP-Port,
+      # gleiche Regelklasse, deterministische Reihenfolge (byte-stabil).
       tcp_lines =
         text
         |> String.split("\n")
@@ -50,7 +52,7 @@ defmodule KomkiCli.ProfileTest do
           &(String.contains?(&1, "network-outbound") and String.contains?(&1, "tcp"))
         )
 
-      assert tcp_lines == ["(allow network-outbound (remote tcp \"localhost:" <> port <> "\"))"]
+      assert tcp_lines == [llama_rule, mediator_rule]
     end
   end
 

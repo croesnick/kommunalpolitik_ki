@@ -8,7 +8,9 @@ defmodule KomkiCli.Profile do
   `docs/research/2026-10-04-probe-harness-sandbox.md` im Branch
   `research/probe-harness-sandbox`), parametrisiert auf:
 
-    * Port — einzige Netz-Exception `(allow network-outbound (remote tcp "localhost:<port>"))`
+     * Ports — zwei Netz-Exceptions, denselben Typ: der llama-Port
+       `(allow network-outbound (remote tcp "localhost:<port>"))` und der
+       Vermittler-MCP-Port (Ticket #102) `…tcp "localhost:<mediator_port>"`
     * pi-Home — isoliertes HOME (lesend/schreibend, inkl. Komponenten-Kette)
     * Scratch-Verzeichnis — die Write-Scope dieses Laufs (lesend/schreibend)
 
@@ -386,6 +388,7 @@ defmodule KomkiCli.Profile do
     pi_pkg = cli_js_pkg(cfg.cli_js)
     node_modules_root = Path.join([node_install, "lib", "node_modules"])
     port = to_string(cfg.port)
+    mediator_port = to_string(cfg.mediator_port)
 
     base_rules =
       basis_and_exec_rules(cfg, node, pi_launcher) ++
@@ -399,7 +402,13 @@ defmodule KomkiCli.Profile do
           user_home
         )
 
+    # Netz-Exceptions am Dateiende, deterministisch: llama zuerst, der
+    # Vermittler-MCP-Port (Ticket #102) danach — beide Loopback-spezifisch,
+    # kein Wildcard-Port (byte-stabil, vom Doctor-Check kontrolliert).
     port_rule = "(allow network-outbound (remote tcp \"localhost:" <> port <> "\"))"
+
+    mediator_port_rule =
+      "(allow network-outbound (remote tcp \"localhost:" <> mediator_port <> "\"))"
 
     base_rules ++
       common_boot_rules() ++
@@ -407,7 +416,7 @@ defmodule KomkiCli.Profile do
       node_boot_rules(pi_pkg, node_modules_root, user_home) ++
       tui_rules() ++
       scope_rules(cfg, scratch) ++
-      [port_rule]
+      [port_rule, mediator_port_rule]
   end
 
   ## ---------------------------------------------------------------- TUI/Terminal-Klasse

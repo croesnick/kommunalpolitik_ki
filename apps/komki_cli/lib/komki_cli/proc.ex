@@ -1,0 +1,148 @@
+defmodule KomkiCli.Proc do
+  @moduledoc """
+  Gemeinsame Prozesssteuerung der langlaufenden Komponenten (llama-server,
+  komki-mediator): pidfile-Read, pid-Identitaetscheck mit ps-Marker,
+  Kill-Eskalation (TERM → KILL), nohup-Spawn-Zeile, Health-Poll mit
+  Deadline und Log-Tail.
+
+  `KomkiCli.Llama` und `KomkiCli.Mediator` trugen diese Mechanik doppelt
+  ("gespiegelt auf KomkiCli.Llama", moduledoc dort) — beide setzen jetzt
+  hier auf und halten nur die komponentenspezifischen Unterschiede lokal:
+  Marker in der ps-Kommandozeile, Pidfile-/Log-Pfad, Health-Funktion und
+  Poll-Deadline.
+
+  Der Identitaetscheck liest vor jedem `kill` die `ps`-Kommandozeile
+  (nur eigene Prozesse empfangen Signale — macOS-taugliche Self-Defense
+  gegen pidfile-Wiederverwendung). `kill` liegt auf macOS in /bin/kill,
+  `/usr/bin/kill` existiert nicht (Smoke-Fund 5f: rohes :enoent).
+  """
+
+  @doc """
+  pidfile lesen: `{:ok, pid}` | `:none` (Datei fehlt) | `{:error, reason}`.
+  Kaputter Inhalt ist ein Fehler, kein `:none` — stiller Repair waere
+  unbeobachtbar.
+  """
+  @spec read_pidfile(String.t()) :: {:ok, pos_integer()} | :none | {:error, String.t()}
+  def read_pidfile(path) do
+    case File.read(path) do
+      {:ok, content} ->
+        case Integer.parse(String.trim_trailing(content)) do
+          {pid, ""} when pid > 0 -> {:ok, pid}
+          _ -> {:error, "corrupt pidfile: " <> Kernel.inspect(content)}
+        end
+
+      {:error, :enoent} ->
+        :none
+
+      {:error, posix} ->
+        {:error, "cannot read pidfile: " <> List.to_string(:file.format_error(posix))}
+    end
+  end
+
+  @doc "Prueft, ob pid existiert und den `marker` in der ps-Kommandozeile faehrt."
+  @spec pid_alive?(term(), String.t()) :: boolean()
+  def pid_alive?(pid, marker) when is_integer(pid) and pid > 0 do
+    case System.cmd("/bin/ps", ["-p", to_string(pid), "-o", "command="]) do
+      {out, 0} -> String.contains?(out, marker)
+      _ -> false
+    end
+  end
+
+  def pid_alive?(_pid, _marker), do: false
+
+  @doc """
+  Kill mit Identitaetscheck und Eskalation: SIGTERM, nach 800 ms SIGKILL,
+  danach Rest-Lebensprobe. Nur der pid-Prozess mit dem eigenen `marker`
+  (z. B. "llama-server" / "komki-mediator") kriegt Signale; alles andere
+  ist ein stale pidfile und erzeugt `{:error, ...}` statt eines Treffers.
+  """
+  @spec kill_checked(term(), String.t()) :: :ok | {:error, String.t()}
+  def kill_checked(pid, marker) do
+    if pid_alive?(pid, marker) do
+      System.cmd("/bin/kill", ["-TERM", to_string(pid)])
+      Process.sleep(800)
+
+      if pid_alive?(pid, marker) do
+        System.cmd("/bin/kill", ["-KILL", to_string(pid)])
+        Process.sleep(300)
+      end
+
+      if pid_alive?(pid, marker) do
+        {:error, marker <> " pid " <> to_string(pid) <> " still alive after SIGKILL"}
+      else
+        :ok
+      end
+    else
+      {:error,
+       "pid " <> to_string(pid) <> " is not " <> marker <> " (pidfile stale); not sent any signal"}
+    end
+  end
+
+  @doc """
+  Spawn-Zeile fuer `/bin/sh -c` (nohup, Args, Log-Umleitung,
+  pid-Ausgabe):
+
+      nohup '<bin>' <args> > '<log>' 2>&1 & echo $!
+
+  `binary` und `log_path` werden hier gequotet (keine Pfad-Injection);
+  `args` werden wortgetreu uebernommen — die Aufrufer quotten ihre
+  NavParams selbst (llama quottet jeden Arg, der Vermittler haelt
+  Flags/Port bewusst unquotiert).
+  """
+  @spec spawn_line(String.t(), [String.t()], String.t()) :: String.t()
+  def spawn_line(binary, args, log_path) do
+    "nohup " <>
+      quote_bin(binary) <>
+      " " <>
+      Enum.join(args, " ") <>
+      " > " <> quote_bin(log_path) <> " 2>&1 & echo $!"
+  end
+
+  @doc """
+  Health-Poll mit Deadline: `check` liefert `{:ok, value}` oder
+  `{:error, reason}`; im Fehlerfall alle 500 ms erneut, bis die Deadline
+  (Monotonic-ms) verstrichen ist — dann "`<marker>` health timeout
+  (`<reason>`)". Erfolg liefert den Check-Wert unverändert.
+  """
+  @spec poll_health(
+          (-> {:ok, value :: term()} | {:error, String.t()}),
+          String.t(),
+          pos_integer()
+        ) :: {:ok, term()} | {:error, String.t()}
+  def poll_health(check, marker, deadline) do
+    case check.() do
+      {:ok, value} ->
+        {:ok, value}
+
+      {:error, reason} ->
+        now = System.monotonic_time(:millisecond)
+
+        if now >= deadline do
+          {:error, marker <> " health timeout (" <> reason <> ")"}
+        else
+          Process.sleep(500)
+          poll_health(check, marker, deadline)
+        end
+    end
+  end
+
+  @doc "Log-Tail als Einzeiler kontrolliert fuer Fehlermeldungen."
+  @spec log_tail(String.t(), pos_integer()) :: String.t()
+  def log_tail(path, lines) do
+    if File.exists?(path) do
+      path
+      |> File.stream!()
+      |> Stream.map(&String.trim_trailing/1)
+      |> Stream.take(-lines)
+      |> Enum.join(" | ")
+    else
+      "(no log)"
+    end
+  end
+
+  ## Shell-Quote fuer Spawn-Zeile (keine Pfad-Injection).
+  @spec quote_bin(String.t()) :: String.t()
+  def quote_bin(bin) when is_binary(bin) do
+    "'" <> String.replace(bin, "'", "'\\''") <> "'"
+  end
+end

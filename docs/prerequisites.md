@@ -368,6 +368,22 @@ aufgelösten Pfade in die config.json; die Experimentbelege für llama-server
 (Ticket #100) beziehen sich auf 0.6.0 (build 11429). Empfohlen: `komki doctor`
 meldet die installierte Version.
 
+**Vermittler (`komki-mediator`, Ticket #102):** `komki up` startet zusätzlich
+den MCP-Vermittler auf einem eigenen Loopback-Port (Default 49525) und
+schreibt pi-seitig die zugehörige `mcp.json` (Server `komki`, nur die
+festgelegten MCP-Werkzeuge `ping` und `admit_document`). Das Binary ist ein
+Repo-eigenes Escript:
+
+```bash
+cd apps/komki_mediator && mix escript.build
+# danach im PATH oder nach <komki-base>/bin/ kopieren — init entdeckt beides
+```
+
+Fehlt das Escript, verweigert `komki up` den Vermittler-Start mit klarer
+Meldung; `komki doctor` meldet den fehlenden Fund. pi selbst wird bewusst
+nicht gepinnt (Issue #103): `komki doctor` meldet die installierte
+pi-Version und die daraus erwartbare Flag-Oberfläche.
+
 **Modell:** Das gepinnte GGUF (Gemma 4 26B-A4B-it, unsloth UD-Q4_K_XL) wird
 nicht heruntergeladen. `komki init` übernimmt es SHA-256-geprüft aus dem
 Staging-Verzeichnis (`~/.local/share/komki/models-staging/`).

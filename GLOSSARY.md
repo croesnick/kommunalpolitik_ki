@@ -470,10 +470,12 @@ rechnend — führt selbst nichts aus.
 
 **Definition:** Festlegungspunkt, an dem eine Freigabe an Bedingungen
 gekoppelt ist. Zulässige Bildungen des Repos: GO-Gate, Boot-Gate,
-Grenz-Gates, Antragsreife-Gates, Hard/Soft Gates.
+Grenz-Gates, Antragsreife-Gates, Hard/Soft Gates, Vermittler-Gates
+(Gate 1/Gate 2).
 
 **Sprache:** Basis ist der etablierte Quality-Gate-Begriff (deutsche
-Fachtexte nutzen ihn); bei Ersteinführung definieren.
+Fachtexte nutzen ihn); bei Ersteinführung definieren. Verdeutschungen wie
+„Tor" sind Fehlformen.
 
 ---
 
@@ -585,6 +587,40 @@ Auftreten und die Reihenfolge des Vorgangs.
 von Vorgängen. Die Inferenz-Engine entscheidet deterministisch anhand
 logischer Regeln über deren Zulässigkeit. Sie ist hier kein LLM-Server.
 
+**Abgrenzung:** Kein Router — der leitet transparent weiter, ohne zu
+prüfen, zu filtern oder ein Journal zu schreiben. Kein Mediator im Sinn
+des Entwurfsmusters — das koordiniert Peers untereinander. Der Vermittler
+ist nicht umgehbar: Der Agent erreicht Operationen nur durch ihn,
+Zugangsdaten bleiben in seinem Prozess.
+
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md);
+implementiert als `apps/komki_mediator` (Modul `KomkiMediator`) —
+Codebezeichner englisch, Domänenbegriff deutsch wie bei `komki_policy`
+(„Regel-Prüfkern"). Im Rollenmodell ist der Vermittler der PEP.
+
+---
+
+### Policy Enforcement Point (PEP) und Policy Decision Point (PDP)
+
+**Definition:** Rollenpaar aus der Zugriffskontrolle. Der PDP entscheidet
+über die Zulässigkeit einer Anfrage; der PEP setzt die Entscheidung an der
+Ausführungsstelle durch und ist der einzige Weg dorthin. Im Modell ist die
+Inferenz-Engine der PDP, der Vermittler der PEP.
+
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md);
+im Repo entscheidet `komki_policy` (PDP), der Vermittler
+`apps/komki_mediator` setzt durch (PEP).
+
+---
+
+### Fassung
+
+**Definition:** Die fest versionierte Gestalt des Angebots eines Vermittlers:
+die Menge der Tools, die er bereitstellt. Jede Änderung erzeugt eine neue
+Fassung; ein Rollover auf eine „aktuelle" Fassung gibt es nicht. Der
+allgemeine Wortgebrauch (versionierte Fassung eines Datenobjekts) bleibt
+davon unberührt.
+
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ---
@@ -627,6 +663,15 @@ bei einer weiteren Entscheidung gemeinsam zu berücksichtigen sind.
 festgehaltenen Ausführungsaufträgen und zugehörigen Belegen. Ein Eintrag allein
 beweist weder die tatsächliche Ausführung noch das Ausbleiben von
 Auswirkungen.
+
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+
+---
+
+### PDR (Policy Decision Record)
+
+**Definition:** Der einzelne Entscheidungsnachweis eines Vermittlungsaufrufs
+im Audit-Journal: Intent-Hash, Payload-Hash und Γ-Stand-Hash des Aufrufs.
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
