@@ -152,6 +152,7 @@ defmodule KomkiCli.DenialsTest do
         Denials.capture(window(),
           base_dir: cfg.base_dir,
           scratch: scratch,
+          binary: existing_binary(),
           runner: fn _argv -> {output, 0} end
         )
 
