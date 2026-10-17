@@ -1,0 +1,11 @@
+Timestamp               Ty Process[PID:TID]
+2026-10-17 21:15:07.287 E  kernel[0:284972] (Sandbox) Sandbox: logd_helper(68001) deny(1) file-read-data /Users/alice/.local/share/komki/runs/2026-10-17T20-00-00Z/secret.txt
+2026-10-17 21:15:07.290 E  kernel[0:284972] (Sandbox) Sandbox: logd_helper(68001) deny(1) file-read-data /Users/alice/.local/share/komki/models/gemma.gguf
+2026-10-17 21:15:07.300 E  kernel[0:284972] (Sandbox) Sandbox: logd_helper(68001) deny(1) file-read-data /Users/alice/private/notes.md
+2026-10-17 21:15:07.305 E  kernel[0:284972] (Sandbox) Sandbox: logd_helper(68001) deny(1) file-read-data /Users/alice/My Documents/report.pdf
+2026-10-17 21:15:07.310 E  kernel[0:284972] (Sandbox) Sandbox: logd_helper(68001) deny(1) mach-lookup com.apple.MTLCompilerService
+2026-10-17 21:15:07.320 E  kernel[0:284972] (Sandbox) Sandbox: logd_helper(68001) deny(1) sysctl-read kern.osproductversion
+2026-10-17 21:15:07.400 E  kernel[0:284972] (Sandbox) Sandbox: logd_helper(68001) deny(1) file-read-data /System/Library/Frameworks/CoreFoundation.framework
+2026-10-17 21:15:07.401 E  kernel[0:284972] (Sandbox) 2 duplicate report for Sandbox: logd_helper(68001) deny(1) file-read-data /System/Library/Frameworks/CoreFoundation.framework
+2026-10-17 21:15:08.000 E  kernel[0:284972] (Sandbox) Sandbox: logd_helper(68001) deny(1) file-write-create /tmp/notiz.md
+2026-10-17 21:15:09.000 E  kernel[0:284972] (Sandbox) process exited without a sandbox denial

@@ -217,6 +217,7 @@ Hinweise zu den einzelnen Schritten:
 ./komki doctor                      # alle Checks (Werkzeuge, Profil, GGUF-SHA, Boot-Gate, Port)
 ./komki up                          # llama-server, Egress, Connectoren, Vermittler starten
 ./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil (startet bei Bedarf alles)
+./komki run "PROMPT" --capture-denials  # zusaetzlich Sandbox-Denials des Lauffensters ablegen
 ./komki session                     # interaktive pi-Session in tmux
 ./komki session --continue          # letzte Session fortsetzen
 ./komki session --detach            # im Hintergrund; der Befehl zum Andocken steht in der Ausgabe
@@ -227,9 +228,28 @@ Hinweise zu den einzelnen Schritten:
 
 Weitere Flags: `init --port N --ctx N --force` sowie für die Connectoren
 `init --vault-dir PFAD --ris-base-url URL --ris-mock-port N`, `up --ctx N`,
-`run --mode text|json --scratch PFAD --timeout SEKUNDEN` (PFAD nur unterhalb von `runs/` der Instanz; der Scratch ist auch das Arbeitsverzeichnis des Laufs; Laufzeit-Limit per Default 600 s, danach Exit 4). pi startet in Lauf und Session mit `--no-context-files`, damit eine vom Modell abgelegte `AGENTS.md` keinen späteren Lauf steuert, und sieht neben seinen Datei-Werkzeugen die Vermittler-Tools (`mcp__komki__*`). Exit-Codes: `0` Erfolg, `2` Nutzungs-,
+`run --mode text|json --scratch PFAD --timeout SEKUNDEN --capture-denials` (PFAD nur unterhalb von `runs/` der Instanz; der Scratch ist auch das Arbeitsverzeichnis des Laufs; Laufzeit-Limit per Default 600 s, danach Exit 4). pi startet in Lauf und Session mit `--no-context-files`, damit eine vom Modell abgelegte `AGENTS.md` keinen späteren Lauf steuert, und sieht neben seinen Datei-Werkzeugen die Vermittler-Tools (`mcp__komki__*`). Exit-Codes: `0` Erfolg, `2` Nutzungs-,
 Konfigurations- oder Bereitschaftsfehler (etwa: fremder Prozess auf dem llama-Port),
-`3` Doctor-/Boot-Gate-Fehlschlag, `4` Laufzeitfehler.
+`3` Doctor-/Boot-Gate-Fehlschlag, `4` Laufzeitfehler (mit `--capture-denials` auch eine fehlgeschlagene
+Denial-Capture oder Berichtspersistenz).
+
+### Denial-Capture (Ticket #125)
+
+`komki run --capture-denials` liest nach dem Lauf die `deny`-Zeilen des
+macOS Unified Log im Lauffenster (`log show`, ohne sudo, im komki-Prozess)
+und legt einen versionierten Bericht unter `<base>/denials/` ab. Der
+Footer auf stderr nennt Anzahl und die wichtigsten verweigerten
+Operationen; im JSON-Bericht stehen Lauffenster, pi-Exit, Capture-Status
+und die gruppierten Denials. Der Bericht ist append-only, atomar
+geschrieben (`0600`) und enthaelt weder Prompt noch Roh-Output.
+
+Jedes Target und jede Fehlermeldung wird vor dem Schreiben redigiert:
+Systempfade (`/System`, `/usr`, `/bin`, `/opt`, ...) bleiben verbatim,
+Home-, asdf/nvm-, Instanz- und Scratch-Pfade werden maskiert, unbekannte
+absolute Pfade zu `<redacted-path>`. Der Bericht ist ein interner
+Nachweis, kein Γ-Objekt; Grants bleiben menschliche Akte. Wichtig: Ein
+Fenster ohne Denials ist **kein** Konfinement-Beweis — die positive
+Kontrolle bleibt das Boot-Gate.
 
 Interaktive Sessions laufen in der tmux-Session `komki` auf einem eigenen
 tmux-Server je Instanz (`tmux -L komki` für die Standard-Instanz, sonst

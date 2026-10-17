@@ -19,7 +19,7 @@ defmodule KomkiCli.CLI do
       komki down
       komki status
       komki go
-      komki run "PROMPT" [--mode text|json] [--scratch PATH] [--timeout SEKUNDEN]
+      komki run "PROMPT" [--mode text|json] [--scratch PATH] [--timeout SEKUNDEN] [--capture-denials]
       komki session [--continue] [--detach]
       komki session-chain [--continue]   # intern: Pane-Einstieg der Session
       komki label import FILE [--db PATH]
@@ -39,7 +39,7 @@ defmodule KomkiCli.CLI do
       | `0`  | Erfolg |
       | `2`  | Usage-/Konfigurationsfehler (unbekannter Befehl, fehlende/unbekannte Optionen, fehlende config.json, GGUF-SHA-Abweichung, nicht laufender llama-server bei `run`/`session`; `label`: Registrierungs-, DB- und Store-Fehler — Ticket #91) |
       | `3`  | Doctor-/Boot-Gate-Fail (Profil-Drift oder sandbox-exec-Boot-Pleite; Weiterbetrieb verweigert) |
-      | `4`  | Runtime-Fail (llama-server, komki-mediator oder pi beendet nicht erfolgreich) |
+      | `4`  | Runtime-Fail (llama-server, komki-mediator oder pi beendet nicht erfolgreich; mit `--capture-denials` auch fehlgeschlagene Denial-Capture oder Berichtspersistenz) |
 
   Die `label`-Befehle (Ticket #91, SQLite-Registry des RFC-0003-Modells)
   kennen nur Erfolg (0) und Eingabefehler (2) — sie sind rein lokal und
@@ -331,6 +331,13 @@ defmodule KomkiCli.CLI do
             long: "timeout",
             parser: :integer,
             help: "Laufzeit-Limit für pi (default 600); danach Abbruch mit Exit 4"
+          ]
+        ],
+        flags: [
+          capture_denials: [
+            long: "capture-denials",
+            help:
+              "Sandbox-Ablehnungen des Laufs aus dem macOS-Log einsammeln, redigieren und unter <base>/denials/ ablegen"
           ]
         ]
       ],
@@ -782,6 +789,22 @@ defmodule KomkiCli.CLI do
   # Render-Flaeche (alle menschlichen Ausgaben; ANSI nur hier)
   # ===========================================================================
 
+  defp write_denial_footer(nil), do: :ok
+
+  defp write_denial_footer(summary) do
+    IO.write(:stderr, KomkiCli.Denials.footer(summary) <> "\n")
+  end
+
+  @doc false
+  @spec run_exit_code(KomkiCli.Steps.denial_summary() | nil) :: non_neg_integer()
+  def run_exit_code(nil), do: 0
+  def run_exit_code(%{status: "ok"}), do: 0
+  def run_exit_code(%{status: _status}), do: 4
+
+  @doc false
+  @spec render_result(KomkiCli.Steps.result()) :: outcome()
+  def render_result(result), do: render(result)
+
   @spec render(
           KomkiCli.Steps.result()
           | KomkiCli.LabelSteps.result()
@@ -855,19 +878,24 @@ defmodule KomkiCli.CLI do
   end
 
   # pi-Ausgabe ist Modell-Output: nie roh aufs Terminal (Ticket #132).
-  defp render({:run_ok, scratch, out}),
-    do:
-      {"scratch: " <>
-         scratch <> "\n" <> String.trim_trailing(KomkiCli.Terminal.sanitize(out)) <> "\n", 0}
+  # Denial-Footer auf stderr (beide pi-Modi, Ticket #125): der stdout-Vertrag
+  # bleibt der pi-Ausgabe vorbehalten. Ein fehlgeschlagener Capture- oder
+  # Persistenzpfad ist auch bei pi-Erfolg ein Runtime-Fail (Exit 4).
+  defp render({:run_ok, scratch, out, denial_summary}) do
+    write_denial_footer(denial_summary)
 
-  defp render({:run_error, scratch, out, pi_code}),
-    do:
-      {"scratch: " <>
-         scratch <>
-         "\npi exit " <>
-         to_string(pi_code) <>
-         ":\n" <>
-         KomkiCli.Terminal.sanitize(out) <> "\n", 4}
+    {"scratch: " <>
+       scratch <> "\n" <> String.trim_trailing(KomkiCli.Terminal.sanitize(out)) <> "\n",
+     run_exit_code(denial_summary)}
+  end
+
+  defp render({:run_error, scratch, out, pi_code, denial_summary}) do
+    write_denial_footer(denial_summary)
+
+    {"scratch: " <>
+       scratch <>
+       "\npi exit " <> to_string(pi_code) <> ":\n" <> KomkiCli.Terminal.sanitize(out) <> "\n", 4}
+  end
 
   defp render({:setup, :ok}), do: {"", 0}
 
