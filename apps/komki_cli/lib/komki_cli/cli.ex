@@ -16,7 +16,8 @@ defmodule KomkiCli.CLI do
       komki down
       komki status
       komki run "PROMPT" [--mode text|json] [--scratch PATH]
-      komki session [--continue] [--detach]
+      komki session [FILE ...] [--continue] [--detach] [--db PATH] [--room PATH]
+                    [--decided-by ID]
       komki session-chain [--continue]   # intern: Pane-Einstieg der Session
       komki label import FILE [--db PATH]
       komki label quarantine OBJ@VER [--content-ref PATH] [--origin TEXT]
@@ -34,12 +35,16 @@ defmodule KomkiCli.CLI do
       |------|-----------|
       | `0`  | Erfolg |
       | `2`  | Usage-/Konfigurationsfehler (unbekannter Befehl, fehlende/unbekannte Optionen, fehlende config.json, GGUF-SHA-Abweichung, nicht laufender llama-server bei `run`/`session`; `label`: Registrierungs-, DB- und Store-Fehler — Ticket #91) |
-      | `3`  | Doctor-/Boot-Gate-Fail (Profil-Drift oder sandbox-exec-Boot-Pleite; Weiterbetrieb verweigert) |
+      | `3`  | Doctor-/Boot-Gate-Fail (Profil-Drift oder sandbox-exec-Boot-Pleite; Weiterbetrieb verweigert); `session` mit Dateien: mindestens eine Datei nicht `permit` (Aufnahme verweigert) |
       | `4`  | Runtime-Fail (llama-server, komki-mediator oder pi beendet nicht erfolgreich) |
 
   Die `label`-Befehle (Ticket #91, SQLite-Registry des RFC-0003-Modells)
   kennen nur Erfolg (0) und Eingabefehler (2) — sie sind rein lokal und
   ohne Boot-Gate.
+
+  `session --db`/`session --room` sind Testnaehte: der Intake akzeptiert
+  sie nur, wenn sie exakt auf die Instanzdateien zeigen (Vermittler-Bindung
+  an `<base>/mediator/room.json` bzw. `<base>/registry.db`).
 
   **CLI-Surface-Isolation:** argv-Parsing/Help/Validierung (optimus) UND alle
   menschlichen Ausgaben (Farben via IO.ANSI, Verdict-Zeilen, Spinner/Statuszeile)
@@ -208,7 +213,35 @@ defmodule KomkiCli.CLI do
         ],
         session: [
           name: "session",
-          description: "interaktive pi-Session in tmux (full doctor zuerst)",
+          description:
+            "interaktive pi-Session in tmux (full doctor zuerst); Dateien werden ueber den Startvertrag aufgenommen",
+          args: [
+            files: [
+              value_name: "FILE...",
+              required: false,
+              help: "Dateien fuer die Aufnahme (mehrere moeglich; vor dem Doctor validiert)"
+            ]
+          ],
+          options: [
+            db: [
+              value_name: "PATH",
+              long: "db",
+              help:
+                "Testnaht: muss auf <base>/registry.db zeigen (der Vermittler liest diese Instanz-Registry)"
+            ],
+            room: [
+              value_name: "PATH",
+              long: "room",
+              help:
+                "Testnaht: muss auf <base>/mediator/room.json zeigen (der Vermittler liest diese Datei)"
+            ],
+            decided_by: [
+              value_name: "ID",
+              long: "decided-by",
+              help:
+                "Entscheiderin fuer automatische Quarantaene (default contract.verantwortliche_person)"
+            ]
+          ],
           flags: [
             continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"],
             detach: [
@@ -334,8 +367,93 @@ defmodule KomkiCli.CLI do
         dispatch(["help" | prefix])
 
       _ ->
-        parse_dispatch(argv)
+        case argv do
+          # `FILE ...` ist bei Optimus nicht abbildbar (keine multiple-args);
+          # die Session-Argumente werden deshalb vor dem Optimus-Parser
+          # gelesen. Die Optimus-Spezifikation bleibt die Help-Quelle.
+          ["session" | rest] -> dispatch_session(rest)
+          _ -> parse_dispatch(argv)
+        end
     end
+  end
+
+  defp dispatch_session(argv) do
+    case parse_session_argv(argv) do
+      {:ok, files, opts} ->
+        run_session(Map.put(opts, "files", files))
+
+      {:error, reason} ->
+        {"Error: " <> reason <> "; run \"komki --help\" fuer usage\n", 2}
+    end
+  end
+
+  @doc false
+  @spec parse_session_argv([String.t()]) ::
+          {:ok, [String.t()], %{String.t() => String.t()}} | {:error, String.t()}
+  def parse_session_argv(argv), do: parse_session_args(argv, [], %{})
+
+  defp parse_session_args([], files, opts), do: {:ok, files, opts}
+
+  defp parse_session_args(["--" | rest], files, opts), do: {:ok, files ++ rest, opts}
+
+  defp parse_session_args(["--continue" | rest], files, opts),
+    do: parse_session_args(rest, files, Map.put(opts, "continue", "true"))
+
+  defp parse_session_args(["--detach" | rest], files, opts),
+    do: parse_session_args(rest, files, Map.put(opts, "detach", "true"))
+
+  defp parse_session_args([flag, "-" <> _ = value | _rest], _files, _opts)
+       when flag in ["--db", "--room", "--decided-by"] do
+    {:error, "Option " <> flag <> " braucht einen Wert, kein Flag " <> value}
+  end
+
+  defp parse_session_args(["--db", value | rest], files, opts),
+    do: parse_session_args(rest, files, Map.put(opts, "db", value))
+
+  defp parse_session_args(["--room", value | rest], files, opts),
+    do: parse_session_args(rest, files, Map.put(opts, "room", value))
+
+  defp parse_session_args(["--decided-by", value | rest], files, opts),
+    do: parse_session_args(rest, files, Map.put(opts, "decided-by", value))
+
+  defp parse_session_args([flag | _rest], _files, _opts)
+       when flag in ["--db", "--room", "--decided-by"],
+       do: {:error, "Option " <> flag <> " braucht einen Wert"}
+
+  defp parse_session_args(["-" <> _ = flag | _rest], _files, _opts),
+    do: {:error, "unbekannte Option " <> flag}
+
+  defp parse_session_args([path | rest], files, opts),
+    do: parse_session_args(rest, files ++ [path], opts)
+
+  defp run_session(opts) do
+    case KomkiCli.Steps.session_plan(opts) do
+      {:session_plan, header, intake} ->
+        {header_out, _} = render_session_header(header)
+        {start_out, code} = render(KomkiCli.Steps.session_start(intake, opts))
+        {header_out <> start_out, code}
+
+      {:session_refused, header, _entries} ->
+        render_session_refused(header)
+
+      {:error, reason, code} ->
+        render({:error, reason, code})
+    end
+  end
+
+  defp render_session_header(header) do
+    {Enum.join(header, "\n") <> "\n", 0}
+  end
+
+  @doc false
+  @spec render_session_refused([String.t()]) :: outcome()
+  def render_session_refused(header) do
+    note =
+      red() <>
+        "session verweigert: Aufnahme nicht fuer alle Dateien permit (keine Datei gestaged)" <>
+        reset()
+
+    {Enum.join(header ++ [note], "\n") <> "\n", 3}
   end
 
   defp trailing_help(argv) do
@@ -407,9 +525,6 @@ defmodule KomkiCli.CLI do
 
   defp dispatch_command(:down, _result), do: render(KomkiCli.Steps.down())
   defp dispatch_command(:status, _result), do: render(KomkiCli.Steps.status())
-
-  defp dispatch_command(:session, result),
-    do: render(KomkiCli.Steps.session(optimus_opts(result)))
 
   defp dispatch_command(:session_chain, result),
     do: render(KomkiCli.Steps.session_chain(optimus_opts(result)))
