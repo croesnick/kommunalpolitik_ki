@@ -54,7 +54,25 @@ defmodule KomkiMediator.ToolsTest do
     body = parse_json_body(response)
     assert body["decision"] == "deny"
     refute Map.has_key?(body, "content")
-    assert [%{"type" => "provide_fact", "clears" => "purpose"}] = body["remedies"]
+
+    # Der Katalog stammt aus der Engine-Entscheidung (KomkiPolicy.Remedies,
+    # CONTRACT § 2.8) — hier ueber das MCP-Tool hindurch, in derselben Form
+    # wie direkt durchs Gate gepinnt (remedies_test).
+    assert body["remedies"] == [
+             %{
+               "code" => "binding_condition_false",
+               "binding" => "doc-vertraulich@1",
+               "condition" => "purpose",
+               "transitions" => [
+                 %{"type" => "fakt_nachreichen", "facts" => ["purpose"]},
+                 %{
+                   "type" => "neuer_raum",
+                   "required_bindings" => ["doc-vertraulich@1"],
+                   "required_recipients" => ["nutzende-person", "pi-agent"]
+                 }
+               ]
+             }
+           ]
   end
 
   test "unbekanntes Dokument: Entscheidungsfehler, kein Crash" do

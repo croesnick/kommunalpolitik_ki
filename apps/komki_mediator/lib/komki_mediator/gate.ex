@@ -6,8 +6,11 @@ defmodule KomkiMediator.Gate do
     (Tool-Name plus vollstaendig gerenderte Parameter) wird kanonisiert
     und gehasht (`intent_hash`), das Objekt aufgeloest, Intent + Snapshot
     gebaut und `KomkiPolicy.Derive.decide/3` gestellt. Ein `deny` oder
-    `indeterminate` tritt niemals als nackter Fehler auf, sondern als
-    Remedy-Plan: die Ordnung der behebbaren Schritte IST die Antwort.
+    `indeterminate` tritt niemals als nackter Fehler auf, sondern mit dem
+    Remedy-Katalog, den die Engine in die Entscheidung einbettet
+    (`KomkiPolicy.Remedies`, CONTRACT § 2.8): die Ordnung der behebbaren
+    Schritte IST die Antwort. Der Vermittler bildet keine eigene
+    Abbildung Blocker/Belege -> Fortsetzung mehr (Single-Sourcing, #115).
   * Gate 2 - Beweispruefung NACH dem Vollzug: das vollzogene Ergebnis wird
     gehasht und unabhaengig durch `KomkiPolicy.Verify.check/4` neu
     geprueft, und das realisierte Payload wird gegen den Gamma-Snapshot
@@ -33,7 +36,7 @@ defmodule KomkiMediator.Gate do
   selbst.
   """
 
-  alias KomkiMediator.{Fassung, Hash, Journal, Remedy, Room}
+  alias KomkiMediator.{Fassung, Gamma, Hash, Journal, Room}
   alias KomkiPolicy.{Derive, JSON, Verify}
 
   @typedoc "Ablauf-Umgebung: Gamma-Stand, Raum, Journal-Anbindung."
@@ -144,14 +147,19 @@ defmodule KomkiMediator.Gate do
 
   defp not_admitted(env, tool, intent_hash, intent, snapshot, kind, decision) do
     decision_id = new_decision_id()
-    remedies = Remedy.from_decision(decision, env.gamma)
+
+    # Single-Sourcing (#115): der Remedy-Katalog entsteht allein in der
+    # Engine (`KomkiPolicy.Remedies`, CONTRACT § 2.8) und reist in der
+    # Entscheidung mit. Der Vermittler reicht ihn unveraendert durch und
+    # bildet keine eigene Abbildung Blocker/Belege -> Fortsetzung mehr.
+    remedies = decision["remedies"]
 
     response = %{
       "decision" => kind,
       "decision_id" => decision_id,
       "registry_id" => env.gamma.registry_id,
       "remedies" => remedies,
-      "relaxation_authorities" => Remedy.relaxation_authorities(remedies)
+      "relaxation_authorities" => relaxation_authorities(env.gamma, remedies)
     }
 
     journal_pdr(
@@ -368,6 +376,21 @@ defmodule KomkiMediator.Gate do
       {:error, :unknown_object, _object_id} ->
         {:payload_mismatch, ["payload_object_unknown"]}
     end
+  end
+
+  # Relaxationsbefugnisse sind Γ-L1-Metadaten (R.2.2) aus dem rohen
+  # Registry-Term — keine Remedy-Semantik: WAS legal fortsetzbar ist,
+  # sagt allein der Engine-Katalog; hier steht nur, WER eine benannte
+  # Bindung lockerungsbefugt ist. Aufgeschluesselt je Bindung der
+  # Engine-Befunde, sortiert und einmalig.
+  defp relaxation_authorities(gamma, remedies) do
+    remedies
+    |> List.wrap()
+    |> Enum.flat_map(fn remedy -> List.wrap(remedy["binding"]) end)
+    |> Enum.uniq()
+    |> Enum.flat_map(&Gamma.relaxation_authorities(gamma, &1))
+    |> Enum.uniq()
+    |> Enum.sort()
   end
 
   # Exakte Parameter-Fassung des Calls: der vollstaendig gerenderte Call

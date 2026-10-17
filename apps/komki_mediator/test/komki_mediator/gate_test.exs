@@ -103,7 +103,7 @@ defmodule KomkiMediator.GateTest do
     assert Enum.count(Enum.uniq(intent_hashes)) == 2
   end
 
-  test "doc-vertraulich -> deny mit Remedy-Plan (kein nackter Fehler)", %{
+  test "doc-vertraulich -> deny mit Engine-Remedy-Katalog (kein nackter Fehler)", %{
     env: env,
     journal_path: journal_path
   } do
@@ -119,7 +119,26 @@ defmodule KomkiMediator.GateTest do
     assert response["decision_id"] =~ "pdr-"
     assert response["registry_id"] == "reg-komki-arbeitsraum"
 
-    assert [%{"type" => "provide_fact", "clears" => "purpose"}] = response["remedies"]
+    # Engine-Katalog (KomkiPolicy.Remedies, CONTRACT § 2.8), unverändert
+    # durchgereicht: der Blocker spiegelt sich mit fakt_nachreichen VOR
+    # neuer_raum; admit kennt keine aktionsfreigabe.
+    assert response["remedies"] == [
+             %{
+               "code" => "binding_condition_false",
+               "binding" => "doc-vertraulich@1",
+               "condition" => "purpose",
+               "transitions" => [
+                 %{"type" => "fakt_nachreichen", "facts" => ["purpose"]},
+                 %{
+                   "type" => "neuer_raum",
+                   "required_bindings" => ["doc-vertraulich@1"],
+                   "required_recipients" => ["nutzende-person", "pi-agent"]
+                 }
+               ]
+             }
+           ]
+
+    assert response["relaxation_authorities"] == []
     refute Map.has_key?(response, "content")
 
     assert [pdr] = TestHelpers.journal_records(journal_path)
@@ -127,7 +146,7 @@ defmodule KomkiMediator.GateTest do
     assert pdr["outcome"] == "not_admitted"
   end
 
-  test "doc-pending-freigabe -> indeterminate mit provide_fact", %{
+  test "doc-pending-freigabe -> indeterminate mit Engine-Remedy-Katalog", %{
     env: env,
     journal_path: journal_path
   } do
@@ -141,14 +160,25 @@ defmodule KomkiMediator.GateTest do
 
     assert response["decision"] == "indeterminate"
 
-    assert [
+    assert response["remedies"] == [
              %{
-               "type" => "provide_fact",
-               "clears" => "vertraulich_freigabe",
-               "relaxation_authorities" => ["nutzende-person"]
+               "code" => "missing_fact",
+               "fact" => "vertraulich_freigabe",
+               "binding" => "doc-pending-freigabe@1",
+               "transitions" => [
+                 %{"type" => "fakt_nachreichen", "facts" => ["vertraulich_freigabe"]},
+                 %{
+                   "type" => "neuer_raum",
+                   "required_bindings" => ["doc-pending-freigabe@1"],
+                   "required_recipients" => ["nutzende-person", "pi-agent"]
+                 }
+               ]
              }
-           ] =
-             response["remedies"]
+           ]
+
+    # Γ-L1 (R.2.2): die Lockerungsbefugnis der benannten Bindung bleibt
+    # Teil der Antwort — aus dem rohen Registry-Term, nicht aus dem Katalog.
+    assert response["relaxation_authorities"] == ["nutzende-person"]
 
     assert [pdr] = TestHelpers.journal_records(journal_path)
     assert pdr["decision"] == "indeterminate"
