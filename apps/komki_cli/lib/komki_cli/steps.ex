@@ -29,7 +29,10 @@ defmodule KomkiCli.Steps do
     * `{:status, cfg, %{llama: llama_state, mediator: mediator_state}}` —
       Status-Snapshot (`llama_state`/`mediator_state` uebernehmen die
       Struktur aus `KomkiCli.Llama.status/1` bzw. `KomkiCli.Mediator.status/1`).
-    * `{:run_ok, scratch, output}` / `{:run_error, scratch, output, pi_code}`.
+    * `{:run_ok, scratch, output, denial_summary}` /
+      `{:run_error, scratch, output, pi_code, denial_summary}` — `denial_summary`
+      ist `nil` ohne `--capture-denials`, sonst der strukturierte Capture-Status
+      (Ticket #125). Die CLI rendert den Footer auf stderr.
     * `{:session, message}` — interaktive pi-Session gestartet oder beendet
       (tmux-Session `komki`; Exit 0).
     * `{:chain_exit, code}` — Ende des internen `session-chain`-Pane-Laufs.
@@ -37,10 +40,19 @@ defmodule KomkiCli.Steps do
       Boot-Gate, 4 = Runtime (llama/mediator/pi).
   """
 
-  alias KomkiCli.{Config, Llama, Mediator, Pi, Profile}
+  alias KomkiCli.{Config, Denials, Llama, Mediator, Pi, Profile}
   require Config
 
+  @denial_epistemic_limit "Keine Denials im Fenster sind kein Konfinement-Beweis; das Boot-Gate bleibt die positive Kontrolle."
+
   @type check :: %{name: String.t(), ok: boolean(), reason: String.t()}
+
+  @type denial_summary :: %{
+          status: String.t(),
+          denials: [Denials.denial()],
+          report_path: String.t() | nil,
+          error: String.t() | nil
+        }
 
   @type mediator_state ::
           {:started, pos_integer(), Mediator.health()} | {:already, Mediator.health()}
@@ -54,8 +66,8 @@ defmodule KomkiCli.Steps do
           | {:down, %{llama: down_state(), mediator: down_state()}}
           | {:status, Config.t(),
              %{llama: term(), mediator: Mediator.mediator_state() | {:error, String.t()}}}
-          | {:run_ok, String.t(), String.t()}
-          | {:run_error, String.t(), String.t(), integer()}
+          | {:run_ok, String.t(), String.t(), denial_summary() | nil}
+          | {:run_error, String.t(), String.t(), integer(), denial_summary() | nil}
           | {:session, String.t()}
           | {:chain_exit, integer()}
           | {:error, String.t(), non_neg_integer()}
@@ -130,6 +142,7 @@ defmodule KomkiCli.Steps do
       Path.join([cfg.base_dir, "models"]),
       Path.join([cfg.base_dir, "tmp"]),
       Path.join([cfg.base_dir, "runs"]),
+      Path.join([cfg.base_dir, "denials"]),
       Path.join([cfg.pi_home, "tmp"]),
       Path.join([cfg.pi_home, ".config"]),
       Path.join([cfg.pi_home, ".local", "share"]),
@@ -138,6 +151,8 @@ defmodule KomkiCli.Steps do
     ]
 
     Enum.each(dirs, &File.mkdir_p!/1)
+    # Der Bericht enthaelt Denial-Targets; das Verzeichnis bleibt privat.
+    File.chmod!(Path.join([cfg.base_dir, "denials"]), 0o700)
     :ok
   end
 
@@ -730,20 +745,228 @@ defmodule KomkiCli.Steps do
     # Fail-Fast vor der Sandbox-Kette: pi startet sonst mit `-e builtin:mcp`
     # gegen eine tote mcp.json (Vertragsluecke nach Mediator-Crash).
     with {:ok, _pid} <- require_llama_up(cfg),
-         {:ok, _pid} <- require_mediator_up(cfg) do
+         {:ok, _pid} <- require_mediator_up(cfg),
+         :ok <- refuse_denials_scratch(opts, cfg) do
       scratch = scratch_for(opts, cfg.base_dir)
       File.mkdir_p!(scratch)
       prompt = Map.fetch!(opts, "prompt")
 
-      case Pi.run(cfg, scratch, mode, prompt) do
-        {:ok, out} ->
-          {:run_ok, scratch, out}
-
-        {:error, out, pi_code} ->
-          {:run_error, scratch, out, pi_code}
-      end
+      run_pi_with_capture(cfg, scratch, mode, prompt,
+        capture?: Map.has_key?(opts, "capture-denials")
+      )
     else
       {:error, reason, code} -> {:error, reason, code}
+    end
+  end
+
+  # Das Denial-Verzeichnis liegt bewusst ausserhalb der pi-Schreib-Scopes.
+  # Reject in beide Richtungen: ein Scratch unterhalb von denials/ wuerde
+  # Berichte mit dem Lauf vermischen; ein Scratch, der denials/ als
+  # Nachfahren enthaelt (z. B. <base> oder ein Elternverzeichnis), gaebe
+  # dem pi-Profil file-write* auf den Berichtsbaum.
+  @doc false
+  @spec refuse_denials_scratch(%{String.t() => term()}, Config.t()) ::
+          :ok | {:error, String.t(), 2}
+  def refuse_denials_scratch(opts, %Config{} = cfg) do
+    case Map.get(opts, "scratch") do
+      nil ->
+        :ok
+
+      scratch ->
+        scratch = Config.canonical(scratch)
+        denials = Denials.dir(cfg)
+
+        if under_path?(scratch, denials) or under_path?(denials, scratch) do
+          safe_denials = Denials.redact(denials, cfg.base_dir, nil)
+
+          {:error,
+           "--scratch darf weder im noch ueber dem Denial-Berichtsverzeichnis liegen: " <>
+             safe_denials, 2}
+        else
+          :ok
+        end
+    end
+  end
+
+  defp under_path?(value, prefix) do
+    value == prefix or String.starts_with?(value, prefix <> "/")
+  end
+
+  @doc """
+  Testnaht des Laufs: pi starten, Zeitfenster festhalten und optional
+  Denials capturen.
+
+  Das Fenster beginnt unmittelbar vor `pi_fun` und endet unmittelbar
+  danach; die Dauer kommt aus `System.monotonic_time`, die Wanduhrzeiten
+  sind UTC. Vor `log show` wartet der Drain-Wait, damit der Unified Log
+  die letzten Denials des Laufs aufgenommen hat. Capture laeuft in beiden
+  pi-Ausgaengen (`{:ok, out}` und `{:error, out, code}`).
+
+  `:pi_fun` und `:capture_fun` sind injizierbar (Tests ohne echtes
+  llama/pi/log). Ohne `capture?: true` wird weder `log show` gerufen noch
+  ein Bericht geschrieben.
+  """
+  @spec run_pi_with_capture(Config.t(), String.t(), Pi.mode(), String.t(), keyword()) ::
+          result()
+  def run_pi_with_capture(%Config{} = cfg, scratch, mode, prompt, opts \\ []) do
+    pi_fun = Keyword.get(opts, :pi_fun, &Pi.run/4)
+    capture_fun = Keyword.get(opts, :capture_fun, &Denials.capture/2)
+    capture? = Keyword.get(opts, :capture?, false)
+    drain_ms = Keyword.get(opts, :drain_ms, 500)
+
+    started_at = DateTime.utc_now()
+    mono_start = System.monotonic_time(:millisecond)
+
+    pi_result = pi_fun.(cfg, scratch, mode, prompt)
+
+    finished_at = DateTime.utc_now()
+    mono_end = System.monotonic_time(:millisecond)
+
+    denial_summary =
+      if capture? do
+        Process.sleep(drain_ms)
+
+        window_start = DateTime.add(started_at, -1, :second)
+
+        window = %{
+          start: window_start,
+          end: DateTime.add(finished_at, 1, :second),
+          duration_ms: max(mono_end - mono_start, 0),
+          pre_roll_ms: DateTime.diff(started_at, window_start, :millisecond),
+          drain_wait_ms: drain_ms
+        }
+
+        capture_and_persist(cfg, scratch, mode, pi_result, window, capture_fun)
+      end
+
+    case pi_result do
+      {:ok, output} -> {:run_ok, scratch, output, denial_summary}
+      {:error, output, pi_code} -> {:run_error, scratch, output, pi_code, denial_summary}
+    end
+  end
+
+  defp capture_and_persist(cfg, scratch, mode, pi_result, window, capture_fun) do
+    case capture_fun.(window, base_dir: cfg.base_dir, scratch: scratch) do
+      {:ok, capture} ->
+        persist_capture(cfg, scratch, mode, pi_result, window, capture)
+
+      {:error, reason} ->
+        summary("capture_error", [], nil, redact_error(reason, cfg, scratch))
+
+      other ->
+        summary(
+          "capture_error",
+          [],
+          nil,
+          redact_error("unexpected capture result: " <> Kernel.inspect(other), cfg, scratch)
+        )
+    end
+  rescue
+    e -> summary("capture_error", [], nil, redact_error(Exception.message(e), cfg, scratch))
+  end
+
+  defp persist_capture(cfg, scratch, mode, pi_result, window, capture) do
+    if capture.status == "ok" do
+      report = denial_report(cfg, scratch, mode, pi_result, window, capture)
+
+      case Denials.write_report(cfg, report) do
+        {:ok, path} ->
+          # Kein absoluter Pfad im Footer: der enthaelt den Username.
+          summary("ok", capture.denials, Path.join("denials", Path.basename(path)), nil)
+
+        {:error, reason} ->
+          summary("write_error", capture.denials, nil, redact_error(reason, cfg, scratch))
+      end
+    else
+      summary(
+        capture.status,
+        capture.denials,
+        nil,
+        redact_error(capture.error || "capture failed", cfg, scratch)
+      )
+    end
+  rescue
+    e ->
+      summary(
+        "write_error",
+        capture.denials,
+        nil,
+        redact_error(Exception.message(e), cfg, scratch)
+      )
+  end
+
+  defp redact_error(reason, cfg, scratch) when is_binary(reason) do
+    Denials.redact(reason, cfg.base_dir, scratch)
+  end
+
+  defp redact_error(reason, _cfg, _scratch), do: Kernel.inspect(reason)
+
+  defp summary(status, denials, report_path, error) do
+    %{status: status, denials: denials, report_path: report_path, error: error}
+  end
+
+  defp denial_report(cfg, scratch, mode, pi_result, window, capture) do
+    %{
+      "schema" => Denials.schema(),
+      "created_at" => DateTime.to_iso8601(DateTime.utc_now()),
+      "window" => %{
+        "start" => DateTime.to_iso8601(window.start),
+        "end" => DateTime.to_iso8601(window.end),
+        "duration_ms" => window.duration_ms,
+        "pre_roll_ms" => window.pre_roll_ms,
+        "drain_wait_ms" => window.drain_wait_ms
+      },
+      "run" => %{
+        "mode" => Atom.to_string(mode),
+        "pi_exit" => pi_exit(pi_result),
+        "scratch_hash" => sha256_string(scratch),
+        "run_profile_sha256" => file_sha256(Pi.profile_path_for(cfg, scratch)),
+        "llama_profile_sha256" => file_sha256(Llama.llama_profile_path(cfg))
+      },
+      "capture" => %{
+        "status" => capture.status,
+        "log_binary" => capture.log_binary,
+        "argv" => capture.argv,
+        "predicate" => capture.predicate,
+        "error" => capture.error,
+        "matched" => capture.matched,
+        "parsed" => capture.parsed,
+        "unparsed" => capture.unparsed
+      },
+      "denials" => Enum.map(capture.denials, &denial_json/1),
+      "redaction" => %{
+        "policy" => "komki-denials-redact/1",
+        "applied" => true,
+        "redacted_count" => capture.redacted_count
+      },
+      "epistemic_limit" => @denial_epistemic_limit
+    }
+  end
+
+  defp pi_exit({:ok, _output}), do: 0
+  defp pi_exit({:error, _output, code}), do: code
+
+  defp denial_json(denial) do
+    %{
+      "logged_at" => denial.logged_at,
+      "process" => denial.process,
+      "pid" => denial.pid,
+      "deny_count" => denial.deny_count,
+      "operation" => denial.operation,
+      "target" => denial.target,
+      "occurrences" => denial.occurrences
+    }
+  end
+
+  defp sha256_string(value) do
+    digest = :crypto.hash(:sha256, value)
+    Base.encode16(digest, case: :lower)
+  end
+
+  defp file_sha256(path) do
+    case sha256(path) do
+      {:ok, hash} -> hash
+      {:error, _reason} -> nil
     end
   end
 

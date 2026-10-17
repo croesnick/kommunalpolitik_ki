@@ -103,6 +103,7 @@ Zwei Hinweise für die verteilte Datei:
 ./komki doctor                      # alle Checks (Werkzeuge, Profil, GGUF-SHA, Boot-Gate, Port)
 ./komki up                          # llama-server starten
 ./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil
+./komki run "PROMPT" --capture-denials  # zusaetzlich Sandbox-Denials des Lauffensters ablegen
 ./komki session                     # interaktive pi-Session in tmux
 ./komki session --continue          # letzte Session fortsetzen
 ./komki session --detach            # im Hintergrund; attach via 'tmux attach -t komki'
@@ -112,9 +113,29 @@ Zwei Hinweise für die verteilte Datei:
 ```
 
 Weitere Flags: `init --port N --ctx N --force`, `up --ctx N`,
-`run --mode text|json --scratch PFAD`. Exit-Codes: `0` Erfolg, `2` Nutzungs-,
-Konfigurations- oder Bereitschaftsfehler (etwa: llama-server nicht aktiv),
-`3` Doctor-/Boot-Gate-Fehlschlag, `4` Laufzeitfehler.
+`run --mode text|json --scratch PFAD --capture-denials`. Exit-Codes: `0`
+Erfolg, `2` Nutzungs-, Konfigurations- oder Bereitschaftsfehler (etwa:
+llama-server nicht aktiv), `3` Doctor-/Boot-Gate-Fehlschlag, `4`
+Laufzeitfehler (mit `--capture-denials` auch eine fehlgeschlagene
+Denial-Capture oder Berichtspersistenz).
+
+### Denial-Capture (Ticket #125)
+
+`komki run --capture-denials` liest nach dem Lauf die `deny`-Zeilen des
+macOS Unified Log im Lauffenster (`log show`, ohne sudo, im komki-Prozess)
+und legt einen versionierten Bericht unter `<base>/denials/` ab. Der
+Footer auf stderr nennt Anzahl und die wichtigsten verweigerten
+Operationen; im JSON-Bericht stehen Lauffenster, pi-Exit, Capture-Status
+und die gruppierten Denials. Der Bericht ist append-only, atomar
+geschrieben (`0600`) und enthaelt weder Prompt noch Roh-Output.
+
+Jedes Target und jede Fehlermeldung wird vor dem Schreiben redigiert:
+Systempfade (`/System`, `/usr`, `/bin`, `/opt`, ...) bleiben verbatim,
+Home-, asdf/nvm-, Instanz- und Scratch-Pfade werden maskiert, unbekannte
+absolute Pfade zu `<redacted-path>`. Der Bericht ist ein interner
+Nachweis, kein Γ-Objekt; Grants bleiben menschliche Akte. Wichtig: Ein
+Fenster ohne Denials ist **kein** Konfinement-Beweis — die positive
+Kontrolle bleibt das Boot-Gate.
 
 Interaktive Sessions laufen in der tmux-Session `komki`, jeweils eine
 gleichzeitig. Dateien aus der Session landen im Verzeichnis `arbeit`
