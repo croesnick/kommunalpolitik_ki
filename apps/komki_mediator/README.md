@@ -41,7 +41,7 @@ als Bild:
   Netz-Auswaerts nur zu zwei Loopback-Literals: llama-Port und
   Vermittler-Port. Auf pi-Seite heissen die Tools `mcp__komki__<tool>`.
 * Wem gibt er Daten zurueck? Zwei Senken. pi erhaelt die MCP-Antwort:
-  permit-Inhalt, Remedy-Plan (bei deny) oder Zurueckhaltung
+  permit-Inhalt, Remedy-Katalog (bei deny) oder Zurueckhaltung
   (`"admitted" => "redacted"`, ohne content) — immer mit eingebetteter
   `decision_id`. Und das PDR-Journal
   (`<base>/mediator/journal/pdr.jsonl`) erhaelt je Aufruf einen
@@ -95,7 +95,7 @@ sequenceDiagram
 
     alt deny oder indeterminate (kein Vollzug)
         M->>J: PDR (Entscheidung, intent_hash)
-        M-->>P: isError=false + remedy plan
+        M-->>P: isError=false + Remedy-Katalog (Engine)
     else permit: Vollzug
         M->>M: Connector vollzieht das Tool
         Note over M,K: Gate 2: zwei unabhaengige Pruefungen
@@ -166,8 +166,11 @@ NIEMALS ueberschrieben (Idempotenz).
 * **Gate 1**: exakt gerenderter Aufruf (Tool samt vollstaendigen Parametern)
   → canonische Bytes → `intent_hash`; Objekt, Intent, Snapshot →
   `KomkiPolicy.Derive.decide`. Ein `deny`/`indeterminate` ist kein nackter
-  Fehler, sondern ein Remedy-Plan (behebbare Schritte,
-  Relaxationsbefugnisse inklusive).
+  Fehler, sondern der Remedy-Katalog, den die Engine in die Entscheidung
+  einbettet (`KomkiPolicy.Remedies`, CONTRACT § 2.8: legal Fortsetzungen
+  in fester Ordnung — der Vermittler bildet keine eigene Remedy-Abbildung,
+  Single-Sourcing #115). Die Relaxationsbefugnisse der benannten Bindungen
+  (Γ-L1, R.2.2) schluesselt der Vermittler aus dem rohen Registry-Term auf.
 * **Gate 2**: nur nach einem `permit` vollzieht der Connector. Danach
   laufen zwei unabhaengige Pruefungen: der Beweis durch
   `KomkiPolicy.Verify.check`, und das realisierte Payload gegen den
@@ -190,7 +193,6 @@ NIEMALS ueberschrieben (Idempotenz).
 | `KomkiMediator.Gate` | Gate 1 + Gate 2 + PDR |
 | `KomkiMediator.Gamma` | Registry-Snapshot + Stand-Hash |
 | `KomkiMediator.Room` | Raum-Zustand, Objekt-/Snapshot-Bildung |
-| `KomkiMediator.Remedy` | Abhilfeplaene aus Blockern/Belegen |
 | `KomkiMediator.Journal` | getrennter PDR-Writer (R.4.4) |
 | `KomkiMediator.Env` | geladene Umgebung fuer die Tools |
 | `KomkiMediator.Templates` | Default-Raum (idempotent provisioniert) |
