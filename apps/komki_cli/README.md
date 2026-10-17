@@ -104,6 +104,7 @@ Zwei Hinweise für die verteilte Datei:
 ./komki up                          # llama-server starten
 ./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil
 ./komki session                     # interaktive pi-Session in tmux
+./komki session DATEI …             # Dateien ueber den Startvertrag aufnehmen
 ./komki session --continue          # letzte Session fortsetzen
 ./komki session --detach            # im Hintergrund; attach via 'tmux attach -t komki'
 ./komki down                        # llama-server stoppen
@@ -126,6 +127,35 @@ stehen `find`/`grep` für die Dateisuche bereit. Aus der Session kopieren:
 `Ctrl+B` und
 dann `[` öffnet den tmux-Copy-Modus (Pfeiltasten bewegen, `Space` startet
 die Auswahl, `Enter` übernimmt).
+
+### Dateiaufnahme beim Session-Start
+
+`komki session DATEI …` nimmt Dateien ueber den optionalen
+`contract`-Block in `<base>/mediator/room.json` auf. Der Block traegt
+`bindings` (B_W, sortiert und eindeutig), `auftrag`,
+`verantwortliche_person` und `eingangsrechte` (erlaubte `OBJ@VER`). Fehlt
+er, laeuft eine Session ohne Dateien wie bisher; zusaetzlich erscheint der
+Startvertrag-Header im Terminal. Mit Dateien verweigert der Start und nennt
+die vier Felder. Fuer die Dateiaufnahme muessen `facts.purpose` und ein
+nichtleeres B_W vorhanden sein (fail-closed, kein unlabeled room).
+
+Jede Datei wird ueber einen gespeicherten `sha256:<hex>`-`content_ref`
+einem Objekt zugeordnet. Eine reine Pfad-Registrierung aus der Zeit vor
+diesem Ticket bindet keine Bytes und wird mit Setup-Hinweis verweigert;
+das Objekt muss mit dem berechneten Digest neu registriert werden.
+Unregistrierte Dateien landen in Quarantaene (derselbe Store-Schritt wie
+`komki label quarantine`, inklusive genanntem aequivalenten Befehl); die
+Attribution ist die `verantwortliche_person` des Startvertrags. Nur
+`permit`-Dateien werden nach `arbeit` kopiert, und zwar erst nach
+erfolgreicher Liveness-Pruefung von llama und Vermittler. Die Entscheidung
+kommt vollstaendig aus der Engine, inklusive Remedy-Katalog. Ist eine Datei
+nicht `permit`, wird keine Datei gestaged und der Start endet mit Exit 3.
+`--decided-by` ueberschreibt die entscheidende Person fuer automatische
+Quarantaene. `--db` und `--room` sind Testnaehte und werden nur akzeptiert,
+wenn sie exakt auf `<base>/registry.db` bzw.
+`<base>/mediator/room.json` zeigen — der laufende Vermittler liest diese
+Instanzdateien. Eine Aufnahme ist nur bei einem neuen Start moeglich (kein
+`--continue`, keine bereits laufende tmux-Session).
 
 Unter `~/.local/share/komki` liegen die Instanzdaten, überschreibbar via
 `KOMKI_HOME`.
