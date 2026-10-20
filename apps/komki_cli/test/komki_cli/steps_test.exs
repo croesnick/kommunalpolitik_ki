@@ -102,6 +102,7 @@ defmodule KomkiCli.StepsTest do
       assert %{ok: true, reason: "noch kein Journal"} = Steps.journal_check(cfg)
     end
 
+    @tag :chflags
     test "Journal ohne uappnd ist FAIL, mit uappnd ok", %{cfg: cfg, path: path} do
       File.mkdir_p!(Path.dirname(path))
       File.write!(path, "")

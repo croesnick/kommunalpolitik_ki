@@ -131,6 +131,7 @@ defmodule KomkiMediator.JournalTest do
     assert {:error, {:journal_corrupt, %{index: 0}}} = Journal.start_link(path)
   end
 
+  @tag :chflags
   test "append_only setzt uappnd: Anhaengen geht, Ueberschreiben nicht", %{path: path} do
     {:ok, _} = Journal.start_link({path, append_only: true})
     on_exit(fn -> System.cmd("/usr/bin/chflags", ["nouappnd", path]) end)
