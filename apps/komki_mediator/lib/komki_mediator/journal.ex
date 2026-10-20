@@ -5,8 +5,13 @@ defmodule KomkiMediator.Journal do
   Datensaetze laufen synchron als `append` durch diesen Prozess.
 
   Die Datei wird einmal beim Start geoeffnet (Append-Modus) und bleibt
-  offen; jede Zeile ist kanonisches JSON (`KomkiPolicy.JSON.canonical`)
-  mit genau einem finalen Newline und wird mit `:file.sync` festgehalten.
+  offen; jeder Datensatz ist ein kanonisches JSON-Dokument
+  (`KomkiPolicy.JSON.canonical`, mehrzeilig eingerueckt) mit genau einem
+  finalen Newline und wird mit `:file.sync` festgehalten. Trotz der
+  Endung `.jsonl` ist die Datei kein zeilenweises JSONL: Die Datensaetze
+  stehen direkt hintereinander, jeder beginnt mit einer Zeile `{`. So
+  bleibt jeder Datensatz byte-identisch mit seiner kanonischen Form
+  (Re-Kanonisieren liefert dieselben Bytes, Ticket #133).
   Schreibfehler sind fatal: der Prozess stoppt, die `:one_for_all`-Strategie
   des Mediator-Supervisors stoppt dadurch die ganze Vermittlung — die
   Auditkette wird nie still abgedunkelt, waehrend weiter vermittelt wird.

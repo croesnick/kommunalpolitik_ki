@@ -82,6 +82,15 @@ defmodule KomkiCli.StepsTest do
   # stale ist — pi startet sonst mit `-e builtin:mcp` gegen eine tote
   # mcp.json. Muster wie das require_llama_up-Integrationsverhalten
   # (doctor_boot_test): klare Meldung, Exit 2, Handlungs-Hinweis.
+  describe "run/1: --timeout (Ticket #133)" do
+    test "0 und negative Werte werden vor jedem Check mit Exit 2 abgewiesen" do
+      for t <- [0, -5] do
+        assert {:error, msg, 2} = Steps.run(%{"prompt" => "x", "timeout" => t})
+        assert msg =~ "--timeout"
+      end
+    end
+  end
+
   describe "scratch_for/2 (Ticket #132: Scratch nur unter base/runs)" do
     setup do
       base = TestSupport.tmp_area!("komki-scratch")

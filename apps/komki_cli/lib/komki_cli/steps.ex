@@ -694,24 +694,35 @@ defmodule KomkiCli.Steps do
   # run
   # ===========================================================================
 
-  @spec run(%{String.t() => String.t()}) :: result()
+  # Laufzeit-Limit des Einmal-Laufs (Ticket #133): ohne Limit drehte ein
+  # Modell, das sein Werkzeug nicht fand, ueber zehn Minuten Schleifen.
+  @run_timeout_s 600
+
+  @spec run(%{String.t() => term()}) :: result()
   def run(opts) do
-    case mode_from(Map.get(opts, "mode", "text")) do
-      {:error, reason} ->
-        {:error, reason, 2}
+    with {:ok, mode} <- mode_from(Map.get(opts, "mode", "text")),
+         :ok <- timeout_valid(Map.get(opts, "timeout", @run_timeout_s)) do
+      run_checked(opts, mode)
+    else
+      {:error, reason} -> {:error, reason, 2}
+    end
+  end
 
-      {:ok, mode} ->
-        case run_checks(:full) do
-          {:checks, _checks, :ok} ->
-            execute_run(opts, mode)
+  defp timeout_valid(s) when is_integer(s) and s > 0, do: :ok
 
-          {:checks, _checks, _} ->
-            {:error, "run verweigert: doctor nicht gruen (Boot-Gate ist Pflicht vor jedem Lauf)",
-             3}
+  defp timeout_valid(s),
+    do: {:error, "invalid --timeout " <> Kernel.inspect(s) <> " (Sekunden > 0)"}
 
-          {:error, reason, code} ->
-            {:error, reason, code}
-        end
+  defp run_checked(opts, mode) do
+    case run_checks(:full) do
+      {:checks, _checks, :ok} ->
+        execute_run(opts, mode)
+
+      {:checks, _checks, _} ->
+        {:error, "run verweigert: doctor nicht gruen (Boot-Gate ist Pflicht vor jedem Lauf)", 3}
+
+      {:error, reason, code} ->
+        {:error, reason, code}
     end
   end
 
@@ -734,8 +745,9 @@ defmodule KomkiCli.Steps do
          {:ok, scratch} <- scratch_for(opts, cfg.base_dir) do
       File.mkdir_p!(scratch)
       prompt = Map.fetch!(opts, "prompt")
+      timeout_ms = Map.get(opts, "timeout", @run_timeout_s) * 1000
 
-      case Pi.run(cfg, scratch, mode, prompt) do
+      case Pi.run(cfg, scratch, mode, prompt, timeout_ms) do
         {:ok, out} ->
           {:run_ok, scratch, out}
 

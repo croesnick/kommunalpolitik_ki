@@ -21,7 +21,11 @@ defmodule KomkiCli.Pi do
       PI_OFFLINE         = 1
       LANG / LC_ALL      = C
 
-  cwd ist das pi-Home. Beim Einmal-Lauf kommt stdin aus /dev/null:
+  cwd ist beim Einmal-Lauf der Scratch, in der Session die Arbeitsflaeche
+  `arbeit` — nie das pi-Home (Ticket #133): pi laedt `AGENTS.md`/`CLAUDE.md`
+  aus dem cwd; ein gekapertes Modell koennte sie per `write` dort ablegen
+  und sich so in jeden spaeteren Lauf einnisten. Zusaetzlich schaltet
+  `--no-context-files` die Discovery ganz ab. Beim Einmal-Lauf kommt stdin aus /dev/null:
   pi liest gepipete stdin als Prompt-Quelle; eine offene Pipe haengt.
   Deshalb startet der Einmal-Lauf ueber
   `/bin/sh -c 'exec "$0" "$@" < /dev/null'` — argv-Einzelwerte, keine
@@ -40,18 +44,91 @@ defmodule KomkiCli.Pi do
 
   @type mode :: :text | :json
 
-  @spec run(Config.t(), String.t(), mode(), String.t()) ::
+  @timeout_status 124
+
+  @doc """
+  Einmal-Lauf mit Laufzeit-Limit (Ticket #133): Nach `timeout_ms` beendet
+  komki pi per SIGTERM und meldet Status 124 (Konvention von timeout(1)).
+  sandbox-exec und `sh -c 'exec …'` ersetzen sich per exec, die OS-pid des
+  Ports ist deshalb der node-Prozess selbst.
+  """
+  @spec run(Config.t(), String.t(), mode(), String.t(), pos_integer()) ::
           {:ok, output :: String.t()}
           | {:error, output :: String.t(), status :: integer()}
-  def run(%Config{} = cfg, scratch_dir, mode, prompt)
-      when mode in [:text, :json] and is_binary(prompt) do
+  def run(%Config{} = cfg, scratch_dir, mode, prompt, timeout_ms)
+      when mode in [:text, :json] and is_binary(prompt) and is_integer(timeout_ms) and
+             timeout_ms > 0 do
     profile_path = profile_path_for(cfg, scratch_dir)
     KomkiCli.Profile.write!(profile_path, KomkiCli.Profile.generate(cfg, scratch_dir))
-    argv = argv_for(cfg, scratch_dir, mode, prompt)
+    [program | args] = argv_for(cfg, scratch_dir, mode, prompt)
+    run_with_timeout(program, args, env_for(cfg), scratch_dir, timeout_ms)
+  end
 
-    case System.cmd(hd(argv), tl(argv), env: env_for(cfg), cd: cfg.pi_home) do
-      {out, 0} -> {:ok, out}
-      {out, code} -> {:error, out, code}
+  @doc """
+  Startet `program` als Port-Kind (der Weg, auf dem node unter dem
+  macOS-27.2-Beta bootet), sammelt stdout und beendet den Prozess nach
+  `timeout_ms` per SIGTERM (Status 124). Public als Testnaht.
+  """
+  @spec run_with_timeout(
+          String.t(),
+          [String.t()],
+          %{String.t() => String.t()},
+          String.t(),
+          pos_integer()
+        ) ::
+          {:ok, String.t()} | {:error, String.t(), integer()}
+  def run_with_timeout(program, args, env, cwd, timeout_ms) do
+    env = Enum.map(env, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end)
+
+    port =
+      Port.open({:spawn_executable, program}, [
+        :binary,
+        :exit_status,
+        {:args, args},
+        {:env, env},
+        {:cd, cwd}
+      ])
+
+    timer = Process.send_after(self(), {:komki_run_timeout, port}, timeout_ms)
+    result = collect(port, [], false)
+    Process.cancel_timer(timer)
+    flush_timeout(port)
+    result
+  end
+
+  defp collect(port, acc, timed_out?) do
+    receive do
+      {^port, {:data, data}} ->
+        collect(port, [acc, data], timed_out?)
+
+      {^port, {:exit_status, status}} ->
+        out = IO.iodata_to_binary(acc)
+
+        cond do
+          timed_out? ->
+            {:error, out <> "\n[komki: Laufzeit-Limit erreicht, pi beendet]", @timeout_status}
+
+          status == 0 ->
+            {:ok, out}
+
+          true ->
+            {:error, out, status}
+        end
+
+      {:komki_run_timeout, ^port} ->
+        with {:os_pid, pid} <- Port.info(port, :os_pid) do
+          System.cmd("/bin/kill", ["-TERM", Integer.to_string(pid)], stderr_to_stdout: true)
+        end
+
+        collect(port, acc, true)
+    end
+  end
+
+  defp flush_timeout(port) do
+    receive do
+      {:komki_run_timeout, ^port} -> :ok
+    after
+      0 -> :ok
     end
   end
 
@@ -161,6 +238,7 @@ defmodule KomkiCli.Pi do
       ] ++
         [
           "--no-skills",
+          "--no-context-files",
           "--no-prompt-templates",
           "--no-themes",
           # KEIN --no-approve hier: Der Flag erzwingt "untrusted" und uebersteuert
@@ -192,12 +270,19 @@ defmodule KomkiCli.Pi do
   # Verbindung (pi >= 1.0; Issue #103: kein Pin).
   defp mcp_contract_flags, do: ["--no-extensions", "-e", "builtin:mcp"]
 
+  # Vermittler-Tools (Ticket #133): pi 1.1.0 blendet MCP-Tools aus, sobald
+  # --tools eine Allowlist traegt (Live-Fund: das Modell sah nur `write`).
+  # Das Muster schaltet genau den Server `komki` frei; welche seiner Tools
+  # sichtbar sind, pinnt weiter die mcp.json (exposure hidden + direct).
+  @mediator_tools "mcp__komki__*"
+
   # ls ist immer dabei (reines Node); find/grep nur mit entdeckter Binary —
   # sonst scheitert der Tool-Aufruf erst zur Laufzeit.
   defp tools_list(%Config{} = cfg) do
     ["read", "write", "ls"]
     |> maybe_tool("find", cfg.fd_bin)
     |> maybe_tool("grep", cfg.rg_bin)
+    |> Kernel.++([@mediator_tools])
     |> Enum.join(",")
   end
 
@@ -215,6 +300,7 @@ defmodule KomkiCli.Pi do
       mcp_contract_flags() ++
       [
         "--no-skills",
+        "--no-context-files",
         "--no-prompt-templates",
         "--no-themes",
         "--no-approve",
@@ -222,7 +308,7 @@ defmodule KomkiCli.Pi do
         "--session-dir",
         Path.join(scratch_dir, "pi-sessions"),
         "--tools",
-        "write",
+        "write," <> @mediator_tools,
         "--provider",
         "pi-local",
         "--model",

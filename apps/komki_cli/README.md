@@ -112,7 +112,7 @@ Zwei Hinweise für die verteilte Datei:
 ```
 
 Weitere Flags: `init --port N --ctx N --force`, `up --ctx N`,
-`run --mode text|json --scratch PFAD` (PFAD nur unterhalb von `runs/` der Instanz). Exit-Codes: `0` Erfolg, `2` Nutzungs-,
+`run --mode text|json --scratch PFAD --timeout SEKUNDEN` (PFAD nur unterhalb von `runs/` der Instanz; der Scratch ist auch das Arbeitsverzeichnis des Laufs; Laufzeit-Limit per Default 600 s, danach Exit 4). pi startet in Lauf und Session mit `--no-context-files`, damit eine vom Modell abgelegte `AGENTS.md` keinen späteren Lauf steuert, und sieht neben seinen Datei-Werkzeugen die Vermittler-Tools (`mcp__komki__*`). Exit-Codes: `0` Erfolg, `2` Nutzungs-,
 Konfigurations- oder Bereitschaftsfehler (etwa: llama-server nicht aktiv),
 `3` Doctor-/Boot-Gate-Fehlschlag, `4` Laufzeitfehler.
 

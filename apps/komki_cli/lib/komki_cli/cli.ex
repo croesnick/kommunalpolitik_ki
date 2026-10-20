@@ -15,7 +15,7 @@ defmodule KomkiCli.CLI do
       komki up    [--ctx N]
       komki down
       komki status
-      komki run "PROMPT" [--mode text|json] [--scratch PATH]
+      komki run "PROMPT" [--mode text|json] [--scratch PATH] [--timeout SEKUNDEN]
       komki session [--continue] [--detach]
       komki session-chain [--continue]   # intern: Pane-Einstieg der Session
       komki label import FILE [--db PATH]
@@ -203,6 +203,12 @@ defmodule KomkiCli.CLI do
               value_name: "PATH",
               long: "scratch",
               help: "Scratch-Verzeichnis unterhalb base/runs/ (default base/runs/<UTC-Stamp>)"
+            ],
+            timeout: [
+              value_name: "SEKUNDEN",
+              long: "timeout",
+              parser: :integer,
+              help: "Laufzeit-Limit fuer pi (default 600); danach Abbruch mit Exit 4"
             ]
           ]
         ],

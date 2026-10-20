@@ -155,8 +155,13 @@ mediator/
 ├── registry.json   # Gamma: Verbindungsregeln, Bindungen, Befugnisse
 ├── room.json       # Raum: Identitaet, Arbeitsraum, Fakten, Objekte
 ├── documents/      # die drei Beispieldokumente (doc-oeffentlich u. a.)
-└── journal/pdr.jsonl  # PDR-Auditjournal (eine kanonische JSON-Zeile je Aufruf)
+└── journal/pdr.jsonl  # PDR-Auditjournal (ein kanonisches, mehrzeiliges JSON-Dokument je Aufruf)
 ```
+
+Das Journal ist trotz der Endung kein zeilenweises JSONL: Jeder Datensatz
+ist byte-identisch die kanonische Form aus `KomkiPolicy.JSON.canonical`
+(mehrzeilig eingerückt), die Datensätze stehen direkt hintereinander. Wer es
+auswertet, liest Dokument für Dokument, etwa mit `jq -c . pdr.jsonl`.
 
 Ein fehlender Raum wird beim Start provisioniert; ein vorhandener wird
 NIEMALS ueberschrieben (Idempotenz).

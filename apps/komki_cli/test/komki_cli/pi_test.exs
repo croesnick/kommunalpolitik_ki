@@ -40,9 +40,38 @@ defmodule KomkiCli.PiTest do
       idx = Enum.find_index(argv, &(&1 == "--no-extensions"))
       assert Enum.slice(argv, idx, 3) == ["--no-extensions", "-e", "builtin:mcp"]
 
-      # sonstige Flags unverändert (Tools-Allowlist bleibt, wie sie war)
+      # Tools-Allowlist: write plus die Vermittler-Tools (Ticket #133)
       idx_tools = Enum.find_index(argv, &(&1 == "--tools"))
-      assert Enum.at(argv, idx_tools + 1) == "write"
+      assert Enum.at(argv, idx_tools + 1) == "write,mcp__komki__*"
+    end
+  end
+
+  describe "run_with_timeout/5 (Ticket #133)" do
+    test "normaler Lauf liefert stdout und Status 0" do
+      assert {:ok, "hallo\n"} = Pi.run_with_timeout("/bin/echo", ["hallo"], %{}, "/", 5_000)
+    end
+
+    test "Fehlerstatus wird durchgereicht" do
+      assert {:error, "", 1} = Pi.run_with_timeout("/usr/bin/false", [], %{}, "/", 5_000)
+    end
+
+    test "Limit beendet den Prozess mit Status 124" do
+      {micros, result} =
+        :timer.tc(fn -> Pi.run_with_timeout("/bin/sleep", ["30"], %{}, "/", 300) end)
+
+      assert {:error, out, 124} = result
+      assert out =~ "Laufzeit-Limit"
+      assert micros < 5_000_000
+    end
+  end
+
+  describe "Kontextdateien (Ticket #133)" do
+    test "run und session schalten AGENTS.md/CLAUDE.md-Discovery ab", %{cfg: cfg} do
+      assert "--no-context-files" in Pi.argv_for(cfg, "/scratch", :text, "hallo")
+
+      for continue? <- [false, true] do
+        assert "--no-context-files" in Pi.argv_session(cfg, continue?)
+      end
     end
   end
 
@@ -113,12 +142,12 @@ defmodule KomkiCli.PiTest do
       argv = Pi.argv_session(cfg, false)
 
       idx = Enum.find_index(argv, &(&1 == "--tools"))
-      assert Enum.at(argv, idx + 1) == "read,write,ls,find,grep"
+      assert Enum.at(argv, idx + 1) == "read,write,ls,find,grep,mcp__komki__*"
 
       bare = Pi.argv_session(%{cfg | fd_bin: nil, rg_bin: nil}, false)
 
       idx_bare = Enum.find_index(bare, &(&1 == "--tools"))
-      assert Enum.at(bare, idx_bare + 1) == "read,write,ls"
+      assert Enum.at(bare, idx_bare + 1) == "read,write,ls,mcp__komki__*"
     end
 
     test "pane_command: Escript-Pfad + session-chain, sh-gequotet" do

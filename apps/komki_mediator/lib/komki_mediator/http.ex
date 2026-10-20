@@ -8,6 +8,15 @@ defmodule KomkiMediator.HTTP do
     (Schluessel sind bewusst fixiert) und muss die Tools nicht
     hartkodieren.
   * `/mcp` — der StreamableHTTP-Transport des anubis MCP-Servers.
+
+  Aufrufer-Pruefung vor jeder Route (Ticket #133): Die Loopback-Bindung
+  haelt fremde Rechner fern, aber nicht den Browser der Nutzerin oder des
+  Nutzers. Eine Website kann per DNS-Rebinding (fremder `Host`) oder per
+  Cross-Origin-POST mit `text/plain` (kein CORS-Preflight) an den Port
+  gelangen. Deshalb gilt: `Host` ist `127.0.0.1` oder `localhost`, ein
+  `Origin`-Header wird abgelehnt (pi sendet keinen, Browser immer bei
+  POST), und POST verlangt `application/json`. Abweisung mit 403 bzw.
+  415, bevor ein Tool oder die Policy-Engine erreicht wird.
   """
 
   use Plug.Router
@@ -15,6 +24,9 @@ defmodule KomkiMediator.HTTP do
   alias KomkiMediator.{Env, Fassung}
   alias KomkiPolicy.JSON
 
+  @loopback_hosts ["127.0.0.1", "localhost"]
+
+  plug(:guard_caller)
   plug(:match)
   plug(:dispatch)
 
@@ -43,4 +55,23 @@ defmodule KomkiMediator.HTTP do
   match _ do
     send_resp(conn, 404, "not found")
   end
+
+  @doc false
+  def guard_caller(conn, _opts) do
+    cond do
+      conn.host not in @loopback_hosts -> reject(conn, 403, "host not allowed")
+      get_req_header(conn, "origin") != [] -> reject(conn, 403, "origin not allowed")
+      conn.method == "POST" and not json?(conn) -> reject(conn, 415, "application/json required")
+      true -> conn
+    end
+  end
+
+  defp json?(conn) do
+    case get_req_header(conn, "content-type") do
+      [type | _] -> type |> String.downcase() |> String.starts_with?("application/json")
+      [] -> false
+    end
+  end
+
+  defp reject(conn, status, reason), do: conn |> send_resp(status, reason) |> halt()
 end
