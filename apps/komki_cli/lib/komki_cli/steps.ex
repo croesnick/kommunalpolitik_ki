@@ -730,8 +730,8 @@ defmodule KomkiCli.Steps do
     # Fail-Fast vor der Sandbox-Kette: pi startet sonst mit `-e builtin:mcp`
     # gegen eine tote mcp.json (Vertragsluecke nach Mediator-Crash).
     with {:ok, _pid} <- require_llama_up(cfg),
-         {:ok, _pid} <- require_mediator_up(cfg) do
-      scratch = scratch_for(opts, cfg.base_dir)
+         {:ok, _pid} <- require_mediator_up(cfg),
+         {:ok, scratch} <- scratch_for(opts, cfg.base_dir) do
       File.mkdir_p!(scratch)
       prompt = Map.fetch!(opts, "prompt")
 
@@ -747,7 +747,19 @@ defmodule KomkiCli.Steps do
     end
   end
 
-  defp scratch_for(opts, base) do
+  @doc """
+  Scratch-Verzeichnis eines Laufs (Ticket #132): der Default
+  `<base>/runs/<UTC-Stamp>` oder ein `--scratch`-Pfad, der kanonisch
+  (Symlinks aufgeloest) echt unterhalb von `<base>/runs/` liegt. Der
+  Scratch ist pis Schreib-Scope im Seatbelt-Profil; ein freier Pfad wie
+  `--scratch ~/Vault` wuerde die Grenze auf beliebige Verzeichnisse
+  ausdehnen. Public als Testnaht.
+  """
+  @spec scratch_for(%{String.t() => term()}, String.t()) ::
+          {:ok, String.t()} | {:error, String.t(), 2}
+  def scratch_for(opts, base) do
+    runs = Config.canonical(Path.join(base, "runs"))
+
     case Map.get(opts, "scratch") do
       nil ->
         stamp =
@@ -756,10 +768,17 @@ defmodule KomkiCli.Steps do
           |> DateTime.to_iso8601()
           |> String.replace([" ", ":"], "-")
 
-        Path.join([base, "runs", stamp])
+        {:ok, Path.join(runs, stamp)}
 
       scratch ->
-        Config.canonical(scratch)
+        scratch = Config.canonical(scratch)
+
+        if String.starts_with?(scratch, runs <> "/") do
+          {:ok, scratch}
+        else
+          {:error, "--scratch muss unterhalb von " <> runs <> " liegen (ist: " <> scratch <> ")",
+           2}
+        end
     end
   end
 
@@ -768,6 +787,30 @@ defmodule KomkiCli.Steps do
   # ===========================================================================
 
   @tmux_session "komki"
+
+  # Eigener tmux-Server (Ticket #132): pis Ausgabe erreicht ueber tmux das
+  # Terminal ausserhalb der Seatbelt-Grenze. `-f /dev/null` haelt die
+  # persoenliche tmux-Config fern (dort steht oft `set-clipboard on`, das
+  # OSC 52 aus dem Pane in die System-Zwischenablage durchreicht); die
+  # Optionen unten setzen die Sperren explizit. `external` laesst den
+  # Copy-Modus weiter in die Zwischenablage schreiben, ignoriert aber
+  # OSC 52 von pi; `allow-passthrough off` sperrt rohe Sequenzen am tmux
+  # vorbei. Restrisiko: OSC 8 (Hyperlinks) reicht tmux durch, wenn das
+  # aeussere Terminal das Feature meldet.
+  @tmux_server ["-L", "komki", "-f", "/dev/null"]
+  @tmux_lockdown [
+    "set-option",
+    "-s",
+    "set-clipboard",
+    "external",
+    ";",
+    "set-option",
+    "-g",
+    "allow-passthrough",
+    "off",
+    ";"
+  ]
+  @tmux_attach_hint "'tmux -L komki attach -t komki'"
 
   @doc """
   Interner Pane-Einstieg (tmux-Pane der Session): startet die pi-Kette als
@@ -945,7 +988,9 @@ defmodule KomkiCli.Steps do
   defp tmux_session_running?(tmux) do
     # stderr gefangen: "no server running"-Meldungen sollen das Terminal
     # des Aufrufers nicht zumuellen (Live-Fund aus dem Session-Smoke).
-    case System.cmd(tmux, ["has-session", "-t", "=" <> @tmux_session], stderr_to_stdout: true) do
+    case System.cmd(tmux, @tmux_server ++ ["has-session", "-t", "=" <> @tmux_session],
+           stderr_to_stdout: true
+         ) do
       {_out, 0} -> true
       _ -> false
     end
@@ -955,7 +1000,15 @@ defmodule KomkiCli.Steps do
   # gäbe BEAM-Pipes ("open terminal failed: not a terminal" — Live-Fund aus
   # dem Session-Smoke). Ein Port ohne :use_stdio reicht das eigene stdio durch.
   defp run_tmux_inheriting_terminal(tmux, args) do
-    port = Port.open({:spawn_executable, tmux}, [:nouse_stdio, :exit_status, {:args, args}])
+    # TMUX ausgeblendet: aus einer laufenden tmux-Session heraus startet der
+    # eigene komki-Server als verschachtelter Client statt abzulehnen.
+    port =
+      Port.open({:spawn_executable, tmux}, [
+        :nouse_stdio,
+        :exit_status,
+        {:args, @tmux_server ++ args},
+        {:env, [{~c"TMUX", false}]}
+      ])
 
     receive do
       {^port, {:exit_status, 0}} -> :ok
@@ -968,14 +1021,13 @@ defmodule KomkiCli.Steps do
       {:error,
        "tmux-session '" <>
          @tmux_session <>
-         "' laeuft bereits; ohne --detach via 'tmux attach -t " <>
-         @tmux_session <> "' andocken", 2}
+         "' laeuft bereits; ohne --detach via " <> @tmux_attach_hint <> " andocken", 2}
     else
       case run_tmux_inheriting_terminal(tmux, ["attach", "-t", "=" <> @tmux_session]) do
         :ok ->
           {:session,
-           "session beendet oder abgekoppelt; 'tmux attach -t " <>
-             @tmux_session <>
+           "session beendet oder abgekoppelt; " <>
+             @tmux_attach_hint <>
              "' zum Weiterarbeiten"}
 
         {:error, code} ->
@@ -1015,7 +1067,8 @@ defmodule KomkiCli.Steps do
   defp create_detached(tmux, cfg, pane) do
     case System.cmd(
            tmux,
-           ["new-session", "-d", "-s", @tmux_session, "-c", cfg.pi_home, pane],
+           @tmux_server ++
+             @tmux_lockdown ++ ["new-session", "-d", "-s", @tmux_session, "-c", cfg.pi_home, pane],
            stderr_to_stdout: true
          ) do
       {_out, 0} ->
@@ -1033,7 +1086,7 @@ defmodule KomkiCli.Steps do
   # Attach-Create: tmux uebernimmt das Terminal des Aufrufers und
   # kehrt erst bei Abkopplung/Session-Ende zurueck.
   defp create_with_attach(tmux, cfg, pane) do
-    args = ["new-session", "-s", @tmux_session, "-c", cfg.pi_home, pane]
+    args = @tmux_lockdown ++ ["new-session", "-s", @tmux_session, "-c", cfg.pi_home, pane]
 
     case run_tmux_inheriting_terminal(tmux, args) do
       :ok ->
@@ -1065,24 +1118,13 @@ defmodule KomkiCli.Steps do
 
   defp session_started_message(true = _detach) do
     "tmux-session '" <>
-      @tmux_session <>
-      "' gestartet (detached); 'tmux attach -t " <>
-      @tmux_session <> "' zum Arbeiten"
+      @tmux_session <> "' gestartet (detached); " <> @tmux_attach_hint <> " zum Arbeiten"
   end
 
   defp session_started_message(false) do
-    if System.get_env("TMUX") do
-      "tmux-session '" <>
-        @tmux_session <>
-        "' gestartet; tmux hat den Client umgeschaltet — pi mit /exit beenden, " <>
-        "Ruecksprung mit 'tmux switch-client -p'"
-    else
-      "tmux-session '" <>
-        @tmux_session <>
-        "' beendet oder abgekoppelt; 'tmux attach -t " <>
-        @tmux_session <>
-        "' zum Weiterarbeiten"
-    end
+    "tmux-session '" <>
+      @tmux_session <>
+      "' beendet oder abgekoppelt; " <> @tmux_attach_hint <> " zum Weiterarbeiten"
   end
 
   # ===========================================================================

@@ -105,19 +105,25 @@ Zwei Hinweise für die verteilte Datei:
 ./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil
 ./komki session                     # interaktive pi-Session in tmux
 ./komki session --continue          # letzte Session fortsetzen
-./komki session --detach            # im Hintergrund; attach via 'tmux attach -t komki'
+./komki session --detach            # im Hintergrund; attach via 'tmux -L komki attach -t komki'
 ./komki down                        # llama-server stoppen
 ./komki status                      # Zustand (base, gguf, port, llama)
 ./komki label …                     # SQLite-Registry: Bindungen, Labels, Γ-Export (siehe unten)
 ```
 
 Weitere Flags: `init --port N --ctx N --force`, `up --ctx N`,
-`run --mode text|json --scratch PFAD`. Exit-Codes: `0` Erfolg, `2` Nutzungs-,
+`run --mode text|json --scratch PFAD` (PFAD nur unterhalb von `runs/` der Instanz). Exit-Codes: `0` Erfolg, `2` Nutzungs-,
 Konfigurations- oder Bereitschaftsfehler (etwa: llama-server nicht aktiv),
 `3` Doctor-/Boot-Gate-Fehlschlag, `4` Laufzeitfehler.
 
-Interaktive Sessions laufen in der tmux-Session `komki`, jeweils eine
-gleichzeitig. Dateien aus der Session landen im Verzeichnis `arbeit`
+Interaktive Sessions laufen in der tmux-Session `komki` auf einem eigenen
+tmux-Server (`tmux -L komki`, ohne persönliche tmux-Config), jeweils eine
+gleichzeitig. Der eigene Server sperrt den Terminal-Ausgang: pi kann weder per
+OSC 52 die Zwischenablage setzen noch Sequenzen am tmux vorbeischleusen; der
+Copy-Modus schreibt weiterhin in die Zwischenablage. Aus einer laufenden
+tmux-Session heraus startet er verschachtelt (Prefix dann zweimal, etwa
+`Ctrl+B Ctrl+B d` zum Abkoppeln). `komki run` filtert Steuersequenzen aus pis
+Ausgabe, bevor sie im Terminal erscheint. Dateien aus der Session landen im Verzeichnis `arbeit`
 innerhalb der Instanz, die Session-Verläufe unter `pi-home/sessions` und
 lassen sich mit `session --continue` fortsetzen. pi startet mit einem
 knappen deutschen System-Prompt (Deutsch als Default, durchgehende

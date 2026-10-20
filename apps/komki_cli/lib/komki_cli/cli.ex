@@ -202,7 +202,7 @@ defmodule KomkiCli.CLI do
             scratch: [
               value_name: "PATH",
               long: "scratch",
-              help: "Scratch-Verzeichnis (default base/runs/<UTC-Stamp>)"
+              help: "Scratch-Verzeichnis unterhalb base/runs/ (default base/runs/<UTC-Stamp>)"
             ]
           ]
         ],
@@ -213,7 +213,7 @@ defmodule KomkiCli.CLI do
             continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"],
             detach: [
               long: "detach",
-              help: "Session ohne attach starten; spaeter 'tmux attach -t komki'"
+              help: "Session ohne attach starten; spaeter 'tmux -L komki attach -t komki'"
             ]
           ]
         ],
@@ -621,11 +621,20 @@ defmodule KomkiCli.CLI do
          "\n"
        ) <> "\n", 0}
 
+  # pi-Ausgabe ist Modell-Output: nie roh aufs Terminal (Ticket #132).
   defp render({:run_ok, scratch, out}),
-    do: {"scratch: " <> scratch <> "\n" <> String.trim_trailing(out) <> "\n", 0}
+    do:
+      {"scratch: " <>
+         scratch <> "\n" <> String.trim_trailing(KomkiCli.Terminal.sanitize(out)) <> "\n", 0}
 
   defp render({:run_error, scratch, out, pi_code}),
-    do: {"scratch: " <> scratch <> "\npi exit " <> to_string(pi_code) <> ":\n" <> out <> "\n", 4}
+    do:
+      {"scratch: " <>
+         scratch <>
+         "\npi exit " <>
+         to_string(pi_code) <>
+         ":\n" <>
+         KomkiCli.Terminal.sanitize(out) <> "\n", 4}
 
   defp render({:session, message}),
     do: {green() <> String.trim_trailing(message) <> reset() <> "\n", 0}

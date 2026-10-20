@@ -427,6 +427,11 @@ defmodule KomkiCli.Profile do
   # ist. Die Headless-Sonden brauchten diese Regeln nie; die interaktive
   # Session (pi-TUI auf der tmux-Pty) schon. Scopes: Prozesssteuerung nur
   # innerhalb desselben Sandkastens, Terminal-Zugriff nur auf echte tty-Geraete.
+  # Restrisiko (Ticket #132): distributed-notification-post ist ein Kanal zu
+  # jedem Prozess des Nutzers (braucht einen Empfaenger ausserhalb der
+  # Grenze). Streichen erst nach Messung, ob die pi-TUI ohne die Regel
+  # bootet. Bewusst als Elixir-Kommentar: ein Profiltext-Kommentar braeche
+  # die Byte-Identitaet bestehender Instanzen.
   defp tui_rules do
     [
       "; TUI/Terminal-Klasse (sandbox-runtime-Muster; srt #419)",

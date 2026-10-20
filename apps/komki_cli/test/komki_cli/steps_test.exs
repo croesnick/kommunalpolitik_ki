@@ -82,6 +82,42 @@ defmodule KomkiCli.StepsTest do
   # stale ist — pi startet sonst mit `-e builtin:mcp` gegen eine tote
   # mcp.json. Muster wie das require_llama_up-Integrationsverhalten
   # (doctor_boot_test): klare Meldung, Exit 2, Handlungs-Hinweis.
+  describe "scratch_for/2 (Ticket #132: Scratch nur unter base/runs)" do
+    setup do
+      base = TestSupport.tmp_area!("komki-scratch")
+      {:ok, base: base, runs: Config.canonical(Path.join(base, "runs"))}
+    end
+
+    test "Default liegt unter base/runs", %{base: base, runs: runs} do
+      assert {:ok, scratch} = Steps.scratch_for(%{}, base)
+      assert String.starts_with?(scratch, runs <> "/")
+    end
+
+    test "expliziter Pfad unter base/runs wird angenommen", %{base: base, runs: runs} do
+      assert {:ok, scratch} = Steps.scratch_for(%{"scratch" => Path.join(runs, "x")}, base)
+      assert scratch == Path.join(runs, "x")
+    end
+
+    test "Pfad ausserhalb wird abgelehnt", %{base: base} do
+      outside = TestSupport.tmp_area!("komki-scratch-outside")
+      assert {:error, msg, 2} = Steps.scratch_for(%{"scratch" => outside}, base)
+      assert msg =~ "unterhalb"
+    end
+
+    test "runs selbst und ..-Ausbruch werden abgelehnt", %{base: base, runs: runs} do
+      assert {:error, _, 2} = Steps.scratch_for(%{"scratch" => runs}, base)
+      assert {:error, _, 2} = Steps.scratch_for(%{"scratch" => Path.join(runs, "../x")}, base)
+    end
+
+    test "Symlink unter runs mit Ziel ausserhalb wird abgelehnt", %{base: base, runs: runs} do
+      outside = TestSupport.tmp_area!("komki-scratch-target")
+      File.mkdir_p!(runs)
+      link = Path.join(runs, "link")
+      File.ln_s!(outside, link)
+      assert {:error, _, 2} = Steps.scratch_for(%{"scratch" => link}, base)
+    end
+  end
+
   describe "require_mediator_up/1 (Liveness-Gate vor pi)" do
     test "kein pidfile, stiller Port: Abbruch mit 'komki up'-Hinweis (Exit 2)" do
       cfg = med_gate_cfg("komki-steps-med")
