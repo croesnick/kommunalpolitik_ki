@@ -346,7 +346,10 @@ defmodule KomkiCli.Steps do
       gguf_checks(cfg, scope),
       boot_gate(cfg),
       llama_boot_gate(cfg),
-      [port_check(cfg), llama_auth_check(cfg)]
+      [port_check(cfg), llama_auth_check(cfg)],
+      # Erst nach `up` sinnvoll: das Flag setzt der Vermittler beim Start,
+      # `up` selbst laeuft mit dem Kurz-Doctor (Ticket #139).
+      if(scope == :full, do: [journal_check(cfg)], else: [])
     ])
   end
 
@@ -564,6 +567,40 @@ defmodule KomkiCli.Steps do
 
       _ ->
         %{name: name, ok: true, reason: "llama nicht aktiv"}
+    end
+  end
+
+  @doc """
+  Doctor-Check (Ticket #139): das PDR-Journal traegt das Append-only-Flag
+  `uappnd`, das der Vermittler beim Start setzt. Fehlt es, hat jemand es
+  entfernt — die Hash-Kette macht Aenderungen dann noch sichtbar, das
+  Betriebssystem verhindert sie aber nicht mehr. Public als Testnaht.
+  """
+  @spec journal_check(Config.t()) :: check()
+  def journal_check(cfg) do
+    name = "journal append-only"
+    path = Path.join([cfg.base_dir, "mediator", "journal", "pdr.jsonl"])
+
+    cond do
+      not File.exists?(path) ->
+        %{name: name, ok: true, reason: "noch kein Journal"}
+
+      append_only?(path) ->
+        %{name: name, ok: true, reason: "uappnd gesetzt"}
+
+      true ->
+        %{
+          name: name,
+          ok: false,
+          reason: "uappnd fehlt auf " <> path <> " — 'komki down' und 'komki up' setzen es neu"
+        }
+    end
+  end
+
+  defp append_only?(path) do
+    case System.cmd("/usr/bin/stat", ["-f", "%Sf", path], stderr_to_stdout: true) do
+      {flags, 0} -> "uappnd" in String.split(String.trim(flags), ",")
+      _ -> false
     end
   end
 

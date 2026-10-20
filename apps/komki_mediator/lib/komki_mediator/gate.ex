@@ -50,7 +50,7 @@ defmodule KomkiMediator.Gate do
   @typedoc "Der Vollzug (Connector-Operation) - laeuft nur nach einem Permit."
   @type executor() :: (-> {:ok, map()} | {:error, term()})
 
-  @response_schema "komki-pdr/1"
+  @response_schema "komki-pdr/2"
 
   # -------------------------------------------------------------------------
   # Gate 1: Aufruf, Intent/Snapshot, Entscheidung

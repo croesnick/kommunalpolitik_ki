@@ -163,6 +163,31 @@ ist byte-identisch die kanonische Form aus `KomkiPolicy.JSON.canonical`
 (mehrzeilig eingerückt), die Datensätze stehen direkt hintereinander. Wer es
 auswertet, liest Dokument für Dokument, etwa mit `jq -c . pdr.jsonl`.
 
+**Manipulationsnachweis (Ticket #139).** Der Writer verkettet die Datensätze:
+`seq` ist die Position, `prev_hash` der SHA-256 der Bytes des Vorgängers (der
+erste hängt an einem Null-Hash). Beim Start setzt der Vermittler außerdem
+`chflags uappnd` auf die Datei: Anhängen geht, Überschreiben, Kürzen und
+Löschen nicht. `komki doctor` meldet ein fehlendes Flag.
+
+```sh
+komki-mediator verify-journal [--base <dir>]   # Kette prüfen, Kopf-Hash ausgeben
+```
+
+Was das leistet und was nicht:
+
+- Erkannt: geänderte, entfernte, vertauschte oder eingeschobene Datensätze
+  vor dem letzten Eintrag, nicht kanonische Bytes, ein abgebrochener letzter
+  Datensatz.
+- Nicht erkannt: Kürzung am Ende, ein geänderter **letzter** Datensatz und
+  eine vollständig neu berechnete Kette. Das fällt nur über einen Vergleich
+  des Kopf-Hashs mit einem unabhängig festgehaltenen Kontrollpunkt auf (offen
+  in #139).
+- `uappnd` kann der Eigentümer mit `chflags nouappnd` wieder entfernen. Wer die
+  Instanz löschen will, muss das vorher tun.
+
+Ältere Datensätze ohne Kettenfelder (vor #139) sind als Präfix zulässig und
+werden als `legacy` gezählt.
+
 Ein fehlender Raum wird beim Start provisioniert; ein vorhandener wird
 NIEMALS ueberschrieben (Idempotenz).
 

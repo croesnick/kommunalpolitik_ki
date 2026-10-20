@@ -91,6 +91,28 @@ defmodule KomkiCli.StepsTest do
     end
   end
 
+  describe "journal_check/1 (Ticket #139)" do
+    setup do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-journal"))
+      path = Path.join([cfg.base_dir, "mediator", "journal", "pdr.jsonl"])
+      {:ok, cfg: cfg, path: path}
+    end
+
+    test "ohne Journal ok", %{cfg: cfg} do
+      assert %{ok: true, reason: "noch kein Journal"} = Steps.journal_check(cfg)
+    end
+
+    test "Journal ohne uappnd ist FAIL, mit uappnd ok", %{cfg: cfg, path: path} do
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, "")
+      assert %{ok: false} = Steps.journal_check(cfg)
+
+      {_, 0} = System.cmd("/usr/bin/chflags", ["uappnd", path])
+      on_exit(fn -> System.cmd("/usr/bin/chflags", ["nouappnd", path]) end)
+      assert %{ok: true, reason: "uappnd gesetzt"} = Steps.journal_check(cfg)
+    end
+  end
+
   describe "scratch_for/2 (Ticket #132: Scratch nur unter base/runs)" do
     setup do
       base = TestSupport.tmp_area!("komki-scratch")

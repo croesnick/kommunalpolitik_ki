@@ -4,6 +4,7 @@ defmodule KomkiMediator.CLI do
   bereit, laedt Gamma und Raum und startet Vermittlung + loopback-Listener.
 
       komki-mediator --base <dir> --port <n>
+      komki-mediator verify-journal [--base <dir>]
       komki-mediator --help
       komki-mediator --version
 
@@ -39,8 +40,43 @@ defmodule KomkiMediator.CLI do
 
       {:run, opts} ->
         run(opts)
+
+      {:verify_journal, opts} ->
+        verify_journal(opts)
     end
   end
+
+  # -------------------------------------------------------------------------
+  # verify-journal (Ticket #139)
+  # -------------------------------------------------------------------------
+
+  defp verify_journal(%{base: base}) do
+    path = journal_path(base)
+
+    case File.read(path) do
+      {:ok, content} ->
+        case KomkiMediator.Journal.verify(content) do
+          {:ok, head} ->
+            IO.puts(
+              JSON.encode!(Map.merge(%{"result" => "valid", "journal" => path}, stringify(head)))
+            )
+
+          {:error, detail} ->
+            IO.puts(
+              JSON.encode!(
+                Map.merge(%{"result" => "invalid", "journal" => path}, stringify(detail))
+              )
+            )
+
+            halt(1)
+        end
+
+      {:error, reason} ->
+        error_exit(%{"error" => "journal", "detail" => jsonable(reason)})
+    end
+  end
+
+  defp stringify(map), do: Map.new(map, fn {k, v} -> {Atom.to_string(k), v} end)
 
   # -------------------------------------------------------------------------
   # Start
@@ -53,7 +89,9 @@ defmodule KomkiMediator.CLI do
            tagged(Gamma.load(Path.join(mediator_dir(base), "registry.json")), "registry.json"),
          {:ok, room} <- tagged(Room.load(mediator_dir(base)), "room.json") do
       {:ok, _} =
-        KomkiMediator.Supervisor.start_link({journal_path(base), gamma, room, port})
+        KomkiMediator.Supervisor.start_link(
+          {{journal_path(base), append_only: true}, gamma, room, port}
+        )
 
       IO.puts(startup_note(base, port, gamma))
       Process.sleep(:infinity)
@@ -88,6 +126,13 @@ defmodule KomkiMediator.CLI do
   # -------------------------------------------------------------------------
   # Argumente (handgerollt, wie komki_policy)
   # -------------------------------------------------------------------------
+
+  defp parse(["verify-journal" | rest]) do
+    case parse_flags(rest, %{base: default_base(), port: @default_port}) do
+      {:run, opts} -> {:verify_journal, opts}
+      other -> other
+    end
+  end
 
   defp parse(argv) do
     parse_flags(argv, %{base: default_base(), port: @default_port})
@@ -159,12 +204,13 @@ defmodule KomkiMediator.CLI do
   # Der Start blockiert ewig (Process.sleep(:infinity)) oder haelt ueber
   # error_exit — beide Pfade sind bewusst ohne lokalen Rueckkehr, fuer
   # dialyzer vermerkt.
-  @dialyzer {:nowarn_function, run: 1, error_exit: 1, halt: 1}
+  @dialyzer {:nowarn_function, run: 1, error_exit: 1, halt: 1, verify_journal: 1}
   defp halt(code), do: System.halt(code)
 
   defp usage do
     """
     komki-mediator --base <dir> --port <n>
+    komki-mediator verify-journal [--base <dir>]
     komki-mediator --help
     komki-mediator --version
     """

@@ -66,10 +66,7 @@ defmodule KomkiMediator.TestHelpers do
     end)
   end
 
-  def journal_chunks_raw(path) do
-    [first | rest] = String.split(File.read!(path), "\n{\n")
-    [first | Enum.map(rest, fn tail -> "{\n" <> tail end)]
-  end
+  def journal_chunks_raw(path), do: KomkiMediator.Journal.split_records(File.read!(path))
 
   @doc "Stoppt benannte Prozesse (Env, Journal) und startet sie frisch am Basisraum."
   def restart_env(base) do
