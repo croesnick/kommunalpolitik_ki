@@ -130,6 +130,7 @@ defmodule KomkiCli.Profile do
         llama_dev_rules() ++
         llama_model_rules(cfg.gguf_path) ++
         llama_log_rules(log_path) ++
+        llama_key_rules(Llama.key_path(cfg)) ++
         llama_network_rules(cfg.port) ++
         llama_sysctl_rules() ++
         llama_etc_passwd_rules() ++
@@ -205,6 +206,13 @@ defmodule KomkiCli.Profile do
       "; Log (Redirect-Ziel des Spawn-Shells; Write-Scope ausschliesslich diese Datei)",
       "(allow file-read* (literal \"" <> log_path <> "\"))",
       "(allow file-write* (literal \"" <> log_path <> "\"))"
+    ]
+  end
+
+  defp llama_key_rules(key_path) do
+    [
+      "; API-Key-Datei (Ticket #136, --api-key-file; nur lesend)",
+      "(allow file-read* (literal \"" <> key_path <> "\"))"
     ]
   end
 

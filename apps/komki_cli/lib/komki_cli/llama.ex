@@ -22,6 +22,14 @@ defmodule KomkiCli.Llama do
   macOS 27.2 Build 26B5101f), konsolidiert in
   `docs/research/2026-10-14-llama-server-confinement.md`.
 
+  API-Key (Ticket #136): llama-server spiegelt jeden `Origin` in die
+  CORS-Antwort. Ohne Schluessel koennte jede Website im Browser das Modell
+  aufrufen und die Antwort lesen. Jeder Start erzeugt deshalb einen
+  Zufallsschluessel in `<base>/tmp/llama.key` (0600), llama liest ihn per
+  `--api-key-file` (ein `--api-key`-Argument waere in `ps` fuer alle
+  lokalen Nutzer sichtbar), pi bekommt ihn ueber seine `models.json`.
+  `/health` bleibt bei llama-server ohne Schluessel erreichbar.
+
   Pidfile, Kill-Eskalation, Spawn-Zeile, Health-Poll und Log-Tail sind
   mit `KomkiCli.Mediator` geteilt und liegen in `KomkiCli.Proc`.
   """
@@ -118,6 +126,53 @@ defmodule KomkiCli.Llama do
     end
   end
 
+  # ---------------------------------------------------------------- API-Key
+
+  @doc "Pfad der Schluesseldatei (ausserhalb von pi-home, pi liest sie nicht)."
+  @spec key_path(Config.t()) :: String.t()
+  def key_path(cfg), do: Path.join([cfg.base_dir, "tmp", "llama.key"])
+
+  @doc "Neuen Zufallsschluessel schreiben (0600, vor dem Inhalt gesetzt)."
+  @spec write_key!(Config.t()) :: String.t()
+  def write_key!(cfg) do
+    key = 32 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
+    path = key_path(cfg)
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, "")
+    File.chmod!(path, 0o600)
+    File.write!(path, key <> "\n")
+    key
+  end
+
+  @doc "Schluessel des laufenden llama-server, falls komki ihn gestartet hat."
+  @spec read_key(Config.t()) :: {:ok, String.t()} | :none
+  def read_key(cfg) do
+    case File.read(key_path(cfg)) do
+      {:ok, content} ->
+        case String.trim(content) do
+          "" -> :none
+          key -> {:ok, key}
+        end
+
+      {:error, _} ->
+        :none
+    end
+  end
+
+  @doc """
+  Verlangt der laufende llama-server einen Schluessel? Fragt `/props` ohne
+  Schluessel ab: 401 heisst ja, 200 heisst nein.
+  """
+  @spec auth_required(pos_integer()) :: {:ok, boolean()} | {:error, String.t()}
+  def auth_required(port) do
+    case http_get(port, "/props") do
+      {:ok, "401"} -> {:ok, true}
+      {:ok, "200"} -> {:ok, false}
+      {:ok, code} -> {:error, "/props returned " <> code}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   # ---------------------------------------------------------------- Pfade
 
   @doc "Log-Pfad des llama-server (tmp unter dem Instanz-Basisverzeichnis)."
@@ -161,8 +216,12 @@ defmodule KomkiCli.Llama do
       "--top-k",
       "64",
       "-c",
-      to_string(cfg.ctx)
+      to_string(cfg.ctx),
+      "--api-key-file",
+      key_path(cfg)
     ]
+
+    write_key!(cfg)
 
     log_path = log_path(cfg)
     File.mkdir_p!(Path.dirname(log_path))
@@ -249,12 +308,14 @@ defmodule KomkiCli.Llama do
 
   @doc "GET /health via plain TCP; {:ok, status_code_string} oder {:error, reason}."
   @spec http_get_200(pos_integer()) :: {:ok, String.t()} | {:error, String.t()}
-  def http_get_200(port) when is_integer(port) do
+  def http_get_200(port) when is_integer(port), do: http_get(port, "/health")
+
+  defp http_get(port, path) do
     case :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false], 3000) do
       {:ok, socket} ->
         :gen_tcp.send(
           socket,
-          "GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+          "GET " <> path <> " HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
         )
 
         case recv_all(socket, <<>>, now_deadline(3000)) do

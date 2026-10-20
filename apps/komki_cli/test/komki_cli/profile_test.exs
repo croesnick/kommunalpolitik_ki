@@ -196,6 +196,12 @@ defmodule KomkiCli.ProfileTest do
       refute String.contains?(text, "(allow mach-lookup)\n")
     end
 
+    test "API-Key-Datei nur lesend freigegeben (Ticket #136)", %{cfg: cfg, text: text} do
+      key = KomkiCli.Llama.key_path(cfg)
+      assert String.contains?(text, ~s|(allow file-read* (literal "#{key}"))|)
+      refute String.contains?(text, ~s|(allow file-write* (literal "#{key}"))|)
+    end
+
     test "kein network-outbound — Offline wird profilseitig erzwungen", %{text: text} do
       refute String.contains?(text, "network-outbound")
     end

@@ -133,6 +133,12 @@ stehen `find`/`grep` für die Dateisuche bereit. Aus der Session kopieren:
 dann `[` öffnet den tmux-Copy-Modus (Pfeiltasten bewegen, `Space` startet
 die Auswahl, `Enter` übernimmt).
 
+llama-server verlangt einen API-Key: `komki up` erzeugt bei jedem llama-Start
+einen neuen Zufallsschlüssel in `tmp/llama.key` (nur für dich lesbar) und trägt
+ihn in pis `models.json` ein. Ohne den Schlüssel antwortet llama mit 401, damit
+keine Website im Browser das lokale Modell nutzen kann. `komki doctor` meldet
+einen llama, der ohne Schlüssel läuft.
+
 Unter `~/.local/share/komki` liegen die Instanzdaten, überschreibbar via
 `KOMKI_HOME`.
 

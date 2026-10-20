@@ -202,19 +202,7 @@ defmodule KomkiCli.Steps do
     agent = Path.join([cfg.pi_home, ".pi", "agent"])
     File.mkdir_p!(agent)
 
-    models =
-      JSON.encode!(%{
-        "providers" => %{
-          "pi-local" => %{
-            "baseUrl" => "http://127.0.0.1:" <> to_string(cfg.port) <> "/v1",
-            "api" => "openai-completions",
-            "apiKey" => "dummy-synthetic-token",
-            "models" => [%{"id" => "local-model"}]
-          }
-        }
-      })
-
-    File.write!(Path.join(agent, "models.json"), models <> "\n")
+    write_models(cfg)
     File.write!(Path.join(agent, "auth.json"), "{}\n")
 
     # Thinking per Default eingeklappt (pi-Settings-Global "hideThinkingBlock";
@@ -251,6 +239,36 @@ defmodule KomkiCli.Steps do
     end
 
     :ok
+  end
+
+  @doc """
+  pis Provider-Konfiguration (`models.json`) mit dem llama-API-Key
+  (Ticket #136). Ohne gestarteten llama steht ein Platzhalter darin;
+  `up` schreibt die Datei nach jedem llama-Start neu.
+  """
+  @spec write_models(Config.t()) :: :ok
+  def write_models(cfg) do
+    api_key =
+      case Llama.read_key(cfg) do
+        {:ok, key} -> key
+        :none -> "kein-llama-key"
+      end
+
+    models =
+      JSON.encode!(%{
+        "providers" => %{
+          "pi-local" => %{
+            "baseUrl" => "http://127.0.0.1:" <> to_string(cfg.port) <> "/v1",
+            "api" => "openai-completions",
+            "apiKey" => api_key,
+            "models" => [%{"id" => "local-model"}]
+          }
+        }
+      })
+
+    path = Path.join([cfg.pi_home, ".pi", "agent", "models.json"])
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, models <> "\n")
   end
 
   defp asdf_node_version(node_bin) when is_binary(node_bin) do
@@ -328,7 +346,7 @@ defmodule KomkiCli.Steps do
       gguf_checks(cfg, scope),
       boot_gate(cfg),
       llama_boot_gate(cfg),
-      [port_check(cfg)]
+      [port_check(cfg), llama_auth_check(cfg)]
     ])
   end
 
@@ -522,6 +540,33 @@ defmodule KomkiCli.Steps do
     end
   end
 
+  # Ticket #136: ein laufender llama ohne API-Key ist fuer jede Website im
+  # Browser lesbar (CORS spiegelt den Origin). Typisch: vor #136 gestartet.
+  defp llama_auth_check(cfg) do
+    name = "llama auth"
+
+    case Llama.http_get_200(cfg.port) do
+      {:ok, "200"} ->
+        case Llama.auth_required(cfg.port) do
+          {:ok, true} ->
+            %{name: name, ok: true, reason: "API-Key verlangt (/props ohne Key: 401)"}
+
+          {:ok, false} ->
+            %{
+              name: name,
+              ok: false,
+              reason: "llama laeuft ohne API-Key — 'komki down' und 'komki up' neu starten"
+            }
+
+          {:error, reason} ->
+            %{name: name, ok: false, reason: reason}
+        end
+
+      _ ->
+        %{name: name, ok: true, reason: "llama nicht aktiv"}
+    end
+  end
+
   defp port_check(cfg) do
     case Llama.http_get_200(cfg.port) do
       {:ok, "200"} ->
@@ -609,6 +654,7 @@ defmodule KomkiCli.Steps do
         cfg = override_ctx(load_cfg!(), opts)
 
         with {:ok, pid} <- Llama.up(cfg),
+             :ok <- write_models(cfg),
              {:ok, mediator} <- mediator_up(cfg) do
           %{"tools" => tools} = health_of(mediator)
           Mediator.write_mcp_config(cfg, tools)
