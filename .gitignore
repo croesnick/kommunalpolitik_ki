@@ -9,6 +9,7 @@ apps/komki_policy/komki-policy
 apps/komki_mediator/komki-mediator
 apps/komki_egress/komki-egress
 apps/komki_connector_web/komki-connector-web
+apps/komki_connector_vault/komki-connector-vault
 apps/komki_cli/komki
 apps/komki_cli/burrito_out/
 apps/komki_cli/.build-report.md
