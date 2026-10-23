@@ -154,6 +154,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi) + lokale Label-Registry mit Export an den Regel-Prüfkern (RFC 0003) | CLI (`komki init/doctor/up/down/status/run/session/label`) | Funktionsfähig |
 | `apps/komki_policy` | Elixir | Regel-Prüfkern: rechnet aus, ob eine Absicht nach den Regeln zulässig ist, und verifiziert die Begründung unabhängig nach; rein, führt selbst nichts aus | CLI (`komki-policy validate/decide/verify/advance`) | Funktionsfähig |
 | `apps/komki_mediator` | Elixir | Vermittler: MCP-Server für pis Tool-Aufrufe — jede Operation wird vor der Ausführung von komki_policy entschieden (Gate 1), jede Antwort vor der Aufnahme in den Kontext geprüft und gelabelt (Gate 2), jede Entscheidung im PDR-Journal festgehalten | MCP (von `komki up` gestartet, Loopback-Port) | Funktionsfähig |
+| `apps/komki_connector_web` | Elixir | Websuche über Brave Search für den Vermittler: liefert Titel, Link und Kurztext je Treffer; der API-Schlüssel kommt aus dem Schlüsselbund und erscheint nirgends | Escript `komki-connector-web` (von `komki up` gestartet, Aufruf nur über den Vermittler) | Funktionsfähig |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | Bestehend |
 | `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (`opencode.json`) | Funktionsfähig |
 | `tools/nextcloud_ods_mcp` | Python | ODS-Dateien lesen (Sheets, Ranges, Zellen, Suche) | MCP (`opencode.json`) | Funktionsfähig |
@@ -304,6 +305,7 @@ kommunalpolitik_ki/
 │   ├── shared/             # Geteilte Domain-Models
 │   ├── komki_policy/       # Regel-Prüfkern für Zulässigkeits-Entscheidungen (AI: CLI)
 │   ├── komki_mediator/     # Vermittler: MCP-Gates + PDR-Journal für pis Tool-Aufrufe (AI: MCP)
+│   ├── komki_connector_web/ # Connector web: Brave-Websuche hinter dem Vermittler
 │   └── komki_cli/          # KomKI-CLI: gesandboxter Arbeitsraum (Seatbelt + llama + pi) (AI: CLI)
 ├── tools/                  # Nicht-Elixir
 │   ├── allgaeuer_zeitung_mcp/  # AZ-Artikel (AI: MCP)
