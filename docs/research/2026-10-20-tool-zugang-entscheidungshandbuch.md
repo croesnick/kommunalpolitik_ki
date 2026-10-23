@@ -149,8 +149,10 @@ sandbox-runtime (srt) mit `allowedDomains`, omac `network.mode: filtered`, Strip
 - **Schwach bei:** Er bewertet nur den Host, nicht Suchtext, Existenz oder Reihenfolge. Ohne TLS-Termination
   ist der Payload unsichtbar. Er ist anfällig für Parser-Bugs am Rand: Die SOCKS5-Null-Byte-Lücke in Claude
   Code (v2.0.24 bis v2.1.89) und CVE-2025-66479 (`allowedDomains: []` griff nicht) sind genau dieser Typ.
-- **Urteil:** kein Vermittler im Sinne von R.4.4. Als Netzgrenze *um Connector-Prozesse* brauchbar, aber
-  Seatbelt mit Host-Literals leistet dasselbe mit weniger beweglichen Teilen.
+- **Urteil:** kein Vermittler im Sinne von R.4.4. Als Netzgrenze *um Connector-Prozesse* aber **nötig**:
+  Seatbelt filtert ausgehenden Verkehr nicht nach Host oder IP. Erlaubt sind nur `*` und `localhost`
+  (geprüft 2026-10-23, `host must be * or localhost in network address`). Die Host-Allowlist je Connector
+  kann deshalb nur ein Proxy erzwingen (Bauform B5, Abschnitt 6a).
 
 ### V4 Host-Sidecar oder Facade (Credential Hider)
 
@@ -206,10 +208,10 @@ flowchart LR
     subgraph MEDB["Vermittler · eigenes Profil, kein Outbound"]
         MED["Gate 1 · Gate 2 · PDR"]
     end
-    subgraph C1["Connector RIS · Profil: nur risapi1.komuna.net"]
+    subgraph C1["Connector RIS · über Egress: nur risapi1.komuna.net"]
         RIS["komki-ris/1"]
     end
-    subgraph C2["Connector Web · Profil: nur api.search.brave.com"]
+    subgraph C2["Connector Web · über Egress: nur api.search.brave.com"]
         WEB["komki-web/1"]
     end
     subgraph C3["Connector Vault · Profil: nur Vault-Pfad, Schreiben nur Testbereich"]
@@ -274,10 +276,10 @@ Credential hält und die Außenwirkung erzeugt? Die Kette ist in allen Bauformen
 | Bauform | Beschreibung | Netz und Credentials beim Vermittler? | Schadensradius bei Connector-Bug | Aufwand | Urteil |
 |---|---|---|---|---|---|
 | **B1 In-Process** | Connector als Elixir-Modul im Vermittler-BEAM, wie heute `admit_document` | ja, der Vermittler braucht die Hosts *aller* Connectoren und alle Keys | alles: Policy, Journal, alle Credentials | gering | verworfen (Architekturentscheidung 2026-10-23): auch Connectoren ohne Netz bekommen eigenen Prozess und eigene Sandbox. `admit_document` wandert mittelfristig aus dem BEAM |
-| **B2 Eigener Prozess mit eigenem Seatbelt-Profil** | `komki up` startet den Connector über `sandbox-exec`. Der Vermittler spricht ihn über einen Unix-Socket an (Seatbelt lässt sich nicht verschachteln, siehe 6a.1). Das Credential kommt über stdin aus dem Keychain nur an diesen Prozess | nein, der Vermittler bleibt ohne Outbound | ein Host, ein Credential | mittel: Profilgenerator gibt es schon (#100, #137) | **Favorit**. Lebenszyklus wie llama-server über `komki up/down`, keine TCP-Ports, kein Bearer, Peer-Prüfung per `LOCAL_PEERPID` |
+| **B2 Eigener Prozess mit eigenem Seatbelt-Profil** | `komki up` startet den Connector über `sandbox-exec`. Der Vermittler spricht ihn über einen Unix-Socket an (Seatbelt lässt sich nicht verschachteln, siehe 6a.1). Das Credential kommt über stdin aus dem Keychain nur an diesen Prozess | nein, der Vermittler bleibt ohne Outbound | ein Host, ein Credential | mittel: Profilgenerator gibt es schon (#100, #137) | **Favorit**. Lebenszyklus wie llama-server über `komki up/down`, Socket-Rechte `0600` unter `<base>/run` (`0700`), kein Bearer nötig (Host-Annahme) |
 | **B3 Host-MCP-Server auf Loopback** | Bestehender MCP-Server (z. B. `@brave/brave-search-mcp-server`, `tools/obsidian_mcp`) läuft eigenständig, der Vermittler ist dessen MCP-Client | nein | der ganze Server-Prozess. Ohne eigenes Profil: volle Nutzerrechte | gering, wenn der Server fertig ist | nur zusammen mit eigenem Seatbelt-Profil, also B2 mit MCP als Protokoll. Ein zusätzlicher Loopback-Port ist für jeden lokalen Prozess erreichbar, und die Fassung muss auf die Tool-Teilmenge geschnitten werden |
 | **B4 Container über MCP-Gateway** | Docker MCP Gateway oder ToolHive als Connector-Host hinter dem Vermittler | nein | Container (mit bekannten Ausbrüchen über `host.docker.internal`) | Docker-Pflicht, zweite Policy-Ebene | nicht für jetzt. Sinnvoll erst bei fremden, schwergewichtigen Servern (Playwright-AZ) oder wenn Linux-Betrieb kommt |
-| **B5 Egress-Proxy um Connectoren** | Connectoren dürfen nur über einen Proxy mit Host-Allowlist raus | nein | wie B2, plus eine weitere Komponente | mittel | überflüssig, solange Seatbelt-Host-Literals pro Connector greifen. Wert nur als Effektbeleg-Quelle (R.11, [Netzwerkwege §4.4](2026-10-02-vermittelte-agent-netzwerkwege.md)) |
+| **B5 Egress-Proxy um Connectoren** | Connectoren dürfen nur über einen Proxy mit Host-Allowlist raus | nein | wie B2, plus eine weitere Komponente | mittel | **nötig** (Korrektur 2026-10-23): Seatbelt kann nicht nach Host filtern. Der Connector darf nur `localhost:<sein Proxy-Port>`, der Proxy (`komki-egress`) prüft die Allowlist und schützt vor DNS-Rebinding. Zusätzlich Effektbeleg-Quelle (R.11, [Netzwerkwege §4.4](2026-10-02-vermittelte-agent-netzwerkwege.md)) |
 
 ### 6a.1 Architekturentscheidung: jeder Connector seine eigene Sandbox
 
@@ -288,7 +290,7 @@ zu prüfen als eine Regel mit Ausnahme. Daraus ergeben sich drei Sandboxen-Klass
 |---|---|---|
 | pi | eigenes Profil | nur den Kanal zum Vermittler und llama-server |
 | Vermittler | eigenes Profil (#137), kein Outbound | Raum lesen, Journal anhängen, Connectoren starten |
-| jeder Connector | eigenes Profil | nur seine Ziel-Hosts bzw. Pfade, sein Credential und das Binden seines eigenen Unix-Sockets. Kein Kanal zu pi, zu anderen Connectoren oder zu Loopback-TCP |
+| jeder Connector | eigenes Profil | nur seinen Egress-Port (die Hosts prüft `komki-egress`) bzw. seine Pfade, sein Credential und das Binden seines eigenen Unix-Sockets. Kein Kanal zu pi, zu anderen Connectoren oder zu Loopback-TCP |
 
 Drei Regeln machen die Entscheidung belastbar:
 
@@ -336,25 +338,22 @@ Kanal zu pi, der am Vermittler vorbeiführt.
 - **G3, Prozesse mit derselben uid.** Alle Prozesse laufen als Nutzer `crn`. Ein Prozess außerhalb der
   Sandbox kann Vermittler, Connectoren und Journal manipulieren. Der Ausweg wäre eine eigene uid für
   Vermittler und Connectoren oder eine VM. Heute ist das ausdrücklich nicht im Anspruch.
-- **Der Kanal pi → Vermittler ist heute offen (Befund 2026-10-23, Ticket #143).** Drei Teilprobleme:
-  - *Mitlesen:* Auf macOS braucht ein Mitschnitt von `lo0` normalerweise root. Auf dem Entwicklungs-Mac hat
-    Wireshark aber `ChmodBPF` installiert, und der Nutzer ist in der Gruppe `access_bpf`. Damit kann jeder
-    Prozess unter derselben uid den MCP-Klartext mitschneiden, ohne root. pi selbst erreicht `/dev/bpf*`
-    nicht (Seatbelt deny default). Solange Raumdaten unverschlüsselt auf der Platte liegen, ist das ein
-    G3-Weg unter vielen. Mit #138 (verschlüsselte Ablage) wird der Vermittler der einzige Zugang zu den Daten,
-    und der Mitschnitt wird ein echtes Leck.
-  - *Kein authentisierter Aufrufer:* Jeder lokale Prozess kann `POST /mcp` senden und bekommt
-    permit-Inhalte wie pi. Die Aufrufer-Prüfung aus #133 schließt nur Browser aus.
-  - *Port-Squatting:* Fällt der Vermittler während der Session aus, kann ein fremder Prozess Port 49525
-    belegen. pi spräche dann mit ihm. `require_mediator_up` prüft pidfile und Prozessidentität nur beim Start.
+- **Gegner mit derselben uid sind ausgeschlossen (Annahme der nutzenden Person, 2026-10-23).** Der Host
+  gilt als nicht kompromittiert. Saubere Antworten auf G3 wären ein eigener Nutzer für Vermittler und
+  Connectoren oder eine VM; macOS hat keine Jails. Beides ist erst nötig, wenn die Annahme fällt.
+- **Kanal pi → Vermittler (Befund und Entscheidung 2026-10-23, Ticket #143).** Befund: Der Vermittler lag
+  auf `127.0.0.1:49525` ohne Authentisierung. Jeder lokale Client, etwa eine zweite, nicht gesandboxte
+  Agent-Session, konnte permit-Inhalte abrufen, und ein fremder Prozess hätte den Port belegen können. Auf
+  dem Entwicklungs-Mac war zudem `lo0` ohne root mitschneidbar (Wireshark-`ChmodBPF`, Gruppe `access_bpf`);
+  unter der Host-Annahme ist das kein Abnahmekriterium mehr.
 
-  Abhilfe, von schnell zu gründlich: (1) `access_bpf` für den Nutzer entfernen, wenn Wireshark nicht nötig
-  ist. (2) Unix-Socket in einem Verzeichnis mit `0700` statt Loopback-TCP, im pi-Profil als einziges
-  Socket-Literal erlaubt. Unix-Socket-Verkehr ist per BPF nicht mitschneidbar, und es gibt keinen Port zum
-  Belegen. (3) Der Vermittler prüft per `LOCAL_PEERPID`, dass die Gegenstelle pi oder ein Kindprozess von pi
-  ist. Falls pis MCP-Client kein HTTP über Unix-Socket kann, startet pi per stdio ein kleines Relay in
-  seiner Sandbox, das den Socket anspricht. Ein Session-Token allein hilft nicht, solange BPF offen ist,
-  denn es läge im Klartext auf `lo0`.
+  Entscheidung: (1) Der Vermittler lauscht nur noch auf einem Unix-Socket unter `<base>/run/` (`0700`). Es
+  gibt keinen Port zum Belegen, und pis Profil erlaubt genau diesen Socket-Pfad. (2) Jede Anfrage braucht
+  ein Bearer-Token, das `komki up` bei jedem Start neu erzeugt (Muster wie Jupyter oder VS Code Server). (3)
+  Eine Session-ID geht zur Zuordnung in jeden PDR. pis MCP-Client kann keinen Unix-Socket (geprüft: der
+  Transport läuft über `fetch`), deshalb startet pi ein kleines stdio-Relay (`komki-relay.js`) in seiner
+  Sandbox. Eine Peer-PID-Prüfung (`LOCAL_PEERPID`, getestet: funktioniert) ist unter der Host-Annahme nicht
+  nötig.
 - **Semantische Leaks über erlaubte Ausgaben.** Ein permit-Suchtext kann Information kodieren. Die
   Engine bewertet Inhalt und Auftreten, aber ein beweisbarer Ausschluss jedes verdeckten Kanals ist nicht
   zu haben.
@@ -383,7 +382,7 @@ flowchart TD
 
 ## 9. Anwendung auf die konkreten Tools
 
-| Tool | Connector-Fassung (Vorschlag) | Credentials | Netz im Connector-Profil | Ausgabe (Gate 1) | Antwort (Gate 2) | Achtung |
+| Tool | Connector-Fassung (Vorschlag) | Credentials | Netz (Allowlist in `komki-egress`) | Ausgabe (Gate 1) | Antwort (Gate 2) | Achtung |
 |---|---|---|---|---|---|---|
 | RIS (#94) | `komki-ris/1`: `search(text)`, `show(top_id)`, `sessions(range)` | keine (öffentlich) | `risapi1.komuna.net` | Suchtext und IDs sind gebundene Ausgaben | public + Abrufdatum, deterministisch | Die lokale FTS filtert `tops.restricted` nicht (`store.ex:187-202`). Der Connector muss vor Top-k filtern, sonst entsteht ein Existenz-Leak |
 | Websuche (#96) | `komki-web/1`: genau `search(query)` | `BRAVE_API_KEY` nur im Connector | `api.search.brave.com` | Query verbatim im PDR, auch leere Requests | public, Integrität *untrusted* | **Kein** `fetch(url)` in derselben Fassung. Seitenabruf ist ein eigener Connector, der höchstens URLs aus vorherigen Suchtreffern akzeptiert |
@@ -401,10 +400,10 @@ Raumlabel prüfen und nicht nur gegen das Ziel.
 
 1. **Connector-Prozessmodell:** *entschieden* am 2026-10-23, jeder Connector bekommt seine eigene Sandbox
    (Abschnitt 6a.1). Offen ist nur noch die Umsetzung: `komki up` startet Connectoren über `sandbox-exec`
-   mit generiertem Profil, der Vermittler erreicht sie über Unix-Sockets mit Peer-Prüfung, und Credentials
+   mit generiertem Profil, der Vermittler erreicht sie über Unix-Sockets, und Credentials
    kommen über stdin aus dem Keychain. Festgehalten in #137.
-2. **Transport pi → Vermittler:** Wechsel auf Unix-Socket mit Peer-PID (Abschnitt 7.2). Vorher muss
-   feststehen, ob pis MCP-Client Unix-Sockets kann. Sonst stdio-Relay (**Test**).
+2. **Transport pi → Vermittler:** *entschieden* am 2026-10-23: Unix-Socket, Bearer-Token und stdio-Relay
+   (Abschnitt 7.2, #143). pis MCP-Client kann keinen Unix-Socket.
 3. **Codemode in pi 1.x:** Laut Doku ist `codemode` die Standard-Exposure, und auch `direct`-Tools sind aus
    Codemode aufrufbar. Zu prüfen ist, ob Codemode unter `--no-extensions -e builtin:mcp` aktiv ist. Die
    Vermittlungsgrenze ändert es nicht, wohl aber Reihenfolge und Menge der Aufrufe pro Modellschritt (**Test**).
