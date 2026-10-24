@@ -5,11 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>komki in Betrieb nehmen</title>
 <meta name="description" content="Schritt für Schritt: den komki-Arbeitsraum mit RIS, Websuche und Vault starten, ausprobieren und die Sicherheitsgrenzen selbst sehen.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: eine ruhige Lesespalte (Lecture), Befehle und Terminal-Ausgaben als eigene Blöcke,
+/* Schriften: nur Systemschriften, keine externen Font-Server (Datenschutz, LG Muenchen I 3 O 17493/20).
+   Layout: eine ruhige Lesespalte (Lecture), Befehle und Terminal-Ausgaben als eigene Blöcke,
    Diagramme dürfen breiter werden und scrollen in sich. */
 :root {
   --bg: #f3f5f4;
@@ -29,9 +27,9 @@
   --term-ok: #7fd18f;
   --term-deny: #ff8f85;
   --cmd-bg: #e8eeeb;
-  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
-  --font-body: "Atkinson Hyperlegible", "Verdana", "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", "Menlo", monospace;
+  --font-display: "Avenir Next", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
