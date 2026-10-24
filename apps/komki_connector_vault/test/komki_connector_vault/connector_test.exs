@@ -303,7 +303,7 @@ defmodule KomkiConnectorVault.ConnectorTest do
             %{},
             %{"assigned_label" => []},
             %{"assigned_label" => ["vault-geheim@1"]},
-            %{"assigned_label" => [@oeff, "web-oeffentlich@1"]},
+            %{"assigned_label" => [@oeff, "doc-vertraulich@1"]},
             %{"assigned_label" => @oeff},
             %{"assigned_label" => [1]}
           ] do

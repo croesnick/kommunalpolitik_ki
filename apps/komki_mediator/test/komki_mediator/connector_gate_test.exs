@@ -172,7 +172,7 @@ defmodule KomkiMediator.ConnectorGateTest do
   end
 
   test "Fake meldet fremde Labels: redacted", %{env: env} do
-    fake(env, "vault", ok(note(["ris-oeffentlich@1"])))
+    fake(env, "vault", ok(note(["doc-vertraulich@1"])))
 
     response = ConnectorGate.call(env, "vault_read", %{"note_id" => "a.md"})
 
