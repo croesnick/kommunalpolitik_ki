@@ -75,7 +75,7 @@ enthalten keine httpc-Gründe, denn die könnten Teile der Anfrage enthalten.
 ## Technik
 
 - HTTP über `:httpc`, TLS über `:ssl`, JSON über `:json`. Alles OTP, keine Hex-Laufzeit-Deps.
-- TLS mit `verify_peer`, dem CA-Speicher des Systems (`:public_key.cacerts_get/0`),
+- TLS mit `verify_peer`, den CA-Zertifikaten aus `/etc/ssl/cert.pem` (`KomkiConnector.TLS`, nicht der Schlüsselbund),
   SNI und Hostname-Prüfung. Keine Redirects.
 - Eigenes httpc-Profil je Connector-Instanz. Mit `--proxy` wird nur
   `https_proxy` gesetzt. Klartext-HTTP geht nie über den Proxy.

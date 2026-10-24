@@ -8,7 +8,7 @@ defmodule KomkiConnectorWeb.Http do
     (CONTRACT.md §9). Klartext-HTTP geht nie ueber den Proxy; `http://`
     gibt es nur fuer den Mock auf Loopback (`--base-url`).
   * TLS mit `verify_peer`, CA-Speicher des Systems
-    (`:public_key.cacerts_get/0`), SNI und Hostname-Pruefung.
+    (`KomkiConnector.TLS.cacerts/0`, PEM-Datei statt Schluesselbund), SNI und Hostname-Pruefung.
   * Fehler werden auf `:timeout` oder `:failed` reduziert: die Gruende
     von httpc koennen die Anfrage enthalten und gehoeren nicht in
     Antworten oder Logs.
@@ -75,7 +75,7 @@ defmodule KomkiConnectorWeb.Http do
   def ssl_options(host) do
     [
       verify: :verify_peer,
-      cacerts: :public_key.cacerts_get(),
+      cacerts: KomkiConnector.TLS.cacerts(),
       depth: 4,
       server_name_indication: String.to_charlist(host || ""),
       customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]

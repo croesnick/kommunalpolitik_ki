@@ -8,7 +8,7 @@ defmodule KomkiConnectorRis.Http do
     (`https_proxy`, CONTRACT.md §4/§9). Klartext-HTTP (nur Mock auf
     Loopback) geht direkt, weil `proxy` nicht gesetzt wird.
   - TLS mit `verify_peer`, CA-Zertifikaten des Systems
-    (`:public_key.cacerts_get/0`) und Hostname-Pruefung.
+    (`KomkiConnector.TLS.cacerts/0`, PEM-Datei statt Schluesselbund) und Hostname-Pruefung.
   - Keine Weiterleitungen: eine Umleitung auf einen anderen Host waere
     eine Tuer am Egress-Proxy vorbei.
   """
@@ -59,7 +59,7 @@ defmodule KomkiConnectorRis.Http do
   def ssl_options(host) do
     [
       verify: :verify_peer,
-      cacerts: :public_key.cacerts_get(),
+      cacerts: KomkiConnector.TLS.cacerts(),
       server_name_indication: String.to_charlist(host),
       customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)],
       depth: 4

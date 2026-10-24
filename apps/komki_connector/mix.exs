@@ -19,7 +19,7 @@ defmodule KomkiConnector.MixProject do
   # Bibliothek ohne Application-Callback: Frame-Protokoll, Client, Server und
   # Manifeste. Keine Runtime-Deps — JSON kommt aus OTP (:json, OTP 27+).
   def application do
-    [extra_applications: [:logger, :crypto]]
+    [extra_applications: [:logger, :crypto, :public_key]]
   end
 
   defp deps do
