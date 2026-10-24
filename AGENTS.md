@@ -134,6 +134,10 @@ Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Ab
 
 Diese vier Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows, Begriffen oder Voraussetzungen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
 
+### Doku-Site aktuell halten
+
+Die Doku-Site unter [`docs/site/`](docs/site/) (veröffentlicht über GitHub Pages) ist der Benutzer-Guide zu komki. **Pflicht**: Ändert ein PR, was Nutzende von komki sehen oder tun (Befehle, Optionen, Ausgaben, Einrichtung, Sicherheitsgrenze), passt derselbe PR die betroffenen Seiten an. Terminal-Ausgaben dort stammen aus echten Läufen, nie nachgebaut. Gestaltungsregeln: [`docs/site/README.md`](docs/site/README.md).
+
 ## Sprachregelung
 
 Etablierte englische Fachbegriffe werden immer und konsistent auf Englisch verwendet — nicht eingedeutscht und nicht durch neugeprägte deutsche Komposita ersetzt (z. B. remedy plan, field provenance, taint tracking, paired execution). Deutsch wird nur verwendet, wenn (a) noch kein etablierter englischer Begriff existiert oder (b) ein etablierter deutscher Begriff vorhanden ist (z. B. Nichtinterferenz, Sitzungsmappe). Neue Begriffe — welcher Sprache auch immer — werden bei ihrer ersten Verwendung definiert.
