@@ -17,7 +17,16 @@ export default defineConfig({
       ],
       editLink: { baseUrl: 'https://github.com/croesnick/kommunalpolitik_ki/edit/main/docs/site/' },
       lastUpdated: true,
-      customCss: ['./src/styles/komki.css'],
+      // Schriften selbst gehostet (Fontsource, SIL OFL): beim Aufruf gehen keine Daten an Google.
+      customCss: [
+        '@fontsource/atkinson-hyperlegible-next/400.css',
+        '@fontsource/atkinson-hyperlegible-next/400-italic.css',
+        '@fontsource/atkinson-hyperlegible-next/600.css',
+        '@fontsource/atkinson-hyperlegible-next/700.css',
+        '@fontsource/atkinson-hyperlegible-mono/400.css',
+        '@fontsource/zilla-slab/600.css',
+        './src/styles/komki.css',
+      ],
       sidebar: [
         {
           label: 'komki',
