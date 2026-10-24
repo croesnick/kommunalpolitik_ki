@@ -156,8 +156,12 @@ defmodule KomkiCli.SandboxProfileTest do
   end
 
   test "Proxy-Connector: nur der eigene Egress-Port, nicht der fremde", ctx do
-    {:ok, listener} = :gen_tcp.listen(49_532, ip: {127, 0, 0, 1}, reuseaddr: true)
-    on_exit(fn -> :gen_tcp.close(listener) end)
+    # Laeuft auf dem Host schon ein komki-egress (Default-Port), dient er
+    # als Gegenstelle; sonst lauscht der Test selbst.
+    case :gen_tcp.listen(49_532, ip: {127, 0, 0, 1}, reuseaddr: true) do
+      {:ok, listener} -> on_exit(fn -> :gen_tcp.close(listener) end)
+      {:error, :eaddrinuse} -> :ok
+    end
 
     allowed(ctx, "web", ["connect", "127.0.0.1", "49532"])
     denied(ctx, "ris", ["connect", "127.0.0.1", "49532"])

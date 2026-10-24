@@ -1136,9 +1136,16 @@ defmodule KomkiCli.Steps do
 
   # Kanal fuer einen pi-Start (Ticket #143): Token lesen, Session-ID
   # erzeugen, Relay frisch schreiben. Fehlt das Token, ist `komki up` noetig.
+  # Auch die mcp.json wird frisch aus der healthz-Antwort geschrieben: das
+  # pi-Home ist fuer den Agenten schreibbar, und ein eingetragener
+  # MCP-Server darf keinen Lauf ueberdauern (Labbook S-07).
   defp prepare_channel(cfg) do
-    case Channel.prepare_pi(cfg) do
-      {:ok, env} -> {:ok, env}
+    with {:ok, env} <- Channel.prepare_pi(cfg),
+         {:ok, "200", health} <- Mediator.fetch_health(cfg) do
+      :ok = Mediator.write_mcp_config(cfg, health["tools"])
+      {:ok, env}
+    else
+      {:ok, code, _health} -> {:error, "komki-mediator /healthz returned " <> code, 2}
       {:error, reason} -> {:error, reason, 2}
     end
   end
