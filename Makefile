@@ -1,4 +1,4 @@
-.PHONY: test lint format ci deps elixir-test python-test install
+.PHONY: test lint format ci deps elixir-test python-test install komki
 
 # Escript bauen und nach /usr/local/bin symlinken.
 # Workspace-Pattern: mix.exs der ratsinfo-App referenziert ../artifacts/deps
@@ -12,6 +12,23 @@ install:
 	@echo "ratsinfo installiert: $(PWD)/apps/ratsinfo/ratsinfo -> /usr/local/bin/ratsinfo"
 	@echo "Falls der Symlink-Rechte fehlt: sudo make install"
 	@echo "Alternative ohne sudo: ln -sf $(PWD)/apps/ratsinfo/ratsinfo ~/.local/bin/ratsinfo"
+
+# komki und seine Bausteine bauen und ablegen (Ticket #176), bis das
+# Multicall-Release (Ticket #179) sie zu einem Programm macht:
+# komki -> ~/.local/bin (Symlink), Vermittler/Egress/Connectoren -> $(KOMKI_HOME)/bin.
+KOMKI_HOME ?= $(HOME)/.local/share/komki
+KOMKI_LINK_DIR ?= $(HOME)/.local/bin
+KOMKI_APPS := komki_cli komki_mediator komki_egress komki_connector_ris komki_connector_web komki_connector_vault
+komki:
+	@for app in $(KOMKI_APPS); do (cd apps/$$app && mix deps.get >/dev/null && mix escript.build) || exit 1; done
+	@mkdir -p "$(KOMKI_HOME)/bin" "$(KOMKI_LINK_DIR)"
+	@cp apps/komki_mediator/komki-mediator apps/komki_egress/komki-egress \
+	   apps/komki_connector_ris/komki-connector-ris apps/komki_connector_web/komki-connector-web \
+	   apps/komki_connector_vault/komki-connector-vault "$(KOMKI_HOME)/bin/"
+	@ln -sf "$(PWD)/apps/komki_cli/komki" "$(KOMKI_LINK_DIR)/komki"
+	@echo ""
+	@echo "komki gebaut: $(KOMKI_LINK_DIR)/komki, Bausteine unter $(KOMKI_HOME)/bin"
+	@echo "Weiter mit: komki setup"
 
 deps:
 	mix deps.get

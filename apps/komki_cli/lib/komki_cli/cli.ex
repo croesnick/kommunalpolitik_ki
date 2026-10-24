@@ -9,7 +9,9 @@ defmodule KomkiCli.CLI do
   Befehle (Vertrag):
 
       komki version
-      komki version
+      komki setup [--demo] [--vault-dir PATH] [--gguf-from PATH] [--port N]
+      komki secret set NAME | komki secret list
+      komki journal verify
       komki init  [--gguf-from PATH] [--port N] [--ctx N]
                   [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--force]
       komki doctor
@@ -128,6 +130,65 @@ defmodule KomkiCli.CLI do
       author: "Carsten Roesnick-Neugebauer",
       subcommands: [
         version: [name: "version", description: "Versiondrucker"],
+        setup: [
+          name: "setup",
+          description:
+            "gefuehrte Einrichtung: Werkzeuge pruefen, Instanz anlegen, Schluessel hinterlegen, starten",
+          options: [
+            vault_dir: [
+              value_name: "PATH",
+              long: "vault-dir",
+              help: "eigener Vault (sonst Frage; Enter waehlt den Test-Vault)"
+            ],
+            gguf_from: [
+              value_name: "PATH",
+              long: "gguf-from",
+              help: "vorhandene Modelldatei (GGUF) verwenden"
+            ],
+            port: [
+              value_name: "N",
+              long: "port",
+              parser: :integer,
+              help: "llama-server-Port (default 49524; anderer Port fuer eine zweite Instanz)"
+            ]
+          ],
+          flags: [
+            demo: [
+              long: "demo",
+              help: "Test-Vault mit erfundenen Notizen verwenden, ohne zu fragen"
+            ]
+          ]
+        ],
+        secret: [
+          name: "secret",
+          description:
+            "Schluessel im macOS-Schluesselbund verwalten (Werte werden nie angezeigt)",
+          subcommands: [
+            set: [
+              name: "set",
+              description:
+                "Schluessel verdeckt eingeben und ablegen (z.B. 'komki secret set brave')",
+              args: [
+                name: [
+                  value_name: "NAME",
+                  required: true,
+                  help: "Kurzname, siehe 'komki secret list'"
+                ]
+              ]
+            ],
+            list: [name: "list", description: "erwartete Schluessel und ob sie vorhanden sind"]
+          ]
+        ],
+        journal: [
+          name: "journal",
+          description: "Entscheidungs-Journal des Vermittlers",
+          subcommands: [
+            verify: [
+              name: "verify",
+              description: "pruefen, dass die Kette lueckenlos und unveraendert ist"
+            ]
+          ]
+        ],
         init: [
           name: "init",
           description: "KomKI-CLI-Instanz anlegen (config + Profil + pi-home + GGUF-SHA-Gate)",
@@ -365,17 +426,38 @@ defmodule KomkiCli.CLI do
 
   defp parse_dispatch(argv) do
     case Optimus.parse(cli(), argv) do
-      {:ok, [:label | tail], result} -> dispatch_label_tail(tail, result)
+      {:ok, [group | tail], result} when group in [:label, :secret, :journal] ->
+        dispatch_group(group, tail, result)
+
       # Top-Level-Befehle (Vertrag ab version bis session-chain):
-      {:ok, [command], result} -> dispatch_command(command, result)
-      {:ok, %Optimus.ParseResult{}} -> {"no command given; run \"komki --help\"\n", 2}
-      {:error, errors} -> {error_line(errors) <> "\n", 2}
-      {:error, _path, errors} -> {error_line(errors) <> "\n", 2}
-      :help -> help_text([])
-      {:help, path} -> help_text(path)
-      :version -> {"komki " <> @version <> "\n", 0}
+      {:ok, [command], result} ->
+        dispatch_command(command, result)
+
+      {:ok, %Optimus.ParseResult{}} ->
+        {"no command given; run \"komki --help\"\n", 2}
+
+      {:error, errors} ->
+        {error_line(errors) <> "\n", 2}
+
+      {:error, _path, errors} ->
+        {error_line(errors) <> "\n", 2}
+
+      :help ->
+        help_text([])
+
+      {:help, path} ->
+        help_text(path)
+
+      :version ->
+        {"komki " <> @version <> "\n", 0}
     end
   end
+
+  # Befehlsgruppen: label (Ticket #91), secret und journal (Ticket #176)
+  defp dispatch_group(:label, tail, result), do: dispatch_label_tail(tail, result)
+  defp dispatch_group(:secret, [:set], result), do: secret_set(result.args.name)
+  defp dispatch_group(:secret, [:list], _result), do: secret_list()
+  defp dispatch_group(:journal, [:verify], _result), do: render(KomkiCli.Steps.journal_verify())
 
   defp dispatch_label_tail([sub], result) do
     render(KomkiCli.LabelSteps.label_command(sub, label_opts(result)))
@@ -426,8 +508,11 @@ defmodule KomkiCli.CLI do
   defp dispatch_command(:down, _result), do: render(KomkiCli.Steps.down())
   defp dispatch_command(:status, _result), do: render(KomkiCli.Steps.status())
 
+  defp dispatch_command(:setup, result),
+    do: render(KomkiCli.Setup.run(optimus_opts(result), setup_ui()))
+
   defp dispatch_command(:session, result),
-    do: render(KomkiCli.Steps.session(optimus_opts(result)))
+    do: render(KomkiCli.Steps.session(optimus_opts(result), &show_start/1))
 
   defp dispatch_command(:session_chain, result),
     do: render(KomkiCli.Steps.session_chain(optimus_opts(result)))
@@ -443,8 +528,61 @@ defmodule KomkiCli.CLI do
       # stoesse einen echten Lauf an (Orchestrator-Fund im Smoke 5d).
       help_text([:run])
     else
-      render(KomkiCli.Steps.run(opts))
+      render(KomkiCli.Steps.run(opts, &show_start/1))
     end
+  end
+
+  # run/session ohne vorheriges `komki up` (Ticket #176): Steps meldet den
+  # Start ueber diesen Rueckruf, die Zeilen erscheinen sofort (die Session
+  # uebernimmt danach das Terminal).
+  defp show_start(up) do
+    {out, _code} = render(up)
+    IO.write("komki war nicht gestartet, jetzt gestartet:\n" <> out)
+  end
+
+  # ===========================================================================
+  # setup und secret (Ticket #176): interaktiv, deshalb schreiben sie direkt
+  # aufs Terminal; Fragen und verdeckte Eingabe in KomkiCli.Prompt.
+  # ===========================================================================
+
+  defp setup_ui do
+    %{
+      say: &IO.puts/1,
+      ask: &KomkiCli.Prompt.ask/2,
+      confirm: &KomkiCli.Prompt.confirm/2,
+      secret: &KomkiCli.Prompt.secret/1,
+      render: fn result ->
+        {out, _code} = render(result)
+        IO.write(out)
+      end
+    }
+  end
+
+  defp secret_set(name) do
+    case KomkiCli.Secrets.fetch(name) do
+      {:ok, entry} ->
+        IO.puts(entry.label <> " (Schluesselbund-Eintrag '" <> entry.service <> "')")
+        message = KomkiCli.Setup.store_secret(entry, setup_ui())
+        code = if String.starts_with?(message, "gespeichert"), do: 0, else: 2
+        {message <> "\n", code}
+
+      :error ->
+        names = Enum.map_join(KomkiCli.Secrets.all(), ", ", & &1.name)
+        {"unbekannter Schluessel '" <> name <> "'; bekannt: " <> names <> "\n", 2}
+    end
+  end
+
+  defp secret_list do
+    lines =
+      Enum.map(KomkiCli.Secrets.all(), fn entry ->
+        state =
+          if KomkiCli.Secrets.present?(entry), do: green() <> "vorhanden", else: red() <> "fehlt"
+
+        String.pad_trailing(entry.name, 10) <>
+          state <> reset() <> "  " <> entry.label <> " ('" <> entry.service <> "')"
+      end)
+
+    {Enum.join(lines, "\n") <> "\n", 0}
   end
 
   # label-Subcommands: args (file/object/binding) mit String-Schluesseln
@@ -589,7 +727,12 @@ defmodule KomkiCli.CLI do
   # Render-Flaeche (alle menschlichen Ausgaben; ANSI nur hier)
   # ===========================================================================
 
-  @spec render(KomkiCli.Steps.result() | KomkiCli.LabelSteps.result()) :: outcome()
+  @spec render(
+          KomkiCli.Steps.result()
+          | KomkiCli.LabelSteps.result()
+          | {:setup, :ok}
+          | {:journal, map()}
+        ) :: outcome()
   defp render({:inited, cfg, gguf_lines}), do: render_init(cfg, gguf_lines)
   defp render({:checks, checks, summary}), do: render_doctor(checks, summary)
 
@@ -666,6 +809,19 @@ defmodule KomkiCli.CLI do
          to_string(pi_code) <>
          ":\n" <>
          KomkiCli.Terminal.sanitize(out) <> "\n", 4}
+
+  defp render({:setup, :ok}), do: {"", 0}
+
+  defp render({:journal, %{"result" => "valid"} = result}),
+    do:
+      {green() <>
+         "Journal ok: " <>
+         to_string(result["records"]) <>
+         " Eintraege, lueckenlos verkettet und unveraendert" <>
+         reset() <> "\n" <> "Kopf: " <> to_string(result["head_hash"]) <> "\n", 0}
+
+  defp render({:journal, result}),
+    do: {red() <> "Journal UNGUELTIG: " <> JSON.encode!(result) <> reset() <> "\n", 4}
 
   defp render({:session, message}),
     do: {green() <> String.trim_trailing(message) <> reset() <> "\n", 0}

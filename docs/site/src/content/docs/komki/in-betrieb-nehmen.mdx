@@ -1,146 +1,68 @@
 ---
 title: In Betrieb nehmen
-description: Elf Schritte vom Repo bis zur ersten Recherche, mit allem, was du im Terminal siehst.
+description: Vom Repo bis zur ersten Recherche in fünf Schritten, mit allem, was du im Terminal siehst.
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
 
-Etwa 15 Minuten auf einem Mac mit Apple Silicon. Alle Befehle laufen in einem Terminal im Repo. Die Ausgaben stammen aus echten Testläufen; Prozessnummern und Zeiten sehen bei dir anders aus.
+Etwa zehn Minuten auf einem Mac mit Apple Silicon, wenn das Modell schon auf der Platte liegt. Die Ausgaben stammen aus echten Testläufen; Prozessnummern und Zeiten sehen bei dir anders aus.
 
 <Aside>
-Du brauchst node, das pi-Paket (`npm install -g @earendil-works/pi-coding-agent`), `llama-server` (`brew install llama.cpp`), Elixir und das gemma-Modell. Was komki im Einzelnen erwartet, steht im [README von komki_cli](https://github.com/croesnick/kommunalpolitik_ki/blob/main/apps/komki_cli/README.md).
+Du brauchst llama.cpp, node, das pi-Paket, Elixir und tmux. Fehlt etwas, nennt `komki setup` den passenden Installationsbefehl, du musst also nicht vorher nachsehen. Dazu kommt das gemma-Modell (17 GB). Bald lädt `komki setup` es selbst herunter, und eine Installation über Homebrew ersetzt den Bauschritt.
 </Aside>
 
 <Steps>
 
-1. ### Stand holen und Kurzbefehle setzen
+1. ### komki bauen
 
-   `B` ist deine komki-Instanz. Der Alias erspart dir den langen Pfad zu `komki`.
+   Im Repo baut ein Befehl komki und seine Bausteine (Vermittler, Egress-Proxy, drei Connectoren) und legt sie ab. `komki` liegt danach in `~/.local/bin` und ist von überall aufrufbar.
 
    ```sh
    cd ~/projects/kommunalpolitik_ki
    git switch main && git pull
-   B=~/.local/share/komki
-   alias komki="$PWD/apps/komki_cli/komki"
-   ```
-
-2. ### Programme bauen und ablegen
-
-   Sechs kleine Programme: komki selbst, der Vermittler, der Egress-Proxy und die drei Connectoren. komki findet sie in `$B/bin`.
-
-   ```sh
-   for app in komki_cli komki_mediator komki_egress komki_connector_ris komki_connector_web komki_connector_vault; do
-     (cd apps/$app && mix deps.get >/dev/null && mix escript.build)
-   done
-   mkdir -p $B/bin
-   cp apps/komki_mediator/komki-mediator apps/komki_egress/komki-egress \
-      apps/komki_connector_ris/komki-connector-ris apps/komki_connector_web/komki-connector-web \
-      apps/komki_connector_vault/komki-connector-vault $B/bin/
-   ```
-
-   ```text frame="terminal" title="Das siehst du"
-   Generated escript komki with MIX_ENV=dev
-   Generated escript komki-mediator with MIX_ENV=dev
-   Generated escript komki-egress with MIX_ENV=dev
-   Generated escript komki-connector-ris with MIX_ENV=dev
-   Generated escript komki-connector-web with MIX_ENV=dev
-   Generated escript komki-connector-vault with MIX_ENV=dev
-   ```
-
-3. ### Test-Vault einlegen
-
-   Zum Ausprobieren ein erfundener Vault aus der Stadtratsarbeit (Buchloe, fiktiv): öffentliche und vertrauliche Notizen, eine Notiz mit einem eingeschleusten Angriffstext und eine vertrauliche Notiz mit dem Marker `GEHEIM-MARKER-7Q4Z`. Dein echter Obsidian-Vault bleibt unberührt.
-
-   ```sh
-   mkdir -p $B/vault
-   cp -R apps/komki_connector_vault/priv/test-vault/. $B/vault/
-   ```
-
-   Der Vault-Connector zeigt nur Notizen mit einem Label im Frontmatter, etwa `komki_labels: [vault-oeffentlich@1]`. Alles ohne Label ist für komki unsichtbar.
-
-4. ### Instanz anlegen oder auffrischen
-
-   Schreibt Konfiguration und alle Sandbox-Profile. Dabei wird das Modell kopiert und per Prüfsumme kontrolliert. Das dauert etwa 30 Sekunden.
-
-   ```sh
-   komki init --force --vault-dir $B/vault
-   ```
-
-   ```text frame="terminal" title="Das siehst du"
-   init ok
-   base-dir:   ~/.local/share/komki
-   port:       49524
-   mediator-sock: ~/.local/share/komki/run/mediator.sock
-   ctx:        131072
-   gguf:         ~/.local/share/komki/models/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
-   gguf-sha256:  ef728c8e0c33…6e30c (pinned, verified)
-   ```
-
-   Auf einem neuen Rechner ohne Instanz ergänzt du `--gguf-from PFAD/ZUM/MODELL.gguf` und lässt `--force` weg.
-
-5. ### Alte Raumvorlage beiseitelegen
-
-   Nur für Instanzen von vor den Connectoren, also auch deine. Ihre Registry und ihr Raum kennen RIS, Web und Vault noch nicht, und der Vermittler würde jede Anfrage ablehnen. Beim nächsten Start legt er die neuen Vorlagen an (Raum „recherche“). Dein Journal bleibt erhalten.
-
-   ```sh
-   mv $B/mediator/registry.json $B/mediator/registry.json.vor-connectoren
-   mv $B/mediator/room.json $B/mediator/room.json.vor-connectoren
-   ```
-
-6. ### Brave-Key prüfen
-
-   Der Befehl prüft nur, dass der Eintrag im Schlüsselbund da ist. Der Key selbst wird nicht angezeigt.
-
-   ```sh
-   security find-generic-password -s brave-search-api >/dev/null && echo "Key vorhanden"
-   ```
-
-   ```text frame="terminal" title="Das siehst du"
-   Key vorhanden
-   ```
-
-   Fehlt er, legst du ihn so an: `security add-generic-password -s brave-search-api -a "$USER" -w`. Beim ersten Start fragt macOS, ob `security` zugreifen darf; dann „Immer erlauben“ wählen.
-
-7. ### Alles starten
-
-   `komki up` startet die Prozesse in fester Reihenfolge, jeden in seiner eigenen Sandbox. Läuft llama schon, wird es nur geprüft.
-
-   ```sh
-   komki up
-   ```
-
-   ```text frame="terminal" title="Das siehst du"
-   llama up: pid 26409 (health 200)
-   egress up: pid 37952
-   connector-ris up: pid 37979
-   connector-vault up: pid 38014
-   connector-web up: pid 38042
-   mediator up: pid 38069 (tools: ping, admit_document, ris_search, ris_show,
-                           vault_read, vault_search, vault_write_test, web_search)
-   ```
-
-8. ### Gesundheitscheck
-
-   `komki doctor` prüft gut 30 Dinge: Werkzeuge, Prüfsummen, ob jedes Sandbox-Profil exakt so ist wie erwartet, ob der Key da ist und ob jeder Connector antwortet. Wichtig ist die letzte Zeile.
-
-   ```sh
-   komki doctor
+   make komki
    ```
 
    ```text frame="terminal" title="Das siehst du (Ende)"
-   …
-   ok: mediator profile (regeneration byte-stabil)
-   ok: egress profile (regeneration byte-stabil)
-   ok: credential BRAVE_API_KEY (Schluesselbund-Eintrag 'brave-search-api' vorhanden)
-   ok: ping ris (komki-ris/1)
-   ok: ping vault (komki-vault/1)
-   ok: ping web (komki-web/1)
-   doctor: ok
+   Generated escript komki-connector-vault with MIX_ENV=dev
+
+   komki gebaut: ~/.local/bin/komki, Bausteine unter ~/.local/share/komki/bin
+   Weiter mit: komki setup
    ```
 
-9. ### Erster Auftrag
+2. ### Einrichten
 
-   Ein einmaliger Lauf: pi recherchiert in allen drei Quellen und legt eine Notiz mit Quellen an. Dauert etwa eine Minute.
+   `komki setup` prüft die Werkzeuge, fragt nach dem Vault, legt die Instanz an, fragt den Brave-Key ab, falls er fehlt, startet alles und prüft es. Zum Ausprobieren nimmst du den Test-Vault: erfundene Notizen aus der Stadtratsarbeit (Buchloe, fiktiv), öffentliche und vertrauliche, dazu eine Notiz mit eingeschleustem Angriffstext. Dein echter Obsidian-Vault bleibt unberührt.
+
+   ```sh
+   komki setup --demo --gguf-from PFAD/ZUM/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
+   ```
+
+   ```text frame="terminal" title="Das siehst du"
+   Werkzeuge   ok (llama-server, node, pi, Erlang (escript), komki-mediator, komki-egress, komki-connector-ris, komki-connector-vault, komki-connector-web)
+   Vault       Test-Vault mit 11 erfundenen Notizen unter ~/.local/share/komki/vault
+   Instanz     wird angelegt unter ~/.local/share/komki (prueft und kopiert das Modell, etwa 30 s)
+   Instanz     angelegt
+   brave       ok (Schluesselbund-Eintrag 'brave-search-api')
+   Start       llama, Egress, Connectoren und Vermittler (beim ersten Mal bis zu einer Minute)
+   llama up: pid 40047 (health 200)
+   egress up: pid 40098
+   connector-ris up: pid 40125
+   connector-vault up: pid 40152
+   connector-web up: pid 40189
+   mediator up: pid 40217 (tools: ping, admit_document, ris_search, ris_show, vault_read, vault_search, vault_write_test, web_search)
+   Pruefung    doctor ok
+
+   Fertig. Probier zum Beispiel:
+     komki run "Was steht im RIS zum Radverkehrskonzept?"
+     komki session
+   ```
+
+   Fehlt der Brave-Key, fragt `setup` ihn verdeckt ab: Die Eingabe erscheint nicht auf dem Bildschirm und landet direkt im macOS-Schlüsselbund. Später geht das auch einzeln mit `komki secret set brave`. Für deinen eigenen Vault nimmst du `--vault-dir PFAD` statt `--demo`. komki sieht dort nur Notizen mit einem Label im Frontmatter, etwa `komki_labels: [vault-oeffentlich@1]`.
+
+3. ### Erster Auftrag
+
+   Ein einmaliger Lauf: pi recherchiert in allen drei Quellen und legt eine Notiz mit Quellen an. Läuft komki gerade nicht, startet `run` es vorher selbst.
 
    ```sh
    komki run "Ich bereite mich auf das Thema Radverkehr in Buchloe vor. 1) Suche im RIS mit ris_search nach 'Radweg'. 2) Suche im Web mit web_search nach 'Förderung Radwege Bayern Kommunen 2026'. 3) Suche im Vault mit vault_search nach 'Radverkehr' und lies die passendste Notiz. 4) Lege mit vault_write_test eine Notiz 'Vorbereitung Radverkehr' an: höchstens fünf Stichpunkte, jeder mit Quelle. Antworte mit der note_id und zwei Sätzen Zusammenfassung."
@@ -155,59 +77,53 @@ Du brauchst node, das pi-Paket (`npm install -g @earendil-works/pi-coding-agent`
    hohen Fördersätze von bis zu 90 % für Kommunen.
    ```
 
-   Die neue Notiz liegt in deinem Test-Vault:
+   Die neue Notiz liegt im Test-Vault unter `komki-test/` und trägt die Labels aller Quellen, aus denen sie entstanden ist. Liest sie später jemand, weiß das System, woher ihr Inhalt stammt.
+
+4. ### Interaktiv arbeiten
+
+   Für längere Arbeit gibt es die Session in tmux. Du schreibst wie in einem Chat; pi nutzt die Tools selbst.
 
    ```sh
-   cat $B/vault/komki-test/*vorbereitung-radverkehr.md
+   komki session
+   ```
+
+   Gute erste Fragen:
+
+   - „Welche Notizen zum Haushalt gibt es im Vault? Fasse sie zusammen.“
+   - „Suche im RIS nach Bahnhofstraße und zeige mir den ersten Treffer im Detail.“
+   - „Was sagt das Web zu Förderprogrammen für Bürgerhäuser in Bayern?“
+
+   Abkoppeln, ohne zu beenden: `Ctrl+B`, dann `d`. Wieder dazu: `komki session --continue`.
+
+5. ### Nachvollziehen und stoppen
+
+   Jede Entscheidung steht im Journal. Dieser Befehl prüft, dass die Kette lückenlos und unverändert ist:
+
+   ```sh
+   komki journal verify
    ```
 
    ```text frame="terminal" title="Das siehst du"
-   ---
-   komki_labels: [ris-oeffentlich@1, vault-oeffentlich@1, web-oeffentlich@1]
-   title: "Vorbereitung Radverkehr"
-   ---
-   - Ziel: Durchgehender Radweg Bahnhof-Schulzentrum (note_id: Projekte/Verkehr/Radverkehrskonzept.md)
-   - Engpass: Bahnhofstraße mit Parkstreifen (note_id: Projekte/Verkehr/Radverkehrskonzept.md)
-   - Förderung: Bis zu 80% durch BayFAG/Radoffensive (URL: https://www.radverkehr.bayern.de/foerderung/index.php)
-   …
+   Journal ok: 2 Eintraege, lueckenlos verkettet und unveraendert
+   Kopf: sha256:b693e6d3bab75349d9e71a291512651d18ca67c07b60e7ccd14ef3503d9abbad
    ```
 
-   Die Notiz trägt die Labels aller Quellen, aus denen sie entstanden ist. Liest sie später jemand, weiß das System, woher ihr Inhalt stammt.
+   Wenn du fertig bist, stoppt `komki down` alles, auch llama:
 
-10. ### Interaktiv arbeiten
-
-    Für längere Arbeit gibt es die Session in tmux. Du schreibst wie in einem Chat; pi nutzt die Tools selbst.
-
-    ```sh
-    komki session
-    ```
-
-    Gute erste Fragen:
-
-    - „Welche Notizen zum Haushalt gibt es im Vault? Fasse sie zusammen.“
-    - „Suche im RIS nach Bahnhofstraße und zeige mir den ersten Treffer im Detail.“
-    - „Was sagt das Web zu Förderprogrammen für Bürgerhäuser in Bayern?“
-
-    Abkoppeln, ohne zu beenden: `Ctrl+B`, dann `d`. Wieder dazu: `komki session --continue`.
-
-11. ### Nachvollziehen und stoppen
-
-    Jede Entscheidung steht im Journal. Dieser Befehl prüft, dass die Kette lückenlos und unverändert ist:
-
-    ```sh
-    $B/bin/komki-mediator verify-journal --base $B
-    ```
-
-    ```text frame="terminal" title="Das siehst du"
-    {"chained":28,"head_hash":"sha256:79b15e37…","records":28,"result":"valid"}
-    ```
-
-    Wenn du fertig bist, stoppt `komki down` alles, auch llama:
-
-    ```sh
-    komki down
-    ```
+   ```sh
+   komki down
+   ```
 
 </Steps>
+
+<Aside type="caution" title="Instanz von vor den Connectoren">
+Hast du komki schon vor RIS, Web und Vault benutzt, kennen `registry.json` und `room.json` deiner Instanz die neuen Quellen noch nicht, und der Vermittler lehnt jede Anfrage ab. Lege beide einmalig beiseite; beim nächsten Start entstehen die neuen Vorlagen, dein Journal bleibt erhalten. Bald erledigt komki das selbst.
+
+```sh
+cd ~/.local/share/komki/mediator
+mv registry.json registry.json.vor-connectoren
+mv room.json room.json.vor-connectoren
+```
+</Aside>
 
 Weiter mit [Die Sicherheitsgrenze sehen](/kommunalpolitik_ki/komki/sicherheitsgrenze/).

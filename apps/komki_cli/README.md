@@ -96,57 +96,45 @@ Zwei Hinweise für die verteilte Datei:
 
 ## Schnellstart: Arbeitsraum mit RIS, Websuche und Vault
 
-Der Ablauf von null bis zur ersten Session. Alle Befehle laufen im Repo-Root;
-`B` ist die Instanz (Default `~/.local/share/komki`, sonst `KOMKI_HOME`).
+Von null bis zur ersten Recherche, im Repo-Root:
 
 ```sh
-B=~/.local/share/komki
-
-# 1. Alle Escripts bauen und in die Instanz legen (komki sucht erst PATH, dann $B/bin)
-for app in komki_cli komki_mediator komki_egress komki_connector_ris komki_connector_web komki_connector_vault; do
-  (cd apps/$app && mix deps.get && mix escript.build)
-done
-mkdir -p $B/bin
-cp apps/komki_mediator/komki-mediator apps/komki_egress/komki-egress \
-   apps/komki_connector_ris/komki-connector-ris apps/komki_connector_web/komki-connector-web \
-   apps/komki_connector_vault/komki-connector-vault $B/bin/
-
-# 2. Brave-Key für die Websuche in den Schlüsselbund (fragt den Key verdeckt ab)
-security add-generic-password -s brave-search-api -a "$USER" -w
-
-# 3. Vault wählen: zum Ausprobieren den erfundenen Test-Vault kopieren
-cp -R apps/komki_connector_vault/priv/test-vault $B/vault
-
-# 4. Instanz anlegen (bestehende Instanz: --force ergänzen)
-apps/komki_cli/komki init --gguf-from PFAD/ZUM/MODELL.gguf --vault-dir $B/vault
-
-# 4b. Nur bei einer Instanz von vor den Connectoren: alte Registry und alten Raum
-#     beiseitelegen; der Vermittler legt beim nächsten Start die neuen Vorlagen an
-#     (Raum "recherche" mit workspace_bindings). Das Journal bleibt unverändert.
-mv $B/mediator/registry.json $B/mediator/registry.json.vor-connectoren
-mv $B/mediator/room.json $B/mediator/room.json.vor-connectoren
-
-# 5. Starten und prüfen
-apps/komki_cli/komki up        # llama, Egress, Connectoren, Vermittler
-apps/komki_cli/komki doctor    # muss mit "doctor: ok" enden
-apps/komki_cli/komki status
-
-# 6. Arbeiten
-apps/komki_cli/komki run "Suche im RIS nach Bahnhofstraße und fasse die Treffer zusammen."
-apps/komki_cli/komki session   # interaktiv in tmux
-
-# 7. Stoppen
-apps/komki_cli/komki down
+make komki                     # baut komki und seine Bausteine, legt sie ab (~/.local/bin, ~/.local/share/komki/bin)
+komki setup --gguf-from PFAD/ZUM/MODELL.gguf
+komki run "Suche im RIS nach Bahnhofstraße und fasse die Treffer zusammen."
+komki session                  # interaktiv in tmux
+komki journal verify           # Hash-Kette des Journals prüfen
+komki down                     # alles stoppen
 ```
+
+`komki setup` prüft die Werkzeuge und nennt für jedes fehlende den
+Installationsbefehl. Es fragt nach dem Vault (Enter wählt den erfundenen
+Test-Vault, `--demo` ohne Frage), legt die Instanz an, fragt den
+Brave-Key verdeckt ab, falls er im Schlüsselbund fehlt, startet alles und
+prüft mit dem Doctor. Ein zweiter Lauf ändert an einer bestehenden Instanz
+nichts. `--gguf-from` entfällt, wenn das Modell schon am Staging-Ort liegt
+(`~/.local/share/komki/models-staging/`); den Download übernimmt künftig
+`setup` selbst (#178). `run` und `session` starten fehlende Prozesse
+selbst, `komki up` ist nur noch nötig, wenn man ausdrücklich vorab starten
+will.
+
+Instanz von vor den Connectoren: Deren `registry.json` und `room.json`
+kennen RIS, Web und Vault noch nicht. Bis die Migration automatisch läuft
+(#177), beide Dateien unter `~/.local/share/komki/mediator/` beiseitelegen
+(`mv registry.json registry.json.vor-connectoren`, ebenso `room.json`);
+der Vermittler legt beim nächsten Start die neuen Vorlagen an, das Journal
+bleibt unverändert.
 
 Hinweise zu den einzelnen Schritten:
 
-* **Schlüsselbund (Schritt 2, 5):** Beim ersten `komki up` fragt macOS, ob
+* **Schlüssel:** `komki secret set brave` legt den Brave-Key verdeckt ab
+  (nie in argv, nie im Log); `komki secret list` zeigt, ob er da ist. Beim
+  ersten Start fragt macOS, ob
   `security` auf den Eintrag `brave-search-api` zugreifen darf. Wähle
   „Immer erlauben“, sonst startet der Web-Connector ohne Key und jede
   Websuche meldet `credential-missing`. „Immer erlauben“ heißt: jeder Prozess
   unter deinem Nutzer kann den Key per `security` lesen.
-* **Vault (Schritt 3):** Der Vault-Connector zeigt nur Notizen mit
+* **Vault:** Der Vault-Connector zeigt nur Notizen mit
   Frontmatter-Feld `komki_labels` (z. B. `komki_labels: [vault-oeffentlich@1]`);
   alles andere bleibt unsichtbar. Geschrieben wird nur nach
   `<vault>/komki-test/`. Für einen echten Vault: Notizen zuerst labeln, dann
@@ -158,16 +146,15 @@ Hinweise zu den einzelnen Schritten:
   `elixir apps/komki_connector_ris/priv/mock_ris.exs --port 49640` und
   `komki init --force --ris-mock-port 49640`.
 * **Raum wechseln:** Welche Daten in einer Session zusammenkommen dürfen,
-  steht in `$B/mediator/room.json`, Feld `workspace_bindings`. Default ist
+  steht in `~/.local/share/komki/mediator/room.json`, Feld `workspace_bindings`. Default ist
   **recherche** (`ris-oeffentlich@1`, `vault-oeffentlich@1`,
   `web-oeffentlich@1`): Websuche und RIS erlaubt, vertrauliche Notizen
   gesperrt. Für **vertraulich** `vault-vertraulich@1` ergänzen: Dann sind
   vertrauliche Notizen lesbar und jede Web- und RIS-Suche gesperrt. Nach der
   Änderung `komki down && komki up`.
 * **Nachvollziehen:** Jede Entscheidung steht im Journal
-  `$B/mediator/journal/pdr.jsonl`;
-  `$B/bin/komki-mediator verify-journal --base $B` prüft die Hash-Kette.
-  Logs liegen unter `$B/tmp/`.
+  `~/.local/share/komki/mediator/journal/pdr.jsonl`; `komki journal verify`
+  prüft die Hash-Kette. Logs liegen unter `~/.local/share/komki/tmp/`.
 * **Wenn etwas hakt:** `komki doctor` nennt den fehlenden Teil (Escript,
   Profil, Credential, Connector-Ping). Ein ausgefallener Connector kommt mit
   erneutem `komki up` zurück, die laufenden Prozesse bleiben dabei stehen.
@@ -176,11 +163,15 @@ Hinweise zu den einzelnen Schritten:
 
 ```sh
 ./komki version
+./komki setup                       # gefuehrte Einrichtung (Werkzeuge, Vault, Instanz, Schluessel, Start)
+./komki secret set brave            # Brave-Key verdeckt in den Schluesselbund
+./komki secret list                 # erwartete Schluessel und ob sie da sind
+./komki journal verify              # Hash-Kette des Journals pruefen
 ./komki init                        # Instanz anlegen (config, Profil, pi-home, GGUF mit SHA-Gate)
 ./komki init --gguf-from PFAD       # GGUF-Quelle explizit angeben
 ./komki doctor                      # alle Checks (Werkzeuge, Profil, GGUF-SHA, Boot-Gate, Port)
 ./komki up                          # llama-server, Egress, Connectoren, Vermittler starten
-./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil
+./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil (startet bei Bedarf alles)
 ./komki session                     # interaktive pi-Session in tmux
 ./komki session --continue          # letzte Session fortsetzen
 ./komki session --detach            # im Hintergrund; attach via 'tmux -L komki attach -t komki'
@@ -192,7 +183,7 @@ Hinweise zu den einzelnen Schritten:
 Weitere Flags: `init --port N --ctx N --force` sowie für die Connectoren
 `init --vault-dir PFAD --ris-base-url URL --ris-mock-port N`, `up --ctx N`,
 `run --mode text|json --scratch PFAD --timeout SEKUNDEN` (PFAD nur unterhalb von `runs/` der Instanz; der Scratch ist auch das Arbeitsverzeichnis des Laufs; Laufzeit-Limit per Default 600 s, danach Exit 4). pi startet in Lauf und Session mit `--no-context-files`, damit eine vom Modell abgelegte `AGENTS.md` keinen späteren Lauf steuert, und sieht neben seinen Datei-Werkzeugen die Vermittler-Tools (`mcp__komki__*`). Exit-Codes: `0` Erfolg, `2` Nutzungs-,
-Konfigurations- oder Bereitschaftsfehler (etwa: llama-server nicht aktiv),
+Konfigurations- oder Bereitschaftsfehler (etwa: fremder Prozess auf dem llama-Port),
 `3` Doctor-/Boot-Gate-Fehlschlag, `4` Laufzeitfehler.
 
 Interaktive Sessions laufen in der tmux-Session `komki` auf einem eigenen

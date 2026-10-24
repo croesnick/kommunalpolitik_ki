@@ -751,6 +751,71 @@ defmodule KomkiCli.Steps do
     e -> {:error, "up fehlgeschlagen: " <> exception_reason(e), 2}
   end
 
+  @doc """
+  Startet alles, wenn llama oder der Vermittler nicht laufen (Ticket #176:
+  `run` und `session` ohne vorheriges `komki up`). `:already`, wenn beide
+  laufen oder ein Zustand vorliegt, den die folgenden Pruefungen klar melden
+  (fremder Prozess, stale pidfile).
+  """
+  @spec ensure_up() :: :already | result()
+  def ensure_up do
+    path = Config.config_path(Config.default_base())
+
+    # Ohne Instanz versucht ensure_up nichts; die folgenden Pruefungen
+    # melden die fehlende config.json wie bisher.
+    with true <- File.exists?(path),
+         cfg = Config.load!(path),
+         true <- Llama.status(cfg) == :stopped or Mediator.status(cfg) == :stopped do
+      up(%{})
+    else
+      false -> :already
+    end
+  rescue
+    e -> {:error, "Start fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  @doc """
+  Journal pruefen (Ticket #176): ruft `komki-mediator verify-journal` fuer
+  die Instanz auf und liefert dessen JSON-Ergebnis strukturiert.
+  """
+  @spec journal_verify() :: {:journal, map()} | {:error, String.t(), 2..4}
+  def journal_verify do
+    cfg = load_cfg!()
+
+    cond do
+      not is_binary(cfg.mediator_bin) ->
+        {:error,
+         "komki-mediator nicht gefunden — 'make komki' im Repo, dann 'komki init --force'", 2}
+
+      not is_binary(cfg.escript_bin) ->
+        {:error, "Erlang-escript nicht gefunden (config.json: escript_bin)", 2}
+
+      true ->
+        {out, code} =
+          System.cmd(
+            cfg.escript_bin,
+            [cfg.mediator_bin, "verify-journal", "--base", cfg.base_dir],
+            stderr_to_stdout: true
+          )
+
+        journal_result(out, code)
+    end
+  rescue
+    e -> {:error, "journal verify fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  defp journal_result(out, code) do
+    case JSON.decode(out |> String.split("\n", trim: true) |> List.last() |> to_string()) do
+      {:ok, %{"result" => _} = result} ->
+        {:journal, result}
+
+      _ ->
+        {:error,
+         "journal verify: unerwartete Ausgabe (exit " <>
+           to_string(code) <> "): " <> String.slice(out, 0, 300), 4}
+    end
+  end
+
   # Praesenz-Pflicht sitzt HIER (up), nicht in init: der Vermittler-Binary
   # ist optional bei init, aber Pflicht zum Start (Ticket #102).
   defp mediator_up(cfg) do
@@ -869,13 +934,35 @@ defmodule KomkiCli.Steps do
   # Modell, das sein Werkzeug nicht fand, ueber zehn Minuten Schleifen.
   @run_timeout_s 600
 
-  @spec run(%{String.t() => term()}) :: result()
-  def run(opts) do
+  # `on_start` bekommt das up-Ergebnis, wenn run/session erst starten mussten
+  # (Ticket #176); die CLI zeigt damit die Startzeilen sofort an.
+  @type on_start :: (result() -> any())
+
+  @spec run(%{String.t() => term()}, on_start()) :: result()
+  def run(opts, on_start \\ fn _ -> :ok end) do
     with {:ok, mode} <- mode_from(Map.get(opts, "mode", "text")),
-         :ok <- timeout_valid(Map.get(opts, "timeout", @run_timeout_s)) do
+         :ok <- timeout_valid(Map.get(opts, "timeout", @run_timeout_s)),
+         :ok <- start_if_needed(on_start) do
       run_checked(opts, mode)
     else
       {:error, reason} -> {:error, reason, 2}
+      {:error, _reason, _code} = error -> error
+    end
+  end
+
+  # Nach der Usage-Pruefung, vor dem Doctor: fehlt llama oder der
+  # Vermittler, startet komki alles (wie `up`).
+  defp start_if_needed(on_start) do
+    case ensure_up() do
+      :already ->
+        :ok
+
+      {:up, _} = up ->
+        on_start.(up)
+        :ok
+
+      {:error, _reason, _code} = error ->
+        error
     end
   end
 
@@ -1080,8 +1167,14 @@ defmodule KomkiCli.Steps do
   "open terminal failed: not a terminal"). `--continue` setzt die letzte
   Session fort (pi-Flag gleichen Namens), `--detach` startet ohne attach.
   """
-  @spec session(%{String.t() => String.t()}) :: result()
-  def session(opts) do
+  @spec session(%{String.t() => String.t()}, on_start()) :: result()
+  def session(opts, on_start \\ fn _ -> :ok end) do
+    with :ok <- start_if_needed(on_start) do
+      session_checked(opts)
+    end
+  end
+
+  defp session_checked(opts) do
     case run_checks(:full) do
       {:checks, _checks, :ok} ->
         execute_session(opts)

@@ -19,7 +19,7 @@ defmodule KomkiCli.Keychain do
   # security(1): Exit 44 = errSecItemNotFound
   @not_found 44
 
-  @type error :: :missing | :timeout | {:failed, integer()}
+  @type error :: :missing | :timeout | :invalid | {:failed, integer()}
 
   @doc "Wert eines generischen Passworts lesen."
   @spec fetch(String.t(), keyword()) :: {:ok, String.t()} | {:error, error()}
@@ -48,12 +48,48 @@ defmodule KomkiCli.Keychain do
     end
   end
 
+  @doc """
+  Wert als generisches Passwort ablegen oder ersetzen (Ticket #176,
+  `komki secret set`). Der Wert steht nie in argv (dort saehe ihn jeder
+  Prozess per `ps`): `security add-generic-password ... -w` ohne Wert liest
+  ohne Terminal zweimal von stdin (Eingabe und Wiederholung), komki
+  schreibt ihn genau dorthin. Ausgaben von `security` werden verworfen.
+  """
+  @spec store(String.t(), String.t(), keyword()) :: :ok | {:error, error()}
+  def store(service, value, opts \\ []) when is_binary(service) and is_binary(value) do
+    if value == "" or String.contains?(value, ["\n", "\r"]) do
+      {:error, :invalid}
+    else
+      command = Keyword.get(opts, :command, Application.get_env(:komki_cli, :security, @security))
+      account = Keyword.get(opts, :account, System.get_env("USER") || "komki")
+
+      port =
+        Port.open({:spawn_executable, command}, [
+          :binary,
+          :exit_status,
+          :use_stdio,
+          :stderr_to_stdout,
+          args: ["add-generic-password", "-s", service, "-a", account, "-U", "-w"]
+        ])
+
+      Port.command(port, value <> "\n" <> value <> "\n")
+
+      case collect(port, [], System.monotonic_time(:millisecond) + @timeout_ms) do
+        {:ok, _prompts} -> :ok
+        {:error, _} = error -> error
+      end
+    end
+  end
+
   @doc "Fehler als Text ohne Wert (fuer Doctor und Logs)."
   @spec describe(String.t(), error()) :: String.t()
   def describe(service, :missing), do: "Schluesselbund-Eintrag '" <> service <> "' fehlt"
 
   def describe(service, :timeout),
     do: "Schluesselbund-Abfrage '" <> service <> "' nach Timeout abgebrochen"
+
+  def describe(service, :invalid),
+    do: "Wert fuer '" <> service <> "' ist leer oder enthaelt einen Zeilenumbruch"
 
   def describe(service, {:failed, code}),
     do:
