@@ -1,0 +1,50 @@
+# Homebrew-Formel fuer komki (Ticket #180). Vorlage: `make komki-formel`
+# setzt Version und Pruefsumme des Pakets ein und schreibt komki.rb fuer das
+# Tap-Repo croesnick/homebrew-komki.
+class Komki < Formula
+  desc "Lokaler KI-Arbeitsraum für die Ratsarbeit, gesandboxt und mit Quellen"
+  homepage "https://croesnick.github.io/kommunalpolitik_ki/"
+  url "https://github.com/croesnick/kommunalpolitik_ki/releases/download/komki-v@VERSION@/komki-@VERSION@-macos-arm64.tar.gz"
+  sha256 "@SHA256@"
+  license "MIT"
+
+  depends_on arch: :arm64
+  depends_on :macos
+  depends_on "erlang"
+  depends_on "llama.cpp"
+  depends_on "node"
+  depends_on "tmux"
+
+  # pi in fester Version: komki nutzt genau diese, nicht eine global per npm
+  # installierte (Plan docs/research/2026-10-24-komki-devx-installation.md, V3).
+  resource "pi" do
+    url "https://registry.npmjs.org/@earendil-works/pi-coding-agent/-/pi-coding-agent-1.4.0.tgz"
+    sha256 "d155c16ef6fa00960fbf58b2911536e80b05f33700e0b14fbd08967ede0c7428"
+  end
+
+  def install
+    # Escript mit allen Rollen und daneben die SQLite-NIF (lib/exqlite)
+    libexec.install "komki", "lib"
+    # pi nach libexec/lib/node_modules; komki sucht dort zuerst
+    resource("pi").stage do
+      system "npm", "install", *std_npm_args(prefix: libexec)
+    end
+    # Das Escript startet mit Homebrews Erlang, auch wenn ein anderes im PATH liegt
+    (bin/"komki").write_env_script libexec/"komki", PATH: "#{Formula["erlang"].opt_bin}:$PATH"
+  end
+
+  def caveats
+    <<~EOS
+      Einrichten (prüft alles, lädt beim ersten Mal das Modell, 17 GB):
+        komki setup
+
+      Nach einem Upgrade einmal `komki setup` ausführen: Es frischt
+      Programmpfade und Sandbox-Profile auf, Einstellungen bleiben.
+    EOS
+  end
+
+  test do
+    assert_match "komki @VERSION@", shell_output("#{bin}/komki version")
+    assert_match "komki-egress < config.json", shell_output("#{bin}/komki komki-egress --help")
+  end
+end

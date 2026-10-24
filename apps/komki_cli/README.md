@@ -61,6 +61,27 @@ Details und Fallbacks: [`docs/prerequisites.md`](../../docs/prerequisites.md).
 mix escript.build   # erzeugt ./komki (Dev-Weg; braucht Elixir/OTP auf dem Host)
 ```
 
+## Veröffentlichen über Homebrew
+
+Nutzende installieren komki mit `brew install croesnick/komki/komki`. Die
+Formel installiert das Escript mit allen Rollen, daneben die SQLite-NIF und
+pi in fester Version, und zieht `erlang`, `llama.cpp`, `node` und `tmux`
+als Abhängigkeiten nach. Erlang und Elixir des Repos (`.tool-versions`)
+folgen deshalb Homebrews aktueller `erlang`-Version.
+
+Ein Release in drei Schritten:
+
+1. Version in `apps/komki_cli/mix.exs` erhöhen und mergen.
+2. Tag setzen: `git tag komki-v<version> && git push origin komki-v<version>`.
+   Der Workflow `komki-release` baut auf Apple Silicon das Paket
+   (`make komki-paket`) und die Formel (`make komki-formel`) und hängt
+   beides an das GitHub-Release.
+3. `komki.rb` aus dem Release als `Formula/komki.rb` ins Tap-Repo
+   `croesnick/homebrew-komki` legen.
+
+Lokal lässt sich beides mit `make komki-formel` bauen (Ergebnis unter
+`dist/`).
+
 ## Verteilen: eine Datei statt Ordner (Burrito)
 
 Für Rechner ohne installiertes Elixir baut Burrito das Release in eine einzige

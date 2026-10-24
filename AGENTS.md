@@ -274,6 +274,8 @@ in `endpoint.ex` als Plug eingetragen (nur `:dev`).
 
 Die Python-Version steht zentral in `.tool-versions` am Repo-Root: asdf und uv lesen die Datei direkt, die CI parst sie für `setup-python` (python.yml). Änderungen dort greifen damit überall.
 
+Ebenso Erlang und Elixir: `.tool-versions` pinnt sie für asdf, und die CI liest dieselbe Datei (`setup-beam` mit `version-file`). Die Versionen folgen Homebrews aktuellem `erlang`, weil die komki-Formel davon abhängt (`packaging/homebrew/`).
+
 ### CI
 
 **Maßgeblich sind die Workflows unter [`.github/workflows/`](.github/workflows/)**: [`ci.yml`](.github/workflows/ci.yml) für Elixir, [`python.yml`](.github/workflows/python.yml) für die Python-Tools und die losen Skripte, [`docs-links.yml`](.github/workflows/docs-links.yml) für Markdown-Links. Dort stehen die exakten Befehle samt Begründungen. Kurzfassung (kein Ersatz für die Dateien):

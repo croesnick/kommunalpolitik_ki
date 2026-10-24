@@ -144,13 +144,17 @@ defmodule KomkiCli.Config do
   end
 
   @doc """
-  pi-Bundle-Entdeckung (cli.js): globale node_modules-Roots — zuerst die
-  zum entdeckten node gehoerige (asdf/nvm-Layout: `<install>/lib`),
-  dann Homebrew ARM und Intel. nil, wenn das Bundle nirgends liegt.
+  pi-Bundle-Entdeckung (cli.js): zuerst das pi, das neben komki liegt
+  (Homebrew-Formel, Ticket #180: gepinnte Version in `libexec/lib`), dann
+  die globalen node_modules-Roots — die zum entdeckten node gehoerige
+  (asdf/nvm-Layout: `<install>/lib`), dann Homebrew ARM und Intel. nil,
+  wenn das Bundle nirgends liegt.
   """
   @spec resolve_cli_js(String.t() | nil) :: String.t() | nil
   def resolve_cli_js(node_bin) do
-    roots = install_lib_roots(node_bin) ++ ["/opt/homebrew/lib", "/usr/local/lib"]
+    roots =
+      bundled_lib_roots() ++
+        install_lib_roots(node_bin) ++ ["/opt/homebrew/lib", "/usr/local/lib"]
 
     Enum.find_value(roots, fn root ->
       candidate = Path.join(root, @pi_bundle_rel)
@@ -300,6 +304,14 @@ defmodule KomkiCli.Config do
 
       if File.exists?(candidate), do: canonical(candidate), else: nil
     end)
+  end
+
+  # Neben dem laufenden komki (Formel-Layout libexec/komki + libexec/lib).
+  defp bundled_lib_roots do
+    case self_komki() do
+      nil -> []
+      komki -> [Path.join(Path.dirname(komki), "lib")]
+    end
   end
 
   # asdf/nvm-Layout: <install>/bin/node -> <install>/lib liegt der globale

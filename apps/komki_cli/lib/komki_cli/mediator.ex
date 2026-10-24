@@ -40,7 +40,6 @@ defmodule KomkiCli.Mediator do
   """
 
   alias KomkiCli.{Channel, Config, MediatorProfile, Proc, Profile}
-  require Config
 
   @health_timeout_ms 10_000
   # Vermittler-Boot ist schnell (escript, keine 17-GB-GGUF): kuerzerer

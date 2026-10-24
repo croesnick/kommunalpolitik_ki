@@ -1,4 +1,4 @@
-.PHONY: test lint format ci deps elixir-test python-test install komki
+.PHONY: test lint format ci deps elixir-test python-test install komki komki-paket komki-formel
 
 # Escript bauen und nach /usr/local/bin symlinken.
 # Workspace-Pattern: mix.exs der ratsinfo-App referenziert ../artifacts/deps
@@ -23,6 +23,24 @@ komki:
 	@echo ""
 	@echo "komki gebaut: $(KOMKI_LINK_DIR)/komki"
 	@echo "Weiter mit: komki setup"
+
+# Paket fuer die Homebrew-Formel (Ticket #180): das Escript (prod) und die
+# SQLite-NIF von exqlite nebeneinander, als dist/komki-<version>-macos-arm64.tar.gz.
+KOMKI_VERSION = $(shell grep -m1 'version:' apps/komki_cli/mix.exs | sed 's/.*"\(.*\)".*/\1/')
+KOMKI_PAKET = dist/komki-$(KOMKI_VERSION)-macos-arm64
+komki-paket:
+	@cd apps/komki_cli && MIX_ENV=prod mix deps.get >/dev/null && MIX_ENV=prod mix escript.build
+	@rm -rf "$(KOMKI_PAKET)" && mkdir -p "$(KOMKI_PAKET)/lib/exqlite"
+	@cp apps/komki_cli/komki "$(KOMKI_PAKET)/komki"
+	@cp -R apps/komki_cli/_build/prod/lib/exqlite/ebin apps/komki_cli/_build/prod/lib/exqlite/priv "$(KOMKI_PAKET)/lib/exqlite/"
+	@tar -C dist -czf "$(KOMKI_PAKET).tar.gz" "$(notdir $(KOMKI_PAKET))"
+	@shasum -a 256 "$(KOMKI_PAKET).tar.gz"
+
+# Formel fuer das Tap-Repo aus der Vorlage: Version und Pruefsumme des Pakets.
+komki-formel: komki-paket
+	@sha=$$(shasum -a 256 "$(KOMKI_PAKET).tar.gz" | cut -d' ' -f1); \
+	  sed -e "s/@VERSION@/$(KOMKI_VERSION)/g" -e "s/@SHA256@/$$sha/" packaging/homebrew/komki.rb.in > dist/komki.rb
+	@echo "Formel geschrieben: dist/komki.rb (ins Tap-Repo croesnick/homebrew-komki als Formula/komki.rb)"
 
 deps:
 	mix deps.get

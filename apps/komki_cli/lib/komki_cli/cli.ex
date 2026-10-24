@@ -106,6 +106,8 @@ defmodule KomkiCli.CLI do
     base = Path.dirname(:escript.script_name())
 
     paths = [
+      # Paket-Layout (Ticket #180): komki und lib/exqlite nebeneinander
+      Path.join([base, "lib/exqlite/ebin"]),
       Path.join([base, "_build/dev/lib/exqlite/ebin"]),
       Path.join([base, "../_build/dev/lib/exqlite/ebin"]),
       Path.join([Application.app_dir(:exqlite), "ebin"])

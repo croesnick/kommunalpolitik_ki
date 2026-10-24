@@ -1,0 +1,46 @@
+# komki-Release (Ticket #180): ein Tag `komki-v<version>` baut das Paket fuer
+# die Homebrew-Formel auf Apple Silicon und haengt Paket und fertige Formel
+# an ein GitHub-Release. Die Formel kommt danach von Hand ins Tap-Repo
+# croesnick/homebrew-komki (Formula/komki.rb). Den Tag setzt der Mensch
+# (GO-Prinzip): git tag komki-v0.1.0 && git push origin komki-v0.1.0
+name: komki-release
+
+on:
+  push:
+    tags:
+      - 'komki-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  paket:
+    name: Paket und Formel
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Erlang/Elixir einrichten
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Version pruefen (Tag = mix.exs)
+        run: |
+          version=$(grep -m1 'version:' apps/komki_cli/mix.exs | sed 's/.*"\(.*\)".*/\1/')
+          test "komki-v${version}" = "${GITHUB_REF_NAME}" || { echo "Tag ${GITHUB_REF_NAME} passt nicht zu Version ${version}"; exit 1; }
+
+      - name: Paket und Formel bauen
+        run: |
+          mix deps.get
+          make komki-formel
+
+      - name: Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/komki-*-macos-arm64.tar.gz dist/komki.rb \
+            --title "komki ${GITHUB_REF_NAME#komki-v}" \
+            --notes "Installation: brew install croesnick/komki/komki, danach komki setup. Formel: komki.rb (ins Tap-Repo)."
