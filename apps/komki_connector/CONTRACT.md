@@ -103,7 +103,7 @@ Einzige Quelle für Fassung, Operationen, Netz, Dateisystem, Credentials und Imp
 | `fs` | Platzhalter-Pfade (`{vault_dir}`) mit Modus `read` oder `write` |
 | `credentials` | Name → Keychain-Service (`security find-generic-password -s <service> -w`) |
 | `environment` | Umgebung für `emit` (modellierte Empfänger der Anfrage), z. B. `web-suche@1` |
-| `import_labels` | erlaubte Labels für Antworten. Bei RIS und Web genau eines, bei Vault eine Menge, aus der die Notiz wählt |
+| `import_labels` | erlaubte Labels für Antworten. Bei RIS und Web genau eines, bei Vault eine Menge, aus der die Notiz wählt. Vault umfasst alle vier Bindungen, weil geschriebene Notizen λ(y) = B_W tragen (§6.3) und im selben Raum wieder lesbar sein müssen |
 
 Parameter-Schemas sind geschlossen: Typ `string` (mit `max` Zeichen und optional `pattern`) oder `integer`
 (mit `min`/`max`). Unbekannte Felder sind ein Fehler. Kein Parameter nimmt eine URL, einen absoluten Pfad

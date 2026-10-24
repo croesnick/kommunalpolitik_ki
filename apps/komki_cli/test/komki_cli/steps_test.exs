@@ -151,7 +151,7 @@ defmodule KomkiCli.StepsTest do
   end
 
   describe "require_mediator_up/1 (Liveness-Gate vor pi)" do
-    test "kein pidfile, stiller Port: Abbruch mit 'komki up'-Hinweis (Exit 2)" do
+    test "kein pidfile, stiller Socket: Abbruch mit 'komki up'-Hinweis (Exit 2)" do
       cfg = med_gate_cfg("komki-steps-med")
 
       assert {:error, reason, 2} = Steps.require_mediator_up(cfg)
@@ -198,7 +198,8 @@ defmodule KomkiCli.StepsTest do
   end
 
   defp med_gate_cfg(prefix) do
-    %{TestSupport.fixture_cfg(TestSupport.tmp_area!(prefix)) | mediator_port: 1}
+    # Kein Token, kein Socket: healthz scheitert sicher (Ticket #143).
+    TestSupport.fixture_cfg(TestSupport.tmp_area!(prefix))
   end
 
   describe "up/down-Reihenfolge (Ticket #146)" do

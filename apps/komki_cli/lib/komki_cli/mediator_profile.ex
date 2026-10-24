@@ -10,8 +10,10 @@ defmodule KomkiCli.MediatorProfile do
     * Erstprovisionierung: registry.json, room.json und documents/ anlegen
       (`KomkiMediator.Templates.provision!/1` schreibt sie beim ersten Start),
     * Log schreiben,
-    * den eigenen Kanal binden: heute Loopback-TCP auf `mediator_port`,
-      Ziel (#143) der Unix-Socket `<base>/run/mediator.sock` mit Token-Datei,
+    * den eigenen Kanal binden (#143): den Unix-Socket
+      `<base>/run/mediator.sock` (binden, annehmen, 0600, alten entfernen)
+      und die Token-Datei `<base>/run/mediator.token` lesen; die Variante
+      `{:tcp, port}` bleibt fuer Tests und Altinstanzen generierbar,
     * `network-outbound` nur auf die Connector-Sockets
       `<base>/run/connectors/<id>.sock` (alle Manifest-IDs, damit der Text
       nicht vom Vault-Schalter abhaengt).
@@ -20,7 +22,7 @@ defmodule KomkiCli.MediatorProfile do
   laesst sich nicht verschachteln; `komki up` startet die Connectoren).
   """
 
-  alias KomkiCli.{Config, ConnectorProfile, EscriptProfile, Mediator}
+  alias KomkiCli.{Channel, Config, ConnectorProfile, EscriptProfile, Mediator}
   alias KomkiConnector.Manifest
 
   @type listen :: {:tcp, pos_integer()} | {:unix, String.t()}
@@ -29,12 +31,11 @@ defmodule KomkiCli.MediatorProfile do
   @spec path(Config.t()) :: String.t()
   def path(%Config{} = cfg), do: Path.join(Path.dirname(cfg.profile_path), "mediator.sb")
 
-  @doc "Socket- und Token-Pfad des Ziel-Kanals (CONTRACT.md §2, #143)."
+  @doc "Socket-Pfad des Kanals (CONTRACT.md §2, #143; Quelle `KomkiCli.Channel`)."
   @spec socket_path(Config.t()) :: String.t()
-  def socket_path(%Config{} = cfg), do: Path.join([cfg.base_dir, "run", "mediator.sock"])
+  def socket_path(%Config{} = cfg), do: Channel.socket_path(cfg)
 
-  @spec token_path(Config.t()) :: String.t()
-  def token_path(%Config{} = cfg), do: Path.join([cfg.base_dir, "run", "mediator.token"])
+  defp token_path(cfg), do: Channel.token_path(cfg)
 
   @doc "Profiltext fuer den Kanal `listen`."
   @spec generate(Config.t(), listen()) :: String.t()
@@ -83,20 +84,23 @@ defmodule KomkiCli.MediatorProfile do
     ]
   end
 
-  # Heute (bis #143): Loopback-TCP auf dem Vermittler-Port.
+  # Altform: Loopback-TCP auf einem Port (vor #143).
   defp listen_rules(_cfg, {:tcp, port}) do
     [
-      "; Kanal pi -> Vermittler: Loopback-TCP (bis #143)",
+      "; Kanal pi -> Vermittler: Loopback-TCP (Altform vor #143)",
       "(allow network-bind (local ip \"localhost:" <> Integer.to_string(port) <> "\"))",
       "(allow network-inbound (local ip))"
     ]
   end
 
-  # Ziel (#143): Unix-Socket unter <base>/run mit Bearer-Token-Datei.
+  # #143: Unix-Socket unter <base>/run mit Bearer-Token-Datei.
   defp listen_rules(cfg, {:unix, socket}) do
-    ["; Kanal pi -> Vermittler: Unix-Socket (CONTRACT.md §8)"] ++
+    ["; Kanal pi -> Vermittler: Unix-Socket (CONTRACT.md §8), Token nur lesen"] ++
       ConnectorProfile.socket_bind_rules(socket) ++
-      ["(allow file-read* (literal \"" <> token_path(cfg) <> "\"))"]
+      [
+        "(allow network-inbound (local unix-socket (path-literal \"" <> socket <> "\")))",
+        "(allow file-read* (literal \"" <> token_path(cfg) <> "\"))"
+      ]
   end
 
   defp listen_paths({:tcp, _port}, _cfg), do: []

@@ -31,8 +31,7 @@ defmodule KomkiCli.ConnectorProfileTest do
         },
         egress_ports: %{"ris" => 49_531, "web" => 49_532},
         ris_mock_port: nil,
-        vault_dir: @base <> "/vault",
-        mediator_port: 49_525
+        vault_dir: @base <> "/vault"
     }
 
     struct!(base, overrides)

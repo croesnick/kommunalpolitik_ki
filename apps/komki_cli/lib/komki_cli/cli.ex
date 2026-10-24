@@ -10,7 +10,7 @@ defmodule KomkiCli.CLI do
 
       komki version
       komki version
-      komki init  [--gguf-from PATH] [--port N] [--mediator-port N] [--ctx N]
+      komki init  [--gguf-from PATH] [--port N] [--ctx N]
                   [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--force]
       komki doctor
       komki up    [--ctx N]
@@ -143,12 +143,6 @@ defmodule KomkiCli.CLI do
               long: "port",
               parser: :integer,
               help: "llama-server-Port (default 49524, gepinnt)"
-            ],
-            mediator_port: [
-              value_name: "N",
-              long: "mediator-port",
-              parser: :integer,
-              help: "Vermittler-MCP-Port (default 49525)"
             ],
             ctx: [
               value_name: "N",
@@ -648,11 +642,11 @@ defmodule KomkiCli.CLI do
               "base:          " <> cfg.base_dir,
               "gguf:          " <> cfg.gguf_path,
               "port:          " <> to_string(cfg.port),
-              "mediator-port: " <> to_string(cfg.mediator_port),
+              "mediator-sock: " <> KomkiCli.Channel.socket_path(cfg),
               "llama:         " <> state_line(llama_state, "/health")
             ] ++
               Enum.map(connectors, fn {name, state} ->
-                String.pad_trailing(name <> ":", 15) <> state_line(state, "")
+                String.pad_trailing(name <> ":", 17) <> state_line(state, "")
               end) ++
               ["mediator:      " <> state_line(mediator_state, "/healthz")],
             "\n"
@@ -831,7 +825,7 @@ defmodule KomkiCli.CLI do
         "profile:    " <> cfg.profile_path,
         "pi-home:    " <> cfg.pi_home,
         "port:       " <> to_string(cfg.port),
-        "mediator-port: " <> to_string(cfg.mediator_port),
+        "mediator-sock: " <> KomkiCli.Channel.socket_path(cfg),
         "ctx:        " <> to_string(cfg.ctx)
       ] ++ gguf_lines
 

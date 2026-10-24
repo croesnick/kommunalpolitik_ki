@@ -79,6 +79,44 @@ defmodule KomkiMediator.TemplatesTest do
            }
   end
 
+  # Γ-Konventionen des Connector-Vertrags §7.
+  test "Registry traegt Beobachter, Umgebungen und Connector-Bindungen nach §7" do
+    registry = Templates.registry()
+
+    assert registry["observers"] == [
+             "brave-search",
+             "nutzende-person",
+             "pi-agent",
+             "ris-betreiber"
+           ]
+
+    assert registry["fact_fields"]["output_content_digest"] == "string"
+
+    assert registry["environments"]["web-suche@1"]["observers"] == [
+             "brave-search",
+             "nutzende-person",
+             "pi-agent"
+           ]
+
+    assert registry["environments"]["ris-abruf@1"]["observers"] == [
+             "nutzende-person",
+             "pi-agent",
+             "ris-betreiber"
+           ]
+
+    for binding <- ["ris-oeffentlich@1", "web-oeffentlich@1", "vault-oeffentlich@1"] do
+      assert registry["bindings"][binding]["readers"] == registry["observers"]
+      assert registry["bindings"][binding]["operations"] == %{"admit" => true, "emit" => true}
+    end
+
+    assert registry["bindings"]["vault-vertraulich@1"]["readers"] == [
+             "nutzende-person",
+             "pi-agent"
+           ]
+
+    assert {:ok, _} = KomkiPolicy.Registry.compile(registry)
+  end
+
   defp room_decisions(base) do
     {:ok, gamma} = Gamma.load(Path.join([base, "mediator", "registry.json"]))
     {:ok, room} = Room.load(Path.join(base, "mediator"))

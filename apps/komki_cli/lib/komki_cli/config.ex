@@ -7,8 +7,9 @@ defmodule KomkiCli.Config do
   SHA256, pi-Home, Node-Interpreter, pi-Bundle, llama-server- und
   sandbox-exec-Pfade; optional die pi-Such-Werkzeuge fd/rg und der
   Vermittler-Binary `komki-mediator` (nil, wenn auf dem Host nicht entdeckt —
-  Ticket #102). Der Vermittler-MCP-Port ist eigener Pflicht-Schlüssel
-  (default 49525, neben dem llama-Port 49524 gepinnt).
+  Ticket #102). Einen Vermittler-Port gibt es seit Ticket #143 nicht mehr:
+  der Vermittler lauscht auf `<base>/run/mediator.sock` (`KomkiCli.Channel`);
+  ein `mediator_port` in aelteren config.json wird ignoriert.
 
   Connectoren und Egress (Ticket #146, CONTRACT.md §2/§4/§9), alle optional
   (aeltere config.json laden mit Defaults):
@@ -34,7 +35,6 @@ defmodule KomkiCli.Config do
   @enforce_keys [
     :base_dir,
     :port,
-    :mediator_port,
     :ctx,
     :gguf_path,
     :gguf_sha256,
@@ -63,7 +63,6 @@ defmodule KomkiCli.Config do
   @type t :: %__MODULE__{
           base_dir: String.t(),
           port: pos_integer(),
-          mediator_port: pos_integer(),
           ctx: pos_integer(),
           gguf_path: String.t(),
           gguf_sha256: String.t(),
@@ -100,9 +99,6 @@ defmodule KomkiCli.Config do
 
   @default_sandbox_exec "/usr/bin/sandbox-exec"
   @default_port 49_524
-  # Vermittler-MCP-Port (Ticket #102): eigener Loopback-Port neben dem
-  # llama-Port; komki-mediator lauscht dort (healthz + POST /mcp).
-  @default_mediator_port 49_525
   # Nutzer-Präferenz «große Kontexte» bei 64 GB RAM: 128K ist der Default;
   # Gemma 4 hält den KV-Cache via SWA klein.
   @default_ctx 131_072
@@ -363,7 +359,6 @@ defmodule KomkiCli.Config do
     %__MODULE__{
       base_dir: base,
       port: opts[:port] || @default_port,
-      mediator_port: opts[:mediator_port] || @default_mediator_port,
       ctx: opts[:ctx] || @default_ctx,
       gguf_path: Path.join([base, "models", @model_filename]),
       gguf_sha256: @expected_gguf_sha256,
@@ -444,7 +439,6 @@ defmodule KomkiCli.Config do
   @keys [
     :base_dir,
     :port,
-    :mediator_port,
     :ctx,
     :gguf_path,
     :gguf_sha256,
@@ -480,7 +474,7 @@ defmodule KomkiCli.Config do
         {:ok, from_complete_map(map)}
 
       _ ->
-        # Neuer Pflicht-Key (z.B. mediator_port seit Ticket #102) in einer
+        # Neuer Pflicht-Key in einer
         # aelteren Instanz: der Recovery-Weg ist direkt im Fehlertext.
         {:error,
          "config.json: missing key(s): " <>
@@ -493,7 +487,6 @@ defmodule KomkiCli.Config do
     %__MODULE__{
       base_dir: map["base_dir"],
       port: require_pos(:port, map["port"]),
-      mediator_port: require_pos(:mediator_port, map["mediator_port"]),
       ctx: require_pos(:ctx, map["ctx"]),
       gguf_path: map["gguf_path"],
       gguf_sha256: map["gguf_sha256"],

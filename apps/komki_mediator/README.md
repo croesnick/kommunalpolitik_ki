@@ -9,37 +9,55 @@ realisierten Payloads gegen den Regelstand Γ, BEVOR sie zur MCP-Antwort
 wird). Fuer jeden Aufruf entsteht ein PDR-Auditdatensatz
 im Journal.
 
+Fassung `komki-mediator/2` (Ticket #144): neben `ping` und `admit_document`
+bietet der Vermittler die sechs Connector-Tools `ris_search`, `ris_show`,
+`web_search`, `vault_search`, `vault_read` und `vault_write_test` an. Jeder
+Connector-Aufruf laeuft als emit → Vollzug → admit mit zwei PDR
+(`apps/komki_connector/CONTRACT.md` §6).
+
 ## Architektur im komki-Lauf
 
 Vier Fragen, vier kurze Antworten — die Diagramme darunter zeigen dasselbe
 als Bild:
 
 * Wo laeuft er? Als eigener OS-Prozess (der Escript `komki-mediator`)
-  auf dem komki-Host, erreichbar nur ueber Loopback
-  `127.0.0.1:<mediator_port>` (Default 49525, einstellbar bei
-  `komki init --mediator-port`). Er laeuft selbst nicht unter einer
+  auf dem komki-Host, erreichbar nur ueber den Unix-Socket
+  `<base>/run/mediator.sock` (Rechte 0600, Ticket #143) und nur mit dem
+  Bearer-Token aus `<base>/run/mediator.token`. Einen TCP-Listener gibt es
+  nicht mehr. Er laeuft selbst nicht unter einer
   Seatbelt-Grenze: er ist die Durchsetzungsstelle, nicht der Gefangene.
   Sandgeboxt ist pi, die Gegenseite.
 * Wer startet ihn? `komki up` (KomkiCli.Steps), in fester Reihenfolge:
   erst llama-server, dann der Vermittler. Der Start erfolgt detached
-  (nohup), das pidfile liegt unter `base/tmp/komki-mediator.pid`, das Log
-  unter `base/tmp/mediator.log`; danach pollt `komki up` healthz (max. 30 s)
+  (nohup) mit `--socket` und `--token-file`; vorher schreibt `komki up` ein
+  neues Token. Das pidfile liegt unter `base/tmp/komki-mediator.pid`, das Log
+  unter `base/tmp/mediator.log`; danach pollt `komki up` healthz ueber den
+  Socket mit Token (max. 30 s)
   und bricht bei Timeout mit Log-Tail ab. Die Binary ist Start-Pflicht:
   fehlt sie, verweigert `komki up` (Praesenz-Pflicht sitzt beim Start, nicht
   bei init — Entdeckung: PATH, dann `<base>/bin/komki-mediator`).
   `komki down` stoppt per pidfile mit Identitaetscheck, `komki doctor`
   prueft die Binary, `komki run` und `komki session` verweigern frueh,
   wenn der Vermittler unten ist.
-* Wer gibt ihm Daten? Zwei Quellen. Erstens der Raum unter
+* Wer gibt ihm Daten? Drei Quellen. Erstens der Raum unter
   `<base>/mediator/` (`registry.json` mit Gamma, `room.json`, `documents/`)
   — einmal beim Boot gelesen. Zweitens pi als einziger Client, per
-  `POST /mcp` (MCP StreamableHTTP). pi findet den Vermittler ueber die
-  `mcp.json` im pi-Home (`<base>/pi-home/.pi/agent/mcp.json`), die `komki up`
-  aus der healthz-Antwort schreibt: Server `komki`, exposure `hidden`, genau
-  die Fassung-Tools `direct`, keine Auth-Felder. pi laeuft mit
+  `POST /mcp` (MCP StreamableHTTP). pis MCP-Client kann keinen Unix-Socket;
+  pi startet deshalb `komki-relay.js` (aus komki_cli) als stdio-MCP-Server,
+  das jede JSON-RPC-Zeile als `POST /mcp` ueber den Socket schickt, mit
+  `Authorization: Bearer`, `X-Komki-Session` und `Mcp-Session-Id`. Die
+  `mcp.json` im pi-Home (`<base>/pi-home/.pi/agent/mcp.json`) schreibt
+  `komki up` aus der healthz-Antwort: Server `komki` (command = node, args =
+  Relay), exposure `hidden`, genau die Fassung-Tools `direct`, Token und
+  Session-ID nur als `${…}`-Verweis auf pis Umgebung. pi laeuft mit
   `--no-extensions -e builtin:mcp`; sein Seatbelt-Profil erlaubt
-  Netz-Auswaerts nur zu zwei Loopback-Literals: llama-Port und
-  Vermittler-Port. Auf pi-Seite heissen die Tools `mcp__komki__<tool>`.
+  Netz-Auswaerts nur zum llama-Port und zum Socket-Pfad des Vermittlers.
+  Auf pi-Seite heissen die Tools `mcp__komki__<tool>`.
+  Drittens die Connectoren (RIS, Web, Vault): je ein eigener Prozess mit
+  Unix-Socket `<connectors_dir>/<id>.sock` (Default `<base>/run/connectors`,
+  einstellbar mit `--connectors-dir`). Der Vermittler ruft sie nur nach
+  einem emit-Permit und nur ueber das Frame-Protokoll
+  (`KomkiConnector.Client`, eine Verbindung je Aufruf).
 * Wem gibt er Daten zurueck? Zwei Senken. pi erhaelt die MCP-Antwort:
   permit-Inhalt, Remedy-Katalog (bei deny) oder Zurueckhaltung
   (`"admitted" => "redacted"`, ohne content) — immer mit eingebetteter
@@ -53,29 +71,33 @@ als Bild:
 
 ```mermaid
 flowchart TB
-    subgraph host["komki-Host (alles Loopback)"]
+    subgraph host["komki-Host (alles lokal)"]
         CLI["komki up / down / status / doctor"]
         RAUM["Raum: registry.json · room.json · documents/"]
         LL["llama-server<br/>127.0.0.1:49524<br/>(eigene Seatbelt-Grenze)"]
         subgraph SB["pi unter Seatbelt (deny default)"]
             PI["pi-Session"]
+            RELAY["komki-relay.js<br/>(stdio-MCP)"]
         end
-        subgraph MEDBOX["komki-mediator: ein BEAM-Prozess · Loopback 49525"]
+        subgraph MEDBOX["komki-mediator: ein BEAM-Prozess · run/mediator.sock"]
             MED["GET /healthz · POST /mcp"]
             KOMKI_POLICY["komki_policy<br/>Derive · Verify"]
         end
         JOURNAL["PDR-Journal<br/>mediator/journal/pdr.jsonl"]
+        CONN["Connectoren ris · web · vault<br/>run/connectors/&lt;id&gt;.sock"]
     end
 
     CLI -- "startet (detached)" --> MED
     CLI -- "startet (sandbox-exec)" --> LL
     CLI -- "schreibt Profil + mcp.json" --> PI
     RAUM -- "liest beim Boot" --> MED
-    PI -- "MCP-Aufrufe" --> MED
+    PI -- "stdio" --> RELAY
+    RELAY -- "POST /mcp · Bearer-Token · Unix-Socket" --> MED
     PI -- "Inferenz" --> LL
     MED -- "Gate 1 · Gate 2" --> KOMKI_POLICY
     MED -- "PDR je Aufruf" --> JOURNAL
-    MED -. "Antwort + decision_id" .-> PI
+    MED -- "Frame nach emit-Permit" --> CONN
+    MED -. "Antwort + decision_id" .-> RELAY
 ```
 
 ### Ein Tool-Aufruf durch die Gates
@@ -110,10 +132,48 @@ sequenceDiagram
     end
 ```
 
+### Ein Connector-Aufruf (emit → Vollzug → admit)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as pi
+    participant M as Vermittler
+    participant K as komki_policy
+    participant J as PDR-Journal
+    participant C as Connector
+
+    P->>M: tools/call ris_search (params)
+    Note over M: Params.check gegen Manifest, B_W des Raums
+    alt Schemaverstoss oder kein workspace_bindings
+        M->>J: PDR (rule emit, decision error)
+        M-->>P: decision error, kein Vollzug
+    else Vorpruefung bestanden
+        M->>K: Derive.decide emit (B_W, Manifest-Umgebung, out-digest12)
+        alt deny / indeterminate
+            M->>J: PDR (rule emit, Remedies)
+            M-->>P: Remedy-Katalog, kein Vollzug
+        else permit
+            M->>J: emit-PDR (decision_id = call_id)
+            M->>C: Frame (call_id, op, params, context)
+            C-->>M: result oder error
+            Note over M: Ergebnisform §5.2, Labels aus dem Manifest
+            M->>K: Derive.decide admit (in-digest12, room.environment) + Verify.check
+            M->>J: admit-PDR (call_id)
+            M-->>P: Inhalt + labels + decision_id + emit_decision_id
+        end
+    end
+```
+
 ### Bewusste Grenzen
 
-* Kein Auth in der mcp.json. Zugangsdaten leben nur im Vermittler
-  (Forschung ticket/102, R.4.3).
+* Kein Token in der mcp.json. Das Kanal-Token reist ueber pis Umgebung
+  zum Relay; Connector-Zugangsdaten leben nur im Vermittler (Forschung
+  ticket/102, R.4.3).
+* Host nicht kompromittiert (Annahme aus #143). Das Token haelt lokale
+  Clients ohne Token fern; wer als derselbe Nutzer Prozessspeicher oder die
+  Token-Datei lesen kann, ist nicht Teil des Modells. Eine Peer-PID-Pruefung
+  gibt es deshalb nicht.
 * Kein Netz-Dienst komki_policy. Der Regel-Kern ist als Bibliothek in
   den Vermittler gebunden; pi erreicht ihn nur durch die Gates.
 * Fassung-Pin auf pi-Seite. `komki up` liest die Tool-Liste aus healthz
@@ -131,9 +191,14 @@ cd apps/komki_mediator
 mix deps.get        # aktualisiert ggf. apps/workspace.lock
 mix escript.build   # erzeugt ./komki-mediator
 
-./komki-mediator --base ~/var/komki --port 49525
-# default --base: KOMKI_HOME oder ~/.local/share/komki
-# default --port: 49525
+mkdir -m 700 -p ~/var/komki/run
+openssl rand -hex 32 | tr -d '\n' > ~/var/komki/run/mediator.token
+chmod 600 ~/var/komki/run/mediator.token
+./komki-mediator --base ~/var/komki
+# default --base:           KOMKI_HOME oder ~/.local/share/komki
+# default --socket:         <base>/run/mediator.sock
+# default --token-file:     <base>/run/mediator.token (Pflicht, sonst kein Start)
+# default --connectors-dir: <base>/run/connectors
 ```
 
 Nach dem Start erscheint eine einzeilige Startnotiz auf stdout; dann
@@ -141,12 +206,61 @@ blockiert der Escript. Im regelmaessigen Lauf uebernimmt `komki up` alle
 diese Schritte (Start, healthz-Poll, mcp.json fuer pi) — der manuelle
 Aufruf hier ist Entwicklung und Debugging vorbehalten.
 
-## HTTP-Oberflaeche (nur loopback, 127.0.0.1)
+## HTTP-Oberflaeche (nur Unix-Socket, CONTRACT §8)
 
 | Route | Zweck |
 |---|---|
 | `GET /healthz` | Status + Fassung (`fassung_id`, `tools`, `registry_id`, `gamma_hash`) |
-| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools `ping` und `admit_document` |
+| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/2` (siehe unten) |
+
+## Tools (Fassung `komki-mediator/2`)
+
+| Tool | Ablauf | Parameter |
+|---|---|---|
+| `ping` | Gate (admit) | — |
+| `admit_document` | Gate (admit) | `document_id` |
+| `ris_search` | ConnectorGate, Connector `ris` | `text` (max 200), `limit` (1..20, Default 10) |
+| `ris_show` | ConnectorGate, Connector `ris` | `top_id` (max 64, `^[A-Za-z0-9_-]+$`) |
+| `vault_read` | ConnectorGate, Connector `vault` | `note_id` (max 200, relativer `.md`-Pfad) |
+| `vault_search` | ConnectorGate, Connector `vault` | `text` (max 200) |
+| `vault_write_test` | ConnectorGate, Connector `vault` (schreibend) | `title` (max 120), `body` (max 20000) |
+| `web_search` | ConnectorGate, Connector `web` | `query` (max 400), `count` (1..10, Default 5) |
+
+Schemas und Beschreibungen der Connector-Tools entstehen zur Compile-Zeit aus
+`KomkiConnector.Manifest` (`KomkiMediator.Tools.Connector`); ein Test
+gleicht sie mit dem Manifest ab. anubis prueft Typ, Laenge, Bereich und
+Pflichtfelder schon auf Protokollebene und verwirft unbekannte Felder; das
+Gate prueft alles noch einmal mit `KomkiConnector.Params.check/2` (Muster
+nur dort).
+
+Vor jeder Route prueft `KomkiMediator.HTTP.guard_caller/2`:
+
+1. `Authorization: Bearer <token>`, Vergleich in konstanter Zeit
+   (`Plug.Crypto.secure_compare/2`). Sonst 401 und eine Logzeile ohne
+   Token-Wert, auch fuer `/healthz`.
+2. `Host` ist `localhost` oder `127.0.0.1`, kein `Origin`, POST nur mit
+   `application/json` (Tiefenverteidigung aus #133).
+3. `X-Komki-Session` (optional, `^[a-z0-9-]{8,64}$`, sonst 400) wird zu
+   `conn.assigns.komki_session`.
+
+Fehlt die Token-Datei oder ist sie ungueltig, verweigert der Vermittler den
+Start. Bedient schon ein anderer Prozess den Socket, ebenfalls.
+
+### Session-ID im PDR (fuer alle Tools)
+
+anubis_mcp uebernimmt `conn.assigns` je Anfrage in `frame.assigns`. Jedes
+Tool holt seine Umgebung deshalb ueber `KomkiMediator.Env.for_call(frame)`
+statt `Env.fetch()`; das liefert zusaetzlich `:session_id`, und das Gate
+schreibt sie als `"session_id"` in den PDR (ohne Header: `null`). Neue Tools
+(etwa die Connector-Tools aus #144) folgen demselben Muster:
+
+```elixir
+def execute(params, frame) do
+  env = Env.for_call(frame)
+  response = Gate.call(env, "tool_name", params, executor)
+  {:reply, Response.json(Response.tool(), response), frame}
+end
+```
 
 ## Raum unter `<base>/mediator/`
 
@@ -208,25 +322,52 @@ NIEMALS ueberschrieben (Idempotenz).
   gegen `room.json` aufgeloest und mit Objekt, Version und Labels des
   Snapshots verglichen wird. Faellt eine der Pruefungen, wird der Inhalt
   zurueckgehalten (`"admitted" => "redacted"`, kein `content`).
+* **Connector-Tools** (`KomkiMediator.ConnectorGate`, CONTRACT §6):
+  * Vorpruefung: Parameter gegen das Manifest, `workspace_bindings` (B_W)
+    muss im Raum stehen. Sonst `decision: error` mit PDR, kein Vollzug.
+  * Gate 1 `emit`: Snapshot mit B_W, Umgebung aus dem Manifest
+    (`ris-abruf@1`, `web-suche@1`, `vault-lokal@1`), Objekt
+    `out-<digest12>`, Fakt `output_content_digest = intent_hash`. Bei permit
+    wird der emit-PDR geschrieben, **bevor** der Connector gerufen wird;
+    seine `decision_id` ist die `call_id` im Frame. Bei `vault_write_test`
+    geht `context.assigned_label` (= B_W) mit.
+  * Gate 2 `admit`: Ergebnisform §5.2 (geschlossen), Labels allein aus dem
+    Manifest (RIS/Web fest `import_labels`; Vault: Labels der Notiz,
+    nicht leer und ⊆ `import_labels`; `write_test`: Rueckmeldung =
+    `assigned_label`). Verstoss: `redacted`. Sonst Objekt `in-<digest12>`
+    in `room.environment`, `Derive.decide` und `Verify.check`.
+  * Connector nicht erreichbar oder Fehlercode: `admitted: false` mit PDR.
+* **Raeume**: Default ist **recherche** (B_W = `ris-oeffentlich@1`,
+  `vault-oeffentlich@1`, `web-oeffentlich@1`). Im Raum **vertraulich**
+  (zusaetzlich `vault-vertraulich@1`) scheitert jede RIS- und Websuche an
+  `recipient_not_allowed`, vertrauliche Notizen sind lesbar. Ein Raum ohne
+  `workspace_bindings` bietet keine Connector-Operationen an.
 * **PDR**: jeder Ablauf haengt einen Auditdatensatz an das Journal, der
   `intent_hash`, `payload_hash` und Γ-Stand-Hash des Aufrufs bindet
   (separater Writer-Prozess; stirbt er, stirbt die Vermittlung — die
   Auditkette dunkelt nie still ab) und bettet die `decision_id` in die
   Antwort ein. `payload_hash` ist der SHA-256 der kanonischen Antwortbasis
-  (Options-Recherche §5, nicht R.4.4).
+  (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/3`: zusaetzlich
+  `rule` (`admit`/`emit`), `call_id` (bei Connector-Aufrufen die
+  `decision_id` des emit-PDR, in beiden PDR gleich), `session_id` (aus der
+  Umgebung, sonst `null`) und `assigned_label` (emit-Permit).
 
 ## Komponenten
 
 | Modul | Aufgabe |
 |---|---|
 | `KomkiMediator.Fassung` | festgedrehte Tool-Auflage (R.4.3) |
-| `KomkiMediator.Gate` | Gate 1 + Gate 2 + PDR |
+| `KomkiMediator.Gate` | Gate 1 + Gate 2 + PDR (ping, admit_document) |
+| `KomkiMediator.ConnectorGate` | emit → Vollzug → admit fuer die Connector-Tools |
+| `KomkiMediator.ResultShape` | Ergebnisformen der Connectoren (§5.2) |
+| `KomkiMediator.PDR` | Form der PDR-Datensaetze (`komki-pdr/3`) |
+| `KomkiMediator.Tools.Connector` | Tool-Baustein aus dem Manifest |
 | `KomkiMediator.Gamma` | Registry-Snapshot + Stand-Hash |
 | `KomkiMediator.Room` | Raum-Zustand, Objekt-/Snapshot-Bildung |
 | `KomkiMediator.Journal` | getrennter PDR-Writer (R.4.4) |
 | `KomkiMediator.Env` | geladene Umgebung fuer die Tools |
 | `KomkiMediator.Templates` | Default-Raum (idempotent provisioniert) |
-| `KomkiMediator.HTTP` | /healthz + /mcp (Plug.Router) |
+| `KomkiMediator.HTTP` | /healthz + /mcp (Plug.Router), Token-/Aufrufer-Pruefung |
 | `KomkiMediator.Supervisor` | Kinderordnung, `:one_for_all` (fail-closed) |
 | `KomkiMediator.CLI` | Escript-Einstieg |
 

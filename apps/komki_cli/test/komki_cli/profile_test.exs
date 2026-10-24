@@ -34,25 +34,29 @@ defmodule KomkiCli.ProfileTest do
     end
   end
 
-  describe "Netz-Exceptions (genau zwei outbound-TCP-Regeln, gepinnte Reihenfolge)" do
-    test "loopback-Spezifik: llama-Port zuerst, Vermittler-Port danach", %{text: text, cfg: cfg} do
+  describe "Netz-Exceptions (llama-Port und Vermittler-Socket, gepinnte Reihenfolge)" do
+    test "llama-Port zuerst, Vermittler-Socket danach, sonst kein Netzziel", %{
+      text: text,
+      cfg: cfg
+    } do
       llama_rule =
         "(allow network-outbound (remote tcp \"localhost:" <> to_string(cfg.port) <> "\"))"
 
-      mediator_rule =
-        "(allow network-outbound (remote tcp \"localhost:" <>
-          to_string(cfg.mediator_port) <> "\"))"
+      # Ticket #143: der Vermittler lauscht nur auf dem Unix-Socket.
+      socket_rule =
+        "(allow network-outbound (remote unix-socket (path-literal \"" <>
+          Path.join([cfg.base_dir, "run", "mediator.sock"]) <> "\")))"
 
-      # Ticket #102: zweite Loopback-Exception für den Vermittler-MCP-Port,
-      # gleiche Regelklasse, deterministische Reihenfolge (byte-stabil).
-      tcp_lines =
+      syslog_rule =
+        "(allow network-outbound (remote unix-socket (literal \"/private/var/run/syslog\")))"
+
+      outbound =
         text
         |> String.split("\n")
-        |> Enum.filter(
-          &(String.contains?(&1, "network-outbound") and String.contains?(&1, "tcp"))
-        )
+        |> Enum.filter(&String.starts_with?(&1, "(allow network-outbound"))
 
-      assert tcp_lines == [llama_rule, mediator_rule]
+      assert outbound == [syslog_rule, llama_rule, socket_rule]
+      assert String.ends_with?(text, llama_rule <> "\n" <> socket_rule <> "\n")
     end
   end
 

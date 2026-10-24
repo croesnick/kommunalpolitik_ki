@@ -68,8 +68,11 @@ defmodule KomkiMediator.TestHelpers do
 
   def journal_chunks_raw(path), do: KomkiMediator.Journal.split_records(File.read!(path))
 
-  @doc "Stoppt benannte Prozesse (Env, Journal) und startet sie frisch am Basisraum."
-  def restart_env(base) do
+  @doc """
+  Stoppt benannte Prozesse (Env, Journal) und startet sie frisch am
+  Basisraum. `extra` ergaenzt die Umgebung (z. B. `connectors_dir`).
+  """
+  def restart_env(base, extra \\ %{}) do
     stop_named(KomkiMediator.Env)
     stop_named(KomkiMediator.Journal)
 
@@ -78,10 +81,45 @@ defmodule KomkiMediator.TestHelpers do
 
     {gamma, room} = load_room_env(base)
 
-    {:ok, _env} =
-      KomkiMediator.Env.start_link(%{gamma: gamma, room: room, journal: KomkiMediator.Journal})
+    env = Map.merge(extra, %{gamma: gamma, room: room, journal: KomkiMediator.Journal})
+    {:ok, _env} = KomkiMediator.Env.start_link(env)
 
-    %{gamma: gamma, room: room, journal: KomkiMediator.Journal, journal_path: journal_path}
+    Map.put(env, :journal_path, journal_path)
+  end
+
+  @doc "Umgebung mit dem Referenzraum vertraulich (Connector-Vertrag §7)."
+  def vertraulich(env) do
+    put_in(env.room.workspace_bindings, KomkiMediator.Templates.vertraulich_bindings())
+  end
+
+  @doc """
+  Kurzer Socket-Pfad unter /tmp: macOS begrenzt Unix-Socket-Pfade auf 103
+  Byte, System.tmp_dir!/0 liegt dort tief unter /var/folders.
+  """
+  def tmp_socket do
+    "/tmp/kmt-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"
+  end
+
+  @doc "Zufaelliges Kanal-Token (64 Hex-Zeichen, wie komki up es schreibt)."
+  def new_token, do: Base.encode16(:crypto.strong_rand_bytes(32), case: :lower)
+
+  @doc """
+  Startet einen vollstaendigen Vermittler-Baum auf einem frischen Socket
+  (Besitz beim Test-Supervisor: start_supervised reisst den Baum mit jedem
+  Test deterministisch ab — benanntes Journal, Env, anubis-Registry, Socket).
+  """
+  def start_socket_server! do
+    base = provisioned_base()
+    {gamma, room} = load_room_env(base)
+    socket = tmp_socket()
+    token = new_token()
+    journal_path = Path.join([base, "mediator", "journal", "pdr.jsonl"])
+
+    ExUnit.Callbacks.start_supervised!(
+      {KomkiMediator.Supervisor, {journal_path, gamma, room, %{socket: socket, token: token}}}
+    )
+
+    %{base: base, socket: socket, token: token, journal_path: journal_path}
   end
 
   def stop_named(module) do

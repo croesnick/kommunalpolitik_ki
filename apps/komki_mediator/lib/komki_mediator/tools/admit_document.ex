@@ -19,7 +19,7 @@ defmodule KomkiMediator.Tools.AdmitDocument do
 
   @impl true
   def execute(params, frame) do
-    env = Env.fetch()
+    env = Env.for_call(frame)
 
     # Der vollstaendige gerenderte Aufruf geht ans Gate (exakter Call als
     # intent_hash-Basis); kuenftige Schema-Felder landen mechanisch mit im

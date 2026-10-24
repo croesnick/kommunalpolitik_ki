@@ -13,7 +13,16 @@ defmodule KomkiCli.SandboxProfileTest do
 
   use ExUnit.Case, async: false
 
-  alias KomkiCli.{Config, ConnectorProfile, Connectors, MediatorProfile, TestSupport}
+  alias KomkiCli.{
+    Channel,
+    Config,
+    ConnectorProfile,
+    Connectors,
+    Mediator,
+    MediatorProfile,
+    TestSupport
+  }
+
   alias KomkiConnector.Manifest
 
   @moduletag :sandbox
@@ -43,7 +52,7 @@ defmodule KomkiCli.SandboxProfileTest do
     profiles =
       Map.merge(connectors, %{
         "egress" => write(cfg, "egress", ConnectorProfile.egress(cfg)),
-        "mediator" => write(cfg, "mediator", MediatorProfile.generate(cfg, {:tcp, 49_597}))
+        "mediator" => write(cfg, "mediator", MediatorProfile.generate(cfg, Mediator.listen(cfg)))
       })
 
     canary = Path.join(System.user_home!(), ".komki-canary-" <> TestSupport.unique_suffix())
@@ -120,6 +129,30 @@ defmodule KomkiCli.SandboxProfileTest do
   test "Vermittler: kein Outbound, auch nicht zu Loopback-Ports der Connectoren", ctx do
     denied(ctx, "mediator", ["connect", "127.0.0.1", "49531"])
     denied(ctx, "mediator", ["connect", "127.0.0.1", "49532"])
+  end
+
+  test "Vermittler: eigenen Socket binden, Token lesen, nur Connector-Sockets verbinden", ctx do
+    base = ctx.cfg.base_dir
+    Channel.write_token!(ctx.cfg)
+    allowed(ctx, "mediator", ["bind-unix", Channel.socket_path(ctx.cfg)])
+    allowed(ctx, "mediator", ["read", Channel.token_path(ctx.cfg)])
+    denied(ctx, "web", ["read", Channel.token_path(ctx.cfg)])
+
+    vault_sock = Manifest.socket_path(base, "vault")
+    other_sock = Path.join([base, "run", "other.sock"])
+
+    listeners =
+      for path <- [vault_sock, other_sock] do
+        File.rm(path)
+        {:ok, l} = :gen_tcp.listen(0, ifaddr: {:local, path})
+        l
+      end
+
+    on_exit(fn -> Enum.each(listeners, &:gen_tcp.close/1) end)
+
+    allowed(ctx, "mediator", ["connect-unix", vault_sock])
+    denied(ctx, "mediator", ["connect-unix", other_sock])
+    denied(ctx, "web", ["connect-unix", vault_sock])
   end
 
   test "Proxy-Connector: nur der eigene Egress-Port, nicht der fremde", ctx do

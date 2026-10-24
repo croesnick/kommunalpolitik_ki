@@ -40,7 +40,7 @@ defmodule KomkiCli.Connectors do
   # ===========================================================================
 
   @spec run_dir(Config.t()) :: String.t()
-  def run_dir(cfg), do: Path.join(cfg.base_dir, "run")
+  def run_dir(cfg), do: KomkiCli.Channel.run_dir(cfg)
 
   @spec connectors_dir(Config.t()) :: String.t()
   def connectors_dir(cfg), do: Path.join([cfg.base_dir, "run", "connectors"])
