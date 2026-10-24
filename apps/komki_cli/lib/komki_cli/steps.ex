@@ -37,7 +37,7 @@ defmodule KomkiCli.Steps do
       Boot-Gate, 4 = Runtime (llama/mediator/pi).
   """
 
-  alias KomkiCli.{Config, Llama, Mediator, Pi, Profile}
+  alias KomkiCli.{Channel, Config, Llama, Mediator, Pi, Profile}
   require Config
 
   @type check :: %{name: String.t(), ok: boolean(), reason: String.t()}
@@ -75,8 +75,7 @@ defmodule KomkiCli.Steps do
       cfg =
         Config.defaults(base,
           port: parse_int!(opts, "port"),
-          ctx: parse_int!(opts, "ctx"),
-          mediator_port: parse_int!(opts, "mediator-port")
+          ctx: parse_int!(opts, "ctx")
         )
 
       case missing_tools(cfg) do
@@ -694,6 +693,7 @@ defmodule KomkiCli.Steps do
              :ok <- write_models(cfg),
              {:ok, mediator} <- mediator_up(cfg) do
           %{"tools" => tools} = health_of(mediator)
+          Channel.write_relay!(cfg)
           Mediator.write_mcp_config(cfg, tools)
           {:up, %{llama: pid, mediator: mediator}}
         else
@@ -825,12 +825,13 @@ defmodule KomkiCli.Steps do
     # gegen eine tote mcp.json (Vertragsluecke nach Mediator-Crash).
     with {:ok, _pid} <- require_llama_up(cfg),
          {:ok, _pid} <- require_mediator_up(cfg),
+         {:ok, channel_env} <- prepare_channel(cfg),
          {:ok, scratch} <- scratch_for(opts, cfg.base_dir) do
       File.mkdir_p!(scratch)
       prompt = Map.fetch!(opts, "prompt")
       timeout_ms = Map.get(opts, "timeout", @run_timeout_s) * 1000
 
-      case Pi.run(cfg, scratch, mode, prompt, timeout_ms) do
+      case Pi.run(cfg, scratch, mode, prompt, timeout_ms, channel_env) do
         {:ok, out} ->
           {:run_ok, scratch, out}
 
@@ -913,7 +914,7 @@ defmodule KomkiCli.Steps do
   Terminal. Der Port-Kind-Weg ist der Kern des macOS-27.2-Beta-Workarounds:
   node bootet unter dem Profil nur als BEAM-Port-Kind, fork-geborene Ketten
   sterben beim Init mit SIGABRT (Crash-Analyse im Session-Smoke). Der
-  Port-Env ersetzt die Umgebung komplett (`Pi.session_env/1`).
+  Port-Env ersetzt die Umgebung komplett (`Pi.session_env/2`).
 
   Unter Burrito (`KomkiCli.Runtime.burrito?/0`) leitet die Kette ihr stdout
   zusaetzlich auf /dev/fd/0 um (Dup des lebenden stdin-PTY): Das BEAM-stdout
@@ -936,6 +937,13 @@ defmodule KomkiCli.Steps do
   end
 
   defp do_session_chain(cfg, continue?) do
+    case prepare_channel(cfg) do
+      {:ok, channel_env} -> start_session_chain(cfg, continue?, channel_env)
+      {:error, reason, code} -> {:error, reason, code}
+    end
+  end
+
+  defp start_session_chain(cfg, continue?, channel_env) do
     File.mkdir_p!(Pi.session_dir(cfg))
 
     arbeit = Path.join(cfg.base_dir, "arbeit")
@@ -947,7 +955,7 @@ defmodule KomkiCli.Steps do
     # Port-Env in Charlist-Form: die open_port-Spec fuer :env verlangt sie
     # (Dialyzer-Fund: Binär-Tupel lassen den Aufruf als fehlgeschlagen typisieren).
     env =
-      Enum.map(Pi.session_env(cfg), fn {key, value} ->
+      Enum.map(Pi.session_env(cfg, channel_env), fn {key, value} ->
         {String.to_charlist(key), String.to_charlist(value)}
       end)
 
@@ -1038,6 +1046,15 @@ defmodule KomkiCli.Steps do
     end
   end
 
+  # Kanal fuer einen pi-Start (Ticket #143): Token lesen, Session-ID
+  # erzeugen, Relay frisch schreiben. Fehlt das Token, ist `komki up` noetig.
+  defp prepare_channel(cfg) do
+    case Channel.prepare_pi(cfg) do
+      {:ok, env} -> {:ok, env}
+      {:error, reason} -> {:error, reason, 2}
+    end
+  end
+
   @doc """
   Vermittler-Liveness-Gate vor jedem pi-Start (`run` UND `session`,
   Ticket #102; Review-Fund zur Vertragsluecke): pi startet mit
@@ -1056,8 +1073,7 @@ defmodule KomkiCli.Steps do
 
       {:health_only, :no_pidfile} ->
         {:error,
-         "port " <>
-           to_string(cfg.mediator_port) <>
+         Channel.socket_path(cfg) <>
            " antwortet healthz, aber pidfile fehlt (fremder Prozess?) — 'komki status' pruefen",
          2}
 

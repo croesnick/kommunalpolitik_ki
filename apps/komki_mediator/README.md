@@ -21,15 +21,18 @@ Vier Fragen, vier kurze Antworten — die Diagramme darunter zeigen dasselbe
 als Bild:
 
 * Wo laeuft er? Als eigener OS-Prozess (der Escript `komki-mediator`)
-  auf dem komki-Host, erreichbar nur ueber Loopback
-  `127.0.0.1:<mediator_port>` (Default 49525, einstellbar bei
-  `komki init --mediator-port`). Er laeuft selbst nicht unter einer
+  auf dem komki-Host, erreichbar nur ueber den Unix-Socket
+  `<base>/run/mediator.sock` (Rechte 0600, Ticket #143) und nur mit dem
+  Bearer-Token aus `<base>/run/mediator.token`. Einen TCP-Listener gibt es
+  nicht mehr. Er laeuft selbst nicht unter einer
   Seatbelt-Grenze: er ist die Durchsetzungsstelle, nicht der Gefangene.
   Sandgeboxt ist pi, die Gegenseite.
 * Wer startet ihn? `komki up` (KomkiCli.Steps), in fester Reihenfolge:
   erst llama-server, dann der Vermittler. Der Start erfolgt detached
-  (nohup), das pidfile liegt unter `base/tmp/komki-mediator.pid`, das Log
-  unter `base/tmp/mediator.log`; danach pollt `komki up` healthz (max. 30 s)
+  (nohup) mit `--socket` und `--token-file`; vorher schreibt `komki up` ein
+  neues Token. Das pidfile liegt unter `base/tmp/komki-mediator.pid`, das Log
+  unter `base/tmp/mediator.log`; danach pollt `komki up` healthz ueber den
+  Socket mit Token (max. 30 s)
   und bricht bei Timeout mit Log-Tail ab. Die Binary ist Start-Pflicht:
   fehlt sie, verweigert `komki up` (Praesenz-Pflicht sitzt beim Start, nicht
   bei init — Entdeckung: PATH, dann `<base>/bin/komki-mediator`).
@@ -39,13 +42,17 @@ als Bild:
 * Wer gibt ihm Daten? Drei Quellen. Erstens der Raum unter
   `<base>/mediator/` (`registry.json` mit Gamma, `room.json`, `documents/`)
   — einmal beim Boot gelesen. Zweitens pi als einziger Client, per
-  `POST /mcp` (MCP StreamableHTTP). pi findet den Vermittler ueber die
-  `mcp.json` im pi-Home (`<base>/pi-home/.pi/agent/mcp.json`), die `komki up`
-  aus der healthz-Antwort schreibt: Server `komki`, exposure `hidden`, genau
-  die Fassung-Tools `direct`, keine Auth-Felder. pi laeuft mit
+  `POST /mcp` (MCP StreamableHTTP). pis MCP-Client kann keinen Unix-Socket;
+  pi startet deshalb `komki-relay.js` (aus komki_cli) als stdio-MCP-Server,
+  das jede JSON-RPC-Zeile als `POST /mcp` ueber den Socket schickt, mit
+  `Authorization: Bearer`, `X-Komki-Session` und `Mcp-Session-Id`. Die
+  `mcp.json` im pi-Home (`<base>/pi-home/.pi/agent/mcp.json`) schreibt
+  `komki up` aus der healthz-Antwort: Server `komki` (command = node, args =
+  Relay), exposure `hidden`, genau die Fassung-Tools `direct`, Token und
+  Session-ID nur als `${…}`-Verweis auf pis Umgebung. pi laeuft mit
   `--no-extensions -e builtin:mcp`; sein Seatbelt-Profil erlaubt
-  Netz-Auswaerts nur zu zwei Loopback-Literals: llama-Port und
-  Vermittler-Port. Auf pi-Seite heissen die Tools `mcp__komki__<tool>`.
+  Netz-Auswaerts nur zum llama-Port und zum Socket-Pfad des Vermittlers.
+  Auf pi-Seite heissen die Tools `mcp__komki__<tool>`.
   Drittens die Connectoren (RIS, Web, Vault): je ein eigener Prozess mit
   Unix-Socket `<connectors_dir>/<id>.sock` (Default `<base>/run/connectors`,
   einstellbar mit `--connectors-dir`). Der Vermittler ruft sie nur nach
@@ -64,14 +71,15 @@ als Bild:
 
 ```mermaid
 flowchart TB
-    subgraph host["komki-Host (alles Loopback)"]
+    subgraph host["komki-Host (alles lokal)"]
         CLI["komki up / down / status / doctor"]
         RAUM["Raum: registry.json · room.json · documents/"]
         LL["llama-server<br/>127.0.0.1:49524<br/>(eigene Seatbelt-Grenze)"]
         subgraph SB["pi unter Seatbelt (deny default)"]
             PI["pi-Session"]
+            RELAY["komki-relay.js<br/>(stdio-MCP)"]
         end
-        subgraph MEDBOX["komki-mediator: ein BEAM-Prozess · Loopback 49525"]
+        subgraph MEDBOX["komki-mediator: ein BEAM-Prozess · run/mediator.sock"]
             MED["GET /healthz · POST /mcp"]
             KOMKI_POLICY["komki_policy<br/>Derive · Verify"]
         end
@@ -83,12 +91,13 @@ flowchart TB
     CLI -- "startet (sandbox-exec)" --> LL
     CLI -- "schreibt Profil + mcp.json" --> PI
     RAUM -- "liest beim Boot" --> MED
-    PI -- "MCP-Aufrufe" --> MED
+    PI -- "stdio" --> RELAY
+    RELAY -- "POST /mcp · Bearer-Token · Unix-Socket" --> MED
     PI -- "Inferenz" --> LL
     MED -- "Gate 1 · Gate 2" --> KOMKI_POLICY
     MED -- "PDR je Aufruf" --> JOURNAL
     MED -- "Frame nach emit-Permit" --> CONN
-    MED -. "Antwort + decision_id" .-> PI
+    MED -. "Antwort + decision_id" .-> RELAY
 ```
 
 ### Ein Tool-Aufruf durch die Gates
@@ -158,8 +167,13 @@ sequenceDiagram
 
 ### Bewusste Grenzen
 
-* Kein Auth in der mcp.json. Zugangsdaten leben nur im Vermittler
-  (Forschung ticket/102, R.4.3).
+* Kein Token in der mcp.json. Das Kanal-Token reist ueber pis Umgebung
+  zum Relay; Connector-Zugangsdaten leben nur im Vermittler (Forschung
+  ticket/102, R.4.3).
+* Host nicht kompromittiert (Annahme aus #143). Das Token haelt lokale
+  Clients ohne Token fern; wer als derselbe Nutzer Prozessspeicher oder die
+  Token-Datei lesen kann, ist nicht Teil des Modells. Eine Peer-PID-Pruefung
+  gibt es deshalb nicht.
 * Kein Netz-Dienst komki_policy. Der Regel-Kern ist als Bibliothek in
   den Vermittler gebunden; pi erreicht ihn nur durch die Gates.
 * Fassung-Pin auf pi-Seite. `komki up` liest die Tool-Liste aus healthz
@@ -177,9 +191,13 @@ cd apps/komki_mediator
 mix deps.get        # aktualisiert ggf. apps/workspace.lock
 mix escript.build   # erzeugt ./komki-mediator
 
-./komki-mediator --base ~/var/komki --port 49525 --connectors-dir ~/var/komki/run/connectors
-# default --base: KOMKI_HOME oder ~/.local/share/komki
-# default --port: 49525
+mkdir -m 700 -p ~/var/komki/run
+openssl rand -hex 32 | tr -d '\n' > ~/var/komki/run/mediator.token
+chmod 600 ~/var/komki/run/mediator.token
+./komki-mediator --base ~/var/komki
+# default --base:           KOMKI_HOME oder ~/.local/share/komki
+# default --socket:         <base>/run/mediator.sock
+# default --token-file:     <base>/run/mediator.token (Pflicht, sonst kein Start)
 # default --connectors-dir: <base>/run/connectors
 ```
 
@@ -188,7 +206,7 @@ blockiert der Escript. Im regelmaessigen Lauf uebernimmt `komki up` alle
 diese Schritte (Start, healthz-Poll, mcp.json fuer pi) — der manuelle
 Aufruf hier ist Entwicklung und Debugging vorbehalten.
 
-## HTTP-Oberflaeche (nur loopback, 127.0.0.1)
+## HTTP-Oberflaeche (nur Unix-Socket, CONTRACT §8)
 
 | Route | Zweck |
 |---|---|
@@ -214,6 +232,35 @@ gleicht sie mit dem Manifest ab. anubis prueft Typ, Laenge, Bereich und
 Pflichtfelder schon auf Protokollebene und verwirft unbekannte Felder; das
 Gate prueft alles noch einmal mit `KomkiConnector.Params.check/2` (Muster
 nur dort).
+
+Vor jeder Route prueft `KomkiMediator.HTTP.guard_caller/2`:
+
+1. `Authorization: Bearer <token>`, Vergleich in konstanter Zeit
+   (`Plug.Crypto.secure_compare/2`). Sonst 401 und eine Logzeile ohne
+   Token-Wert, auch fuer `/healthz`.
+2. `Host` ist `localhost` oder `127.0.0.1`, kein `Origin`, POST nur mit
+   `application/json` (Tiefenverteidigung aus #133).
+3. `X-Komki-Session` (optional, `^[a-z0-9-]{8,64}$`, sonst 400) wird zu
+   `conn.assigns.komki_session`.
+
+Fehlt die Token-Datei oder ist sie ungueltig, verweigert der Vermittler den
+Start. Bedient schon ein anderer Prozess den Socket, ebenfalls.
+
+### Session-ID im PDR (fuer alle Tools)
+
+anubis_mcp uebernimmt `conn.assigns` je Anfrage in `frame.assigns`. Jedes
+Tool holt seine Umgebung deshalb ueber `KomkiMediator.Env.for_call(frame)`
+statt `Env.fetch()`; das liefert zusaetzlich `:session_id`, und das Gate
+schreibt sie als `"session_id"` in den PDR (ohne Header: `null`). Neue Tools
+(etwa die Connector-Tools aus #144) folgen demselben Muster:
+
+```elixir
+def execute(params, frame) do
+  env = Env.for_call(frame)
+  response = Gate.call(env, "tool_name", params, executor)
+  {:reply, Response.json(Response.tool(), response), frame}
+end
+```
 
 ## Raum unter `<base>/mediator/`
 
@@ -320,7 +367,7 @@ NIEMALS ueberschrieben (Idempotenz).
 | `KomkiMediator.Journal` | getrennter PDR-Writer (R.4.4) |
 | `KomkiMediator.Env` | geladene Umgebung fuer die Tools |
 | `KomkiMediator.Templates` | Default-Raum (idempotent provisioniert) |
-| `KomkiMediator.HTTP` | /healthz + /mcp (Plug.Router) |
+| `KomkiMediator.HTTP` | /healthz + /mcp (Plug.Router), Token-/Aufrufer-Pruefung |
 | `KomkiMediator.Supervisor` | Kinderordnung, `:one_for_all` (fail-closed) |
 | `KomkiMediator.CLI` | Escript-Einstieg |
 

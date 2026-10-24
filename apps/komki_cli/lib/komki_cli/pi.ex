@@ -21,6 +21,11 @@ defmodule KomkiCli.Pi do
       PI_OFFLINE         = 1
       LANG / LC_ALL      = C
 
+  Dazu kommt der Kanal zum Vermittler (Ticket #143, `KomkiCli.Channel`):
+  `KOMKI_MEDIATOR_TOKEN` und `KOMKI_SESSION_ID`. pi reicht beide ueber die
+  `env`-Felder der mcp.json an `komki-relay.js` weiter. Das Token steht nie
+  in argv.
+
   cwd ist beim Einmal-Lauf der Scratch, in der Session die Arbeitsflaeche
   `arbeit` — nie das pi-Home (Ticket #133): pi laedt `AGENTS.md`/`CLAUDE.md`
   aus dem cwd; ein gekapertes Modell koennte sie per `write` dort ablegen
@@ -52,16 +57,24 @@ defmodule KomkiCli.Pi do
   sandbox-exec und `sh -c 'exec …'` ersetzen sich per exec, die OS-pid des
   Ports ist deshalb der node-Prozess selbst.
   """
-  @spec run(Config.t(), String.t(), mode(), String.t(), pos_integer()) ::
+  @spec run(
+          Config.t(),
+          String.t(),
+          mode(),
+          String.t(),
+          pos_integer(),
+          %{String.t() => String.t()}
+        ) ::
           {:ok, output :: String.t()}
           | {:error, output :: String.t(), status :: integer()}
-  def run(%Config{} = cfg, scratch_dir, mode, prompt, timeout_ms)
+  def run(%Config{} = cfg, scratch_dir, mode, prompt, timeout_ms, channel_env)
       when mode in [:text, :json] and is_binary(prompt) and is_integer(timeout_ms) and
-             timeout_ms > 0 do
+             timeout_ms > 0 and is_map(channel_env) do
     profile_path = profile_path_for(cfg, scratch_dir)
     KomkiCli.Profile.write!(profile_path, KomkiCli.Profile.generate(cfg, scratch_dir))
     [program | args] = argv_for(cfg, scratch_dir, mode, prompt)
-    run_with_timeout(program, args, env_for(cfg), scratch_dir, timeout_ms)
+    env = Map.merge(env_for(cfg), channel_env)
+    run_with_timeout(program, args, env, scratch_dir, timeout_ms)
   end
 
   @doc """
@@ -194,13 +207,14 @@ defmodule KomkiCli.Pi do
   def env_list(%Config{} = cfg), do: cfg |> env_for() |> Map.to_list() |> Enum.sort()
 
   @doc """
-  Session-Umgebung fuer den Port-Replace: Lauf-Umgebung plus `TERM` fuer
+  Session-Umgebung fuer den Port-Replace: Lauf-Umgebung plus Kanal
+  (`KOMKI_MEDIATOR_TOKEN`, `KOMKI_SESSION_ID`, Ticket #143) plus `TERM` fuer
   die TUI. Der Port-Env ersetzt die geerbte Umgebung komplett — dieselbe
   Konvention wie beim Einmal-Lauf via `System.cmd`-env-Replace.
   """
-  @spec session_env(Config.t()) :: [{String.t(), String.t()}]
-  def session_env(%Config{} = cfg),
-    do: env_list(cfg) ++ [{"TERM", @session_term}]
+  @spec session_env(Config.t(), %{String.t() => String.t()}) :: [{String.t(), String.t()}]
+  def session_env(%Config{} = cfg, channel_env) when is_map(channel_env),
+    do: env_list(cfg) ++ Enum.sort(channel_env) ++ [{"TERM", @session_term}]
 
   @doc """
   Pane-Kommando fuer `tmux new-session … <command>`: der Pfad des

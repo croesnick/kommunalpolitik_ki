@@ -52,7 +52,7 @@ defmodule KomkiMediator.Tools.Connector do
 
       @impl true
       def execute(params, frame) do
-        env = KomkiMediator.Env.fetch()
+        env = KomkiMediator.Env.for_call(frame)
         response = KomkiMediator.ConnectorGate.call(env, unquote(tool), params)
         {:reply, Response.json(Response.tool(), response), frame}
       end

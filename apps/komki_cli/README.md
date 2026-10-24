@@ -32,11 +32,11 @@ Komponenten mit denselben Pins:
   aufgelösten Pfade direkt auf (`node <pfad> <cli.js>`).
 * **Sandbox:** Jedes pi startet unter einem frisch generierten
   Seatbelt-Profil (deny-default mit Whitelist). Schreibbereich ist der
-  Arbeitsraum selbst, die einzige Netzwerk-Exception ist der lokale
-  Modellserver.
+  Arbeitsraum selbst. Netzwerk erlaubt das Profil nur zu zwei Zielen: zum
+  lokalen Modellserver und zum Unix-Socket des Vermittlers.
 
 Die Assets (GGUF, pi-Bundle, llama-server) liegen bereits lokal; komki
-verbindet sich ausschließlich mit Loopback.
+verbindet sich ausschließlich lokal (Loopback und Unix-Socket).
 
 ## Voraussetzungen und Installation
 
@@ -101,13 +101,13 @@ Zwei Hinweise für die verteilte Datei:
 ./komki init                        # Instanz anlegen (config, Profil, pi-home, GGUF mit SHA-Gate)
 ./komki init --gguf-from PFAD       # GGUF-Quelle explizit angeben
 ./komki doctor                      # alle Checks (Werkzeuge, Profil, GGUF-SHA, Boot-Gate, Port)
-./komki up                          # llama-server starten
+./komki up                          # llama-server und Vermittler starten
 ./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil
 ./komki session                     # interaktive pi-Session in tmux
 ./komki session --continue          # letzte Session fortsetzen
 ./komki session --detach            # im Hintergrund; attach via 'tmux -L komki attach -t komki'
 ./komki down                        # llama-server stoppen
-./komki status                      # Zustand (base, gguf, port, llama)
+./komki status                      # Zustand (base, gguf, port, Vermittler-Socket, llama, Vermittler)
 ./komki label …                     # SQLite-Registry: Bindungen, Labels, Γ-Export (siehe unten)
 ```
 
@@ -138,6 +138,41 @@ einen neuen Zufallsschlüssel in `tmp/llama.key` (nur für dich lesbar) und trä
 ihn in pis `models.json` ein. Ohne den Schlüssel antwortet llama mit 401, damit
 keine Website im Browser das lokale Modell nutzen kann. `komki doctor` meldet
 einen llama, der ohne Schlüssel läuft.
+
+### Kanal zum Vermittler (Ticket #143)
+
+pi erreicht den Vermittler (`komki-mediator`) nur über einen Unix-Socket,
+nicht über einen TCP-Port:
+
+```
+<base>/run/                 Rechte 0700, angelegt von komki up
+<base>/run/mediator.sock    der einzige Listener des Vermittlers, Rechte 0600
+<base>/run/mediator.token   32 Byte Zufall als Hex, Rechte 0600
+```
+
+* `komki up` schreibt bei jedem Vermittler-Start ein neues Token und startet
+  den Vermittler mit `--socket` und `--token-file`. Das Token steht nie in
+  einer Kommandozeile. Läuft der Vermittler schon und antwortet mit dem
+  aktuellen Token, bleibt beides unverändert.
+* Jede Anfrage braucht `Authorization: Bearer <token>`, auch `/healthz`.
+  Ohne oder mit falschem Token antwortet der Vermittler mit 401 und schreibt
+  eine Logzeile (ohne Token-Wert) nach `tmp/mediator.log`. Das hält andere
+  lokale Programme fern, etwa eine zweite, nicht gesandboxte Agent-Session.
+* pis MCP-Client kann keinen Unix-Socket. Deshalb startet pi
+  `komki-relay.js` als stdio-MCP-Server (Node, nur Standardbibliothek). Das
+  Relay schickt jede JSON-RPC-Zeile als `POST /mcp` über den Socket und gibt
+  die Antworten (JSON oder SSE) zeilenweise zurück. komki schreibt es vor
+  jedem pi-Start neu nach `pi-home/.pi/agent/komki-relay.js`; eine vom Agenten
+  veränderte Fassung überlebt damit keinen Lauf.
+* `komki run` und `komki session` lesen das Token und erzeugen je pi-Start
+  eine Session-ID (`ses-` plus 16 Hex-Zeichen). Beides geht über die Umgebung
+  an pi (`KOMKI_MEDIATOR_TOKEN`, `KOMKI_SESSION_ID`). Die `mcp.json` enthält
+  nur Verweise (`${KOMKI_MEDIATOR_TOKEN}`), kein Token. Der Vermittler
+  schreibt die Session-ID als `session_id` in jeden PDR.
+* Instanzen von vor #143 brauchen einmalig `komki init --force`: das
+  pi-Profil ändert sich (Socket-Regel statt Vermittler-Port), und
+  `--mediator-port` gibt es nicht mehr. macOS begrenzt Socket-Pfade auf
+  103 Byte; `komki up` lehnt eine zu tiefe Basis ab.
 
 Unter `~/.local/share/komki` liegen die Instanzdaten, überschreibbar via
 `KOMKI_HOME`.
