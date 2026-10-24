@@ -7,9 +7,20 @@ defmodule KomkiMediator.Fassung do
   (Regressionssicherung D.9 gegen den Connector-Bypass).
   """
 
-  @fassung_id "komki-mediator/1"
+  @fassung_id "komki-mediator/2"
 
-  @tools ["ping", "admit_document"]
+  # Feste Ordnung: die Raum-Tools, dann die Connector-Tools sortiert
+  # (= KomkiConnector.Manifest.tools/0, Connector-Vertrag §5.1).
+  @tools [
+    "ping",
+    "admit_document",
+    "ris_search",
+    "ris_show",
+    "vault_read",
+    "vault_search",
+    "vault_write_test",
+    "web_search"
+  ]
 
   @doc "Versionskennung dieser Verbindungsauflage."
   @spec fassung_id() :: String.t()

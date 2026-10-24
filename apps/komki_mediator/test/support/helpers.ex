@@ -68,8 +68,11 @@ defmodule KomkiMediator.TestHelpers do
 
   def journal_chunks_raw(path), do: KomkiMediator.Journal.split_records(File.read!(path))
 
-  @doc "Stoppt benannte Prozesse (Env, Journal) und startet sie frisch am Basisraum."
-  def restart_env(base) do
+  @doc """
+  Stoppt benannte Prozesse (Env, Journal) und startet sie frisch am
+  Basisraum. `extra` ergaenzt die Umgebung (z. B. `connectors_dir`).
+  """
+  def restart_env(base, extra \\ %{}) do
     stop_named(KomkiMediator.Env)
     stop_named(KomkiMediator.Journal)
 
@@ -78,10 +81,15 @@ defmodule KomkiMediator.TestHelpers do
 
     {gamma, room} = load_room_env(base)
 
-    {:ok, _env} =
-      KomkiMediator.Env.start_link(%{gamma: gamma, room: room, journal: KomkiMediator.Journal})
+    env = Map.merge(extra, %{gamma: gamma, room: room, journal: KomkiMediator.Journal})
+    {:ok, _env} = KomkiMediator.Env.start_link(env)
 
-    %{gamma: gamma, room: room, journal: KomkiMediator.Journal, journal_path: journal_path}
+    Map.put(env, :journal_path, journal_path)
+  end
+
+  @doc "Umgebung mit dem Referenzraum vertraulich (Connector-Vertrag §7)."
+  def vertraulich(env) do
+    put_in(env.room.workspace_bindings, KomkiMediator.Templates.vertraulich_bindings())
   end
 
   def stop_named(module) do

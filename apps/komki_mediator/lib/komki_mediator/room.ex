@@ -4,11 +4,25 @@ defmodule KomkiMediator.Room do
   Die Daten stammen aus `room.json` (Schema `"komki-mediator-room/1"`):
   Identitaet, Arbeitsraum, Umfeld, Fakten und die Objektbelegung —
   Objekt-IDs auf Version und Labels abgebildet.
+
+  Optional `workspace_bindings`: B_W fuer Connector-Operationen
+  (sortierte Liste, Connector-Vertrag §7). Fehlt das Feld, ist es `nil`,
+  und der Raum bietet keine Connector-Operationen an (fail-closed).
+  `admit_document` und `ping` nutzen es nicht.
   """
 
   @schema "komki-mediator-room/1"
 
-  defstruct [:dir, :identity, :workspace_id, :environment, :facts, :objects, :documents_dir]
+  defstruct [
+    :dir,
+    :identity,
+    :workspace_id,
+    :environment,
+    :facts,
+    :objects,
+    :documents_dir,
+    :workspace_bindings
+  ]
 
   @type t :: %__MODULE__{
           dir: Path.t(),
@@ -17,7 +31,8 @@ defmodule KomkiMediator.Room do
           environment: String.t(),
           facts: %{String.t() => map()},
           objects: %{String.t() => map()},
-          documents_dir: Path.t()
+          documents_dir: Path.t(),
+          workspace_bindings: [String.t()] | nil
         }
 
   # Objektbildung je Toolaufruf: die Basis eines jeden Calls.
@@ -84,7 +99,8 @@ defmodule KomkiMediator.Room do
        environment: term["environment"],
        facts: term["facts"],
        objects: term["objects"],
-       documents_dir: Path.join(dir, term["documents_dir"])
+       documents_dir: Path.join(dir, term["documents_dir"]),
+       workspace_bindings: Map.get(term, "workspace_bindings")
      }}
   end
 
@@ -153,6 +169,41 @@ defmodule KomkiMediator.Room do
         "labels" => object.labels
       },
       "facts" => room.facts
+    }
+  end
+
+  @doc """
+  Snapshot eines Connector-Aufrufs (Connector-Vertrag §6): B_W aus
+  `workspace_bindings`, Umgebung und Fakten je Gate. Gate 1 (`emit`)
+  setzt die Umgebung aus dem Manifest und den Fakt
+  `output_content_digest`; Gate 2 (`admit`) nimmt `room.environment` und
+  die Raumfakten.
+  """
+  @spec connector_snapshot(t(), KomkiMediator.Gamma.t(), %{
+          snapshot_id: String.t(),
+          environment: String.t(),
+          object: Object.t(),
+          facts: %{String.t() => map()}
+        }) :: map()
+  def connector_snapshot(room, gamma, spec) do
+    %{
+      "schema" => "komki-snapshot/1",
+      "snapshot_id" => spec.snapshot_id,
+      "registry_ref" => gamma.registry_id,
+      "identity" => room.identity,
+      "workspace" => %{
+        "workspace_id" => room.workspace_id,
+        "bindings" => room.workspace_bindings,
+        "valid" => true,
+        "environment" => spec.environment
+      },
+      "object" => %{
+        "object_id" => spec.object.object_id,
+        "version" => spec.object.version,
+        "classification" => "classified",
+        "labels" => spec.object.labels
+      },
+      "facts" => spec.facts
     }
   end
 end
