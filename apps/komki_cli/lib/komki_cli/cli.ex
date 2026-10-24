@@ -148,7 +148,7 @@ defmodule KomkiCli.CLI do
               value_name: "N",
               long: "ctx",
               parser: :integer,
-              help: "llama-Kontextgroesse (default 8192)"
+              help: "llama-Kontextgroesse (default 131072)"
             ],
             vault_dir: [
               value_name: "PATH",

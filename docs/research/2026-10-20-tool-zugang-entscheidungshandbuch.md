@@ -49,6 +49,9 @@ Die drei wichtigsten Regeln für jedes neue Tool:
 
 ## 2. Ausgangslage im Repo
 
+> **Stand 2026-10-24:** Diese Tabelle beschreibt die Lage *vor* dem Bau. Was umgesetzt ist und wo die Umsetzung
+> vom Handbuch abweicht, steht in [Abschnitt 11](#11-abgleich-mit-der-umsetzung-stand-2026-10-24).
+
 | Baustein | Stand | Quelle |
 |---|---|---|
 | pi unter Seatbelt, deny default | Netz-Auswärts nur zu zwei Loopback-Literals: llama-server und Vermittler | `apps/komki_mediator/README.md` |
@@ -217,7 +220,7 @@ flowchart LR
     subgraph C3["Connector Vault · Profil: nur Vault-Pfad, Schreiben nur Testbereich"]
         VAULT["komki-vault/1"]
     end
-    PI -- "MCP (heute Loopback, Ziel Unix-Socket, #143)" --> MED
+    PI -- "MCP über Unix-Socket + Token (#143)" --> MED
     MED -- "nur nach permit" --> RIS
     MED -- "nur nach permit" --> WEB
     MED -- "nur nach permit" --> VAULT
@@ -404,7 +407,8 @@ Raumlabel prüfen und nicht nur gegen das Ziel.
    kommen über stdin aus dem Keychain. Festgehalten in #137.
 2. **Transport pi → Vermittler:** *entschieden* am 2026-10-23: Unix-Socket, Bearer-Token und stdio-Relay
    (Abschnitt 7.2, #143). pis MCP-Client kann keinen Unix-Socket.
-3. **Codemode in pi 1.x:** Laut Doku ist `codemode` die Standard-Exposure, und auch `direct`-Tools sind aus
+3. **Codemode in pi 1.x:** *geklärt* am 2026-10-24: in komki-Läufen nicht erreichbar, weil pi mit einer
+   `--tools`-Allowlist startet (`komki run`: `write,mcp__komki__*`). Ursprüngliche Frage: Laut Doku ist `codemode` die Standard-Exposure, und auch `direct`-Tools sind aus
    Codemode aufrufbar. Zu prüfen ist, ob Codemode unter `--no-extensions -e builtin:mcp` aktiv ist. Die
    Vermittlungsgrenze ändert es nicht, wohl aber Reihenfolge und Menge der Aufrufe pro Modellschritt (**Test**).
 4. **Brave-MCP-Server oder eigener Connector:** #96 sieht den offiziellen `@brave/brave-search-mcp-server`
@@ -414,7 +418,48 @@ Raumlabel prüfen und nicht nur gegen das Ziel.
 5. **G3-Anspruch:** Bleibt die Grenze bei derselben uid, oder bekommen Vermittler und Connectoren
    langfristig eine eigene uid?
 
-## 11. Quellen
+## 11. Abgleich mit der Umsetzung (Stand 2026-10-24)
+
+Umgesetzt auf Branch `komki-connectors` (PR #167). Verträge: `apps/komki_connector/CONTRACT.md`. Prüfung:
+[Labbook](2026-10-23-labbook-komki-connectoren.md), zuletzt Phase 5 mit 11/11 Sicherheitsprüfungen auf einer
+nach Schnellstart frisch aufgesetzten Instanz.
+
+**Konsistent mit dem Handbuch:**
+
+| Aussage im Handbuch | Umsetzung |
+|---|---|
+| Vermittler ist der einzige Ausgang, ohne Netz nach außen (§1) | `mediator.sb`: Outbound nur zu den Connector-Sockets; pi erreicht nur Vermittler und llama (S-07) |
+| Jeder Connector eigener Prozess, eigenes Profil, ausnahmslos (§6a.1) | `komki up` startet RIS, Web, Vault und Egress je unter `connector-<id>.sb` bzw. `egress.sb` |
+| Profile aus dem Fassungs-Manifest, byte-stabil geprüft (§6a.1, Regel 1) | `KomkiConnector.Manifest` → Profilgenerator; `komki doctor` prüft |
+| Credentials über stdin, nie env/argv (§6a.1, Regel 2) | S-11: Key in 0 Prozessen und 0 Dateien |
+| Egress-Proxy nötig, weil Seatbelt nicht nach Host filtert (§5 V3, §6a B5) | `komki-egress`, Allowlist je Port, Schutz vor Rebinding und Metadaten (S-08) |
+| Semantische Fassungen, keine URL- oder Pfad-Parameter (§1, Regel 1) | geschlossene Schemas; Pfad-Escapes abgewiesen (S-06) |
+| Anfrage = gebundene Ausgabe (Gate 1), Antwort = gelabelter Eingang (Gate 2) | emit → Vollzug → admit, zwei PDR, emit-PDR vor der Wirkung (L-105) |
+| Lethal-Trifecta-Sperre (§9) | ergibt sich aus der Empfängerprüfung von `emit`; im Raum vertraulich keine Verbindung (S-09, S-10) |
+| Kanal: Unix-Socket, Token, Session-ID, Relay (§7.2) | umgesetzt (#143); kein TCP-Listener (S-01, S-02) |
+| Host-Annahme statt G3-Schutz (§7.2) | gilt; keine eigene uid, keine Peer-PID-Prüfung |
+| Kein `fetch(url)` in der Web-Fassung (§9) | `komki-web/1` hat nur `search` |
+| Nicht-öffentliche RIS-TOPs vor Top-k filtern (§9) | Filter vor Begrenzung und Zählung, identische `not-found` (U-1, S-06) |
+
+**Abweichungen und Nachträge:**
+
+| Handbuch | Umsetzung | Einordnung |
+|---|---|---|
+| §6a.1 Regel 3: Labels nach Import-Regel, nicht nach Selbstauskunft | RIS und Web: fest aus dem Manifest. Vault: Labels stehen in der Notiz, der Connector meldet sie, der Vermittler glaubt sie nur ⊆ `import_labels` | Ein kompromittierter Vault-Connector könnte vertraulich als öffentlich melden. Hingenommen: Er hat nur Lesezugriff auf den Vault und keine Netzroute |
+| §9 RIS: `sessions(range)` | nicht gebaut, nur `search` und `show` | Ohne konkreten Bedarf weggelassen (KISS) |
+| §9 RIS: Abruf über `risapi1.komuna.net` | nur die öffentlichen Gast-Endpunkte; diese liefern keine TOP-Texte | #148 |
+| §9 Web: Query verbatim im PDR | PDR bindet die Anfrage über `intent_hash`/`payload_hash`, nicht im Klartext | Nach R.11.5 gewollt (Journal ohne Payloads); Klartext-Beleg wäre eine eigene Entscheidung |
+| §9 Vault: Schreibvorgänge mit GO | `write_test` nur in `komki-test/`, ohne GO | GO-Flow ist #98 |
+| §9 Vault: Label aus Frontmatter oder Tag | nur Frontmatter `komki_labels` | Tags bewusst nicht, eindeutiger und prüfbarer |
+| §9 pdf_ingest als eigener Prozess (B2) | `admit_document` läuft weiter im Vermittler-BEAM | Übergang laut §6a; #169 |
+| §6a.1: Connector ohne Netz und Credential | Vault-Connector ohne Egress-Port; Zertifikate aus `/etc/ssl/cert.pem`, weil `cacerts_get` den Schlüsselbund öffnet | Nachtrag aus L-108 |
+| — (neu) | Suchtreffer außerhalb B_W fallen vor Gate 2 still heraus | Nachtrag aus L-109: sonst Existenz-Orakel |
+| — (neu) | `mcp.json` wird bei jedem pi-Start neu geschrieben | Nachtrag aus S-07b: sonst Persistenz eines eingeschleusten MCP-Servers |
+
+**Offen aus §10:** nur noch der G3-Anspruch (bewusst ausgeschlossen). Folgetickets aus den Tests: #148, #164,
+#165, #166, #168, #169.
+
+## 12. Quellen
 
 Repo und Vault (gelesen 2026-10-20):
 

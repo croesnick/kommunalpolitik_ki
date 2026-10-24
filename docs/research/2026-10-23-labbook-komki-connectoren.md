@@ -30,6 +30,7 @@ nicht lief, steht als nicht gelaufen da.
 | L-110 | llama der echten Instanz beendet | eigenes Versehen | Folgeticket |
 | S-01–S-13 | Sicherheitstests | bestanden | Phase 3 |
 | U-1–U-7 | Nutzungstests | bestanden | Phase 4 |
+| F-1–F-4 | Finaler Durchgang | 11/11 Sicherheit, Schnellstart und Nutzung ok | Phase 5 |
 
 ## Phase 0: Vorab-Experimente (vor dem Bau)
 
@@ -416,6 +417,49 @@ Prüfungen).
   den Egress-Tunnel zu 3.33.153.106:443.
 - **Befund:** `komki-egress` schreibt die Logzeile einer Verbindung erst beim Schließen. `:httpc` hält den Tunnel
   offen, und bis dahin fehlt der Effektbeleg im Log. Außerdem überschreibt jeder Neustart das Log.
+
+## Phase 5: Finaler Durchgang (2026-10-24)
+
+### F-1 Schnellstart wörtlich befolgt
+
+- **Aufbau:** Frische Instanz `/private/tmp/kfin` nach README-Schnellstart (komki_cli), Schritte 1, 3, 4, 5.
+  Abweichungen: Schritt 2 entfällt (Schlüsselbund-Eintrag existiert), `--port 49544`, weil die echte Instanz
+  ihren llama auf 49524 betreibt. RIS gegen die echte Gast-API über den Egress-Proxy, kein Mock.
+- **Ergebnis:** `komki up` startet alle Prozesse, `komki doctor` endet mit `doctor: ok` (31 Prüfungen).
+- **Befund:** Die Hilfe von `init` nannte `--ctx` „default 8192“, tatsächlich gilt 131072. Korrigiert.
+
+### F-2 Nutzung mit allen drei Tools (gemma)
+
+- **Aufbau:** `komki run` mit dem Auftrag, zum Radverkehr RIS, Web und Vault zu durchsuchen und eine Notiz mit
+  Quellen anzulegen.
+- **Ergebnis:** 60 s. Zehn PDR (je emit und admit für `ris_search`, `web_search`, `vault_search`, `vault_read`,
+  `vault_write_test`), alle permit, alle mit derselben Session-ID. Notiz mit fünf Stichpunkten, jeder mit
+  Quelle (note_id bzw. URL von radverkehr.bayern.de), Labels = B_W.
+
+### F-3 Sicherheits-Regression
+
+`final_security.py` gegen die frische Instanz, einschließlich Raumwechsel nach vertraulich und zurück:
+
+```
+BESTANDEN     S-01 ohne/mit falschem Token -> 401
+BESTANDEN     S-02 kein TCP, Socket/Token 0600, run/ 0700
+BESTANDEN     S-04 vertrauliche Notiz in recherche -> deny, ohne Marker
+BESTANDEN     S-05 Suche: nur-vertraulich == kein Treffer  [permit/permit]
+BESTANDEN     S-06 Pfad-Escapes und versteckte Objekte abgewiesen
+BESTANDEN     S-07 aus pis Sandbox nur Scratch, Vermittler, llama (+pi-Home)
+BESTANDEN     S-08 Egress: Brave ja, fremde/Metadaten/Suffix nein
+BESTANDEN     S-09 vertraulich: Web/RIS deny ohne jede Aktivitaet, Notiz lesbar  [log-delta=[0, 0, 0]]
+BESTANDEN     S-11 Key nicht in Prozessen, Dateien  [Treffer=0]
+BESTANDEN     S-12 Journal-Kette valid
+BESTANDEN     S-13 Ausfall fail-closed, komki up heilt
+11/11 bestanden
+```
+
+### F-4 Abgleich mit dem Entscheidungshandbuch
+
+Ergebnis im Handbuch, Abschnitt 11: Die Kernaussagen (§1, §6a.1, §7.2) sind umgesetzt. Abweichungen sind dort
+einzeln begründet; neues Ticket #169 (`admit_document` als eigener Prozess). Die offene Codemode-Frage (§10.3)
+ist geklärt: Die `--tools`-Allowlist macht Codemode in komki-Läufen unerreichbar.
 
 ## Erkenntnisse und offene Punkte
 
