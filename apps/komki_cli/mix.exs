@@ -88,6 +88,10 @@ defmodule KomkiCli.MixProject do
       {:burrito, "~> 1.6"},
       {:exqlite, "~> 0.42"},
       {:komki_policy, path: "../komki_policy"},
+      # Connector-Manifeste und Frame-Client (Ticket #146): Profilgenerator,
+      # Start-Argumente und der ping im Doctor lesen dasselbe Modul wie der
+      # Vermittler (CONTRACT.md §5).
+      {:komki_connector, path: "../komki_connector"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]

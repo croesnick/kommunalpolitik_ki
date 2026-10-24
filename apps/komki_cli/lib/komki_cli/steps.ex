@@ -15,13 +15,14 @@ defmodule KomkiCli.Steps do
       (Pfad + SHA), die CLI rendert sie.
     * `{:checks, [%{name, ok, reason}], summary_state}` — Doctor-Ergebnis;
       `summary_state` ∈ `:ok | :fail | :boot_gate_fail`.
-    * `{:up, %{llama: pid, mediator: mediator_state}}` — llama-server und
-      Vermittler laufen; `mediator_state` ist
+    * `{:up, %{llama: pid, connectors: [{name, up_state}], mediator: mediator_state}}`
+      — llama-server, Egress, Connectoren (Ticket #146) und Vermittler laufen; `mediator_state` ist
       `{:started, pid, health}` (frisch gespawnt) oder `{:already, health}`
       (healthz war gruen, kein Neustart) — Struktur aus `KomkiCli.Mediator.up`.
       `health` traegt die healthz-Vertrags-Keys (inkl. `tools`, aus denen
       die mcp.json geschrieben wurde).
-    * `{:down, %{llama: down_state, mediator: down_state}}` — gestoppt;
+    * `{:down, %{llama: down_state, connectors: [{name, down_state}], mediator: down_state}}`
+      — gestoppt (Vermittler, Connectoren, Egress, llama);
       `down_state` ∈ `:ok | :already | {:stale, reason}` pro Komponente
       (`:already` = war bereits unten, Idempotenz; `:stale` = stale pidfile
       aufgeräumt, kein Prozess getötet). Stoppreihenfolge: Vermittler zuerst
@@ -37,7 +38,7 @@ defmodule KomkiCli.Steps do
       Boot-Gate, 4 = Runtime (llama/mediator/pi).
   """
 
-  alias KomkiCli.{Config, Llama, Mediator, Pi, Profile}
+  alias KomkiCli.{Channel, Config, ConnectorChecks, Connectors, Llama, Mediator, Pi, Profile}
   require Config
 
   @type check :: %{name: String.t(), ok: boolean(), reason: String.t()}
@@ -50,10 +51,24 @@ defmodule KomkiCli.Steps do
   @type result ::
           {:inited, Config.t(), [String.t()]}
           | {:checks, [check()], :ok | :fail | :boot_gate_fail}
-          | {:up, %{llama: pos_integer(), mediator: mediator_state()}}
-          | {:down, %{llama: down_state(), mediator: down_state()}}
+          | {:up,
+             %{
+               llama: pos_integer(),
+               connectors: [{String.t(), Connectors.up_state()}],
+               mediator: mediator_state()
+             }}
+          | {:down,
+             %{
+               llama: down_state(),
+               connectors: [{String.t(), down_state() | {:error, String.t()}}],
+               mediator: down_state()
+             }}
           | {:status, Config.t(),
-             %{llama: term(), mediator: Mediator.mediator_state() | {:error, String.t()}}}
+             %{
+               llama: term(),
+               connectors: [{String.t(), Connectors.state()}],
+               mediator: Mediator.mediator_state() | {:error, String.t()}
+             }}
           | {:run_ok, String.t(), String.t()}
           | {:run_error, String.t(), String.t(), integer()}
           | {:session, String.t()}
@@ -76,11 +91,17 @@ defmodule KomkiCli.Steps do
         Config.defaults(base,
           port: parse_int!(opts, "port"),
           ctx: parse_int!(opts, "ctx"),
-          mediator_port: parse_int!(opts, "mediator-port")
+          ris_mock_port: parse_int!(opts, "ris-mock-port"),
+          ris_base_url: Map.get(opts, "ris-base-url"),
+          vault_dir: Map.get(opts, "vault-dir")
         )
 
-      case missing_tools(cfg) do
-        [] -> create_instance(cfg, opts)
+      # macOS: Unix-Socket-Pfade hoechstens 103 Byte (CONTRACT.md §2)
+      with :ok <- Connectors.socket_length(cfg.base_dir),
+           [] <- missing_tools(cfg) do
+        create_instance(cfg, opts)
+      else
+        {:error, reason} -> {:error, "Basis abgelehnt: " <> reason, 2}
         missing -> {:error, tools_error(missing), 2}
       end
     end
@@ -95,6 +116,7 @@ defmodule KomkiCli.Steps do
       Profile.write!(cfg.profile_path, Profile.generate(cfg, Profile.check_scratch(cfg)))
       # Ticket #100: llama-server-Profil neben dem pi-Profil schreiben
       Profile.write!(Llama.llama_profile_path(cfg), Profile.generate_llama(cfg))
+      write_sandbox_profiles(cfg)
       Config.save(cfg)
       {:inited, cfg, gguf_lines}
     else
@@ -103,6 +125,20 @@ defmodule KomkiCli.Steps do
       # unerreichbar (Dialyzer) und verdeckte das.
       {:error, _reason, _code} = error -> error
     end
+  end
+
+  # Ticket #146/#137: Vermittler-, Egress- und Connector-Profile. Fehlt ein
+  # Binary, bleibt sein Profil ungeschrieben; der Doctor meldet es.
+  defp write_sandbox_profiles(cfg) do
+    for {_name, path, generate} <- ConnectorChecks.profiles(cfg) do
+      try do
+        Profile.write!(path, generate.())
+      rescue
+        ArgumentError -> :skipped
+      end
+    end
+
+    :ok
   end
 
   # Entdeckung schlug fehl -> init verweigert mit klaren Namen statt
@@ -138,6 +174,8 @@ defmodule KomkiCli.Steps do
     ]
 
     Enum.each(dirs, &File.mkdir_p!/1)
+    # Synthetischer Test-Vault (Default) samt Schreibordner des Vault-Connectors
+    if is_binary(cfg.vault_dir), do: File.mkdir_p!(Path.join(cfg.vault_dir, "komki-test"))
     :ok
   end
 
@@ -349,7 +387,10 @@ defmodule KomkiCli.Steps do
       [port_check(cfg), llama_auth_check(cfg)],
       # Erst nach `up` sinnvoll: das Flag setzt der Vermittler beim Start,
       # `up` selbst laeuft mit dem Kurz-Doctor (Ticket #139).
-      if(scope == :full, do: [journal_check(cfg)], else: [])
+      if(scope == :full, do: [journal_check(cfg)], else: []),
+      # Ticket #146/#137: Egress, Connectoren, Vermittler-Profil. Nur im vollen
+      # Doctor: `up` schreibt diese Profile vor jedem Start frisch.
+      if(scope == :full, do: ConnectorChecks.all(cfg), else: [])
     ])
   end
 
@@ -690,12 +731,15 @@ defmodule KomkiCli.Steps do
       {:checks, _checks, :ok} ->
         cfg = override_ctx(load_cfg!(), opts)
 
+        # Reihenfolge (Ticket #146): llama -> egress -> Connectoren -> Vermittler
         with {:ok, pid} <- Llama.up(cfg),
              :ok <- write_models(cfg),
+             {:ok, connectors} <- Connectors.up(cfg),
              {:ok, mediator} <- mediator_up(cfg) do
           %{"tools" => tools} = health_of(mediator)
+          Channel.write_relay!(cfg)
           Mediator.write_mcp_config(cfg, tools)
-          {:up, %{llama: pid, mediator: mediator}}
+          {:up, %{llama: pid, connectors: connectors, mediator: mediator}}
         else
           {:error, reason} -> {:error, reason, 4}
         end
@@ -710,14 +754,31 @@ defmodule KomkiCli.Steps do
   # Praesenz-Pflicht sitzt HIER (up), nicht in init: der Vermittler-Binary
   # ist optional bei init, aber Pflicht zum Start (Ticket #102).
   defp mediator_up(cfg) do
-    if is_binary(cfg.mediator_bin) do
-      Mediator.up(cfg)
-    else
-      {:error,
-       "komki-mediator nicht gefunden — mix escript.build in apps/komki_mediator" <>
-         " oder in PATH/<base>/bin ablegen ('komki init --force' entdeckt neu)"}
+    cond do
+      not is_binary(cfg.mediator_bin) ->
+        {:error,
+         "komki-mediator nicht gefunden — mix escript.build in apps/komki_mediator" <>
+           " oder in PATH/<base>/bin ablegen ('komki init --force' entdeckt neu)"}
+
+      # Ticket #137: der Vermittler startet unter seinem Profil ueber escript
+      not is_binary(cfg.escript_bin) ->
+        {:error, "Erlang-escript nicht entdeckt — Erlang installieren, 'komki init --force'"}
+
+      true ->
+        Mediator.up(cfg)
     end
   end
+
+  @doc """
+  Startreihenfolge von `up` (Ticket #146): llama, Egress (falls noetig),
+  aktive Connectoren, Vermittler. Rein; `stop_order/0` ist die Umkehrung
+  fuer `down` (dort immer alle Connectoren, idempotent).
+  """
+  @spec start_order(Config.t()) :: [String.t()]
+  def start_order(cfg), do: ["llama"] ++ Connectors.start_order(cfg) ++ ["mediator"]
+
+  @spec stop_order() :: [String.t()]
+  def stop_order, do: ["mediator"] ++ Connectors.stop_order() ++ ["llama"]
 
   defp health_of({:started, _pid, health}), do: health
   defp health_of({:already, health}), do: health
@@ -742,20 +803,42 @@ defmodule KomkiCli.Steps do
   # Vermittler wurde von up zuletzt gestartet, wird hier zuerst gestoppt.
   @spec down() :: result()
   def down do
-    cfg = load_cfg!()
-
-    case Mediator.down(cfg) do
-      {:error, reason} ->
-        {:error, reason, 4}
-
-      mediator ->
-        case Llama.down(cfg) do
-          {:error, reason} -> {:error, reason, 4}
-          llama -> {:down, %{mediator: down_state(mediator), llama: down_state(llama)}}
-        end
-    end
+    down_with(load_cfg!())
   rescue
     e -> {:error, "down fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  @doc """
+  down mit expliziter cfg (Testnaht): Vermittler, Connectoren (rueckwaerts),
+  Egress, llama — `stop_order/0`. Ein Connector-Fehler bricht nicht ab:
+  der Aufraeumweg stoppt so viel wie moeglich und meldet den Fehler danach.
+  """
+  @spec down_with(Config.t()) :: result()
+  def down_with(cfg) do
+    case Mediator.down(cfg) do
+      {:error, reason} -> {:error, reason, 4}
+      mediator -> down_rest(cfg, mediator, Connectors.down(cfg))
+    end
+  end
+
+  defp down_rest(cfg, mediator, connectors) do
+    errors = for {name, {:error, reason}} <- connectors, do: name <> ": " <> reason
+
+    case Llama.down(cfg) do
+      {:error, reason} ->
+        {:error, Enum.join(errors ++ [reason], "; "), 4}
+
+      llama when errors == [] ->
+        {:down,
+         %{
+           mediator: down_state(mediator),
+           connectors: Enum.map(connectors, fn {name, state} -> {name, down_state(state)} end),
+           llama: down_state(llama)
+         }}
+
+      _llama ->
+        {:error, Enum.join(errors, "; "), 4}
+    end
   end
 
   defp down_state(:ok), do: :ok
@@ -769,7 +852,12 @@ defmodule KomkiCli.Steps do
         {:error, "config: " <> reason, 2}
 
       {:ok, cfg} ->
-        {:status, cfg, %{llama: Llama.status(cfg), mediator: Mediator.status(cfg)}}
+        {:status, cfg,
+         %{
+           llama: Llama.status(cfg),
+           connectors: Connectors.status(cfg),
+           mediator: Mediator.status(cfg)
+         }}
     end
   end
 
@@ -825,12 +913,13 @@ defmodule KomkiCli.Steps do
     # gegen eine tote mcp.json (Vertragsluecke nach Mediator-Crash).
     with {:ok, _pid} <- require_llama_up(cfg),
          {:ok, _pid} <- require_mediator_up(cfg),
+         {:ok, channel_env} <- prepare_channel(cfg),
          {:ok, scratch} <- scratch_for(opts, cfg.base_dir) do
       File.mkdir_p!(scratch)
       prompt = Map.fetch!(opts, "prompt")
       timeout_ms = Map.get(opts, "timeout", @run_timeout_s) * 1000
 
-      case Pi.run(cfg, scratch, mode, prompt, timeout_ms) do
+      case Pi.run(cfg, scratch, mode, prompt, timeout_ms, channel_env) do
         {:ok, out} ->
           {:run_ok, scratch, out}
 
@@ -913,7 +1002,7 @@ defmodule KomkiCli.Steps do
   Terminal. Der Port-Kind-Weg ist der Kern des macOS-27.2-Beta-Workarounds:
   node bootet unter dem Profil nur als BEAM-Port-Kind, fork-geborene Ketten
   sterben beim Init mit SIGABRT (Crash-Analyse im Session-Smoke). Der
-  Port-Env ersetzt die Umgebung komplett (`Pi.session_env/1`).
+  Port-Env ersetzt die Umgebung komplett (`Pi.session_env/2`).
 
   Unter Burrito (`KomkiCli.Runtime.burrito?/0`) leitet die Kette ihr stdout
   zusaetzlich auf /dev/fd/0 um (Dup des lebenden stdin-PTY): Das BEAM-stdout
@@ -936,6 +1025,13 @@ defmodule KomkiCli.Steps do
   end
 
   defp do_session_chain(cfg, continue?) do
+    case prepare_channel(cfg) do
+      {:ok, channel_env} -> start_session_chain(cfg, continue?, channel_env)
+      {:error, reason, code} -> {:error, reason, code}
+    end
+  end
+
+  defp start_session_chain(cfg, continue?, channel_env) do
     File.mkdir_p!(Pi.session_dir(cfg))
 
     arbeit = Path.join(cfg.base_dir, "arbeit")
@@ -947,7 +1043,7 @@ defmodule KomkiCli.Steps do
     # Port-Env in Charlist-Form: die open_port-Spec fuer :env verlangt sie
     # (Dialyzer-Fund: Binär-Tupel lassen den Aufruf als fehlgeschlagen typisieren).
     env =
-      Enum.map(Pi.session_env(cfg), fn {key, value} ->
+      Enum.map(Pi.session_env(cfg, channel_env), fn {key, value} ->
         {String.to_charlist(key), String.to_charlist(value)}
       end)
 
@@ -1038,6 +1134,22 @@ defmodule KomkiCli.Steps do
     end
   end
 
+  # Kanal fuer einen pi-Start (Ticket #143): Token lesen, Session-ID
+  # erzeugen, Relay frisch schreiben. Fehlt das Token, ist `komki up` noetig.
+  # Auch die mcp.json wird frisch aus der healthz-Antwort geschrieben: das
+  # pi-Home ist fuer den Agenten schreibbar, und ein eingetragener
+  # MCP-Server darf keinen Lauf ueberdauern (Labbook S-07).
+  defp prepare_channel(cfg) do
+    with {:ok, env} <- Channel.prepare_pi(cfg),
+         {:ok, "200", health} <- Mediator.fetch_health(cfg) do
+      :ok = Mediator.write_mcp_config(cfg, health["tools"])
+      {:ok, env}
+    else
+      {:ok, code, _health} -> {:error, "komki-mediator /healthz returned " <> code, 2}
+      {:error, reason} -> {:error, reason, 2}
+    end
+  end
+
   @doc """
   Vermittler-Liveness-Gate vor jedem pi-Start (`run` UND `session`,
   Ticket #102; Review-Fund zur Vertragsluecke): pi startet mit
@@ -1056,8 +1168,7 @@ defmodule KomkiCli.Steps do
 
       {:health_only, :no_pidfile} ->
         {:error,
-         "port " <>
-           to_string(cfg.mediator_port) <>
+         Channel.socket_path(cfg) <>
            " antwortet healthz, aber pidfile fehlt (fremder Prozess?) — 'komki status' pruefen",
          2}
 

@@ -1,0 +1,340 @@
+defmodule KomkiMediator.ConnectorGateTest do
+  use ExUnit.Case, async: false
+
+  alias Anubis.Server.Frame
+  alias KomkiMediator.{ConnectorGate, FakeConnector, Journal, Templates, TestHelpers, Tools}
+
+  @recherche ["ris-oeffentlich@1", "vault-oeffentlich@1", "web-oeffentlich@1"]
+
+  setup do
+    base = TestHelpers.provisioned_base()
+    dir = FakeConnector.short_dir()
+    on_exit(fn -> File.rm_rf!(dir) end)
+
+    env = TestHelpers.restart_env(base, %{connectors_dir: dir, session_id: "sess-test"})
+    %{env: env, dir: dir}
+  end
+
+  defp fake(env, id, reply) do
+    pid = FakeConnector.start(id, env.connectors_dir, env.journal_path, reply)
+    on_exit(fn -> Process.exit(pid, :kill) end)
+  end
+
+  defp ok(result), do: fn _op, _params, _context -> {:ok, result} end
+
+  defp records(env), do: TestHelpers.journal_records(env.journal_path)
+
+  defp ris_hits do
+    %{
+      "results" => [
+        %{
+          "top_id" => "top-1",
+          "titel" => "Bahnhofstrasse",
+          "sitzung" => "Stadtrat",
+          "datum" => "2026-10-01",
+          "url" => "https://ris.example/top-1"
+        }
+      ],
+      "abrufdatum" => "2026-10-23"
+    }
+  end
+
+  defp note(labels) do
+    %{"note_id" => "a.md", "title" => "A", "content" => "geheimer Inhalt", "labels" => labels}
+  end
+
+  defp remedy_codes(response), do: Enum.map(response["remedies"], & &1["code"])
+
+  # -----------------------------------------------------------------------
+  # Permit-Fluss: emit-PDR vor dem Vollzug, zwei PDR mit gleicher call_id
+  # -----------------------------------------------------------------------
+
+  test "recherche ris_search: emit-PDR liegt vor dem Connector-Aufruf, dann admit", %{env: env} do
+    fake(env, "ris", ok(ris_hits()))
+
+    response = ConnectorGate.call(env, "ris_search", %{"text" => "Bahnhof"})
+
+    # Der Fake hat beim Aufruf genau einen Journal-Datensatz gesehen: den
+    # emit-PDR. Default-Parameter sind gesetzt, kein Kontext bei read.
+    assert_received {:connector_called, "ris", "search", %{"text" => "Bahnhof", "limit" => 10},
+                     %{}, 1}
+
+    assert response["decision"] == "permit"
+    assert response["labels"] == ["ris-oeffentlich@1"]
+    assert response["results"] == ris_hits()["results"]
+    assert response["payload_hash"] =~ "sha256:"
+
+    [emit, admit] = records(env)
+    assert emit["rule"] == "emit"
+    assert emit["outcome"] == "emitted"
+    assert emit["call_id"] == emit["decision_id"]
+    assert emit["checked_label"] == @recherche
+    assert emit["session_id"] == "sess-test"
+    assert emit["schema"] == "komki-pdr/3"
+
+    assert admit["rule"] == "admit"
+    assert admit["outcome"] == "admitted"
+    assert admit["call_id"] == emit["decision_id"]
+    assert admit["decision_id"] == response["decision_id"]
+    assert admit["intent_hash"] == emit["intent_hash"]
+    assert admit["payload_hash"] == response["payload_hash"]
+    assert response["emit_decision_id"] == emit["decision_id"]
+
+    assert {:ok, %{records: 2}} = Journal.verify(File.read!(env.journal_path))
+  end
+
+  test "call_id im Frame ist die decision_id des emit-PDR", %{env: env} do
+    test = self()
+
+    fake(env, "web", fn _op, _params, _context ->
+      send(test, :web_called)
+      {:ok, %{"results" => [], "abrufdatum" => "2026-10-23"}}
+    end)
+
+    response = ConnectorGate.call(env, "web_search", %{"query" => "Foerderung"})
+    assert_received :web_called
+    assert response["labels"] == ["web-oeffentlich@1"]
+
+    # Die Server-Seite antwortet nur, wenn die call_id passt (Client prueft
+    # sie); ein permit belegt also die Zuordnung call_id == emit-PDR.
+    [emit, _admit] = records(env)
+    assert response["emit_decision_id"] == emit["decision_id"]
+  end
+
+  # -----------------------------------------------------------------------
+  # Lethal-Trifecta-Sperre: Raum vertraulich
+  # -----------------------------------------------------------------------
+
+  for {tool, id, params} <- [
+        {"web_search", "web", %{"query" => "Buergerfall 4711"}},
+        {"ris_search", "ris", %{"text" => "Buergerfall"}}
+      ] do
+    test "vertraulich #{tool}: deny recipient_not_allowed, Connector nicht gerufen", %{env: env} do
+      fake(env, unquote(id), ok(%{}))
+      env = TestHelpers.vertraulich(env)
+
+      response = ConnectorGate.call(env, unquote(tool), unquote(Macro.escape(params)))
+
+      assert response["decision"] == "deny"
+      assert response["rule"] == "emit"
+      assert "recipient_not_allowed" in remedy_codes(response)
+      refute_received {:connector_called, _, _, _, _, _}
+
+      [pdr] = records(env)
+      assert pdr["rule"] == "emit"
+      assert pdr["decision"] == "deny"
+      assert pdr["call_id"] == nil
+    end
+  end
+
+  test "vertraulich vault_read: vertrauliche Notiz wird zugelassen", %{env: env} do
+    fake(env, "vault", ok(note(["vault-vertraulich@1"])))
+    env = TestHelpers.vertraulich(env)
+
+    response = ConnectorGate.call(env, "vault_read", %{"note_id" => "a.md"})
+
+    assert response["decision"] == "permit"
+    assert response["content"] == "geheimer Inhalt"
+    assert response["labels"] == ["vault-vertraulich@1"]
+  end
+
+  # -----------------------------------------------------------------------
+  # Gate 2: Labels und Ergebnisform
+  # -----------------------------------------------------------------------
+
+  test "recherche vault_read einer vertraulichen Notiz: deny, kein Inhalt", %{env: env} do
+    fake(env, "vault", ok(note(["vault-vertraulich@1"])))
+
+    response = ConnectorGate.call(env, "vault_read", %{"note_id" => "a.md"})
+
+    assert response["decision"] == "deny"
+    assert response["rule"] == "admit"
+    assert "label_not_included" in remedy_codes(response)
+    refute Map.has_key?(response, "content")
+    refute inspect(response) =~ "geheimer Inhalt"
+
+    [emit, admit] = records(env)
+    assert admit["call_id"] == emit["decision_id"]
+    assert admit["outcome"] == "not_admitted"
+  end
+
+  test "recherche vault_search: vertraulicher Treffer faellt still heraus (kein Orakel, L-109)",
+       %{env: env} do
+    hits = [
+      %{"note_id" => "a.md", "title" => "A", "labels" => ["vault-oeffentlich@1"]},
+      %{"note_id" => "b.md", "title" => "Geheim B", "labels" => ["vault-vertraulich@1"]}
+    ]
+
+    fake(env, "vault", ok(%{"results" => hits}))
+
+    response = ConnectorGate.call(env, "vault_search", %{"text" => "x"})
+    assert response["decision"] == "permit"
+    assert Enum.map(response["results"], & &1["note_id"]) == ["a.md"]
+    assert response["labels"] == ["vault-oeffentlich@1"]
+    refute inspect(response) =~ "Geheim B"
+  end
+
+  test "recherche vault_search: nur vertrauliche Treffer sehen aus wie keine Treffer",
+       %{env: env} do
+    secret = [%{"note_id" => "b.md", "title" => "Geheim B", "labels" => ["vault-vertraulich@1"]}]
+    fake(env, "vault", ok(%{"results" => secret}))
+    with_secret = ConnectorGate.call(env, "vault_search", %{"text" => "x"})
+
+    fake(env, "vault", ok(%{"results" => []}))
+    without = ConnectorGate.call(env, "vault_search", %{"text" => "x"})
+
+    keys = ["decision", "results", "labels"]
+    assert Map.take(with_secret, keys) == Map.take(without, keys)
+  end
+
+  test "Fake meldet fremde Labels: redacted", %{env: env} do
+    fake(env, "vault", ok(note(["doc-vertraulich@1"])))
+
+    response = ConnectorGate.call(env, "vault_read", %{"note_id" => "a.md"})
+
+    assert response["admitted"] == "redacted"
+    assert response["verify"] == ["label_not_importable"]
+    refute Map.has_key?(response, "content")
+
+    [_emit, admit] = records(env)
+    assert admit["outcome"] == "redacted"
+  end
+
+  test "Notiz ohne Labels: redacted (fail-closed)", %{env: env} do
+    fake(env, "vault", ok(note([])))
+
+    response = ConnectorGate.call(env, "vault_read", %{"note_id" => "a.md"})
+    assert response["admitted"] == "redacted"
+  end
+
+  test "RIS-Labels kommen aus dem Manifest, nicht aus der Antwort", %{env: env} do
+    fake(env, "ris", ok(Map.put(ris_hits(), "labels", ["vault-vertraulich@1"])))
+
+    # Zusatzfeld verletzt die geschlossene Ergebnisform.
+    response = ConnectorGate.call(env, "ris_search", %{"text" => "x"})
+    assert response["admitted"] == "redacted"
+    refute Map.has_key?(response, "results")
+  end
+
+  test "Ergebnisform verletzt (fehlendes Feld, falscher Typ): redacted", %{env: env} do
+    fake(env, "ris", fn
+      "show", _params, _context -> {:ok, %{"top_id" => "t", "titel" => 1}}
+    end)
+
+    response = ConnectorGate.call(env, "ris_show", %{"top_id" => "t"})
+    assert response["admitted"] == "redacted"
+    assert response["reason"] =~ "Ergebnisform"
+  end
+
+  # -----------------------------------------------------------------------
+  # Vorpruefung: Schema, B_W
+  # -----------------------------------------------------------------------
+
+  test "Schemaverstoss: error mit PDR, kein Vollzug", %{env: env} do
+    fake(env, "ris", ok(%{}))
+
+    for params <- [
+          %{"top_id" => "../etc/passwd"},
+          %{"top_id" => "t", "url" => "https://evil.example"},
+          %{}
+        ] do
+      response = ConnectorGate.call(env, "ris_show", params)
+      assert response["decision"] == "error"
+      assert response["detail"] =~ "Parameter"
+    end
+
+    refute_received {:connector_called, _, _, _, _, _}
+
+    pdrs = records(env)
+    assert length(pdrs) == 3
+    assert Enum.all?(pdrs, &(&1["decision"] == "error" and &1["rule"] == "emit"))
+  end
+
+  test "Raum ohne workspace_bindings: Connector-Tools fail-closed", %{env: env} do
+    fake(env, "web", ok(%{}))
+    env = put_in(env.room.workspace_bindings, nil)
+
+    response = ConnectorGate.call(env, "web_search", %{"query" => "x"})
+
+    assert response["decision"] == "error"
+    assert response["detail"] =~ "workspace_bindings"
+    refute_received {:connector_called, _, _, _, _, _}
+    assert [%{"decision" => "error", "admitted" => false}] = records(env)
+  end
+
+  # -----------------------------------------------------------------------
+  # Connector-Fehler
+  # -----------------------------------------------------------------------
+
+  test "Connector down: admitted false mit emit- und admit-PDR", %{env: env} do
+    response = ConnectorGate.call(env, "ris_search", %{"text" => "x"})
+
+    assert response["decision"] == "permit"
+    assert response["admitted"] == false
+    assert response["error"]["code"] == "upstream-error"
+
+    [emit, admit] = records(env)
+    assert emit["rule"] == "emit"
+    assert admit["outcome"] == "error"
+    assert admit["call_id"] == emit["decision_id"]
+  end
+
+  test "Connector meldet not-found: admitted false", %{env: env} do
+    fake(env, "ris", fn _op, _params, _context -> {:error, "not-found", "kein TOP"} end)
+
+    response = ConnectorGate.call(env, "ris_show", %{"top_id" => "t"})
+    assert response["admitted"] == false
+    assert response["error"] == %{"code" => "not-found", "detail" => "kein TOP"}
+  end
+
+  # -----------------------------------------------------------------------
+  # Schreibende Operation
+  # -----------------------------------------------------------------------
+
+  test "vault_write_test: assigned_label = B_W geht mit, Rueckmeldung wird geprueft", %{env: env} do
+    fake(env, "vault", fn "write_test", _params, context ->
+      {:ok, %{"note_id" => "komki-test/x.md", "labels" => context["assigned_label"]}}
+    end)
+
+    response = ConnectorGate.call(env, "vault_write_test", %{"title" => "T", "body" => "B"})
+
+    assert_received {:connector_called, "vault", "write_test", _,
+                     %{"assigned_label" => @recherche}, 1}
+
+    assert response["decision"] == "permit"
+    assert response["labels"] == @recherche
+
+    [emit, _admit] = records(env)
+    assert emit["assigned_label"] == @recherche
+  end
+
+  test "vault_write_test: abweichende Labels in der Rueckmeldung -> redacted", %{env: env} do
+    fake(env, "vault", ok(%{"note_id" => "komki-test/x.md", "labels" => ["vault-oeffentlich@1"]}))
+
+    response = ConnectorGate.call(env, "vault_write_test", %{"title" => "T", "body" => "B"})
+    assert response["admitted"] == "redacted"
+    assert response["verify"] == ["label_mismatch"]
+  end
+
+  # -----------------------------------------------------------------------
+  # MCP-Tool und Default-Raum
+  # -----------------------------------------------------------------------
+
+  test "MCP-Tool ris_search laeuft ueber Env und ConnectorGate", %{env: env} do
+    fake(env, "ris", ok(ris_hits()))
+
+    assert {:reply, response, _frame} =
+             Tools.RisSearch.execute(%{text: "Bahnhof", limit: 3}, Frame.new())
+
+    refute response.isError
+    [%{"type" => "text", "text" => json}] = response.content
+    body = JSON.decode!(json)
+    assert body["decision"] == "permit"
+    assert_received {:connector_called, "ris", "search", %{"limit" => 3}, _, 1}
+  end
+
+  test "Default-Raum ist recherche", %{env: env} do
+    assert env.room.workspace_bindings == Templates.recherche_bindings()
+    assert Templates.recherche_bindings() == @recherche
+  end
+end

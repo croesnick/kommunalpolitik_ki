@@ -1,0 +1,37 @@
+/* komki-Farben: ruhiges Petrol als Akzent, Starlight-Grautöne bleiben.
+   Starlight ist dunkel als Standard; :root[data-theme='light'] überschreibt. */
+:root {
+  --sl-color-accent-low: #12302b;
+  --sl-color-accent: #3aa893;
+  --sl-color-accent-high: #c3ebe2;
+  --komki-ok: #7fd18f;
+  --komki-deny: #ff8f85;
+}
+:root[data-theme='light'] {
+  --sl-color-accent-low: #d9ece7;
+  --sl-color-accent: #0f6b5c;
+  --sl-color-accent-high: #0b3f37;
+  --komki-ok: #1f7a3a;
+  --komki-deny: #b3261e;
+}
+
+/* Diagramme (inline-SVG aus src/assets), Farben nur über Theme-Variablen. */
+.komki-figure { overflow-x: auto; padding: 1rem; border: 1px solid var(--sl-color-gray-5); border-radius: 0.6rem; background: var(--sl-color-bg-nav); }
+.komki-figure svg { display: block; min-width: 640px; width: 100%; height: auto; }
+.komki-figure + p { font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }
+.svg-box { fill: var(--sl-color-bg); stroke: var(--sl-color-gray-4); stroke-width: 1.5; }
+.svg-zone { fill: var(--sl-color-accent-low); stroke: var(--sl-color-accent); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.svg-hot { fill: var(--sl-color-accent); }
+.svg-text { fill: var(--sl-color-white); font-family: var(--sl-font); font-size: 13px; }
+.svg-small { fill: var(--sl-color-gray-3); font-family: var(--sl-font-mono); font-size: 10.5px; }
+.svg-strong { fill: var(--sl-color-white); font-family: var(--sl-font); font-size: 14px; font-weight: 600; }
+.svg-onhot { fill: var(--sl-color-black); font-family: var(--sl-font); font-size: 14px; font-weight: 600; }
+.svg-onhot-small { fill: var(--sl-color-black); font-family: var(--sl-font-mono); font-size: 10.5px; }
+.svg-line { stroke: var(--sl-color-gray-2); stroke-width: 1.4; fill: none; }
+.svg-arrowhead { fill: var(--sl-color-gray-2); }
+.svg-deny { stroke: var(--komki-deny); stroke-width: 1.6; fill: none; stroke-dasharray: 4 3; }
+.svg-denytext { fill: var(--komki-deny); font-family: var(--sl-font-mono); font-size: 10.5px; }
+
+/* Ja/Nein in Tabellen */
+.ja { color: var(--komki-ok); font-weight: 700; }
+.nein { color: var(--komki-deny); font-weight: 700; }

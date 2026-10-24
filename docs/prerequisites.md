@@ -369,9 +369,11 @@ aufgelösten Pfade in die config.json; die Experimentbelege für llama-server
 meldet die installierte Version.
 
 **Vermittler (`komki-mediator`, Ticket #102):** `komki up` startet zusätzlich
-den MCP-Vermittler auf einem eigenen Loopback-Port (Default 49525) und
-schreibt pi-seitig die zugehörige `mcp.json` (Server `komki`, nur die
-festgelegten MCP-Werkzeuge `ping` und `admit_document`). Das Binary ist ein
+den MCP-Vermittler auf dem Unix-Socket `<komki-base>/run/mediator.sock`
+mit Bearer-Token (Ticket #143) und schreibt pi-seitig die zugehörige
+`mcp.json` (Server `komki` über `komki-relay.js`, nur die festgelegten
+MCP-Werkzeuge `ping` und `admit_document`). Das Relay läuft mit demselben
+Node wie pi; zusätzliche Abhängigkeiten braucht es nicht. Das Binary ist ein
 Repo-eigenes Escript:
 
 ```bash

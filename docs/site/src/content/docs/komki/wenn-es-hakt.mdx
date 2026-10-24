@@ -1,0 +1,24 @@
+---
+title: Wenn etwas hakt
+description: Häufige Meldungen, ihre Ursachen und was hilft. Dazu die ehrlichen Grenzen.
+---
+
+## Meldungen und was hilft
+
+| Du siehst | Ursache | Das hilft |
+|---|---|---|
+| `credential-missing` bei der Websuche | komki kam beim Start nicht an den Schlüsselbund | Den Brave-Key prüfen ([Schritt 6](/kommunalpolitik_ki/komki/in-betrieb-nehmen/)), im Dialog „Immer erlauben“ wählen, dann `komki down && komki up` |
+| Jede Connector-Anfrage endet mit `error` | Alter Raum ohne Connector-Regeln | Schritt 5 aus [In Betrieb nehmen](/kommunalpolitik_ki/komki/in-betrieb-nehmen/), dann `komki down && komki up` |
+| `doctor` meldet ein Profil als abweichend | Instanz älter als der Code | `komki init --force --vault-dir ~/.local/share/komki/vault` |
+| `komki-mediator nicht aktiv: 'komki up' zuerst` | Vermittler läuft nicht | `komki up` |
+| Ein Connector fehlt in `komki status` | Prozess abgestürzt | `komki up` startet nur das Fehlende neu |
+| Websuche im Raum „vertraulich“ abgelehnt | So gewollt | In den Raum „recherche“ wechseln ([Anleitung](/kommunalpolitik_ki/komki/sicherheitsgrenze/)) |
+| pi sucht nach einer Ablehnung minutenlang weiter | Bekannte Schwäche ([#166](https://github.com/croesnick/kommunalpolitik_ki/issues/166)) | Abbrechen; der Lauf endet spätestens nach 10 Minuten |
+
+Logs liegen unter `~/.local/share/komki/tmp/`: `connector-web.log`, `egress.log`, `mediator.log`. Sie enthalten keine Inhalte und keine Schlüssel, nur was wann entschieden wurde.
+
+## Was noch nicht geht
+
+- **RIS liefert nur Titel.** Ohne Zugangsdaten gibt die Ratsinformations-API keine Texte der Tagesordnungspunkte heraus ([#148](https://github.com/croesnick/kommunalpolitik_ki/issues/148)).
+- **Schreiben ohne Freigabe-Dialog.** Notizen landen nur im Ordner `komki-test/`; eine Bestätigung vor jedem Schreiben kommt mit [#98](https://github.com/croesnick/kommunalpolitik_ki/issues/98).
+- **Gegner auf dem eigenen Rechner sind nicht abgedeckt.** komki schützt vor einem manipulierten Agenten, nicht vor Schadsoftware, die schon unter deinem Benutzer läuft.

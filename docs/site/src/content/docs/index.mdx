@@ -1,0 +1,40 @@
+---
+title: komki
+description: Ein lokaler KI-Arbeitsraum für die Ratsarbeit, der recherchiert, ohne Vertrauliches nach draußen zu tragen.
+template: splash
+hero:
+  tagline: Ein lokaler KI-Arbeitsraum für die Ratsarbeit. Er recherchiert im Ratsinformationssystem, im Web und in deinen Notizen, mit Quellen zu jeder Aussage. Was vertraulich ist, bleibt auf deinem Rechner.
+  actions:
+    - text: So funktioniert komki
+      link: /kommunalpolitik_ki/komki/so-funktioniert-es/
+      icon: right-arrow
+    - text: In Betrieb nehmen
+      link: /kommunalpolitik_ki/komki/in-betrieb-nehmen/
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+import Architektur from '../../assets/architektur.svg';
+
+<div class="komki-figure"><Architektur /></div>
+
+Jeder gestrichelte Kasten ist eine eigene Sandbox. Der Agent erreicht nur das Sprachmodell und den Vermittler; ins Internet kommt allein der Egress-Proxy, und auch der nur zu freigegebenen Adressen.
+
+<CardGrid>
+  <Card title="So funktioniert komki" icon="puzzle">
+    Agent, Vermittler, Connectoren und Räume in fünf Minuten erklärt.
+    [Zum Kapitel](/kommunalpolitik_ki/komki/so-funktioniert-es/)
+  </Card>
+  <Card title="In Betrieb nehmen" icon="rocket">
+    Elf Schritte vom Repo bis zur ersten Recherche, mit allem, was du im Terminal siehst.
+    [Zum Kapitel](/kommunalpolitik_ki/komki/in-betrieb-nehmen/)
+  </Card>
+  <Card title="Die Sicherheitsgrenze sehen" icon="approve-check">
+    Lass den Agenten ein Geheimnis hinaustragen und sieh zu, wie es scheitert.
+    [Zum Kapitel](/kommunalpolitik_ki/komki/sicherheitsgrenze/)
+  </Card>
+  <Card title="Wenn etwas hakt" icon="information">
+    Häufige Meldungen, ihre Ursachen und was hilft. Dazu die ehrlichen Grenzen.
+    [Zum Kapitel](/kommunalpolitik_ki/komki/wenn-es-hakt/)
+  </Card>
+</CardGrid>

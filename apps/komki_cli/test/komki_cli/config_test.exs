@@ -80,20 +80,17 @@ defmodule KomkiCli.ConfigTest do
       assert cfg.ctx == 4_096
     end
 
-    test "Vermittler-Pins (Ticket #102): mediator_port default 49525, mediator_bin optional" do
+    test "Vermittler-Pins (Ticket #102): mediator_bin optional, kein Port mehr (Ticket #143)" do
       cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-med"))
-      assert cfg.mediator_port == 49_525
 
       # Entdeckung wird durchgereicht (nil bleibt optional — kein init-Gate;
       # die Discovery-Logik selbst deckt config_test nicht ein, wie fd/rg).
       assert cfg.mediator_bin == Config.resolve_mediator_bin(cfg.base_dir)
-
-      over = Config.defaults(TestSupport.tmp_area!("komki-cfg-med"), mediator_port: 49_999)
-      assert over.mediator_port == 49_999
+      refute Map.has_key?(cfg, :mediator_port)
     end
 
-    test "mediator_port/mediator_bin roundtrip: Pflicht-Port, optionaler Binary-Pfad" do
-      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-med"), mediator_port: 49_998)
+    test "mediator_bin roundtrip; mediator_port aelterer Instanzen wird ignoriert" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-med"))
       base = cfg.base_dir
 
       no_bin = %{cfg | mediator_bin: nil}
@@ -103,6 +100,15 @@ defmodule KomkiCli.ConfigTest do
       with_bin = %{cfg | mediator_bin: "/pfad/zu/komki-mediator"}
       Config.save(with_bin)
       assert {:ok, with_bin} == Config.load(Config.config_path(base))
+
+      legacy =
+        base
+        |> Config.config_path()
+        |> File.read!()
+        |> JSON.decode!()
+        |> Map.put("mediator_port", 49_525)
+
+      assert {:ok, ^with_bin} = Config.from_map(legacy)
     end
   end
 
@@ -122,6 +128,78 @@ defmodule KomkiCli.ConfigTest do
     test "fehlende config.json ist ein Fehler, kein Crash" do
       assert {:error, reason} = Config.load("/nonexistent/komki/config.json")
       assert reason =~ "cannot read"
+    end
+  end
+
+  describe "Connector-Felder (Ticket #146)" do
+    test "Defaults: Egress-Ports, echte RIS-URL, Test-Vault unter der Basis" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-conn"))
+      assert cfg.egress_ports == %{"ris" => 49_531, "web" => 49_532}
+      assert cfg.ris_base_url == "https://risapi1.komuna.net/web/"
+      assert cfg.ris_mock_port == nil
+      assert cfg.vault_dir == Path.join(cfg.base_dir, "vault")
+      assert Config.ris_url(cfg) == "https://risapi1.komuna.net/web/"
+      refute Config.ris_mock?(cfg)
+      assert Map.keys(cfg.connector_bins) == ["ris", "vault", "web"]
+    end
+
+    test "Overrides: Mock-Port schaltet die URL um, leerer vault_dir schaltet ab" do
+      cfg =
+        Config.defaults(TestSupport.tmp_area!("komki-cfg-conn"),
+          ris_mock_port: 4010,
+          vault_dir: ""
+        )
+
+      assert Config.ris_mock?(cfg)
+      assert Config.ris_url(cfg) == "http://127.0.0.1:4010/"
+      assert cfg.vault_dir == nil
+    end
+
+    test "Roundtrip mit allen neuen Feldern" do
+      cfg = %{
+        Config.defaults(TestSupport.tmp_area!("komki-cfg-conn"), ris_mock_port: 4011)
+        | escript_bin: "/opt/erl/bin/escript",
+          egress_bin: "/opt/bin/komki-egress",
+          connector_bins: %{"ris" => "/opt/bin/r", "vault" => nil, "web" => "/opt/bin/w"},
+          egress_ports: %{"ris" => 50_001, "web" => 50_002}
+      }
+
+      Config.save(cfg)
+      assert {:ok, cfg} == Config.load(Config.config_path(cfg.base_dir))
+    end
+
+    test "aeltere config.json ohne die Felder: Defaults, Vault abgeschaltet" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-old"))
+
+      old =
+        cfg
+        |> Config.encode()
+        |> JSON.decode!()
+        |> Map.drop(
+          ~w(escript_bin egress_bin connector_bins egress_ports ris_base_url ris_mock_port vault_dir)
+        )
+
+      assert {:ok, loaded} = Config.from_map(old)
+      assert loaded.egress_ports == Config.default_egress_ports()
+      assert loaded.ris_base_url == Config.default_ris_base_url()
+      assert loaded.vault_dir == nil
+      assert loaded.connector_bins == %{}
+    end
+
+    test "ungueltiger Egress-Port ist ein Fehler" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-bad"))
+
+      map =
+        cfg
+        |> Config.encode()
+        |> JSON.decode!()
+        |> Map.put("egress_ports", %{"ris" => 0})
+
+      assert_raise RuntimeError, ~r/egress_ports/, fn -> Config.from_map(map) end
+    end
+
+    test "Erlang-Wurzel aus dem escript-Pfad" do
+      assert Config.erlang_root("/x/erlang/28/bin/escript") == "/x/erlang/28"
     end
   end
 end
