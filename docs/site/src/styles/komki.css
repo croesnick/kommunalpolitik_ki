@@ -1,46 +1,152 @@
-/* komki-Farben: ruhiges Petrol als Akzent, Starlight-Grautöne bleiben.
-   Starlight ist dunkel als Standard; :root[data-theme='light'] überschreibt. */
+/* komki-Gestaltung „Leicht lesbar“: ruhig, freundlich, seriös.
+   Hervorhebung über Schriftgröße und -gewicht, eine Akzentfarbe (Blau), keine Marker, keine Deko.
+   Starlight setzt immer data-theme (dark/light); dunkel steht auf :root, hell auf [data-theme='light']. */
+
 :root {
-  --sl-color-accent-low: #12302b;
-  --sl-color-accent: #3aa893;
-  --sl-color-accent-high: #c3ebe2;
+  --sl-font: 'Atkinson Hyperlegible Next';
+  --sl-font-mono: 'Atkinson Hyperlegible Mono';
+  --komki-head: 'Zilla Slab', Georgia, serif;
+  --sl-text-body: 1.0625rem;
+  --sl-line-height: 1.7;
+
+  --sl-color-white: #f2f4f8;
+  --sl-color-gray-1: #e6e9ef;
+  --sl-color-gray-2: #c9cfd9;
+  --sl-color-gray-3: #a3acba;
+  --sl-color-gray-4: #6b7585;
+  --sl-color-gray-5: #2c3440;
+  --sl-color-gray-6: #1b2129;
+  --sl-color-black: #13171d;
+  --sl-color-accent-low: #1b2b42;
+  --sl-color-accent: #8db8ef;
+  --sl-color-accent-high: #c7dcf7;
+  --sl-color-text: var(--sl-color-gray-1);
+  /* Hinweiskästen (Aside „note“) im Akzentblau statt Starlights Lila-Blau */
+  --sl-color-blue-low: #1b2b42;
+  --sl-color-blue: #8db8ef;
+  --sl-color-blue-high: #c7dcf7;
+
+  --komki-soft: #1b2129;
+  --komki-on-accent: #0f1520;
   --komki-ok: #7fd18f;
-  --komki-deny: #ff8f85;
-}
-:root[data-theme='light'] {
-  --sl-color-accent-low: #d9ece7;
-  --sl-color-accent: #0f6b5c;
-  --sl-color-accent-high: #0b3f37;
-  --komki-ok: #1f7a3a;
-  --komki-deny: #b3261e;
+  --komki-deny: #ff9a8f;
 }
 
-/* Diagramme (inline-SVG aus src/assets), Farben nur über Theme-Variablen. */
-.komki-figure { overflow-x: auto; padding: 1rem; border: 1px solid var(--sl-color-gray-5); border-radius: 0.6rem; background: var(--sl-color-bg-nav); }
+:root[data-theme='light'] {
+  --sl-color-white: #1c2330;
+  --sl-color-gray-1: #1c2330;
+  --sl-color-gray-2: #2e3746;
+  --sl-color-gray-3: #556071;
+  --sl-color-gray-4: #8a93a3;
+  --sl-color-gray-5: #dde3ec;
+  --sl-color-gray-6: #f2f6fb;
+  --sl-color-gray-7: #f7f9fc;
+  --sl-color-black: #ffffff;
+  --sl-color-accent-low: #e3edf8;
+  --sl-color-accent: #1f5c9e;
+  --sl-color-accent-high: #163f6e;
+  --sl-color-text: var(--sl-color-gray-1);
+  --sl-color-blue-low: #e3edf8;
+  --sl-color-blue: #1f5c9e;
+  --sl-color-blue-high: #163f6e;
+
+  --komki-soft: #f2f6fb;
+  --komki-on-accent: #ffffff;
+  --komki-ok: #1f7a3a;
+  --komki-deny: #b42318;
+}
+
+/* Überschriften in Zilla Slab, ohne Fettdruck-Übertreibung */
+h1#_top,
+.sl-markdown-content :is(h1, h2, h3, h4) {
+  font-family: var(--komki-head);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
+}
+.sl-markdown-content :is(p, li, dd) { text-wrap: pretty; }
+
+/* Startseite: schmaler als Starlights Splash-Standard, Lesetext auf ~65 Zeichen */
+html[data-has-hero] { --sl-content-width: 64rem; }
+[data-has-hero] .sl-markdown-content > :is(p, ul, ol) { max-width: 40rem; }
+.hero h1 { font-size: clamp(2.2rem, 1rem + 4vw, 3.5rem); line-height: 1.12; max-width: 21ch; }
+.hero .tagline { color: var(--sl-color-gray-1); max-width: 37rem; }
+.hero { padding-block-end: 1rem; }
+
+/* Knöpfe und Karten: dünne Linie, kleiner Radius, kein Schatten */
+.sl-link-button { border-radius: 0.5rem; font-weight: 600; }
+.sl-link-button.primary { background: var(--sl-color-accent); border-color: var(--sl-color-accent); color: var(--komki-on-accent); }
+.sl-link-card { box-shadow: none; border-radius: 0.6rem; transition: border-color 0.15s; }
+.sl-link-card:hover { background: transparent; border-color: var(--sl-color-accent); }
+.sl-link-card .title { font-family: var(--komki-head); font-weight: 600; font-size: 1.2rem; color: var(--sl-color-accent); }
+
+/* Seitenleiste: aktuelle Seite zart hinterlegt statt als kräftiger Block */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+  background: var(--sl-color-accent-low);
+  color: var(--sl-color-accent-high);
+  font-weight: 600;
+}
+
+/* Inline-Code als ruhige Marke */
+.sl-markdown-content code:not(pre code) { border: 1px solid var(--sl-color-gray-5); border-radius: 0.25rem; padding: 0.02em 0.3em; }
+
+/* Session-Bild mit nummerierten Erläuterungen daneben */
+.komki-session { display: grid; gap: 1.75rem; align-items: start; }
+.komki-session > * { min-width: 0; }
+.komki-session-bild { margin: 0; }
+.komki-session-bild svg { display: block; width: 100%; height: auto; border-radius: 0.5rem; border: 1px solid var(--sl-color-gray-5); }
+.komki-session-bild figcaption { font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); margin-top: 0.75rem; }
+.sl-markdown-content ol.komki-schritte { list-style: none; padding: 0; margin: 0; counter-reset: n; display: grid; gap: 1.5rem; }
+.sl-markdown-content ol.komki-schritte > li { counter-increment: n; position: relative; padding-inline-start: 2.75rem; margin: 0; }
+.sl-markdown-content ol.komki-schritte > li::before {
+  content: counter(n); position: absolute; inset-inline-start: 0; top: 0.1rem;
+  width: 1.9rem; height: 1.9rem; display: grid; place-items: center; border-radius: 50%;
+  border: 1.5px solid var(--sl-color-accent); color: var(--sl-color-accent); font-weight: 600; font-size: 1rem; line-height: 1;
+}
+.komki-schritte strong { display: block; color: var(--sl-color-white); }
+@media (min-width: 60rem) {
+  .komki-session { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  .komki-schritte { position: sticky; top: calc(var(--sl-nav-height) + 1.5rem); }
+}
+
+/* „Was du erwarten kannst“: 2×2, feine Akzentlinie über jedem Punkt */
+.sl-markdown-content ul.komki-erwartung { list-style: none; padding: 0; margin: 0; display: grid; gap: 2rem 3rem; max-width: none; }
+.sl-markdown-content ul.komki-erwartung > li { margin: 0; padding-top: 1rem; border-top: 2px solid var(--sl-color-accent); }
+.komki-erwartung strong { display: block; font-family: var(--komki-head); font-weight: 600; font-size: 1.25rem; line-height: 1.3; color: var(--sl-color-white); margin-bottom: 0.25rem; }
+@media (min-width: 44rem) { .sl-markdown-content ul.komki-erwartung { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.komki-nicht { color: var(--sl-color-gray-3); }
+
+/* Freigaben · Bindungen · Belege als ruhige Begriffsliste */
+.komki-schichten { margin: 1.25rem 0 0; border-top: 1px solid var(--sl-color-gray-5); }
+.komki-schichten > div { display: grid; gap: 0.2rem 2rem; padding-block: 1rem; border-bottom: 1px solid var(--sl-color-gray-5); }
+.komki-schichten dt { font-family: var(--komki-head); font-weight: 600; font-size: 1.2rem; color: var(--sl-color-accent); margin: 0; }
+.komki-schichten dd { margin: 0; }
+@media (min-width: 48rem) { .komki-schichten > div { grid-template-columns: 11rem minmax(0, 1fr); } }
+
+/* Diagramme (inline-SVG aus src/assets), Farben nur über Theme-Variablen */
+.komki-figure { overflow-x: auto; padding: clamp(0.8rem, 3vw, 1.6rem); border-radius: 0.6rem; background: var(--komki-soft); }
 .komki-figure svg { display: block; min-width: 640px; width: 100%; height: auto; }
 .komki-figure + p { font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }
-.svg-box { fill: var(--sl-color-bg); stroke: var(--sl-color-gray-4); stroke-width: 1.5; }
-.svg-zone { fill: var(--sl-color-accent-low); stroke: var(--sl-color-accent); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.svg-box { fill: var(--sl-color-black); stroke: var(--sl-color-gray-3); stroke-width: 1.4; }
+.svg-zone { fill: var(--komki-soft); stroke: var(--sl-color-accent); stroke-width: 1.2; stroke-dasharray: 5 4; }
 .svg-hot { fill: var(--sl-color-accent); }
-.svg-text { fill: var(--sl-color-white); font-family: var(--sl-font); font-size: 13px; }
-.svg-small { fill: var(--sl-color-gray-3); font-family: var(--sl-font-mono); font-size: 10.5px; }
-.svg-strong { fill: var(--sl-color-white); font-family: var(--sl-font); font-size: 14px; font-weight: 600; }
-.svg-onhot { fill: var(--sl-color-black); font-family: var(--sl-font); font-size: 14px; font-weight: 600; }
-.svg-onhot-small { fill: var(--sl-color-black); font-family: var(--sl-font-mono); font-size: 10.5px; }
-.svg-line { stroke: var(--sl-color-gray-2); stroke-width: 1.4; fill: none; }
-.svg-arrowhead { fill: var(--sl-color-gray-2); }
+.svg-text { fill: var(--sl-color-white); font-family: var(--__sl-font); font-size: 13px; }
+.svg-small { fill: var(--sl-color-gray-3); font-family: var(--__sl-font); font-size: 10.5px; }
+.svg-strong { fill: var(--sl-color-white); font-family: var(--__sl-font); font-size: 14px; font-weight: 700; }
+.svg-onhot { fill: var(--komki-on-accent); font-family: var(--__sl-font); font-size: 14px; font-weight: 700; }
+.svg-onhot-small { fill: var(--komki-on-accent); font-family: var(--__sl-font); font-size: 10.5px; }
+.svg-line { stroke: var(--sl-color-gray-3); stroke-width: 1.4; fill: none; }
+.svg-arrowhead { fill: var(--sl-color-gray-3); }
 .svg-deny { stroke: var(--komki-deny); stroke-width: 1.6; fill: none; stroke-dasharray: 4 3; }
-.svg-denytext { fill: var(--komki-deny); font-family: var(--sl-font-mono); font-size: 10.5px; }
+.svg-denytext { fill: var(--komki-deny); font-family: var(--__sl-font); font-size: 10.5px; }
 
 /* Ja/Nein in Tabellen */
 .ja { color: var(--komki-ok); font-weight: 700; }
 .nein { color: var(--komki-deny); font-weight: 700; }
 
-/* Startseite: Session-Bild mit Erläuterung daneben */
-.komki-session { display: grid; gap: 1.5rem; align-items: start; }
-.komki-session-bild svg { display: block; width: 100%; height: auto; border-radius: 0.6rem; box-shadow: 0 8px 30px rgb(0 0 0 / 0.35); }
-.komki-session-text > :first-child { margin-top: 0; }
-@media (min-width: 60rem) {
-  .komki-session { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
-  .komki-session-text { position: sticky; top: 5rem; }
-}
+@media (prefers-reduced-motion: reduce) { .sl-link-card { transition: none; } }
+
+/* Seitenname im Kopf wie die Überschriften */
+.site-title { font-family: var(--komki-head); font-weight: 600; color: var(--sl-color-white); }

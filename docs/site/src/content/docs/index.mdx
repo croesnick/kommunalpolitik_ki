@@ -3,59 +3,56 @@ title: komki
 description: Ein lokaler KI-Arbeitsraum für die Ratsarbeit, der recherchiert, ohne Vertrauliches nach draußen zu tragen.
 template: splash
 hero:
-  tagline: Ein lokaler KI-Arbeitsraum für die Ratsarbeit. Er recherchiert im Ratsinformationssystem, im Web und in deinen Notizen, mit Quellen zu jeder Aussage. Was vertraulich ist, bleibt auf deinem Rechner.
+  title: Recherchieren, ohne Vertrauliches nach draußen zu tragen.
+  tagline: komki ist ein lokaler KI-Arbeitsraum für die Ratsarbeit. Er sucht im Ratsinformationssystem, im Web und in deinen Notizen und nennt zu jeder Aussage die Quelle. Das Sprachmodell läuft auf deinem Rechner. Was vertraulich ist, bleibt dort.
   actions:
     - text: So funktioniert komki
       link: /kommunalpolitik_ki/komki/so-funktioniert-es/
-      icon: right-arrow
     - text: In Betrieb nehmen
       link: /kommunalpolitik_ki/komki/in-betrieb-nehmen/
-      variant: minimal
+      variant: secondary
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 import Architektur from '../../assets/architektur.svg';
 import Session from '../../assets/session.svg';
 
 ## So sieht eine Sitzung aus
 
 <div class="komki-session">
-  <div class="komki-session-bild"><Session role="img" aria-label="Terminal mit einer komki-Sitzung: eine Frage, vier Tool-Aufrufe mit der Antwort des Vermittlers und eine Zusammenfassung mit Quellen" /></div>
-  <div class="komki-session-text">
-
-**Du fragst in normaler Sprache.** Hier: „Suche im RIS nach Radverkehrskonzept und im Vault nach Radverkehr …“
-
-**pi holt sich, was es braucht.** Jede fett gesetzte Zeile ist ein Werkzeug, etwa `komki/ris_search` oder `komki/vault_read`. Darunter steht, was der Vermittler zurückgibt:
-
-- `"decision":"permit"` heißt: Die Regeln dieses Raums erlauben den Aufruf.
-- `"labels":["ris-oeffentlich@1"]` sagt, woher der Inhalt stammt.
-- `decision_id` ist der Beleg im Journal. Darüber lässt sich jeder Schritt später nachvollziehen.
-
-**Am Ende steht die Antwort**, jede Aussage mit Quelle. Das Ganze dauerte knapp eine Minute, alles lief auf dem eigenen Rechner.
-
-  </div>
+  <figure class="komki-session-bild">
+    <Session role="img" aria-label="Terminal mit einer komki-Sitzung: eine Frage, vier Tool-Aufrufe mit der Antwort des Vermittlers und eine Zusammenfassung mit Quellen" />
+    <figcaption>Echte Sitzung vom 24.10.2026 mit dem Test-Vault und dem echten RIS. Sie dauerte knapp eine Minute und lief vollständig auf dem eigenen Rechner.</figcaption>
+  </figure>
+  <ol class="komki-schritte">
+    <li><strong>Du fragst in normaler Sprache.</strong> „Suche im RIS nach Radverkehrskonzept und im Vault nach Radverkehr …“</li>
+    <li><strong>pi holt sich, was es braucht.</strong> Jede fette Zeile ist ein Werkzeug, etwa <code>ris_search</code>. Darunter antwortet der Vermittler: <code>"decision":"permit"</code> heißt, der Raum erlaubt den Aufruf. <code>labels</code> sagt, woher der Inhalt stammt. <code>decision_id</code> ist der Beleg im Journal.</li>
+    <li><strong>Am Ende steht die Antwort,</strong> jede Aussage mit Quelle.</li>
+  </ol>
 </div>
 
-## Was du von komki erwarten kannst
+## Was du erwarten kannst
 
-- **Recherche mit Quellen.** komki sucht im Ratsinformationssystem, im Web und in deinen Notizen und sagt zu jeder Aussage, woher sie stammt.
-- **Ein Sprachmodell auf deinem Rechner.** Deine Fragen und Notizen gehen an keinen KI-Anbieter.
-- **Feste Regeln je Raum.** Vorher steht fest, welche Quellen in einer Sitzung zusammenkommen dürfen. Vertrauliche Notizen und das Internet treffen sich nie.
-- **Ein Journal.** Jede Anfrage wird vor der Ausführung geprüft und festgehalten. Später siehst du, was wann erlaubt oder abgelehnt wurde und warum.
+<ul class="komki-erwartung">
+  <li><strong>Recherche mit Quellen.</strong> komki sucht im RIS, im Web und in deinen Notizen und sagt zu jeder Aussage, woher sie stammt.</li>
+  <li><strong>Ein Sprachmodell auf deinem Rechner.</strong> Deine Fragen und Notizen gehen an keinen KI-Anbieter.</li>
+  <li><strong>Feste Regeln je Raum.</strong> Vorher steht fest, welche Quellen in einer Sitzung zusammenkommen dürfen. Vertrauliche Notizen und das Internet treffen sich nie.</li>
+  <li><strong>Ein Journal.</strong> Jede Anfrage wird vor der Ausführung geprüft und festgehalten. Später siehst du, was wann erlaubt oder abgelehnt wurde und warum.</li>
+</ul>
 
-Was komki nicht ist: kein Cloud-Dienst, kein Ersatz für dein eigenes Urteil und kein Schutz, wenn dein Rechner selbst schon kompromittiert ist.
+<p class="komki-nicht">komki ist kein Cloud-Dienst, kein Ersatz für dein eigenes Urteil und kein Schutz, wenn dein Rechner selbst schon kompromittiert ist.</p>
 
 ## Warum nicht einfach irgendeine Sandbox?
 
-Eine Sandbox sperrt ein Programm ein. Ein Agent, der recherchieren soll, braucht aber einen Weg nach draußen. Sobald die Sandbox ihn ins Internet lässt, sieht sie nur noch Netzverbindungen. Ob darin eine harmlose Suchanfrage steckt oder deine Notizen, kann sie nicht unterscheiden. Die macOS-Sandbox kennt nicht einmal einzelne Adressen, nur „Internet ja“ oder „Internet nein“.
+Eine Sandbox sperrt ein Programm ein. Ein Agent, der recherchieren soll, braucht aber einen Weg nach draußen. Sobald die Sandbox ihn ins Internet lässt, sieht sie nur noch Netzverbindungen. Ob darin eine Suchanfrage steckt oder deine Notizen, kann sie nicht unterscheiden. Die macOS-Sandbox kennt nicht einmal einzelne Adressen, nur „Internet ja“ oder „Internet nein“.
 
-komki legt deshalb eine Schicht darüber, die weiß, *was* gerade fließt:
+komki legt deshalb eine Schicht darüber, die weiß, was gerade fließt. Die Sandboxen sorgen dafür, dass niemand an ihr vorbeikommt.
 
-- **Freigaben:** pi kann nur fest umrissene Operationen aufrufen, etwa „suche im RIS nach Text“. Keine freien Adressen, keine Dateipfade, keine Befehle.
-- **Bindungen:** Jeder Inhalt trägt ein Label, das sagt, woher er stammt. Der Raum legt fest, welche Labels zusammenkommen und wohin etwas gehen darf.
-- **Belege:** Geprüft wird vor der Wirkung, und jede Entscheidung steht im Journal.
-
-Die Sandboxen sorgen dafür, dass niemand an dieser Schicht vorbeikommt: pi selbst hat kein Internet, und jeder Connector darf nur seine eigene Adresse erreichen.
+<dl class="komki-schichten">
+  <div><dt>Freigaben</dt><dd>pi ruft nur fest umrissene Operationen auf, etwa „suche im RIS nach Text“. Keine freien Adressen, keine Dateipfade, keine Befehle.</dd></div>
+  <div><dt>Bindungen</dt><dd>Jeder Inhalt trägt ein Label, das sagt, woher er stammt. Der Raum legt fest, welche Labels zusammenkommen und wohin etwas gehen darf.</dd></div>
+  <div><dt>Belege</dt><dd>Geprüft wird vor der Wirkung. Jede Entscheidung steht im verketteten Journal.</dd></div>
+</dl>
 
 ## Das Bild im Kopf
 
@@ -63,21 +60,11 @@ Die Sandboxen sorgen dafür, dass niemand an dieser Schicht vorbeikommt: pi selb
 
 Jeder gestrichelte Kasten ist eine eigene Sandbox. pi erreicht nur das Sprachmodell und den Vermittler. Jeder Connector kann nur, was für ihn freigegeben ist, und ins Internet kommt allein der Egress-Proxy, je Connector zu genau einer Adresse.
 
+## Weiterlesen
+
 <CardGrid>
-  <Card title="So funktioniert komki" icon="puzzle">
-    Agent, Vermittler, Connectoren und Räume in fünf Minuten erklärt.
-    [Zum Kapitel](/kommunalpolitik_ki/komki/so-funktioniert-es/)
-  </Card>
-  <Card title="In Betrieb nehmen" icon="rocket">
-    Elf Schritte vom Repo bis zur ersten Recherche, mit allem, was du im Terminal siehst.
-    [Zum Kapitel](/kommunalpolitik_ki/komki/in-betrieb-nehmen/)
-  </Card>
-  <Card title="Die Sicherheitsgrenze sehen" icon="approve-check">
-    Lass den Agenten ein Geheimnis hinaustragen und sieh zu, wie es scheitert.
-    [Zum Kapitel](/kommunalpolitik_ki/komki/sicherheitsgrenze/)
-  </Card>
-  <Card title="Wenn etwas hakt" icon="information">
-    Häufige Meldungen, ihre Ursachen und was hilft. Dazu die ehrlichen Grenzen.
-    [Zum Kapitel](/kommunalpolitik_ki/komki/wenn-es-hakt/)
-  </Card>
+  <LinkCard title="So funktioniert komki" description="Agent, Vermittler, Connectoren und Räume in fünf Minuten." href="/kommunalpolitik_ki/komki/so-funktioniert-es/" />
+  <LinkCard title="In Betrieb nehmen" description="Elf Schritte vom Repo bis zur ersten Recherche, mit allem, was du im Terminal siehst." href="/kommunalpolitik_ki/komki/in-betrieb-nehmen/" />
+  <LinkCard title="Die Sicherheitsgrenze sehen" description="Lass den Agenten ein Geheimnis hinaustragen und sieh zu, wie es scheitert." href="/kommunalpolitik_ki/komki/sicherheitsgrenze/" />
+  <LinkCard title="Wenn etwas hakt" description="Häufige Meldungen, ihre Ursachen und was hilft. Dazu die ehrlichen Grenzen." href="/kommunalpolitik_ki/komki/wenn-es-hakt/" />
 </CardGrid>
