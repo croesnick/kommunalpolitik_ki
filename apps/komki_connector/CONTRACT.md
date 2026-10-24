@@ -158,6 +158,9 @@ Jeder Connector-Aufruf besteht aus **zwei Entscheidungen** der Engine und **zwei
 2. Labels vergeben: RIS und Web bekommen fest `import_labels` des Manifests. Bei Vault gelten die Labels der
    Notiz, die ⊆ `import_labels` sein müssen, sonst `redacted`. **Die Selbstauskunft des Connectors wird nie
    über das Manifest hinaus geglaubt.**
+   **Suchoperationen** (`vault.search`): Treffer, deren Labels nicht ⊆ B_W sind, fallen vor der Entscheidung
+   still heraus. Sonst wäre „deny“ gegenüber „permit, 0 Treffer“ ein Existenz-Orakel für vertrauliche Inhalte
+   (Labbook L-109). Einzelzugriffe (`read`) bleiben eine Entscheidung mit Remedies.
 3. Objekt `in-<digest12 der Ergebnis-Bytes>` / `v1` / Labels, `workspace.environment = room.environment`.
 4. `Derive.decide(admit)` und `Verify.check`. permit: Antwort mit `labels`, `decision_id`,
    `emit_decision_id` und `payload_hash`. Sonst Remedies bzw. `redacted`.
