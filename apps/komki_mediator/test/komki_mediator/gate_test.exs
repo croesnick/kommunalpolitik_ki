@@ -28,7 +28,7 @@ defmodule KomkiMediator.GateTest do
     assert response["decision_id"] =~ "pdr-"
     assert response["labels"] == ["mediator-ping@1"]
     assert response["payload_hash"] =~ "sha256:"
-    assert response["tools"] == ["ping", "admit_document"]
+    assert response["tools"] == KomkiMediator.Fassung.tools()
   end
 
   test "PDR-Datensatz: Form, byte-kanonischer Chunk, abrufdatum ISO8601", %{
@@ -43,7 +43,7 @@ defmodule KomkiMediator.GateTest do
     # Der Eintrag ist selbst byte-kanonisch.
     assert JSON.canonical(pdr) == chunk
 
-    assert pdr["schema"] == "komki-pdr/2"
+    assert pdr["schema"] == "komki-pdr/3"
     assert pdr["decision"] == "permit"
     assert pdr["outcome"] == "admitted"
     assert pdr["admitted"] == true
@@ -54,7 +54,7 @@ defmodule KomkiMediator.GateTest do
     assert pdr["payload_hash"] =~ "sha256:"
     assert pdr["intent_id"] =~ "intent-"
     assert pdr["snapshot_id"] =~ "snap-"
-    assert pdr["fassung_id"] == "komki-mediator/1"
+    assert pdr["fassung_id"] == "komki-mediator/2"
 
     {:ok, _, _} = DateTime.from_iso8601(pdr["abrufdatum"])
   end

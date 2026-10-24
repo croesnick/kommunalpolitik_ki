@@ -36,7 +36,7 @@ defmodule KomkiMediator.Gate do
   selbst.
   """
 
-  alias KomkiMediator.{Fassung, Gamma, Hash, Journal, Room}
+  alias KomkiMediator.{Gamma, Hash, PDR, Room}
   alias KomkiPolicy.{Derive, JSON, Verify}
 
   @typedoc "Ablauf-Umgebung: Gamma-Stand, Raum, Journal-Anbindung."
@@ -49,8 +49,6 @@ defmodule KomkiMediator.Gate do
 
   @typedoc "Der Vollzug (Connector-Operation) - laeuft nur nach einem Permit."
   @type executor() :: (-> {:ok, map()} | {:error, term()})
-
-  @response_schema "komki-pdr/2"
 
   # -------------------------------------------------------------------------
   # Gate 1: Aufruf, Intent/Snapshot, Entscheidung
@@ -159,12 +157,12 @@ defmodule KomkiMediator.Gate do
       "decision_id" => decision_id,
       "registry_id" => env.gamma.registry_id,
       "remedies" => remedies,
-      "relaxation_authorities" => relaxation_authorities(env.gamma, remedies)
+      "relaxation_authorities" => Gamma.relaxation_authorities_for(env.gamma, remedies)
     }
 
     journal_pdr(
       env,
-      pdr(env, tool, kind, "not_admitted", false, intent_hash, %{
+      pdr(tool, kind, "not_admitted", false, intent_hash, %{
         decision_id: decision_id,
         intent_id: intent["intent_id"],
         snapshot_id: snapshot["snapshot_id"],
@@ -203,7 +201,7 @@ defmodule KomkiMediator.Gate do
 
             journal_pdr(
               env,
-              pdr(env, tool, "permit", "admitted", true, intent_hash, %{
+              pdr(tool, "permit", "admitted", true, intent_hash, %{
                 decision_id: decision_id,
                 intent_id: intent["intent_id"],
                 snapshot_id: snapshot["snapshot_id"],
@@ -266,7 +264,7 @@ defmodule KomkiMediator.Gate do
 
     journal_pdr(
       env,
-      pdr(env, tool, "permit", "redacted", "redacted", intent_hash, %{
+      pdr(tool, "permit", "redacted", "redacted", intent_hash, %{
         decision_id: decision_id,
         payload_hash: payload_hash,
         remedies: nil
@@ -286,7 +284,7 @@ defmodule KomkiMediator.Gate do
 
     journal_pdr(
       env,
-      pdr(env, tool, "permit", "error", false, intent_hash, %{
+      pdr(tool, "permit", "error", false, intent_hash, %{
         decision_id: decision_id,
         checked_label: decision["checked_label"],
         remedies: nil,
@@ -308,7 +306,7 @@ defmodule KomkiMediator.Gate do
 
     journal_pdr(
       env,
-      pdr(env, tool, "error", "not_admitted", false, intent_hash, %{
+      pdr(tool, "error", "not_admitted", false, intent_hash, %{
         decision_id: decision_id,
         remedies: nil,
         payload_hash: payload_hash(response)
@@ -330,7 +328,7 @@ defmodule KomkiMediator.Gate do
 
     journal_pdr(
       env,
-      pdr(env, tool, pdr_decision, "error", false, intent_hash, %{
+      pdr(tool, pdr_decision, "error", false, intent_hash, %{
         decision_id: decision_id,
         intent_id: intent_id,
         snapshot_id: snapshot_id,
@@ -378,31 +376,17 @@ defmodule KomkiMediator.Gate do
     end
   end
 
-  # Relaxationsbefugnisse sind Γ-L1-Metadaten (R.2.2) aus dem rohen
-  # Registry-Term — keine Remedy-Semantik: WAS legal fortsetzbar ist,
-  # sagt allein der Engine-Katalog; hier steht nur, WER eine benannte
-  # Bindung lockerungsbefugt ist. Aufgeschluesselt je Bindung der
-  # Engine-Befunde, sortiert und einmalig.
-  defp relaxation_authorities(gamma, remedies) do
-    remedies
-    |> List.wrap()
-    |> Enum.flat_map(fn remedy -> List.wrap(remedy["binding"]) end)
-    |> Enum.uniq()
-    |> Enum.flat_map(&Gamma.relaxation_authorities(gamma, &1))
-    |> Enum.uniq()
-    |> Enum.sort()
-  end
-
   # Exakte Parameter-Fassung des Calls: der vollstaendig gerenderte Call
   # ist die Hash-Basis fuer den intent_hash - nicht eine Projektion.
   # Structs (die vom MCP-Schema gerenderten Parameter) werden entpackt,
   # Atom-Schluessel werden String-Schluessel (der Vertrag zwischen
   # MCP-Schicht und Gate), String-Schluessel bleiben unveraendert.
+  @doc false
   @spec rendered_params(term()) :: %{String.t() => term()}
-  defp rendered_params(params) when is_struct(params),
+  def rendered_params(params) when is_struct(params),
     do: rendered_params(Map.from_struct(params))
 
-  defp rendered_params(params) when is_map(params) do
+  def rendered_params(params) when is_map(params) do
     Map.new(params, fn {key, value} -> {render_key(key), value} end)
   end
 
@@ -419,37 +403,36 @@ defmodule KomkiMediator.Gate do
     }
   end
 
-  defp pdr(env, tool, decision, outcome, admitted, intent_hash, opts) do
+  # PDR der Raum-Tools (ping, admit_document): Regelzweig admit, keine
+  # call_id (kein Connector-Aufruf).
+  defp pdr(tool, decision, outcome, admitted, intent_hash, opts) do
     %{
-      "schema" => @response_schema,
       "decision_id" => opts.decision_id,
       "tool" => tool,
+      "rule" => "admit",
       "decision" => decision,
       "outcome" => outcome,
       "admitted" => admitted,
       "intent_hash" => intent_hash,
       "payload_hash" => opts.payload_hash,
-      "gamma" => %{"registry_id" => env.gamma.registry_id, "gamma_hash" => env.gamma.gamma_hash},
       "intent_id" => Map.get(opts, :intent_id),
       "snapshot_id" => Map.get(opts, :snapshot_id),
       "checked_label" => Map.get(opts, :checked_label),
-      "remedies" => Map.get(opts, :remedies),
-      "abrufdatum" => DateTime.to_iso8601(DateTime.utc_now()),
-      "fassung_id" => Fassung.fassung_id()
+      "remedies" => Map.get(opts, :remedies)
     }
   end
 
-  defp payload_hash(term), do: Hash.sha256_hex(JSON.canonical(term))
+  defp payload_hash(term), do: PDR.payload_hash(term)
 
-  defp journal_pdr(env, record), do: Journal.append(env.journal, record)
+  defp journal_pdr(env, fields), do: PDR.append(env, fields)
 
-  defp new_decision_id do
-    "pdr-" <> Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)
-  end
+  defp new_decision_id, do: PDR.new_id()
 
   # Eingabefehler-Map (atom-Key-Form, wie JSON.parse sie liefert) in die
   # JSON-wuerdige String-Schluesselform ueberfuehren.
-  defp error_detail(err) do
+  @doc false
+  @spec error_detail(map()) :: %{String.t() => term()}
+  def error_detail(err) do
     %{
       "code" => Atom.to_string(Map.fetch!(err, :code)),
       "path" => Map.fetch!(err, :path),

@@ -3,14 +3,16 @@ defmodule KomkiMediator.CLI do
   Escript-Einstiegspunkt `komki-mediator`: stellt fehlende Aufstellung
   bereit, laedt Gamma und Raum und startet Vermittlung + loopback-Listener.
 
-      komki-mediator --base <dir> --port <n>
+      komki-mediator --base <dir> --port <n> [--connectors-dir <pfad>]
       komki-mediator verify-journal [--base <dir>]
       komki-mediator --help
       komki-mediator --version
 
   * `--base`    (Default: KOMKI_HOME oder ~/.local/share/komki)
   * `--port`    (Default: 49525)
-  * `--version` gibt die Fassung "komki-mediator/1" aus.
+  * `--connectors-dir` Verzeichnis der Connector-Sockets `<id>.sock`
+    (Default: `<base>/run/connectors`, Connector-Vertrag §2)
+  * `--version` gibt die Fassung "komki-mediator/2" aus.
 
   Bei schlechten Argumenten oder Ladefehlern erscheint eine einzeilige
   JSON-Fehlermeldung auf stderr und Exit 1. Nach dem Start kommt eine
@@ -82,7 +84,7 @@ defmodule KomkiMediator.CLI do
   # Start
   # -------------------------------------------------------------------------
 
-  defp run(%{base: base, port: port}) do
+  defp run(%{base: base, port: port} = opts) do
     with :ok <- ensure_runtime_apps(),
          :ok <- provision(base),
          {:ok, gamma} <-
@@ -90,7 +92,8 @@ defmodule KomkiMediator.CLI do
          {:ok, room} <- tagged(Room.load(mediator_dir(base)), "room.json") do
       {:ok, _} =
         KomkiMediator.Supervisor.start_link(
-          {{journal_path(base), append_only: true}, gamma, room, port}
+          {{journal_path(base), append_only: true}, gamma, room, port,
+           %{connectors_dir: connectors_dir(opts)}}
         )
 
       IO.puts(startup_note(base, port, gamma))
@@ -144,6 +147,9 @@ defmodule KomkiMediator.CLI do
   defp parse_flags(["--base", value | rest], acc),
     do: parse_flags(rest, Map.put(acc, :base, value))
 
+  defp parse_flags(["--connectors-dir", value | rest], acc),
+    do: parse_flags(rest, Map.put(acc, :connectors_dir, value))
+
   defp parse_flags(["--port", value | rest], acc) do
     case Integer.parse(value) do
       {port, ""} when port > 0 and port <= 65_535 ->
@@ -168,6 +174,9 @@ defmodule KomkiMediator.CLI do
   # -------------------------------------------------------------------------
 
   defp mediator_dir(base), do: Path.join(base, "mediator")
+
+  defp connectors_dir(%{connectors_dir: dir}), do: dir
+  defp connectors_dir(%{base: base}), do: Path.join([base, "run", "connectors"])
 
   defp journal_path(base), do: Path.join([mediator_dir(base), "journal", "pdr.jsonl"])
 
@@ -209,7 +218,7 @@ defmodule KomkiMediator.CLI do
 
   defp usage do
     """
-    komki-mediator --base <dir> --port <n>
+    komki-mediator --base <dir> --port <n> [--connectors-dir <pfad>]
     komki-mediator verify-journal [--base <dir>]
     komki-mediator --help
     komki-mediator --version

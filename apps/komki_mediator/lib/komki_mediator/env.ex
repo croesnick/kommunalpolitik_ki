@@ -1,7 +1,8 @@
 defmodule KomkiMediator.Env do
   @moduledoc """
   Vermittlungs-Umgebung: haelt den geladenen Gamma-Stand, den Raum und die
-  Journal-Anbindung bereit. Die MCP-Tools holen die Umgebung einmal je
+  Journal-Anbindung bereit, dazu `connectors_dir` (Verzeichnis der
+  Connector-Sockets) und optional `session_id` (Zuordnung im PDR). Die MCP-Tools holen die Umgebung einmal je
   Aufruf und reichen sie an das Gate durch — Tests starten eine
   konfigurierte Instanz und erzeugen so definierten Nachlauf.
   """
@@ -14,7 +15,7 @@ defmodule KomkiMediator.Env do
     GenServer.start_link(__MODULE__, state, name: __MODULE__)
   end
 
-  @doc "Holt die aktuelle Umgebung (gamma, room, journal)."
+  @doc "Holt die aktuelle Umgebung (gamma, room, journal, connectors_dir, session_id)."
   @spec fetch() :: map()
   def fetch do
     GenServer.call(__MODULE__, :fetch)

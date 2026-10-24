@@ -1,7 +1,10 @@
 defmodule KomkiMediator.Templates do
   @moduledoc """
   Default-Raumaufstellung als Elixir-Maps: Registry (Gamma), Raum und die
-  drei Beispieldokumente. Ausgegeben wird ueber `KomkiPolicy.JSON.canonical`
+  drei Beispieldokumente. Die Registry traegt zusaetzlich die
+  Γ-Konventionen des Connector-Vertrags §7 (Beobachter, Umgebungen,
+  Connector-Bindungen, Fakt `output_content_digest`); der Default-Raum ist
+  der Referenzraum **recherche**. Ausgegeben wird ueber `KomkiPolicy.JSON.canonical`
   — der Provisionierungs-Output ist damit von Haus aus kanonisch.
 
   provision!/1 ist idempotent: sobald `registry.json` existiert, wird
@@ -13,48 +16,80 @@ defmodule KomkiMediator.Templates do
 
   @mediator_dir "mediator"
 
+  @observers ["brave-search", "nutzende-person", "pi-agent", "ris-betreiber"]
+
   @doc "Registry-Term des Default-Arbeitsraums (Gamma der Aufstellung)."
   def registry do
     %{
       "schema" => "komki-registry/2",
       "registry_id" => "reg-komki-arbeitsraum",
-      "observers" => ["nutzende-person", "pi-agent"],
+      "observers" => @observers,
       "fact_fields" => %{
+        "output_content_digest" => "string",
         "purpose" => "string",
         "vertraulich_freigabe" => "boolean"
       },
       "environments" => %{
-        "lokaler-arbeitsraum@1" => %{"observers" => ["nutzende-person", "pi-agent"]}
+        "lokaler-arbeitsraum@1" => %{"observers" => ["nutzende-person", "pi-agent"]},
+        "ris-abruf@1" => %{"observers" => ["nutzende-person", "pi-agent", "ris-betreiber"]},
+        "vault-lokal@1" => %{"observers" => ["nutzende-person", "pi-agent"]},
+        "web-suche@1" => %{"observers" => ["brave-search", "nutzende-person", "pi-agent"]}
       },
-      "bindings" => %{
-        "mediator-ping@1" => %{
-          "readers" => ["nutzende-person", "pi-agent"],
-          "operations" => %{"admit" => true},
-          "relaxation_authorities" => []
-        },
-        "doc-oeffentlich@1" => %{
-          "readers" => ["nutzende-person", "pi-agent"],
-          "operations" => %{"admit" => true},
-          "relaxation_authorities" => []
-        },
-        "doc-vertraulich@1" => %{
-          "readers" => ["nutzende-person", "pi-agent"],
-          "operations" => %{"admit" => %{"eq" => ["purpose", "vertraulich"]}},
-          "relaxation_authorities" => []
-        },
-        "doc-pending-freigabe@1" => %{
-          "readers" => ["nutzende-person", "pi-agent"],
-          "operations" => %{"admit" => %{"eq" => ["vertraulich_freigabe", true]}},
-          "relaxation_authorities" => ["nutzende-person"]
-        }
-      }
+      "bindings" =>
+        Map.merge(connector_bindings(), %{
+          "mediator-ping@1" => %{
+            "readers" => ["nutzende-person", "pi-agent"],
+            "operations" => %{"admit" => true},
+            "relaxation_authorities" => []
+          },
+          "doc-oeffentlich@1" => %{
+            "readers" => ["nutzende-person", "pi-agent"],
+            "operations" => %{"admit" => true},
+            "relaxation_authorities" => []
+          },
+          "doc-vertraulich@1" => %{
+            "readers" => ["nutzende-person", "pi-agent"],
+            "operations" => %{"admit" => %{"eq" => ["purpose", "vertraulich"]}},
+            "relaxation_authorities" => []
+          },
+          "doc-pending-freigabe@1" => %{
+            "readers" => ["nutzende-person", "pi-agent"],
+            "operations" => %{"admit" => %{"eq" => ["vertraulich_freigabe", true]}},
+            "relaxation_authorities" => ["nutzende-person"]
+          }
+        })
     }
   end
+
+  # Connector-Bindungen (Connector-Vertrag §7): admit und emit ohne
+  # Bedingung. Die Trennung leistet der Empfaengerkreis: vault-vertraulich
+  # liest nur nutzende-person und pi-agent, damit faellt in einem Raum mit
+  # dieser Bindung jede Anfrage an RIS oder Websuche an recipient_inclusion.
+  defp connector_bindings do
+    open = %{"operations" => %{"admit" => true, "emit" => true}, "relaxation_authorities" => []}
+
+    %{
+      "ris-oeffentlich@1" => Map.put(open, "readers", @observers),
+      "web-oeffentlich@1" => Map.put(open, "readers", @observers),
+      "vault-oeffentlich@1" => Map.put(open, "readers", @observers),
+      "vault-vertraulich@1" => Map.put(open, "readers", ["nutzende-person", "pi-agent"])
+    }
+  end
+
+  @doc "B_W des Referenzraums recherche (Default-Raum)."
+  @spec recherche_bindings() :: [String.t()]
+  def recherche_bindings, do: ["ris-oeffentlich@1", "vault-oeffentlich@1", "web-oeffentlich@1"]
+
+  @doc "B_W des Referenzraums vertraulich (Connector-Vertrag §7)."
+  @spec vertraulich_bindings() :: [String.t()]
+  def vertraulich_bindings,
+    do: ["ris-oeffentlich@1", "vault-oeffentlich@1", "vault-vertraulich@1", "web-oeffentlich@1"]
 
   @doc """
   Raum-Term des Default-Arbeitsraums. Bewusst OHNE die
   `vertraulich_freigabe`-Fakt: `doc-pending-freigabe` faehrt damit die
   indeterminate-Route (missing_fact) — die Freigabe ist nachzuholen.
+  `workspace_bindings` ist B_W des Referenzraums recherche.
   """
   def room do
     %{
@@ -63,6 +98,7 @@ defmodule KomkiMediator.Templates do
       "workspace_id" => "ws-komki-arbeitsraum",
       "environment" => "lokaler-arbeitsraum@1",
       "documents_dir" => "documents",
+      "workspace_bindings" => recherche_bindings(),
       "facts" => %{
         "audit_path_ready" => %{
           "value" => true,
