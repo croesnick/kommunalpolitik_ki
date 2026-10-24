@@ -94,12 +94,18 @@ defmodule KomkiCli.Proc do
 
   @doc """
   Spawn-Zeile mit stdin-Umleitung (Ticket #146): `"0<&0"` reicht das stdin
-  der Shell an den Hintergrundprozess durch (ohne explizite Umleitung gibt
-  sh einem `&`-Job /dev/null), `"< /dev/null"` schliesst es.
+  der Shell an den Hintergrundprozess durch, `"< /dev/null"` schliesst es.
+
+  POSIX gibt einem `&`-Job in einer nicht-interaktiven Shell /dev/null als
+  stdin, BEVOR explizite Umleitungen greifen; ein schlichtes `0<&0`
+  duplizierte dann nur /dev/null (dash auf Linux; bash auf macOS ist
+  nachsichtiger). Deshalb wird stdin vorher auf fd 3 gesichert und im Job
+  explizit von dort umgeleitet (`exec 3<&0; … 0<&3 3<&- &`).
   """
   @spec spawn_line(String.t(), [String.t()], String.t(), String.t()) :: String.t()
   def spawn_line(binary, args, log_path, stdin_redirect) do
-    "nohup " <>
+    stdin_prefix(stdin_redirect) <>
+      "nohup " <>
       quote_bin(binary) <>
       " " <>
       Enum.join(args, " ") <>
@@ -107,7 +113,11 @@ defmodule KomkiCli.Proc do
       " > " <> quote_bin(log_path) <> " 2>&1 & echo $!"
   end
 
+  defp stdin_prefix("0<&0"), do: "exec 3<&0; "
+  defp stdin_prefix(_redirect), do: ""
+
   defp stdin_part(""), do: ""
+  defp stdin_part("0<&0"), do: " 0<&3 3<&-"
   defp stdin_part(redirect), do: " " <> redirect
 
   @doc """

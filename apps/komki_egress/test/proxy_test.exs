@@ -123,7 +123,15 @@ defmodule KomkiEgress.ProxyTest do
         KomkiEgress.Log.write(%{port: 1, connector: "web", host: "a.de:443", decision: "deny"})
       end)
 
-    assert %{"event" => "connection", "host" => "a.de:443"} = JSON.decode!(log)
+    # capture_io(:stderr) faengt global; parallel laufende Proxy-Tests koennen
+    # weitere Zeilen beisteuern (Linux-CI). Gesucht ist genau die eigene.
+    own =
+      log
+      |> String.split("\n", trim: true)
+      |> Enum.map(&JSON.decode!/1)
+      |> Enum.find(&(&1["host"] == "a.de:443" and &1["port"] == 1))
+
+    assert %{"event" => "connection", "host" => "a.de:443"} = own
 
     proxy = free_port()
     start_proxy(%{"#{proxy}" => %{"connector" => "web", "allow" => ["a.de:443"]}})

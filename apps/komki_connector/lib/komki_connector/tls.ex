@@ -11,18 +11,25 @@ defmodule KomkiConnector.TLS do
   Aufruf scheitert (fail-closed).
   """
 
-  @default_bundle "/etc/ssl/cert.pem"
+  # Erstes vorhandenes Buendel gewinnt: macOS, Debian/Ubuntu, RHEL/Fedora.
+  # Das macOS-Connector-Profil erlaubt nur den ersten Pfad; die anderen
+  # dienen Tests und CI unter Linux.
+  @bundles [
+    "/etc/ssl/cert.pem",
+    "/etc/ssl/certs/ca-certificates.crt",
+    "/etc/pki/tls/certs/ca-bundle.crt"
+  ]
 
-  @doc "Pfad des Zertifikatsbuendels."
+  @doc "Pfad des Zertifikatsbuendels (erstes vorhandenes der Plattform)."
   @spec bundle_path() :: Path.t()
-  def bundle_path, do: @default_bundle
+  def bundle_path, do: Enum.find(@bundles, hd(@bundles), &File.regular?/1)
 
   @doc """
   DER-kodierte CA-Zertifikate aus `path`, einmal je Knoten gelesen und in
   `:persistent_term` gehalten.
   """
   @spec cacerts(Path.t()) :: [binary()]
-  def cacerts(path \\ @default_bundle) do
+  def cacerts(path \\ bundle_path()) do
     key = {__MODULE__, path}
 
     case :persistent_term.get(key, nil) do

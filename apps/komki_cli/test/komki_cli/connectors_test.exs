@@ -143,13 +143,13 @@ defmodule KomkiCli.ConnectorsTest do
         )
 
       assert line ==
-               "nohup '/usr/bin/env' '-i' 'HOME=" <>
+               "exec 3<&0; nohup '/usr/bin/env' '-i' 'HOME=" <>
                  cfg.base_dir <>
                  "/run' 'PATH=/usr/bin:/bin' 'LANG=C' '" <>
                  cfg.sandbox_exec <>
                  "' '-f' '" <>
                  profile <>
-                 "' '/opt/erl/bin/escript' '/opt/komki/bin/komki-connector-ris' '--socket' '/s' 0<&0 > '/l.log' 2>&1 & echo $!"
+                 "' '/opt/erl/bin/escript' '/opt/komki/bin/komki-connector-ris' '--socket' '/s' 0<&3 3<&- > '/l.log' 2>&1 & echo $!"
     end
   end
 
