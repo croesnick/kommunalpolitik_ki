@@ -100,7 +100,7 @@ Von null bis zur ersten Recherche, im Repo-Root:
 
 ```sh
 make komki                     # baut komki und seine Bausteine, legt sie ab (~/.local/bin, ~/.local/share/komki/bin)
-komki setup --gguf-from PFAD/ZUM/MODELL.gguf
+komki setup                    # lädt beim ersten Mal das Modell (17 GB), fragt vorher
 komki run "Suche im RIS nach Bahnhofstraße und fasse die Treffer zusammen."
 komki session                  # interaktiv in tmux
 komki journal verify           # Hash-Kette des Journals prüfen
@@ -112,9 +112,13 @@ Installationsbefehl. Es fragt nach dem Vault (Enter wählt den erfundenen
 Test-Vault, `--demo` ohne Frage), legt die Instanz an, fragt den
 Brave-Key verdeckt ab, falls er im Schlüsselbund fehlt, startet alles und
 prüft mit dem Doctor. Ein zweiter Lauf ändert an einer bestehenden Instanz
-nichts. `--gguf-from` entfällt, wenn das Modell schon am Staging-Ort liegt
-(`~/.local/share/komki/models-staging/`); den Download übernimmt künftig
-`setup` selbst (#178). `run` und `session` starten fehlende Prozesse
+nichts. Fehlt das Modell, nennt `setup` Größe, Quelle (feste Revision auf
+Hugging Face) und Lizenz und lädt es nach Rückfrage an den Staging-Ort
+(`~/.local/share/komki/models-staging/`). Ein abgebrochener Download setzt
+beim nächsten Aufruf fort; verwendet wird die Datei nur mit passender
+Prüfsumme. Liegt das Modell schon woanders, `--gguf-from PFAD`. Die Instanz
+bekommt das Modell als APFS-Klon: kein zusätzlicher Platz, Millisekunden
+statt einer 17-GB-Kopie. `run` und `session` starten fehlende Prozesse
 selbst, `komki up` ist nur noch nötig, wenn man ausdrücklich vorab starten
 will.
 

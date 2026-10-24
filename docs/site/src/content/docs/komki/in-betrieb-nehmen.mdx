@@ -5,10 +5,10 @@ description: Vom Repo bis zur ersten Recherche in fünf Schritten, mit allem, wa
 
 import { Aside, Steps } from '@astrojs/starlight/components';
 
-Etwa zehn Minuten auf einem Mac mit Apple Silicon, wenn das Modell schon auf der Platte liegt. Die Ausgaben stammen aus echten Testläufen; Prozessnummern und Zeiten sehen bei dir anders aus.
+Etwa zehn Minuten auf einem Mac mit Apple Silicon, dazu einmalig der Download des Modells. Die Ausgaben stammen aus echten Testläufen; Prozessnummern und Zeiten sehen bei dir anders aus.
 
 <Aside>
-Du brauchst llama.cpp, node, das pi-Paket, Elixir und tmux. Fehlt etwas, nennt `komki setup` den passenden Installationsbefehl, du musst also nicht vorher nachsehen. Dazu kommt das gemma-Modell (17 GB). Bald lädt `komki setup` es selbst herunter, und eine Installation über Homebrew ersetzt den Bauschritt.
+Du brauchst llama.cpp, node, das pi-Paket, Elixir und tmux. Fehlt etwas, nennt `komki setup` den passenden Installationsbefehl, du musst also nicht vorher nachsehen. Das Sprachmodell (gemma, 17 GB) lädt `komki setup` beim ersten Mal selbst. Bald ersetzt eine Installation über Homebrew auch den Bauschritt.
 </Aside>
 
 <Steps>
@@ -35,28 +35,30 @@ Du brauchst llama.cpp, node, das pi-Paket, Elixir und tmux. Fehlt etwas, nennt `
    `komki setup` prüft die Werkzeuge, fragt nach dem Vault, legt die Instanz an, fragt den Brave-Key ab, falls er fehlt, startet alles und prüft es. Zum Ausprobieren nimmst du den Test-Vault: erfundene Notizen aus der Stadtratsarbeit (Buchloe, fiktiv), öffentliche und vertrauliche, dazu eine Notiz mit eingeschleustem Angriffstext. Dein echter Obsidian-Vault bleibt unberührt.
 
    ```sh
-   komki setup --demo --gguf-from PFAD/ZUM/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
+   komki setup --demo
    ```
 
    ```text frame="terminal" title="Das siehst du"
    Werkzeuge   ok (llama-server, node, pi, Erlang (escript), komki-mediator, komki-egress, komki-connector-ris, komki-connector-vault, komki-connector-web)
    Vault       Test-Vault mit 11 erfundenen Notizen unter ~/.local/share/komki/vault
-   Instanz     wird angelegt unter ~/.local/share/komki (prueft und kopiert das Modell, etwa 30 s)
+   Instanz     wird angelegt unter ~/.local/share/komki (prueft das Modell, etwa 30 s)
    Instanz     angelegt
    brave       ok (Schluesselbund-Eintrag 'brave-search-api')
    Start       llama, Egress, Connectoren und Vermittler (beim ersten Mal bis zu einer Minute)
-   llama up: pid 40047 (health 200)
-   egress up: pid 40098
-   connector-ris up: pid 40125
-   connector-vault up: pid 40152
-   connector-web up: pid 40189
-   mediator up: pid 40217 (tools: ping, admit_document, ris_search, ris_show, vault_read, vault_search, vault_write_test, web_search)
+   llama up: pid 49811 (health 200)
+   egress up: pid 49872
+   connector-ris up: pid 49899
+   connector-vault up: pid 49926
+   connector-web up: pid 49954
+   mediator up: pid 49981 (tools: ping, admit_document, ris_search, ris_show, vault_read, vault_search, vault_write_test, web_search)
    Pruefung    doctor ok
 
    Fertig. Probier zum Beispiel:
      komki run "Was steht im RIS zum Radverkehrskonzept?"
      komki session
    ```
+
+   Beim ersten Mal fehlt noch das Modell. Dann nennt `setup` Größe (17,0 GB), Quelle (eine feste Revision auf Hugging Face) und Lizenz (Apache-2.0) und fragt, ob es laden soll. Bricht der Download ab, macht der nächste Aufruf dort weiter. Verwendet wird die Datei nur, wenn ihre Prüfsumme exakt stimmt. Die Ausgabe oben stammt aus einem Lauf, bei dem das Modell schon da war.
 
    Fehlt der Brave-Key, fragt `setup` ihn verdeckt ab: Die Eingabe erscheint nicht auf dem Bildschirm und landet direkt im macOS-Schlüsselbund. Später geht das auch einzeln mit `komki secret set brave`. Für deinen eigenen Vault nimmst du `--vault-dir PFAD` statt `--demo`. komki sieht dort nur Notizen mit einem Label im Frontmatter, etwa `komki_labels: [vault-oeffentlich@1]`.
 

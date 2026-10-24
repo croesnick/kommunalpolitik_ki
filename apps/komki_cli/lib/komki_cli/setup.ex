@@ -13,7 +13,7 @@ defmodule KomkiCli.Setup do
   Tests die Antworten vorgeben koennen.
   """
 
-  alias KomkiCli.{Config, DemoVault, Keychain, Secrets, Steps}
+  alias KomkiCli.{Config, DemoVault, Keychain, Model, Secrets, Steps}
 
   @type ui :: %{
           say: (String.t() -> any()),
@@ -97,9 +97,46 @@ defmodule KomkiCli.Setup do
   end
 
   defp create_instance(base, vault_dir, opts, ui) do
-    ui.say.(
-      "Instanz     wird angelegt unter " <> base <> " (prueft und kopiert das Modell, etwa 30 s)"
-    )
+    with :ok <- ensure_model(opts, ui) do
+      init_instance(base, vault_dir, opts, ui)
+    end
+  end
+
+  # Modell (Ticket #178): vorhanden am Staging-Ort oder per --gguf-from,
+  # sonst nach Rueckfrage laden (Groesse, Quelle, Lizenz vorab).
+  defp ensure_model(opts, ui) do
+    if Map.has_key?(opts, "gguf-from") or Config.default_probe_gguf() do
+      :ok
+    else
+      Enum.each(Model.summary(), ui.say)
+
+      cond do
+        not ui.confirm.("            jetzt herunterladen?", true) ->
+          {:error, "setup angehalten: ohne Modell keine Instanz (oder --gguf-from PFAD angeben)",
+           2}
+
+        (check = Model.remote_matches?()) not in [:ok, :unknown] ->
+          {:error, elem(check, 1), 2}
+
+        true ->
+          download(ui)
+      end
+    end
+  end
+
+  defp download(ui) do
+    case Model.download() do
+      {:ok, path} ->
+        ui.say.("Modell      geladen und geprueft: " <> path)
+        :ok
+
+      {:error, reason} ->
+        {:error, reason, 2}
+    end
+  end
+
+  defp init_instance(base, vault_dir, opts, ui) do
+    ui.say.("Instanz     wird angelegt unter " <> base <> " (prueft das Modell, etwa 30 s)")
 
     init_opts =
       %{"vault-dir" => vault_dir}

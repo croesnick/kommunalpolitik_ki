@@ -179,6 +179,27 @@ defmodule KomkiCli.Steps do
     :ok
   end
 
+  @doc """
+  Legt `dest` als APFS-Klon von `source` an (Ticket #178): `cp -c` nutzt
+  clonefile(2), belegt keinen zusaetzlichen Platz und dauert Millisekunden
+  statt einer 17-GB-Kopie. Scheitert der Klon (anderes Volume, kein APFS),
+  kopiert komki wie bisher. Liefert, welcher Weg genommen wurde.
+  """
+  @spec clone_or_copy(String.t(), String.t()) :: String.t()
+  def clone_or_copy(source, dest) do
+    File.rm(dest)
+
+    case System.cmd("/bin/cp", ["-c", source, dest], stderr_to_stdout: true) do
+      {_, 0} ->
+        "APFS-Klon (kein zusaetzlicher Platz)"
+
+      {_, _} ->
+        File.rm(dest)
+        {:ok, _bytes} = File.copy(source, dest)
+        "Kopie (Klon nicht moeglich, etwa anderes Volume)"
+    end
+  end
+
   # GGUF: Quelle = --gguf-from oder das verifizierte Artefakt der
   # Sandbox-Forschung; SHA-Pflicht
   # (Mismatch bricht ab, die Kopie wird entfernt — KEIN brauchbarer Verweis).
@@ -188,8 +209,8 @@ defmodule KomkiCli.Steps do
     cond do
       is_nil(source) ->
         {:error,
-         "keine GGUF-Quelle: --gguf-from PATH angeben (komki laedt nichts herunter; " <>
-           "das Default-Artefakt liegt nicht am erwarteten Ort)", 2}
+         "keine GGUF-Quelle: 'komki setup' laedt das Modell, oder --gguf-from PATH angeben " <>
+           "(erwartet unter " <> Config.staging_gguf_path() <> ")", 2}
 
       not File.exists?(source) ->
         {:error, "--gguf-from Pfad nicht gefunden: " <> source, 2}
@@ -203,11 +224,12 @@ defmodule KomkiCli.Steps do
   defp copy_and_verify_gguf(cfg, source) do
     dest = cfg.gguf_path
     File.mkdir_p!(Path.dirname(dest))
-    {:ok, _bytes} = File.copy(source, dest)
+    how = clone_or_copy(source, dest)
 
     case sha256(dest) do
       {:ok, actual} ->
-        verify_gguf_sha(cfg, dest, actual)
+        with {:ok, lines} <- verify_gguf_sha(cfg, dest, actual),
+             do: {:ok, lines ++ ["gguf-ablage:  " <> how]}
 
       {:error, reason} ->
         File.rm(dest)
