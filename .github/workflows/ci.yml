@@ -135,7 +135,8 @@ jobs:
       # Umbrella-Child-Bootstrap, der auf frischem Runner ebenfalls
       # crasht (dialyxir haelt die App fuer ein Umbrella-Child, weil das
       # Lockfile "../workspace.lock" heisst). Apps mit Dialyzer-Pflicht:
-      # komki_policy und komki_cli.
+      # komki_policy, komki_cli, Vermittler, Connector-Bibliothek, Egress
+      # und die drei Connectoren.
       - name: Dialyzer (komki_policy)
         working-directory: apps/komki_policy
         run: mix dialyzer
@@ -143,6 +144,15 @@ jobs:
       - name: Dialyzer (komki_cli)
         working-directory: apps/komki_cli
         run: mix dialyzer
+
+      - name: Dialyzer (Vermittler, Connectoren, Egress)
+        run: |
+          set -e
+          for app in komki_mediator komki_connector komki_egress komki_connector_ris komki_connector_web komki_connector_vault; do
+            echo "::group::dialyzer $app"
+            (cd "apps/$app" && mix dialyzer)
+            echo "::endgroup::"
+          done
 
       # Stärkster Akzeptanzschritt: frischer Checkout, escript Build, alle
       # Kommandopfade mit erwarteten Exit-Codes (decide permit/deny/

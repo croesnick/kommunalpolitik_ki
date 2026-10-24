@@ -53,6 +53,24 @@ defmodule KomkiMediator.Gamma do
     end
   end
 
+  @doc """
+  Relaxationsbefugnisse zu einem Remedy-Katalog: Γ-L1-Metadaten (R.2.2)
+  aus dem rohen Registry-Term, keine Remedy-Semantik. WAS legal
+  fortsetzbar ist, sagt allein der Engine-Katalog; hier steht nur, WER
+  eine benannte Bindung lockern darf. Aufgeschluesselt je Bindung der
+  Engine-Befunde, sortiert und einmalig.
+  """
+  @spec relaxation_authorities_for(t(), [map()] | nil) :: [String.t()]
+  def relaxation_authorities_for(gamma, remedies) do
+    remedies
+    |> List.wrap()
+    |> Enum.flat_map(fn remedy -> List.wrap(remedy["binding"]) end)
+    |> Enum.uniq()
+    |> Enum.flat_map(&relaxation_authorities(gamma, &1))
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
   defp read(path) do
     case File.read(path) do
       {:ok, raw} -> {:ok, raw}

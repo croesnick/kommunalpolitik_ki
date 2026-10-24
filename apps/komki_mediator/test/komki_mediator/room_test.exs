@@ -19,6 +19,21 @@ defmodule KomkiMediator.RoomTest do
     assert room.facts["purpose"]["value"] == "offene-recherche"
   end
 
+  test "workspace_bindings: recherche im Default-Raum, nil wenn das Feld fehlt", %{room: room} do
+    assert room.workspace_bindings == [
+             "ris-oeffentlich@1",
+             "vault-oeffentlich@1",
+             "web-oeffentlich@1"
+           ]
+
+    base = KomkiMediator.TestHelpers.provisioned_base()
+    path = Path.join([base, "mediator", "room.json"])
+    {:ok, term} = KomkiPolicy.JSON.parse(File.read!(path))
+    File.write!(path, KomkiPolicy.JSON.canonical(Map.delete(term, "workspace_bindings")))
+
+    assert {:ok, %Room{workspace_bindings: nil}} = Room.load(Path.join(base, "mediator"))
+  end
+
   test "Ping-Objekt verbindet wie unabhaengig, unbekannte Objekte bleiben strukturierter Fehler",
        %{room: room} do
     {:ok, object} = Room.object_for_call(room, "ping", %{})

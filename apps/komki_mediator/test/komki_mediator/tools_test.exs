@@ -22,7 +22,7 @@ defmodule KomkiMediator.ToolsTest do
     body = parse_json_body(response)
     assert body["decision"] == "permit"
     assert body["object_id"] == "mediator-ping"
-    assert body["tools"] == ["ping", "admit_document"]
+    assert body["tools"] == KomkiMediator.Fassung.tools()
     assert body["registry_id"] == "reg-komki-arbeitsraum"
     assert gamma.registry_id == "reg-komki-arbeitsraum"
   end

@@ -10,8 +10,10 @@ defmodule KomkiCli.Mediator do
   Der Vertrag zwischen den Apps ist fix und wird hier nicht mehr geprüft
   als nötig (komki_cli liest statt zu raten):
 
-      - Args:            --base <dir>  --port <n>
-      - Health-Endpoint: GET http://127.0.0.1:<port>/healthz
+      - Args:            --base <dir>  --socket <base>/run/mediator.sock
+                         --token-file <base>/run/mediator.token
+      - Health-Endpoint: GET /healthz ueber den Unix-Socket, mit
+                         `Authorization: Bearer <token>`
                          -> 200 JSON, byte-stabil, Keys:
                             status ("ok"), fassung_id, tools (sortierte
                             String-Liste), registry_id, gamma_hash
@@ -24,10 +26,12 @@ defmodule KomkiCli.Mediator do
   Die pi-seitige Freigabe erfolgt via `write_mcp_config/2`: alles zweite
   bleibt verborgen.
 
-  Netz-Regel: healthz/MCP laufen rein lokal (Loopback-Port aus der
-  config, im Seatbelt-Profil als eigene Outbound-Regel erlaubt).
-  Auth enthaelt mcp.json bewusst KEINE: Zugangsdaten leben nur im
-  Vermittler-Prozess selbst (Forschung ticket/102, R.4.3).
+  Kanal (Ticket #143, `KomkiCli.Channel`): Der Vermittler lauscht nur auf
+  dem Unix-Socket und verlangt das Token, das `up` vor jedem Start neu
+  schreibt. pi erreicht ihn ueber `komki-relay.js` (stdio-MCP-Server); das
+  pi-Profil erlaubt Netz-Auswaerts nur zu diesem Socket-Pfad und zum
+  llama-Port. Die mcp.json enthaelt kein Token, nur den Verweis
+  `${KOMKI_MEDIATOR_TOKEN}` auf pis Umgebung.
 
   Pidfile unter `base/tmp/komki-mediator.pid`, Log unter
   `base/tmp/mediator.log`; der Identitätscheck vor jedem `kill` liest die
@@ -35,7 +39,7 @@ defmodule KomkiCli.Mediator do
   Signale — macOS-taugliche Self-Defense gegen pidfile-Wiederverwendung).
   """
 
-  alias KomkiCli.{Config, Proc}
+  alias KomkiCli.{Channel, Config, MediatorProfile, Proc, Profile}
   require Config
 
   @health_timeout_ms 10_000
@@ -54,12 +58,18 @@ defmodule KomkiCli.Mediator do
   def up(%Config{} = cfg) do
     case fetch_health(cfg) do
       {:ok, "200", health} ->
+        # Laufender Vermittler mit dem aktuellen Token: kein Neustart, das
+        # Token bleibt (ein neues wuerde ihn aussperren).
         {:ok, {:already, health}}
 
       _ ->
-        # Fremder Dienst am Port (nicht-200) oder stiller Port: Spawn-Versuch;
-        # eine echte Kollision scheitert dann am Health-Poll.
-        spawn_mediator(cfg)
+        # Kein Token, falsches Token oder stiller Socket: neues Token, dann
+        # Spawn-Versuch. Bedient ein anderer Prozess den Socket, verweigert
+        # der Vermittler den Start; das faellt am Health-Poll auf.
+        with :ok <- Channel.check_socket_path(cfg) do
+          Channel.write_token!(cfg)
+          spawn_mediator(cfg)
+        end
     end
   end
 
@@ -112,7 +122,7 @@ defmodule KomkiCli.Mediator do
         end
 
       :none ->
-        # Ohne pidfile unterscheidet Health: antwortet der Port, laeuft ein
+        # Ohne pidfile unterscheidet Health: antwortet der Socket, laeuft ein
         # fremder Prozess (pidfile verschwunden); sonst steht der Vermittler
         # wirklich unten.
         case health(cfg) do
@@ -122,7 +132,7 @@ defmodule KomkiCli.Mediator do
     end
   end
 
-  @doc "Health-Endpoint pruefen (plain TCP auf Loopback, GET /healthz)."
+  @doc "Health-Endpoint pruefen (GET /healthz ueber den Unix-Socket, mit Token)."
   @spec health(Config.t()) :: :ok | {:error, String.t()}
   def health(%Config{} = cfg) do
     case fetch_health(cfg) do
@@ -133,23 +143,19 @@ defmodule KomkiCli.Mediator do
         {:error, "komki-mediator /healthz returned " <> code}
 
       {:error, reason} ->
-        {:error,
-         "komki-mediator unreachable on port " <> to_string(cfg.mediator_port) <> ": " <> reason}
+        {:error, "komki-mediator unreachable on " <> Channel.socket_path(cfg) <> ": " <> reason}
     end
   end
 
   @doc "healthz-Uebertrag: {:ok, status_code, geparster Body} | {:error, reason}."
   @spec fetch_health(Config.t()) :: {:ok, String.t(), health()} | {:error, String.t()}
   def fetch_health(%Config{} = cfg) do
-    case http_get(cfg.mediator_port) do
-      {:ok, code, body} ->
-        case parse_healthz(body) do
-          {:ok, health} -> {:ok, code, health}
-          {:error, reason} -> {:error, "healthz-Body unlesbar (" <> code <> "): " <> reason}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
+    with {:ok, token} <- Channel.read_token(cfg),
+         {:ok, code, body} <- http_get(Channel.socket_path(cfg), token) do
+      case parse_healthz(body) do
+        {:ok, health} -> {:ok, code, health}
+        {:error, reason} -> {:error, "healthz-Body unlesbar (" <> code <> "): " <> reason}
+      end
     end
   end
 
@@ -158,9 +164,12 @@ defmodule KomkiCli.Mediator do
   defp spawn_mediator(%Config{} = cfg) do
     log_path = log_path(cfg)
     File.mkdir_p!(Path.dirname(log_path))
+    # --- Ticket #146/#137 (Vermittler-Profil): Profil vor jedem Start frisch
+    # schreiben (Muster llama); cwd "/" fuer getcwd unter der Grenze.
+    Profile.write!(MediatorProfile.path(cfg), MediatorProfile.generate(cfg, listen(cfg)))
     line = spawn_line(cfg)
 
-    case System.cmd("/bin/sh", ["-c", line]) do
+    case System.cmd("/bin/sh", ["-c", line], cd: "/") do
       {out, 0} ->
         case Integer.parse(String.trim_trailing(out)) do
           {pid, ""} when pid > 0 ->
@@ -178,22 +187,44 @@ defmodule KomkiCli.Mediator do
 
   @doc """
   Spawn-Zeile fuer /bin/sh -c (nohup, Args, Log-Umleitung, pid-Ausgabe).
-  Rein: Binary/Verzeichnis werden sh-gequotet, Port ist Integer —
-  testbar ohne echten Prozess. Scaffold in KomkiCli.Proc.spawn_line/3.
+  Rein: Binary und Pfade werden sh-gequotet — testbar ohne echten
+  Prozess. Das Token steht nicht in der Zeile, nur der Pfad der
+  Token-Datei. Scaffold in KomkiCli.Proc.spawn_line/3.
   """
   @spec spawn_line(Config.t()) :: String.t()
   def spawn_line(%Config{} = cfg) do
-    Proc.spawn_line(
-      cfg.mediator_bin,
-      [
-        "--base",
-        Proc.quote_bin(cfg.base_dir),
-        "--port",
-        to_string(cfg.mediator_port)
-      ],
-      log_path(cfg)
-    )
+    # --- Ticket #146/#137 (Vermittler-Profil, schmale Aenderung): Start unter
+    # `sandbox-exec -f <base>/profile/mediator.sb` ueber die aufgeloeste
+    # escript-Laufzeit, Umgebung geleert (Proc.escript_cmd/6), stdin
+    # /dev/null. `--connectors-dir` nennt das Socket-Verzeichnis der
+    # Connectoren (CONTRACT.md §2).
+    args = [
+      "--base",
+      cfg.base_dir,
+      "--socket",
+      Channel.socket_path(cfg),
+      "--token-file",
+      Channel.token_path(cfg),
+      "--connectors-dir",
+      Path.join([cfg.base_dir, "run", "connectors"])
+    ]
+
+    [program | words] =
+      Proc.escript_cmd(
+        cfg.sandbox_exec,
+        MediatorProfile.path(cfg),
+        cfg.escript_bin,
+        cfg.mediator_bin,
+        args,
+        Channel.run_dir(cfg)
+      )
+
+    Proc.spawn_line(program, Enum.map(words, &Proc.quote_bin/1), log_path(cfg), "< /dev/null")
   end
+
+  @doc "Kanal des Vermittlers fuer sein Profil (Ticket #137): der Unix-Socket aus #143."
+  @spec listen(Config.t()) :: MediatorProfile.listen()
+  def listen(%Config{} = cfg), do: {:unix, Channel.socket_path(cfg)}
 
   defp wait_health(cfg, pid) do
     deadline = System.monotonic_time(:millisecond) + @up_timeout_ms
@@ -231,21 +262,25 @@ defmodule KomkiCli.Mediator do
 
   # ---------------------------------------------------------------- Pipeline-Helfer
 
-  defp log_path(cfg), do: Path.join([cfg.base_dir, "tmp", "mediator.log"])
+  @doc "Log-Pfad des Vermittlers (auch Schreibziel im Vermittler-Profil)."
+  @spec log_path(Config.t()) :: String.t()
+  def log_path(cfg), do: Path.join([cfg.base_dir, "tmp", "mediator.log"])
   defp pidfile(cfg), do: Path.join([cfg.base_dir, "tmp", "komki-mediator.pid"])
 
   @doc """
-  GET /healthz via plain TCP; {:ok, status_code_string, body} oder
+  GET /healthz ueber den Unix-Socket (minimales HTTP/1.1, `:gen_tcp`
+  mit `{:local, path}`); {:ok, status_code_string, body} oder
   {:error, reason} — im Unterschied zu llama http_get_200 wird hier auch
   der BODY gelesen (healthz muss das Fassung-Angebot hergeben).
   """
-  @spec http_get(pos_integer()) :: {:ok, String.t(), String.t()} | {:error, String.t()}
-  def http_get(port) when is_integer(port) do
-    case :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false], 3000) do
+  @spec http_get(String.t(), String.t()) :: {:ok, String.t(), String.t()} | {:error, String.t()}
+  def http_get(socket_path, token) when is_binary(socket_path) and is_binary(token) do
+    case :gen_tcp.connect({:local, socket_path}, 0, [:binary, active: false], 3000) do
       {:ok, socket} ->
         :gen_tcp.send(
           socket,
-          "GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+          "GET /healthz HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer " <>
+            token <> "\r\nConnection: close\r\n\r\n"
         )
 
         case recv_all(socket, <<>>, now_deadline(3000)) do
@@ -335,19 +370,33 @@ defmodule KomkiCli.Mediator do
 
   @doc """
   mcp.json-Inhalt als Map (Rendering zum Schreiben via JSON, siehe
-  write_mcp_config/2): Server "komki" auf dem Vermittler-MCP-Endpoint.
+  write_mcp_config/2): Server "komki" als stdio-Server — pi startet
+  `komki-relay.js` mit demselben node-Binary, das pi selbst ausfuehrt (das
+  Profil erlaubt nur dieses `process-exec`). Das Relay spricht den
+  Vermittler ueber den Unix-Socket an (Ticket #143).
+
+  `env`: der Socket-Pfad als Literal, Token und Session-ID nur als Verweis
+  auf pis Umgebung (`${…}`, von pi beim Start aufgeloest; fehlt eine
+  Variable, verweigert pi den Server). Das Token steht damit nie in der
+  Datei.
+
   Server-Exposure "hidden" plus GENAU die Fassung-Tools als "direct" ist
   ein bewusster Fassung-Pin auf pi-Seite: alles, was der Vermittler
   kuenftig ueber die Fassung hinaus anbieten sollte, bleibt hinter dem
-  hidden-Default verborgen. Keine Auth-/Header-Felder — Zugangsdaten
-  leben ausschließlich im Vermittler-Prozess (Forschung ticket/102, R.4.3).
+  hidden-Default verborgen.
   """
-  @spec mcp_config_json(pos_integer(), [String.t()]) :: %{String.t() => term()}
-  def mcp_config_json(port, tools_list) when is_integer(port) and is_list(tools_list) do
+  @spec mcp_config_json(Config.t(), [String.t()]) :: %{String.t() => term()}
+  def mcp_config_json(%Config{} = cfg, tools_list) when is_list(tools_list) do
     %{
       "mcpServers" => %{
         "komki" => %{
-          "url" => "http://127.0.0.1:" <> to_string(port) <> "/mcp",
+          "command" => cfg.node_bin,
+          "args" => [Channel.relay_path(cfg)],
+          "env" => %{
+            "KOMKI_MEDIATOR_SOCKET" => Channel.socket_path(cfg),
+            "KOMKI_MEDIATOR_TOKEN" => "${KOMKI_MEDIATOR_TOKEN}",
+            "KOMKI_SESSION_ID" => "${KOMKI_SESSION_ID}"
+          },
           "exposure" => "hidden",
           "toolExposure" => Map.new(tools_list, fn tool -> {tool, "direct"} end)
         }
@@ -364,7 +413,7 @@ defmodule KomkiCli.Mediator do
   def write_mcp_config(%Config{} = cfg, tools_list) when is_list(tools_list) do
     path = Path.join([cfg.pi_home, ".pi", "agent", "mcp.json"])
     File.mkdir_p!(Path.dirname(path))
-    File.write!(path, JSON.encode!(mcp_config_json(cfg.mediator_port, tools_list)) <> "\n")
+    File.write!(path, JSON.encode!(mcp_config_json(cfg, tools_list)) <> "\n")
     :ok
   end
 end

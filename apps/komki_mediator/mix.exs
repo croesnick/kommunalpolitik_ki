@@ -39,13 +39,16 @@ defmodule KomkiMediator.MixProject do
   # Runtime-Deps:
   # - komki_policy: der Policy-Kern (Derive.decide, Verify.check, JSON) —
   #   Pflicht-Gate fuer jeden Toolaufruf (Tor 1/Tor 2).
+  # - komki_connector: Manifeste, Parameter-Pruefung und Frame-Client fuer
+  #   die Connector-Tools (CONTRACT.md §5/§6).
   # - anubis_mcp: MCP-Server-Layer (StreamableHTTP-Transport, Plug).
-  # - bandit: HTTP-Listener, nur loopback. Der Escript nimmt Runtime-Deps
+  # - bandit: HTTP-Listener, nur auf dem Unix-Socket (Ticket #143). Der Escript nimmt Runtime-Deps
   #   automatisch ins Payload auf (Praezedenz: komki_cli mit optimus/burrito).
   # Build-Werkzeuge (credo/dialyxir) nur :dev, runtime false.
   defp deps do
     [
       {:komki_policy, path: "../komki_policy"},
+      {:komki_connector, path: "../komki_connector"},
       {:anubis_mcp, "~> 1.6"},
       {:bandit, "~> 1.12"},
       {:credo, "~> 1.7", only: :dev, runtime: false},

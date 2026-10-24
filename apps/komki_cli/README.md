@@ -32,11 +32,11 @@ Komponenten mit denselben Pins:
   aufgelösten Pfade direkt auf (`node <pfad> <cli.js>`).
 * **Sandbox:** Jedes pi startet unter einem frisch generierten
   Seatbelt-Profil (deny-default mit Whitelist). Schreibbereich ist der
-  Arbeitsraum selbst, die einzige Netzwerk-Exception ist der lokale
-  Modellserver.
+  Arbeitsraum selbst. Netzwerk erlaubt das Profil nur zu zwei Zielen: zum
+  lokalen Modellserver und zum Unix-Socket des Vermittlers.
 
 Die Assets (GGUF, pi-Bundle, llama-server) liegen bereits lokal; komki
-verbindet sich ausschließlich mit Loopback.
+verbindet sich ausschließlich lokal (Loopback und Unix-Socket).
 
 ## Voraussetzungen und Installation
 
@@ -94,6 +94,84 @@ Zwei Hinweise für die verteilte Datei:
   `komki init --force` ausführen — der Doctor meldet Profil-Drift, bis das
   Profil neu geschrieben ist.
 
+## Schnellstart: Arbeitsraum mit RIS, Websuche und Vault
+
+Der Ablauf von null bis zur ersten Session. Alle Befehle laufen im Repo-Root;
+`B` ist die Instanz (Default `~/.local/share/komki`, sonst `KOMKI_HOME`).
+
+```sh
+B=~/.local/share/komki
+
+# 1. Alle Escripts bauen und in die Instanz legen (komki sucht erst PATH, dann $B/bin)
+for app in komki_cli komki_mediator komki_egress komki_connector_ris komki_connector_web komki_connector_vault; do
+  (cd apps/$app && mix deps.get && mix escript.build)
+done
+mkdir -p $B/bin
+cp apps/komki_mediator/komki-mediator apps/komki_egress/komki-egress \
+   apps/komki_connector_ris/komki-connector-ris apps/komki_connector_web/komki-connector-web \
+   apps/komki_connector_vault/komki-connector-vault $B/bin/
+
+# 2. Brave-Key für die Websuche in den Schlüsselbund (fragt den Key verdeckt ab)
+security add-generic-password -s brave-search-api -a "$USER" -w
+
+# 3. Vault wählen: zum Ausprobieren den erfundenen Test-Vault kopieren
+cp -R apps/komki_connector_vault/priv/test-vault $B/vault
+
+# 4. Instanz anlegen (bestehende Instanz: --force ergänzen)
+apps/komki_cli/komki init --gguf-from PFAD/ZUM/MODELL.gguf --vault-dir $B/vault
+
+# 4b. Nur bei einer Instanz von vor den Connectoren: alte Registry und alten Raum
+#     beiseitelegen; der Vermittler legt beim nächsten Start die neuen Vorlagen an
+#     (Raum "recherche" mit workspace_bindings). Das Journal bleibt unverändert.
+mv $B/mediator/registry.json $B/mediator/registry.json.vor-connectoren
+mv $B/mediator/room.json $B/mediator/room.json.vor-connectoren
+
+# 5. Starten und prüfen
+apps/komki_cli/komki up        # llama, Egress, Connectoren, Vermittler
+apps/komki_cli/komki doctor    # muss mit "doctor: ok" enden
+apps/komki_cli/komki status
+
+# 6. Arbeiten
+apps/komki_cli/komki run "Suche im RIS nach Bahnhofstraße und fasse die Treffer zusammen."
+apps/komki_cli/komki session   # interaktiv in tmux
+
+# 7. Stoppen
+apps/komki_cli/komki down
+```
+
+Hinweise zu den einzelnen Schritten:
+
+* **Schlüsselbund (Schritt 2, 5):** Beim ersten `komki up` fragt macOS, ob
+  `security` auf den Eintrag `brave-search-api` zugreifen darf. Wähle
+  „Immer erlauben“, sonst startet der Web-Connector ohne Key und jede
+  Websuche meldet `credential-missing`. „Immer erlauben“ heißt: jeder Prozess
+  unter deinem Nutzer kann den Key per `security` lesen.
+* **Vault (Schritt 3):** Der Vault-Connector zeigt nur Notizen mit
+  Frontmatter-Feld `komki_labels` (z. B. `komki_labels: [vault-oeffentlich@1]`);
+  alles andere bleibt unsichtbar. Geschrieben wird nur nach
+  `<vault>/komki-test/`. Für einen echten Vault: Notizen zuerst labeln, dann
+  `init --force --vault-dir PFAD`. Leerer `--vault-dir` schaltet den
+  Vault-Connector ab.
+* **RIS:** Ohne Zugangsdaten nutzt der Connector die öffentlichen
+  Gast-Endpunkte; die liefern nur Titel, keine Texte (#148). Zum Üben ohne
+  Netz gibt es einen Mock:
+  `elixir apps/komki_connector_ris/priv/mock_ris.exs --port 49640` und
+  `komki init --force --ris-mock-port 49640`.
+* **Raum wechseln:** Welche Daten in einer Session zusammenkommen dürfen,
+  steht in `$B/mediator/room.json`, Feld `workspace_bindings`. Default ist
+  **recherche** (`ris-oeffentlich@1`, `vault-oeffentlich@1`,
+  `web-oeffentlich@1`): Websuche und RIS erlaubt, vertrauliche Notizen
+  gesperrt. Für **vertraulich** `vault-vertraulich@1` ergänzen: Dann sind
+  vertrauliche Notizen lesbar und jede Web- und RIS-Suche gesperrt. Nach der
+  Änderung `komki down && komki up`.
+* **Nachvollziehen:** Jede Entscheidung steht im Journal
+  `$B/mediator/journal/pdr.jsonl`;
+  `$B/bin/komki-mediator verify-journal --base $B` prüft die Hash-Kette.
+  Logs liegen unter `$B/tmp/`.
+* **Wenn etwas hakt:** `komki doctor` nennt den fehlenden Teil (Escript,
+  Profil, Credential, Connector-Ping). Ein ausgefallener Connector kommt mit
+  erneutem `komki up` zurück, die laufenden Prozesse bleiben dabei stehen.
+
 ## Befehle
 
 ```sh
@@ -101,17 +179,18 @@ Zwei Hinweise für die verteilte Datei:
 ./komki init                        # Instanz anlegen (config, Profil, pi-home, GGUF mit SHA-Gate)
 ./komki init --gguf-from PFAD       # GGUF-Quelle explizit angeben
 ./komki doctor                      # alle Checks (Werkzeuge, Profil, GGUF-SHA, Boot-Gate, Port)
-./komki up                          # llama-server starten
+./komki up                          # llama-server, Egress, Connectoren, Vermittler starten
 ./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil
 ./komki session                     # interaktive pi-Session in tmux
 ./komki session --continue          # letzte Session fortsetzen
 ./komki session --detach            # im Hintergrund; attach via 'tmux -L komki attach -t komki'
-./komki down                        # llama-server stoppen
-./komki status                      # Zustand (base, gguf, port, llama)
+./komki down                        # alles stoppen (Vermittler, Connectoren, Egress, llama)
+./komki status                      # Zustand (base, gguf, port, Socket, llama, Egress, Connectoren, Vermittler)
 ./komki label …                     # SQLite-Registry: Bindungen, Labels, Γ-Export (siehe unten)
 ```
 
-Weitere Flags: `init --port N --ctx N --force`, `up --ctx N`,
+Weitere Flags: `init --port N --ctx N --force` sowie für die Connectoren
+`init --vault-dir PFAD --ris-base-url URL --ris-mock-port N`, `up --ctx N`,
 `run --mode text|json --scratch PFAD --timeout SEKUNDEN` (PFAD nur unterhalb von `runs/` der Instanz; der Scratch ist auch das Arbeitsverzeichnis des Laufs; Laufzeit-Limit per Default 600 s, danach Exit 4). pi startet in Lauf und Session mit `--no-context-files`, damit eine vom Modell abgelegte `AGENTS.md` keinen späteren Lauf steuert, und sieht neben seinen Datei-Werkzeugen die Vermittler-Tools (`mcp__komki__*`). Exit-Codes: `0` Erfolg, `2` Nutzungs-,
 Konfigurations- oder Bereitschaftsfehler (etwa: llama-server nicht aktiv),
 `3` Doctor-/Boot-Gate-Fehlschlag, `4` Laufzeitfehler.
@@ -138,6 +217,96 @@ einen neuen Zufallsschlüssel in `tmp/llama.key` (nur für dich lesbar) und trä
 ihn in pis `models.json` ein. Ohne den Schlüssel antwortet llama mit 401, damit
 keine Website im Browser das lokale Modell nutzen kann. `komki doctor` meldet
 einen llama, der ohne Schlüssel läuft.
+
+### Kanal zum Vermittler (Ticket #143)
+
+pi erreicht den Vermittler (`komki-mediator`) nur über einen Unix-Socket,
+nicht über einen TCP-Port:
+
+```
+<base>/run/                 Rechte 0700, angelegt von komki up
+<base>/run/mediator.sock    der einzige Listener des Vermittlers, Rechte 0600
+<base>/run/mediator.token   32 Byte Zufall als Hex, Rechte 0600
+```
+
+* `komki up` schreibt bei jedem Vermittler-Start ein neues Token und startet
+  den Vermittler mit `--socket` und `--token-file`. Das Token steht nie in
+  einer Kommandozeile. Läuft der Vermittler schon und antwortet mit dem
+  aktuellen Token, bleibt beides unverändert.
+* Jede Anfrage braucht `Authorization: Bearer <token>`, auch `/healthz`.
+  Ohne oder mit falschem Token antwortet der Vermittler mit 401 und schreibt
+  eine Logzeile (ohne Token-Wert) nach `tmp/mediator.log`. Das hält andere
+  lokale Programme fern, etwa eine zweite, nicht gesandboxte Agent-Session.
+* pis MCP-Client kann keinen Unix-Socket. Deshalb startet pi
+  `komki-relay.js` als stdio-MCP-Server (Node, nur Standardbibliothek). Das
+  Relay schickt jede JSON-RPC-Zeile als `POST /mcp` über den Socket und gibt
+  die Antworten (JSON oder SSE) zeilenweise zurück. komki schreibt es vor
+  jedem pi-Start neu nach `pi-home/.pi/agent/komki-relay.js`; eine vom Agenten
+  veränderte Fassung überlebt damit keinen Lauf.
+* `komki run` und `komki session` lesen das Token und erzeugen je pi-Start
+  eine Session-ID (`ses-` plus 16 Hex-Zeichen). Beides geht über die Umgebung
+  an pi (`KOMKI_MEDIATOR_TOKEN`, `KOMKI_SESSION_ID`). Die `mcp.json` enthält
+  nur Verweise (`${KOMKI_MEDIATOR_TOKEN}`), kein Token. Der Vermittler
+  schreibt die Session-ID als `session_id` in jeden PDR.
+* Instanzen von vor #143 brauchen einmalig `komki init --force`: das
+  pi-Profil ändert sich (Socket-Regel statt Vermittler-Port), und
+  `--mediator-port` gibt es nicht mehr. macOS begrenzt Socket-Pfade auf
+  103 Byte; `komki up` lehnt eine zu tiefe Basis ab.
+
+### Egress, Connectoren und Vermittler-Profil (Tickets #146, #137)
+
+Werkzeuge mit Außenwirkung (RIS, Websuche, Vault) laufen als eigene
+Prozesse, jeder unter einem eigenen, generierten Seatbelt-Profil
+(Vertrag: [`apps/komki_connector/CONTRACT.md`](../komki_connector/CONTRACT.md)).
+Seatbelt filtert ausgehenden Verkehr nicht nach Host, und gesandboxte
+Prozesse können keine weiteren Sandboxen starten. Deshalb startet `komki up`
+selbst alle Prozesse, und nur der Egress-Proxy darf nach außen:
+
+```
+                 komki up (nicht gesandboxt) startet alles, Reihenfolge 1..5
+ 1 llama-server ─ llama-server.sb (kein Outbound)
+ 2 komki-egress ─ egress.sb: einziger Prozess mit Outbound *:443 (+ DNS),
+       ▲          Host-Allowlist je Port im Proxy; Ports 49531 (ris), 49532 (web)
+       │ CONNECT über localhost:<eigener Port>
+ 3 komki-connector-ris / -web / -vault ─ connector-<id>.sb:
+       │          nur eigener Socket, eigener Loopback-Port, fs nach Manifest
+       │ Unix-Socket <base>/run/connectors/<id>.sock (Frame-Protokoll)
+ 4 komki-mediator ─ mediator.sb: Raum lesen, Journal/Log schreiben,
+       ▲          <base>/run/mediator.sock binden, Outbound nur Connector-Sockets
+       │ Unix-Socket + Bearer-Token (#143)
+ 5 pi ─ komki.sb (über komki run/session)
+```
+
+* **Profile** entstehen aus `KomkiConnector.Manifest` und der `config.json`
+  (`profile/connector-<id>.sb`, `egress.sb`, `mediator.sb`); `init` und jeder
+  Start schreiben sie neu, `komki doctor` prüft sie byte-stabil. Gemeinsame
+  Grundschicht aller Escripts: Erlang-Runtime lesen und ausführen, Escript
+  lesen, Boot-Sonden. Kein Home, kein `~/.ssh`. Ermittelt per Denial-Log:
+  [`docs/research/2026-10-23-connector-profile.md`](../../docs/research/2026-10-23-connector-profile.md).
+* **Start:** `env -i HOME=<base>/run PATH=/usr/bin:/bin LANG=C sandbox-exec -f
+  <profil> <escript> <binary> …`. Die leere Umgebung hält Variablen aus deiner
+  Shell (etwa Tokens) von den Prozessen fern. `escript` ist der aufgelöste
+  Erlang-Pfad (`escript_bin`), weil der asdf-Shim unter der Sandbox scheitert.
+  Die Escripts findet komki wie den Vermittler: erst `PATH`, dann `<base>/bin`.
+* **Credentials** (heute nur `BRAVE_API_KEY` für die Websuche) liest komki mit
+  `security find-generic-password -s brave-search-api -w` und schreibt sie als
+  eine JSON-Zeile in stdin des Web-Connectors, danach schließt es stdin. Sie
+  stehen nie in argv, Umgebung, Log oder Status. Fehlt der Eintrag, startet der
+  Connector trotzdem und meldet `credential-missing`; `komki doctor` warnt
+  (geprüft wird nur die Existenz, ohne den Wert zu lesen).
+* **Konfiguration** (`config.json`, Defaults): `egress_ports`
+  (`{"ris": 49531, "web": 49532}`), `ris_base_url`
+  (`https://risapi1.komuna.net/web/`), `ris_mock_port` (aus; gesetzt spricht der
+  RIS-Connector direkt mit `http://127.0.0.1:<port>/`, ohne Proxy), `vault_dir`
+  (`<base>/vault`, anfangs leer, Test-Vault siehe Schnellstart; leer gesetzt: Vault-Connector aus).
+* **Bereit** ist ein Connector, wenn die reservierte Operation `ping` die
+  Fassung des Manifests liefert; der Egress, wenn er „listening“ meldet.
+  `komki doctor` pingt jeden laufenden Connector.
+* Logs und pidfiles: `tmp/egress.log`, `tmp/connector-<id>.log`,
+  `tmp/komki-egress.pid`, `tmp/connector-<id>.pid`. `<base>/run` und
+  `<base>/run/connectors` haben die Rechte `0700`.
+* Bestehende Instanzen: einmalig `komki init --force`, damit `escript_bin`,
+  die Escript-Pfade und die neuen Profile eingetragen werden.
 
 Unter `~/.local/share/komki` liegen die Instanzdaten, überschreibbar via
 `KOMKI_HOME`.
