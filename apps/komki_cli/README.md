@@ -122,12 +122,11 @@ statt einer 17-GB-Kopie. `run` und `session` starten fehlende Prozesse
 selbst, `komki up` ist nur noch nötig, wenn man ausdrücklich vorab starten
 will.
 
-Instanz von vor den Connectoren: Deren `registry.json` und `room.json`
-kennen RIS, Web und Vault noch nicht. Bis die Migration automatisch läuft
-(#177), beide Dateien unter `~/.local/share/komki/mediator/` beiseitelegen
-(`mv registry.json registry.json.vor-connectoren`, ebenso `room.json`);
-der Vermittler legt beim nächsten Start die neuen Vorlagen an, das Journal
-bleibt unverändert.
+Instanz von vor den Connectoren: Der Vermittler ersetzt `registry.json`
+und `room.json` beim nächsten Start selbst, wenn sie unveränderte alte
+Vorlagen sind (Prüfung per SHA-256; das Journal bleibt unverändert). Hast du
+eine der beiden Dateien verändert, ersetzt er nichts und erklärt beim Start,
+was zu tun ist.
 
 Hinweise zu den einzelnen Schritten:
 

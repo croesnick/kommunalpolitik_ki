@@ -118,14 +118,8 @@ Du brauchst llama.cpp, node, das pi-Paket, Elixir und tmux. Fehlt etwas, nennt `
 
 </Steps>
 
-<Aside type="caution" title="Instanz von vor den Connectoren">
-Hast du komki schon vor RIS, Web und Vault benutzt, kennen `registry.json` und `room.json` deiner Instanz die neuen Quellen noch nicht, und der Vermittler lehnt jede Anfrage ab. Lege beide einmalig beiseite; beim nächsten Start entstehen die neuen Vorlagen, dein Journal bleibt erhalten. Bald erledigt komki das selbst.
-
-```sh
-cd ~/.local/share/komki/mediator
-mv registry.json registry.json.vor-connectoren
-mv room.json room.json.vor-connectoren
-```
+<Aside title="Instanz von vor den Connectoren">
+Hast du komki schon vor RIS, Web und Vault benutzt, aktualisiert der Vermittler beim nächsten Start die alten Vorlagen `registry.json` und `room.json` selbst. Das tut er nur, wenn sie unverändert sind; dein Journal bleibt erhalten. Hast du eine der Dateien angepasst, ersetzt er nichts und sagt beim Start, was zu tun ist.
 </Aside>
 
 Weiter mit [Die Sicherheitsgrenze sehen](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
