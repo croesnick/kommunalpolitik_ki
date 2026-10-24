@@ -15,10 +15,53 @@ hero:
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 import Architektur from '../../assets/architektur.svg';
+import Session from '../../assets/session.svg';
+
+## So sieht eine Sitzung aus
+
+<div class="komki-session">
+  <div class="komki-session-bild"><Session role="img" aria-label="Terminal mit einer komki-Sitzung: eine Frage, vier Tool-Aufrufe mit der Antwort des Vermittlers und eine Zusammenfassung mit Quellen" /></div>
+  <div class="komki-session-text">
+
+**Du fragst in normaler Sprache.** Hier: „Suche im RIS nach Radverkehrskonzept und im Vault nach Radverkehr …“
+
+**pi holt sich, was es braucht.** Jede fett gesetzte Zeile ist ein Werkzeug, etwa `komki/ris_search` oder `komki/vault_read`. Darunter steht, was der Vermittler zurückgibt:
+
+- `"decision":"permit"` heißt: Die Regeln dieses Raums erlauben den Aufruf.
+- `"labels":["ris-oeffentlich@1"]` sagt, woher der Inhalt stammt.
+- `decision_id` ist der Beleg im Journal. Darüber lässt sich jeder Schritt später nachvollziehen.
+
+**Am Ende steht die Antwort**, jede Aussage mit Quelle. Das Ganze dauerte knapp eine Minute, alles lief auf dem eigenen Rechner.
+
+  </div>
+</div>
+
+## Was du von komki erwarten kannst
+
+- **Recherche mit Quellen.** komki sucht im Ratsinformationssystem, im Web und in deinen Notizen und sagt zu jeder Aussage, woher sie stammt.
+- **Ein Sprachmodell auf deinem Rechner.** Deine Fragen und Notizen gehen an keinen KI-Anbieter.
+- **Feste Regeln je Raum.** Vorher steht fest, welche Quellen in einer Sitzung zusammenkommen dürfen. Vertrauliche Notizen und das Internet treffen sich nie.
+- **Ein Journal.** Jede Anfrage wird vor der Ausführung geprüft und festgehalten. Später siehst du, was wann erlaubt oder abgelehnt wurde und warum.
+
+Was komki nicht ist: kein Cloud-Dienst, kein Ersatz für dein eigenes Urteil und kein Schutz, wenn dein Rechner selbst schon kompromittiert ist.
+
+## Warum nicht einfach irgendeine Sandbox?
+
+Eine Sandbox sperrt ein Programm ein. Ein Agent, der recherchieren soll, braucht aber einen Weg nach draußen. Sobald die Sandbox ihn ins Internet lässt, sieht sie nur noch Netzverbindungen. Ob darin eine harmlose Suchanfrage steckt oder deine Notizen, kann sie nicht unterscheiden. Die macOS-Sandbox kennt nicht einmal einzelne Adressen, nur „Internet ja“ oder „Internet nein“.
+
+komki legt deshalb eine Schicht darüber, die weiß, *was* gerade fließt:
+
+- **Freigaben:** pi kann nur fest umrissene Operationen aufrufen, etwa „suche im RIS nach Text“. Keine freien Adressen, keine Dateipfade, keine Befehle.
+- **Bindungen:** Jeder Inhalt trägt ein Label, das sagt, woher er stammt. Der Raum legt fest, welche Labels zusammenkommen und wohin etwas gehen darf.
+- **Belege:** Geprüft wird vor der Wirkung, und jede Entscheidung steht im Journal.
+
+Die Sandboxen sorgen dafür, dass niemand an dieser Schicht vorbeikommt: pi selbst hat kein Internet, und jeder Connector darf nur seine eigene Adresse erreichen.
+
+## Das Bild im Kopf
 
 <div class="komki-figure"><Architektur /></div>
 
-Jeder gestrichelte Kasten ist eine eigene Sandbox. Der Agent erreicht nur das Sprachmodell und den Vermittler; ins Internet kommt allein der Egress-Proxy, und auch der nur zu freigegebenen Adressen.
+Jeder gestrichelte Kasten ist eine eigene Sandbox. pi erreicht nur das Sprachmodell und den Vermittler. Jeder Connector kann nur, was für ihn freigegeben ist, und ins Internet kommt allein der Egress-Proxy, je Connector zu genau einer Adresse.
 
 <CardGrid>
   <Card title="So funktioniert komki" icon="puzzle">

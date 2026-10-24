@@ -13,7 +13,7 @@ Ein KI-Agent, der recherchieren darf, ist praktisch. Gefährlich wird er, wenn d
 
 <div class="komki-figure"><Architektur /></div>
 
-Jeder gestrichelte Kasten ist eine eigene Sandbox, beschriftet mit ihrem Profil. Pfeile zeigen die einzigen erlaubten Wege. Gestartet werden alle Prozesse von `komki up`.
+Jeder gestrichelte Kasten ist eine eigene Sandbox. Pfeile zeigen die einzigen erlaubten Wege, kleine Schrift die Freigaben. Gestartet werden alle Prozesse von `komki up`.
 
 - **pi** ist der Agent. Er läuft mit einem lokalen Sprachmodell (gemma) in einer macOS-Sandbox, die ihm fast alles verbietet: kein Internet, kein Zugriff auf deine Dateien, keine fremden Prozesse. Er erreicht genau zwei Dinge: das Sprachmodell und den Vermittler.
 - **Der Vermittler** ist die einzige Tür nach draußen. Er selbst hat kein Internet. Er entscheidet jede Anfrage und schreibt jede Entscheidung ins Journal.

@@ -35,3 +35,12 @@
 /* Ja/Nein in Tabellen */
 .ja { color: var(--komki-ok); font-weight: 700; }
 .nein { color: var(--komki-deny); font-weight: 700; }
+
+/* Startseite: Session-Bild mit Erläuterung daneben */
+.komki-session { display: grid; gap: 1.5rem; align-items: start; }
+.komki-session-bild svg { display: block; width: 100%; height: auto; border-radius: 0.6rem; box-shadow: 0 8px 30px rgb(0 0 0 / 0.35); }
+.komki-session-text > :first-child { margin-top: 0; }
+@media (min-width: 60rem) {
+  .komki-session { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  .komki-session-text { position: sticky; top: 5rem; }
+}
