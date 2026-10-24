@@ -120,6 +120,12 @@ cp -R apps/komki_connector_vault/priv/test-vault $B/vault
 # 4. Instanz anlegen (bestehende Instanz: --force ergänzen)
 apps/komki_cli/komki init --gguf-from PFAD/ZUM/MODELL.gguf --vault-dir $B/vault
 
+# 4b. Nur bei einer Instanz von vor den Connectoren: alte Registry und alten Raum
+#     beiseitelegen; der Vermittler legt beim nächsten Start die neuen Vorlagen an
+#     (Raum "recherche" mit workspace_bindings). Das Journal bleibt unverändert.
+mv $B/mediator/registry.json $B/mediator/registry.json.vor-connectoren
+mv $B/mediator/room.json $B/mediator/room.json.vor-connectoren
+
 # 5. Starten und prüfen
 apps/komki_cli/komki up        # llama, Egress, Connectoren, Vermittler
 apps/komki_cli/komki doctor    # muss mit "doctor: ok" enden
