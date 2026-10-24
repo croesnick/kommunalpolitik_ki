@@ -28,8 +28,8 @@ nicht lief, steht als nicht gelaufen da.
 | L-108 | Zertifikate unter dem Profil | Schlüsselbund-Zugriff verhindert | `KomkiConnector.TLS` |
 | L-109 | Existenz-Orakel `vault_search` | Schwachstelle, behoben | CONTRACT §6.2 |
 | L-110 | llama der echten Instanz beendet | eigenes Versehen | Folgeticket |
-| S-01–S-13 | Sicherheitstests | bestanden bis auf S-11 (offen) | Phase 3 |
-| U-1–U-7 | Nutzungstests | bestanden bis auf U-3 (offen) | Phase 4 |
+| S-01–S-13 | Sicherheitstests | bestanden | Phase 3 |
+| U-1–U-7 | Nutzungstests | bestanden | Phase 4 |
 
 ## Phase 0: Vorab-Experimente (vor dem Bau)
 
@@ -297,7 +297,7 @@ Prüfungen).
 | S-10 | Echter Abflussversuch eines kompromittierten Agenten (gemma) | bestanden in beiden Räumen |
 | S-12 | Journal-Integrität | bestanden: 116 Einträge, `valid`, `uappnd` gesetzt |
 | S-13 | Connector-Ausfall | bestanden: `admitted: false`, Vermittler läuft weiter, `komki up` heilt |
-| S-11 | Credential-Leck (argv, env, Logs) mit echtem Key | **nicht gelaufen**: Schlüsselbund-Freigabe durch die nutzende Person steht aus |
+| S-11 | Credential-Leck mit echtem Key | bestanden: 0 Treffer in argv/env von 10 Prozessen, in 98 Dateien der Basis und in der Vermittler-Antwort |
 
 ### L-109 Existenz-Orakel über `vault_search` (S-05)
 
@@ -392,11 +392,24 @@ Prüfungen).
 |---|---|---|
 | U-1 | `ris_search` „Bahnhofstraße“ (Mock) | permit, 2 öffentliche TOPs, Label `ris-oeffentlich@1`, nicht-öffentliche fehlen |
 | U-2 | `ris_show 1001-3` | permit, Text mit Injection-Satz unverändert (Daten, keine Anweisung) |
-| U-3 | `web_search` echt | **nicht gelaufen**: `credential-missing`, Schlüsselbund-Freigabe steht aus |
+| U-3 | `web_search` echt (Brave über Egress) | permit, 3 Treffer (radverkehr.bayern.de, stmb.bayern.de), Label `web-oeffentlich@1` |
 | U-4 | `vault_search` „Radverkehr“, `vault_read` | permit, 2 öffentliche Treffer, Inhalt mit Label |
 | U-5 | `vault_write_test` und Zurücklesen | Notiz mit `komki_labels` = B_W, im selben Raum lesbar |
 | U-6 | Echter Lauf mit gemma: Sitzungsvorbereitung „Bahnhofstraße“ | 66 s; RIS und Vault durchsucht, Notiz mit drei quellenbelegten Stichpunkten angelegt |
 | U-7 | `komki run` mit `ping` über das Relay | PDR mit `session_id` `ses-e34e834fc1e47c93` |
+
+### S-11 Credential-Leck und U-3 echte Websuche
+
+- **Vorlauf:** Die nutzende Person hat `security` für den Eintrag `brave-search-api` freigegeben („Immer
+  erlauben“). Ein erster Versuch lief noch in den 5-s-Timeout von `KomkiCli.Keychain`, weil der Dialog wartete.
+  Ohne Key startet der Connector still und meldet `credential-missing`; erst `komki doctor` macht das sichtbar.
+- **Aufbau:** `leak_check.py` liest den Key einmal und sucht ihn (voll und als 12-Zeichen-Präfix) in `ps -axeww`
+  (argv und Umgebung), in allen Dateien der Basis außer dem Modell und in einer Vermittler-Antwort. Ausgegeben
+  werden nur Zahlen.
+- **Ergebnis:** 10 Prozesse, 0 Treffer; 98 Dateien, 0 Treffer; Antwort 0 Treffer. Die echte Suche lief durch
+  den Egress-Tunnel zu 3.33.153.106:443.
+- **Befund:** `komki-egress` schreibt die Logzeile einer Verbindung erst beim Schließen. `:httpc` hält den Tunnel
+  offen, und bis dahin fehlt der Effektbeleg im Log. Außerdem überschreibt jeder Neustart das Log.
 
 ## Erkenntnisse und offene Punkte
 
@@ -412,8 +425,8 @@ Prüfungen).
 
 **Offen:**
 
-1. Echte Websuche und Credential-Leck-Test (U-3, S-11): Freigabe von `security` für den Schlüsselbund-Eintrag
-   `brave-search-api` durch die nutzende Person.
+1. Egress-Log: Verbindung schon beim Öffnen protokollieren und Log nicht bei jedem Neustart überschreiben (S-11).
+   Fehlende Credentials beim `komki up` sichtbar melden statt still (S-11).
 2. Schemaverstöße, die anubis abfängt, erzeugen keinen PDR, und unbekannte Felder werden still verworfen
    (L-105).
 3. pidfile-Identität an Basis und Modellpfad binden (L-110).
