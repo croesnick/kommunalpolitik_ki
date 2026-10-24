@@ -150,18 +150,20 @@ Alles Weitere (eigener Vault, zweiter Raum, Fehlersuche mit `komki doctor`) wand
 
 | Ticket | Inhalt | Aufwand | Abhängig von |
 |---|---|---|---|
-| T1 | `komki setup` (Prüfung, Brave-Key, Vault-Wahl, Start), `komki secret set`, `komki journal verify`, eingebauter Test-Vault | M | – |
-| T2 | Versionierte Vorlagen mit sicherer Auto-Migration (Hash-Vergleich, Sicherung, Abbruch bei eigenen Änderungen) | S | – |
-| T3 | Modell-Download mit Pin und Fortsetzen; APFS-Klon statt Kopie | S–M | – |
-| T4 | Multicall-Release mit Rollen-Weiche; Profilgenerator auf Release-Wurzel; Nachweis crypto/TLS ohne Host-OpenSSL | M–L | – |
-| T5 | Homebrew-Tap (eigenes Repo `homebrew-komki`), Formel mit llama.cpp, tmux, node; pi gepinnt in `libexec`; Release-Workflow | M | T4 |
-| T6 | Burrito-Bau auf Multicall umstellen, Einzeldatei als Release-Anhang | S | T4 |
-| T7 | Seite „In Betrieb nehmen“ auf vier Schritte umschreiben, Bauschritte in die Entwickler-Doku | S | T1, T5 |
+| T1 [#176](https://github.com/croesnick/kommunalpolitik_ki/issues/176) | `komki setup` (Prüfung, Brave-Key, Vault-Wahl, Start), `komki secret set`, `komki journal verify`, eingebauter Test-Vault | M | – |
+| T2 [#177](https://github.com/croesnick/kommunalpolitik_ki/issues/177) | Versionierte Vorlagen mit sicherer Auto-Migration (Hash-Vergleich, Sicherung, Abbruch bei eigenen Änderungen) | S | – |
+| T3 [#178](https://github.com/croesnick/kommunalpolitik_ki/issues/178) | Modell-Download mit Pin und Fortsetzen; APFS-Klon statt Kopie | S–M | – |
+| T4 [#179](https://github.com/croesnick/kommunalpolitik_ki/issues/179) | Multicall-Release mit Rollen-Weiche; Profilgenerator auf Release-Wurzel; Nachweis crypto/TLS ohne Host-OpenSSL | M–L | – |
+| T5 [#180](https://github.com/croesnick/kommunalpolitik_ki/issues/180) | Homebrew-Tap (eigenes Repo `homebrew-komki`), Formel mit llama.cpp, tmux, node; pi gepinnt in `libexec`; Release-Workflow | M | T4 |
+| T6 [#181](https://github.com/croesnick/kommunalpolitik_ki/issues/181) | Burrito-Bau auf Multicall umstellen, Einzeldatei als Release-Anhang | S | T4 |
+| T7 [#182](https://github.com/croesnick/kommunalpolitik_ki/issues/182) | Seite „In Betrieb nehmen“ auf vier Schritte umschreiben, Bauschritte in die Entwickler-Doku | S | T1, T5 |
 
 T1 bis T3 bringen ohne Umbau den größten Teil der Erleichterung: Die Seite schrumpft schon damit von elf auf etwa sechs Schritte.
 
-## 8. Offene Entscheidungen
+## 8. Entscheidungen (24.10.2026)
 
-1. **Download durch komki:** Darf `komki setup` das Modell selbst laden, mit Pin und Prüfsumme? Bisher galt „komki lädt nichts herunter“.
-2. **Homebrew-Tap:** Ist ein eigenes Tap-Repo unter `croesnick` in Ordnung? Es wäre der erste öffentliche Verteilweg.
-3. **Multicall:** Passt ein gebündeltes Programm zum Unix-Prinzip, wenn die Apps im Workspace getrennt bleiben und nur die Verpackung bündelt?
+Alle drei offenen Fragen hat der Nutzer am 24.10.2026 mit Ja beantwortet:
+
+1. **Download durch komki: ja.** `komki setup` darf das gepinnte Modell selbst laden, mit Prüfsumme und Hinweis auf die Nutzungsbedingungen. Die Regel „komki lädt nichts herunter“ entfällt für genau diesen Pin.
+2. **Homebrew-Tap: ja.** Eigenes Tap-Repo unter `croesnick` als erster öffentlicher Verteilweg.
+3. **Multicall: ja.** Ein gebündeltes Programm mit Rollen; die Apps bleiben im Workspace getrennt, gebündelt wird nur beim Verpacken.
