@@ -47,7 +47,9 @@ defmodule KomkiConnectorRis.HttpCliTest do
     assert ssl[:server_name_indication] == ~c"risapi1.komuna.net"
     assert is_function(ssl[:customize_hostname_check][:match_fun])
 
-    refute Keyword.has_key?(Http.http_options("http://127.0.0.1:4010/", 100), :ssl)
+    # Klartext: leere ssl-Option, damit httpc keinen Default ueber
+    # cacerts_get (Schluesselbund) berechnet (Labbook L-108).
+    assert Keyword.fetch!(Http.http_options("http://127.0.0.1:4010/", 100), :ssl) == []
   end
 
   describe "CLI.parse" do

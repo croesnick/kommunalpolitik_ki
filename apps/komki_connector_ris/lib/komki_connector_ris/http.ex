@@ -50,7 +50,11 @@ defmodule KomkiConnectorRis.Http do
 
     case URI.parse(url) do
       %URI{scheme: "https", host: host} -> [{:ssl, ssl_options(host)} | base]
-      _ -> base
+      # Klartext (nur Mock auf Loopback): eine leere ssl-Option ist Pflicht,
+      # sonst berechnet httpc seinen Default ueber
+      # `:public_key.cacerts_get/0` (Schluesselbund, unter dem Profil
+      # verweigert; Labbook L-108).
+      _ -> [{:ssl, []} | base]
     end
   end
 
