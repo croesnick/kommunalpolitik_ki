@@ -6,7 +6,7 @@
 | Stand | 2026-10-24 (Experimente, Node 24.22.1, pi 1.4.0) |
 | Gegenstand | Auswahl, Freigabe und Vendoring von pi.dev-Packages für den KomKI-Harness |
 | Umsetzung | Policy validiert; Produktivintegration offen (Tickets #154–#163) |
-| Verwandt | [RFC 0003](0003-vertrauliche-ki-arbeitsraeume.md), [RFC 0000](0000-sandbox-threat-modell.md) |
+| Verwandt | [RFC 0003](0003-vertrauliche-ki-arbeitsraeume.md), [RFC 0001](0001-vertrauliche-ki-arbeitsraeume.md) (ersetzt das nicht mehr eingecheckte RFC 0000) |
 | Labbook | [2026-10-24-pi-package-experiments.md](../research/2026-10-24-pi-package-experiments.md) (in Arbeit) |
 
 Dieses RFC beschreibt, welche pi.dev-Packages der KomKI-Harness aufnehmen darf, unter welchen Bedingungen und mit welcher Validierung. Es ist kein Feature-Katalog: Die meisten Packages sind für Coding-Agenten oder Cloud-Modelle gebaut und für einen lokalen, offline laufenden Ratsarbeitsraum ungeeignet.
