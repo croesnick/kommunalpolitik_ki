@@ -276,8 +276,14 @@ der Integrator nach dem Merge auf `komki-connectors` erneut ausgeführt.
   oder den Modellpfad.
 - **Erkenntnis:** Ein pidfile einer anderen Basis genügt, um deren Prozess zu stoppen. Unter der Host-Annahme
   ist das kein Angriff, aber eine Falle für parallele Instanzen.
-- **Folge:** Folgeticket: Identitätsprüfung an Basis und Modellpfad (Kommandozeile) binden. Der Ausgangszustand
-  wird nach den Tests wiederhergestellt.
+- **Folge:** Folgeticket #164 (Identitätsprüfung an Basis und Modellpfad binden).
+- **Wiederherstellung (2026-10-24):** Test-Basis gestoppt und gelöscht (inkl. der 17-GB-Modellkopie). Der llama der
+  echten Instanz läuft wieder (`Llama.down` räumte das veraltete pidfile auf, `Llama.up` startete neu); Egress,
+  Connectoren und Vermittler bleiben gestoppt wie vorher.
+- **Beobachtung:** Die `config.json` der echten Instanz war um 12:20 auf das neue Format migriert worden
+  (Felder `egress_ports`, `vault_dir` …; neue Profile; Doctor-Canaries 12:22–12:27). Die Befehle des Integrators
+  liefen alle mit `KOMKI_HOME=/private/tmp/kint`; die Ursache ist nicht geklärt (vermutlich eine parallele
+  Session). Deshalb lief die Wiederherstellung mit dem Branch-Code statt mit `main`.
 
 ## Phase 3: Sicherheitstests
 
