@@ -35,7 +35,7 @@ defmodule KomkiCli.Mediator do
   Signale — macOS-taugliche Self-Defense gegen pidfile-Wiederverwendung).
   """
 
-  alias KomkiCli.{Config, Proc}
+  alias KomkiCli.{Config, MediatorProfile, Proc, Profile}
   require Config
 
   @health_timeout_ms 10_000
@@ -158,9 +158,12 @@ defmodule KomkiCli.Mediator do
   defp spawn_mediator(%Config{} = cfg) do
     log_path = log_path(cfg)
     File.mkdir_p!(Path.dirname(log_path))
+    # --- Ticket #146/#137 (Vermittler-Profil): Profil vor jedem Start frisch
+    # schreiben (Muster llama); cwd "/" fuer getcwd unter der Grenze.
+    Profile.write!(MediatorProfile.path(cfg), MediatorProfile.generate(cfg, listen(cfg)))
     line = spawn_line(cfg)
 
-    case System.cmd("/bin/sh", ["-c", line]) do
+    case System.cmd("/bin/sh", ["-c", line], cd: "/") do
       {out, 0} ->
         case Integer.parse(String.trim_trailing(out)) do
           {pid, ""} when pid > 0 ->
@@ -183,17 +186,39 @@ defmodule KomkiCli.Mediator do
   """
   @spec spawn_line(Config.t()) :: String.t()
   def spawn_line(%Config{} = cfg) do
-    Proc.spawn_line(
-      cfg.mediator_bin,
-      [
-        "--base",
-        Proc.quote_bin(cfg.base_dir),
-        "--port",
-        to_string(cfg.mediator_port)
-      ],
-      log_path(cfg)
-    )
+    # --- Ticket #146/#137 (Vermittler-Profil, schmale Aenderung): Start unter
+    # `sandbox-exec -f <base>/profile/mediator.sb` ueber die aufgeloeste
+    # escript-Laufzeit, Umgebung geleert (Proc.escript_cmd/6), stdin
+    # /dev/null. `--connectors-dir` nennt das Socket-Verzeichnis der
+    # Connectoren (CONTRACT.md §2). #143 ersetzt `--port` durch den Socket.
+    args = [
+      "--base",
+      cfg.base_dir,
+      "--port",
+      to_string(cfg.mediator_port),
+      "--connectors-dir",
+      Path.join([cfg.base_dir, "run", "connectors"])
+    ]
+
+    [program | words] =
+      Proc.escript_cmd(
+        cfg.sandbox_exec,
+        MediatorProfile.path(cfg),
+        cfg.escript_bin,
+        cfg.mediator_bin,
+        args,
+        Path.join(cfg.base_dir, "run")
+      )
+
+    Proc.spawn_line(program, Enum.map(words, &Proc.quote_bin/1), log_path(cfg), "< /dev/null")
   end
+
+  @doc """
+  Kanal des Vermittlers fuer sein Profil (Ticket #137). Heute Loopback-TCP
+  auf `mediator_port`; #143 stellt auf `{:unix, <base>/run/mediator.sock}` um.
+  """
+  @spec listen(Config.t()) :: MediatorProfile.listen()
+  def listen(%Config{} = cfg), do: {:tcp, cfg.mediator_port}
 
   defp wait_health(cfg, pid) do
     deadline = System.monotonic_time(:millisecond) + @up_timeout_ms
@@ -231,7 +256,9 @@ defmodule KomkiCli.Mediator do
 
   # ---------------------------------------------------------------- Pipeline-Helfer
 
-  defp log_path(cfg), do: Path.join([cfg.base_dir, "tmp", "mediator.log"])
+  @doc "Log-Pfad des Vermittlers (auch Schreibziel im Vermittler-Profil)."
+  @spec log_path(Config.t()) :: String.t()
+  def log_path(cfg), do: Path.join([cfg.base_dir, "tmp", "mediator.log"])
   defp pidfile(cfg), do: Path.join([cfg.base_dir, "tmp", "komki-mediator.pid"])
 
   @doc """

@@ -41,6 +41,17 @@ defmodule KomkiCli.DoctorBootTest do
       File.mkdir_p!(Path.dirname(fake_mediator))
       File.write!(fake_mediator, "komki-mediator-platzhalter ( teste-Instanz )")
 
+      # Ticket #146: Egress und Connectoren ebenso als Platzhalter (Praesenz
+      # und Profil-Identitaet; gestartet werden sie hier nicht).
+      for name <- [
+            "komki-egress",
+            "komki-connector-ris",
+            "komki-connector-web",
+            "komki-connector-vault"
+          ] do
+        File.write!(Path.join([home, "bin", name]), name <> "-platzhalter")
+      end
+
       {init_out, 0} = CLI.run(["init", "--port", "59999"])
       {:ok, init_out: init_out}
     end

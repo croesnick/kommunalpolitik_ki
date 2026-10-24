@@ -2,8 +2,8 @@ defmodule KomkiCli.TestSupport do
   @moduledoc """
   Test-Fixtures (nur in `:test` kompiliert; siehe `elixirc_paths` in mix.exs).
 
-  Hermetisch und umgebungsagnostisch: temporäre Bereiche unter
-  `System.tmp_dir!/` mit Auto-Cleanup über `on_exit/1`, selbstgebaute
+  Hermetisch und umgebungsagnostisch: temporäre Bereiche unter `/tmp`
+  (sonst `System.tmp_dir!/`) mit Auto-Cleanup über `on_exit/1`, selbstgebaute
   Symlink-Paare und die Kernel-realpath-Referenz. Keine Annahmen über
   `/private` oder das Symlink-Layout des Hosts — die Invarianten gelten
   per Definition auf jedem Dateisystem.
@@ -18,13 +18,18 @@ defmodule KomkiCli.TestSupport do
   """
   @spec tmp_area!(String.t()) :: String.t()
   def tmp_area!(prefix) do
-    dir = Path.join(System.tmp_dir!(), prefix <> "-" <> unique_suffix())
+    dir = Path.join(tmp_root(), prefix <> "-" <> unique_suffix())
 
     File.mkdir_p!(dir)
     on_exit(fn -> File.rm_rf!(dir) end)
 
     dir
   end
+
+  # Kurze Wurzel (Ticket #146): Socket-Pfade unter der Basis duerfen 103 Byte
+  # nicht ueberschreiten; das macOS-TMPDIR (/var/folders/...) ist dafuer zu
+  # lang. /tmp, wo vorhanden, sonst System.tmp_dir!/0.
+  defp tmp_root, do: if(File.dir?("/tmp"), do: "/tmp", else: System.tmp_dir!())
 
   @doc "Symlink-Paar unter `dir`: `%{real: existierendes Verz., link: Symlink darauf}`."
   @spec symlink_pair!(String.t()) :: %{real: String.t(), link: String.t()}

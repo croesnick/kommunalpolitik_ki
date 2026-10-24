@@ -70,10 +70,17 @@ defmodule KomkiCli.MediatorTest do
 
       line = Mediator.spawn_line(cfg)
 
-      assert String.contains?(line, "nohup '/opt/bin/komki-mediator'")
+      # Ticket #137: Start unter dem eigenen Profil ueber die escript-Laufzeit,
+      # Umgebung geleert, stdin /dev/null
+      assert String.starts_with?(line, "nohup '/usr/bin/env' '-i' ")
+      assert String.contains?(line, "'" <> cfg.sandbox_exec <> "' '-f' '")
+      assert String.contains?(line, "/profile/mediator.sb' '")
+      assert String.contains?(line, "'/opt/bin/komki-mediator'")
       # basis im Spawn-Kontext kernel-kanonisch (Pfadform-Cave, config.ex)
-      assert String.contains?(line, "--base '" <> cfg.base_dir <> "'")
-      assert String.contains?(line, "--port " <> to_string(cfg.mediator_port))
+      assert String.contains?(line, "'--base' '" <> cfg.base_dir <> "'")
+      assert String.contains?(line, "'--port' '" <> to_string(cfg.mediator_port) <> "'")
+      assert String.contains?(line, "'--connectors-dir' '" <> cfg.base_dir <> "/run/connectors'")
+      assert String.contains?(line, "< /dev/null > ")
       assert String.contains?(line, Path.join([base, "tmp", "mediator.log"]))
       assert String.ends_with?(line, "2>&1 & echo $!")
     end
