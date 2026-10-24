@@ -103,7 +103,90 @@ nicht lief, steht als nicht gelaufen da.
 
 ## Phase 1: Lanes (Bau)
 
-*(wird nach Abschluss der Lanes ergänzt)*
+Jede Lane lief als eigener Agent in einem eigenen Worktree auf Basis von 9cb8af6. Die Tests jeder Lane hat
+der Integrator nach dem Merge auf `komki-connectors` erneut ausgeführt.
+
+| ID | Lane | Ticket | Tests (Lane / Nachlauf) | Merge |
+|---|---|---|---|---|
+| L-101 | Egress-Proxy | #145 | 30/30 inkl. `:network` / 29 ohne `:network` | d0476d1 |
+| L-102 | Web-Connector | #96 | 19/19 / 19/19 | 250d707 |
+| L-103 | Vault-Connector | #97 | 31/31 / 31/31 | 764fc4d |
+| L-104 | RIS-Connector | #94 | 21/21 / 21/21 | a49c87f |
+
+### L-101 Egress-Proxy `komki-egress`
+
+- **Frage:** Erzwingt der Proxy die Allowlist je Connector-Port und schützt er vor Umgehung?
+- **Aufbau:** ExUnit mit lokalem Echo-Upstream und injiziertem Resolver. Smoke-Test mit curl gegen das
+  Escript (Allowlist `api.search.brave.com:443`).
+- **Ergebnis:**
+  - Abgelehnt werden mit 403: nicht gelistete Hosts, gelistete Hosts mit anderem Port, Hosts eines
+    anderen Connector-Ports, Klartext-GET und POST, IP-Literale (127.0.0.1, [::1], 169.254.169.254),
+    Köpfe über 8 KiB. Header-Timeout gibt 408.
+  - Rebinding: `localhost` mit echtem Resolver wird abgelehnt (`blocked_address`), und schon eine
+    private Adresse unter mehreren genügt zur Ablehnung.
+  - Smoke-Test: Brave über den Proxy liefert HTTP 301 (Tunnel steht), `https://example.com` bekommt 403
+    (`not_allowed`), `http://example.com` bekommt 403 (`method`).
+  - Das Log enthält keine Inhalte; eine GET-URL mit `token=` erscheint nicht.
+- **Erkenntnis:** Die Host-Allowlist, die Seatbelt nicht ausdrücken kann (L-001), ist damit am einzigen
+  Ausgang durchgesetzt. Status 403/408/502 statt pauschal 403 (README-Tabelle).
+- **Folge:** Start und Profil durch `komki up` (#146).
+
+### L-102 Web-Connector
+
+- **Frage:** Liefert der Connector nur die Vertragsform, und bleibt der Key unsichtbar?
+- **Aufbau:** ExUnit gegen einen OTP-Mock über einen echten Unix-Socket. CONNECT-Attrappe für den
+  Proxy-Pfad.
+- **Ergebnis:**
+  - Form exakt `{results: [{title, url, snippet}], abrufdatum}`; HTML wird bereinigt, Längen
+    begrenzt, nicht-HTTP-URLs werden verworfen.
+  - Fehlercodes: 401 → `credential-missing`, 403, 429 und 500 → `upstream-error`, Timeout →
+    `upstream-timeout`.
+  - Der Key steht in keinem Log (Level debug), keiner Antwort und keinem `inspect`/`~p` des Zustands.
+  - Die Proxy-Attrappe sieht `CONNECT api.search.brave.com:443` ohne Key.
+  - **Echter Smoke-Test nicht gelaufen:** `security find-generic-password -s brave-search-api -w` hing
+    über 20 s, vermutlich wegen eines Schlüsselbund-Dialogs, und wurde abgebrochen. Der Key wurde nie
+    ausgegeben.
+- **Erkenntnis:** Der Schlüsselbund verlangt beim ersten Zugriff über `security` eine Freigabe durch die
+  nutzende Person. Das betrifft auch `komki up`.
+- **Folge:** Echter Smoke-Test in der Integration mit der nutzenden Person; ein Hinweis in `komki doctor`
+  ist wünschenswert.
+
+### L-103 Vault-Connector
+
+- **Frage:** Hält die Pfadhärtung gegen den omac-Fall (Symlink auf `~/.ssh/id_rsa`) und gegen eingeschleuste
+  Labels?
+- **Aufbau:** ExUnit über einen Socket mit einer tmp-Kopie des synthetischen Test-Vaults
+  (`apps/komki_connector_vault/priv/test-vault`); die Symlinks legen die Tests an.
+- **Ergebnis:**
+  - `forbidden-path` für `../`, absolute Pfade, leere Segmente, `.obsidian/`, Symlink-Datei nach außen
+    und auf `~/.ssh/id_rsa`, Symlink-Verzeichnis nach außen und innen, `komki-test` als Symlink oder Datei.
+  - Über den Socket werden `%2e%2e` und NUL schon vom Schema abgewiesen.
+  - Ungelabelte Notizen und solche mit ungültigem Label sind unsichtbar (`not-found`).
+  - `write_test` überschreibt nie (`-2`, `-3`). Ein eingeschleustes `komki_labels` in Body oder Titel
+    ändert die Labels nicht.
+- **Erkenntnis:** Erlang bietet kein `O_NOFOLLOW`. Zwischen `lstat` und `open` bleibt ein TOCTOU-Fenster, das
+  unter der Host-Annahme nur der Agent selbst nutzen könnte. pi hat aber keinen Schreibzugriff auf den
+  Vault, und das Seatbelt-Profil ist die zweite Grenze.
+- **Folge:** keine.
+
+### L-104 RIS-Connector
+
+- **Frage:** Bleiben nicht-öffentliche TOPs unsichtbar, auch über Zählung und Fehlermeldungen?
+- **Aufbau:** ExUnit gegen den Mock (`priv/mock_ris.exs`) über einen Socket. Zusätzlich hat die Lane das
+  Escript gegen die echte, öffentliche Gast-API geprüft (keine Credentials).
+- **Ergebnis:**
+  - „Bahnhofstraße“ ergibt 2 Treffer bei limit 20 und den richtigen bei limit 1.
+  - Ein Wort, das nur in nicht-öffentlichen TOPs steht, ergibt `[]`, genau wie ein unbekanntes Wort.
+  - `show` auf restricted, geschützten Teil, fehlende und falsch geformte IDs liefert identisch
+    `not-found` / „TOP nicht gefunden“.
+  - Echte API: search „friedhof“ fand 1 Treffer in 3,6 s; über einen lokalen CONNECT-Proxy besteht die
+    TLS-Prüfung.
+  - **Befund:** Die von ratsinfo genutzten Endpunkte (`meetings`, `agendaitems`, `fulltextsearch`) antworten
+    ohne Token mit 401. Der Connector nutzt die Gast-Endpunkte (`guestmeetings`, `guestagendaitems`), und
+    diese liefern `textsanddocsvisible: false`, also keine TOP-Texte.
+- **Erkenntnis:** Ohne Credentials findet die RIS-Suche nur Titel. Öffentlich heißt in der Gast-API
+  `restricted == false` und `protectedpart == false` (fail-closed).
+- **Folge:** Folgeticket „RIS-Texte über authentisierte API“ (Credential im Manifest, Keychain).
 
 ## Phase 2: Integration
 
