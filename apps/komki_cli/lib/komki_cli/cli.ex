@@ -10,7 +10,8 @@ defmodule KomkiCli.CLI do
 
       komki version
       komki version
-      komki init  [--gguf-from PATH] [--port N] [--ctx N] [--force]
+      komki init  [--gguf-from PATH] [--port N] [--ctx N]
+                  [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--force]
       komki doctor
       komki up    [--ctx N]
       komki down
@@ -148,6 +149,23 @@ defmodule KomkiCli.CLI do
               long: "ctx",
               parser: :integer,
               help: "llama-Kontextgroesse (default 8192)"
+            ],
+            vault_dir: [
+              value_name: "PATH",
+              long: "vault-dir",
+              help:
+                "Vault des Vault-Connectors (default <base>/vault, synthetischer Test-Vault; leer: abgeschaltet)"
+            ],
+            ris_base_url: [
+              value_name: "URL",
+              long: "ris-base-url",
+              help: "RIS-API-Basis (default https://risapi1.komuna.net/web/)"
+            ],
+            ris_mock_port: [
+              value_name: "N",
+              long: "ris-mock-port",
+              parser: :integer,
+              help: "RIS-Mock auf 127.0.0.1:N statt echter API (ohne Egress-Proxy)"
             ]
           ],
           flags: [
@@ -158,7 +176,7 @@ defmodule KomkiCli.CLI do
         up: [
           name: "up",
           description:
-            "llama-server und Vermittler starten (doctor-quick zuerst; Health-Poll nach)",
+            "llama-server, Egress, Connectoren und Vermittler starten (doctor-quick zuerst; Health-Poll nach)",
           options: [
             ctx: [
               value_name: "N",
@@ -171,11 +189,11 @@ defmodule KomkiCli.CLI do
         down: [
           name: "down",
           description:
-            "Vermittler und llama-server stoppen (Aufraeumweg ohne Boot-Gate; nur eigener pidfile-Prozess)"
+            "Vermittler, Connectoren, Egress und llama-server stoppen (Aufraeumweg ohne Boot-Gate; nur eigener pidfile-Prozess)"
         ],
         status: [
           name: "status",
-          description: "Zustandsabfrage (base, gguf, ports, llama, mediator)"
+          description: "Zustandsabfrage (base, gguf, ports, llama, egress, connectoren, mediator)"
         ],
         run: [
           name: "run",
@@ -578,48 +596,61 @@ defmodule KomkiCli.CLI do
   # Ticket #102: up startet llama-server UND den Vermittler (zwei
   # Zustandszeilen); der Vermittler kann auch :already sein (healthz gruen,
   # kein Neustart — Idempotenz).
-  defp render({:up, %{llama: pid, mediator: {:started, mediator_pid, health}}}),
-    do:
-      {green() <>
-         "llama up: pid " <>
-         to_string(pid) <>
-         reset() <>
-         " (health 200)\n" <>
-         green() <>
-         "mediator up: pid " <>
-         to_string(mediator_pid) <>
-         reset() <>
-         " (tools: " <>
-         mediator_tools_line(health) <> ")\n", 0}
+  defp render(
+         {:up, %{llama: pid, connectors: connectors, mediator: {:started, mediator_pid, health}}}
+       ),
+       do:
+         {green() <>
+            "llama up: pid " <>
+            to_string(pid) <>
+            reset() <>
+            " (health 200)\n" <>
+            connector_up_lines(connectors) <>
+            green() <>
+            "mediator up: pid " <>
+            to_string(mediator_pid) <>
+            reset() <>
+            " (tools: " <>
+            mediator_tools_line(health) <> ")\n", 0}
 
-  defp render({:up, %{llama: pid, mediator: {:already, health}}}),
+  defp render({:up, %{llama: pid, connectors: connectors, mediator: {:already, health}}}),
     do:
       {green() <>
          "llama up: pid " <>
          to_string(pid) <>
          reset() <>
          " (health 200)\n" <>
+         connector_up_lines(connectors) <>
          green() <>
          "mediator: bereits laufend (healthz ok, tools: " <>
          mediator_tools_line(health) <> ")" <> reset() <> "\n", 0}
 
   # Stoppreihenfolge wie up rueckwaerts: Vermittler-Zeile zuerst.
-  defp render({:down, %{llama: llama, mediator: mediator}}),
-    do: {down_line("mediator", mediator) <> "\n" <> down_line("llama", llama) <> "\n", 0}
-
-  defp render({:status, cfg, %{llama: llama_state, mediator: mediator_state}}),
+  defp render({:down, %{llama: llama, connectors: connectors, mediator: mediator}}),
     do:
-      {Enum.join(
-         [
-           "base:          " <> cfg.base_dir,
-           "gguf:          " <> cfg.gguf_path,
-           "port:          " <> to_string(cfg.port),
-           "mediator-sock: " <> KomkiCli.Channel.socket_path(cfg),
-           "llama:         " <> state_line(llama_state, "/health"),
-           "mediator:      " <> state_line(mediator_state, "/healthz")
-         ],
-         "\n"
-       ) <> "\n", 0}
+      {Enum.map_join(
+         [{"mediator", mediator}] ++ connectors ++ [{"llama", llama}],
+         fn {name, state} -> down_line(name, state) <> "\n" end
+       ), 0}
+
+  defp render(
+         {:status, cfg, %{llama: llama_state, connectors: connectors, mediator: mediator_state}}
+       ),
+       do:
+         {Enum.join(
+            [
+              "base:          " <> cfg.base_dir,
+              "gguf:          " <> cfg.gguf_path,
+              "port:          " <> to_string(cfg.port),
+              "mediator-sock: " <> KomkiCli.Channel.socket_path(cfg),
+              "llama:         " <> state_line(llama_state, "/health")
+            ] ++
+              Enum.map(connectors, fn {name, state} ->
+                String.pad_trailing(name <> ":", 17) <> state_line(state, "")
+              end) ++
+              ["mediator:      " <> state_line(mediator_state, "/healthz")],
+            "\n"
+          ) <> "\n", 0}
 
   # pi-Ausgabe ist Modell-Output: nie roh aufs Terminal (Ticket #132).
   defp render({:run_ok, scratch, out}),
@@ -837,10 +868,22 @@ defmodule KomkiCli.CLI do
     do: "port antwortet " <> health_path <> " aber kein pidfile (fremder Prozess?)"
 
   defp state_line(:stopped, _health_path), do: "stopped"
+  defp state_line(:disabled, _health_path), do: "abgeschaltet (Konfiguration)"
   defp state_line({:error, reason}, _health_path), do: "error: " <> reason
 
   # Fassung-Tools im up-Output: kleine Ehrlichkeit der Schnittstelle — der
   # Nutzer sieht, was pi per mcp.json freigeschaltet bekommt.
+  # Ticket #146: Egress und Connectoren zwischen llama und Vermittler.
+  defp connector_up_lines(connectors) do
+    Enum.map_join(connectors, fn
+      {name, {:started, pid}} ->
+        green() <> name <> " up: pid " <> to_string(pid) <> reset() <> "\n"
+
+      {name, {:already, pid}} ->
+        green() <> name <> ": bereits laufend (pid " <> to_string(pid) <> ")" <> reset() <> "\n"
+    end)
+  end
+
   defp mediator_tools_line(%{"tools" => tools}) when is_list(tools), do: Enum.join(tools, ", ")
   defp mediator_tools_line(_), do: "?"
 

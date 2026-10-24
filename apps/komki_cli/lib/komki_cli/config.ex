@@ -11,6 +11,19 @@ defmodule KomkiCli.Config do
   der Vermittler lauscht auf `<base>/run/mediator.sock` (`KomkiCli.Channel`);
   ein `mediator_port` in aelteren config.json wird ignoriert.
 
+  Connectoren und Egress (Ticket #146, CONTRACT.md §2/§4/§9), alle optional
+  (aeltere config.json laden mit Defaults):
+
+    * `escript_bin` — aufgeloeste Erlang-`escript`-Laufzeit; jedes komki-Escript
+      startet unter Seatbelt als `escript <datei>`.
+    * `egress_bin`, `connector_bins` (id → Pfad) — entdeckt wie der Vermittler.
+    * `egress_ports` — Loopback-Port je Connector mit Netz (Default ris 49531,
+      web 49532).
+    * `ris_base_url` — Default die echte RIS-API; `ris_mock_port` schaltet auf
+      `http://127.0.0.1:<port>/` ohne Proxy um.
+    * `vault_dir` — Default `<base>/vault` (synthetischer Test-Vault); leer
+      oder fehlend: Vault-Connector startet nicht.
+
   Basisverzeichnis: `KOMKI_HOME` (default `~/.local/share/komki`).
   Alle Pfade werden kernel-kanonisiert, bevor sie ins Profil oder die
   Konfiguration geschrieben werden: aufgeloest per `realpath`, wie der
@@ -31,7 +44,21 @@ defmodule KomkiCli.Config do
     :llama_server_bin,
     :sandbox_exec
   ]
-  defstruct @enforce_keys ++ [:profile_path, :fd_bin, :rg_bin, :mediator_bin]
+  defstruct @enforce_keys ++
+              [
+                :profile_path,
+                :fd_bin,
+                :rg_bin,
+                :mediator_bin,
+                # Connectoren und Egress (Ticket #146): Laufzeit, Binaries, Netz, Vault
+                :escript_bin,
+                :egress_bin,
+                :ris_mock_port,
+                :vault_dir,
+                connector_bins: %{},
+                egress_ports: %{},
+                ris_base_url: nil
+              ]
 
   @type t :: %__MODULE__{
           base_dir: String.t(),
@@ -47,7 +74,14 @@ defmodule KomkiCli.Config do
           rg_bin: String.t() | nil,
           mediator_bin: String.t() | nil,
           sandbox_exec: String.t(),
-          profile_path: String.t()
+          profile_path: String.t(),
+          escript_bin: String.t() | nil,
+          egress_bin: String.t() | nil,
+          connector_bins: %{String.t() => String.t() | nil},
+          egress_ports: %{String.t() => pos_integer()},
+          ris_base_url: String.t() | nil,
+          ris_mock_port: pos_integer() | nil,
+          vault_dir: String.t() | nil
         }
 
   # Felder, deren Werkzeug-Pfade bei init entdeckt wurden (nil, wenn das
@@ -68,6 +102,12 @@ defmodule KomkiCli.Config do
   # Nutzer-Präferenz «große Kontexte» bei 64 GB RAM: 128K ist der Default;
   # Gemma 4 hält den KV-Cache via SWA klein.
   @default_ctx 131_072
+  # Connectoren (Ticket #146): je Connector mit egress_hosts ein eigener
+  # Loopback-Port am Egress-Proxy (CONTRACT.md §9).
+  @default_egress_ports %{"ris" => 49_531, "web" => 49_532}
+  # Echte RIS-API (dieselbe Basis wie apps/ratsinfo); der Host steht im
+  # Manifest als egress_hosts-Eintrag.
+  @default_ris_base_url "https://risapi1.komuna.net/web/"
   @pi_bundle_rel "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
 
   @spec expected_gguf_sha256 :: String.t()
@@ -128,17 +168,53 @@ defmodule KomkiCli.Config do
   Praesenz. Keine ausgedachten Pfade: nur gefundene werden gepinnt.
   """
   @spec resolve_mediator_bin(String.t()) :: String.t() | nil
-  def resolve_mediator_bin(base_dir) when is_binary(base_dir) do
-    case resolve_optional_tool("komki-mediator") do
-      nil -> local_mediator_bin(base_dir)
-      path -> path
+  def resolve_mediator_bin(base_dir) when is_binary(base_dir),
+    do: resolve_escript("komki-mediator", base_dir)
+
+  @doc """
+  Entdeckung eines komki-Escripts (Vermittler, Egress, Connectoren; Ticket
+  #146): erst PATH (Kernel-Realpath), dann `<base>/bin/<name>`. nil, wenn
+  beides fehlt — `up` und `doctor` verantworten die Praesenz.
+  """
+  @spec resolve_escript(String.t(), String.t()) :: String.t() | nil
+  def resolve_escript(name, base_dir) when is_binary(name) and is_binary(base_dir) do
+    case resolve_optional_tool(name) do
+      nil ->
+        candidate = Path.join([base_dir, "bin", name])
+        if File.exists?(candidate), do: candidate, else: nil
+
+      path ->
+        path
     end
   end
 
-  defp local_mediator_bin(base_dir) do
-    candidate = Path.join([base_dir, "bin", "komki-mediator"])
-    if File.exists?(candidate), do: candidate, else: nil
+  @doc """
+  Erlang-`escript`-Laufzeit (Ticket #146): Unter Seatbelt startet komki
+  jedes Escript ueber den aufgeloesten `escript`-Pfad statt ueber den
+  Shebang (`/usr/bin/env escript` endete im asdf-Shim, einem Shell-Skript,
+  das unter der Sandbox scheitert — dieselbe Klasse wie beim node-Shim).
+  asdf zuerst, dann PATH ohne asdf-Shims.
+  """
+  @spec resolve_escript_bin() :: String.t() | nil
+  def resolve_escript_bin do
+    asdf_which("escript") ||
+      case System.find_executable("escript") do
+        nil -> nil
+        path -> if String.contains?(path, "/.asdf/shims/"), do: nil, else: canonical(path)
+      end
   end
+
+  @doc "Erlang-Wurzel zu einem `escript`-Pfad (`<root>/bin/escript`)."
+  @spec erlang_root(String.t()) :: String.t()
+  def erlang_root(escript_bin), do: escript_bin |> Path.dirname() |> Path.dirname()
+
+  @doc "Default der Egress-Ports je Connector (CONTRACT.md §9)."
+  @spec default_egress_ports() :: %{String.t() => pos_integer()}
+  def default_egress_ports, do: @default_egress_ports
+
+  @doc "Default-Basis der RIS-API (echter Betrieb)."
+  @spec default_ris_base_url() :: String.t()
+  def default_ris_base_url, do: @default_ris_base_url
 
   @doc """
   Entdeckung eines optionalen Werkzeugs ueber PATH (Kernel-Realpath). nil,
@@ -294,9 +370,36 @@ defmodule KomkiCli.Config do
       rg_bin: resolve_optional_tool("rg"),
       mediator_bin: resolve_mediator_bin(base),
       sandbox_exec: canonical(@default_sandbox_exec),
-      profile_path: Path.join([base, "profile", "komki.sb"])
+      profile_path: Path.join([base, "profile", "komki.sb"]),
+      escript_bin: resolve_escript_bin(),
+      egress_bin: resolve_escript("komki-egress", base),
+      connector_bins:
+        Map.new(KomkiConnector.Manifest.all(), &{&1.id, resolve_escript(&1.binary, base)}),
+      egress_ports: @default_egress_ports,
+      ris_base_url: opts[:ris_base_url] || @default_ris_base_url,
+      ris_mock_port: opts[:ris_mock_port],
+      # Default: synthetischer Test-Vault unter der Basis (init legt ihn an)
+      vault_dir: vault_dir_opt(opts[:vault_dir], base)
     }
   end
+
+  defp vault_dir_opt(nil, base), do: Path.join(base, "vault")
+  defp vault_dir_opt("", _base), do: nil
+  defp vault_dir_opt(dir, _base), do: canonical(dir)
+
+  @doc """
+  RIS im Mock-Betrieb (CONTRACT.md §9)? Dann spricht der Connector direkt
+  mit `http://127.0.0.1:<ris_mock_port>/` statt ueber den Egress-Proxy.
+  """
+  @spec ris_mock?(t()) :: boolean()
+  def ris_mock?(%__MODULE__{ris_mock_port: port}), do: is_integer(port)
+
+  @doc "Effektive RIS-Basis-URL (Mock-Port gewinnt)."
+  @spec ris_url(t()) :: String.t()
+  def ris_url(%__MODULE__{ris_mock_port: port}) when is_integer(port),
+    do: "http://127.0.0.1:" <> Integer.to_string(port) <> "/"
+
+  def ris_url(%__MODULE__{ris_base_url: url}), do: url || @default_ris_base_url
 
   @doc "Pfad der config.json für ein Basisverzeichnis."
   @spec config_path(String.t()) :: String.t()
@@ -349,7 +452,18 @@ defmodule KomkiCli.Config do
 
   # Optionale Felder: fehlen sie in aelteren config.json, wird nil gelesen —
   # kein Breaking-Change fuer bestehende Instanzen.
-  @optional_keys [:fd_bin, :rg_bin, :mediator_bin]
+  @optional_keys [
+    :fd_bin,
+    :rg_bin,
+    :mediator_bin,
+    :escript_bin,
+    :egress_bin,
+    :connector_bins,
+    :egress_ports,
+    :ris_base_url,
+    :ris_mock_port,
+    :vault_dir
+  ]
 
   @spec from_map(%{String.t() => term()}) :: {:ok, t()} | {:error, String.t()}
   def from_map(map) do
@@ -384,9 +498,32 @@ defmodule KomkiCli.Config do
       rg_bin: Map.get(map, "rg_bin"),
       mediator_bin: Map.get(map, "mediator_bin"),
       sandbox_exec: map["sandbox_exec"],
-      profile_path: map["profile_path"]
+      profile_path: map["profile_path"],
+      # Ticket #146: aeltere Instanzen ohne diese Felder laden mit Defaults;
+      # ein fehlender oder leerer vault_dir heisst: Vault-Connector startet nicht.
+      escript_bin: Map.get(map, "escript_bin"),
+      egress_bin: Map.get(map, "egress_bin"),
+      connector_bins: Map.get(map, "connector_bins") || %{},
+      egress_ports: ports(Map.get(map, "egress_ports", @default_egress_ports)),
+      ris_base_url: Map.get(map, "ris_base_url") || @default_ris_base_url,
+      ris_mock_port: optional_pos(:ris_mock_port, Map.get(map, "ris_mock_port")),
+      vault_dir: blank_to_nil(Map.get(map, "vault_dir"))
     }
   end
+
+  defp ports(map) when is_map(map),
+    do: Map.new(map, fn {id, port} -> {id, require_pos(:egress_ports, port)} end)
+
+  defp ports(other) do
+    raise RuntimeError,
+      message: "config.json: egress_ports must be an object, got " <> Kernel.inspect(other)
+  end
+
+  defp optional_pos(_key, nil), do: nil
+  defp optional_pos(key, value), do: require_pos(key, value)
+
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(value), do: value
 
   @doc "config.json serialisieren (sortierte Schluessel, genau ein finales Newline beim Speichern)."
   @spec encode(t()) :: String.t()

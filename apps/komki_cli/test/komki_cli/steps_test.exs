@@ -201,4 +201,79 @@ defmodule KomkiCli.StepsTest do
     # Kein Token, kein Socket: healthz scheitert sicher (Ticket #143).
     TestSupport.fixture_cfg(TestSupport.tmp_area!(prefix))
   end
+
+  describe "up/down-Reihenfolge (Ticket #146)" do
+    test "start_order: llama, egress, Connectoren, Vermittler; stop_order umgekehrt" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-order"))
+
+      assert Steps.start_order(cfg) ==
+               [
+                 "llama",
+                 "egress",
+                 "connector-ris",
+                 "connector-vault",
+                 "connector-web",
+                 "mediator"
+               ]
+
+      assert Steps.stop_order() ==
+               [
+                 "mediator",
+                 "connector-web",
+                 "connector-vault",
+                 "connector-ris",
+                 "egress",
+                 "llama"
+               ]
+
+      assert Steps.start_order(%{cfg | vault_dir: nil, ris_mock_port: 4010}) ==
+               ["llama", "egress", "connector-ris", "connector-web", "mediator"]
+    end
+
+    test "down_with/1: stoppt Egress und Connectoren per pidfile, Ergebnis in stop_order, idempotent" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-down"))
+      tmp = Path.join(cfg.base_dir, "tmp")
+      File.mkdir_p!(tmp)
+
+      # Marker-Prozesse wie im Liveness-Gate-Test: die ps-Kommandozeile
+      # traegt den Escript-Namen, den der Identitaetscheck erwartet.
+      pids =
+        for {file, marker} <- [
+              {"komki-egress.pid", "komki-egress"},
+              {"connector-ris.pid", "komki-connector-ris"},
+              {"connector-web.pid", "komki-connector-web"}
+            ] do
+          port =
+            Port.open({:spawn_executable, "/bin/sh"},
+              args: ["-c", "while :; do sleep 1; done # " <> marker]
+            )
+
+          {:os_pid, pid} = Port.info(port, :os_pid)
+          File.write!(Path.join(tmp, file), Integer.to_string(pid) <> "\n")
+          pid
+        end
+
+      # stale pidfile beim Vault-Connector: wird entfernt, nichts getoetet
+      File.write!(Path.join(tmp, "connector-vault.pid"), "99998\n")
+
+      assert {:down, %{mediator: :already, connectors: connectors, llama: :already}} =
+               Steps.down_with(cfg)
+
+      assert Enum.map(connectors, &elem(&1, 0)) ==
+               ["connector-web", "connector-vault", "connector-ris", "egress"]
+
+      assert [
+               {"connector-web", :ok},
+               {"connector-vault", {:stale, _}},
+               {"connector-ris", :ok},
+               {"egress", :ok}
+             ] =
+               connectors
+
+      refute Enum.any?(pids, &Proc.pid_alive?(&1, ""))
+
+      assert {:down, %{connectors: again}} = Steps.down_with(cfg)
+      assert Enum.all?(again, fn {_name, state} -> state == :already end)
+    end
+  end
 end
