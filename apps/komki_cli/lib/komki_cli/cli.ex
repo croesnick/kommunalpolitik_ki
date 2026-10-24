@@ -154,7 +154,7 @@ defmodule KomkiCli.CLI do
               value_name: "PATH",
               long: "vault-dir",
               help:
-                "Vault des Vault-Connectors (default <base>/vault, synthetischer Test-Vault; leer: abgeschaltet)"
+                "Vault des Vault-Connectors (default <base>/vault, anfangs leer; leer gesetzt: abgeschaltet)"
             ],
             ris_base_url: [
               value_name: "URL",

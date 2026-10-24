@@ -94,6 +94,78 @@ Zwei Hinweise für die verteilte Datei:
   `komki init --force` ausführen — der Doctor meldet Profil-Drift, bis das
   Profil neu geschrieben ist.
 
+## Schnellstart: Arbeitsraum mit RIS, Websuche und Vault
+
+Der Ablauf von null bis zur ersten Session. Alle Befehle laufen im Repo-Root;
+`B` ist die Instanz (Default `~/.local/share/komki`, sonst `KOMKI_HOME`).
+
+```sh
+B=~/.local/share/komki
+
+# 1. Alle Escripts bauen und in die Instanz legen (komki sucht erst PATH, dann $B/bin)
+for app in komki_cli komki_mediator komki_egress komki_connector_ris komki_connector_web komki_connector_vault; do
+  (cd apps/$app && mix deps.get && mix escript.build)
+done
+mkdir -p $B/bin
+cp apps/komki_mediator/komki-mediator apps/komki_egress/komki-egress \
+   apps/komki_connector_ris/komki-connector-ris apps/komki_connector_web/komki-connector-web \
+   apps/komki_connector_vault/komki-connector-vault $B/bin/
+
+# 2. Brave-Key für die Websuche in den Schlüsselbund (fragt den Key verdeckt ab)
+security add-generic-password -s brave-search-api -a "$USER" -w
+
+# 3. Vault wählen: zum Ausprobieren den erfundenen Test-Vault kopieren
+cp -R apps/komki_connector_vault/priv/test-vault $B/vault
+
+# 4. Instanz anlegen (bestehende Instanz: --force ergänzen)
+apps/komki_cli/komki init --gguf-from PFAD/ZUM/MODELL.gguf --vault-dir $B/vault
+
+# 5. Starten und prüfen
+apps/komki_cli/komki up        # llama, Egress, Connectoren, Vermittler
+apps/komki_cli/komki doctor    # muss mit "doctor: ok" enden
+apps/komki_cli/komki status
+
+# 6. Arbeiten
+apps/komki_cli/komki run "Suche im RIS nach Bahnhofstraße und fasse die Treffer zusammen."
+apps/komki_cli/komki session   # interaktiv in tmux
+
+# 7. Stoppen
+apps/komki_cli/komki down
+```
+
+Hinweise zu den einzelnen Schritten:
+
+* **Schlüsselbund (Schritt 2, 5):** Beim ersten `komki up` fragt macOS, ob
+  `security` auf den Eintrag `brave-search-api` zugreifen darf. Wähle
+  „Immer erlauben“, sonst startet der Web-Connector ohne Key und jede
+  Websuche meldet `credential-missing`. „Immer erlauben“ heißt: jeder Prozess
+  unter deinem Nutzer kann den Key per `security` lesen.
+* **Vault (Schritt 3):** Der Vault-Connector zeigt nur Notizen mit
+  Frontmatter-Feld `komki_labels` (z. B. `komki_labels: [vault-oeffentlich@1]`);
+  alles andere bleibt unsichtbar. Geschrieben wird nur nach
+  `<vault>/komki-test/`. Für einen echten Vault: Notizen zuerst labeln, dann
+  `init --force --vault-dir PFAD`. Leerer `--vault-dir` schaltet den
+  Vault-Connector ab.
+* **RIS:** Ohne Zugangsdaten nutzt der Connector die öffentlichen
+  Gast-Endpunkte; die liefern nur Titel, keine Texte (#148). Zum Üben ohne
+  Netz gibt es einen Mock:
+  `elixir apps/komki_connector_ris/priv/mock_ris.exs --port 49640` und
+  `komki init --force --ris-mock-port 49640`.
+* **Raum wechseln:** Welche Daten in einer Session zusammenkommen dürfen,
+  steht in `$B/mediator/room.json`, Feld `workspace_bindings`. Default ist
+  **recherche** (`ris-oeffentlich@1`, `vault-oeffentlich@1`,
+  `web-oeffentlich@1`): Websuche und RIS erlaubt, vertrauliche Notizen
+  gesperrt. Für **vertraulich** `vault-vertraulich@1` ergänzen: Dann sind
+  vertrauliche Notizen lesbar und jede Web- und RIS-Suche gesperrt. Nach der
+  Änderung `komki down && komki up`.
+* **Nachvollziehen:** Jede Entscheidung steht im Journal
+  `$B/mediator/journal/pdr.jsonl`;
+  `$B/bin/komki-mediator verify-journal --base $B` prüft die Hash-Kette.
+  Logs liegen unter `$B/tmp/`.
+* **Wenn etwas hakt:** `komki doctor` nennt den fehlenden Teil (Escript,
+  Profil, Credential, Connector-Ping). Ein ausgefallener Connector kommt mit
+  erneutem `komki up` zurück, die laufenden Prozesse bleiben dabei stehen.
+
 ## Befehle
 
 ```sh
@@ -220,7 +292,7 @@ selbst alle Prozesse, und nur der Egress-Proxy darf nach außen:
   (`{"ris": 49531, "web": 49532}`), `ris_base_url`
   (`https://risapi1.komuna.net/web/`), `ris_mock_port` (aus; gesetzt spricht der
   RIS-Connector direkt mit `http://127.0.0.1:<port>/`, ohne Proxy), `vault_dir`
-  (`<base>/vault`, synthetischer Test-Vault; leer: Vault-Connector aus).
+  (`<base>/vault`, anfangs leer, Test-Vault siehe Schnellstart; leer gesetzt: Vault-Connector aus).
 * **Bereit** ist ein Connector, wenn die reservierte Operation `ping` die
   Fassung des Manifests liefert; der Egress, wenn er „listening“ meldet.
   `komki doctor` pingt jeden laufenden Connector.
