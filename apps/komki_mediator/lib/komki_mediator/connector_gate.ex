@@ -161,6 +161,8 @@ defmodule KomkiMediator.ConnectorGate do
 
   defp admit(env, call, call_id, emit_decision, result) do
     with :ok <- shape(call, result),
+         {:ok, _labels} <- labels(call, emit_decision, result),
+         result = visible(call, env.room, result),
          {:ok, labels} <- labels(call, emit_decision, result) do
       d12 = Hash.digest12(PDR.payload_hash(result))
       object = %Object{object_id: "in-" <> d12, version: "v1", labels: labels}
@@ -186,6 +188,19 @@ defmodule KomkiMediator.ConnectorGate do
       {:redact, reason, codes} -> redact(env, call, call_id, reason, codes)
     end
   end
+
+  # Suchtreffer ausserhalb von B_W fallen VOR Gate 2 still heraus
+  # (Labbook L-109): sonst waere "deny" gegenueber "permit, 0 Treffer" ein
+  # Existenz-Orakel fuer vertrauliche Inhalte. Die Antwort sieht dann aus
+  # wie eine Suche ohne diese Treffer; ihre Anzahl verraet nichts.
+  # Einzelzugriffe (`read`) bleiben eine Entscheidung mit Remedies.
+  defp visible(%{manifest: %{id: "vault"}, op: "search"}, %Room{workspace_bindings: b_w}, result) do
+    Map.update!(result, "results", fn hits ->
+      Enum.filter(hits, fn hit -> Enum.all?(hit["labels"], &(&1 in b_w)) end)
+    end)
+  end
+
+  defp visible(_call, _room, result), do: result
 
   defp shape(call, result) do
     case ResultShape.check(call.manifest.id, call.op, result) do

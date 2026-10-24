@@ -158,17 +158,33 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert admit["outcome"] == "not_admitted"
   end
 
-  test "recherche vault_search mit vertraulichem Treffer: deny", %{env: env} do
+  test "recherche vault_search: vertraulicher Treffer faellt still heraus (kein Orakel, L-109)",
+       %{env: env} do
     hits = [
       %{"note_id" => "a.md", "title" => "A", "labels" => ["vault-oeffentlich@1"]},
-      %{"note_id" => "b.md", "title" => "B", "labels" => ["vault-vertraulich@1"]}
+      %{"note_id" => "b.md", "title" => "Geheim B", "labels" => ["vault-vertraulich@1"]}
     ]
 
     fake(env, "vault", ok(%{"results" => hits}))
 
     response = ConnectorGate.call(env, "vault_search", %{"text" => "x"})
-    assert response["decision"] == "deny"
-    refute Map.has_key?(response, "results")
+    assert response["decision"] == "permit"
+    assert Enum.map(response["results"], & &1["note_id"]) == ["a.md"]
+    assert response["labels"] == ["vault-oeffentlich@1"]
+    refute inspect(response) =~ "Geheim B"
+  end
+
+  test "recherche vault_search: nur vertrauliche Treffer sehen aus wie keine Treffer",
+       %{env: env} do
+    secret = [%{"note_id" => "b.md", "title" => "Geheim B", "labels" => ["vault-vertraulich@1"]}]
+    fake(env, "vault", ok(%{"results" => secret}))
+    with_secret = ConnectorGate.call(env, "vault_search", %{"text" => "x"})
+
+    fake(env, "vault", ok(%{"results" => []}))
+    without = ConnectorGate.call(env, "vault_search", %{"text" => "x"})
+
+    keys = ["decision", "results", "labels"]
+    assert Map.take(with_secret, keys) == Map.take(without, keys)
   end
 
   test "Fake meldet fremde Labels: redacted", %{env: env} do
