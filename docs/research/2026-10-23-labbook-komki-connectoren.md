@@ -112,6 +112,8 @@ der Integrator nach dem Merge auf `komki-connectors` erneut ausgeführt.
 | L-102 | Web-Connector | #96 | 19/19 / 19/19 | 250d707 |
 | L-103 | Vault-Connector | #97 | 31/31 / 31/31 | 764fc4d |
 | L-104 | RIS-Connector | #94 | 21/21 / 21/21 | a49c87f |
+| L-105 | Vermittler-Gate | #144 | 93/93 / 113/113 nach Kanal-Merge | 6a6f7bf |
+| L-106 | Kanal | #143 | 87 + 170 / 113 + 170 | 81ba174 |
 
 ### L-101 Egress-Proxy `komki-egress`
 
@@ -186,7 +188,55 @@ der Integrator nach dem Merge auf `komki-connectors` erneut ausgeführt.
     diese liefern `textsanddocsvisible: false`, also keine TOP-Texte.
 - **Erkenntnis:** Ohne Credentials findet die RIS-Suche nur Titel. Öffentlich heißt in der Gast-API
   `restricted == false` und `protectedpart == false` (fail-closed).
-- **Folge:** Folgeticket „RIS-Texte über authentisierte API“ (Credential im Manifest, Keychain).
+- **Folge:** Folgeticket #148 „RIS-Connector: TOP-Texte über authentisierte API“.
+
+### L-105 Vermittler: emit → Vollzug → admit
+
+- **Frage:** Hält der Vermittler die Reihenfolge Vorbeleg vor Wirkung ein, und greift die
+  Lethal-Trifecta-Sperre, bevor ein Connector etwas tut?
+- **Aufbau:** `connector_gate_test.exs` (19 Tests) mit einem echten `KomkiConnector.Server` als Fake unter
+  `/tmp/km<hex>/<id>.sock`. Der Fake prüft beim Aufruf die Journal-Länge.
+- **Ergebnis:**
+  - Beim Aufruf liegt 1 Journal-Datensatz vor (emit-PDR). emit- und admit-PDR tragen dieselbe `call_id`, und
+    `Journal.verify` bestätigt die Hash-Kette.
+  - Raum vertraulich: `web_search` und `ris_search` → deny `recipient_not_allowed`, **der Fake wird nicht
+    aufgerufen**.
+  - Raum recherche: `vault_read` einer vertraulichen Notiz → deny `label_not_included`, ohne Inhalt.
+  - Fremde Labels, fehlende Labels, Zusatzfelder oder falsche Typen in der Connector-Antwort → `redacted`.
+  - Raum ohne `workspace_bindings` → fail-closed. Connector down → `admitted: false` mit PDR.
+- **Erkenntnis:**
+  - anubis prüft Typ, Länge, Bereich und Pflichtfelder vor dem Tool und verwirft unbekannte Felder
+    stillschweigend. Solche Verstöße erzeugen **keinen PDR**; nur Musterverstöße erreichen `Params.check`.
+  - `vault_search` labelt die Vereinigung aller Treffer. Ein vertraulicher Treffer sperrt in recherche die
+    ganze Suche: sicher, aber grob.
+- **Folge:** Beides steht unter „offene Punkte“ unten.
+
+### L-106 Kanal pi → Vermittler
+
+- **Frage:** Erreicht nur der Inhaber des Tokens den Vermittler, und kommt die Session-ID im PDR an?
+- **Aufbau:** ExUnit über einen echten Socket. Relay-Test mit `node`. Live: Wegwerf-Instanz unter
+  `/private/tmp/kk` gegen den laufenden llama, `komki run` mit `admit_document`.
+- **Ergebnis:**
+  - Ohne oder mit falschem Token → 401, die Logzeile enthält den Token-Wert nicht. `/healthz` ohne Token →
+    401. Socket `0600`, `run/` `0700`.
+  - `lsof` zeigt keinen TCP-Socket des Vermittlers, und `127.0.0.1:49525` antwortet nicht.
+  - Live-PDR: `{"tool":"admit_document","decision":"permit","outcome":"admitted","session_id":"ses-7534d7276d4fcbeb"}`.
+- **Erkenntnis:** Die `mcp.json` im pi-Home bleibt für den Agenten schreibbar und wird nur bei `komki up` neu
+  geschrieben. Ein in pis Sandbox eingetragener MCP-Server liefe zwar ebenfalls in pis Sandbox, aber die
+  Konfiguration sollte trotzdem keinen Lauf überdauern. Das Relay wird schon bei jedem pi-Start neu
+  geschrieben.
+- **Folge:** `mcp.json` ebenfalls bei jedem pi-Start neu schreiben (Integration).
+
+### L-107 Integration: Befunde beim Zusammenführen
+
+- **Vault-Labels nach dem Schreiben:** Eine in recherche geschriebene Notiz trägt λ(y) = B_W, also auch
+  `ris-oeffentlich@1` und `web-oeffentlich@1`, und wäre mit den alten `import_labels` nicht mehr lesbar
+  gewesen (Befund von Lane B). Behoben: `import_labels` des Vault umfassen alle vier Bindungen, Commit dd40d8f.
+- **Workspace scannt Agent-Worktrees:** Der Pre-commit-Hook `mix workspace compile` lud
+  `.claude/worktrees/agent-*` als Projekte und scheiterte. Behoben: `.workspace.exs` ignoriert `.claude`.
+- **Konflikte zwischen Gate und Kanal:** `supervisor.ex`, `cli.ex`, `http_test.exs` und README. Gelöst mit dem Kanal
+  als Basis und `connectors_dir` in der Kanal-Map. Die Connector-Tools nutzen jetzt `Env.for_call(frame)`, damit
+  `session_id` auch in Connector-PDR landet. Ergebnis: Vermittler 113/113, komki_cli 170/170, credo ohne Befund.
 
 ## Phase 2: Integration
 
