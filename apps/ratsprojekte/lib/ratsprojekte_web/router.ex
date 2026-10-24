@@ -1,6 +1,9 @@
 defmodule RatsprojekteWeb.Router do
   use RatsprojekteWeb, :router
 
+  # CSP-Härtung ist bewusst nicht Teil von #150; der befristete Skip wird in #151
+  # durch eine getestete Policy ersetzt (LiveView/WebSocket brauchen Smoke-Tests).
+  # sobelow_skip ["Config.CSP"]
   pipeline :browser do
     plug(:accepts, ["html"])
     plug(:fetch_session)

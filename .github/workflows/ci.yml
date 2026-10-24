@@ -90,6 +90,13 @@ jobs:
       - name: Credo strict (alle Apps, ausser deklarierte Ausnahmen)
         run: mix workspace.run -t credo --exclude ratsprojekte -- --strict
 
+      # Sobelow fuer die Phoenix-App. Config: apps/ratsprojekte/.sobelow-conf.
+      # --threshold high begrenzt auf High-Confidence-Findings; der einzige
+      # Bestandsfund (Config.CSP) ist befristet in #151 dokumentiert.
+      - name: Sobelow (ratsprojekte)
+        working-directory: apps/ratsprojekte
+        run: mix sobelow --private --threshold high --exit
+
       # Tests ueber den Workspace, ohne --cover. Abweichung von AGENTS.md
       # ("-- --cover"): Mix' Default-Schwellwert fuer Coverage ist 90 %.
       # komki_policy liegt bei 87,6 %, aeltere Apps darunter. Ein
