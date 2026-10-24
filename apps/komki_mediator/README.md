@@ -37,11 +37,14 @@ als Bild:
   fehlt sie, verweigert `komki up` (Praesenz-Pflicht sitzt beim Start, nicht
   bei init — Entdeckung: PATH, dann `<base>/bin/komki-mediator`).
   `komki down` stoppt per pidfile mit Identitaetscheck, `komki doctor`
-  prueft die Binary, `komki run` und `komki session` verweigern frueh,
-  wenn der Vermittler unten ist.
+  prueft die Binary, `komki run` und `komki session` starten ihn (und
+  alles andere) selbst, wenn er unten ist.
 * Wer gibt ihm Daten? Drei Quellen. Erstens der Raum unter
   `<base>/mediator/` (`registry.json` mit Gamma, `room.json`, `documents/`)
-  — einmal beim Boot gelesen. Zweitens pi als einziger Client, per
+  — einmal beim Boot gelesen. Fehlen die Dateien, legt der Vermittler die
+  Vorlagen an; sind sie unveraenderte Vorlagen einer frueheren Fassung
+  (SHA-256), ersetzt er sie, veraenderte laesst er stehen und erklaert beim
+  Start den Konflikt (Ticket #177). Zweitens pi als einziger Client, per
   `POST /mcp` (MCP StreamableHTTP). pis MCP-Client kann keinen Unix-Socket;
   pi startet deshalb `komki-relay.js` (aus komki_cli) als stdio-MCP-Server,
   das jede JSON-RPC-Zeile als `POST /mcp` ueber den Socket schickt, mit
