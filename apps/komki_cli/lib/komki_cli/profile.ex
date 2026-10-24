@@ -8,9 +8,12 @@ defmodule KomkiCli.Profile do
   `docs/research/2026-10-04-probe-harness-sandbox.md` im Branch
   `research/probe-harness-sandbox`), parametrisiert auf:
 
-     * Ports — zwei Netz-Exceptions, denselben Typ: der llama-Port
+     * Netz — genau zwei Exceptions: der llama-Port
        `(allow network-outbound (remote tcp "localhost:<port>"))` und der
-       Vermittler-MCP-Port (Ticket #102) `…tcp "localhost:<mediator_port>"`
+       Vermittler-Socket (Ticket #143)
+       `(allow network-outbound (remote unix-socket (path-literal "<base>/run/mediator.sock")))`.
+       `komki-relay.js` liegt im pi-Home und ist ueber dessen Leseregel
+       abgedeckt.
     * pi-Home — isoliertes HOME (lesend/schreibend, inkl. Komponenten-Kette)
     * Scratch-Verzeichnis — die Write-Scope dieses Laufs (lesend/schreibend)
 
@@ -26,7 +29,7 @@ defmodule KomkiCli.Profile do
       Profil).
   """
 
-  alias KomkiCli.{Config, Llama, MachODeps}
+  alias KomkiCli.{Channel, Config, Llama, MachODeps}
   require Config
 
   @doc """
@@ -396,7 +399,6 @@ defmodule KomkiCli.Profile do
     pi_pkg = cli_js_pkg(cfg.cli_js)
     node_modules_root = Path.join([node_install, "lib", "node_modules"])
     port = to_string(cfg.port)
-    mediator_port = to_string(cfg.mediator_port)
 
     base_rules =
       basis_and_exec_rules(cfg, node, pi_launcher) ++
@@ -411,12 +413,13 @@ defmodule KomkiCli.Profile do
         )
 
     # Netz-Exceptions am Dateiende, deterministisch: llama zuerst, der
-    # Vermittler-MCP-Port (Ticket #102) danach — beide Loopback-spezifisch,
-    # kein Wildcard-Port (byte-stabil, vom Doctor-Check kontrolliert).
+    # Vermittler-Socket (Ticket #143) danach — kein Wildcard-Port, kein
+    # weiteres Ziel (byte-stabil, vom Doctor-Check kontrolliert).
     port_rule = "(allow network-outbound (remote tcp \"localhost:" <> port <> "\"))"
 
-    mediator_port_rule =
-      "(allow network-outbound (remote tcp \"localhost:" <> mediator_port <> "\"))"
+    mediator_socket_rule =
+      "(allow network-outbound (remote unix-socket (path-literal \"" <>
+        Channel.socket_path(cfg) <> "\")))"
 
     base_rules ++
       common_boot_rules() ++
@@ -424,7 +427,7 @@ defmodule KomkiCli.Profile do
       node_boot_rules(pi_pkg, node_modules_root, user_home) ++
       tui_rules() ++
       scope_rules(cfg, scratch) ++
-      [port_rule, mediator_port_rule]
+      [port_rule, mediator_socket_rule]
   end
 
   ## ---------------------------------------------------------------- TUI/Terminal-Klasse

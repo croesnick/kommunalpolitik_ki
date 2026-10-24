@@ -84,6 +84,36 @@ defmodule KomkiMediator.TestHelpers do
     %{gamma: gamma, room: room, journal: KomkiMediator.Journal, journal_path: journal_path}
   end
 
+  @doc """
+  Kurzer Socket-Pfad unter /tmp: macOS begrenzt Unix-Socket-Pfade auf 103
+  Byte, System.tmp_dir!/0 liegt dort tief unter /var/folders.
+  """
+  def tmp_socket do
+    "/tmp/kmt-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"
+  end
+
+  @doc "Zufaelliges Kanal-Token (64 Hex-Zeichen, wie komki up es schreibt)."
+  def new_token, do: Base.encode16(:crypto.strong_rand_bytes(32), case: :lower)
+
+  @doc """
+  Startet einen vollstaendigen Vermittler-Baum auf einem frischen Socket
+  (Besitz beim Test-Supervisor: start_supervised reisst den Baum mit jedem
+  Test deterministisch ab — benanntes Journal, Env, anubis-Registry, Socket).
+  """
+  def start_socket_server! do
+    base = provisioned_base()
+    {gamma, room} = load_room_env(base)
+    socket = tmp_socket()
+    token = new_token()
+    journal_path = Path.join([base, "mediator", "journal", "pdr.jsonl"])
+
+    ExUnit.Callbacks.start_supervised!(
+      {KomkiMediator.Supervisor, {journal_path, gamma, room, %{socket: socket, token: token}}}
+    )
+
+    %{base: base, socket: socket, token: token, journal_path: journal_path}
+  end
+
   def stop_named(module) do
     case Process.whereis(module) do
       nil -> :ok

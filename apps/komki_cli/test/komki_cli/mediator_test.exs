@@ -1,25 +1,32 @@
 defmodule KomkiCli.MediatorTest do
   @moduledoc """
   Hermetische Unit-Tests der Vermittler-Vertragsnaehe (Ticket #102):
-  mcp.json-Aufbau, Spawn-Zeile, healthz-Body-Parsen und vollstaendige
-  write_mcp_config. Kein echter Prozess wird gespawnt — der Lifecycle
+  mcp.json-Aufbau (stdio-Relay, Ticket #143), Spawn-Zeile, healthz ueber den
+  Unix-Socket und vollstaendige write_mcp_config. Kein echter Prozess wird gespawnt — der Lifecycle
   (up/down/status) ist wie Llama.up-Laeufe nicht in der Suite (echte
   Binaries, echte Ports).
   """
 
   use ExUnit.Case, async: true
 
-  alias KomkiCli.{Mediator, TestSupport}
+  alias KomkiCli.{Channel, Mediator, TestSupport}
 
-  describe "mcp_config_json/2 (Fassung-Pin auf pi-Seite)" do
-    test "Struktur: Server komki, url aus Port, exposure hidden, Fassung-Tools direct" do
-      mcp = Mediator.mcp_config_json(49_525, ["ping", "admit_document"])
+  describe "mcp_config_json/2 (stdio-Relay, Fassung-Pin auf pi-Seite)" do
+    test "Struktur: Server komki als stdio-Relay, env nur mit Verweisen, Fassung-Tools direct" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-mcp"))
+      mcp = Mediator.mcp_config_json(cfg, ["ping", "admit_document"])
 
       # Exakte Gleichheit: keine Extra-Keys, keine zusaetzlichen Server.
       assert mcp == %{
                "mcpServers" => %{
                  "komki" => %{
-                   "url" => "http://127.0.0.1:49525/mcp",
+                   "command" => cfg.node_bin,
+                   "args" => [Path.join([cfg.pi_home, ".pi", "agent", "komki-relay.js"])],
+                   "env" => %{
+                     "KOMKI_MEDIATOR_SOCKET" => Path.join([cfg.base_dir, "run", "mediator.sock"]),
+                     "KOMKI_MEDIATOR_TOKEN" => "${KOMKI_MEDIATOR_TOKEN}",
+                     "KOMKI_SESSION_ID" => "${KOMKI_SESSION_ID}"
+                   },
                    "exposure" => "hidden",
                    "toolExposure" => %{"ping" => "direct", "admit_document" => "direct"}
                  }
@@ -28,22 +35,29 @@ defmodule KomkiCli.MediatorTest do
     end
 
     test "Tool-Liste wird 1:1 abgebildet — jede Eingabe genau ein direct-Eintrag" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-mcp"))
       tools = ["a", "b", "c"]
-      exposure = Mediator.mcp_config_json(50_000, tools)["mcpServers"]["komki"]["toolExposure"]
+      exposure = Mediator.mcp_config_json(cfg, tools)["mcpServers"]["komki"]["toolExposure"]
 
       assert exposure == %{"a" => "direct", "b" => "direct", "c" => "direct"}
-      assert Map.keys(exposure) == tools
 
       # Leere Fassung: kein Tool frei, Server bleibt komplett hidden.
-      assert Mediator.mcp_config_json(50_000, [])["mcpServers"]["komki"]["toolExposure"] == %{}
+      assert Mediator.mcp_config_json(cfg, [])["mcpServers"]["komki"]["toolExposure"] == %{}
     end
 
-    test "kein Auth-/Header-Feld im Output (Zugangsdaten nur im Vermittler-Prozess)" do
-      komki = Mediator.mcp_config_json(49_525, ["ping"])["mcpServers"]["komki"]
+    test "kein Token, keine URL, kein Auth-/Header-Feld in der Datei" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-mcp"))
+      Channel.write_token!(cfg)
+      {:ok, token} = Channel.read_token(cfg)
 
-      refute Map.has_key?(komki, "headers")
-      refute Map.has_key?(komki, "auth")
-      refute Map.has_key?(komki, "bearerToken")
+      :ok = Mediator.write_mcp_config(cfg, ["ping"])
+      raw = File.read!(Path.join([cfg.pi_home, ".pi", "agent", "mcp.json"]))
+      refute raw =~ token
+
+      komki = Mediator.mcp_config_json(cfg, ["ping"])["mcpServers"]["komki"]
+
+      for key <- ["url", "headers", "auth", "bearerToken"],
+          do: refute(Map.has_key?(komki, key))
     end
   end
 
@@ -56,15 +70,12 @@ defmodule KomkiCli.MediatorTest do
       assert :ok = Mediator.write_mcp_config(cfg, tools)
 
       path = Path.join([cfg.pi_home, ".pi", "agent", "mcp.json"])
-      assert File.exists?(path)
-
-      assert JSON.decode!(File.read!(path)) ==
-               Mediator.mcp_config_json(cfg.mediator_port, tools)
+      assert JSON.decode!(File.read!(path)) == Mediator.mcp_config_json(cfg, tools)
     end
   end
 
   describe "spawn_line/1 (Spawn-Maschine, rein)" do
-    test "enthaelt Binary, --base, --port, Log-Umleitung und pid-Ausgabe" do
+    test "enthaelt Binary, --base, --socket, --token-file, Log-Umleitung und pid-Ausgabe" do
       base = TestSupport.tmp_area!("komki-med-spawn")
       cfg = %{TestSupport.fixture_cfg(base) | mediator_bin: "/opt/bin/komki-mediator"}
 
@@ -73,9 +84,22 @@ defmodule KomkiCli.MediatorTest do
       assert String.contains?(line, "nohup '/opt/bin/komki-mediator'")
       # basis im Spawn-Kontext kernel-kanonisch (Pfadform-Cave, config.ex)
       assert String.contains?(line, "--base '" <> cfg.base_dir <> "'")
-      assert String.contains?(line, "--port " <> to_string(cfg.mediator_port))
+      assert String.contains?(line, "--socket '" <> Channel.socket_path(cfg) <> "'")
+      assert String.contains?(line, "--token-file '" <> Channel.token_path(cfg) <> "'")
+      refute String.contains?(line, "--port")
       assert String.contains?(line, Path.join([base, "tmp", "mediator.log"]))
       assert String.ends_with?(line, "2>&1 & echo $!")
+    end
+
+    test "das Token selbst steht nie in der Spawn-Zeile" do
+      cfg = %{
+        TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-med-tok"))
+        | mediator_bin: "/opt/bin/komki-mediator"
+      }
+
+      Channel.write_token!(cfg)
+      {:ok, token} = Channel.read_token(cfg)
+      refute Mediator.spawn_line(cfg) =~ token
     end
 
     test "Pfad-Injection-sicher: Quote im Binary-Namen wird escaped" do
@@ -122,14 +146,13 @@ defmodule KomkiCli.MediatorTest do
     end
   end
 
-  describe "http_get/1 (echter Loopback-Socket — Smoke-Regression, Ticket #102)" do
+  describe "http_get/2 (echter Unix-Socket — Smoke-Regression, Tickets #102/#143)" do
     # Der erste reale up-Lauf starb in der recv-Schleife: der Akkumulator
     # wurde als Deadline weitergereicht (binary-Arithmetik) und der Body bei
     # Verbindungschluss weggeworfen. Dieser Test bedient healthz über einen
-    # echten Loopback-Listener — ohne echten Socket ware der Fehler
-    # unentdeckt geblieben (reine Funktionstests greifen nicht bis hierher).
+    # echten Unix-Socket-Listener und prueft zugleich die Anfrage-Header.
 
-    test "liefert Status UND vollstaendigen Body ueber die recv-Schleife" do
+    test "liefert Status UND vollstaendigen Body, sendet Host und Bearer-Token" do
       body =
         JSON.encode!(%{
           "status" => "ok",
@@ -142,8 +165,8 @@ defmodule KomkiCli.MediatorTest do
       resp =
         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n" <> body
 
-      {:ok, listen} = :gen_tcp.listen(0, [:binary, ip: {127, 0, 0, 1}, active: false, backlog: 1])
-      {:ok, port} = :inet.port(listen)
+      path = short_socket()
+      {:ok, listen} = :gen_tcp.listen(0, [:binary, ifaddr: {:local, path}, active: false])
 
       server =
         Task.async(fn ->
@@ -154,19 +177,26 @@ defmodule KomkiCli.MediatorTest do
           req
         end)
 
-      assert {:ok, "200", got} = Mediator.http_get(port)
+      token = String.duplicate("ab", 32)
+      assert {:ok, "200", got} = Mediator.http_get(path, token)
       assert got == body
 
       req = Task.await(server)
       assert String.starts_with?(req, "GET /healthz")
+      assert req =~ "\r\nHost: localhost\r\n"
+      assert req =~ "\r\nAuthorization: Bearer " <> token <> "\r\n"
 
       :gen_tcp.close(listen)
+      File.rm(path)
     end
 
-    test "kein Listener am Port: strukturierter Fehler statt Crash" do
-      # Port ohne Dienst: connect schlaegt fehl (kein rueckweisungsfreier
-      # Ephemeral-Port garantiert — der Fehlerfall ist der erwartete).
-      assert {:error, _reason} = Mediator.http_get(1)
+    test "kein Listener am Socket: strukturierter Fehler statt Crash" do
+      assert {:error, _reason} = Mediator.http_get(short_socket(), String.duplicate("ab", 32))
     end
+  end
+
+  # macOS begrenzt Unix-Socket-Pfade auf 103 Byte; System.tmp_dir!/0 ist dort tief.
+  defp short_socket do
+    "/tmp/kct-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"
   end
 end

@@ -1,20 +1,28 @@
 defmodule KomkiMediator.CLI do
   @moduledoc """
   Escript-Einstiegspunkt `komki-mediator`: stellt fehlende Aufstellung
-  bereit, laedt Gamma und Raum und startet Vermittlung + loopback-Listener.
+  bereit, laedt Gamma und Raum und startet Vermittlung + Socket-Listener.
 
-      komki-mediator --base <dir> --port <n>
+      komki-mediator --base <dir> [--socket <pfad>] [--token-file <pfad>]
       komki-mediator verify-journal [--base <dir>]
       komki-mediator --help
       komki-mediator --version
 
-  * `--base`    (Default: KOMKI_HOME oder ~/.local/share/komki)
-  * `--port`    (Default: 49525)
+  * `--base`       (Default: KOMKI_HOME oder ~/.local/share/komki)
+  * `--socket`     (Default: `<base>/run/mediator.sock`) — der einzige
+    Listener (Unix-Socket, Rechte 0600; Ticket #143, CONTRACT §8)
+  * `--token-file` (Default: `<base>/run/mediator.token`) — 64 Hex-Zeichen,
+    geschrieben von `komki up`. Fehlt die Datei oder ist sie ungueltig,
+    verweigert der Vermittler den Start (fail-closed). Das Token steht nie
+    in argv.
   * `--version` gibt die Fassung "komki-mediator/1" aus.
+
+  Bedient schon ein anderer Prozess den Socket, verweigert der Start; eine
+  verwaiste Socket-Datei wird ersetzt.
 
   Bei schlechten Argumenten oder Ladefehlern erscheint eine einzeilige
   JSON-Fehlermeldung auf stderr und Exit 1. Nach dem Start kommt eine
-  einzeilige Startnotiz (Port, Fassung, registry_id) auf stdout; danach
+  einzeilige Startnotiz (Socket, Fassung, registry_id) auf stdout; danach
   blockiert der Escript ewig (er stirbt, wenn die Hauptschleife
   zurueckkehren wuerde).
 
@@ -24,8 +32,6 @@ defmodule KomkiMediator.CLI do
   """
 
   alias KomkiMediator.{Gamma, Room}
-
-  @default_port 49_525
 
   def main(argv) do
     case parse(argv) do
@@ -82,21 +88,63 @@ defmodule KomkiMediator.CLI do
   # Start
   # -------------------------------------------------------------------------
 
-  defp run(%{base: base, port: port}) do
-    with :ok <- ensure_runtime_apps(),
+  defp run(%{base: base} = opts) do
+    socket = Map.get(opts, :socket) || Path.join([base, "run", "mediator.sock"])
+    token_file = Map.get(opts, :token_file) || Path.join([base, "run", "mediator.token"])
+
+    with {:ok, token} <- load_token(token_file),
+         :ok <- socket_free(socket),
+         :ok <- ensure_runtime_apps(),
          :ok <- provision(base),
          {:ok, gamma} <-
            tagged(Gamma.load(Path.join(mediator_dir(base), "registry.json")), "registry.json"),
          {:ok, room} <- tagged(Room.load(mediator_dir(base)), "room.json") do
       {:ok, _} =
         KomkiMediator.Supervisor.start_link(
-          {{journal_path(base), append_only: true}, gamma, room, port}
+          {{journal_path(base), append_only: true}, gamma, room, %{socket: socket, token: token}}
         )
 
-      IO.puts(startup_note(base, port, gamma))
+      IO.puts(startup_note(base, socket, gamma))
       Process.sleep(:infinity)
     else
       {:error, reason} -> error_exit(reason)
+    end
+  end
+
+  @doc """
+  Liest das Kanal-Token (Ticket #143): genau 64 Hex-Zeichen (klein), ein
+  abschliessender Zeilenumbruch ist erlaubt. Fehler nennen den Pfad, nie
+  den Inhalt.
+  """
+  @spec load_token(Path.t()) :: {:ok, String.t()} | {:error, map()}
+  def load_token(path) do
+    case File.read(path) do
+      {:ok, content} ->
+        token = String.trim_trailing(content, "\n")
+
+        if Regex.match?(~r/\A[0-9a-f]{64}\z/, token),
+          do: {:ok, token},
+          else: {:error, %{"error" => "token", "detail" => "ungueltiges Token in " <> path}}
+
+      {:error, reason} ->
+        {:error,
+         %{
+           "error" => "token",
+           "detail" => path <> ": " <> List.to_string(:file.format_error(reason))
+         }}
+    end
+  end
+
+  @doc "Verweigert, wenn ein anderer Prozess den Socket bedient; eine verwaiste Datei ist frei."
+  @spec socket_free(Path.t()) :: :ok | {:error, map()}
+  def socket_free(socket) do
+    case :gen_tcp.connect({:local, socket}, 0, [:binary, active: false], 1000) do
+      {:ok, conn} ->
+        :gen_tcp.close(conn)
+        {:error, %{"error" => "socket", "detail" => "bereits in Benutzung: " <> socket}}
+
+      {:error, _reason} ->
+        :ok
     end
   end
 
@@ -128,14 +176,14 @@ defmodule KomkiMediator.CLI do
   # -------------------------------------------------------------------------
 
   defp parse(["verify-journal" | rest]) do
-    case parse_flags(rest, %{base: default_base(), port: @default_port}) do
+    case parse_flags(rest, %{base: default_base()}) do
       {:run, opts} -> {:verify_journal, opts}
       other -> other
     end
   end
 
   defp parse(argv) do
-    parse_flags(argv, %{base: default_base(), port: @default_port})
+    parse_flags(argv, %{base: default_base()})
   end
 
   defp parse_flags(["--help" | _rest], _acc), do: :help
@@ -144,15 +192,11 @@ defmodule KomkiMediator.CLI do
   defp parse_flags(["--base", value | rest], acc),
     do: parse_flags(rest, Map.put(acc, :base, value))
 
-  defp parse_flags(["--port", value | rest], acc) do
-    case Integer.parse(value) do
-      {port, ""} when port > 0 and port <= 65_535 ->
-        parse_flags(rest, Map.put(acc, :port, port))
+  defp parse_flags(["--socket", value | rest], acc),
+    do: parse_flags(rest, Map.put(acc, :socket, value))
 
-      _ ->
-        {:error, "--port erwartet eine ganzzahlige Portnummer (1..65535), erhalten: " <> value}
-    end
-  end
+  defp parse_flags(["--token-file", value | rest], acc),
+    do: parse_flags(rest, Map.put(acc, :token_file, value))
 
   defp parse_flags([element | _rest], _acc),
     do: {:error, "unerwartetes Argument: " <> Kernel.inspect(element)}
@@ -171,10 +215,10 @@ defmodule KomkiMediator.CLI do
 
   defp journal_path(base), do: Path.join([mediator_dir(base), "journal", "pdr.jsonl"])
 
-  defp startup_note(base, port, gamma) do
+  defp startup_note(base, socket, gamma) do
     JSON.encode!(%{
       "base" => base,
-      "port" => port,
+      "socket" => socket,
       "fassung_id" => KomkiMediator.Fassung.fassung_id(),
       "registry_id" => gamma.registry_id
     })
@@ -209,7 +253,7 @@ defmodule KomkiMediator.CLI do
 
   defp usage do
     """
-    komki-mediator --base <dir> --port <n>
+    komki-mediator --base <dir> [--socket <pfad>] [--token-file <pfad>]
     komki-mediator verify-journal [--base <dir>]
     komki-mediator --help
     komki-mediator --version

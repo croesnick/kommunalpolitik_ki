@@ -435,7 +435,8 @@ defmodule KomkiMediator.Gate do
       "checked_label" => Map.get(opts, :checked_label),
       "remedies" => Map.get(opts, :remedies),
       "abrufdatum" => DateTime.to_iso8601(DateTime.utc_now()),
-      "fassung_id" => Fassung.fassung_id()
+      "fassung_id" => Fassung.fassung_id(),
+      "session_id" => Map.get(env, :session_id)
     }
   end
 
