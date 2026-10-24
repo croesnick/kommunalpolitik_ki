@@ -215,7 +215,7 @@ defmodule KomkiCli.Mediator do
         MediatorProfile.path(cfg),
         cfg.escript_bin,
         cfg.mediator_bin,
-        args,
+        KomkiCli.Roles.prefix(cfg, cfg.mediator_bin, "komki-mediator") ++ args,
         Channel.run_dir(cfg)
       )
 

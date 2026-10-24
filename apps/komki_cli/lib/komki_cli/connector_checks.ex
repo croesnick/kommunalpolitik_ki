@@ -32,14 +32,14 @@ defmodule KomkiCli.ConnectorChecks do
           else: %{
             name: "escript",
             ok: false,
-            reason: "missing: " <> bin <> " — 'komki init --force'"
+            reason: "missing: " <> bin <> " — 'komki setup' entdeckt neu"
           }
 
       nil ->
         %{
           name: "escript",
           ok: false,
-          reason: "Erlang-escript nicht entdeckt — Erlang installieren, 'komki init --force'"
+          reason: "Erlang-escript nicht entdeckt — Erlang installieren, 'komki setup'"
         }
     end
   end
@@ -96,7 +96,7 @@ defmodule KomkiCli.ConnectorChecks do
           else: %{
             name: name,
             ok: false,
-            reason: "missing: " <> path <> " — 'komki init --force' entdeckt neu"
+            reason: "missing: " <> path <> " — 'komki setup' entdeckt neu"
           }
     end)
   end
@@ -132,7 +132,8 @@ defmodule KomkiCli.ConnectorChecks do
         %{
           name: name,
           ok: false,
-          reason: "drift: regenerierter Profiltext weicht ab (init --force)"
+          reason:
+            "drift: regenerierter Profiltext weicht ab — nach einem Update 'komki setup'; bleibt sie, wurde das Profil veraendert"
         }
     end
   rescue

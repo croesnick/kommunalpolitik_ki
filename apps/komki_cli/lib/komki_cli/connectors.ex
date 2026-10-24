@@ -211,7 +211,7 @@ defmodule KomkiCli.Connectors do
   def missing_binary(name),
     do:
       name <>
-        " nicht gefunden — in PATH oder <base>/bin ablegen ('komki init --force' entdeckt neu)"
+        " nicht gefunden — in PATH oder <base>/bin ablegen ('komki setup' entdeckt neu)"
 
   # ===========================================================================
   # Profile
@@ -316,7 +316,9 @@ defmodule KomkiCli.Connectors do
         {:ok, {comp.name, {:already, pid}}}
 
       :none ->
-        line = spawn_line(cfg, profile, binary, args, comp.log)
+        # Multicall (Ticket #179): der Rollenname (= marker) vor den Argumenten
+        role = KomkiCli.Roles.prefix(cfg, binary, comp.marker)
+        line = spawn_line(cfg, profile, binary, role ++ args, comp.log)
 
         with {:ok, pid} <- Proc.spawn_detached(line, input, "/") do
           File.write!(comp.pidfile, Integer.to_string(pid) <> "\n")
@@ -342,7 +344,7 @@ defmodule KomkiCli.Connectors do
 
   defp escript!(_cfg),
     do:
-      raise(ArgumentError, "escript-Laufzeit nicht entdeckt (Erlang installieren, init --force)")
+      raise(ArgumentError, "escript-Laufzeit nicht entdeckt (Erlang installieren, 'komki setup')")
 
   defp await(comp, pid, ready) do
     deadline = System.monotonic_time(:millisecond) + @ready_timeout_ms

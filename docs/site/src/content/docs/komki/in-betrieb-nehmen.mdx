@@ -15,7 +15,7 @@ Du brauchst llama.cpp, node, das pi-Paket, Elixir und tmux. Fehlt etwas, nennt `
 
 1. ### komki bauen
 
-   Im Repo baut ein Befehl komki und seine Bausteine (Vermittler, Egress-Proxy, drei Connectoren) und legt sie ab. `komki` liegt danach in `~/.local/bin` und ist von überall aufrufbar.
+   Im Repo baut ein Befehl komki. Es ist ein einziges Programm: Vermittler, Egress-Proxy und die drei Connectoren stecken als Rollen darin und laufen trotzdem jeweils als eigener Prozess in ihrer eigenen Sandbox. `komki` liegt danach in `~/.local/bin` und ist von überall aufrufbar.
 
    ```sh
    cd ~/projects/kommunalpolitik_ki
@@ -24,9 +24,9 @@ Du brauchst llama.cpp, node, das pi-Paket, Elixir und tmux. Fehlt etwas, nennt `
    ```
 
    ```text frame="terminal" title="Das siehst du (Ende)"
-   Generated escript komki-connector-vault with MIX_ENV=dev
+   Generated escript komki with MIX_ENV=dev
 
-   komki gebaut: ~/.local/bin/komki, Bausteine unter ~/.local/share/komki/bin
+   komki gebaut: ~/.local/bin/komki
    Weiter mit: komki setup
    ```
 

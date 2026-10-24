@@ -99,7 +99,7 @@ Zwei Hinweise für die verteilte Datei:
 Von null bis zur ersten Recherche, im Repo-Root:
 
 ```sh
-make komki                     # baut komki und seine Bausteine, legt sie ab (~/.local/bin, ~/.local/share/komki/bin)
+make komki                     # baut komki (ein Programm, alle Rollen) und legt es nach ~/.local/bin
 komki setup                    # lädt beim ersten Mal das Modell (17 GB), fragt vorher
 komki run "Suche im RIS nach Bahnhofstraße und fasse die Treffer zusammen."
 komki session                  # interaktiv in tmux
@@ -108,7 +108,11 @@ komki down                     # alles stoppen
 ```
 
 `komki setup` prüft die Werkzeuge und nennt für jedes fehlende den
-Installationsbefehl. Es fragt nach dem Vault (Enter wählt den erfundenen
+Installationsbefehl. Vermittler, Egress-Proxy und Connectoren sind Rollen
+desselben Programms (`komki komki-mediator …`); jede läuft trotzdem als
+eigener Prozess unter ihrem eigenen Sandbox-Profil. Auf einer bestehenden
+Instanz frischt `setup` nach einem Update die Programmpfade und Profile auf
+und lässt alle Einstellungen stehen. Es fragt nach dem Vault (Enter wählt den erfundenen
 Test-Vault, `--demo` ohne Frage), legt die Instanz an, fragt den
 Brave-Key verdeckt ab, falls er im Schlüsselbund fehlt, startet alles und
 prüft mit dem Doctor. Ein zweiter Lauf ändert an einer bestehenden Instanz

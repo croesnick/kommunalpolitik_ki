@@ -14,9 +14,10 @@ defmodule KomkiCli.Application do
       deterministisch gegen `elixir start_cli`, das sonst argv beanspruchen
       und die VM anhalten wuerde (Burrito-Issue #229, offene Regression).
       Exit-Codes 0/2/3/4 reichen durch den Zig-Wrapper bis zur Shell.
-    * **Mix-Kontext** (dev/test, `Mix` geladen): die App startet als
+    * **Mix- und Escript-Kontext** (kein `__BURRITO`): die App startet als
       No-Op-Supervisor — `mix test`/`mix run` duerfen die VM nicht
-      anhalten; CLI-Laufe gehen dort direkt ueber `KomkiCli.CLI.main/1`.
+      anhalten, und das Escript ruft `KomkiCli.CLI.main/1` nach dem
+      App-Start selbst auf.
   """
 
   use Application
@@ -24,18 +25,19 @@ defmodule KomkiCli.Application do
   @impl Application
   @spec start(Application.start_type(), term()) :: {:ok, pid()} | {:error, term()}
   def start(_type, _args) do
-    if mix_context?() do
-      Supervisor.start_link([], strategy: :one_for_one)
-    else
+    # Nur die Burrito-Binary startet die CLI aus dem App-Start. Unter mix und
+    # im Escript ist der Start ein No-Op; das Escript ruft danach
+    # `KomkiCli.CLI.main/1` selbst auf. Wichtig fuer die Rollen (Ticket
+    # #179): ein Vermittler, der im App-Start liefe, blockierte den
+    # Application-Controller und damit seine eigenen Abhaengigkeiten.
+    if KomkiCli.Runtime.burrito?() do
       # VM-weites ANSI nach dem Burrito-TTY-Gate richten, bevor irgendwer
       # formatiert — auch Optimus' eigene Fehler-/Usage-Ausgaben folgen
       # sonst dem erzwungenen ansi_enabled (Pilot-Fund, Regression #234).
       KomkiCli.Runtime.sync_ansi!()
       KomkiCli.CLI.main(KomkiCli.Runtime.argv())
+    else
+      Supervisor.start_link([], strategy: :one_for_one)
     end
   end
-
-  # Mix ist in Releases nicht Teil des Payloads: geladenes Mix-Modul kennzeichnet
-  # den dev-/test-Kontext. Im Release ist Code.ensure_loaded?/1 fuer Mix false.
-  defp mix_context?, do: Code.ensure_loaded?(Mix)
 end

@@ -50,6 +50,8 @@ defmodule KomkiCli.Config do
                 :fd_bin,
                 :rg_bin,
                 :mediator_bin,
+                # Multicall-Programm (Ticket #179): komki selbst, wenn es alle Rollen traegt
+                :komki_bin,
                 # Connectoren und Egress (Ticket #146): Laufzeit, Binaries, Netz, Vault
                 :escript_bin,
                 :egress_bin,
@@ -73,6 +75,7 @@ defmodule KomkiCli.Config do
           fd_bin: String.t() | nil,
           rg_bin: String.t() | nil,
           mediator_bin: String.t() | nil,
+          komki_bin: String.t() | nil,
           sandbox_exec: String.t(),
           profile_path: String.t(),
           escript_bin: String.t() | nil,
@@ -197,11 +200,33 @@ defmodule KomkiCli.Config do
   """
   @spec resolve_escript_bin() :: String.t() | nil
   def resolve_escript_bin do
-    asdf_which("escript") ||
+    running_escript() || asdf_which("escript") ||
       case System.find_executable("escript") do
         nil -> nil
         path -> if String.contains?(path, "/.asdf/shims/"), do: nil, else: canonical(path)
       end
+  end
+
+  @doc """
+  komki selbst als Multicall-Programm (Ticket #179): der kanonische Pfad
+  des laufenden Escripts bzw. der Burrito-Binary, wenn deren Dateiname mit
+  `komki` beginnt. Unter `mix` (Tests, `mix run`) ist das laufende Skript
+  `mix`; dann nil, und die Bausteine werden wie bisher einzeln gesucht.
+  """
+  @spec self_komki() :: String.t() | nil
+  def self_komki do
+    path = KomkiCli.Runtime.self_path()
+    if String.starts_with?(Path.basename(path), "komki"), do: canonical(path), else: nil
+  rescue
+    _ -> nil
+  end
+
+  # Die Laufzeit, auf der komki selbst laeuft (Ticket #179): Rollen starten
+  # auf derselben Erlang-Installation, auch wenn sie nicht im PATH liegt
+  # (etwa Homebrews keg-only `erlang@28`).
+  defp running_escript do
+    candidate = Path.join([to_string(:code.root_dir()), "bin", "escript"])
+    if File.exists?(candidate), do: canonical(candidate), else: nil
   end
 
   @doc "Erlang-Wurzel zu einem `escript`-Pfad (`<root>/bin/escript`)."
@@ -355,6 +380,7 @@ defmodule KomkiCli.Config do
   def defaults(base_dir, opts \\ []) when is_binary(base_dir) and is_list(opts) do
     base = canonical(base_dir)
     node_bin = resolve_node_bin()
+    komki = Keyword.get_lazy(opts, :komki_bin, &self_komki/0)
 
     %__MODULE__{
       base_dir: base,
@@ -368,13 +394,17 @@ defmodule KomkiCli.Config do
       llama_server_bin: resolve_llama_server(),
       fd_bin: resolve_optional_tool("fd"),
       rg_bin: resolve_optional_tool("rg"),
-      mediator_bin: resolve_mediator_bin(base),
+      mediator_bin: komki || resolve_mediator_bin(base),
+      komki_bin: komki,
       sandbox_exec: canonical(@default_sandbox_exec),
       profile_path: Path.join([base, "profile", "komki.sb"]),
       escript_bin: resolve_escript_bin(),
-      egress_bin: resolve_escript("komki-egress", base),
+      egress_bin: komki || resolve_escript("komki-egress", base),
       connector_bins:
-        Map.new(KomkiConnector.Manifest.all(), &{&1.id, resolve_escript(&1.binary, base)}),
+        Map.new(
+          KomkiConnector.Manifest.all(),
+          &{&1.id, komki || resolve_escript(&1.binary, base)}
+        ),
       egress_ports: @default_egress_ports,
       ris_base_url: opts[:ris_base_url] || @default_ris_base_url,
       ris_mock_port: opts[:ris_mock_port],
@@ -456,6 +486,7 @@ defmodule KomkiCli.Config do
     :fd_bin,
     :rg_bin,
     :mediator_bin,
+    :komki_bin,
     :escript_bin,
     :egress_bin,
     :connector_bins,
@@ -497,6 +528,7 @@ defmodule KomkiCli.Config do
       fd_bin: Map.get(map, "fd_bin"),
       rg_bin: Map.get(map, "rg_bin"),
       mediator_bin: Map.get(map, "mediator_bin"),
+      komki_bin: Map.get(map, "komki_bin"),
       sandbox_exec: map["sandbox_exec"],
       profile_path: map["profile_path"],
       # Ticket #146: aeltere Instanzen ohne diese Felder laden mit Defaults;

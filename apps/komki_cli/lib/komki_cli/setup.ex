@@ -87,12 +87,34 @@ defmodule KomkiCli.Setup do
 
   defp instance(base, opts, ui) do
     if File.exists?(Config.config_path(base)) do
-      ui.say.("Instanz     vorhanden: " <> base <> " (bleibt unveraendert)")
-      :ok
+      existing_instance(base, ui)
     else
       with {:ok, vault_dir} <- vault(base, opts, ui) do
         create_instance(base, vault_dir, opts, ui)
       end
+    end
+  end
+
+  # Bestehende Instanz: Einstellungen bleiben, nur Programmpfade werden nach
+  # einem Update aufgefrischt (Ticket #179).
+  defp existing_instance(base, ui) do
+    case Steps.refresh_instance() do
+      :unchanged ->
+        ui.say.("Instanz     vorhanden: " <> base <> " (unveraendert)")
+        :ok
+
+      {:refreshed, fields} ->
+        ui.say.(
+          "Instanz     vorhanden: " <>
+            base <>
+            "; Programmpfade aufgefrischt (" <>
+            Enum.join(fields, ", ") <> "), Profile neu geschrieben"
+        )
+
+        :ok
+
+      {:error, _reason, _code} = error ->
+        error
     end
   end
 

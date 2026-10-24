@@ -67,6 +67,22 @@ defmodule KomkiCli.CLI do
   @doc false
   @spec main([binary()]) :: no_return()
   def main(argv) do
+    # Multicall (Ticket #179): `komki komki-mediator ...` usw. startet die
+    # Rolle; deren Einstieg blockiert und beendet die VM selbst.
+    case KomkiCli.Roles.dispatch(argv) do
+      {module, rest} ->
+        # Kehrt eine Rolle zurueck (etwa `--help`), endet das Programm wie
+        # ein eigenstaendiges Escript mit Exit 0.
+        module.main(rest)
+        halt(0)
+
+      nil ->
+        main_cli(argv)
+    end
+  end
+
+  @spec main_cli([binary()]) :: no_return()
+  defp main_cli(argv) do
     # NIF-Bootstrap (Muster aus ratsinfo/lib/ratsinfo/cli.ex, Ticket #91):
     # Im Escript-Kontext sind NIF-priv-Verzeichnisse gezippt und koennen
     # von dort nicht dlopen-geladen werden; daher das physische

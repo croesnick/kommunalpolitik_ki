@@ -116,5 +116,5 @@ defmodule KomkiCli.MediatorProfile do
   defp mediator_bin!(%Config{mediator_bin: bin}) when is_binary(bin), do: bin
 
   defp mediator_bin!(_cfg),
-    do: raise(ArgumentError, "komki-mediator nicht entdeckt (mix escript.build, init --force)")
+    do: raise(ArgumentError, "komki-mediator nicht entdeckt ('make komki', dann 'komki setup')")
 end

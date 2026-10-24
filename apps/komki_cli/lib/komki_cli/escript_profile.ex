@@ -31,7 +31,7 @@ defmodule KomkiCli.EscriptProfile do
 
   def erlang_root!(%Config{}),
     do:
-      raise(ArgumentError, "escript-Laufzeit nicht entdeckt (Erlang installieren, init --force)")
+      raise(ArgumentError, "escript-Laufzeit nicht entdeckt (Erlang installieren, 'komki setup')")
 
   @doc "Regeln zu einem Profiltext verbinden (ein finales Newline, Duplikate entfernt)."
   @spec render([String.t()]) :: String.t()

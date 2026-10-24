@@ -129,6 +129,51 @@ defmodule KomkiCli.Steps do
 
   # Ticket #146/#137: Vermittler-, Egress- und Connector-Profile. Fehlt ein
   # Binary, bleibt sein Profil ungeschrieben; der Doctor meldet es.
+  @doc """
+  Frischt eine bestehende Instanz nach einem Update auf (Ticket #179,
+  `komki setup`): Programmpfade (komki und seine Rollen, Erlang-Laufzeit,
+  node, pi, llama-server, fd, rg) neu entdecken und, nur wenn sich einer
+  geaendert hat, config.json und alle Sandbox-Profile neu schreiben. Ohne
+  Pfadaenderung bleibt alles unberuehrt; eine Profil-Abweichung ist dann
+  ein Befund fuer den Doctor, kein Anlass zum Ueberschreiben.
+  """
+  @spec refresh_instance() :: :unchanged | {:refreshed, [String.t()]} | {:error, String.t(), 2}
+  def refresh_instance do
+    cfg = load_cfg!()
+    fresh = Config.defaults(cfg.base_dir)
+
+    fields =
+      [:komki_bin, :mediator_bin, :egress_bin, :connector_bins, :escript_bin] ++
+        [:node_bin, :cli_js, :llama_server_bin, :fd_bin, :rg_bin]
+
+    # Nur entdeckte Werte uebernehmen; fehlt ein Werkzeug gerade, bleibt
+    # der gepinnte Pfad stehen (der Doctor meldet es).
+    changes =
+      for field <- fields,
+          value = Map.fetch!(fresh, field),
+          value not in [nil, %{}],
+          value != Map.fetch!(cfg, field),
+          do: {field, value}
+
+    if changes == [] do
+      :unchanged
+    else
+      updated = struct!(cfg, changes)
+      Config.save(updated)
+
+      Profile.write!(
+        updated.profile_path,
+        Profile.generate(updated, Profile.check_scratch(updated))
+      )
+
+      Profile.write!(Llama.llama_profile_path(updated), Profile.generate_llama(updated))
+      write_sandbox_profiles(updated)
+      {:refreshed, Enum.map(changes, fn {field, _} -> Atom.to_string(field) end)}
+    end
+  rescue
+    e -> {:error, "Auffrischen fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
   defp write_sandbox_profiles(cfg) do
     for {_name, path, generate} <- ConnectorChecks.profiles(cfg) do
       try do
@@ -439,7 +484,7 @@ defmodule KomkiCli.Steps do
             %{
               name: name,
               ok: false,
-              reason: "missing: " <> path <> " — 'komki init --force' entdeckt neu"
+              reason: "missing: " <> path <> " — 'komki setup' entdeckt neu"
             }
         end
       end)
@@ -456,8 +501,7 @@ defmodule KomkiCli.Steps do
         %{
           name: "komki-mediator",
           ok: false,
-          reason:
-            "komki-mediator nicht entdeckt — init --force oder mix escript.build in apps/komki_mediator"
+          reason: "komki-mediator nicht entdeckt — 'make komki', dann 'komki setup'"
         }
 
       File.exists?(cfg.mediator_bin) ->
@@ -467,7 +511,7 @@ defmodule KomkiCli.Steps do
         %{
           name: "komki-mediator",
           ok: false,
-          reason: "missing: " <> cfg.mediator_bin <> " — 'komki init --force' entdeckt neu"
+          reason: "missing: " <> cfg.mediator_bin <> " — 'komki setup' entdeckt neu"
         }
     end
   end
@@ -556,7 +600,7 @@ defmodule KomkiCli.Steps do
       "profile",
       cfg.profile_path,
       Profile.generate(cfg, Profile.check_scratch(cfg)),
-      "drift: regenerierter Profilttext weicht ab (init --force)"
+      "drift: regenerierter Profilttext weicht ab — nach einem Update 'komki setup'; bleibt sie, wurde das Profil veraendert"
     )
   end
 
@@ -566,7 +610,7 @@ defmodule KomkiCli.Steps do
       "llama profile",
       Llama.llama_profile_path(cfg),
       Profile.generate_llama(cfg),
-      "drift: regenerierter llama-Profiltext weicht ab (init --force)"
+      "drift: regenerierter llama-Profiltext weicht ab — nach einem Update 'komki setup'; bleibt sie, wurde das Profil veraendert"
     )
   end
 
@@ -806,8 +850,7 @@ defmodule KomkiCli.Steps do
 
     cond do
       not is_binary(cfg.mediator_bin) ->
-        {:error,
-         "komki-mediator nicht gefunden — 'make komki' im Repo, dann 'komki init --force'", 2}
+        {:error, "komki-mediator nicht gefunden — 'make komki' im Repo, dann 'komki setup'", 2}
 
       not is_binary(cfg.escript_bin) ->
         {:error, "Erlang-escript nicht gefunden (config.json: escript_bin)", 2}
@@ -816,7 +859,9 @@ defmodule KomkiCli.Steps do
         {out, code} =
           System.cmd(
             cfg.escript_bin,
-            [cfg.mediator_bin, "verify-journal", "--base", cfg.base_dir],
+            [cfg.mediator_bin] ++
+              KomkiCli.Roles.prefix(cfg, cfg.mediator_bin, "komki-mediator") ++
+              ["verify-journal", "--base", cfg.base_dir],
             stderr_to_stdout: true
           )
 
@@ -845,11 +890,11 @@ defmodule KomkiCli.Steps do
       not is_binary(cfg.mediator_bin) ->
         {:error,
          "komki-mediator nicht gefunden — mix escript.build in apps/komki_mediator" <>
-           " oder in PATH/<base>/bin ablegen ('komki init --force' entdeckt neu)"}
+           " oder in PATH/<base>/bin ablegen ('komki setup' entdeckt neu)"}
 
       # Ticket #137: der Vermittler startet unter seinem Profil ueber escript
       not is_binary(cfg.escript_bin) ->
-        {:error, "Erlang-escript nicht entdeckt — Erlang installieren, 'komki init --force'"}
+        {:error, "Erlang-escript nicht entdeckt — Erlang installieren, 'komki setup'"}
 
       true ->
         Mediator.up(cfg)

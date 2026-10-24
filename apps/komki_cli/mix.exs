@@ -92,6 +92,14 @@ defmodule KomkiCli.MixProject do
       # Start-Argumente und der ping im Doctor lesen dasselbe Modul wie der
       # Vermittler (CONTRACT.md §5).
       {:komki_connector, path: "../komki_connector"},
+      # Multicall (Ticket #179): Vermittler, Egress-Proxy und Connectoren als
+      # Rollen desselben Programms (`komki komki-mediator ...`). Die Apps
+      # bleiben im Workspace getrennt; gebuendelt wird nur hier.
+      {:komki_mediator, path: "../komki_mediator"},
+      {:komki_egress, path: "../komki_egress"},
+      {:komki_connector_ris, path: "../komki_connector_ris"},
+      {:komki_connector_web, path: "../komki_connector_web"},
+      {:komki_connector_vault, path: "../komki_connector_vault"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]

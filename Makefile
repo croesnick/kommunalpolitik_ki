@@ -13,21 +13,15 @@ install:
 	@echo "Falls der Symlink-Rechte fehlt: sudo make install"
 	@echo "Alternative ohne sudo: ln -sf $(PWD)/apps/ratsinfo/ratsinfo ~/.local/bin/ratsinfo"
 
-# komki und seine Bausteine bauen und ablegen (Ticket #176), bis das
-# Multicall-Release (Ticket #179) sie zu einem Programm macht:
-# komki -> ~/.local/bin (Symlink), Vermittler/Egress/Connectoren -> $(KOMKI_HOME)/bin.
-KOMKI_HOME ?= $(HOME)/.local/share/komki
+# komki bauen und in den PATH legen (Tickets #176, #179): ein Programm, das
+# Vermittler, Egress-Proxy und Connectoren als Rollen enthaelt.
 KOMKI_LINK_DIR ?= $(HOME)/.local/bin
-KOMKI_APPS := komki_cli komki_mediator komki_egress komki_connector_ris komki_connector_web komki_connector_vault
 komki:
-	@for app in $(KOMKI_APPS); do (cd apps/$$app && mix deps.get >/dev/null && mix escript.build) || exit 1; done
-	@mkdir -p "$(KOMKI_HOME)/bin" "$(KOMKI_LINK_DIR)"
-	@cp apps/komki_mediator/komki-mediator apps/komki_egress/komki-egress \
-	   apps/komki_connector_ris/komki-connector-ris apps/komki_connector_web/komki-connector-web \
-	   apps/komki_connector_vault/komki-connector-vault "$(KOMKI_HOME)/bin/"
+	@cd apps/komki_cli && mix deps.get >/dev/null && mix escript.build
+	@mkdir -p "$(KOMKI_LINK_DIR)"
 	@ln -sf "$(PWD)/apps/komki_cli/komki" "$(KOMKI_LINK_DIR)/komki"
 	@echo ""
-	@echo "komki gebaut: $(KOMKI_LINK_DIR)/komki, Bausteine unter $(KOMKI_HOME)/bin"
+	@echo "komki gebaut: $(KOMKI_LINK_DIR)/komki"
 	@echo "Weiter mit: komki setup"
 
 deps:
