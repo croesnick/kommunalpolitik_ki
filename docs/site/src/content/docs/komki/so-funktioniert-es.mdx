@@ -1,0 +1,55 @@
+---
+title: So funktioniert komki
+description: Agent, Vermittler, Connectoren und Räume, kurz hergeleitet.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Architektur from '../../../assets/architektur.svg';
+import Anfrage from '../../../assets/anfrage.svg';
+
+Ein KI-Agent, der recherchieren darf, ist praktisch. Gefährlich wird er, wenn drei Dinge zusammenkommen: Er kennt private Daten, er liest fremde Inhalte, und er hat einen Weg nach draußen. Dann reicht ein präparierter Text auf einer Webseite, und der Agent trägt deine Notizen hinaus. komki ist so gebaut, dass diese Kombination nicht entstehen kann.
+
+## Das Bild im Kopf
+
+<div class="komki-figure"><Architektur /></div>
+
+Jeder gestrichelte Kasten ist eine eigene Sandbox, beschriftet mit ihrem Profil. Pfeile zeigen die einzigen erlaubten Wege. Gestartet werden alle Prozesse von `komki up`.
+
+- **pi** ist der Agent. Er läuft mit einem lokalen Sprachmodell (gemma) in einer macOS-Sandbox, die ihm fast alles verbietet: kein Internet, kein Zugriff auf deine Dateien, keine fremden Prozesse. Er erreicht genau zwei Dinge: das Sprachmodell und den Vermittler.
+- **Der Vermittler** ist die einzige Tür nach draußen. Er selbst hat kein Internet. Er entscheidet jede Anfrage und schreibt jede Entscheidung ins Journal.
+- **Die Connectoren** für RIS, Websuche und Vault sind eigene kleine Programme, jedes in seiner eigenen Sandbox, mit genau den Rechten, die es braucht. Der Brave-Key liegt nur beim Web-Connector.
+- **Der Egress-Proxy** ist der einzige Prozess, der ins Internet darf, und auch er nur zu freigegebenen Adressen, je Connector getrennt.
+
+Drei Regeln halten das zusammen:
+
+1. **Feste Fragen statt freier Befehle.** Ein Connector bietet nur eng gefasste Operationen an, etwa „suche im RIS nach Text“. Kein Tool nimmt eine beliebige URL, einen Pfad oder einen Shell-Befehl entgegen.
+2. **Schlüssel bleiben beim Connector.** Der Brave-Key liegt im macOS-Schlüsselbund und geht beim Start nur an den Web-Connector. pi sieht ihn nie.
+3. **Hin und zurück wird geprüft.** Die Anfrage ist eine Ausgabe, die Antwort ein neuer Eingang. Beides entscheidet ein Regelwerk, und jede Entscheidung landet im Journal.
+
+## Was bei einer Anfrage passiert
+
+Angenommen, pi möchte im Web nach „Förderung Radwege Bayern“ suchen. Der Vermittler stellt dafür zwei Fragen an das Regelwerk:
+
+<div class="komki-figure"><Anfrage /></div>
+
+Gate 1 heißt technisch `emit` (eine Ausgabe erzeugen), Gate 2 `admit` (einen Eingang aufnehmen).
+
+- **Gate 1:** Wer würde die Anfrage sehen? Bei der Websuche ist das Brave. Ist Brave ein zulässiger Empfänger für alles, was gerade im Raum liegt? Wenn nein, ist hier Schluss, und es entsteht keine einzige Netzverbindung.
+- **Beleg vor der Wirkung:** Erst wenn der Beleg zu Gate 1 im Journal steht, ruft der Vermittler den Connector.
+- **Gate 2:** Die Antwort bekommt ein Label, etwa `web-oeffentlich@1`. Das Label vergibt der Vermittler nach festen Regeln, nicht der Connector. Passt das Label nicht zum Raum, kommt der Inhalt nicht bei pi an.
+
+## Räume: was zusammenkommen darf
+
+Ein **Raum** legt fest, welche Arten von Daten in einer Sitzung zusammenkommen dürfen. komki kennt zwei:
+
+| Darf pi … | Raum `recherche` (Standard) | Raum `vertraulich` |
+|---|---|---|
+| im RIS suchen | <span class="ja">ja</span> | <span class="nein">nein</span> |
+| im Web suchen | <span class="ja">ja</span> | <span class="nein">nein</span> |
+| öffentliche Notizen lesen | <span class="ja">ja</span> | <span class="ja">ja</span> |
+| vertrauliche Notizen lesen | <span class="nein">nein, sie sind unsichtbar</span> | <span class="ja">ja</span> |
+| Notizen in `komki-test/` schreiben | <span class="ja">ja</span> | <span class="ja">ja, mit vertraulichem Label</span> |
+
+<Aside type="tip" title="Warum das wirkt">
+Im Raum „vertraulich“ fehlt jeder Weg nach draußen. Selbst ein Agent, der vollständig von einem Angreifer gesteuert würde, kann vertrauliche Inhalte dort nicht weitergeben. Im Raum „recherche“ ist der Weg nach draußen offen, dafür kommt der Agent gar nicht erst an Vertrauliches. Das kannst du [selbst ausprobieren](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
+</Aside>

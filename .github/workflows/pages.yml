@@ -1,36 +1,68 @@
-# Veroeffentlicht docs/site/ unveraendert auf GitHub Pages (kein Build-Schritt).
-# Die Seiten sind eigenstaendige HTML-Dateien; ob spaeter ein Renderer dazukommt,
-# klaert docs/research/2026-10-24-doku-site-und-bildband.md.
-# Voraussetzung: Pages ist in den Repo-Einstellungen auf "GitHub Actions" gestellt.
+# Doku-Site „komki“ (Astro Starlight unter docs/site/): baut in jedem Pull
+# Request (Pruefung), veroeffentlicht bei jedem Push auf main ueber GitHub Pages.
+# Node-Version zentral aus .tool-versions (wie die Python-Version in python.yml).
+# Voraussetzung fuer den Deploy: Pages steht in den Repo-Einstellungen auf
+# "GitHub Actions".
 
 name: Pages
 
 on:
   push:
     branches: [main]
-    paths: ['docs/site/**', '.github/workflows/pages.yml']
+    paths: ['docs/site/**', '.github/workflows/pages.yml', '.tool-versions']
+  pull_request:
+    paths: ['docs/site/**', '.github/workflows/pages.yml', '.tool-versions']
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/site
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Node-Version aus .tool-versions lesen
+        id: node
+        working-directory: .
+        run: |
+          version="$(awk '$1 == "nodejs" { print $2; exit }' .tool-versions)"
+          if [ -z "$version" ]; then
+            >&2 echo "Keine nodejs-Zeile in .tool-versions gefunden."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          cache: npm
+          cache-dependency-path: docs/site/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        if: github.event_name != 'pull_request'
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: github.event_name != 'pull_request'
+        with:
+          path: docs/site/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: docs/site
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

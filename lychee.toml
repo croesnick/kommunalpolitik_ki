@@ -18,3 +18,8 @@ extensions = ["md"]
 # auflösen, statt sie als Fehler zu werten. Relative Pfade sind seit
 # lychee v0.23 erlaubt.
 root_dir = "."
+
+# Doku-Site (Astro Starlight): Abhaengigkeiten und Build-Ausgabe sind keine
+# Repo-Doku. Die Seiten selbst sind .mdx und fallen ohnehin nicht unter
+# extensions = ["md"].
+exclude_path = ["docs/site/node_modules", "docs/site/dist", "docs/site/.astro"]

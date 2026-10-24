@@ -327,3 +327,11 @@ Alle abgerufen am 2026-10-24.
   <https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site>
 - LG München I, Urteil vom 20.01.2022, Az. 3 O 17493/20 (Google Fonts), Besprechung:
   <https://www.ra-plutte.de/lg-muenchen-dynamische-einbindung-google-web-fonts-ist-dsgvo/>
+
+## Nachtrag 2026-10-24: Entscheidung
+
+Die nutzende Person hat entschieden, Astro Starlight **sofort** einzusetzen statt erst ab etwa 8 bis 10 Seiten:
+Ab dem ersten Tag sollen Aktualität, Lesbarkeit und Pflege leichtfallen. Umsetzung unter `docs/site/`
+(Starlight 0.42.7, Astro 7.4.2), veröffentlicht über `.github/workflows/pages.yml`. Die Seiten sind `.mdx`,
+Diagramme sind inline eingebundene SVGs mit Theme-Farben, externe Schriften gibt es keine.
+
