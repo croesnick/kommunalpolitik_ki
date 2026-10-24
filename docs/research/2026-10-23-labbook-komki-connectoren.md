@@ -461,6 +461,19 @@ Ergebnis im Handbuch, Abschnitt 11: Die Kernaussagen (§1, §6a.1, §7.2) sind u
 einzeln begründet; neues Ticket #169 (`admit_document` als eigener Prozess). Die offene Codemode-Frage (§10.3)
 ist geklärt: Die `--tools`-Allowlist macht Codemode in komki-Läufen unerreichbar.
 
+### L-111 Linux-CI (2026-10-24)
+
+- **Befund:** Der Elixir-Workflow scheiterte auf Ubuntu in vier Apps; auf macOS war alles grün.
+  - `/etc/ssl/cert.pem` existiert nur auf macOS (Ubuntu: `/etc/ssl/certs/ca-certificates.crt`). RIS- und
+    Web-Tests brachen beim Lesen der CA-Zertifikate ab.
+  - stdin-Übergabe der Credentials: POSIX gibt einem `&`-Job in einer nicht-interaktiven Shell `/dev/null` als
+    stdin, bevor explizite Umleitungen greifen. `0<&0` duplizierte unter dash nur `/dev/null`; macOS
+    (`/bin/sh` = bash) ist nachsichtiger, deshalb blieb es lokal unentdeckt.
+  - Ein Egress-Test las globales stderr und bekam unter Linux eine zweite Logzeile eines parallelen Tests.
+- **Fix:** `KomkiConnector.TLS` nimmt das erste vorhandene Bündel je Plattform; `spawn_line` sichert stdin auf
+  fd 3 (`exec 3<&0; … 0<&3 3<&- &`), lokal mit dash nachgeprüft; der Egress-Test sucht seine eigene Zeile.
+  Commit 75843a0; danach CI, Pages, docs-links und python grün.
+
 ## Erkenntnisse und offene Punkte
 
 **Was trägt:**
