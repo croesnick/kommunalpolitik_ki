@@ -167,3 +167,11 @@ Alle drei offenen Fragen hat der Nutzer am 24.10.2026 mit Ja beantwortet:
 1. **Download durch komki: ja.** `komki setup` darf das gepinnte Modell selbst laden, mit Prüfsumme und Hinweis auf die Nutzungsbedingungen. Die Regel „komki lädt nichts herunter“ entfällt für genau diesen Pin.
 2. **Homebrew-Tap: ja.** Eigenes Tap-Repo unter `croesnick` als erster öffentlicher Verteilweg.
 3. **Multicall: ja.** Ein gebündeltes Programm mit Rollen; die Apps bleiben im Workspace getrennt, gebündelt wird nur beim Verpacken.
+
+## 9. Nachtrag: Umsetzung (25.10.2026)
+
+Umgesetzt mit PR #184. Wo die Umsetzung vom Plan abweicht:
+
+- **Tap nur lokal.** Statt eines öffentlichen Repos `homebrew-komki` gibt es vorerst den rein lokalen Tap `croesnick/tap` (`make komki-tap`), um schnell iterieren zu können. Installiert wird mit `brew install croesnick/tap/komki`; veröffentlicht wird erst nach Prüfung und ausdrücklichem GO (AGENTS.md §8).
+- **pi fertig im Paket statt per npm in der Formel.** `make komki-paket` installiert pi mit pnpm nach `packaging/pi/pnpm-lock.yaml` (frozen, ohne Installationsskripte). Damit sind auch alle Abhängigkeiten von pi gepinnt, und die Formel lädt bei der Installation nichts aus der npm-Registry. Plain npm wird im Repo nicht mehr empfohlen.
+- **Seite „In Betrieb nehmen“** richtet sich an technisch versierte Ratskolleginnen und -kollegen. Bis zur Veröffentlichung beschreibt sie den Bau aus dem Repo; der Homebrew-Weg folgt mit dem öffentlichen Tap.
