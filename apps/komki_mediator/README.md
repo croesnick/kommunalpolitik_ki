@@ -53,7 +53,9 @@ als Bild:
   `komki up` aus der healthz-Antwort: Server `komki` (command = node, args =
   Relay), exposure `hidden`, genau die Fassung-Tools `direct`, Token und
   Session-ID nur als `${…}`-Verweis auf pis Umgebung. pi laeuft mit
-  `--no-extensions -e builtin:mcp`; sein Seatbelt-Profil erlaubt
+  `--no-extensions -e builtin:mcp` und ohne eigene Werkzeuge
+  (`--no-builtin-tools --tools 'mcp__komki__*'`, Ticket #104): jeder
+  Datei- und Netzweg laeuft durch Gate 1 und Gate 2. Sein Seatbelt-Profil erlaubt
   Netz-Auswaerts nur zum llama-Port und zum Socket-Pfad des Vermittlers.
   Auf pi-Seite heissen die Tools `mcp__komki__<tool>`.
   Drittens die Connectoren (RIS, Web, Vault): je ein eigener Prozess mit

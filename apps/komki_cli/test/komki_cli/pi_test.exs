@@ -40,9 +40,10 @@ defmodule KomkiCli.PiTest do
       idx = Enum.find_index(argv, &(&1 == "--no-extensions"))
       assert Enum.slice(argv, idx, 3) == ["--no-extensions", "-e", "builtin:mcp"]
 
-      # Tools-Allowlist: write plus die Vermittler-Tools (Ticket #133)
+      # Gate 2 (Ticket #104): keine Built-ins, nur die Vermittler-Tools
+      assert "--no-builtin-tools" in argv
       idx_tools = Enum.find_index(argv, &(&1 == "--tools"))
-      assert Enum.at(argv, idx_tools + 1) == "write,mcp__komki__*"
+      assert Enum.at(argv, idx_tools + 1) == "mcp__komki__*"
     end
   end
 
@@ -151,16 +152,12 @@ defmodule KomkiCli.PiTest do
       assert String.contains?(prompt, "kommunalpolitische")
     end
 
-    test "Tool-Allowlist: ls immer, find/grep nur mit entdeckter Binary", %{cfg: cfg} do
+    test "Gate 2 (Ticket #104): Built-ins aus, nur die Vermittler-Tools", %{cfg: cfg} do
       argv = Pi.argv_session(cfg, false)
 
+      assert "--no-builtin-tools" in argv
       idx = Enum.find_index(argv, &(&1 == "--tools"))
-      assert Enum.at(argv, idx + 1) == "read,write,ls,find,grep,mcp__komki__*"
-
-      bare = Pi.argv_session(%{cfg | fd_bin: nil, rg_bin: nil}, false)
-
-      idx_bare = Enum.find_index(bare, &(&1 == "--tools"))
-      assert Enum.at(bare, idx_bare + 1) == "read,write,ls,mcp__komki__*"
+      assert Enum.at(argv, idx + 1) == "mcp__komki__*"
     end
 
     test "pane_command: Escript-Pfad + session-chain, sh-gequotet" do
