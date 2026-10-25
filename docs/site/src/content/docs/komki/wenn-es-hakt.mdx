@@ -7,9 +7,10 @@ description: Häufige Meldungen, ihre Ursachen und was hilft. Dazu die ehrlichen
 
 | Du siehst | Ursache | Das hilft |
 |---|---|---|
-| `credential-missing` bei der Websuche | komki kam beim Start nicht an den Schlüsselbund | Den Brave-Key prüfen ([Schritt 6](/kommunalpolitik_ki/komki/in-betrieb-nehmen/)), im Dialog „Immer erlauben“ wählen, dann `komki down && komki up` |
-| Jede Connector-Anfrage endet mit `error` | Alter Raum ohne Connector-Regeln | Schritt 5 aus [In Betrieb nehmen](/kommunalpolitik_ki/komki/in-betrieb-nehmen/), dann `komki down && komki up` |
-| `doctor` meldet ein Profil als abweichend | Instanz älter als der Code | `komki init --force --vault-dir ~/.local/share/komki/vault` |
+| `setup` meldet ein fehlendes Werkzeug | Etwas aus [Schritt 1](/kommunalpolitik_ki/komki/in-betrieb-nehmen/) fehlt | Den genannten Befehl ausführen, dann `komki setup` erneut |
+| `credential-missing` bei der Websuche | komki kam beim Start nicht an den Schlüsselbund | Mit `komki secret list` prüfen, ob der Schlüssel da ist, sonst `komki secret set brave`; im macOS-Dialog „Immer erlauben“ wählen, dann `komki down && komki up` |
+| Vermittler startet nicht: „registry.json und room.json passen nicht zusammen“ | Instanz von vor den Connectoren, deren Vorlagen du angepasst hast. Unveränderte alte Vorlagen ersetzt der Vermittler selbst, das Journal bleibt. | Eigene Änderungen sichern, beide Dateien aus `~/.local/share/komki/mediator/` entfernen, dann `komki up` |
+| `doctor` meldet ein Profil als abweichend | Instanz älter als der Code | `komki setup` schreibt die Profile neu |
 | `komki-mediator nicht aktiv: 'komki up' zuerst` | Vermittler läuft nicht | `komki up` |
 | Ein Connector fehlt in `komki status` | Prozess abgestürzt | `komki up` startet nur das Fehlende neu |
 | Websuche im Raum „vertraulich“ abgelehnt | So gewollt | In den Raum „recherche“ wechseln ([Anleitung](/kommunalpolitik_ki/komki/sicherheitsgrenze/)) |
