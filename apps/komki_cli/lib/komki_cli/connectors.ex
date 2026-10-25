@@ -284,18 +284,32 @@ defmodule KomkiCli.Connectors do
     :ok
   end
 
-  defp start(cfg, :egress, _fetch) do
+  # Laeuft die Komponente schon, bleibt alles unberuehrt: Profil und Socket
+  # werden nur vor einem echten Start vorbereitet. Frueher loeschte jedes
+  # `up` den Socket eines laufenden Connectors, der danach als "running"
+  # galt, aber unerreichbar war (enoent), etwa in `komki session` nach `run`.
+  defp start(cfg, step, fetch) do
+    comp = component_for(cfg, step)
+
+    case alive(comp) do
+      {:ok, pid} -> {:ok, {comp.name, {:already, pid}}}
+      :none -> start_fresh(cfg, step, comp, fetch)
+    end
+  end
+
+  defp component_for(cfg, :egress), do: egress_component(cfg)
+  defp component_for(cfg, {:connector, manifest}), do: connector_component(cfg, manifest.id)
+
+  defp start_fresh(cfg, :egress, comp, _fetch) do
     Profile.write!(egress_profile_path(cfg), ConnectorProfile.egress(cfg))
-    comp = egress_component(cfg)
 
     launch(cfg, comp, egress_binary!(cfg), [], egress_profile_path(cfg), egress_stdin(cfg), fn ->
       egress_ready(cfg)
     end)
   end
 
-  defp start(cfg, {:connector, manifest}, fetch) do
+  defp start_fresh(cfg, {:connector, manifest}, comp, fetch) do
     Profile.write!(profile_path(cfg, manifest.id), ConnectorProfile.connector(cfg, manifest))
-    comp = connector_component(cfg, manifest.id)
     File.rm(comp.socket)
     {line, _missing} = credentials_line(manifest, fetch)
 
