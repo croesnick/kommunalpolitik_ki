@@ -76,7 +76,7 @@ macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge.
 ## 4. Start eines Connectors
 
 ```
-sandbox-exec -f <base>/profile/connector-<id>.sb <binary> --socket <base>/run/connectors/<id>.sock [--proxy 127.0.0.1:<port>] [--base-url <url>] [--vault-dir <pfad>]
+sandbox-exec -f <base>/profile/connector-<id>.sb <binary> --socket <base>/run/connectors/<id>.sock [--proxy 127.0.0.1:<port>] [--base-url <url>] [--vault-dir <pfad>] [--documents-dir <pfad>]
 ```
 
 - **Credentials kommen über stdin**: genau eine JSON-Zeile `{"<NAME>": "<wert>", ...}`, danach schließt
@@ -95,12 +95,12 @@ Einzige Quelle für Fassung, Operationen, Netz, Dateisystem, Credentials und Imp
 
 | Feld | Bedeutung |
 |---|---|
-| `id` | `ris`, `web`, `vault` |
-| `fassung` | `komki-ris/1`, `komki-web/1`, `komki-vault/1` |
+| `id` | `documents`, `ris`, `web`, `vault` |
+| `fassung` | `komki-documents/1`, `komki-ris/1`, `komki-web/1`, `komki-vault/1` |
 | `binary` | Name des Escripts |
 | `ops` | Operation → Parameter-Schema (geschlossen, siehe unten) und `kind` (`read` oder `write`) |
 | `egress_hosts` | Host-Allowlist für den Egress-Proxy (`host:port`). Leer heißt: kein Netz, kein Proxy-Port |
-| `fs` | Platzhalter-Pfade (`{vault_dir}`) mit Modus `read` oder `write` |
+| `fs` | Platzhalter-Pfade (`{vault_dir}`, `{documents_dir}` = `<base>/mediator/documents`) mit Modus `read` oder `write` |
 | `credentials` | Name → Keychain-Service (`security find-generic-password -s <service> -w`) |
 | `environment` | Umgebung für `emit` (modellierte Empfänger der Anfrage), z. B. `web-suche@1` |
 | `import_labels` | erlaubte Labels für Antworten. Bei RIS und Web genau eines, bei Vault eine Menge, aus der die Notiz wählt. Vault umfasst alle vier Bindungen, weil geschriebene Notizen λ(y) = B_W tragen (§6.3) und im selben Raum wieder lesbar sein müssen |
@@ -113,6 +113,7 @@ oder einen Host an.
 
 | Connector | MCP-Tool (Vermittler) | Operation | Parameter | Art |
 |---|---|---|---|---|
+| documents | `admit_document` | `read` | `document_id` (string, max 64, pattern `^[a-z0-9-]+$`) | read |
 | ris | `ris_search` | `search` | `text` (string, max 200), `limit` (integer 1..20, optional, Default 10) | read |
 | ris | `ris_show` | `show` | `top_id` (string, max 64, pattern `^[A-Za-z0-9_-]+$`) | read |
 | web | `web_search` | `search` | `query` (string, max 400), `count` (integer 1..10, optional, Default 5) | read |
@@ -120,11 +121,15 @@ oder einen Host an.
 | vault | `vault_read` | `read` | `note_id` (string, max 200, pattern `^[A-Za-z0-9äöüÄÖÜß _./-]+\.md$`) | read |
 | vault | `vault_write_test` | `write_test` | `title` (string, max 120), `body` (string, max 20000) | write |
 
-Der Vermittler bietet damit `ping`, `admit_document` und diese sechs Tools an. Das ist Fassung
+Der Vermittler bietet damit `ping` und diese sieben Tools an. `admit_document` ist ein Sonderfall
+(Ticket #169): Der Vermittler entscheidet es über die Objekt-Labels aus `room.json` (Regelzweig `admit`,
+`KomkiMediator.Gate`), bevor er den Connector ruft. Der Connector führt nur das Lesen aus; Gate 1 (`emit`) und
+die Labels aus dem Manifest gelten dafür nicht. Das ist Fassung
 `komki-mediator/2`, und der D.9-Pin bricht absichtlich.
 
 ### 5.2 Ergebnisformen (Connector → Vermittler)
 
+- `documents.read`: `{"document_id", "content"}`. Ein fehlendes Dokument ergibt `not-found`.
 - `ris.search`: `{"results": [{"top_id", "titel", "sitzung", "datum", "url"}], "abrufdatum"}`. Nicht-öffentliche
   TOPs filtert der Connector **vor** Begrenzung und Zählung heraus. Ihre Existenz ist nicht erkennbar,
   auch nicht über die Anzahl.

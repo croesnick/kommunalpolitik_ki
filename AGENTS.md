@@ -162,6 +162,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `apps/komki_egress` | Elixir | Ausgangstür ins Internet für die Connectoren: jeder Connector bekommt einen eigenen lokalen Port und erreicht darüber nur die Adressen, die für ihn freigegeben sind; alles andere wird abgewiesen und protokolliert, ohne Inhalte mitzuschreiben | CLI (`komki-egress`, Konfiguration per stdin; später von `komki up` gestartet) | Funktionsfähig |
 | `apps/komki_connector_web` | Elixir | Websuche über Brave Search für den Vermittler: liefert Titel, Link und Kurztext je Treffer; der API-Schlüssel kommt aus dem Schlüsselbund und erscheint nirgends | Rolle `komki-connector-web` im Programm komki (von `komki up` gestartet, Aufruf nur über den Vermittler) | Funktionsfähig |
 | `apps/komki_connector_vault` | Elixir | Vault-Anschluss für komki: durchsucht und liest Notizen eines lokalen Markdown-Vaults (nur Notizen mit gültigem Label) und legt Testnotizen in einem eigenen Ordner an; Symlinks und Pfade aus dem Vault heraus werden abgewiesen; mit erfundenem Test-Vault | Frame-Protokoll über Unix-Socket (von `komki up` gestartet, aufgerufen vom Vermittler) | Funktionsfähig |
+| `apps/komki_connector_documents` | Elixir | Liest die Beispieldokumente des Arbeitsraums für `admit_document`, erst nachdem der Vermittler die Aufnahme erlaubt hat; so braucht der Vermittler selbst keinen Zugriff auf die Dokumente | Connector-Socket (von `komki up` gestartet, Aufruf nur über den Vermittler) | Funktionsfähig |
 | `apps/komki_connector_ris` | Elixir | RIS-Anbindung für den Vermittler: sucht und liest öffentliche Tagesordnungspunkte im Ratsinformationssystem; nicht-öffentliche Punkte bleiben unsichtbar, auch in der Trefferzahl. Mit Übungs-RIS (Mock) für Tests | Connector-Socket (von `komki up` gestartet, CLI `komki-connector-ris`) | Funktionsfähig |
 | `docs/site` | Astro Starlight (Node) | Bebilderter Benutzer-Guide zu komki: wie es funktioniert, wie man es startet, wie man die Sicherheitsgrenze selbst sieht; veröffentlicht als Website über GitHub Pages | Website (Markdown/MDX-Quellen, `pnpm build`) | Funktionsfähig |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | Bestehend |
@@ -320,6 +321,7 @@ kommunalpolitik_ki/
 │   ├── komki_egress/       # Egress-Proxy: freigegebene Ziele je Connector (AI: CLI)
 │   ├── komki_connector_web/ # Connector web: Brave-Websuche hinter dem Vermittler
 │   ├── komki_connector_vault/ # Vault-Connector: Notizen suchen/lesen, Testnotizen schreiben (via Vermittler)
+│   ├── komki_connector_documents/ # Dokument-Connector: Raumdokumente für admit_document lesen (via Vermittler)
 │   ├── komki_connector_ris/ # RIS-Connector: öffentliche TOPs suchen/lesen, Mock-RIS (AI: Connector)
 │   └── komki_cli/          # KomKI-CLI: gesandboxter Arbeitsraum (Seatbelt + llama + pi) (AI: CLI)
 ├── tools/                  # Nicht-Elixir

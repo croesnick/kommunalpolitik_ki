@@ -11,7 +11,7 @@ defmodule KomkiCli.ConnectorProfile do
     * Netz nur `localhost:<egress-port>` (bzw. `localhost:<mock-port>` im
       RIS-Mock-Betrieb), und nur, wenn das Manifest `egress_hosts` hat,
     * Dateisystem nur nach `fs` des Manifests (`{vault_dir}` lesen,
-      `{vault_dir}/komki-test` schreiben).
+      `{vault_dir}/komki-test` schreiben, `{documents_dir}` lesen).
 
   Kein Home, kein `~/.ssh`, kein DNS: Ein Connector kennt nur Loopback.
 
@@ -107,7 +107,12 @@ defmodule KomkiCli.ConnectorProfile do
 
   defp fs_paths(cfg, manifest) do
     Enum.map(manifest.fs, fn {pattern, mode} ->
-      {String.replace(pattern, "{vault_dir}", vault_dir!(cfg)), mode}
+      path =
+        if String.contains?(pattern, "{vault_dir}"),
+          do: String.replace(pattern, "{vault_dir}", vault_dir!(cfg)),
+          else: String.replace(pattern, "{documents_dir}", KomkiCli.Connectors.documents_dir(cfg))
+
+      {path, mode}
     end)
   end
 

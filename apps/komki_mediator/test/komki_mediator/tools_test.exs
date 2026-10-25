@@ -2,7 +2,7 @@ defmodule KomkiMediator.ToolsTest do
   use ExUnit.Case, async: false
 
   alias Anubis.Server.Frame
-  alias KomkiMediator.{TestHelpers, Tools}
+  alias KomkiMediator.{FakeConnector, TestHelpers, Tools}
 
   setup do
     base = TestHelpers.provisioned_base()
@@ -27,8 +27,17 @@ defmodule KomkiMediator.ToolsTest do
     assert gamma.registry_id == "reg-komki-arbeitsraum"
   end
 
-  test "admit_document doc-oeffentlich: permit mit Inhalt", %{base: base} do
+  test "admit_document doc-oeffentlich: permit mit Inhalt vom Dokument-Connector", %{base: base} do
     content = File.read!(Path.join([base, "mediator", "documents", "doc-oeffentlich.md"]))
+    dir = FakeConnector.short_dir()
+    on_exit(fn -> File.rm_rf!(dir) end)
+    env = TestHelpers.restart_env(base, %{connectors_dir: dir})
+
+    FakeConnector.start("documents", dir, env.journal_path, fn "read",
+                                                               %{"document_id" => id},
+                                                               _ ->
+      {:ok, %{"document_id" => id, "content" => content}}
+    end)
 
     assert {:reply, response, _frame} =
              Tools.AdmitDocument.execute(%{document_id: "doc-oeffentlich"}, Frame.new())
@@ -41,6 +50,24 @@ defmodule KomkiMediator.ToolsTest do
     assert body["document_id"] == "doc-oeffentlich"
     assert body["content"] == content
     assert body["labels"] == ["doc-oeffentlich@1"]
+    # Erst nach dem permit, mit genau dieser document_id
+    assert_received {:connector_called, "documents", "read",
+                     %{"document_id" => "doc-oeffentlich"}, %{}, _records}
+  end
+
+  test "admit_document doc-vertraulich: deny, der Dokument-Connector wird nicht gerufen", %{
+    base: base
+  } do
+    dir = FakeConnector.short_dir()
+    on_exit(fn -> File.rm_rf!(dir) end)
+    env = TestHelpers.restart_env(base, %{connectors_dir: dir})
+    FakeConnector.start("documents", dir, env.journal_path, fn _, _, _ -> {:ok, %{}} end)
+
+    assert {:reply, response, _frame} =
+             Tools.AdmitDocument.execute(%{document_id: "doc-vertraulich"}, Frame.new())
+
+    assert parse_json_body(response)["decision"] == "deny"
+    refute_received {:connector_called, "documents", _, _, _, _}
   end
 
   test "admit_document doc-vertraulich: deny als Remedy-Plan, isError bleibt false", %{base: base} do

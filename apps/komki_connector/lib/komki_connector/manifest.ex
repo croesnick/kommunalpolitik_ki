@@ -30,7 +30,7 @@ defmodule KomkiConnector.Manifest do
           import_labels: [String.t()]
         }
 
-  @ids ["ris", "vault", "web"]
+  @ids ["documents", "ris", "vault", "web"]
 
   @doc "Alle Connector-IDs, sortiert."
   @spec ids() :: [String.t()]
@@ -42,6 +42,34 @@ defmodule KomkiConnector.Manifest do
 
   @doc "Manifest zu einer ID; unbekannte ID ist ein Programmierfehler."
   @spec fetch!(String.t()) :: t()
+  # Raumdokumente (Ticket #169): nur der Vollzug von admit_document. Die
+  # Entscheidung faellt vorher im Vermittler (KomkiMediator.Gate) ueber die
+  # Objekt-Labels aus room.json; Labels und Umgebung dieses Manifests
+  # spielen dafuer keine Rolle (import_labels leer).
+  def fetch!("documents") do
+    %{
+      id: "documents",
+      fassung: "komki-documents/1",
+      binary: "komki-connector-documents",
+      ops: %{
+        "read" => %{
+          tool: "admit_document",
+          kind: :read,
+          description:
+            "Ein Raumdokument anhand seiner document_id zum Agentenkontext zulassen (z. B. \"doc-oeffentlich\").",
+          params: %{
+            "document_id" => %{type: :string, max: 64, required: true, pattern: ~r/^[a-z0-9-]+$/}
+          }
+        }
+      },
+      egress_hosts: [],
+      fs: [{"{documents_dir}", :read}],
+      credentials: %{},
+      environment: "lokaler-arbeitsraum@1",
+      import_labels: []
+    }
+  end
+
   def fetch!("ris") do
     %{
       id: "ris",

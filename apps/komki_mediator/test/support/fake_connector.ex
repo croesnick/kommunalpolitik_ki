@@ -30,6 +30,7 @@ defmodule KomkiMediator.FakeConnector do
     pid
   end
 
+  defp module("documents"), do: KomkiMediator.FakeConnector.Documents
   defp module("ris"), do: KomkiMediator.FakeConnector.Ris
   defp module("web"), do: KomkiMediator.FakeConnector.Web
   defp module("vault"), do: KomkiMediator.FakeConnector.Vault
@@ -39,6 +40,16 @@ defmodule KomkiMediator.FakeConnector do
     records = length(KomkiMediator.TestHelpers.journal_records(state.journal_path))
     send(state.test, {:connector_called, id, op, params, context, records})
     state.reply.(op, params, context)
+  end
+
+  defmodule Documents do
+    @moduledoc false
+    @behaviour KomkiConnector.Server
+    def manifest_id, do: "documents"
+    def init(arg), do: {:ok, arg}
+
+    def handle_op(op, params, context, state),
+      do: KomkiMediator.FakeConnector.handle_op("documents", op, params, context, state)
   end
 
   defmodule Ris do

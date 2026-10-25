@@ -9,8 +9,9 @@ defmodule KomkiMediator.Fassung do
 
   @fassung_id "komki-mediator/2"
 
-  # Feste Ordnung: die Raum-Tools, dann die Connector-Tools sortiert
-  # (= KomkiConnector.Manifest.tools/0, Connector-Vertrag §5.1).
+  # Feste Ordnung: ping, dann die Connector-Tools sortiert
+  # (= KomkiConnector.Manifest.tools/0, Connector-Vertrag §5.1; seit #169
+  # gehoert admit_document dazu).
   @tools [
     "ping",
     "admit_document",

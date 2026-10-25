@@ -33,6 +33,9 @@ defmodule KomkiCli.SandboxProfileTest do
     probe = Config.canonical(@probe)
     File.mkdir_p!(Path.join([base, "vault", "komki-test"]))
     File.write!(Path.join([base, "vault", "notiz.md"]), "# Notiz\n")
+    File.mkdir_p!(Path.join([base, "mediator", "documents"]))
+    File.write!(Path.join([base, "mediator", "documents", "doc-oeffentlich.md"]), "# Doc\n")
+    File.write!(Path.join([base, "mediator", "room.json"]), "{}\n")
 
     cfg = %{
       Config.defaults(base)
@@ -103,7 +106,7 @@ defmodule KomkiCli.SandboxProfileTest do
            profile <> " " <> Enum.join(args, " ") <> " haette verweigert werden müssen: " <> out
   end
 
-  @all ["ris", "web", "vault", "egress", "mediator"]
+  @all ["documents", "ris", "web", "vault", "egress", "mediator"]
 
   test "Positivkontrolle: jedes Profil bootet die Erlang-Runtime", ctx do
     for p <- @all, do: allowed(ctx, p, ["nop"])
@@ -181,5 +184,17 @@ defmodule KomkiCli.SandboxProfileTest do
     denied(ctx, "vault", ["write", Path.join([ctx.cfg.base_dir, "tmp", "x.log"])])
     # andere Connectoren sehen den Vault nicht
     denied(ctx, "web", ["read", Path.join(vault, "notiz.md")])
+  end
+
+  test "Raumdokumente: der Dokument-Connector liest sie, der Vermittler nicht (#169)", ctx do
+    mediator_dir = Path.join(ctx.cfg.base_dir, "mediator")
+    doc = Path.join([mediator_dir, "documents", "doc-oeffentlich.md"])
+
+    allowed(ctx, "documents", ["read", doc])
+    denied(ctx, "mediator", ["read", doc])
+    # Gegenkontrolle: den Raum liest der Vermittler weiter
+    allowed(ctx, "mediator", ["read", Path.join(mediator_dir, "room.json")])
+    denied(ctx, "documents", ["read", Path.join(mediator_dir, "room.json")])
+    denied(ctx, "documents", ["write", Path.join([mediator_dir, "documents", "neu.md"])])
   end
 end

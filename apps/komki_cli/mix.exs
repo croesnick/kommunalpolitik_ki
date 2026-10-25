@@ -8,7 +8,8 @@ defmodule KomkiCli.MixProject do
     :komki_egress,
     :komki_connector_ris,
     :komki_connector_web,
-    :komki_connector_vault
+    :komki_connector_vault,
+    :komki_connector_documents
   ]
 
   def project do
@@ -131,6 +132,7 @@ defmodule KomkiCli.MixProject do
       {:komki_connector_ris, path: "../komki_connector_ris"},
       {:komki_connector_web, path: "../komki_connector_web"},
       {:komki_connector_vault, path: "../komki_connector_vault"},
+      {:komki_connector_documents, path: "../komki_connector_documents"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]

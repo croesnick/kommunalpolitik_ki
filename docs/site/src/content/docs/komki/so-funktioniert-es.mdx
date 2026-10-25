@@ -17,7 +17,7 @@ Jeder gestrichelte Kasten ist eine eigene Sandbox. Pfeile zeigen die einzigen er
 
 - **pi** ist der Agent. Er läuft mit einem lokalen Sprachmodell (gemma) in einer macOS-Sandbox, die ihm fast alles verbietet: kein Internet, kein Zugriff auf deine Dateien, keine fremden Prozesse. Eigene Werkzeuge zum Lesen, Schreiben oder Ausführen hat er nicht; auch Notizen liest und schreibt er nur über den Vermittler. Er erreicht genau zwei Dinge: das Sprachmodell und den Vermittler.
 - **Der Vermittler** ist die einzige Tür nach draußen. Er selbst hat kein Internet. Er entscheidet jede Anfrage und schreibt jede Entscheidung ins Journal.
-- **Die Connectoren** für RIS, Websuche und Vault laufen als eigene Prozesse, jeder in seiner eigenen Sandbox, mit genau den Rechten, die es braucht. Der Brave-Key liegt nur beim Web-Connector.
+- **Die Connectoren** für RIS, Websuche, Vault und die Beispieldokumente des Arbeitsraums laufen als eigene Prozesse, jeder in seiner eigenen Sandbox, mit genau den Rechten, die es braucht. Der Brave-Key liegt nur beim Web-Connector.
 - **Der Egress-Proxy** ist der einzige Prozess, der ins Internet darf, und auch er nur zu freigegebenen Adressen, je Connector getrennt.
 
 Drei Regeln halten das zusammen:

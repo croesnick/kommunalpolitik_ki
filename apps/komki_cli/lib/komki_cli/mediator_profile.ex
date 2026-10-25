@@ -67,9 +67,20 @@ defmodule KomkiCli.MediatorProfile do
   defp data_rules(data) do
     journal = Path.join(data, "journal")
 
+    documents = Path.join(data, "documents")
+    go = Path.join(data, "go")
+
     [
-      "; Raum lesen (registry.json, room.json, documents)",
-      "(allow file-read* (subpath \"" <> data <> "\"))",
+      "; Raum lesen (registry.json, room.json). Die Dokumente liest der",
+      "; Dokument-Connector (Ticket #169); hier nur Metadaten fuer die",
+      "; Erstprovisionierung, keine Inhalte.",
+      "(allow file-read* (literal \"" <>
+        data <>
+        "\") (literal \"" <>
+        Path.join(data, "registry.json") <>
+        "\") (literal \"" <> Path.join(data, "room.json") <> "\"))",
+      "(allow file-read-metadata (subpath \"" <> documents <> "\"))",
+      "(allow file-read* (subpath \"" <> journal <> "\") (subpath \"" <> go <> "\"))",
       "; Journal: anhaengen und uappnd setzen (Ticket #139)",
       "(allow file-write* (subpath \"" <> journal <> "\"))",
       "(allow process-exec (literal \"/usr/bin/chflags\"))",
@@ -80,9 +91,9 @@ defmodule KomkiCli.MediatorProfile do
         "\") (literal \"" <>
         Path.join(data, "registry.json") <>
         "\") (literal \"" <> Path.join(data, "room.json") <> "\"))",
-      "(allow file-write* (subpath \"" <> Path.join(data, "documents") <> "\"))",
+      "(allow file-write* (subpath \"" <> documents <> "\"))",
       "; GO-Anfragen und Offenlegungsstand (Ticket #98)",
-      "(allow file-write* (subpath \"" <> Path.join(data, "go") <> "\"))"
+      "(allow file-write* (subpath \"" <> go <> "\"))"
     ]
   end
 
