@@ -8,13 +8,38 @@ defmodule KomkiMediator.Templates do
   — der Provisionierungs-Output ist damit von Haus aus kanonisch.
 
   provision!/1 ist idempotent: sobald `registry.json` existiert, wird
-  NICHTS mehr ueberschrieben — ein nachtraeglich redigierter Raum bleibt
-  genau so, wie die nutzende Person ihn hinterlassen hat.
+  nichts ueberschrieben, was die nutzende Person veraendert haben koennte.
+  Einzige Ausnahme (Ticket #177): Sind `registry.json` und `room.json`
+  byte-genau eine fruehere Fassung dieser Vorlagen (SHA-256 in
+  `@outdated`), ersetzt provision!/1 sie durch die aktuelle. Eine Sicherung
+  entfaellt bewusst: der Inhalt einer unveraenderten Vorlage steht
+  vollstaendig im Git-Verlauf, und das Seatbelt-Profil des Vermittlers
+  erlaubt nur genau diese beiden Dateinamen. Ist nur eine der beiden Dateien
+  eine alte Vorlage, die andere aber veraendert, bricht provision!/1 mit
+  Erklaerung ab, statt zu raten.
+
+  Pflege: Wer `registry/0` oder `room/0` aendert, traegt die bisherigen
+  Hashes aus `@current` in `@outdated` ein und setzt `@current` neu; ein
+  Test haelt `@current` an den tatsaechlichen Vorlagen fest.
   """
 
   alias KomkiPolicy.JSON
 
   @mediator_dir "mediator"
+
+  # SHA-256 der kanonischen Vorlagen. @outdated: fruehere Fassungen auf main
+  # (#106 und #107 fuer die Registry, beide mit demselben Raum).
+  @current %{
+    "registry.json" => "38e86ed685b8887ddac4eb1976873b105fb1f272ce6c8ff67ac806370c8ecdf7",
+    "room.json" => "4b3ac34dc5ac6a81ea5cb81178cd1fea9f0045e753a079823aab98f6ea45fe32"
+  }
+  @outdated %{
+    "registry.json" => [
+      "fed48d30194094c6e84be239ef40bf74be88457b1aaec09cb3dce8b5bb090e4f",
+      "d2b6a4e987036711a517a31dc40368dea82f7136b4213fbf9614cf290ba6d22f"
+    ],
+    "room.json" => ["127831a737e7f5565d8def234c260ca270056b8954b346725f03ef638ef0b51f"]
+  }
 
   @observers ["brave-search", "nutzende-person", "pi-agent", "ris-betreiber"]
 
@@ -161,26 +186,85 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
 )
   end
 
-  @doc "Provisioniert `<base>/mediator/` nur, wenn keine `registry.json` vorliegt."
+  @doc "Gepinnte SHA-256 der aktuellen Vorlagen (fuer den Pflege-Test)."
+  def current_hashes, do: @current
+
+  @doc """
+  Provisioniert `<base>/mediator/`: legt die Vorlagen an, wenn keine
+  `registry.json` vorliegt, und ersetzt unveraenderte fruehere Fassungen
+  (Ticket #177). Ergebnis: `:ok` (neu angelegt), `:already_provisioned`,
+  `{:migrated, from}` (alte Vorlagen ersetzt) oder `{:error, detail}`.
+  """
   def provision!(base_dir) do
     mediator_dir = Path.join(base_dir, @mediator_dir)
     registry_path = Path.join(mediator_dir, "registry.json")
 
     if File.exists?(registry_path) do
-      :already_provisioned
+      migrate(mediator_dir)
     else
-      documents_dir = Path.join(mediator_dir, room()["documents_dir"])
-      File.mkdir_p!(documents_dir)
-      File.write!(registry_path, JSON.canonical(registry()))
-      File.write!(Path.join(mediator_dir, "room.json"), JSON.canonical(room()))
-      write_documents(documents_dir)
+      write_templates(mediator_dir)
       :ok
     end
   end
 
+  defp migrate(mediator_dir) do
+    states = Map.new(["registry.json", "room.json"], &{&1, state(mediator_dir, &1)})
+
+    cond do
+      Enum.all?(states, fn {_file, state} -> state == :outdated end) ->
+        write_templates(mediator_dir)
+        {:migrated, "unveraenderte Vorlagen einer frueheren Fassung"}
+
+      Enum.any?(states, fn {_file, state} -> state == :outdated end) ->
+        {:error,
+         "registry.json und room.json passen nicht zusammen: " <>
+           describe(states) <>
+           ". komki ersetzt nur unveraenderte alte Vorlagen. Eigene Aenderungen sichern, " <>
+           "beide Dateien aus " <>
+           mediator_dir <> " entfernen; der naechste Start legt die neuen Vorlagen an."}
+
+      true ->
+        :already_provisioned
+    end
+  end
+
+  defp state(dir, file) do
+    case File.read(Path.join(dir, file)) do
+      {:ok, raw} ->
+        hash = Base.encode16(:crypto.hash(:sha256, raw), case: :lower)
+
+        cond do
+          hash == @current[file] -> :current
+          hash in @outdated[file] -> :outdated
+          true -> :own
+        end
+
+      {:error, _} ->
+        :own
+    end
+  end
+
+  defp describe(states) do
+    Enum.map_join(states, ", ", fn
+      {file, :outdated} -> file <> " ist eine unveraenderte alte Vorlage"
+      {file, :current} -> file <> " ist aktuell"
+      {file, :own} -> file <> " wurde veraendert"
+    end)
+  end
+
+  # Dokumente nur anlegen, wenn sie fehlen: vorhandene bleiben unberuehrt.
+  defp write_templates(mediator_dir) do
+    documents_dir = Path.join(mediator_dir, room()["documents_dir"])
+    File.mkdir_p!(documents_dir)
+    File.write!(Path.join(mediator_dir, "registry.json"), JSON.canonical(registry()))
+    File.write!(Path.join(mediator_dir, "room.json"), JSON.canonical(room()))
+    write_documents(documents_dir)
+  end
+
   defp write_documents(documents_dir) do
-    for document_id <- ["doc-oeffentlich", "doc-vertraulich", "doc-pending-freigabe"] do
-      path = Path.join(documents_dir, document_id <> ".md")
+    for document_id <- ["doc-oeffentlich", "doc-vertraulich", "doc-pending-freigabe"],
+        path = Path.join(documents_dir, document_id <> ".md"),
+        not File.exists?(path) do
       File.write!(path, document_content(document_id))
     end
 

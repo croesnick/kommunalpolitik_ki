@@ -40,7 +40,6 @@ defmodule KomkiCli.Mediator do
   """
 
   alias KomkiCli.{Channel, Config, MediatorProfile, Proc, Profile}
-  require Config
 
   @health_timeout_ms 10_000
   # Vermittler-Boot ist schnell (escript, keine 17-GB-GGUF): kuerzerer
@@ -132,7 +131,7 @@ defmodule KomkiCli.Mediator do
     end
   end
 
-  @doc "Health-Endpoint pruefen (GET /healthz ueber den Unix-Socket, mit Token)."
+  @doc "Health-Endpoint prüfen (GET /healthz über den Unix-Socket, mit Token)."
   @spec health(Config.t()) :: :ok | {:error, String.t()}
   def health(%Config{} = cfg) do
     case fetch_health(cfg) do
@@ -147,7 +146,7 @@ defmodule KomkiCli.Mediator do
     end
   end
 
-  @doc "healthz-Uebertrag: {:ok, status_code, geparster Body} | {:error, reason}."
+  @doc "healthz-Übertrag: {:ok, status_code, geparster Body} | {:error, reason}."
   @spec fetch_health(Config.t()) :: {:ok, String.t(), health()} | {:error, String.t()}
   def fetch_health(%Config{} = cfg) do
     with {:ok, token} <- Channel.read_token(cfg),
@@ -210,19 +209,18 @@ defmodule KomkiCli.Mediator do
     ]
 
     [program | words] =
-      Proc.escript_cmd(
-        cfg.sandbox_exec,
+      Proc.role_cmd(
+        cfg,
         MediatorProfile.path(cfg),
-        cfg.escript_bin,
         cfg.mediator_bin,
-        args,
+        KomkiCli.Roles.prefix(cfg, cfg.mediator_bin, "komki-mediator") ++ args,
         Channel.run_dir(cfg)
       )
 
     Proc.spawn_line(program, Enum.map(words, &Proc.quote_bin/1), log_path(cfg), "< /dev/null")
   end
 
-  @doc "Kanal des Vermittlers fuer sein Profil (Ticket #137): der Unix-Socket aus #143."
+  @doc "Kanal des Vermittlers für sein Profil (Ticket #137): der Unix-Socket aus #143."
   @spec listen(Config.t()) :: MediatorProfile.listen()
   def listen(%Config{} = cfg), do: {:unix, Channel.socket_path(cfg)}
 
@@ -252,11 +250,11 @@ defmodule KomkiCli.Mediator do
   # Kill-Eskalation TERM→KILL mit Identitaetscheck (Proc.kill_checked).
   defp kill_mediator(pid), do: Proc.kill_checked(pid, "komki-mediator")
 
-  @doc "Prueft, ob pid existiert und als komki-mediator laeuft (ps-Kontrolle)."
+  @doc "Prüft, ob pid existiert und als komki-mediator läuft (ps-Kontrolle)."
   @spec mediator_alive?(integer()) :: boolean()
   def mediator_alive?(pid), do: Proc.pid_alive?(pid, "komki-mediator")
 
-  @doc "Log-Tail als Einzeiler kontrolliert fuer Fehlermeldungen."
+  @doc "Log-Tail als Einzeiler kontrolliert für Fehlermeldungen."
   @spec log_tail(Config.t(), pos_integer()) :: String.t()
   def log_tail(cfg, lines), do: Proc.log_tail(log_path(cfg), lines)
 

@@ -111,7 +111,7 @@ defmodule KomkiCli.Llama do
     end
   end
 
-  @doc "Health-Endpoint pruefen (plain TCP auf Loopback, GET /health)."
+  @doc "Health-Endpoint prüfen (plain TCP auf Loopback, GET /health)."
   @spec health(Config.t()) :: :ok | {:error, String.t()}
   def health(%Config{} = cfg) do
     case http_get_200(port(cfg)) do
@@ -128,11 +128,11 @@ defmodule KomkiCli.Llama do
 
   # ---------------------------------------------------------------- API-Key
 
-  @doc "Pfad der Schluesseldatei (ausserhalb von pi-home, pi liest sie nicht)."
+  @doc "Pfad der Schlüsseldatei (außerhalb von pi-home, pi liest sie nicht)."
   @spec key_path(Config.t()) :: String.t()
   def key_path(cfg), do: Path.join([cfg.base_dir, "tmp", "llama.key"])
 
-  @doc "Neuen Zufallsschluessel schreiben (0600, vor dem Inhalt gesetzt)."
+  @doc "Neuen Zufallsschlüssel schreiben (0600, vor dem Inhalt gesetzt)."
   @spec write_key!(Config.t()) :: String.t()
   def write_key!(cfg) do
     key = 32 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
@@ -144,7 +144,7 @@ defmodule KomkiCli.Llama do
     key
   end
 
-  @doc "Schluessel des laufenden llama-server, falls komki ihn gestartet hat."
+  @doc "Schlüssel des laufenden llama-server, falls komki ihn gestartet hat."
   @spec read_key(Config.t()) :: {:ok, String.t()} | :none
   def read_key(cfg) do
     case File.read(key_path(cfg)) do
@@ -264,7 +264,7 @@ defmodule KomkiCli.Llama do
   defp spawn_llama(%Config{} = _cfg),
     do:
       raise(ArgumentError,
-        message: "config unvollstaendig: llama-server-Pfad fehlt (init praeflight)"
+        message: "config unvollständig: llama-server-Pfad fehlt (init praeflight)"
       )
 
   defp wait_health(cfg, pid) do
@@ -292,11 +292,11 @@ defmodule KomkiCli.Llama do
   # Kill-Eskalation TERM→KILL mit Identitaetscheck (Proc.kill_checked).
   defp kill_llama(pid), do: Proc.kill_checked(pid, "llama-server")
 
-  @doc "Prueft, ob pid existiert und als llama-server laeuft (ps-Kontrolle)."
+  @doc "Prüft, ob pid existiert und als llama-server läuft (ps-Kontrolle)."
   @spec llama_alive?(integer()) :: boolean()
   def llama_alive?(pid), do: Proc.pid_alive?(pid, "llama-server")
 
-  @doc "Log-Tail als Einzeiler kontrolliert fuer Fehlermeldungen."
+  @doc "Log-Tail als Einzeiler kontrolliert für Fehlermeldungen."
   @spec log_tail(Config.t(), pos_integer()) :: String.t()
   def log_tail(cfg, lines), do: Proc.log_tail(log_path(cfg), lines)
 

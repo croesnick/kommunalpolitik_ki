@@ -186,7 +186,7 @@ defmodule KomkiCli.ConfigTest do
       assert loaded.connector_bins == %{}
     end
 
-    test "ungueltiger Egress-Port ist ein Fehler" do
+    test "ungültiger Egress-Port ist ein Fehler" do
       cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-bad"))
 
       map =

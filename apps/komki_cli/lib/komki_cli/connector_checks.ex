@@ -24,6 +24,17 @@ defmodule KomkiCli.ConnectorChecks do
       ping_checks(cfg)
   end
 
+  # Burrito-Einzeldatei (Ticket #181): Laufzeit ist die entpackte Wurzel
+  defp escript_check(%Config{launcher: "burrito", runtime_root: root}) do
+    if is_binary(root) and File.dir?(root),
+      do: %{name: "runtime", ok: true, reason: root},
+      else: %{
+        name: "runtime",
+        ok: false,
+        reason: "entpackte Laufzeit fehlt: " <> to_string(root) <> " — 'komki setup' entdeckt neu"
+      }
+  end
+
   defp escript_check(cfg) do
     case cfg.escript_bin do
       bin when is_binary(bin) ->
@@ -32,14 +43,14 @@ defmodule KomkiCli.ConnectorChecks do
           else: %{
             name: "escript",
             ok: false,
-            reason: "missing: " <> bin <> " — 'komki init --force'"
+            reason: "missing: " <> bin <> " — 'komki setup' entdeckt neu"
           }
 
       nil ->
         %{
           name: "escript",
           ok: false,
-          reason: "Erlang-escript nicht entdeckt — Erlang installieren, 'komki init --force'"
+          reason: "Erlang-escript nicht entdeckt — Erlang installieren, 'komki setup'"
         }
     end
   end
@@ -53,7 +64,7 @@ defmodule KomkiCli.ConnectorChecks do
         %{
           name: "socket path",
           ok: false,
-          reason: reason <> " — kuerzere Basis (KOMKI_HOME) waehlen"
+          reason: reason <> " — kürzere Basis (KOMKI_HOME) wählen"
         }
     end
   end
@@ -96,7 +107,7 @@ defmodule KomkiCli.ConnectorChecks do
           else: %{
             name: name,
             ok: false,
-            reason: "missing: " <> path <> " — 'komki init --force' entdeckt neu"
+            reason: "missing: " <> path <> " — 'komki setup' entdeckt neu"
           }
     end)
   end
@@ -110,7 +121,7 @@ defmodule KomkiCli.ConnectorChecks do
     ] ++ Connectors.profiles(cfg)
   end
 
-  @doc "Byte-Identitaet jedes Profils mit seiner Regeneration."
+  @doc "Byte-Identität jedes Profils mit seiner Regeneration."
   @spec profile_checks(Config.t()) :: [check()]
   def profile_checks(cfg) do
     Enum.map(profiles(cfg), fn {name, path, generate} ->
@@ -132,7 +143,8 @@ defmodule KomkiCli.ConnectorChecks do
         %{
           name: name,
           ok: false,
-          reason: "drift: regenerierter Profiltext weicht ab (init --force)"
+          reason:
+            "drift: regenerierter Profiltext weicht ab — nach einem Update 'komki setup'; bleibt sie, wurde das Profil verändert"
         }
     end
   rescue
@@ -146,7 +158,7 @@ defmodule KomkiCli.ConnectorChecks do
 
       case keychain.(service) do
         :ok ->
-          %{name: check, ok: true, reason: "Schluesselbund-Eintrag '" <> service <> "' vorhanden"}
+          %{name: check, ok: true, reason: "Schlüsselbund-Eintrag '" <> service <> "' vorhanden"}
 
         {:error, error} ->
           %{

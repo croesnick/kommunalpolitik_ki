@@ -61,7 +61,7 @@ defmodule KomkiCli.DoctorBootTest do
       assert init_out =~ "gguf-sha256:  " <> Config.expected_gguf_sha256()
     end
 
-    test "doctor: alle Checks gruen inklusive Boot-Gate" do
+    test "doctor: alle Checks grün inklusive Boot-Gate" do
       # cfg aus der Instanz der setup_all-Phase: der llama-Boot-Probe-Check
       # heisst "boot " <> llama-server-Pfad (steps.ex: boot_l) — genau
       # gepinnt statt Substring ("llama-server" matcht auch den Tools-Check,
@@ -78,10 +78,17 @@ defmodule KomkiCli.DoctorBootTest do
       refute out_doctor =~ "FAIL"
     end
 
-    test "run ohne laufenden llama-server: fail-fast mit Hinweis (Exit 2)" do
-      {out_run, 2} = CLI.run(["run", "hallo"])
-      assert out_run =~ "llama-server nicht aktiv"
-      assert out_run =~ "'komki up' zuerst"
+    # Ticket #176: run startet fehlende Prozesse selbst (wie up). In diesem
+    # Testumfeld scheitert der Start; die Ursache kommt mit Runtime-Exit 4,
+    # statt dass run auf 'komki up' verweist.
+    test "run ohne laufenden llama-server startet selbst; scheitert der Start, kommt die Ursache (Exit 4)" do
+      # Der Startversuch kann einen echten llama-server hochfahren: danach
+      # immer stoppen, sonst bleibt er als Waise auf dem Testport.
+      on_exit(fn -> CLI.run(["down"]) end)
+
+      {out_run, 4} = CLI.run(["run", "hallo"])
+      refute out_run =~ "'komki up' zuerst"
+      assert out_run =~ "egress"
     end
 
     test "down ohne Boot-Gate: bereits gestoppt ist Erfolg (Exit 0)" do

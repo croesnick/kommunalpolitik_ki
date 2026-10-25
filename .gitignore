@@ -65,3 +65,7 @@ vault_suche-workspace/
 
 # Deepwork orchestrator state (local progress files)
 .slim/deepwork/
+dist/
+
+# pi fuers komki-Paket (make komki-paket installiert es hier)
+packaging/pi/node_modules/

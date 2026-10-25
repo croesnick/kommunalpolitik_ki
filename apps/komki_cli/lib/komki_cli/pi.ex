@@ -40,12 +40,12 @@ defmodule KomkiCli.Pi do
   node -> cli.js gestartet (der asdf-Shim scheitert unter dem Profil stumm).
   """
 
-  alias KomkiCli.Config
+  alias KomkiCli.{Anzeige, Config}
   require Config
 
   @session_term "xterm-256color"
 
-  @incomplete_tools_msg "config unvollstaendig: node/cli/llama-server fehlen — init verweigert unvollstaendige Instanzen"
+  @incomplete_tools_msg "config unvollständig: node/cli/llama-server fehlen — init verweigert unvollständige Instanzen"
 
   @type mode :: :text | :json
 
@@ -242,7 +242,9 @@ defmodule KomkiCli.Pi do
   # Knapper KomKI-System-Prompt (Nutzer-Wunsch: geeignet, per Default
   # Deutsch). Ersetzt pis Coding-Assistenten-Default — der KomkiCli ist
   # Ratsarbeit, nicht Codearbeit.
-  @komki_system_prompt "Antworte knapp und präzise, per Default auf Deutsch und durchgehend in der Du-Form. Du bist Assistent für kommunalpolitische Arbeit in einem lokalen, offline laufenden Arbeitsraum. Belege sachliche Aussagen mit Quellen, wo vorhanden, und markiere Unsicherheit offen."
+  # Quellenpflicht (AGENTS.md §6): jede Aussage mit ihrer Quelle, auch in
+  # Notizen, die pi anlegt.
+  @komki_system_prompt "Antworte knapp und präzise, per Default auf Deutsch und durchgehend in der Du-Form. Du bist Assistent für kommunalpolitische Arbeit in einem lokalen Arbeitsraum. Belege jede sachliche Aussage mit ihrer Quelle: aus der Websuche mit der vollständigen URL des Treffers (https://…, nicht nur die Domain), aus dem RIS mit Gremium, Sitzungsdatum und Tagesordnungspunkt, aus dem Vault mit dem Pfad der Notiz. Das gilt auch für Notizen: Die legst du mit vault_write_test im Vault an, mit den Quellen bei jeder Aussage. Hast du für eine Aussage keine Quelle, lass sie weg oder kennzeichne sie als unbelegt. Markiere Unsicherheit offen."
 
   defp session_flags(cfg, continue?) do
     base =
@@ -250,6 +252,7 @@ defmodule KomkiCli.Pi do
         "--offline"
         | mcp_contract_flags()
       ] ++
+        anzeige_flags(cfg) ++
         [
           "--no-skills",
           "--no-context-files",
@@ -283,6 +286,10 @@ defmodule KomkiCli.Pi do
   # reaktiviert NUR die eingebaute Extension MCP fuer die Vermittler-
   # Verbindung (pi >= 1.0; Issue #103: kein Pin).
   defp mcp_contract_flags, do: ["--no-extensions", "-e", "builtin:mcp"]
+
+  # Nur in der Session: lesbare Vermittler-Antworten statt Roh-JSON. Die
+  # Extension zeichnet nur (KomkiCli.Anzeige); der Einmal-Lauf hat keine TUI.
+  defp anzeige_flags(cfg), do: ["-e", Anzeige.entry(cfg)]
 
   # Vermittler-Tools (Ticket #133): pi 1.1.0 blendet MCP-Tools aus, sobald
   # --tools eine Allowlist traegt (Live-Fund: das Modell sah nur `write`).
@@ -341,13 +348,17 @@ defmodule KomkiCli.Pi do
       "XDG_DATA_HOME" => Path.join([cfg.pi_home, ".local", "share"]),
       "XDG_CACHE_HOME" => Path.join([cfg.pi_home, ".cache"]),
       "NODE_COMPILE_CACHE" => Path.join([cfg.pi_home, ".cache", "node-compile"]),
+      # Kein Übersetzungs-Cache für Extensions: er läge im schreibbaren
+      # pi-Home, und eine präparierte Cache-Datei würde statt der frisch
+      # geschriebenen Anzeige geladen (KomkiCli.Anzeige).
+      "JITI_FS_CACHE" => "false",
       "PI_OFFLINE" => "1",
       "LANG" => "C",
       "LC_ALL" => "C"
     }
   end
 
-  @doc "argv fuer den sandbox-exec-Aufruf (fuer Doctor/Tests sichtbar)."
+  @doc "argv für den sandbox-exec-Aufruf (für Doctor/Tests sichtbar)."
   @spec argv_for(Config.t(), String.t(), mode(), String.t()) :: [String.t()]
   def argv_for(%Config{} = cfg, scratch_dir, mode, prompt) when Config.tools_ready(cfg) do
     profile_path = profile_path_for(cfg, scratch_dir)

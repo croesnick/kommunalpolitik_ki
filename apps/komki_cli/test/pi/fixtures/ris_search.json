@@ -1,0 +1,7 @@
+{
+  "args": {
+    "text": "Radverkehrskonzept"
+  },
+  "text": "{\"abrufdatum\":\"2026-10-24T18:17:10Z\",\"decision\":\"permit\",\"decision_id\":\"pdr-9dd7c70ba7cd984ef64a570ecd8f24d7\",\"emit_decision_id\":\"pdr-fd9a1894a4e0fbf070dead6287d8d877\",\"labels\":[\"ris-oeffentlich@1\"],\"payload_hash\":\"sha256:cf57e3b8f07443219aae94ff4b4b4346fff32418e2007afb565664f179362b9d\",\"results\":[{\"datum\":\"2026-06-30\",\"sitzung\":\"1. Sitzung des Mobilitätsausschusses Buchloe\",\"titel\":\"Ergebnisse des Arbeitskreises Radverkehrskonzept mit Umsetzung - Beratung und Beschlussfassung\",\"top_id\":\"117643874-118606671\",\"url\":\"https://ris.komuna.net/vgbuchloe/Meeting.mvc/Details/117643874-118606671\"},{\"datum\":\"2026-03-12\",\"sitzung\":\"Sitzung des Stadtrates Buchloe\",\"titel\":\"Radverkehrskonzept: Beauftragung eines Planungsbüros\",\"top_id\":\"117643874-118411203\",\"url\":\"https://ris.komuna.net/vgbuchloe/Meeting.mvc/Details/117643874-118411203\"},{\"datum\":\"2025-11-20\",\"sitzung\":\"Sitzung des Bau-, Umwelt- und Verkehrsausschusses Buchloe\",\"titel\":\"Antrag der Fraktion auf Fortschreibung des Radverkehrskonzepts\",\"top_id\":\"117643874-117990012\",\"url\":\"https://ris.komuna.net/vgbuchloe/Meeting.mvc/Details/117643874-117990012\"}],\"rule\":\"admit\"}",
+  "tool": "ris_search"
+}

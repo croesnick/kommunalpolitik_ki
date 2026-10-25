@@ -9,7 +9,9 @@ defmodule KomkiCli.CLI do
   Befehle (Vertrag):
 
       komki version
-      komki version
+      komki setup [--demo] [--vault-dir PATH] [--gguf-from PATH] [--port N]
+      komki secret set NAME | komki secret list
+      komki journal verify
       komki init  [--gguf-from PATH] [--port N] [--ctx N]
                   [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--force]
       komki doctor
@@ -65,6 +67,22 @@ defmodule KomkiCli.CLI do
   @doc false
   @spec main([binary()]) :: no_return()
   def main(argv) do
+    # Multicall (Ticket #179): `komki komki-mediator ...` usw. startet die
+    # Rolle; deren Einstieg blockiert und beendet die VM selbst.
+    case KomkiCli.Roles.dispatch(argv) do
+      {module, rest} ->
+        # Kehrt eine Rolle zurueck (etwa `--help`), endet das Programm wie
+        # ein eigenstaendiges Escript mit Exit 0.
+        module.main(rest)
+        halt(0)
+
+      nil ->
+        main_cli(argv)
+    end
+  end
+
+  @spec main_cli([binary()]) :: no_return()
+  defp main_cli(argv) do
     # NIF-Bootstrap (Muster aus ratsinfo/lib/ratsinfo/cli.ex, Ticket #91):
     # Im Escript-Kontext sind NIF-priv-Verzeichnisse gezippt und koennen
     # von dort nicht dlopen-geladen werden; daher das physische
@@ -88,6 +106,8 @@ defmodule KomkiCli.CLI do
     base = Path.dirname(:escript.script_name())
 
     paths = [
+      # Paket-Layout (Ticket #180): komki und lib/exqlite nebeneinander
+      Path.join([base, "lib/exqlite/ebin"]),
       Path.join([base, "_build/dev/lib/exqlite/ebin"]),
       Path.join([base, "../_build/dev/lib/exqlite/ebin"]),
       Path.join([Application.app_dir(:exqlite), "ebin"])
@@ -105,7 +125,10 @@ defmodule KomkiCli.CLI do
   @doc "Testbare Kernfunktion: `{output, exit_code}` ohne System.halt."
   @spec run(term()) :: outcome()
   def run(argv) when is_list(argv) do
-    dispatch(argv)
+    # Log-Auszuege der Rollen koennen Latin-1-Bytes tragen (Rollen laufen mit
+    # LANG=C); ungueltiges UTF-8 ersetzen statt beim Ausgeben abzustuerzen.
+    {output, code} = dispatch(argv)
+    {String.replace_invalid(output), code}
   rescue
     exception -> {"internal error: " <> Exception.format(:error, exception) <> "\n", 2}
   catch
@@ -122,224 +145,304 @@ defmodule KomkiCli.CLI do
   defp cli do
     Optimus.new!(
       name: "komki",
-      description:
-        "Launcher fuer die gepinnte Modellkombination (Ticket #74; Entscheidungen: Ticket #70)",
+      description: "komki: KI-Recherche für die Ratsarbeit in einer abgeschotteten Umgebung",
       version: @version,
       author: "Carsten Roesnick-Neugebauer",
-      subcommands: [
-        version: [name: "version", description: "Versiondrucker"],
-        init: [
-          name: "init",
-          description: "KomKI-CLI-Instanz anlegen (config + Profil + pi-home + GGUF-SHA-Gate)",
-          options: [
-            gguf_from: [
-              value_name: "PATH",
-              long: "gguf-from",
-              help:
-                "GGUF-Quelle (Kopie; default: das Staging-Artefakt unter ~/.local/share/komki/models-staging/)"
-            ],
-            port: [
-              value_name: "N",
-              long: "port",
-              parser: :integer,
-              help: "llama-server-Port (default 49524, gepinnt)"
-            ],
-            ctx: [
-              value_name: "N",
-              long: "ctx",
-              parser: :integer,
-              help: "llama-Kontextgroesse (default 131072)"
-            ],
-            vault_dir: [
-              value_name: "PATH",
-              long: "vault-dir",
-              help:
-                "Vault des Vault-Connectors (default <base>/vault, anfangs leer; leer gesetzt: abgeschaltet)"
-            ],
-            ris_base_url: [
-              value_name: "URL",
-              long: "ris-base-url",
-              help: "RIS-API-Basis (default https://risapi1.komuna.net/web/)"
-            ],
-            ris_mock_port: [
-              value_name: "N",
-              long: "ris-mock-port",
-              parser: :integer,
-              help: "RIS-Mock auf 127.0.0.1:N statt echter API (ohne Egress-Proxy)"
+      subcommands: with_about(subcommands())
+    )
+  end
+
+  # Optimus listet Unterbefehle mit ihrem `about`; die Kurzbeschreibung ist
+  # dieselbe wie die `description` der jeweiligen Hilfe-Seite.
+  defp with_about(subcommands) do
+    Enum.map(subcommands, fn {key, spec} ->
+      spec =
+        spec
+        |> Keyword.put_new(:about, spec[:description])
+        |> Keyword.update(:subcommands, [], &with_about/1)
+
+      {key, spec}
+    end)
+  end
+
+  defp subcommands do
+    [
+      version: [name: "version", description: "Version anzeigen"],
+      setup: [
+        name: "setup",
+        description:
+          "geführte Einrichtung: Werkzeuge prüfen, Instanz anlegen, Schlüssel hinterlegen, starten",
+        options: [
+          vault_dir: [
+            value_name: "PATH",
+            long: "vault-dir",
+            help: "eigener Vault (sonst Frage; Enter wählt den Test-Vault)"
+          ],
+          gguf_from: [
+            value_name: "PATH",
+            long: "gguf-from",
+            help: "vorhandene Modelldatei (GGUF) verwenden"
+          ],
+          port: [
+            value_name: "N",
+            long: "port",
+            parser: :integer,
+            help: "llama-server-Port (default 49524; anderer Port für eine zweite Instanz)"
+          ]
+        ],
+        flags: [
+          demo: [
+            long: "demo",
+            help: "Test-Vault mit erfundenen Notizen verwenden, ohne zu fragen"
+          ]
+        ]
+      ],
+      secret: [
+        name: "secret",
+        description: "Schlüssel im macOS-Schlüsselbund verwalten (Werte werden nie angezeigt)",
+        subcommands: [
+          set: [
+            name: "set",
+            description:
+              "Schlüssel verdeckt eingeben und ablegen (z.B. 'komki secret set brave')",
+            args: [
+              name: [
+                value_name: "NAME",
+                required: true,
+                help: "Kurzname, siehe 'komki secret list'"
+              ]
             ]
           ],
-          flags: [
-            force: [long: "force", help: "bestehende config.json ueberschreiben"]
+          list: [name: "list", description: "erwartete Schlüssel und ob sie vorhanden sind"]
+        ]
+      ],
+      journal: [
+        name: "journal",
+        description: "Entscheidungs-Journal des Vermittlers",
+        subcommands: [
+          verify: [
+            name: "verify",
+            description: "prüfen, dass die Kette lückenlos und unverändert ist"
+          ]
+        ]
+      ],
+      init: [
+        name: "init",
+        description:
+          "Instanz von Hand anlegen (macht setup mit; Modell wird per Prüfsumme geprüft)",
+        options: [
+          gguf_from: [
+            value_name: "PATH",
+            long: "gguf-from",
+            help:
+              "GGUF-Quelle (Kopie; default: das Staging-Artefakt unter ~/.local/share/komki/models-staging/)"
+          ],
+          port: [
+            value_name: "N",
+            long: "port",
+            parser: :integer,
+            help: "llama-server-Port (default 49524, gepinnt)"
+          ],
+          ctx: [
+            value_name: "N",
+            long: "ctx",
+            parser: :integer,
+            help: "llama-Kontextgröße (default 131072)"
+          ],
+          vault_dir: [
+            value_name: "PATH",
+            long: "vault-dir",
+            help:
+              "Vault des Vault-Connectors (default <base>/vault, anfangs leer; leer gesetzt: abgeschaltet)"
+          ],
+          ris_base_url: [
+            value_name: "URL",
+            long: "ris-base-url",
+            help: "RIS-API-Basis (default https://risapi1.komuna.net/web/)"
+          ],
+          ris_mock_port: [
+            value_name: "N",
+            long: "ris-mock-port",
+            parser: :integer,
+            help: "RIS-Mock auf 127.0.0.1:N statt echter API (ohne Egress-Proxy)"
           ]
         ],
-        doctor: [name: "doctor", description: "alle Checks; Boot-Gate ist Pflicht vor jedem Lauf"],
-        up: [
-          name: "up",
-          description:
-            "llama-server, Egress, Connectoren und Vermittler starten (doctor-quick zuerst; Health-Poll nach)",
-          options: [
-            ctx: [
-              value_name: "N",
-              long: "ctx",
-              parser: :integer,
-              help: "Kontextgroesse Override fuer diesen Start"
-            ]
+        flags: [
+          force: [long: "force", help: "bestehende config.json überschreiben"]
+        ]
+      ],
+      doctor: [
+        name: "doctor",
+        description:
+          "alles prüfen: Werkzeuge, Profile, Start in der Sandbox (läuft vor jedem run und jeder session)"
+      ],
+      up: [
+        name: "up",
+        description:
+          "llama-server, Egress, Connectoren und Vermittler starten (prüft vorher kurz, wartet bis alles antwortet)",
+        options: [
+          ctx: [
+            value_name: "N",
+            long: "ctx",
+            parser: :integer,
+            help: "Kontextgröße Override für diesen Start"
+          ]
+        ]
+      ],
+      down: [
+        name: "down",
+        description: "alles stoppen, was komki gestartet hat (fremde Prozesse bleiben unberührt)"
+      ],
+      status: [
+        name: "status",
+        description:
+          "zeigt, was läuft (llama, Egress, Connectoren, Vermittler) und wo die Instanz liegt"
+      ],
+      run: [
+        name: "run",
+        description:
+          "einen Auftrag einmal ausführen und die Antwort ausgeben (startet komki bei Bedarf)",
+        args: [
+          prompt: [
+            value_name: "PROMPT",
+            required: true,
+            help: "Prompt (quoted; nicht mit -- beginnend)"
           ]
         ],
-        down: [
-          name: "down",
-          description:
-            "Vermittler, Connectoren, Egress und llama-server stoppen (Aufraeumweg ohne Boot-Gate; nur eigener pidfile-Prozess)"
-        ],
-        status: [
-          name: "status",
-          description: "Zustandsabfrage (base, gguf, ports, llama, egress, connectoren, mediator)"
-        ],
-        run: [
-          name: "run",
-          description: "pi-Einmallauf unter Profil (+ full doctor zuerst)",
-          args: [
-            prompt: [
-              value_name: "PROMPT",
-              required: true,
-              help: "Prompt (quoted; nicht mit -- beginnend)"
+        options: [
+          mode: [
+            value_name: "TEXT|JSON",
+            long: "mode",
+            help: "pi-Ausgabe-Modus (default text)"
+          ],
+          scratch: [
+            value_name: "PATH",
+            long: "scratch",
+            help: "Scratch-Verzeichnis unterhalb base/runs/ (default base/runs/<UTC-Stamp>)"
+          ],
+          timeout: [
+            value_name: "SEKUNDEN",
+            long: "timeout",
+            parser: :integer,
+            help: "Laufzeit-Limit für pi (default 600); danach Abbruch mit Exit 4"
+          ]
+        ]
+      ],
+      session: [
+        name: "session",
+        description: "interaktiv mit pi arbeiten, in tmux (startet komki bei Bedarf)",
+        flags: [
+          continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"],
+          detach: [
+            long: "detach",
+            help: "Session im Hintergrund starten; der Befehl zum Andocken steht in der Ausgabe"
+          ]
+        ]
+      ],
+      session_chain: [
+        name: "session-chain",
+        description: "intern: pi-Kette als Port-Kind (Pane-Einstieg von 'session')",
+        flags: [
+          continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"]
+        ]
+      ],
+      label: [
+        name: "label",
+        description:
+          "SQLite-Registry: Bindungen, Labels, Quarantäne und Γ-Export (Ticket #91; RFC 0003 R.2)",
+        subcommands: [
+          import: [
+            name: "import",
+            description: "Store aus Registry-Datei füllen (komki-label-store/2, Merge)",
+            args: [
+              file: [
+                value_name: "FILE",
+                required: true,
+                help: "Pfad der komki-label-store/2-JSON-Datei"
+              ]
+            ],
+            options: [db: db_opt()]
+          ],
+          quarantine: [
+            name: "quarantine",
+            description:
+              "Objekt in Quarantäne (Eingang eines neuen Objekts oder Rückholung; R.2.5)",
+            args: [
+              object: [
+                value_name: "OBJ@VER",
+                required: true,
+                help: "Objektreferenz OBJ@VER (Version kebab, z.B. v42)"
+              ]
+            ],
+            options: [
+              db: db_opt(),
+              content_ref: content_ref_opt(),
+              origin: origin_opt(),
+              decided_by: decided_by_opt(),
+              basis: basis_opt()
             ]
           ],
-          options: [
-            mode: [
-              value_name: "TEXT|JSON",
-              long: "mode",
-              help: "pi-Ausgabe-Modus (default text)"
-            ],
-            scratch: [
-              value_name: "PATH",
-              long: "scratch",
-              help: "Scratch-Verzeichnis unterhalb base/runs/ (default base/runs/<UTC-Stamp>)"
-            ],
-            timeout: [
-              value_name: "SEKUNDEN",
-              long: "timeout",
-              parser: :integer,
-              help: "Laufzeit-Limit fuer pi (default 600); danach Abbruch mit Exit 4"
-            ]
-          ]
-        ],
-        session: [
-          name: "session",
-          description: "interaktive pi-Session in tmux (full doctor zuerst)",
-          flags: [
-            continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"],
-            detach: [
-              long: "detach",
-              help: "Session ohne attach starten; spaeter 'tmux -L komki attach -t komki'"
-            ]
-          ]
-        ],
-        session_chain: [
-          name: "session-chain",
-          description: "intern: pi-Kette als Port-Kind (Pane-Einstieg von 'session')",
-          flags: [
-            continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"]
-          ]
-        ],
-        label: [
-          name: "label",
-          description:
-            "SQLite-Registry: Bindungen, Labels, Quarantäne und Γ-Export (Ticket #91; RFC 0003 R.2)",
-          subcommands: [
-            import: [
-              name: "import",
-              description: "Store aus Registry-Datei fuellen (komki-label-store/2, Merge)",
-              args: [
-                file: [
-                  value_name: "FILE",
-                  required: true,
-                  help: "Pfad der komki-label-store/2-JSON-Datei"
-                ]
-              ],
-              options: [db: db_opt()]
-            ],
-            quarantine: [
-              name: "quarantine",
-              description:
-                "Objekt in Quarantäne (Eingang eines neuen Objekts oder Rueckholung; R.2.5)",
-              args: [
-                object: [
-                  value_name: "OBJ@VER",
-                  required: true,
-                  help: "Objektreferenz OBJ@VER (Version kebab, z.B. v42)"
-                ]
-              ],
-              options: [
-                db: db_opt(),
-                content_ref: content_ref_opt(),
-                origin: origin_opt(),
-                decided_by: decided_by_opt(),
-                basis: basis_opt()
+          classify: [
+            name: "classify",
+            description:
+              "Erstklassifikation/Neuklassifikation (menschlicher Akt; Λ=∅ ist legitimes leeres Label)",
+            args: [
+              object: [
+                value_name: "OBJ@VER",
+                required: true,
+                help: "Objektreferenz OBJ@VER"
               ]
             ],
-            classify: [
-              name: "classify",
-              description:
-                "Erstklassifikation/Neuklassifikation (menschlicher Akt; Λ=∅ ist legitimes leeres Label)",
-              args: [
-                object: [
-                  value_name: "OBJ@VER",
-                  required: true,
-                  help: "Objektreferenz OBJ@VER"
-                ]
-              ],
-              options: [
-                db: db_opt(),
-                label: label_opt(),
-                decided_by: decided_by_opt(),
-                basis: basis_opt()
-              ]
-            ],
-            list: [
-              name: "list",
-              description: "Uebersicht: Bindungen und Objektstaende",
-              options: [db: db_opt()]
-            ],
-            show: [
-              name: "show",
-              description: "Einzelansichten (Binding R.2.2/Objekt-Historie)",
-              subcommands: [
-                binding: [
-                  name: "binding",
-                  description: "Volle Bindungsdefinition (alle R.2.2-Felder)",
-                  args: [
-                    binding: [
-                      value_name: "BINDUNGS-ID",
-                      required: true,
-                      help: "Bindungskennung <kebab>@<int>"
-                    ]
-                  ],
-                  options: [db: db_opt()]
+            options: [
+              db: db_opt(),
+              label: label_opt(),
+              decided_by: decided_by_opt(),
+              basis: basis_opt()
+            ]
+          ],
+          list: [
+            name: "list",
+            description: "Übersicht: Bindungen und Objektstände",
+            options: [db: db_opt()]
+          ],
+          show: [
+            name: "show",
+            description: "Einzelansichten (Binding R.2.2/Objekt-Historie)",
+            subcommands: [
+              binding: [
+                name: "binding",
+                description: "Volle Bindungsdefinition (alle R.2.2-Felder)",
+                args: [
+                  binding: [
+                    value_name: "BINDUNGS-ID",
+                    required: true,
+                    help: "Bindungskennung <kebab>@<int>"
+                  ]
                 ],
-                object: [
-                  name: "object",
-                  description: "Objekt-Metadaten + Entscheidungshistorie",
-                  args: [
-                    object: [
-                      value_name: "OBJ@VER",
-                      required: true,
-                      help: "Objektreferenz OBJ@VER"
-                    ]
-                  ],
-                  options: [db: db_opt()]
-                ]
+                options: [db: db_opt()]
+              ],
+              object: [
+                name: "object",
+                description: "Objekt-Metadaten + Entscheidungshistorie",
+                args: [
+                  object: [
+                    value_name: "OBJ@VER",
+                    required: true,
+                    help: "Objektreferenz OBJ@VER"
+                  ]
+                ],
+                options: [db: db_opt()]
               ]
-            ],
-            export: [
-              name: "export",
-              description: "Γ-Export: komki-registry/2 JSON (stdout oder --out)",
-              options: [db: db_opt(), out: out_opt()]
             ]
+          ],
+          export: [
+            name: "export",
+            description: "Γ-Export: komki-registry/2 JSON (stdout oder --out)",
+            options: [db: db_opt(), out: out_opt()]
           ]
         ]
       ]
-    )
+    ]
   end
 
   defp dispatch(argv) do
@@ -365,17 +468,38 @@ defmodule KomkiCli.CLI do
 
   defp parse_dispatch(argv) do
     case Optimus.parse(cli(), argv) do
-      {:ok, [:label | tail], result} -> dispatch_label_tail(tail, result)
+      {:ok, [group | tail], result} when group in [:label, :secret, :journal] ->
+        dispatch_group(group, tail, result)
+
       # Top-Level-Befehle (Vertrag ab version bis session-chain):
-      {:ok, [command], result} -> dispatch_command(command, result)
-      {:ok, %Optimus.ParseResult{}} -> {"no command given; run \"komki --help\"\n", 2}
-      {:error, errors} -> {error_line(errors) <> "\n", 2}
-      {:error, _path, errors} -> {error_line(errors) <> "\n", 2}
-      :help -> help_text([])
-      {:help, path} -> help_text(path)
-      :version -> {"komki " <> @version <> "\n", 0}
+      {:ok, [command], result} ->
+        dispatch_command(command, result)
+
+      {:ok, %Optimus.ParseResult{}} ->
+        {"no command given; run \"komki --help\"\n", 2}
+
+      {:error, errors} ->
+        {error_line(errors) <> "\n", 2}
+
+      {:error, _path, errors} ->
+        {error_line(errors) <> "\n", 2}
+
+      :help ->
+        help_text([])
+
+      {:help, path} ->
+        help_text(path)
+
+      :version ->
+        {"komki " <> @version <> "\n", 0}
     end
   end
+
+  # Befehlsgruppen: label (Ticket #91), secret und journal (Ticket #176)
+  defp dispatch_group(:label, tail, result), do: dispatch_label_tail(tail, result)
+  defp dispatch_group(:secret, [:set], result), do: secret_set(result.args.name)
+  defp dispatch_group(:secret, [:list], _result), do: secret_list()
+  defp dispatch_group(:journal, [:verify], _result), do: render(KomkiCli.Steps.journal_verify())
 
   defp dispatch_label_tail([sub], result) do
     render(KomkiCli.LabelSteps.label_command(sub, label_opts(result)))
@@ -393,7 +517,7 @@ defmodule KomkiCli.CLI do
   end
 
   defp error_line(errors) do
-    "Error: " <> Enum.join(format_errors(errors), ", ") <> "; run \"komki --help\" fuer usage"
+    "Error: " <> Enum.join(format_errors(errors), ", ") <> "; run \"komki --help\" für usage"
   end
 
   # Optimus formatiert Parse-Fehler bedingungslos farbig (IO.ANSI.red/bright/
@@ -426,8 +550,11 @@ defmodule KomkiCli.CLI do
   defp dispatch_command(:down, _result), do: render(KomkiCli.Steps.down())
   defp dispatch_command(:status, _result), do: render(KomkiCli.Steps.status())
 
+  defp dispatch_command(:setup, result),
+    do: render(KomkiCli.Setup.run(optimus_opts(result), setup_ui()))
+
   defp dispatch_command(:session, result),
-    do: render(KomkiCli.Steps.session(optimus_opts(result)))
+    do: render(KomkiCli.Steps.session(optimus_opts(result), &show_start/1))
 
   defp dispatch_command(:session_chain, result),
     do: render(KomkiCli.Steps.session_chain(optimus_opts(result)))
@@ -443,8 +570,61 @@ defmodule KomkiCli.CLI do
       # stoesse einen echten Lauf an (Orchestrator-Fund im Smoke 5d).
       help_text([:run])
     else
-      render(KomkiCli.Steps.run(opts))
+      render(KomkiCli.Steps.run(opts, &show_start/1))
     end
+  end
+
+  # run/session ohne vorheriges `komki up` (Ticket #176): Steps meldet den
+  # Start ueber diesen Rueckruf, die Zeilen erscheinen sofort (die Session
+  # uebernimmt danach das Terminal).
+  defp show_start(up) do
+    {out, _code} = render(up)
+    IO.write("komki war nicht gestartet, jetzt gestartet:\n" <> out)
+  end
+
+  # ===========================================================================
+  # setup und secret (Ticket #176): interaktiv, deshalb schreiben sie direkt
+  # aufs Terminal; Fragen und verdeckte Eingabe in KomkiCli.Prompt.
+  # ===========================================================================
+
+  defp setup_ui do
+    %{
+      say: &IO.puts/1,
+      ask: &KomkiCli.Prompt.ask/2,
+      confirm: &KomkiCli.Prompt.confirm/2,
+      secret: &KomkiCli.Prompt.secret/1,
+      render: fn result ->
+        {out, _code} = render(result)
+        IO.write(out)
+      end
+    }
+  end
+
+  defp secret_set(name) do
+    case KomkiCli.Secrets.fetch(name) do
+      {:ok, entry} ->
+        IO.puts(entry.label <> " (Schlüsselbund-Eintrag '" <> entry.service <> "')")
+        message = KomkiCli.Setup.store_secret(entry, setup_ui())
+        code = if String.starts_with?(message, "gespeichert"), do: 0, else: 2
+        {message <> "\n", code}
+
+      :error ->
+        names = Enum.map_join(KomkiCli.Secrets.all(), ", ", & &1.name)
+        {"unbekannter Schlüssel '" <> name <> "'; bekannt: " <> names <> "\n", 2}
+    end
+  end
+
+  defp secret_list do
+    lines =
+      Enum.map(KomkiCli.Secrets.all(), fn entry ->
+        state =
+          if KomkiCli.Secrets.present?(entry), do: green() <> "vorhanden", else: red() <> "fehlt"
+
+        String.pad_trailing(entry.name, 10) <>
+          state <> reset() <> "  " <> entry.label <> " ('" <> entry.service <> "')"
+      end)
+
+    {Enum.join(lines, "\n") <> "\n", 0}
   end
 
   # label-Subcommands: args (file/object/binding) mit String-Schluesseln
@@ -499,7 +679,7 @@ defmodule KomkiCli.CLI do
       value_name: "TEXT",
       long: "basis",
       required: true,
-      help: "Begruendung + Quelle (Quellenpflicht, AGENTS.md §6)"
+      help: "Begründung + Quelle (Quellenpflicht, AGENTS.md §6)"
     ]
   end
 
@@ -508,7 +688,7 @@ defmodule KomkiCli.CLI do
       value_name: "BINDUNG",
       long: "label",
       multiple: true,
-      help: "Bindungslabel (wiederholbar; ohne Angabe = ausdruecklich leeres Label Λ=∅)"
+      help: "Bindungslabel (wiederholbar; ohne Angabe = ausdrücklich leeres Label Λ=∅)"
     ]
   end
 
@@ -589,7 +769,12 @@ defmodule KomkiCli.CLI do
   # Render-Flaeche (alle menschlichen Ausgaben; ANSI nur hier)
   # ===========================================================================
 
-  @spec render(KomkiCli.Steps.result() | KomkiCli.LabelSteps.result()) :: outcome()
+  @spec render(
+          KomkiCli.Steps.result()
+          | KomkiCli.LabelSteps.result()
+          | {:setup, :ok}
+          | {:journal, map()}
+        ) :: outcome()
   defp render({:inited, cfg, gguf_lines}), do: render_init(cfg, gguf_lines)
   defp render({:checks, checks, summary}), do: render_doctor(checks, summary)
 
@@ -626,12 +811,12 @@ defmodule KomkiCli.CLI do
          mediator_tools_line(health) <> ")" <> reset() <> "\n", 0}
 
   # Stoppreihenfolge wie up rueckwaerts: Vermittler-Zeile zuerst.
-  defp render({:down, %{llama: llama, connectors: connectors, mediator: mediator}}),
+  defp render({:down, %{llama: llama, connectors: connectors, mediator: mediator} = down}),
     do:
       {Enum.map_join(
          [{"mediator", mediator}] ++ connectors ++ [{"llama", llama}],
          fn {name, state} -> down_line(name, state) <> "\n" end
-       ), 0}
+       ) <> orphans_line(Map.get(down, :orphans, 0)), 0}
 
   defp render(
          {:status, cfg, %{llama: llama_state, connectors: connectors, mediator: mediator_state}}
@@ -666,6 +851,19 @@ defmodule KomkiCli.CLI do
          to_string(pi_code) <>
          ":\n" <>
          KomkiCli.Terminal.sanitize(out) <> "\n", 4}
+
+  defp render({:setup, :ok}), do: {"", 0}
+
+  defp render({:journal, %{"result" => "valid"} = result}),
+    do:
+      {green() <>
+         "Journal ok: " <>
+         to_string(result["records"]) <>
+         " Einträge, lückenlos verkettet und unverändert" <>
+         reset() <> "\n" <> "Kopf: " <> to_string(result["head_hash"]) <> "\n", 0}
+
+  defp render({:journal, result}),
+    do: {red() <> "Journal UNGUELTIG: " <> JSON.encode!(result) <> reset() <> "\n", 4}
 
   defp render({:session, message}),
     do: {green() <> String.trim_trailing(message) <> reset() <> "\n", 0}
@@ -762,7 +960,7 @@ defmodule KomkiCli.CLI do
       " — basis: " <> decision.basis
   end
 
-  defp render_labels([]), do: "(leer; ausdrueckliches Λ=∅)"
+  defp render_labels([]), do: "(leer; ausdrückliches Λ=∅)"
 
   defp render_labels(labels), do: Enum.join(labels, ", ")
 
@@ -790,7 +988,7 @@ defmodule KomkiCli.CLI do
   # wer (authority) welche Einschraenkung (restriction) fuer welche Ausgabe
   # (output) lockern darf.
   defp render_relaxation_authorities([]),
-    do: ["  relaxation_authorities: [] (keine Lockerung zulaessig, R.2.2)"]
+    do: ["  relaxation_authorities: [] (keine Lockerung zulässig, R.2.2)"]
 
   defp render_relaxation_authorities(entries) do
     [
@@ -801,7 +999,7 @@ defmodule KomkiCli.CLI do
               entry["authority"] <>
               " lockert '" <>
               entry["restriction"] <>
-              "' fuer Ausgabe '" <> entry["output"] <> "'"
+              "' für Ausgabe '" <> entry["output"] <> "'"
 
           _flat ->
             "    (unlesbarer Eintrag — Store-Stand vor komki-label-store/2)"
@@ -887,8 +1085,15 @@ defmodule KomkiCli.CLI do
   defp mediator_tools_line(%{"tools" => tools}) when is_list(tools), do: Enum.join(tools, ", ")
   defp mediator_tools_line(_), do: "?"
 
+  defp orphans_line(0), do: ""
+
+  defp orphans_line(count),
+    do:
+      green() <>
+        "pi: " <> Integer.to_string(count) <> " verwaiste Session(s) beendet" <> reset() <> "\n"
+
   defp down_line(component, :ok),
-    do: green() <> component <> " down: pidfile entfernt, pid abwesend" <> reset()
+    do: green() <> component <> " gestoppt" <> reset()
 
   defp down_line(component, :already),
     do: green() <> component <> ": bereits gestoppt (kein pidfile)" <> reset()

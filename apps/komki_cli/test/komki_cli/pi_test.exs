@@ -88,10 +88,23 @@ defmodule KomkiCli.PiTest do
       for continue? <- [false, true] do
         argv = Pi.argv_session(cfg, continue?)
 
-        assert Enum.count(argv, &(&1 == "-e")) == 1
-
         idx = Enum.find_index(argv, &(&1 == "--no-extensions"))
         assert Enum.slice(argv, idx, 3) == ["--no-extensions", "-e", "builtin:mcp"]
+      end
+    end
+
+    test "genau zwei Extensions: builtin:mcp und die Anzeige aus dem pi-Home", %{cfg: cfg} do
+      for continue? <- [false, true] do
+        argv = Pi.argv_session(cfg, continue?)
+
+        extensions =
+          argv
+          |> Enum.with_index()
+          |> Enum.filter(fn {arg, _} -> arg == "-e" end)
+          |> Enum.map(fn {_, i} -> Enum.at(argv, i + 1) end)
+
+        assert extensions == ["builtin:mcp", KomkiCli.Anzeige.entry(cfg)]
+        assert String.starts_with?(KomkiCli.Anzeige.entry(cfg), cfg.pi_home)
       end
     end
 
@@ -209,6 +222,7 @@ defmodule KomkiCli.PiTest do
       assert {"HOME", cfg.pi_home} in env
       assert {"PI_OFFLINE", "1"} in env
       assert {"PATH", "/usr/bin:/bin"} in env
+      assert {"JITI_FS_CACHE", "false"} in env
       assert Enum.sort(env) == env
     end
   end

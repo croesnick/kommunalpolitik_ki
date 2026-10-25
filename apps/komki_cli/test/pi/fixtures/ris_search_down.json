@@ -1,0 +1,7 @@
+{
+  "args": {
+    "text": "Radverkehrskonzept"
+  },
+  "text": "{\"admitted\":false,\"decision\":\"permit\",\"decision_id\":\"pdr-6499daaede0eec915a3ee4a3f134aede\",\"emit_decision_id\":\"pdr-a27cec0125becec4e0cb4aae38c6965b\",\"error\":{\"code\":\"upstream-error\",\"detail\":\"Connector nicht erreichbar: :enoent\"},\"rule\":\"admit\"}",
+  "tool": "ris_search"
+}

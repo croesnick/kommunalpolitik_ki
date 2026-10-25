@@ -44,8 +44,8 @@ komki läuft nur unter macOS (Seatbelt-Sandbox). Drei Werkzeuge müssen
 vorhanden sein, `init` entdeckt sie selbst und pinnt die aufgelösten Pfade
 in die `config.json` der Instanz: ein node-Interpreter (asdf, Homebrew oder
 nvm — bei asdf wird der echte Installationspfad hinter dem Shim benutzt,
-weil der Shim unter der Sandbox still scheitert), das pi-Bundle als globales
-npm-Paket (`npm install -g @earendil-works/pi-coding-agent`) und
+weil der Shim unter der Sandbox still scheitert), das pi-Bundle global über
+pnpm (`pnpm add -g @earendil-works/pi-coding-agent`; nie plain npm) und
 `llama-server` (llama.cpp, etwa via `brew install llama.cpp`). Fehlt eins,
 verweigert `init` mit klarer Meldung.
 
@@ -61,92 +61,125 @@ Details und Fallbacks: [`docs/prerequisites.md`](../../docs/prerequisites.md).
 mix escript.build   # erzeugt ./komki (Dev-Weg; braucht Elixir/OTP auf dem Host)
 ```
 
+## Veröffentlichen über Homebrew
+
+Nutzende installieren komki später mit `brew install croesnick/tap/komki`;
+bis zur Veröffentlichung gibt es den Tap nur lokal (`make komki-tap`). Die
+Formel installiert das Escript mit allen Rollen, daneben die SQLite-NIF und
+pi in fester Version, und zieht `erlang`, `llama.cpp`, `node` und `tmux`
+als Abhängigkeiten nach.
+
+pi liegt fertig im Paket: `make komki-paket` installiert es mit pnpm nach
+der Lockfile in `packaging/pi/` (`--frozen-lockfile --ignore-scripts`), samt
+aller Abhängigkeiten in fester Version. Die Formel kopiert nur noch, bei der
+Installation lädt nichts aus der npm-Registry nach. pi aktualisieren heißt:
+Version in `packaging/pi/package.json` ändern, `pnpm install` dort, Lockfile
+prüfen und committen (Renovate schlägt das auch vor). Erlang und Elixir des Repos (`.tool-versions`)
+folgen deshalb Homebrews aktueller `erlang`-Version.
+
+Ein Release in drei Schritten:
+
+1. Version in `apps/komki_cli/mix.exs` erhöhen und mergen.
+2. Tag setzen: `git tag komki-v<version> && git push origin komki-v<version>`.
+   Der Workflow `komki-release` baut auf Apple Silicon das Paket
+   (`make komki-paket`) und die Formel (`make komki-formel`) und hängt
+   beides an das GitHub-Release.
+3. `komki.rb` aus dem Release als `Formula/komki.rb` ins Tap-Repo
+   `croesnick/homebrew-tap` legen.
+
+Lokal lässt sich beides mit `make komki-formel` bauen (Ergebnis unter
+`dist/`). Der Bau braucht pnpm (`brew install pnpm`).
+
 ## Verteilen: eine Datei statt Ordner (Burrito)
 
-Für Rechner ohne installiertes Elixir baut Burrito das Release in eine einzige
-ausführbare Datei mit eingebettetem Erlang-Runtime (macOS arm64):
+Für Rechner ohne Homebrew baut Burrito komki samt Laufzeit in eine einzige
+ausführbare Datei (macOS arm64, rund 7 MB). Sie enthält alle Rollen;
+Vermittler, Egress-Proxy und Connectoren starten als `<datei> komki-mediator …`
+usw., jede unter ihrem eigenen Sandbox-Profil (Ticket #181).
 
 ```sh
-PATH="$HOME/.local/opt/zig-aarch64-macos-0.16.0:$PATH" \
-  MIX_ENV=prod BURRITO_TARGET=macos_silicon mix release
-# → burrito_out/komki_macos_silicon (eine Datei, ~10 MB)
+make komki-burrito
+# → dist/komki-<version>-macos-arm64-einzeldatei
 ```
 
+Burrito bringt vorgebaute Erlang-Laufzeiten nur für manche OTP-Versionen mit
+(für 29.1.2 noch nicht). `make komki-burrito` packt deshalb die laufende
+Erlang-Installation (`.tool-versions`) als eigene Laufzeit ein. Bau braucht
+zig exakt 0.16.0 und xz ([`docs/prerequisites.md`](../../docs/prerequisites.md)).
+
 Beim ersten Start entpackt die Datei ihr Payload nach
-`~/Library/Application Support/.burrito/` und läuft danach ohne jede
-Elixir-Installation. Eingebaute Wartungsbefehle:
-`komki maintenance directory` (Entpackpfad), `maintenance meta`,
-`maintenance uninstall` (Payload löschen, mit y/n-Rückfrage).
+`~/Library/Application Support/.burrito/` (`KOMKI_INSTALL_DIR` überschreibt
+den Ort). Rollen bekommen diesen Ort beim Start mit, weil sie mit dem
+HOME der Instanz laufen. Wartungsbefehle: `maintenance directory`,
+`maintenance meta`, `maintenance uninstall`.
 
-Bau-Voraussetzungen und Details: [`docs/prerequisites.md`](../../docs/prerequisites.md);
-Pilot-Bericht mit allen Messungen:
-[`docs/research/2026-10-11-komki-burrito-pilot.md`](../../docs/research/2026-10-11-komki-burrito-pilot.md).
+Hinweise:
 
-Zwei Hinweise für die verteilte Datei:
-
-- **Gatekeeper:** Die lokal gebaute Datei ist ad-hoc signiert und läuft ohne
-  Nachfrage. Wer sie aus einem GitHub-Release herunterlädt, bekommt beim
-  ersten Start den Gatekeeper-Dialog („Entwickler nicht verifiziert“) —
-  einmalig `xattr -d com.apple.quarantine komki_macos_silicon` ausführen
-  oder unter Systemeinstellungen › Datenschutz & Sicherheit freigeben.
-- **Bestehende Instanzen:** Das Seatbelt-Profil hat zwei Regeln für den
-  Session-Betrieb unter der Binary dazubekommen. Nach diesem Update einmalig
-  `komki init --force` ausführen — der Doctor meldet Profil-Drift, bis das
-  Profil neu geschrieben ist.
+- **Gleiche Version, alter Payload:** Eine neu gebaute Datei mit
+  unveränderter Version läuft mit dem schon entpackten alten Payload. Vor dem
+  Testen `maintenance uninstall` ausführen oder die Version erhöhen
+  ([Pilot-Bericht](../../docs/research/2026-10-11-komki-burrito-pilot.md)).
+- **Sandbox:** Das Profil jeder Rolle erlaubt zusätzlich nur, die Datei
+  auszuführen, ihr Laufzeit-Verzeichnis per `mkdir -p` „anzulegen“ (es
+  existiert), `.burrito` zu listen und `releases/COOKIE` zu öffnen. Löschen
+  bleibt verboten; alte Versionen räumt das ungesandboxte `komki` auf.
+- **Laufzeit von diesem Rechner:** Die eingepackte Laufzeit lädt OpenSSL von
+  Homebrew (`openssl@3`). Auf Rechnern ohne Homebrew-OpenSSL braucht es eine
+  Laufzeit mit eingebautem OpenSSL (vorgebaute Burrito-ERTS, sobald es sie
+  für die OTP-Version gibt).
+- **Gatekeeper:** Lokal gebaut läuft die Datei ohne Nachfrage. Aus dem Netz
+  geladen blockiert Gatekeeper den ersten Start; einmalig
+  `xattr -d com.apple.quarantine <datei>` oder Freigabe in den
+  Systemeinstellungen.
 
 ## Schnellstart: Arbeitsraum mit RIS, Websuche und Vault
 
-Der Ablauf von null bis zur ersten Session. Alle Befehle laufen im Repo-Root;
-`B` ist die Instanz (Default `~/.local/share/komki`, sonst `KOMKI_HOME`).
+Von null bis zur ersten Recherche, im Repo-Root:
 
 ```sh
-B=~/.local/share/komki
-
-# 1. Alle Escripts bauen und in die Instanz legen (komki sucht erst PATH, dann $B/bin)
-for app in komki_cli komki_mediator komki_egress komki_connector_ris komki_connector_web komki_connector_vault; do
-  (cd apps/$app && mix deps.get && mix escript.build)
-done
-mkdir -p $B/bin
-cp apps/komki_mediator/komki-mediator apps/komki_egress/komki-egress \
-   apps/komki_connector_ris/komki-connector-ris apps/komki_connector_web/komki-connector-web \
-   apps/komki_connector_vault/komki-connector-vault $B/bin/
-
-# 2. Brave-Key für die Websuche in den Schlüsselbund (fragt den Key verdeckt ab)
-security add-generic-password -s brave-search-api -a "$USER" -w
-
-# 3. Vault wählen: zum Ausprobieren den erfundenen Test-Vault kopieren
-cp -R apps/komki_connector_vault/priv/test-vault $B/vault
-
-# 4. Instanz anlegen (bestehende Instanz: --force ergänzen)
-apps/komki_cli/komki init --gguf-from PFAD/ZUM/MODELL.gguf --vault-dir $B/vault
-
-# 4b. Nur bei einer Instanz von vor den Connectoren: alte Registry und alten Raum
-#     beiseitelegen; der Vermittler legt beim nächsten Start die neuen Vorlagen an
-#     (Raum "recherche" mit workspace_bindings). Das Journal bleibt unverändert.
-mv $B/mediator/registry.json $B/mediator/registry.json.vor-connectoren
-mv $B/mediator/room.json $B/mediator/room.json.vor-connectoren
-
-# 5. Starten und prüfen
-apps/komki_cli/komki up        # llama, Egress, Connectoren, Vermittler
-apps/komki_cli/komki doctor    # muss mit "doctor: ok" enden
-apps/komki_cli/komki status
-
-# 6. Arbeiten
-apps/komki_cli/komki run "Suche im RIS nach Bahnhofstraße und fasse die Treffer zusammen."
-apps/komki_cli/komki session   # interaktiv in tmux
-
-# 7. Stoppen
-apps/komki_cli/komki down
+make komki                     # baut komki (ein Programm, alle Rollen) und legt es nach ~/.local/bin
+komki setup                    # lädt beim ersten Mal das Modell (17 GB), fragt vorher
+komki run "Suche im RIS nach Bahnhofstraße und fasse die Treffer zusammen."
+komki session                  # interaktiv in tmux
+komki journal verify           # Hash-Kette des Journals prüfen
+komki down                     # alles stoppen
 ```
+
+`komki setup` prüft die Werkzeuge und nennt für jedes fehlende den
+Installationsbefehl. Vermittler, Egress-Proxy und Connectoren sind Rollen
+desselben Programms (`komki komki-mediator …`); jede läuft trotzdem als
+eigener Prozess unter ihrem eigenen Sandbox-Profil. Auf einer bestehenden
+Instanz frischt `setup` nach einem Update die Programmpfade und Profile auf
+und lässt alle Einstellungen stehen. Es fragt nach dem Vault (Enter wählt den erfundenen
+Test-Vault, `--demo` ohne Frage), legt die Instanz an, fragt den
+Brave-Key verdeckt ab, falls er im Schlüsselbund fehlt, startet alles und
+prüft mit dem Doctor. Ein zweiter Lauf ändert an einer bestehenden Instanz
+nichts. Fehlt das Modell, nennt `setup` Größe, Quelle (feste Revision auf
+Hugging Face) und Lizenz und lädt es nach Rückfrage an den Staging-Ort
+(`~/.local/share/komki/models-staging/`). Ein abgebrochener Download setzt
+beim nächsten Aufruf fort; verwendet wird die Datei nur mit passender
+Prüfsumme. Liegt das Modell schon woanders, `--gguf-from PFAD`. Die Instanz
+bekommt das Modell als APFS-Klon: kein zusätzlicher Platz, Millisekunden
+statt einer 17-GB-Kopie. `run` und `session` starten fehlende Prozesse
+selbst, `komki up` ist nur noch nötig, wenn man ausdrücklich vorab starten
+will.
+
+Instanz von vor den Connectoren: Der Vermittler ersetzt `registry.json`
+und `room.json` beim nächsten Start selbst, wenn sie unveränderte alte
+Vorlagen sind (Prüfung per SHA-256; das Journal bleibt unverändert). Hast du
+eine der beiden Dateien verändert, ersetzt er nichts und erklärt beim Start,
+was zu tun ist.
 
 Hinweise zu den einzelnen Schritten:
 
-* **Schlüsselbund (Schritt 2, 5):** Beim ersten `komki up` fragt macOS, ob
+* **Schlüssel:** `komki secret set brave` legt den Brave-Key verdeckt ab
+  (nie in argv, nie im Log); `komki secret list` zeigt, ob er da ist. Beim
+  ersten Start fragt macOS, ob
   `security` auf den Eintrag `brave-search-api` zugreifen darf. Wähle
   „Immer erlauben“, sonst startet der Web-Connector ohne Key und jede
   Websuche meldet `credential-missing`. „Immer erlauben“ heißt: jeder Prozess
   unter deinem Nutzer kann den Key per `security` lesen.
-* **Vault (Schritt 3):** Der Vault-Connector zeigt nur Notizen mit
+* **Vault:** Der Vault-Connector zeigt nur Notizen mit
   Frontmatter-Feld `komki_labels` (z. B. `komki_labels: [vault-oeffentlich@1]`);
   alles andere bleibt unsichtbar. Geschrieben wird nur nach
   `<vault>/komki-test/`. Für einen echten Vault: Notizen zuerst labeln, dann
@@ -158,16 +191,15 @@ Hinweise zu den einzelnen Schritten:
   `elixir apps/komki_connector_ris/priv/mock_ris.exs --port 49640` und
   `komki init --force --ris-mock-port 49640`.
 * **Raum wechseln:** Welche Daten in einer Session zusammenkommen dürfen,
-  steht in `$B/mediator/room.json`, Feld `workspace_bindings`. Default ist
+  steht in `~/.local/share/komki/mediator/room.json`, Feld `workspace_bindings`. Default ist
   **recherche** (`ris-oeffentlich@1`, `vault-oeffentlich@1`,
   `web-oeffentlich@1`): Websuche und RIS erlaubt, vertrauliche Notizen
   gesperrt. Für **vertraulich** `vault-vertraulich@1` ergänzen: Dann sind
   vertrauliche Notizen lesbar und jede Web- und RIS-Suche gesperrt. Nach der
   Änderung `komki down && komki up`.
 * **Nachvollziehen:** Jede Entscheidung steht im Journal
-  `$B/mediator/journal/pdr.jsonl`;
-  `$B/bin/komki-mediator verify-journal --base $B` prüft die Hash-Kette.
-  Logs liegen unter `$B/tmp/`.
+  `~/.local/share/komki/mediator/journal/pdr.jsonl`; `komki journal verify`
+  prüft die Hash-Kette. Logs liegen unter `~/.local/share/komki/tmp/`.
 * **Wenn etwas hakt:** `komki doctor` nennt den fehlenden Teil (Escript,
   Profil, Credential, Connector-Ping). Ein ausgefallener Connector kommt mit
   erneutem `komki up` zurück, die laufenden Prozesse bleiben dabei stehen.
@@ -176,14 +208,18 @@ Hinweise zu den einzelnen Schritten:
 
 ```sh
 ./komki version
+./komki setup                       # gefuehrte Einrichtung (Werkzeuge, Vault, Instanz, Schluessel, Start)
+./komki secret set brave            # Brave-Key verdeckt in den Schluesselbund
+./komki secret list                 # erwartete Schluessel und ob sie da sind
+./komki journal verify              # Hash-Kette des Journals pruefen
 ./komki init                        # Instanz anlegen (config, Profil, pi-home, GGUF mit SHA-Gate)
 ./komki init --gguf-from PFAD       # GGUF-Quelle explizit angeben
 ./komki doctor                      # alle Checks (Werkzeuge, Profil, GGUF-SHA, Boot-Gate, Port)
 ./komki up                          # llama-server, Egress, Connectoren, Vermittler starten
-./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil
+./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil (startet bei Bedarf alles)
 ./komki session                     # interaktive pi-Session in tmux
 ./komki session --continue          # letzte Session fortsetzen
-./komki session --detach            # im Hintergrund; attach via 'tmux -L komki attach -t komki'
+./komki session --detach            # im Hintergrund; der Befehl zum Andocken steht in der Ausgabe
 ./komki down                        # alles stoppen (Vermittler, Connectoren, Egress, llama)
 ./komki status                      # Zustand (base, gguf, port, Socket, llama, Egress, Connectoren, Vermittler)
 ./komki label …                     # SQLite-Registry: Bindungen, Labels, Γ-Export (siehe unten)
@@ -192,12 +228,14 @@ Hinweise zu den einzelnen Schritten:
 Weitere Flags: `init --port N --ctx N --force` sowie für die Connectoren
 `init --vault-dir PFAD --ris-base-url URL --ris-mock-port N`, `up --ctx N`,
 `run --mode text|json --scratch PFAD --timeout SEKUNDEN` (PFAD nur unterhalb von `runs/` der Instanz; der Scratch ist auch das Arbeitsverzeichnis des Laufs; Laufzeit-Limit per Default 600 s, danach Exit 4). pi startet in Lauf und Session mit `--no-context-files`, damit eine vom Modell abgelegte `AGENTS.md` keinen späteren Lauf steuert, und sieht neben seinen Datei-Werkzeugen die Vermittler-Tools (`mcp__komki__*`). Exit-Codes: `0` Erfolg, `2` Nutzungs-,
-Konfigurations- oder Bereitschaftsfehler (etwa: llama-server nicht aktiv),
+Konfigurations- oder Bereitschaftsfehler (etwa: fremder Prozess auf dem llama-Port),
 `3` Doctor-/Boot-Gate-Fehlschlag, `4` Laufzeitfehler.
 
 Interaktive Sessions laufen in der tmux-Session `komki` auf einem eigenen
-tmux-Server (`tmux -L komki`, ohne persönliche tmux-Config), jeweils eine
-gleichzeitig. Der eigene Server sperrt den Terminal-Ausgang: pi kann weder per
+tmux-Server je Instanz (`tmux -L komki` für die Standard-Instanz, sonst
+`komki-<8 Zeichen aus dem Instanzpfad>`; ohne persönliche tmux-Config), jeweils
+eine gleichzeitig. Schließt sich das tmux-Fenster, beendet komki pi mit; pi-Reste
+früherer Sessions räumt `komki down` auf (Ticket #174). Der eigene Server sperrt den Terminal-Ausgang: pi kann weder per
 OSC 52 die Zwischenablage setzen noch Sequenzen am tmux vorbeischleusen; der
 Copy-Modus schreibt weiterhin in die Zwischenablage. Aus einer laufenden
 tmux-Session heraus startet er verschachtelt (Prefix dann zweimal, etwa
@@ -243,6 +281,16 @@ nicht über einen TCP-Port:
   die Antworten (JSON oder SSE) zeilenweise zurück. komki schreibt es vor
   jedem pi-Start neu nach `pi-home/.pi/agent/komki-relay.js`; eine vom Agenten
   veränderte Fassung überlebt damit keinen Lauf.
+* Die Antworten des Vermittlers zeigt die Session lesbar statt als Roh-JSON:
+  Status (zugelassen, abgelehnt mit Grund und Ausweg, zurückgehalten,
+  Quelle nicht erreichbar), Label, Treffer, Quelle mit Abrufzeit und Beleg;
+  ctrl+o klappt volle URLs und alle Belege auf. Das macht die pi-Extension
+  `komki-anzeige` (`priv/pi/komki-anzeige/`). Sie registriert nur Renderer,
+  ändert also weder Entscheidungen noch das, was das Modell sieht. komki
+  schreibt sie wie das Relay vor jedem pi-Start neu ins pi-Home und lädt sie
+  nur in der Session (`-e`); den Übersetzungs-Cache für TypeScript schaltet
+  `JITI_FS_CACHE=false` ab, weil er sonst im schreibbaren pi-Home läge.
+  Tests: `node --test apps/komki_cli/test/pi/*.test.ts`.
 * `komki run` und `komki session` lesen das Token und erzeugen je pi-Start
   eine Session-ID (`ses-` plus 16 Hex-Zeichen). Beides geht über die Umgebung
   an pi (`KOMKI_MEDIATOR_TOKEN`, `KOMKI_SESSION_ID`). Die `mcp.json` enthält

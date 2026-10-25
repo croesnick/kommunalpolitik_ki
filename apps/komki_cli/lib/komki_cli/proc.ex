@@ -39,7 +39,7 @@ defmodule KomkiCli.Proc do
     end
   end
 
-  @doc "Prueft, ob pid existiert und den `marker` in der ps-Kommandozeile faehrt."
+  @doc "Prüft, ob pid existiert und den `marker` in der ps-Kommandozeile fährt."
   @spec pid_alive?(term(), String.t()) :: boolean()
   def pid_alive?(pid, marker) when is_integer(pid) and pid > 0 do
     case System.cmd("/bin/ps", ["-p", to_string(pid), "-o", "command="]) do
@@ -59,15 +59,23 @@ defmodule KomkiCli.Proc do
   @spec kill_checked(term(), String.t()) :: :ok | {:error, String.t()}
   def kill_checked(pid, marker) do
     if pid_alive?(pid, marker) do
-      System.cmd("/bin/kill", ["-TERM", to_string(pid)])
+      # Burrito-Einzeldatei (Ticket #181): der Wrapper startet die VM als
+      # Kindprozess. Nur den Wrapper zu beenden liesse die Rolle als Waise
+      # weiterlaufen; deshalb alle Nachfahren mit demselben Marker mit.
+      family = [pid | marked_descendants(pid, marker)]
+      signal(family, "-TERM")
       Process.sleep(800)
 
-      if pid_alive?(pid, marker) do
-        System.cmd("/bin/kill", ["-KILL", to_string(pid)])
-        Process.sleep(300)
+      case Enum.filter(family, &pid_alive?(&1, marker)) do
+        [] ->
+          :ok
+
+        alive ->
+          signal(alive, "-KILL")
+          Process.sleep(300)
       end
 
-      if pid_alive?(pid, marker) do
+      if Enum.any?(family, &pid_alive?(&1, marker)) do
         {:error, marker <> " pid " <> to_string(pid) <> " still alive after SIGKILL"}
       else
         :ok
@@ -75,6 +83,27 @@ defmodule KomkiCli.Proc do
     else
       {:error,
        "pid " <> to_string(pid) <> " is not " <> marker <> " (pidfile stale); not sent any signal"}
+    end
+  end
+
+  defp signal(pids, sig), do: System.cmd("/bin/kill", [sig | Enum.map(pids, &to_string/1)])
+
+  @doc "Nachfahren von `pid` (rekursiv per pgrep -P), die `marker` in der Kommandozeile tragen."
+  @spec marked_descendants(pos_integer(), String.t()) :: [pos_integer()]
+  def marked_descendants(pid, marker) do
+    pid
+    |> descendants()
+    |> Enum.filter(&pid_alive?(&1, marker))
+  end
+
+  defp descendants(pid) do
+    case System.cmd("/usr/bin/pgrep", ["-P", to_string(pid)], stderr_to_stdout: true) do
+      {out, 0} ->
+        children = out |> String.split("\n", trim: true) |> Enum.map(&String.to_integer/1)
+        children ++ Enum.flat_map(children, &descendants/1)
+
+      _ ->
+        []
     end
   end
 
@@ -149,6 +178,61 @@ defmodule KomkiCli.Proc do
       file | args
     ]
   end
+
+  @doc """
+  Gesandboxter Start einer Rolle der Burrito-Einzeldatei (Ticket #181):
+
+      env -i HOME=<home> PATH=/usr/bin:/bin LANG=C KOMKI_INSTALL_DIR=<dir>
+        sandbox-exec -f <profil> <komki-binary> <args>
+
+  Wie `escript_cmd/6` mit geleerter Umgebung; einzige Ergaenzung ist
+  `KOMKI_INSTALL_DIR`, damit der Burrito-Wrapper die schon entpackte
+  Laufzeit findet (er sucht sie sonst unter HOME, und HOME zeigt hier auf
+  das Laufverzeichnis der Instanz).
+  """
+  @spec burrito_cmd(String.t(), String.t(), String.t(), [String.t()], String.t(), String.t()) ::
+          [String.t()]
+  def burrito_cmd(sandbox_exec, profile, binary, args, home, install_dir) do
+    [
+      "/usr/bin/env",
+      "-i",
+      "HOME=" <> home,
+      "PATH=/usr/bin:/bin",
+      "LANG=C",
+      "KOMKI_INSTALL_DIR=" <> install_dir,
+      sandbox_exec,
+      "-f",
+      profile,
+      binary | args
+    ]
+  end
+
+  @doc """
+  Start-Wortliste einer Rolle je nach Startart der Instanz: Burrito-Binary
+  oder Escript (`escript_cmd/6`, Rollenname steckt dann schon in `args`).
+  """
+  @spec role_cmd(KomkiCli.Config.t(), String.t(), String.t(), [String.t()], String.t()) ::
+          [String.t()]
+  def role_cmd(cfg, profile, binary, args, home) do
+    if cfg.launcher == "burrito" and binary == cfg.komki_bin do
+      burrito_cmd(
+        cfg.sandbox_exec,
+        profile,
+        binary,
+        args,
+        home,
+        KomkiCli.Config.burrito_install_dir(cfg)
+      )
+    else
+      escript_cmd(cfg.sandbox_exec, profile, escript!(cfg), binary, args, home)
+    end
+  end
+
+  defp escript!(%{escript_bin: bin}) when is_binary(bin), do: bin
+
+  defp escript!(_cfg),
+    do:
+      raise(ArgumentError, "escript-Laufzeit nicht entdeckt (Erlang installieren, 'komki setup')")
 
   @doc """
   Startet eine Spawn-Zeile (`spawn_line/4` mit `"0<&0"`) und schreibt
@@ -229,7 +313,7 @@ defmodule KomkiCli.Proc do
     end
   end
 
-  @doc "Log-Tail als Einzeiler kontrolliert fuer Fehlermeldungen."
+  @doc "Log-Tail als Einzeiler kontrolliert für Fehlermeldungen."
   @spec log_tail(String.t(), pos_integer()) :: String.t()
   def log_tail(path, lines) do
     if File.exists?(path) do

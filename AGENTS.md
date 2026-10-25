@@ -134,6 +134,10 @@ Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Ab
 
 Diese vier Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows, Begriffen oder Voraussetzungen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
 
+### Doku-Site aktuell halten
+
+Die Doku-Site unter [`docs/site/`](docs/site/) (veröffentlicht über GitHub Pages) ist der Benutzer-Guide zu komki. **Pflicht**: Ändert ein PR, was Nutzende von komki sehen oder tun (Befehle, Optionen, Ausgaben, Einrichtung, Sicherheitsgrenze), passt derselbe PR die betroffenen Seiten an. Terminal-Ausgaben dort stammen aus echten Läufen, nie nachgebaut. Gestaltungsregeln: [`docs/site/README.md`](docs/site/README.md).
+
 ## Sprachregelung
 
 Etablierte englische Fachbegriffe werden immer und konsistent auf Englisch verwendet — nicht eingedeutscht und nicht durch neugeprägte deutsche Komposita ersetzt (z. B. remedy plan, field provenance, taint tracking, paired execution). Deutsch wird nur verwendet, wenn (a) noch kein etablierter englischer Begriff existiert oder (b) ein etablierter deutscher Begriff vorhanden ist (z. B. Nichtinterferenz, Sitzungsmappe). Neue Begriffe — welcher Sprache auch immer — werden bei ihrer ersten Verwendung definiert.
@@ -151,15 +155,15 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `apps/ratsinfo` | Elixir | RIS-Scraper + CLI + lokale Volltextsuche | CLI (`ratsinfo sync/search/show`) | Funktionsfähig |
 | `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard | LiveView + MCP (`/mcp`) | Funktionsfähig |
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | Funktionsfähig |
-| `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi) + lokale Label-Registry mit Export an den Regel-Prüfkern (RFC 0003) | CLI (`komki init/doctor/up/down/status/run/session/label`) | Funktionsfähig |
+| `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi), ein Programm, das Vermittler, Egress-Proxy und Connectoren als Rollen mitbringt, + lokale Label-Registry mit Export an den Regel-Prüfkern (RFC 0003) | CLI (`komki setup/init/doctor/up/down/status/run/session/secret/journal/label`) | Funktionsfähig |
 | `apps/komki_policy` | Elixir | Regel-Prüfkern: rechnet aus, ob eine Absicht nach den Regeln zulässig ist, und verifiziert die Begründung unabhängig nach; rein, führt selbst nichts aus | CLI (`komki-policy validate/decide/verify/advance`) | Funktionsfähig |
 | `apps/komki_mediator` | Elixir | Vermittler: MCP-Server für pis Tool-Aufrufe — jede Operation wird vor der Ausführung von komki_policy entschieden (Gate 1), jede Antwort vor der Aufnahme in den Kontext geprüft und gelabelt (Gate 2), jede Entscheidung im PDR-Journal festgehalten | MCP (von `komki up` gestartet, Unix-Socket mit Token) | Funktionsfähig |
 | `apps/komki_connector` | Elixir | Gemeinsame Grundlage aller Connectoren: wie Vermittler und Connector miteinander sprechen, welche Operationen jeder Connector anbietet, welche Internet-Adressen und Ordner er braucht und welches Label seine Antworten bekommen | — (Bibliothek, Vertrag in `CONTRACT.md`) | Funktionsfähig |
 | `apps/komki_egress` | Elixir | Ausgangstür ins Internet für die Connectoren: jeder Connector bekommt einen eigenen lokalen Port und erreicht darüber nur die Adressen, die für ihn freigegeben sind; alles andere wird abgewiesen und protokolliert, ohne Inhalte mitzuschreiben | CLI (`komki-egress`, Konfiguration per stdin; später von `komki up` gestartet) | Funktionsfähig |
-| `apps/komki_connector_web` | Elixir | Websuche über Brave Search für den Vermittler: liefert Titel, Link und Kurztext je Treffer; der API-Schlüssel kommt aus dem Schlüsselbund und erscheint nirgends | Escript `komki-connector-web` (von `komki up` gestartet, Aufruf nur über den Vermittler) | Funktionsfähig |
+| `apps/komki_connector_web` | Elixir | Websuche über Brave Search für den Vermittler: liefert Titel, Link und Kurztext je Treffer; der API-Schlüssel kommt aus dem Schlüsselbund und erscheint nirgends | Rolle `komki-connector-web` im Programm komki (von `komki up` gestartet, Aufruf nur über den Vermittler) | Funktionsfähig |
 | `apps/komki_connector_vault` | Elixir | Vault-Anschluss für komki: durchsucht und liest Notizen eines lokalen Markdown-Vaults (nur Notizen mit gültigem Label) und legt Testnotizen in einem eigenen Ordner an; Symlinks und Pfade aus dem Vault heraus werden abgewiesen; mit erfundenem Test-Vault | Frame-Protokoll über Unix-Socket (von `komki up` gestartet, aufgerufen vom Vermittler) | Funktionsfähig |
 | `apps/komki_connector_ris` | Elixir | RIS-Anbindung für den Vermittler: sucht und liest öffentliche Tagesordnungspunkte im Ratsinformationssystem; nicht-öffentliche Punkte bleiben unsichtbar, auch in der Trefferzahl. Mit Übungs-RIS (Mock) für Tests | Connector-Socket (von `komki up` gestartet, CLI `komki-connector-ris`) | Funktionsfähig |
-| `docs/site` | Astro Starlight (Node) | Bebilderter Benutzer-Guide zu komki: wie es funktioniert, wie man es startet, wie man die Sicherheitsgrenze selbst sieht; veröffentlicht als Website über GitHub Pages | Website (Markdown/MDX-Quellen, `npm run build`) | Funktionsfähig |
+| `docs/site` | Astro Starlight (Node) | Bebilderter Benutzer-Guide zu komki: wie es funktioniert, wie man es startet, wie man die Sicherheitsgrenze selbst sieht; veröffentlicht als Website über GitHub Pages | Website (Markdown/MDX-Quellen, `pnpm build`) | Funktionsfähig |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | Bestehend |
 | `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (`opencode.json`) | Funktionsfähig |
 | `tools/nextcloud_ods_mcp` | Python | ODS-Dateien lesen (Sheets, Ranges, Zellen, Suche) | MCP (`opencode.json`) | Funktionsfähig |
@@ -269,6 +273,8 @@ in `endpoint.ex` als Plug eingetragen (nur `:dev`).
 | pytest | Test-Runner | `uv run pytest` |
 
 Die Python-Version steht zentral in `.tool-versions` am Repo-Root: asdf und uv lesen die Datei direkt, die CI parst sie für `setup-python` (python.yml). Änderungen dort greifen damit überall.
+
+Ebenso Erlang und Elixir: `.tool-versions` pinnt sie für asdf, und die CI liest dieselbe Datei (`setup-beam` mit `version-file`). Die Versionen folgen Homebrews aktuellem `erlang`, weil die komki-Formel davon abhängt (`packaging/homebrew/`).
 
 ### CI
 

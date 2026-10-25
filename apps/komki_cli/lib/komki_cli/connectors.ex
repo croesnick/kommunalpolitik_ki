@@ -64,7 +64,7 @@ defmodule KomkiCli.Connectors do
   @spec egress_profile_path(Config.t()) :: String.t()
   def egress_profile_path(cfg), do: Path.join(Path.dirname(cfg.profile_path), "egress.sb")
 
-  @doc "Laengster Socket-Pfad der Instanz (Grenze 103 Byte, CONTRACT.md §2)."
+  @doc "Längster Socket-Pfad der Instanz (Grenze 103 Byte, CONTRACT.md §2)."
   @spec longest_socket(String.t()) :: String.t()
   def longest_socket(base) do
     Enum.max_by(
@@ -120,7 +120,7 @@ defmodule KomkiCli.Connectors do
   defp egress_port!(cfg, id) do
     case Map.fetch(cfg.egress_ports, id) do
       {:ok, port} -> port
-      :error -> raise ArgumentError, "egress_ports: kein Port fuer Connector " <> id
+      :error -> raise ArgumentError, "egress_ports: kein Port für Connector " <> id
     end
   end
 
@@ -155,7 +155,7 @@ defmodule KomkiCli.Connectors do
     JSON.encode!(%{"ports" => ports}) <> "\n"
   end
 
-  @doc "Argumente nach dem Binary (CONTRACT.md §4). Enthaelt nie Credentials."
+  @doc "Argumente nach dem Binary (CONTRACT.md §4). Enthält nie Credentials."
   @spec connector_args(Config.t(), Manifest.t()) :: [String.t()]
   def connector_args(%Config{} = cfg, manifest) do
     ["--socket", Manifest.socket_path(cfg.base_dir, manifest.id)] ++
@@ -206,18 +206,18 @@ defmodule KomkiCli.Connectors do
   def egress_binary!(%Config{egress_bin: bin}) when is_binary(bin), do: bin
   def egress_binary!(_cfg), do: raise(ArgumentError, missing_binary(@egress_marker))
 
-  @doc "Hinweistext fuer ein fehlendes Escript."
+  @doc "Hinweistext für ein fehlendes Escript."
   @spec missing_binary(String.t()) :: String.t()
   def missing_binary(name),
     do:
       name <>
-        " nicht gefunden — in PATH oder <base>/bin ablegen ('komki init --force' entdeckt neu)"
+        " nicht gefunden — in PATH oder <base>/bin ablegen ('komki setup' entdeckt neu)"
 
   # ===========================================================================
   # Profile
   # ===========================================================================
 
-  @doc "Zu schreibende Profile: `[{name, pfad, generator}]` fuer Egress (falls noetig) und aktive Connectoren."
+  @doc "Zu schreibende Profile: `[{name, pfad, generator}]` für Egress (falls nötig) und aktive Connectoren."
   @spec profiles(Config.t()) :: [{String.t(), String.t(), (-> String.t())}]
   def profiles(%Config{} = cfg) do
     egress =
@@ -260,14 +260,14 @@ defmodule KomkiCli.Connectors do
     end)
   end
 
-  @doc "Startreihenfolge: Egress (falls noetig), dann die aktiven Connectoren in Manifest-Reihenfolge."
+  @doc "Startreihenfolge: Egress (falls nötig), dann die aktiven Connectoren in Manifest-Reihenfolge."
   @spec start_order(Config.t()) :: [String.t()]
   def start_order(cfg) do
     if(egress_needed?(cfg), do: ["egress"], else: []) ++
       Enum.map(enabled(cfg), &("connector-" <> &1.id))
   end
 
-  @doc "Stoppreihenfolge von `down/1`: Connectoren rueckwaerts (alle, idempotent), dann Egress."
+  @doc "Stoppreihenfolge von `down/1`: Connectoren rückwärts (alle, idempotent), dann Egress."
   @spec stop_order() :: [String.t()]
   def stop_order do
     Enum.map(Enum.reverse(Manifest.ids()), &("connector-" <> &1)) ++ ["egress"]
@@ -284,18 +284,32 @@ defmodule KomkiCli.Connectors do
     :ok
   end
 
-  defp start(cfg, :egress, _fetch) do
+  # Laeuft die Komponente schon, bleibt alles unberuehrt: Profil und Socket
+  # werden nur vor einem echten Start vorbereitet. Frueher loeschte jedes
+  # `up` den Socket eines laufenden Connectors, der danach als "running"
+  # galt, aber unerreichbar war (enoent), etwa in `komki session` nach `run`.
+  defp start(cfg, step, fetch) do
+    comp = component_for(cfg, step)
+
+    case alive(comp) do
+      {:ok, pid} -> {:ok, {comp.name, {:already, pid}}}
+      :none -> start_fresh(cfg, step, comp, fetch)
+    end
+  end
+
+  defp component_for(cfg, :egress), do: egress_component(cfg)
+  defp component_for(cfg, {:connector, manifest}), do: connector_component(cfg, manifest.id)
+
+  defp start_fresh(cfg, :egress, comp, _fetch) do
     Profile.write!(egress_profile_path(cfg), ConnectorProfile.egress(cfg))
-    comp = egress_component(cfg)
 
     launch(cfg, comp, egress_binary!(cfg), [], egress_profile_path(cfg), egress_stdin(cfg), fn ->
       egress_ready(cfg)
     end)
   end
 
-  defp start(cfg, {:connector, manifest}, fetch) do
+  defp start_fresh(cfg, {:connector, manifest}, comp, fetch) do
     Profile.write!(profile_path(cfg, manifest.id), ConnectorProfile.connector(cfg, manifest))
-    comp = connector_component(cfg, manifest.id)
     File.rm(comp.socket)
     {line, _missing} = credentials_line(manifest, fetch)
 
@@ -316,7 +330,9 @@ defmodule KomkiCli.Connectors do
         {:ok, {comp.name, {:already, pid}}}
 
       :none ->
-        line = spawn_line(cfg, profile, binary, args, comp.log)
+        # Multicall (Ticket #179): der Rollenname (= marker) vor den Argumenten
+        role = KomkiCli.Roles.prefix(cfg, binary, comp.marker)
+        line = spawn_line(cfg, profile, binary, role ++ args, comp.log)
 
         with {:ok, pid} <- Proc.spawn_detached(line, input, "/") do
           File.write!(comp.pidfile, Integer.to_string(pid) <> "\n")
@@ -332,17 +348,9 @@ defmodule KomkiCli.Connectors do
   """
   @spec spawn_line(Config.t(), String.t(), String.t(), [String.t()], String.t()) :: String.t()
   def spawn_line(%Config{} = cfg, profile, binary, args, log) do
-    [program | words] =
-      Proc.escript_cmd(cfg.sandbox_exec, profile, escript!(cfg), binary, args, run_dir(cfg))
-
+    [program | words] = Proc.role_cmd(cfg, profile, binary, args, run_dir(cfg))
     Proc.spawn_line(program, Enum.map(words, &Proc.quote_bin/1), log, "0<&0")
   end
-
-  defp escript!(%Config{escript_bin: bin}) when is_binary(bin), do: bin
-
-  defp escript!(_cfg),
-    do:
-      raise(ArgumentError, "escript-Laufzeit nicht entdeckt (Erlang installieren, init --force)")
 
   defp await(comp, pid, ready) do
     deadline = System.monotonic_time(:millisecond) + @ready_timeout_ms

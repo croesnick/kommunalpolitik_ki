@@ -61,12 +61,23 @@ defmodule KomkiCli.MixProject do
         steps: [:assemble, &Burrito.wrap/1],
         burrito: [
           targets: [
-            macos_silicon: [os: :darwin, cpu: :aarch64]
+            macos_silicon: [os: :darwin, cpu: :aarch64] ++ custom_erts()
           ],
           debug: Mix.env() != :prod
         ]
       ]
     ]
+  end
+
+  # Eigene Laufzeit (Ticket #181): Burrito bringt vorgebaute ERTS nur fuer
+  # manche OTP-Versionen mit (fuer 29.1.2 noch nicht). `make komki-burrito`
+  # packt die laufende Erlang-Installation als Tarball und reicht ihn ueber
+  # KOMKI_CUSTOM_ERTS herein; ohne die Variable nimmt Burrito seine eigene.
+  defp custom_erts do
+    case System.get_env("KOMKI_CUSTOM_ERTS") do
+      nil -> []
+      path -> [custom_erts: path]
+    end
   end
 
   # Runtime-Deps: optimus 0.6 (CLI-Layer), burrito 1.6 (Ticket #75),
@@ -92,6 +103,14 @@ defmodule KomkiCli.MixProject do
       # Start-Argumente und der ping im Doctor lesen dasselbe Modul wie der
       # Vermittler (CONTRACT.md §5).
       {:komki_connector, path: "../komki_connector"},
+      # Multicall (Ticket #179): Vermittler, Egress-Proxy und Connectoren als
+      # Rollen desselben Programms (`komki komki-mediator ...`). Die Apps
+      # bleiben im Workspace getrennt; gebuendelt wird nur hier.
+      {:komki_mediator, path: "../komki_mediator"},
+      {:komki_egress, path: "../komki_egress"},
+      {:komki_connector_ris, path: "../komki_connector_ris"},
+      {:komki_connector_web, path: "../komki_connector_web"},
+      {:komki_connector_vault, path: "../komki_connector_vault"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]

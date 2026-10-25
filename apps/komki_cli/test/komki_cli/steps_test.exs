@@ -9,7 +9,7 @@ defmodule KomkiCli.StepsTest do
   alias KomkiCli.{Config, Proc, Steps, TestSupport}
 
   describe "write_pi_home/1" do
-    test "Trust-Schluessel ist das Instanz-Root (deckt arbeit und pi-home ab)" do
+    test "Trust-Schlüssel ist das Instanz-Root (deckt arbeit und pi-home ab)" do
       cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-steps"))
 
       Steps.write_pi_home(cfg)
@@ -130,7 +130,7 @@ defmodule KomkiCli.StepsTest do
       assert scratch == Path.join(runs, "x")
     end
 
-    test "Pfad ausserhalb wird abgelehnt", %{base: base} do
+    test "Pfad außerhalb wird abgelehnt", %{base: base} do
       outside = TestSupport.tmp_area!("komki-scratch-outside")
       assert {:error, msg, 2} = Steps.scratch_for(%{"scratch" => outside}, base)
       assert msg =~ "unterhalb"
@@ -141,7 +141,7 @@ defmodule KomkiCli.StepsTest do
       assert {:error, _, 2} = Steps.scratch_for(%{"scratch" => Path.join(runs, "../x")}, base)
     end
 
-    test "Symlink unter runs mit Ziel ausserhalb wird abgelehnt", %{base: base, runs: runs} do
+    test "Symlink unter runs mit Ziel außerhalb wird abgelehnt", %{base: base, runs: runs} do
       outside = TestSupport.tmp_area!("komki-scratch-target")
       File.mkdir_p!(runs)
       link = Path.join(runs, "link")

@@ -51,7 +51,7 @@ defmodule KomkiCli.MediatorProfile do
         "Vermittler-Profil (komki-mediator, Tickets #137/#146): kein Netz-Outbound,",
         "nur die Connector-Sockets. Feste Eingaben -> byte-identischer Text."
       ]) ++
-        EscriptProfile.runtime(root, binary) ++
+        EscriptProfile.runtime_for(cfg, binary) ++
         EscriptProfile.log_rules(log) ++
         data_rules(data) ++
         listen_rules(cfg, listen) ++
@@ -116,5 +116,5 @@ defmodule KomkiCli.MediatorProfile do
   defp mediator_bin!(%Config{mediator_bin: bin}) when is_binary(bin), do: bin
 
   defp mediator_bin!(_cfg),
-    do: raise(ArgumentError, "komki-mediator nicht entdeckt (mix escript.build, init --force)")
+    do: raise(ArgumentError, "komki-mediator nicht entdeckt ('make komki', dann 'komki setup')")
 end

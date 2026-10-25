@@ -38,7 +38,7 @@ defmodule KomkiCli.ConnectorProfile do
         "Connector-Profil " <> manifest.id <> " (" <> manifest.fassung <> ", Ticket #146).",
         "Generiert aus KomkiConnector.Manifest und config.json; feste Eingaben -> byte-identischer Text."
       ]) ++
-        EscriptProfile.runtime(root, binary) ++
+        EscriptProfile.runtime_for(cfg, binary) ++
         EscriptProfile.log_rules(log) ++
         socket_bind_rules(socket) ++
         connector_net_rules(Connectors.upstream(cfg, manifest)) ++
@@ -63,7 +63,7 @@ defmodule KomkiCli.ConnectorProfile do
         "Egress-Profil (komki-egress, Ticket #146): einziger Prozess mit Outbound *:443.",
         "Generiert aus KomkiConnector.Manifest und config.json; feste Eingaben -> byte-identischer Text."
       ]) ++
-        EscriptProfile.runtime(root, binary) ++
+        EscriptProfile.runtime_for(cfg, binary) ++
         EscriptProfile.log_rules(log) ++
         egress_bind_rules(Connectors.egress_ports(cfg)) ++
         egress_out_rules() ++

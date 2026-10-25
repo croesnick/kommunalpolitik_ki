@@ -42,11 +42,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Versionen zentral aus .tool-versions (wie asdf lokal), exakt.
       - name: Erlang/Elixir einrichten
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          elixir-version: '1.19.5'
-          otp-version: '28'
+          version-file: .tool-versions
+          version-type: strict
 
       # Ein Cache-Eintrag für alles: Hex-Pakete und kompilierte Deps liegen
       # unter artifacts/deps, App-Builds und Dialyzer-PLTs unter
@@ -57,9 +58,9 @@ jobs:
           path: |
             artifacts/deps
             apps/*/_build
-          key: mix-${{ runner.os }}-ex19.5-otp28-${{ hashFiles('workspace.lock', 'apps/workspace.lock', 'mix.exs', 'apps/*/mix.exs') }}
+          key: mix-${{ runner.os }}-${{ hashFiles('.tool-versions') }}-${{ hashFiles('workspace.lock', 'apps/workspace.lock', 'mix.exs', 'apps/*/mix.exs') }}
           restore-keys: |
-            mix-${{ runner.os }}-ex19.5-otp28-
+            mix-${{ runner.os }}-${{ hashFiles('.tool-versions') }}-
 
       # Bootstrap wie in elixir.yml: erst Root-deps.get, denn das holt das
       # workspace-Werkzeug selbst nach artifacts/deps. mix workspace.run

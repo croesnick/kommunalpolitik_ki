@@ -100,7 +100,7 @@ defmodule KomkiCli.SandboxProfileTest do
     {rc, out} = probe(ctx, profile, args)
 
     assert rc != 0,
-           profile <> " " <> Enum.join(args, " ") <> " haette verweigert werden muessen: " <> out
+           profile <> " " <> Enum.join(args, " ") <> " haette verweigert werden müssen: " <> out
   end
 
   @all ["ris", "web", "vault", "egress", "mediator"]
@@ -177,7 +177,7 @@ defmodule KomkiCli.SandboxProfileTest do
     vault = ctx.cfg.vault_dir
     allowed(ctx, "vault", ["read", Path.join(vault, "notiz.md")])
     allowed(ctx, "vault", ["write", Path.join([vault, "komki-test", "neu.md"])])
-    denied(ctx, "vault", ["write", Path.join(vault, "ausserhalb.md")])
+    denied(ctx, "vault", ["write", Path.join(vault, "außerhalb.md")])
     denied(ctx, "vault", ["write", Path.join([ctx.cfg.base_dir, "tmp", "x.log"])])
     # andere Connectoren sehen den Vault nicht
     denied(ctx, "web", ["read", Path.join(vault, "notiz.md")])

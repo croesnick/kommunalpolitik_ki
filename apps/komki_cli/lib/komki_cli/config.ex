@@ -50,6 +50,10 @@ defmodule KomkiCli.Config do
                 :fd_bin,
                 :rg_bin,
                 :mediator_bin,
+                # Multicall-Programm (Ticket #179): komki selbst, wenn es alle Rollen traegt
+                :komki_bin,
+                # Burrito-Einzeldatei (Ticket #181): entpackte Laufzeit der Binary
+                :runtime_root,
                 # Connectoren und Egress (Ticket #146): Laufzeit, Binaries, Netz, Vault
                 :escript_bin,
                 :egress_bin,
@@ -57,7 +61,10 @@ defmodule KomkiCli.Config do
                 :vault_dir,
                 connector_bins: %{},
                 egress_ports: %{},
-                ris_base_url: nil
+                ris_base_url: nil,
+                # Wie Rollen starten (Ticket #181): "escript" (escript <komki> <rolle>)
+                # oder "burrito" (<komki-binary> <rolle>)
+                launcher: "escript"
               ]
 
   @type t :: %__MODULE__{
@@ -73,6 +80,9 @@ defmodule KomkiCli.Config do
           fd_bin: String.t() | nil,
           rg_bin: String.t() | nil,
           mediator_bin: String.t() | nil,
+          komki_bin: String.t() | nil,
+          runtime_root: String.t() | nil,
+          launcher: String.t(),
           sandbox_exec: String.t(),
           profile_path: String.t(),
           escript_bin: String.t() | nil,
@@ -141,13 +151,19 @@ defmodule KomkiCli.Config do
   end
 
   @doc """
-  pi-Bundle-Entdeckung (cli.js): globale node_modules-Roots — zuerst die
-  zum entdeckten node gehoerige (asdf/nvm-Layout: `<install>/lib`),
-  dann Homebrew ARM und Intel. nil, wenn das Bundle nirgends liegt.
+  pi-Bundle-Entdeckung (cli.js): zuerst das pi, das neben komki liegt
+  (Homebrew-Formel, Ticket #180: gepinnte Version in `libexec/lib`), dann
+  ein globales pnpm (`pnpm add -g`, unter `$PNPM_HOME` oder `~/Library/pnpm`),
+  dann die globalen node_modules-Roots — die zum entdeckten node gehoerige
+  (asdf/nvm-Layout: `<install>/lib`), dann Homebrew ARM und Intel. nil,
+  wenn das Bundle nirgends liegt.
   """
   @spec resolve_cli_js(String.t() | nil) :: String.t() | nil
   def resolve_cli_js(node_bin) do
-    roots = install_lib_roots(node_bin) ++ ["/opt/homebrew/lib", "/usr/local/lib"]
+    roots =
+      bundled_lib_roots() ++
+        pnpm_lib_roots() ++
+        install_lib_roots(node_bin) ++ ["/opt/homebrew/lib", "/usr/local/lib"]
 
     Enum.find_value(roots, fn root ->
       candidate = Path.join(root, @pi_bundle_rel)
@@ -156,7 +172,7 @@ defmodule KomkiCli.Config do
     end)
   end
 
-  @doc "llama-server-Entdeckung ueber PATH (Kernel-Realpath). nil, falls fehlt."
+  @doc "llama-server-Entdeckung über PATH (Kernel-Realpath). nil, falls fehlt."
   @spec resolve_llama_server() :: String.t() | nil
   def resolve_llama_server, do: resolve_optional_tool("llama-server")
 
@@ -197,11 +213,33 @@ defmodule KomkiCli.Config do
   """
   @spec resolve_escript_bin() :: String.t() | nil
   def resolve_escript_bin do
-    asdf_which("escript") ||
+    running_escript() || asdf_which("escript") ||
       case System.find_executable("escript") do
         nil -> nil
         path -> if String.contains?(path, "/.asdf/shims/"), do: nil, else: canonical(path)
       end
+  end
+
+  @doc """
+  komki selbst als Multicall-Programm (Ticket #179): der kanonische Pfad
+  des laufenden Escripts bzw. der Burrito-Binary, wenn deren Dateiname mit
+  `komki` beginnt. Unter `mix` (Tests, `mix run`) ist das laufende Skript
+  `mix`; dann nil, und die Bausteine werden wie bisher einzeln gesucht.
+  """
+  @spec self_komki() :: String.t() | nil
+  def self_komki do
+    path = KomkiCli.Runtime.self_path()
+    if String.starts_with?(Path.basename(path), "komki"), do: canonical(path), else: nil
+  rescue
+    _ -> nil
+  end
+
+  # Die Laufzeit, auf der komki selbst laeuft (Ticket #179): Rollen starten
+  # auf derselben Erlang-Installation, auch wenn sie nicht im PATH liegt
+  # (etwa Homebrews keg-only `erlang@28`).
+  defp running_escript do
+    candidate = Path.join([to_string(:code.root_dir()), "bin", "escript"])
+    if File.exists?(candidate), do: canonical(candidate), else: nil
   end
 
   @doc "Erlang-Wurzel zu einem `escript`-Pfad (`<root>/bin/escript`)."
@@ -277,6 +315,24 @@ defmodule KomkiCli.Config do
     end)
   end
 
+  # Neben dem laufenden komki (Formel-Layout libexec/komki + libexec/lib).
+  defp bundled_lib_roots do
+    case self_komki() do
+      nil -> []
+      komki -> [Path.join(Path.dirname(komki), "lib")]
+    end
+  end
+
+  # Globales pnpm: bis pnpm 10 liegt der Baum unter global/<n>/node_modules,
+  # ab pnpm 11 je Installation unter global/v<n>/<id>/node_modules.
+  defp pnpm_lib_roots do
+    home =
+      System.get_env("PNPM_HOME") || Path.join(System.user_home!(), "Library/pnpm")
+
+    Enum.sort(Path.wildcard(Path.join(home, "global/*"))) ++
+      Enum.sort(Path.wildcard(Path.join(home, "global/*/*")))
+  end
+
   # asdf/nvm-Layout: <install>/bin/node -> <install>/lib liegt der globale
   # npm-Baum. Fremde Layouts liefern [] und die generischen Roots greifen.
   defp install_lib_roots(nil), do: []
@@ -346,6 +402,30 @@ defmodule KomkiCli.Config do
     end
   end
 
+  # Burrito-Einzeldatei (Ticket #181): Rollen starten als `<binary> <rolle>`,
+  # die Laufzeit liegt entpackt unter :code.root_dir(). Sonst Escript.
+  defp launcher(komki) when is_binary(komki) do
+    if KomkiCli.Runtime.burrito?(), do: "burrito", else: "escript"
+  end
+
+  defp launcher(nil), do: "escript"
+
+  defp runtime_root(komki) when is_binary(komki) do
+    if KomkiCli.Runtime.burrito?(), do: canonical(to_string(:code.root_dir())), else: nil
+  end
+
+  defp runtime_root(nil), do: nil
+
+  @doc """
+  Verzeichnis, das der Burrito-Wrapper per `KOMKI_INSTALL_DIR` bekommt, damit
+  er die entpackte Laufzeit findet, obwohl Rollen mit dem HOME der Instanz
+  starten: zwei Ebenen ueber `runtime_root`
+  (`<dir>/.burrito/komki_erts-<v>_<app>`).
+  """
+  @spec burrito_install_dir(t()) :: String.t()
+  def burrito_install_dir(%__MODULE__{runtime_root: root}) when is_binary(root),
+    do: root |> Path.dirname() |> Path.dirname()
+
   @doc """
   Defaults für eine frische KomKI-CLI-Instanz: Modell-Pins plus die zur
   Laufzeit entdeckten Werkzeugpfade (kanonisch; nil, wenn das Werkzeug
@@ -355,6 +435,7 @@ defmodule KomkiCli.Config do
   def defaults(base_dir, opts \\ []) when is_binary(base_dir) and is_list(opts) do
     base = canonical(base_dir)
     node_bin = resolve_node_bin()
+    komki = Keyword.get_lazy(opts, :komki_bin, &self_komki/0)
 
     %__MODULE__{
       base_dir: base,
@@ -368,13 +449,19 @@ defmodule KomkiCli.Config do
       llama_server_bin: resolve_llama_server(),
       fd_bin: resolve_optional_tool("fd"),
       rg_bin: resolve_optional_tool("rg"),
-      mediator_bin: resolve_mediator_bin(base),
+      mediator_bin: komki || resolve_mediator_bin(base),
+      komki_bin: komki,
+      launcher: launcher(komki),
+      runtime_root: runtime_root(komki),
       sandbox_exec: canonical(@default_sandbox_exec),
       profile_path: Path.join([base, "profile", "komki.sb"]),
       escript_bin: resolve_escript_bin(),
-      egress_bin: resolve_escript("komki-egress", base),
+      egress_bin: komki || resolve_escript("komki-egress", base),
       connector_bins:
-        Map.new(KomkiConnector.Manifest.all(), &{&1.id, resolve_escript(&1.binary, base)}),
+        Map.new(
+          KomkiConnector.Manifest.all(),
+          &{&1.id, komki || resolve_escript(&1.binary, base)}
+        ),
       egress_ports: @default_egress_ports,
       ris_base_url: opts[:ris_base_url] || @default_ris_base_url,
       ris_mock_port: opts[:ris_mock_port],
@@ -456,6 +543,9 @@ defmodule KomkiCli.Config do
     :fd_bin,
     :rg_bin,
     :mediator_bin,
+    :komki_bin,
+    :launcher,
+    :runtime_root,
     :escript_bin,
     :egress_bin,
     :connector_bins,
@@ -497,6 +587,9 @@ defmodule KomkiCli.Config do
       fd_bin: Map.get(map, "fd_bin"),
       rg_bin: Map.get(map, "rg_bin"),
       mediator_bin: Map.get(map, "mediator_bin"),
+      komki_bin: Map.get(map, "komki_bin"),
+      launcher: Map.get(map, "launcher") || "escript",
+      runtime_root: Map.get(map, "runtime_root"),
       sandbox_exec: map["sandbox_exec"],
       profile_path: map["profile_path"],
       # Ticket #146: aeltere Instanzen ohne diese Felder laden mit Defaults;
@@ -525,7 +618,7 @@ defmodule KomkiCli.Config do
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
 
-  @doc "config.json serialisieren (sortierte Schluessel, genau ein finales Newline beim Speichern)."
+  @doc "config.json serialisieren (sortierte Schlüssel, genau ein finales Newline beim Speichern)."
   @spec encode(t()) :: String.t()
   def encode(%__MODULE__{} = cfg) do
     (@keys ++ @optional_keys)

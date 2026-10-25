@@ -9,10 +9,14 @@ Warum Starlight: [Report Doku-Site und Bildband](../research/2026-10-24-doku-sit
 
 ```sh
 cd docs/site
-npm ci
-npm run dev        # http://localhost:4321/kommunalpolitik_ki/ mit Live-Reload
-npm run build      # erzeugt dist/ wie in CI
+pnpm install --frozen-lockfile
+pnpm dev           # http://localhost:4321/kommunalpolitik_ki/ mit Live-Reload
+pnpm build         # erzeugt dist/ wie in CI
+pnpm preview       # zeigt dist/ so, wie GitHub Pages es ausliefert
 ```
+
+Paketmanager ist pnpm, nie plain npm: pnpm führt Install-Skripte von Abhängigkeiten nur nach ausdrücklicher
+Freigabe aus. Die Version steht in `package.json` unter `packageManager`, die CI liest sie von dort.
 
 ## Eine Seite schreiben
 

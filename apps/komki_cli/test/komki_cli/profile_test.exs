@@ -106,7 +106,7 @@ defmodule KomkiCli.ProfileTest do
   end
 
   describe "pi-Such-Werkzeuge (fd/rg-Fundus)" do
-    test "exec-Literale fuer die agent-bin-Kopien", %{text: text, cfg: cfg} do
+    test "exec-Literale für die agent-bin-Kopien", %{text: text, cfg: cfg} do
       bin = Path.join([cfg.pi_home, ".pi", "agent", "bin"])
 
       assert String.contains?(
@@ -121,7 +121,7 @@ defmodule KomkiCli.ProfileTest do
     end
   end
 
-  describe "Portabilitaet (Nutzer-Regel: keine hartkodierten Systempfade)" do
+  describe "Portabilität (Nutzer-Regel: keine hartkodierten Systempfade)" do
     test "Nicht-brew-Konfiguration erzeugt keinerlei /opt/homebrew-Literale", %{
       cfg: cfg,
       scratch: scratch
@@ -154,7 +154,7 @@ defmodule KomkiCli.ProfileTest do
   end
 
   describe "/dev/fd/0-Redirect (Burrito-Session-Fix, Pilot 2026-10-11)" do
-    test "Regeln vorhanden — kontextfrei im Profil, damit die Identitaet nicht vom Laufkontext abhaengt",
+    test "Regeln vorhanden — kontextfrei im Profil, damit die Identität nicht vom Laufkontext abhängt",
          %{text: text} do
       assert String.contains?(text, "(allow file-write* (literal \"/dev/fd/0\"))")
       assert String.contains?(text, "(allow file-read-metadata (literal \"/dev/fd\"))")
@@ -226,7 +226,7 @@ defmodule KomkiCli.ProfileTest do
              ]
     end
 
-    test "exec/read fuer llama-server, Modell und Log", %{text: text, cfg: cfg} do
+    test "exec/read für llama-server, Modell und Log", %{text: text, cfg: cfg} do
       assert String.contains?(
                text,
                "(allow process-exec (literal \"" <> cfg.llama_server_bin <> "\"))"

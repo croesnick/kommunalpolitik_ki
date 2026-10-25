@@ -164,8 +164,18 @@ defmodule KomkiMediator.CLI do
 
   defp provision(base) do
     case KomkiMediator.Templates.provision!(base) do
-      :ok -> :ok
-      :already_provisioned -> :ok
+      :ok ->
+        :ok
+
+      :already_provisioned ->
+        :ok
+
+      {:migrated, what} ->
+        IO.puts(:stderr, JSON.encode!(%{"note" => "Vorlagen aktualisiert", "detail" => what}))
+        :ok
+
+      {:error, detail} ->
+        {:error, %{"error" => "vorlagen", "detail" => detail}}
     end
   end
 

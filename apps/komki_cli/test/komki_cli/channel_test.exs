@@ -45,7 +45,7 @@ defmodule KomkiCli.ChannelTest do
       assert reason =~ "komki up"
     end
 
-    test "ungueltiger Inhalt: Fehler ohne den Inhalt", %{cfg: cfg} do
+    test "ungültiger Inhalt: Fehler ohne den Inhalt", %{cfg: cfg} do
       :ok = Channel.write_token!(cfg)
       File.write!(Channel.token_path(cfg), "geheim-aber-falsch")
       assert {:error, reason} = Channel.read_token(cfg)
@@ -84,7 +84,7 @@ defmodule KomkiCli.ChannelTest do
   end
 
   describe "Token nie in argv" do
-    test "argv von Einmal-Lauf und Session enthaelt das Token nicht", %{cfg: cfg} do
+    test "argv von Einmal-Lauf und Session enthält das Token nicht", %{cfg: cfg} do
       :ok = Channel.write_token!(cfg)
       {:ok, env} = Channel.prepare_pi(cfg)
       token = env["KOMKI_MEDIATOR_TOKEN"]

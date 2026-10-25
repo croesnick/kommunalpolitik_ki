@@ -9,7 +9,7 @@ defmodule KomkiCli.ConnectorsTest do
   alias KomkiCli.{Connectors, Proc, TestSupport}
   alias KomkiConnector.Manifest
 
-  @kanarie "kanarienwert-fuer-tests"
+  @kanarie "kanarienwert-für-tests"
 
   defp cfg(overrides \\ []) do
     base = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-conn"))
@@ -44,7 +44,7 @@ defmodule KomkiCli.ConnectorsTest do
       assert Enum.map(Connectors.enabled(cfg(vault_dir: nil)), & &1.id) == ["ris", "web"]
     end
 
-    test "RIS-Mock: direkter Port, kein Egress-Port fuer ris" do
+    test "RIS-Mock: direkter Port, kein Egress-Port für ris" do
       cfg = cfg(ris_mock_port: 4010)
       assert Connectors.upstream(cfg, Manifest.fetch!("ris")) == {:direct, 4010}
       assert [{49_532, "web", _}] = Connectors.egress_ports(cfg)
@@ -179,7 +179,7 @@ defmodule KomkiCli.ConnectorsTest do
   end
 
   describe "Reihenfolge" do
-    test "Start: egress vor den Connectoren; Stopp: Connectoren rueckwaerts, dann egress" do
+    test "Start: egress vor den Connectoren; Stopp: Connectoren rückwärts, dann egress" do
       assert Connectors.start_order(cfg()) == [
                "egress",
                "connector-ris",
@@ -207,6 +207,46 @@ defmodule KomkiCli.ConnectorsTest do
       fun.() -> true
       tries == 0 -> false
       true -> Process.sleep(100) && wait_until(fun, tries - 1)
+    end
+  end
+
+  describe "up/2 bei laufenden Komponenten" do
+    # Regression: up loeschte den Socket eines laufenden Connectors, bevor es
+    # merkte, dass er laeuft; danach galt er als "running", war aber
+    # unerreichbar (enoent in komki session nach komki run).
+    test "laufende Connectoren behalten Socket und gelten als bereits gestartet" do
+      cfg = cfg()
+      Connectors.ensure_run_dirs!(cfg)
+      File.mkdir_p!(Path.join(cfg.base_dir, "tmp"))
+
+      fakes =
+        for {pidfile, marker} <-
+              [{Connectors.egress_pidfile(cfg), "komki-egress"}] ++
+                for(
+                  id <- ["ris", "vault", "web"],
+                  do: {Connectors.pidfile(cfg, id), Manifest.fetch!(id).binary}
+                ) do
+          # Compound-Kommando, damit der Marker in der ps-Zeile bleibt
+          port =
+            Port.open({:spawn_executable, "/bin/sh"},
+              args: ["-c", "while :; do sleep 1; done # " <> marker]
+            )
+
+          {:os_pid, pid} = Port.info(port, :os_pid)
+          File.write!(pidfile, Integer.to_string(pid) <> "\n")
+          {pid, marker}
+        end
+
+      sockets = for id <- ["ris", "vault", "web"], do: Manifest.socket_path(cfg.base_dir, id)
+      Enum.each(sockets, &File.write!(&1, ""))
+
+      try do
+        assert {:ok, entries} = Connectors.up(cfg, fetch: fn _ -> {:error, :missing} end)
+        assert Enum.all?(entries, fn {_name, state} -> match?({:already, _}, state) end)
+        assert Enum.all?(sockets, &File.exists?/1)
+      after
+        for {pid, marker} <- fakes, do: Proc.kill_checked(pid, marker)
+      end
     end
   end
 end

@@ -25,13 +25,20 @@ defmodule KomkiCli.EscriptProfile do
 
   alias KomkiCli.{Config, MachODeps}
 
-  @doc "Erlang-Wurzel aus der config (`escript_bin`); fehlt sie, scheitert die Generierung klar."
+  @doc """
+  Erlang-Wurzel aus der config: unter der Burrito-Einzeldatei (Ticket #181)
+  die entpackte Laufzeit (`runtime_root`), sonst die Wurzel zu `escript_bin`;
+  fehlt sie, scheitert die Generierung klar.
+  """
   @spec erlang_root!(Config.t()) :: String.t()
+  def erlang_root!(%Config{launcher: "burrito", runtime_root: root}) when is_binary(root),
+    do: root
+
   def erlang_root!(%Config{escript_bin: bin}) when is_binary(bin), do: Config.erlang_root(bin)
 
   def erlang_root!(%Config{}),
     do:
-      raise(ArgumentError, "escript-Laufzeit nicht entdeckt (Erlang installieren, init --force)")
+      raise(ArgumentError, "escript-Laufzeit nicht entdeckt (Erlang installieren, 'komki setup')")
 
   @doc "Regeln zu einem Profiltext verbinden (ein finales Newline, Duplikate entfernt)."
   @spec render([String.t()]) :: String.t()
@@ -52,6 +59,37 @@ defmodule KomkiCli.EscriptProfile do
       beam_rules() ++
       crypto_rules(erlang_root)
   end
+
+  @doc """
+  Grundschicht fuer die Rolle `binary` nach der Startart der Instanz. Im
+  Escript-Betrieb genau `runtime/2` (Profiltext unveraendert); unter der
+  Burrito-Einzeldatei (Ticket #181) zusaetzlich das Ausfuehren der Binary,
+  die als Wrapper die entpackte Laufzeit unter `runtime_root` startet.
+  """
+  @spec runtime_for(Config.t(), String.t()) :: [String.t()]
+  def runtime_for(%Config{} = cfg, binary) do
+    runtime(erlang_root!(cfg), binary) ++ burrito_rules(cfg, binary)
+  end
+
+  # Ermittelt durch Eingrenzen am laufenden Wrapper (Burrito 1.6, wrapper.zig
+  # und erlang_launcher.zig); Loeschen bleibt verboten: alte Versionen raeumt
+  # das ungesandboxte `komki` beim normalen Aufruf vorher auf.
+  defp burrito_rules(%Config{launcher: "burrito", komki_bin: komki, runtime_root: root}, komki) do
+    [
+      "; Burrito-Einzeldatei (Ticket #181): komki startet als Wrapper und fuehrt",
+      "; die entpackte Laufzeit (Erlang-Wurzel oben) aus",
+      "(allow process-exec (literal \"" <> komki <> "\"))",
+      "; der Wrapper legt sein Laufzeit-Verzeichnis bei jedem Start per mkdir -p an (es existiert)",
+      "(allow file-write-create (literal \"" <> root <> "\"))",
+      "; und listet .burrito, um alte Versionen zu finden",
+      "(allow file-read* (literal \"" <> Path.dirname(root) <> "\"))",
+      "; releases/COOKIE oeffnet er lesend und schreibend, liest aber nur",
+      "; (Rollen nutzen kein verteiltes Erlang)",
+      "(allow file-write-data (literal \"" <> Path.join([root, "releases", "COOKIE"]) <> "\"))"
+    ]
+  end
+
+  defp burrito_rules(_cfg, _binary), do: []
 
   defp exec_rules(root, escript_file) do
     [

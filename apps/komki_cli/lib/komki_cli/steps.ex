@@ -38,7 +38,18 @@ defmodule KomkiCli.Steps do
       Boot-Gate, 4 = Runtime (llama/mediator/pi).
   """
 
-  alias KomkiCli.{Channel, Config, ConnectorChecks, Connectors, Llama, Mediator, Pi, Profile}
+  alias KomkiCli.{
+    Anzeige,
+    Channel,
+    Config,
+    ConnectorChecks,
+    Connectors,
+    Llama,
+    Mediator,
+    Pi,
+    Profile
+  }
+
   require Config
 
   @type check :: %{name: String.t(), ok: boolean(), reason: String.t()}
@@ -61,7 +72,8 @@ defmodule KomkiCli.Steps do
              %{
                llama: down_state(),
                connectors: [{String.t(), down_state() | {:error, String.t()}}],
-               mediator: down_state()
+               mediator: down_state(),
+               orphans: non_neg_integer()
              }}
           | {:status, Config.t(),
              %{
@@ -129,6 +141,98 @@ defmodule KomkiCli.Steps do
 
   # Ticket #146/#137: Vermittler-, Egress- und Connector-Profile. Fehlt ein
   # Binary, bleibt sein Profil ungeschrieben; der Doctor meldet es.
+  @doc """
+  Frischt eine bestehende Instanz nach einem Update auf (Ticket #179,
+  `komki setup`): Programmpfade (komki und seine Rollen, Erlang-Laufzeit,
+  node, pi, llama-server, fd, rg) neu entdecken und, nur wenn sich einer
+  geaendert hat, config.json und alle Sandbox-Profile neu schreiben. Ohne
+  Pfadaenderung bleibt alles unberuehrt; eine Profil-Abweichung ist dann
+  ein Befund fuer den Doctor, kein Anlass zum Ueberschreiben.
+  """
+  @spec refresh_instance() :: :unchanged | {:refreshed, [String.t()]} | {:error, String.t(), 2}
+  def refresh_instance do
+    cfg = load_cfg!()
+    fresh = Config.defaults(cfg.base_dir)
+
+    fields =
+      [:komki_bin, :launcher, :runtime_root, :mediator_bin, :egress_bin, :connector_bins] ++
+        [:escript_bin, :node_bin, :cli_js, :llama_server_bin, :fd_bin, :rg_bin]
+
+    # Nur entdeckte Werte uebernehmen; fehlt ein Werkzeug gerade, bleibt
+    # der gepinnte Pfad stehen (der Doctor meldet es).
+    changes =
+      for field <- fields,
+          value = Map.fetch!(fresh, field),
+          value not in [nil, %{}],
+          value != Map.fetch!(cfg, field),
+          do: {field, value}
+
+    cond do
+      changes != [] ->
+        updated = struct!(cfg, changes)
+        Config.save(updated)
+        write_all_profiles(updated)
+        {:refreshed, Enum.map(changes, fn {field, _} -> Atom.to_string(field) end)}
+
+      # Gleiche Pfade, aber der Profil-Generator einer neuen komki-Version
+      # erzeugt anderen Text (neue Regeln): neu schreiben und das benennen.
+      not profiles_current?(cfg) ->
+        write_all_profiles(cfg)
+        {:refreshed, ["Sandbox-Profile (neue komki-Version)"]}
+
+      true ->
+        :unchanged
+    end
+  rescue
+    e -> {:error, "Auffrischen fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  @doc """
+  Vault der Instanz wechseln: stoppt komki (der laufende Vault-Connector
+  hat den alten Ordner im Profil), traegt den neuen Ordner ein und schreibt
+  die Profile neu. Gleicher Ordner: `:unchanged`.
+  """
+  @spec set_vault(String.t()) ::
+          :unchanged | {:switched, String.t() | nil} | {:error, String.t(), pos_integer()}
+  def set_vault(dir) do
+    cfg = load_cfg!()
+
+    if cfg.vault_dir == dir do
+      :unchanged
+    else
+      with {:down, _} <- down_with(cfg) do
+        updated = %{cfg | vault_dir: dir}
+        Config.save(updated)
+        write_all_profiles(updated)
+        {:switched, cfg.vault_dir}
+      end
+    end
+  rescue
+    e -> {:error, "Vault-Wechsel fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  defp write_all_profiles(cfg) do
+    Profile.write!(cfg.profile_path, Profile.generate(cfg, Profile.check_scratch(cfg)))
+    Profile.write!(Llama.llama_profile_path(cfg), Profile.generate_llama(cfg))
+    write_sandbox_profiles(cfg)
+  end
+
+  defp profiles_current?(cfg) do
+    expected =
+      [
+        {cfg.profile_path, fn -> Profile.generate(cfg, Profile.check_scratch(cfg)) end},
+        {Llama.llama_profile_path(cfg), fn -> Profile.generate_llama(cfg) end}
+      ] ++ Enum.map(ConnectorChecks.profiles(cfg), fn {_name, path, gen} -> {path, gen} end)
+
+    Enum.all?(expected, fn {path, generate} ->
+      try do
+        File.read(path) == {:ok, generate.()}
+      rescue
+        ArgumentError -> true
+      end
+    end)
+  end
+
   defp write_sandbox_profiles(cfg) do
     for {_name, path, generate} <- ConnectorChecks.profiles(cfg) do
       try do
@@ -156,7 +260,7 @@ defmodule KomkiCli.Steps do
   defp tools_error(missing) do
     "Werkzeug nicht entdeckt: " <>
       Enum.join(missing, ", ") <>
-      " — Installation pruefen (node via asdf/brew/nvm, pi-Bundle via npm-global, llama.cpp)" <>
+      " — Installation prüfen (node via asdf/brew/nvm, pi via pnpm add -g, llama.cpp)" <>
       " oder Pfade in der config.json manuell setzen"
   end
 
@@ -179,6 +283,27 @@ defmodule KomkiCli.Steps do
     :ok
   end
 
+  @doc """
+  Legt `dest` als APFS-Klon von `source` an (Ticket #178): `cp -c` nutzt
+  clonefile(2), belegt keinen zusaetzlichen Platz und dauert Millisekunden
+  statt einer 17-GB-Kopie. Scheitert der Klon (anderes Volume, kein APFS),
+  kopiert komki wie bisher. Liefert, welcher Weg genommen wurde.
+  """
+  @spec clone_or_copy(String.t(), String.t()) :: String.t()
+  def clone_or_copy(source, dest) do
+    File.rm(dest)
+
+    case System.cmd("/bin/cp", ["-c", source, dest], stderr_to_stdout: true) do
+      {_, 0} ->
+        "APFS-Klon (kein zusätzlicher Platz)"
+
+      {_, _} ->
+        File.rm(dest)
+        {:ok, _bytes} = File.copy(source, dest)
+        "Kopie (Klon nicht möglich, etwa anderes Volume)"
+    end
+  end
+
   # GGUF: Quelle = --gguf-from oder das verifizierte Artefakt der
   # Sandbox-Forschung; SHA-Pflicht
   # (Mismatch bricht ab, die Kopie wird entfernt — KEIN brauchbarer Verweis).
@@ -188,8 +313,8 @@ defmodule KomkiCli.Steps do
     cond do
       is_nil(source) ->
         {:error,
-         "keine GGUF-Quelle: --gguf-from PATH angeben (komki laedt nichts herunter; " <>
-           "das Default-Artefakt liegt nicht am erwarteten Ort)", 2}
+         "keine GGUF-Quelle: 'komki setup' lädt das Modell, oder --gguf-from PATH angeben " <>
+           "(erwartet unter " <> Config.staging_gguf_path() <> ")", 2}
 
       not File.exists?(source) ->
         {:error, "--gguf-from Pfad nicht gefunden: " <> source, 2}
@@ -203,11 +328,12 @@ defmodule KomkiCli.Steps do
   defp copy_and_verify_gguf(cfg, source) do
     dest = cfg.gguf_path
     File.mkdir_p!(Path.dirname(dest))
-    {:ok, _bytes} = File.copy(source, dest)
+    how = clone_or_copy(source, dest)
 
     case sha256(dest) do
       {:ok, actual} ->
-        verify_gguf_sha(cfg, dest, actual)
+        with {:ok, lines} <- verify_gguf_sha(cfg, dest, actual),
+             do: {:ok, lines ++ ["gguf-ablage:  " <> how]}
 
       {:error, reason} ->
         File.rm(dest)
@@ -347,11 +473,11 @@ defmodule KomkiCli.Steps do
   @spec doctor() :: result()
   def doctor, do: run_checks(:full)
 
-  @doc "Doctor-quick (Profil-Identität + Boot-Gate) fuer up/down."
+  @doc "Doctor-quick (Profil-Identität + Boot-Gate) für up/down."
   @spec doctor_quick() :: result()
   def doctor_quick, do: run_checks(:profile_boot)
 
-  @doc "Checks ausfuehren; Struktur fuer den CLI-Renderer."
+  @doc "Checks ausführen; Struktur für den CLI-Renderer."
   @spec run_checks(:full | :profile_boot) :: result()
   def run_checks(scope) do
     case Config.load(Config.config_path(Config.default_base())) do
@@ -406,7 +532,7 @@ defmodule KomkiCli.Steps do
       Enum.map(tools, fn {name, path} ->
         cond do
           is_nil(path) ->
-            %{name: name, ok: false, reason: "nicht entdeckt (Installation/init pruefen)"}
+            %{name: name, ok: false, reason: "nicht entdeckt (Installation/init prüfen)"}
 
           File.exists?(path) ->
             %{name: name, ok: true, reason: path}
@@ -417,7 +543,7 @@ defmodule KomkiCli.Steps do
             %{
               name: name,
               ok: false,
-              reason: "missing: " <> path <> " — 'komki init --force' entdeckt neu"
+              reason: "missing: " <> path <> " — 'komki setup' entdeckt neu"
             }
         end
       end)
@@ -434,8 +560,7 @@ defmodule KomkiCli.Steps do
         %{
           name: "komki-mediator",
           ok: false,
-          reason:
-            "komki-mediator nicht entdeckt — init --force oder mix escript.build in apps/komki_mediator"
+          reason: "komki-mediator nicht entdeckt — 'make komki', dann 'komki setup'"
         }
 
       File.exists?(cfg.mediator_bin) ->
@@ -445,7 +570,7 @@ defmodule KomkiCli.Steps do
         %{
           name: "komki-mediator",
           ok: false,
-          reason: "missing: " <> cfg.mediator_bin <> " — 'komki init --force' entdeckt neu"
+          reason: "missing: " <> cfg.mediator_bin <> " — 'komki setup' entdeckt neu"
         }
     end
   end
@@ -475,7 +600,7 @@ defmodule KomkiCli.Steps do
           name: "pi version",
           ok: false,
           reason:
-            "pi " <> version <> " (major < 1): MCP-Flags nicht unterstuetzt — pi aktualisieren"
+            "pi " <> version <> " (major < 1): MCP-Flags nicht unterstützt — pi aktualisieren"
         }
 
       {:error, reason} ->
@@ -509,13 +634,13 @@ defmodule KomkiCli.Steps do
     if Config.tools_ready(cfg) do
       profile_identity_checks(cfg) ++ llama_profile_identity_checks(cfg)
     else
-      [%{name: "profile", ok: false, reason: "Werkzeugpfade fehlen (config.json unvollstaendig)"}]
+      [%{name: "profile", ok: false, reason: "Werkzeugpfade fehlen (config.json unvollständig)"}]
     end
   end
 
   # Gemeinsame Drei-Zweig-Kaskade der Profil-Identitaetschecks (missing /
   # byte-stabil / drift); die Wrapper liefern name/Pfad/Erwartung —
-  # Reason-Strings byte-identisch gepinnt (Tippfehler "Profilttext" im
+  # Reason-Strings byte-identisch gepinnt (Tippfehler "Profiltext" im
   # pi-Drift-String ist Bestand).
   defp identity_checks(name, path, expected, drift_reason) do
     if File.exists?(path) do
@@ -534,7 +659,7 @@ defmodule KomkiCli.Steps do
       "profile",
       cfg.profile_path,
       Profile.generate(cfg, Profile.check_scratch(cfg)),
-      "drift: regenerierter Profilttext weicht ab (init --force)"
+      "drift: regenerierter Profiltext weicht ab — nach einem Update 'komki setup'; bleibt sie, wurde das Profil verändert"
     )
   end
 
@@ -544,7 +669,7 @@ defmodule KomkiCli.Steps do
       "llama profile",
       Llama.llama_profile_path(cfg),
       Profile.generate_llama(cfg),
-      "drift: regenerierter llama-Profiltext weicht ab (init --force)"
+      "drift: regenerierter llama-Profiltext weicht ab — nach einem Update 'komki setup'; bleibt sie, wurde das Profil verändert"
     )
   end
 
@@ -599,7 +724,7 @@ defmodule KomkiCli.Steps do
             %{
               name: name,
               ok: false,
-              reason: "llama laeuft ohne API-Key — 'komki down' und 'komki up' neu starten"
+              reason: "llama läuft ohne API-Key — 'komki down' und 'komki up' neu starten"
             }
 
           {:error, reason} ->
@@ -690,7 +815,10 @@ defmodule KomkiCli.Steps do
       try do
         case System.cmd(cfg.sandbox_exec, ["-f", profile_path, "--", binary] ++ args,
                env: %{"PATH" => "/usr/bin:/bin"},
-               cd: boot_cwd(cfg, cwd)
+               cd: boot_cwd(cfg, cwd),
+               # llama-server schreibt --version nach stderr; ohne Umleitung
+               # landete es mitten in der Ausgabe von setup/up.
+               stderr_to_stdout: true
              ) do
           {_out, 0} -> {true, "rc0"}
           {out, code} -> {false, rc_reason(code, out)}
@@ -745,10 +873,79 @@ defmodule KomkiCli.Steps do
         end
 
       _ ->
-        {:error, "llama start verweigert: doctor-quick nicht gruen (Boot-Gate)", 3}
+        {:error, "llama start verweigert: doctor-quick nicht grün (Boot-Gate)", 3}
     end
   rescue
     e -> {:error, "up fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  @doc """
+  Startet alles, wenn llama oder der Vermittler nicht laufen (Ticket #176:
+  `run` und `session` ohne vorheriges `komki up`). `:already`, wenn beide
+  laufen oder ein Zustand vorliegt, den die folgenden Pruefungen klar melden
+  (fremder Prozess, stale pidfile).
+  """
+  @spec ensure_up() :: :already | result()
+  def ensure_up do
+    path = Config.config_path(Config.default_base())
+
+    # Ohne Instanz versucht ensure_up nichts; die folgenden Pruefungen
+    # melden die fehlende config.json wie bisher.
+    with true <- File.exists?(path),
+         cfg = Config.load!(path),
+         true <- Llama.status(cfg) == :stopped or Mediator.status(cfg) == :stopped do
+      up(%{})
+    else
+      false -> :already
+    end
+  rescue
+    e -> {:error, "Start fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  @doc """
+  Journal pruefen (Ticket #176): ruft `komki-mediator verify-journal` fuer
+  die Instanz auf und liefert dessen JSON-Ergebnis strukturiert.
+  """
+  @spec journal_verify() :: {:journal, map()} | {:error, String.t(), 2..4}
+  def journal_verify do
+    cfg = load_cfg!()
+
+    args =
+      KomkiCli.Roles.prefix(cfg, cfg.mediator_bin, "komki-mediator") ++
+        ["verify-journal", "--base", cfg.base_dir]
+
+    cond do
+      not is_binary(cfg.mediator_bin) ->
+        {:error, "komki-mediator nicht gefunden — 'make komki' im Repo, dann 'komki setup'", 2}
+
+      # Burrito-Einzeldatei (Ticket #181): die Binary direkt aufrufen
+      cfg.launcher == "burrito" and cfg.mediator_bin == cfg.komki_bin ->
+        {out, code} = System.cmd(cfg.komki_bin, args, stderr_to_stdout: true)
+        journal_result(out, code)
+
+      not is_binary(cfg.escript_bin) ->
+        {:error, "Erlang-escript nicht gefunden (config.json: escript_bin)", 2}
+
+      true ->
+        {out, code} =
+          System.cmd(cfg.escript_bin, [cfg.mediator_bin | args], stderr_to_stdout: true)
+
+        journal_result(out, code)
+    end
+  rescue
+    e -> {:error, "journal verify fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  defp journal_result(out, code) do
+    case JSON.decode(out |> String.split("\n", trim: true) |> List.last() |> to_string()) do
+      {:ok, %{"result" => _} = result} ->
+        {:journal, result}
+
+      _ ->
+        {:error,
+         "journal verify: unerwartete Ausgabe (exit " <>
+           to_string(code) <> "): " <> String.slice(out, 0, 300), 4}
+    end
   end
 
   # Praesenz-Pflicht sitzt HIER (up), nicht in init: der Vermittler-Binary
@@ -758,11 +955,12 @@ defmodule KomkiCli.Steps do
       not is_binary(cfg.mediator_bin) ->
         {:error,
          "komki-mediator nicht gefunden — mix escript.build in apps/komki_mediator" <>
-           " oder in PATH/<base>/bin ablegen ('komki init --force' entdeckt neu)"}
+           " oder in PATH/<base>/bin ablegen ('komki setup' entdeckt neu)"}
 
       # Ticket #137: der Vermittler startet unter seinem Profil ueber escript
-      not is_binary(cfg.escript_bin) ->
-        {:error, "Erlang-escript nicht entdeckt — Erlang installieren, 'komki init --force'"}
+      # (unter der Burrito-Einzeldatei direkt ueber die Binary, Ticket #181)
+      cfg.launcher != "burrito" and not is_binary(cfg.escript_bin) ->
+        {:error, "Erlang-escript nicht entdeckt — Erlang installieren, 'komki setup'"}
 
       true ->
         Mediator.up(cfg)
@@ -833,7 +1031,9 @@ defmodule KomkiCli.Steps do
          %{
            mediator: down_state(mediator),
            connectors: Enum.map(connectors, fn {name, state} -> {name, down_state(state)} end),
-           llama: down_state(llama)
+           llama: down_state(llama),
+           # Ticket #174: pi-Waisen frueherer Sessions mit aufraeumen
+           orphans: KomkiCli.Hangup.reap_orphans(Channel.relay_path(cfg))
          }}
 
       _llama ->
@@ -869,13 +1069,35 @@ defmodule KomkiCli.Steps do
   # Modell, das sein Werkzeug nicht fand, ueber zehn Minuten Schleifen.
   @run_timeout_s 600
 
-  @spec run(%{String.t() => term()}) :: result()
-  def run(opts) do
+  # `on_start` bekommt das up-Ergebnis, wenn run/session erst starten mussten
+  # (Ticket #176); die CLI zeigt damit die Startzeilen sofort an.
+  @type on_start :: (result() -> any())
+
+  @spec run(%{String.t() => term()}, on_start()) :: result()
+  def run(opts, on_start \\ fn _ -> :ok end) do
     with {:ok, mode} <- mode_from(Map.get(opts, "mode", "text")),
-         :ok <- timeout_valid(Map.get(opts, "timeout", @run_timeout_s)) do
+         :ok <- timeout_valid(Map.get(opts, "timeout", @run_timeout_s)),
+         :ok <- start_if_needed(on_start) do
       run_checked(opts, mode)
     else
       {:error, reason} -> {:error, reason, 2}
+      {:error, _reason, _code} = error -> error
+    end
+  end
+
+  # Nach der Usage-Pruefung, vor dem Doctor: fehlt llama oder der
+  # Vermittler, startet komki alles (wie `up`).
+  defp start_if_needed(on_start) do
+    case ensure_up() do
+      :already ->
+        :ok
+
+      {:up, _} = up ->
+        on_start.(up)
+        :ok
+
+      {:error, _reason, _code} = error ->
+        error
     end
   end
 
@@ -890,7 +1112,7 @@ defmodule KomkiCli.Steps do
         execute_run(opts, mode)
 
       {:checks, _checks, _} ->
-        {:error, "run verweigert: doctor nicht gruen (Boot-Gate ist Pflicht vor jedem Lauf)", 3}
+        {:error, "run verweigert: doctor nicht grün (Boot-Gate ist Pflicht vor jedem Lauf)", 3}
 
       {:error, reason, code} ->
         {:error, reason, code}
@@ -981,7 +1203,22 @@ defmodule KomkiCli.Steps do
   # OSC 52 von pi; `allow-passthrough off` sperrt rohe Sequenzen am tmux
   # vorbei. Restrisiko: OSC 8 (Hyperlinks) reicht tmux durch, wenn das
   # aeussere Terminal das Feature meldet.
-  @tmux_server ["-L", "komki", "-f", "/dev/null"]
+  # Ein Server je Instanz: die Standard-Instanz heisst "komki", jede andere
+  # (KOMKI_HOME) bekommt einen eigenen Namen aus ihrem Pfad. Sonst teilten
+  # sich zwei Instanzen eine Session.
+  defp tmux_server(cfg), do: ["-L", tmux_socket(cfg), "-f", "/dev/null"]
+
+  @doc "Name des tmux-Servers der Instanz (`tmux -L <name>`)."
+  @spec tmux_socket(Config.t()) :: String.t()
+  def tmux_socket(%Config{base_dir: base}) do
+    default = Path.join(Config.canonical(System.user_home!()), ".local/share/komki")
+
+    if base == default,
+      do: "komki",
+      else:
+        "komki-" <> String.slice(Base.encode16(:crypto.hash(:sha256, base), case: :lower), 0, 8)
+  end
+
   @tmux_lockdown [
     "set-option",
     "-s",
@@ -994,7 +1231,7 @@ defmodule KomkiCli.Steps do
     "off",
     ";"
   ]
-  @tmux_attach_hint "'tmux -L komki attach -t komki'"
+  defp attach_hint(cfg), do: "'tmux -L " <> tmux_socket(cfg) <> " attach -t komki'"
 
   @doc """
   Interner Pane-Einstieg (tmux-Pane der Session): startet die pi-Kette als
@@ -1062,6 +1299,10 @@ defmodule KomkiCli.Steps do
         ]
       )
 
+    # Ticket #174: schliesst sich das tmux-Fenster, nimmt der BEAM pi mit.
+    {:os_pid, pi_pid} = Port.info(port, :os_pid)
+    KomkiCli.Hangup.install(pi_pid)
+
     receive do
       {^port, {:exit_status, code}} -> {:chain_exit, code}
     end
@@ -1080,14 +1321,20 @@ defmodule KomkiCli.Steps do
   "open terminal failed: not a terminal"). `--continue` setzt die letzte
   Session fort (pi-Flag gleichen Namens), `--detach` startet ohne attach.
   """
-  @spec session(%{String.t() => String.t()}) :: result()
-  def session(opts) do
+  @spec session(%{String.t() => String.t()}, on_start()) :: result()
+  def session(opts, on_start \\ fn _ -> :ok end) do
+    with :ok <- start_if_needed(on_start) do
+      session_checked(opts)
+    end
+  end
+
+  defp session_checked(opts) do
     case run_checks(:full) do
       {:checks, _checks, :ok} ->
         execute_session(opts)
 
       {:checks, _checks, _} ->
-        {:error, "session verweigert: doctor nicht gruen (Boot-Gate ist Pflicht vor jedem Lauf)",
+        {:error, "session verweigert: doctor nicht grün (Boot-Gate ist Pflicht vor jedem Lauf)",
          3}
 
       {:error, reason, code} ->
@@ -1105,8 +1352,8 @@ defmodule KomkiCli.Steps do
     with {:ok, _pid} <- require_llama_up(cfg),
          {:ok, _pid} <- require_mediator_up(cfg),
          {:ok, tmux} <- find_tmux() do
-      if tmux_session_running?(tmux) do
-        attach_or_refuse(tmux, opts)
+      if tmux_session_running?(tmux, cfg) do
+        attach_or_refuse(tmux, cfg, opts)
       else
         start_new_session(cfg, tmux, opts)
       end
@@ -1124,7 +1371,7 @@ defmodule KomkiCli.Steps do
         {:error,
          "port " <>
            to_string(cfg.port) <>
-           " antwortet, aber pidfile fehlt (fremder Prozess?) — 'komki status' pruefen", 2}
+           " antwortet, aber pidfile fehlt (fremder Prozess?) — 'komki status' prüfen", 2}
 
       :stopped ->
         {:error, "llama-server nicht aktiv: 'komki up' zuerst", 2}
@@ -1138,11 +1385,13 @@ defmodule KomkiCli.Steps do
   # erzeugen, Relay frisch schreiben. Fehlt das Token, ist `komki up` noetig.
   # Auch die mcp.json wird frisch aus der healthz-Antwort geschrieben: das
   # pi-Home ist fuer den Agenten schreibbar, und ein eingetragener
-  # MCP-Server darf keinen Lauf ueberdauern (Labbook S-07).
+  # MCP-Server darf keinen Lauf ueberdauern (Labbook S-07). Aus demselben
+  # Grund wird die Anzeige-Extension neu geschrieben.
   defp prepare_channel(cfg) do
     with {:ok, env} <- Channel.prepare_pi(cfg),
          {:ok, "200", health} <- Mediator.fetch_health(cfg) do
       :ok = Mediator.write_mcp_config(cfg, health["tools"])
+      :ok = Anzeige.write!(cfg)
       {:ok, env}
     else
       {:ok, code, _health} -> {:error, "komki-mediator /healthz returned " <> code, 2}
@@ -1169,8 +1418,7 @@ defmodule KomkiCli.Steps do
       {:health_only, :no_pidfile} ->
         {:error,
          Channel.socket_path(cfg) <>
-           " antwortet healthz, aber pidfile fehlt (fremder Prozess?) — 'komki status' pruefen",
-         2}
+           " antwortet healthz, aber pidfile fehlt (fremder Prozess?) — 'komki status' prüfen", 2}
 
       :stopped ->
         {:error, "komki-mediator nicht aktiv: 'komki up' zuerst", 2}
@@ -1183,18 +1431,18 @@ defmodule KomkiCli.Steps do
   defp find_tmux do
     case System.find_executable("tmux") do
       nil ->
-        {:error,
-         "tmux nicht gefunden (noetig fuer interaktive Sessions; z.B. 'brew install tmux')", 2}
+        {:error, "tmux nicht gefunden (nötig für interaktive Sessions; z.B. 'brew install tmux')",
+         2}
 
       tmux ->
         {:ok, tmux}
     end
   end
 
-  defp tmux_session_running?(tmux) do
+  defp tmux_session_running?(tmux, cfg) do
     # stderr gefangen: "no server running"-Meldungen sollen das Terminal
     # des Aufrufers nicht zumuellen (Live-Fund aus dem Session-Smoke).
-    case System.cmd(tmux, @tmux_server ++ ["has-session", "-t", "=" <> @tmux_session],
+    case System.cmd(tmux, tmux_server(cfg) ++ ["has-session", "-t", "=" <> @tmux_session],
            stderr_to_stdout: true
          ) do
       {_out, 0} -> true
@@ -1205,14 +1453,14 @@ defmodule KomkiCli.Steps do
   # tmux im Attach-Modus braucht das echte Terminal des Aufrufers; System.cmd
   # gäbe BEAM-Pipes ("open terminal failed: not a terminal" — Live-Fund aus
   # dem Session-Smoke). Ein Port ohne :use_stdio reicht das eigene stdio durch.
-  defp run_tmux_inheriting_terminal(tmux, args) do
+  defp run_tmux_inheriting_terminal(tmux, cfg, args) do
     # TMUX ausgeblendet: aus einer laufenden tmux-Session heraus startet der
     # eigene komki-Server als verschachtelter Client statt abzulehnen.
     port =
       Port.open({:spawn_executable, tmux}, [
         :nouse_stdio,
         :exit_status,
-        {:args, @tmux_server ++ args},
+        {:args, tmux_server(cfg) ++ args},
         {:env, [{~c"TMUX", false}]}
       ])
 
@@ -1222,18 +1470,18 @@ defmodule KomkiCli.Steps do
     end
   end
 
-  defp attach_or_refuse(tmux, opts) do
+  defp attach_or_refuse(tmux, cfg, opts) do
     if Map.has_key?(opts, "detach") do
       {:error,
        "tmux-session '" <>
          @tmux_session <>
-         "' laeuft bereits; ohne --detach via " <> @tmux_attach_hint <> " andocken", 2}
+         "' läuft bereits; ohne --detach via " <> attach_hint(cfg) <> " andocken", 2}
     else
-      case run_tmux_inheriting_terminal(tmux, ["attach", "-t", "=" <> @tmux_session]) do
+      case run_tmux_inheriting_terminal(tmux, cfg, ["attach", "-t", "=" <> @tmux_session]) do
         :ok ->
           {:session,
            "session beendet oder abgekoppelt; " <>
-             @tmux_attach_hint <>
+             attach_hint(cfg) <>
              "' zum Weiterarbeiten"}
 
         {:error, code} ->
@@ -1273,12 +1521,12 @@ defmodule KomkiCli.Steps do
   defp create_detached(tmux, cfg, pane) do
     case System.cmd(
            tmux,
-           @tmux_server ++
+           tmux_server(cfg) ++
              @tmux_lockdown ++ ["new-session", "-d", "-s", @tmux_session, "-c", cfg.pi_home, pane],
            stderr_to_stdout: true
          ) do
       {_out, 0} ->
-        {:session, session_started_message(true)}
+        {:session, session_started_message(cfg, true)}
 
       {out, code} ->
         {:error,
@@ -1294,9 +1542,9 @@ defmodule KomkiCli.Steps do
   defp create_with_attach(tmux, cfg, pane) do
     args = @tmux_lockdown ++ ["new-session", "-s", @tmux_session, "-c", cfg.pi_home, pane]
 
-    case run_tmux_inheriting_terminal(tmux, args) do
+    case run_tmux_inheriting_terminal(tmux, cfg, args) do
       :ok ->
-        {:session, session_started_message(false)}
+        {:session, session_started_message(cfg, false)}
 
       {:error, code} ->
         {:error, "tmux new-session fehlgeschlagen (exit " <> to_string(code) <> ")", 4}
@@ -1309,28 +1557,28 @@ defmodule KomkiCli.Steps do
     case File.ls(Pi.session_dir(cfg)) do
       {:ok, []} ->
         {:error,
-         "keine fruehere Session in " <> Pi.session_dir(cfg) <> "; ohne --continue starten", 2}
+         "keine frühere Session in " <> Pi.session_dir(cfg) <> "; ohne --continue starten", 2}
 
       {:ok, _sessions} ->
         :ok
 
       {:error, _posix} ->
         {:error,
-         "keine fruehere Session in " <> Pi.session_dir(cfg) <> "; ohne --continue starten", 2}
+         "keine frühere Session in " <> Pi.session_dir(cfg) <> "; ohne --continue starten", 2}
     end
   end
 
   defp continue_precondition(_cfg, false), do: :ok
 
-  defp session_started_message(true = _detach) do
+  defp session_started_message(cfg, true = _detach) do
     "tmux-session '" <>
-      @tmux_session <> "' gestartet (detached); " <> @tmux_attach_hint <> " zum Arbeiten"
+      @tmux_session <> "' gestartet (detached); " <> attach_hint(cfg) <> " zum Arbeiten"
   end
 
-  defp session_started_message(false) do
+  defp session_started_message(cfg, false) do
     "tmux-session '" <>
       @tmux_session <>
-      "' beendet oder abgekoppelt; " <> @tmux_attach_hint <> " zum Weiterarbeiten"
+      "' beendet oder abgekoppelt; " <> attach_hint(cfg) <> " zum Weiterarbeiten"
   end
 
   # ===========================================================================
@@ -1370,12 +1618,12 @@ defmodule KomkiCli.Steps do
 
           _ ->
             raise ArgumentError,
-              message: "ungueltiger Wert fuer --" <> flag <> ": " <> Kernel.inspect(raw)
+              message: "ungültiger Wert für --" <> flag <> ": " <> Kernel.inspect(raw)
         end
 
       raw ->
         raise ArgumentError,
-          message: "ungueltiger Wert fuer --" <> flag <> ": " <> Kernel.inspect(raw)
+          message: "ungültiger Wert für --" <> flag <> ": " <> Kernel.inspect(raw)
     end
   end
 

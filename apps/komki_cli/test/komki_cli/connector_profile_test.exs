@@ -57,7 +57,7 @@ defmodule KomkiCli.ConnectorProfileTest do
   defp rules_with(text, needle), do: Enum.filter(lines(text), &String.contains?(&1, needle))
 
   describe "Golden (byte-genau)" do
-    test "alle Profile stimmen mit den Golden-Dateien ueberein" do
+    test "alle Profile stimmen mit den Golden-Dateien überein" do
       for {name, text} <- profiles(cfg()) do
         path = Path.join(@golden, name)
 
@@ -141,7 +141,7 @@ defmodule KomkiCli.ConnectorProfileTest do
   end
 
   describe "Egress-Profil" do
-    test "*:443 plus DNS, bind genau auf die Egress-Ports, keine Dateien ausser Log" do
+    test "*:443 plus DNS, bind genau auf die Egress-Ports, keine Dateien außer Log" do
       text = ConnectorProfile.egress(cfg())
 
       assert "(allow network-outbound (remote tcp \"*:443\"))" in lines(text)
@@ -166,7 +166,7 @@ defmodule KomkiCli.ConnectorProfileTest do
   end
 
   describe "Vermittler-Profil (#137)" do
-    test "kein Outbound ausser den Connector-Sockets" do
+    test "kein Outbound außer den Connector-Sockets" do
       text = MediatorProfile.generate(cfg(), {:tcp, 49_525})
 
       outbound = rules_with(text, "(allow network-outbound")
