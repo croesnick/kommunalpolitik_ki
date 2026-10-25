@@ -84,36 +84,45 @@ Lokal lässt sich beides mit `make komki-formel` bauen (Ergebnis unter
 
 ## Verteilen: eine Datei statt Ordner (Burrito)
 
-Für Rechner ohne installiertes Elixir baut Burrito das Release in eine einzige
-ausführbare Datei mit eingebettetem Erlang-Runtime (macOS arm64):
+Für Rechner ohne Homebrew baut Burrito komki samt Laufzeit in eine einzige
+ausführbare Datei (macOS arm64, rund 7 MB). Sie enthält alle Rollen;
+Vermittler, Egress-Proxy und Connectoren starten als `<datei> komki-mediator …`
+usw., jede unter ihrem eigenen Sandbox-Profil (Ticket #181).
 
 ```sh
-PATH="$HOME/.local/opt/zig-aarch64-macos-0.16.0:$PATH" \
-  MIX_ENV=prod BURRITO_TARGET=macos_silicon mix release
-# → burrito_out/komki_macos_silicon (eine Datei, ~10 MB)
+make komki-burrito
+# → dist/komki-<version>-macos-arm64-einzeldatei
 ```
 
+Burrito bringt vorgebaute Erlang-Laufzeiten nur für manche OTP-Versionen mit
+(für 29.1.2 noch nicht). `make komki-burrito` packt deshalb die laufende
+Erlang-Installation (`.tool-versions`) als eigene Laufzeit ein. Bau braucht
+zig exakt 0.16.0 und xz ([`docs/prerequisites.md`](../../docs/prerequisites.md)).
+
 Beim ersten Start entpackt die Datei ihr Payload nach
-`~/Library/Application Support/.burrito/` und läuft danach ohne jede
-Elixir-Installation. Eingebaute Wartungsbefehle:
-`komki maintenance directory` (Entpackpfad), `maintenance meta`,
-`maintenance uninstall` (Payload löschen, mit y/n-Rückfrage).
+`~/Library/Application Support/.burrito/` (`KOMKI_INSTALL_DIR` überschreibt
+den Ort). Rollen bekommen diesen Ort beim Start mit, weil sie mit dem
+HOME der Instanz laufen. Wartungsbefehle: `maintenance directory`,
+`maintenance meta`, `maintenance uninstall`.
 
-Bau-Voraussetzungen und Details: [`docs/prerequisites.md`](../../docs/prerequisites.md);
-Pilot-Bericht mit allen Messungen:
-[`docs/research/2026-10-11-komki-burrito-pilot.md`](../../docs/research/2026-10-11-komki-burrito-pilot.md).
+Hinweise:
 
-Zwei Hinweise für die verteilte Datei:
-
-- **Gatekeeper:** Die lokal gebaute Datei ist ad-hoc signiert und läuft ohne
-  Nachfrage. Wer sie aus einem GitHub-Release herunterlädt, bekommt beim
-  ersten Start den Gatekeeper-Dialog („Entwickler nicht verifiziert“) —
-  einmalig `xattr -d com.apple.quarantine komki_macos_silicon` ausführen
-  oder unter Systemeinstellungen › Datenschutz & Sicherheit freigeben.
-- **Bestehende Instanzen:** Das Seatbelt-Profil hat zwei Regeln für den
-  Session-Betrieb unter der Binary dazubekommen. Nach diesem Update einmalig
-  `komki init --force` ausführen — der Doctor meldet Profil-Drift, bis das
-  Profil neu geschrieben ist.
+- **Gleiche Version, alter Payload:** Eine neu gebaute Datei mit
+  unveränderter Version läuft mit dem schon entpackten alten Payload. Vor dem
+  Testen `maintenance uninstall` ausführen oder die Version erhöhen
+  ([Pilot-Bericht](../../docs/research/2026-10-11-komki-burrito-pilot.md)).
+- **Sandbox:** Das Profil jeder Rolle erlaubt zusätzlich nur, die Datei
+  auszuführen, ihr Laufzeit-Verzeichnis per `mkdir -p` „anzulegen“ (es
+  existiert), `.burrito` zu listen und `releases/COOKIE` zu öffnen. Löschen
+  bleibt verboten; alte Versionen räumt das ungesandboxte `komki` auf.
+- **Laufzeit von diesem Rechner:** Die eingepackte Laufzeit lädt OpenSSL von
+  Homebrew (`openssl@3`). Auf Rechnern ohne Homebrew-OpenSSL braucht es eine
+  Laufzeit mit eingebautem OpenSSL (vorgebaute Burrito-ERTS, sobald es sie
+  für die OTP-Version gibt).
+- **Gatekeeper:** Lokal gebaut läuft die Datei ohne Nachfrage. Aus dem Netz
+  geladen blockiert Gatekeeper den ersten Start; einmalig
+  `xattr -d com.apple.quarantine <datei>` oder Freigabe in den
+  Systemeinstellungen.
 
 ## Schnellstart: Arbeitsraum mit RIS, Websuche und Vault
 

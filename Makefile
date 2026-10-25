@@ -1,4 +1,4 @@
-.PHONY: test lint format ci deps elixir-test python-test install komki komki-paket komki-formel komki-tap
+.PHONY: test lint format ci deps elixir-test python-test install komki komki-paket komki-formel komki-tap komki-burrito
 
 # Escript bauen und nach /usr/local/bin symlinken.
 # Workspace-Pattern: mix.exs der ratsinfo-App referenziert ../artifacts/deps
@@ -59,7 +59,23 @@ komki-tap: komki-paket
 	@git -C "$(KOMKI_TAP)" add README.md Formula/komki.rb
 	@git -C "$(KOMKI_TAP)" diff --cached --quiet || git -C "$(KOMKI_TAP)" commit -q -m "komki $(KOMKI_VERSION) (lokal gebaut)"
 	@rm -f "$$(brew --cache croesnick/tap/komki 2>/dev/null)"
-	@if brew list --formula komki >/dev/null 2>&1; then brew reinstall croesnick/tap/komki; else brew install croesnick/tap/komki; fi
+	@export HOMEBREW_NO_INSTALL_UPGRADE=1 HOMEBREW_NO_AUTO_UPDATE=1; \
+	  if brew list --formula komki >/dev/null 2>&1; then brew reinstall croesnick/tap/komki; else brew install croesnick/tap/komki; fi
+
+# Burrito-Einzeldatei (Ticket #181): komki mit eingebauter Laufzeit, fuer
+# Rechner ohne Homebrew. Laufzeit = die laufende Erlang-Installation (Burrito
+# hat fuer die aktuelle OTP-Version keine vorgebaute). Bau braucht zig 0.16.0
+# und xz (docs/prerequisites.md). Ergebnis: dist/komki-<version>-macos-arm64-einzeldatei
+KOMKI_ZIG ?= $(HOME)/.local/opt/zig-aarch64-macos-0.16.0
+komki-burrito:
+	@mkdir -p dist
+	@root=$$(erl -noshell -eval 'io:format("~s",[code:root_dir()]), halt().'); \
+	  otp=$$(cat "$$root"/releases/*/OTP_VERSION | head -1); \
+	  tar -czf dist/erts-$$otp-macos-aarch64.tar.gz -C "$$root" -s ",^\.,otp-$$otp-macos-aarch64," . ; \
+	  cd apps/komki_cli && PATH="$(KOMKI_ZIG):$$PATH" MIX_ENV=prod BURRITO_TARGET=macos_silicon \
+	    KOMKI_CUSTOM_ERTS="$(PWD)/dist/erts-$$otp-macos-aarch64.tar.gz" mix release --overwrite
+	@cp apps/komki_cli/burrito_out/komki_macos_silicon "$(KOMKI_PAKET)-einzeldatei"
+	@echo "Einzeldatei: $(KOMKI_PAKET)-einzeldatei"
 
 deps:
 	mix deps.get

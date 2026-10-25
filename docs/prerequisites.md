@@ -420,14 +420,16 @@ tar -xJf zig-aarch64-macos-0.16.0.tar.xz -C ~/.local/opt/
 brew install xz      # xz ist im PATH nötig (ist es über Homebrew meist schon)
 ```
 
-**Bau:**
+**Bau** (Repo-Root; die Datei enthält alle Rollen, Ticket #181):
 
 ```bash
-cd apps/komki_cli
-PATH="$HOME/.local/opt/zig-aarch64-macos-0.16.0:$PATH" \
-  MIX_ENV=prod BURRITO_TARGET=macos_silicon mix release
-# → burrito_out/komki_macos_silicon
+make komki-burrito
+# → dist/komki-<version>-macos-arm64-einzeldatei
 ```
+
+Burrito hat für die aktuelle OTP-Version (29.1.2) noch keine vorgebaute
+Laufzeit; `make komki-burrito` packt deshalb die laufende Erlang-Installation
+als `custom_erts` ein (Variable `KOMKI_CUSTOM_ERTS` in `apps/komki_cli/mix.exs`).
 
 **Hinweise:**
 

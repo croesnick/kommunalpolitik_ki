@@ -71,11 +71,21 @@ defmodule KomkiCli.EscriptProfile do
     runtime(erlang_root!(cfg), binary) ++ burrito_rules(cfg, binary)
   end
 
-  defp burrito_rules(%Config{launcher: "burrito", komki_bin: komki}, komki) do
+  # Ermittelt durch Eingrenzen am laufenden Wrapper (Burrito 1.6, wrapper.zig
+  # und erlang_launcher.zig); Loeschen bleibt verboten: alte Versionen raeumt
+  # das ungesandboxte `komki` beim normalen Aufruf vorher auf.
+  defp burrito_rules(%Config{launcher: "burrito", komki_bin: komki, runtime_root: root}, komki) do
     [
       "; Burrito-Einzeldatei (Ticket #181): komki startet als Wrapper und fuehrt",
       "; die entpackte Laufzeit (Erlang-Wurzel oben) aus",
-      "(allow process-exec (literal \"" <> komki <> "\"))"
+      "(allow process-exec (literal \"" <> komki <> "\"))",
+      "; der Wrapper legt sein Laufzeit-Verzeichnis bei jedem Start per mkdir -p an (es existiert)",
+      "(allow file-write-create (literal \"" <> root <> "\"))",
+      "; und listet .burrito, um alte Versionen zu finden",
+      "(allow file-read* (literal \"" <> Path.dirname(root) <> "\"))",
+      "; releases/COOKIE oeffnet er lesend und schreibend, liest aber nur",
+      "; (Rollen nutzen kein verteiltes Erlang)",
+      "(allow file-write-data (literal \"" <> Path.join([root, "releases", "COOKIE"]) <> "\"))"
     ]
   end
 

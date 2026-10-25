@@ -41,17 +41,17 @@ defmodule KomkiCli.Application do
     end
   end
 
-  # Rollen (Ticket #181) laufen in einem eigenen Prozess: ein Vermittler oder
-  # Connector im App-Start selbst blockierte den Application-Controller, und
-  # die Rolle koennte ihre eigenen Abhaengigkeiten nicht mehr starten. Der
-  # App-Start kehrt sofort zurueck; die Rolle beendet die VM selbst.
+  # Rollen (Ticket #181) laufen wie die CLI synchron im App-Start: Kehrte der
+  # Start zurueck, beanspruchte Elixirs `start_cli` die Argumente und suchte
+  # eine Skriptdatei namens `komki-egress` (Burrito-Issue #229, Pilotbericht).
+  # Im Release startet die Boot-Sequenz alle Abhaengigkeiten vor komki_cli;
+  # ein `ensure_all_started` der Rolle findet sie also schon laufend vor.
+  @spec start_burrito([String.t()]) :: no_return()
   defp start_burrito(argv) do
     case KomkiCli.Roles.dispatch(argv) do
       {module, rest} ->
-        Task.start_link(fn ->
-          module.main(rest)
-          System.halt(0)
-        end)
+        module.main(rest)
+        System.halt(0)
 
       nil ->
         KomkiCli.CLI.main(argv)

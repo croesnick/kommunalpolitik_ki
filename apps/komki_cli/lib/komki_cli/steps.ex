@@ -155,23 +155,46 @@ defmodule KomkiCli.Steps do
           value != Map.fetch!(cfg, field),
           do: {field, value}
 
-    if changes == [] do
-      :unchanged
-    else
-      updated = struct!(cfg, changes)
-      Config.save(updated)
+    cond do
+      changes != [] ->
+        updated = struct!(cfg, changes)
+        Config.save(updated)
+        write_all_profiles(updated)
+        {:refreshed, Enum.map(changes, fn {field, _} -> Atom.to_string(field) end)}
 
-      Profile.write!(
-        updated.profile_path,
-        Profile.generate(updated, Profile.check_scratch(updated))
-      )
+      # Gleiche Pfade, aber der Profil-Generator einer neuen komki-Version
+      # erzeugt anderen Text (neue Regeln): neu schreiben und das benennen.
+      not profiles_current?(cfg) ->
+        write_all_profiles(cfg)
+        {:refreshed, ["Sandbox-Profile (neue komki-Version)"]}
 
-      Profile.write!(Llama.llama_profile_path(updated), Profile.generate_llama(updated))
-      write_sandbox_profiles(updated)
-      {:refreshed, Enum.map(changes, fn {field, _} -> Atom.to_string(field) end)}
+      true ->
+        :unchanged
     end
   rescue
     e -> {:error, "Auffrischen fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  defp write_all_profiles(cfg) do
+    Profile.write!(cfg.profile_path, Profile.generate(cfg, Profile.check_scratch(cfg)))
+    Profile.write!(Llama.llama_profile_path(cfg), Profile.generate_llama(cfg))
+    write_sandbox_profiles(cfg)
+  end
+
+  defp profiles_current?(cfg) do
+    expected =
+      [
+        {cfg.profile_path, fn -> Profile.generate(cfg, Profile.check_scratch(cfg)) end},
+        {Llama.llama_profile_path(cfg), fn -> Profile.generate_llama(cfg) end}
+      ] ++ Enum.map(ConnectorChecks.profiles(cfg), fn {_name, path, gen} -> {path, gen} end)
+
+    Enum.all?(expected, fn {path, generate} ->
+      try do
+        File.read(path) == {:ok, generate.()}
+      rescue
+        ArgumentError -> true
+      end
+    end)
   end
 
   defp write_sandbox_profiles(cfg) do

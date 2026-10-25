@@ -110,14 +110,8 @@ defmodule KomkiCli.Setup do
         ui.say.("Instanz     vorhanden: " <> base <> " (unveraendert)")
         :ok
 
-      {:refreshed, fields} ->
-        ui.say.(
-          "Instanz     vorhanden: " <>
-            base <>
-            "; Programmpfade aufgefrischt (" <>
-            Enum.join(fields, ", ") <> "), Profile neu geschrieben"
-        )
-
+      {:refreshed, items} ->
+        ui.say.("Instanz     vorhanden: " <> base <> "; aufgefrischt: " <> Enum.join(items, ", "))
         :ok
 
       {:error, _reason, _code} = error ->
