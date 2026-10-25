@@ -71,7 +71,7 @@ Die tief geprüften Packages:
 
 ### D2 — Session und Headless trennen
 
-- **Headless (`--print`):** bleibt bei `-e builtin:mcp` und `--tools write,mcp__komki__*`. Dritte Extensions, Rückfragen und Todo-Persistenz bleiben aus.
+- **Headless (`--print`):** bleibt bei `-e builtin:mcp` und `--no-builtin-tools --tools mcp__komki__*` (seit #104 ohne `write`). Dritte Extensions, Rückfragen und Todo-Persistenz bleiben aus.
 - **Interaktive Session:** darf die freigegebenen Packages laden. Die Tool-Allowlist wird um die tatsächlich benötigten Tools erweitert; Klartextnamen ersetzen die gesamte Auswahl, deshalb muss die Liste vollständig sein.
 
 ### D3 — Package-Entscheidungen

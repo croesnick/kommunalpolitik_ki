@@ -263,13 +263,10 @@ defmodule KomkiCli.Pi do
           # Headless-Laeufe (pi_flags) behalten --no-approve: dort gibt es keinen
           # Projekt-Kontext.
           "--session-dir",
-          session_dir(cfg),
-          # ls ist reines Node (kein Binary noetig) — ohne es kann der Agent
-          # Verzeichnisse nicht sehen und rät dann zu read . (EISDIR-Live-Fund).
-          # find/grep brauchen fd/rg: init kopiert sie in pi's agent-bin-Fundus;
-          # fehlen sie auf dem Host, bleiben die Tools ehrlich weg.
-          "--tools",
-          tools_list(cfg),
+          session_dir(cfg)
+        ] ++
+        tool_flags() ++
+        [
           "--system-prompt",
           @komki_system_prompt,
           "--provider",
@@ -291,25 +288,14 @@ defmodule KomkiCli.Pi do
   # Extension zeichnet nur (KomkiCli.Anzeige); der Einmal-Lauf hat keine TUI.
   defp anzeige_flags(cfg), do: ["-e", Anzeige.entry(cfg)]
 
-  # Vermittler-Tools (Ticket #133): pi 1.1.0 blendet MCP-Tools aus, sobald
-  # --tools eine Allowlist traegt (Live-Fund: das Modell sah nur `write`).
-  # Das Muster schaltet genau den Server `komki` frei; welche seiner Tools
-  # sichtbar sind, pinnt weiter die mcp.json (exposure hidden + direct).
-  @mediator_tools "mcp__komki__*"
-
-  # ls ist immer dabei (reines Node); find/grep nur mit entdeckter Binary —
-  # sonst scheitert der Tool-Aufruf erst zur Laufzeit.
-  defp tools_list(%Config{} = cfg) do
-    ["read", "write", "ls"]
-    |> maybe_tool("find", cfg.fd_bin)
-    |> maybe_tool("grep", cfg.rg_bin)
-    |> Kernel.++([@mediator_tools])
-    |> Enum.join(",")
-  end
-
-  defp maybe_tool(names, _tool, nil), do: names
-
-  defp maybe_tool(names, tool, _binary), do: names ++ [tool]
+  # Gate-2-Schliessung (Ticket #104, identisch in Session und Einmal-Lauf):
+  # pis Built-ins (read, write, ls, find, grep, bash, ...) sind aus; jeder
+  # Datei- und Netzweg laeuft ueber die Vermittler-Tools und damit durch
+  # Gate 1 und Gate 2 (Lesen: vault_read, Schreiben: vault_write_test).
+  # Die Allowlist bleibt, weil pi 1.1.0 MCP-Tools ausblendet, sobald --tools
+  # gesetzt ist (Ticket #133); das Muster schaltet genau den Server `komki`
+  # frei, welche seiner Tools sichtbar sind, pinnt die mcp.json.
+  defp tool_flags, do: ["--no-builtin-tools", "--tools", "mcp__komki__*"]
 
   defp sh_quote(bin) when is_binary(bin),
     do: "'" <> String.replace(bin, "'", "'\\''") <> "'"
@@ -327,9 +313,10 @@ defmodule KomkiCli.Pi do
         "--no-approve",
         "--no-session",
         "--session-dir",
-        Path.join(scratch_dir, "pi-sessions"),
-        "--tools",
-        "write," <> @mediator_tools,
+        Path.join(scratch_dir, "pi-sessions")
+      ] ++
+      tool_flags() ++
+      [
         "--provider",
         "pi-local",
         "--model",
