@@ -62,6 +62,8 @@
 ; Erstprovisionierung beim ersten Start (Templates.provision!/1)
 (allow file-write* (literal "/opt/komki-golden/mediator") (literal "/opt/komki-golden/mediator/registry.json") (literal "/opt/komki-golden/mediator/room.json"))
 (allow file-write* (subpath "/opt/komki-golden/mediator/documents"))
+; GO-Anfragen und Offenlegungsstand (Ticket #98)
+(allow file-write* (subpath "/opt/komki-golden/mediator/go"))
 ; Kanal pi -> Vermittler: Unix-Socket (CONTRACT.md §8), Token nur lesen
 ; eigener Unix-Socket (binden, 0600 setzen, alten Socket entfernen)
 (allow network-bind (local unix-socket (path-literal "/opt/komki-golden/run/mediator.sock")))

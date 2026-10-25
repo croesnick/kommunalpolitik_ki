@@ -168,6 +168,30 @@ sequenceDiagram
     end
 ```
 
+### GO fuer einen gesperrten Aufruf (Ticket #98)
+
+Bietet der Remedy-Katalog einer emit-Ablehnung eine Aktionsfreigabe fuer
+den exakten Call an (`aktionsfreigabe`, scope `call`) und hoert jemand zu,
+legt der Vermittler `<base>/mediator/go/<call_hash>.request.json` ab und
+wartet bis zu 120 s. Zuhoeren heisst: Der Herzschlag
+`<base>/mediator/go/listener` ist hoechstens 5 s alt. Den erneuert der
+Pane-BEAM einer Session mit angedocktem Terminal (`KomkiCli.GoWatcher`).
+Ohne Zuhoerer bleibt es beim sofortigen deny. `komki go` zeigt die
+Vorschau (Tool, Parameter, Blocker) und schreibt auf ein `j` eine
+Aktionsfreigabe `komki-release/1` (frische Nonce, Fenster 300 s) als
+`<call_hash>.answer.json`. pi kann in `mediator/go` weder lesen noch
+schreiben.
+
+Ob die Freigabe gilt, entscheidet `Derive.decide_with_release/5` gegen den
+Offenlegungsstand `komki-stand/1` (`KomkiMediator.GoStand`,
+`mediator/go/stand.json`). Bei permit gilt commit vor Wirkung:
+`Stand.advance` verbraucht die Nonce, danach folgt das PDR mit `outcome:
+released` (`payload_hash` bindet den Verbrauchs-Vorschlag), danach der
+normale Vollzug. Ein Nein ergibt `go_refused`, keine Antwort `go_timeout`,
+jeweils mit PDR. Die Antwort bleibt das deny samt Katalog, ergaenzt um
+`"go"`. Eine ungueltige Freigabe (falscher Call, abgelaufen, Nonce
+verbraucht) ist ein neues deny des Freigabe-Zweigs.
+
 ### Bewusste Grenzen
 
 * Kein Token in der mcp.json. Das Kanal-Token reist ueber pis Umgebung
@@ -362,6 +386,8 @@ NIEMALS ueberschrieben (Idempotenz).
 | `KomkiMediator.Fassung` | festgedrehte Tool-Auflage (R.4.3) |
 | `KomkiMediator.Gate` | Gate 1 + Gate 2 + PDR (ping, admit_document) |
 | `KomkiMediator.ConnectorGate` | emit → Vollzug → admit fuer die Connector-Tools |
+| `KomkiMediator.Go` | GO-Anfragen und -Antworten unter `mediator/go` (Ticket #98) |
+| `KomkiMediator.GoStand` | Offenlegungsstand der GO-Noncen, commit vor Wirkung |
 | `KomkiMediator.ResultShape` | Ergebnisformen der Connectoren (§5.2) |
 | `KomkiMediator.PDR` | Form der PDR-Datensaetze (`komki-pdr/3`) |
 | `KomkiMediator.Tools.Connector` | Tool-Baustein aus dem Manifest |

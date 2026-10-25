@@ -7,6 +7,8 @@ defmodule KomkiMediator.Supervisor do
 
   Reihenfolge:
   1. Journal (PDR-Writer, Datei bleibt offen)
+  1a. GoStand (Offenlegungsstand der GO-Noncen, nur mit GO-Konfiguration;
+      Ticket #98)
   2. Env (Gamma-Stand + Raum + Journal-Anbindung)
   3. anubis MCP-Server (Registry/Session-Maschinerie, KEIN eigener
      Listener — der HTTP-Port ist Punkt 4)
@@ -30,7 +32,8 @@ defmodule KomkiMediator.Supervisor do
   @type channel() :: %{
           required(:socket) => Path.t(),
           required(:token) => String.t(),
-          optional(:connectors_dir) => Path.t()
+          optional(:connectors_dir) => Path.t(),
+          optional(:go) => KomkiMediator.Go.config()
         }
 
   def start_link({journal_path, gamma, room, channel}) do
@@ -60,24 +63,34 @@ defmodule KomkiMediator.Supervisor do
       gamma: gamma,
       room: room,
       journal: KomkiMediator.Journal,
-      connectors_dir: Map.get(channel, :connectors_dir)
+      connectors_dir: Map.get(channel, :connectors_dir),
+      go: Map.get(channel, :go)
     }
 
-    children = [
-      {KomkiMediator.Journal, journal_path},
-      {KomkiMediator.Env, env},
-      # start: true ist bewusst explizit: die Registry/Session-Maschinerie
-      # von anubis 1.6 bindet fuer :streamable_http selbst keinen Socket
-      # (der Plug ist der einzige Zugang) — mit start: false waere die
-      # Registrierung :ignore und der Plug wuerde eine leere Maschinerie
-      # an finden.
-      {KomkiMediator.Server, transport: {:streamable_http, start: true}},
-      %{
-        id: :listener,
-        start: {__MODULE__, :start_listener, [socket, token]},
-        type: :supervisor
-      }
-    ]
+    # Der Offenlegungsstand der GO-Noncen (Ticket #98) gehoert zum Raum.
+    go_stand =
+      case env.go do
+        %{dir: dir} -> [{KomkiMediator.GoStand, %{dir: dir, scope: "go-" <> room.workspace_id}}]
+        nil -> []
+      end
+
+    children =
+      [{KomkiMediator.Journal, journal_path}] ++
+        go_stand ++
+        [
+          {KomkiMediator.Env, env},
+          # start: true ist bewusst explizit: die Registry/Session-Maschinerie
+          # von anubis 1.6 bindet fuer :streamable_http selbst keinen Socket
+          # (der Plug ist der einzige Zugang) — mit start: false waere die
+          # Registrierung :ignore und der Plug wuerde eine leere Maschinerie
+          # an finden.
+          {KomkiMediator.Server, transport: {:streamable_http, start: true}},
+          %{
+            id: :listener,
+            start: {__MODULE__, :start_listener, [socket, token]},
+            type: :supervisor
+          }
+        ]
 
     Supervisor.init(children, strategy: :one_for_all)
   end

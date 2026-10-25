@@ -62,6 +62,8 @@
 ; Erstprovisionierung beim ersten Start (Templates.provision!/1)
 (allow file-write* (literal "/opt/komki-golden/mediator") (literal "/opt/komki-golden/mediator/registry.json") (literal "/opt/komki-golden/mediator/room.json"))
 (allow file-write* (subpath "/opt/komki-golden/mediator/documents"))
+; GO-Anfragen und Offenlegungsstand (Ticket #98)
+(allow file-write* (subpath "/opt/komki-golden/mediator/go"))
 ; Kanal pi -> Vermittler: Loopback-TCP (Altform vor #143)
 (allow network-bind (local ip "localhost:49525"))
 (allow network-inbound (local ip))

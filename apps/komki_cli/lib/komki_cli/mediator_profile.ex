@@ -80,7 +80,9 @@ defmodule KomkiCli.MediatorProfile do
         "\") (literal \"" <>
         Path.join(data, "registry.json") <>
         "\") (literal \"" <> Path.join(data, "room.json") <> "\"))",
-      "(allow file-write* (subpath \"" <> Path.join(data, "documents") <> "\"))"
+      "(allow file-write* (subpath \"" <> Path.join(data, "documents") <> "\"))",
+      "; GO-Anfragen und Offenlegungsstand (Ticket #98)",
+      "(allow file-write* (subpath \"" <> Path.join(data, "go") <> "\"))"
     ]
   end
 

@@ -181,7 +181,7 @@ defmodule KomkiCli.ConnectorProfileTest do
       assert "(allow network-bind (local ip \"localhost:49525\"))" in lines(text)
     end
 
-    test "Schreiben nur Journal, Erstprovisionierung und Log" do
+    test "Schreiben nur Journal, Erstprovisionierung, GO-Anfragen und Log" do
       text = MediatorProfile.generate(cfg(), {:tcp, 49_525})
 
       writes =
@@ -193,7 +193,8 @@ defmodule KomkiCli.ConnectorProfileTest do
                "(allow file-read* file-write* (literal \"/opt/komki-golden/tmp/mediator.log\"))",
                "(allow file-write* (subpath \"/opt/komki-golden/mediator/journal\"))",
                "(allow file-write* (literal \"/opt/komki-golden/mediator\") (literal \"/opt/komki-golden/mediator/registry.json\") (literal \"/opt/komki-golden/mediator/room.json\"))",
-               "(allow file-write* (subpath \"/opt/komki-golden/mediator/documents\"))"
+               "(allow file-write* (subpath \"/opt/komki-golden/mediator/documents\"))",
+               "(allow file-write* (subpath \"/opt/komki-golden/mediator/go\"))"
              ]
     end
 
