@@ -123,6 +123,20 @@ test("lange Trefferlisten werden zugeklappt gekürzt", () => {
 
 test("leere Trefferliste", () => {
 	assert.match(strip(render("ris_search_leer")), /öffentlich · keine Treffer/);
+	// Vault ohne Treffer: der Vermittler liefert keine Labels, das ist keine Warnung.
+	const vault = render("vault_search", false, (r) => {
+		r.results = [];
+		r.labels = [];
+	});
+	assert.match(strip(vault), /✓ zugelassen · keine Treffer/);
+	assert.doesNotMatch(vault, /ohne Label/);
+});
+
+test("Inhalt ohne Label bleibt eine Warnung", () => {
+	const out = render("vault_read", false, (r) => {
+		r.labels = [];
+	});
+	assert.match(out, /<warning>ohne Label<\/>/);
 });
 
 test("fremde Inhalte können keine Steuersequenzen oder falschen Status einschleusen", () => {

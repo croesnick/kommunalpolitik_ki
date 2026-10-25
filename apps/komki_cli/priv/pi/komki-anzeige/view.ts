@@ -212,7 +212,10 @@ function transition(t: Json): string {
 function admittedRows(tool: string, r: Json, o: ViewOptions, p: Paint): Row[] | undefined {
 	const hits = Array.isArray(r.results) ? r.results : undefined;
 	const count = hits ? ` · ${hits.length === 0 ? "keine Treffer" : `${hits.length} Treffer`}` : "";
-	const head = { body: `${p.fg("success", p.bold("✓ zugelassen"))} · ${labelBadge(r.labels, p)}${p.fg("muted", count)}` };
+	// Ohne Treffer gibt der Vermittler keine Labels zurück; dann ist "ohne Label" keine Warnung wert.
+	const empty = hits?.length === 0 && !(Array.isArray(r.labels) && r.labels.length > 0);
+	const badge = empty ? "" : ` · ${labelBadge(r.labels, p)}`;
+	const head = { body: `${p.fg("success", p.bold("✓ zugelassen"))}${badge}${p.fg("muted", count)}` };
 
 	let body: Row[] | undefined;
 	switch (tool) {
