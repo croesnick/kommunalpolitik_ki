@@ -35,6 +35,10 @@ defmodule KomkiMediator.CLI do
 
   alias KomkiMediator.{Gamma, Room}
 
+  # So lange wartet eine blockierte Ausgabe auf `komki go` (Ticket #98);
+  # danach bleibt es beim deny.
+  @go_timeout_ms 120_000
+
   def main(argv) do
     case parse(argv) do
       :help ->
@@ -105,7 +109,12 @@ defmodule KomkiMediator.CLI do
       {:ok, _} =
         KomkiMediator.Supervisor.start_link(
           {{journal_path(base), append_only: true}, gamma, room,
-           %{socket: socket, token: token, connectors_dir: connectors_dir(opts)}}
+           %{
+             socket: socket,
+             token: token,
+             connectors_dir: connectors_dir(opts),
+             go: %{dir: Path.join(mediator_dir(base), "go"), timeout_ms: @go_timeout_ms}
+           }}
         )
 
       IO.puts(startup_note(base, socket, gamma))

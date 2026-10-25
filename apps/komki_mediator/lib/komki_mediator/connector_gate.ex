@@ -23,10 +23,19 @@ defmodule KomkiMediator.ConnectorGate do
 
   Die Selbstauskunft des Connectors wird nie ueber das Manifest hinaus
   geglaubt. Connector-Fehler ergeben `admitted: false` mit PDR.
+
+  GO (Ticket #98): Bietet der Katalog einer emit-Ablehnung eine
+  Aktionsfreigabe fuer den exakten Call an und ist `env.go` gesetzt, fragt
+  der Vermittler die nutzende Person, sofern eine Session zuhoert
+  (`KomkiMediator.Go`). Eine vorgelegte
+  Freigabe entscheidet der Freigabe-Zweig der Engine; nach einem Permit
+  committet `KomkiMediator.GoStand` die Nonce und ein PDR
+  (`outcome: released`) belegt das GO, beides vor dem Vollzug. Nein,
+  keine Antwort oder eine ungueltige Freigabe lassen es beim deny.
   """
 
   alias KomkiConnector.{Client, Manifest, Params}
-  alias KomkiMediator.{Gamma, Gate, Hash, PDR, ResultShape, Room}
+  alias KomkiMediator.{Gamma, Gate, Go, GoStand, Hash, PDR, ResultShape, Room}
   alias KomkiMediator.Room.Object
   alias KomkiPolicy.{Derive, JSON, Verify}
 
@@ -102,8 +111,109 @@ defmodule KomkiMediator.ConnectorGate do
         execute(env, call, decision, snapshot, intent)
 
       other ->
+        response = not_permitted(env, call, "emit", nil, intent, snapshot, other)
+        maybe_go(env, call, snapshot, intent, response)
+    end
+  end
+
+  # -------------------------------------------------------------------------
+  # GO: Aktionsfreigabe fuer den exakten Call (Ticket #98)
+  # -------------------------------------------------------------------------
+
+  defp maybe_go(%{go: %{} = go} = env, call, snapshot, intent, response) do
+    case {Go.offered(response["remedies"]), Go.listening?(go.dir)} do
+      {call_hash, true} when is_binary(call_hash) ->
+        ask_go(env, go, call, snapshot, intent, response, call_hash)
+
+      _no_offer_or_nobody_listening ->
+        response
+    end
+  end
+
+  defp maybe_go(_env, _call, _snapshot, _intent, response), do: response
+
+  defp ask_go(env, go, call, snapshot, intent, response, call_hash) do
+    request = %{
+      "schema" => "komki-go-request/1",
+      "call_hash" => call_hash,
+      "decision_id" => response["decision_id"],
+      "tool" => call.tool,
+      "params" => call.params,
+      "blockers" => Enum.map(response["remedies"], & &1["code"]),
+      "object" => intent["object"],
+      "workspace" => intent["workspace"],
+      # Das Release-Schema verlangt reines Hex; die Engine rechnet den
+      # Call-Hash ohnehin selbst aus dem Fakt nach.
+      "content_digest" => String.replace_prefix(call.intent_hash, "sha256:", ""),
+      "scope" => GoStand.current()["scope"],
+      "authority" => Go.authority()
+    }
+
+    case Go.await(go, request) do
+      {:release, release} -> released(env, call, snapshot, intent, release)
+      :refused -> go_not_given(env, call, intent, response, "go_refused")
+      :timeout -> go_not_given(env, call, intent, response, "go_timeout")
+    end
+  end
+
+  defp released(env, call, snapshot, intent, release) do
+    case Derive.decide_with_release(
+           env.gamma.compiled,
+           snapshot,
+           intent,
+           release,
+           GoStand.current()
+         ) do
+      {:ok, %{"decision" => "permit", "release" => proposal} = decision} ->
+        commit_release(env, call, snapshot, intent, decision, proposal)
+
+      other ->
         not_permitted(env, call, "emit", nil, intent, snapshot, other)
     end
+  end
+
+  # Commit vor Wirkung (CONTRACT §4.6, B.8): erst die Nonce verbrauchen,
+  # dann der PDR, dann der Vollzug. Faellt ein Schritt aus, folgt keiner
+  # der spaeteren.
+  defp commit_release(env, call, snapshot, intent, decision, proposal) do
+    case GoStand.advance(proposal) do
+      {:ok, _stand} ->
+        PDR.append(env, %{
+          "decision_id" => PDR.new_id(),
+          "tool" => call.tool,
+          "rule" => "emit",
+          "decision" => "permit",
+          "outcome" => "released",
+          "intent_hash" => call.intent_hash,
+          "payload_hash" => PDR.payload_hash(proposal),
+          "intent_id" => intent["intent_id"],
+          "snapshot_id" => snapshot["snapshot_id"],
+          "assigned_label" => decision["assigned_label"]
+        })
+
+        execute(env, call, decision, snapshot, intent)
+
+      {_refused_or_error, reason} ->
+        refused(env, call.tool, call.intent_hash, "GO nicht committet: " <> inspect(reason))
+    end
+  end
+
+  # Nein oder keine Antwort: es bleibt beim deny, der Katalog bleibt
+  # sichtbar; das PDR haelt fest, dass gefragt wurde.
+  defp go_not_given(env, call, intent, response, outcome) do
+    PDR.append(env, %{
+      "decision_id" => PDR.new_id(),
+      "tool" => call.tool,
+      "rule" => "emit",
+      "decision" => "deny",
+      "outcome" => outcome,
+      "admitted" => false,
+      "intent_hash" => call.intent_hash,
+      "payload_hash" => PDR.payload_hash(response),
+      "intent_id" => intent["intent_id"]
+    })
+
+    Map.put(response, "go", if(outcome == "go_refused", do: "abgelehnt", else: "keine Antwort"))
   end
 
   # -------------------------------------------------------------------------

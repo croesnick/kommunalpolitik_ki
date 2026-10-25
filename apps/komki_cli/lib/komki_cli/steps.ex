@@ -1303,6 +1303,15 @@ defmodule KomkiCli.Steps do
     {:os_pid, pi_pid} = Port.info(port, :os_pid)
     KomkiCli.Hangup.install(pi_pid)
 
+    # Ticket #98: GO-Anfragen des Vermittlers als Popup in dieser Session.
+    with tmux when is_binary(tmux) <- System.find_executable("tmux") do
+      KomkiCli.GoWatcher.start_link(
+        cfg.base_dir,
+        [tmux, "-L", tmux_socket(cfg)],
+        KomkiCli.Runtime.self_path()
+      )
+    end
+
     receive do
       {^port, {:exit_status, code}} -> {:chain_exit, code}
     end

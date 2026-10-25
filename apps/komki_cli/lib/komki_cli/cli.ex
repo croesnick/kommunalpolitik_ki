@@ -18,6 +18,7 @@ defmodule KomkiCli.CLI do
       komki up    [--ctx N]
       komki down
       komki status
+      komki go
       komki run "PROMPT" [--mode text|json] [--scratch PATH] [--timeout SEKUNDEN]
       komki session [--continue] [--detach]
       komki session-chain [--continue]   # intern: Pane-Einstieg der Session
@@ -293,6 +294,11 @@ defmodule KomkiCli.CLI do
         name: "down",
         description: "alles stoppen, was komki gestartet hat (fremde Prozesse bleiben unberührt)"
       ],
+      go: [
+        name: "go",
+        description:
+          "gesperrte Aufrufe ansehen und einzeln freigeben (GO gilt einmal, nur für diesen Aufruf)"
+      ],
       status: [
         name: "status",
         description:
@@ -549,6 +555,13 @@ defmodule KomkiCli.CLI do
 
   defp dispatch_command(:down, _result), do: render(KomkiCli.Steps.down())
   defp dispatch_command(:status, _result), do: render(KomkiCli.Steps.status())
+
+  defp dispatch_command(:go, _result),
+    do:
+      KomkiCli.GoSteps.run(KomkiCli.Config.default_base(), %{
+        say: &IO.puts/1,
+        confirm: &KomkiCli.Prompt.confirm/2
+      })
 
   defp dispatch_command(:setup, result),
     do: render(KomkiCli.Setup.run(optimus_opts(result), setup_ui()))

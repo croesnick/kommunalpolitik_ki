@@ -49,7 +49,9 @@ defmodule KomkiMediator.HTTP do
 
   forward("/mcp",
     to: Anubis.Server.Transport.StreamableHTTP.Plug,
-    init_opts: [server: KomkiMediator.Server]
+    # Ein Aufruf kann auf ein GO warten (Ticket #98, bis 120 s); der
+    # anubis-Standard von 30 s braeche ihn vorher ab.
+    init_opts: [server: KomkiMediator.Server, request_timeout: 180_000]
   )
 
   get "/healthz" do

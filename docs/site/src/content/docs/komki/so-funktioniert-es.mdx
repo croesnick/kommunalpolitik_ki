@@ -44,12 +44,31 @@ Ein **Raum** legt fest, welche Arten von Daten in einer Sitzung zusammenkommen d
 
 | Darf pi … | Raum `recherche` (Standard) | Raum `vertraulich` |
 |---|---|---|
-| im RIS suchen | <span class="ja">ja</span> | <span class="nein">nein</span> |
-| im Web suchen | <span class="ja">ja</span> | <span class="nein">nein</span> |
+| im RIS suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO |
+| im Web suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO |
 | öffentliche Notizen lesen | <span class="ja">ja</span> | <span class="ja">ja</span> |
 | vertrauliche Notizen lesen | <span class="nein">nein, sie sind unsichtbar</span> | <span class="ja">ja</span> |
 | Notizen in `komki-test/` schreiben | <span class="ja">ja</span> | <span class="ja">ja, mit vertraulichem Label</span> |
 
 <Aside type="tip" title="Warum das wirkt">
-Im Raum „vertraulich“ fehlt jeder Weg nach draußen. Selbst ein Agent, der vollständig von einem Angreifer gesteuert würde, kann vertrauliche Inhalte dort nicht weitergeben. Im Raum „recherche“ ist der Weg nach draußen offen, dafür kommt der Agent gar nicht erst an Vertrauliches. Das kannst du [selbst ausprobieren](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
+Im Raum „vertraulich“ fehlt jeder Weg nach draußen, solange du nicht selbst einen einzelnen Aufruf freigibst. Selbst ein Agent, der vollständig von einem Angreifer gesteuert würde, kann vertrauliche Inhalte dort nicht weitergeben. Im Raum „recherche“ ist der Weg nach draußen offen, dafür kommt der Agent gar nicht erst an Vertrauliches. Das kannst du [selbst ausprobieren](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
 </Aside>
+
+## Freigabe: dein GO für genau einen Aufruf
+
+Manchmal ist eine gesperrte Anfrage in Ordnung, etwa eine Websuche nach einem Förderprogramm, während eine vertrauliche Notiz offen ist. Dann entscheidest du. Läuft eine Session und hängt dein Terminal daran, öffnet komki bei einer gesperrten Anfrage ein Fenster:
+
+```text
+Gesperrter Aufruf (Beleg pdr-993830d5c6cf5f5dffddfaad3f9948be)
+  Werkzeug:  web_search
+  Parameter:
+    count: 1
+    query: "Förderprogramm Radweg Bayern"
+  Gesperrt:  recipient_not_allowed
+  Ein GO gilt nur für genau diesen Aufruf, einmal, fünf Minuten lang.
+GO für genau diesen Aufruf? [j/N]
+```
+
+Mit `j` läuft genau diese Anfrage, einmal. Fragt pi danach etwas anderes oder dasselbe noch einmal, wird wieder gesperrt. Enter oder `n` heißt Nein. Antwortest du zwei Minuten lang nicht, bleibt es ebenfalls beim Nein. Jede Freigabe und jede Ablehnung steht im Journal.
+
+Ohne angedocktes Terminal, also bei `komki run` oder einer Session im Hintergrund, fragt komki nicht und lehnt sofort ab. Offene Anfragen kannst du auch in einem zweiten Terminal mit `komki go` beantworten.
