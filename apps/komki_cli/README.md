@@ -44,8 +44,8 @@ komki läuft nur unter macOS (Seatbelt-Sandbox). Drei Werkzeuge müssen
 vorhanden sein, `init` entdeckt sie selbst und pinnt die aufgelösten Pfade
 in die `config.json` der Instanz: ein node-Interpreter (asdf, Homebrew oder
 nvm — bei asdf wird der echte Installationspfad hinter dem Shim benutzt,
-weil der Shim unter der Sandbox still scheitert), das pi-Bundle als globales
-npm-Paket (`npm install -g @earendil-works/pi-coding-agent`) und
+weil der Shim unter der Sandbox still scheitert), das pi-Bundle global über
+pnpm (`pnpm add -g @earendil-works/pi-coding-agent`; nie plain npm) und
 `llama-server` (llama.cpp, etwa via `brew install llama.cpp`). Fehlt eins,
 verweigert `init` mit klarer Meldung.
 

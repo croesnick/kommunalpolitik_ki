@@ -208,7 +208,7 @@ defmodule KomkiCli.LabelStore do
     end
   end
 
-  @doc "Uebersicht: Bindungszusammenfassungen (id, bezeichnung) und Objektstaende."
+  @doc "Übersicht: Bindungszusammenfassungen (id, bezeichnung) und Objektstände."
   @spec list(String.t()) :: {:ok, [map()], [map()]} | {:error, String.t()}
   def list(db_path) do
     with_conn(db_path, fn conn -> do_list(conn) end)
@@ -282,18 +282,18 @@ defmodule KomkiCli.LabelStore do
   end
 
   defp validate_import(other),
-    do: {:error, "Import ungueltig: expected an object, got " <> Kernel.inspect(other)}
+    do: {:error, "Import ungültig: expected an object, got " <> Kernel.inspect(other)}
 
   defp require_label_store_schema(%{"schema" => "komki-label-store/2"}), do: :ok
 
   defp require_label_store_schema(%{"schema" => other}),
     do:
       {:error,
-       "Import ungueltig: invalid_schema at $.schema (expected \"komki-label-store/2\", got " <>
+       "Import ungültig: invalid_schema at $.schema (expected \"komki-label-store/2\", got " <>
          Kernel.inspect(other) <> ")"}
 
   defp require_label_store_schema(_term),
-    do: {:error, "Import ungueltig: invalid_schema at $.schema (field \"schema\" fehlt)"}
+    do: {:error, "Import ungültig: invalid_schema at $.schema (field \"schema\" fehlt)"}
 
   defp closed_top_fields(term) do
     unknown = term |> Map.keys() |> Enum.reject(&(&1 in @import_top_fields)) |> Enum.sort()
@@ -304,7 +304,7 @@ defmodule KomkiCli.LabelStore do
 
       [first | _] ->
         {:error,
-         "Import ungueltig: unknown_field at $." <>
+         "Import ungültig: unknown_field at $." <>
            first <> " (field not part of the closed schema)"}
     end
   end
@@ -319,7 +319,7 @@ defmodule KomkiCli.LabelStore do
         {:ok, compiled}
 
       {:error, %{code: code, path: path, detail: detail}} ->
-        {:error, labeled_engine_error("Import ungueltig", code, path, detail)}
+        {:error, labeled_engine_error("Import ungültig", code, path, detail)}
     end
   end
 
@@ -382,7 +382,7 @@ defmodule KomkiCli.LabelStore do
   defp validate_store_binding(id, other, _observers),
     do:
       {:error,
-       "Import ungueltig: $.bindings." <>
+       "Import ungültig: $.bindings." <>
          id <> " (expected an object, got " <> Kernel.inspect(other) <> ")"}
 
   # Store-Zusatzfeld observer_types (R.2.5): Typ je Beobachter, nur
@@ -398,8 +398,8 @@ defmodule KomkiCli.LabelStore do
 
       {extra, missing} ->
         {:error,
-         "Import ungueltig: $.observer_types (Schluessel muessen exakt der " <>
-           "Beobachtermenge entsprechen; zusaetzlich: " <>
+         "Import ungültig: $.observer_types (Schlüssel müssen exakt der " <>
+           "Beobachtermenge entsprechen; zusätzlich: " <>
            Kernel.inspect(extra) <>
            ", fehlend: " <> Kernel.inspect(missing) <> ")"}
     end
@@ -408,7 +408,7 @@ defmodule KomkiCli.LabelStore do
   defp validate_observer_types(other),
     do:
       {:error,
-       "Import ungueltig: $.observer_types (erwartet ein Objekt mit einem Typ je Beobachter, got " <>
+       "Import ungültig: $.observer_types (erwartet ein Objekt mit einem Typ je Beobachter, got " <>
          Kernel.inspect(other) <> ")"}
 
   defp validate_observer_type_values(types) do
@@ -418,7 +418,7 @@ defmodule KomkiCli.LabelStore do
       else
         {:halt,
          {:error,
-          "Import ungueltig: $.observer_types." <>
+          "Import ungültig: $.observer_types." <>
             id <>
             " (" <>
             ~s(erwartet "person" oder "processing_domain") <>
@@ -437,7 +437,7 @@ defmodule KomkiCli.LabelStore do
 
       [first | _] ->
         {:error,
-         "Import ungueltig: unknown_field at $.bindings." <>
+         "Import ungültig: unknown_field at $.bindings." <>
            id <> "." <> first <> " (field not part of the closed schema)"}
     end
   end
@@ -454,7 +454,7 @@ defmodule KomkiCli.LabelStore do
 
   defp nonempty_field_error(id, field, value),
     do:
-      "Import ungueltig: $.bindings." <>
+      "Import ungültig: $.bindings." <>
         id <>
         "." <>
         field <>
@@ -472,7 +472,7 @@ defmodule KomkiCli.LabelStore do
   defp validate_auflagen(_id, other),
     do:
       {:error,
-       "Import ungueltig: $.auflagen (expected an array, got " <> Kernel.inspect(other) <> ")"}
+       "Import ungültig: $.auflagen (expected an array, got " <> Kernel.inspect(other) <> ")"}
 
   defp validate_auflage(auflage) when is_map(auflage) do
     # String-Klassenvergleich mit sortierten Schluesseln: Map.keys/1
@@ -487,7 +487,7 @@ defmodule KomkiCli.LabelStore do
       :ok
     else
       {:error,
-       "Import ungueltig: $.auflagen (erwartet Objekte mit genau " <>
+       "Import ungültig: $.auflagen (erwartet Objekte mit genau " <>
          Kernel.inspect(@auflage_fields) <> " und nichtleeren Strings)"}
     end
   end
@@ -495,7 +495,7 @@ defmodule KomkiCli.LabelStore do
   defp validate_auflage(other),
     do:
       {:error,
-       "Import ungueltig: $.auflagen (erwartet Objekt, got " <> Kernel.inspect(other) <> ")"}
+       "Import ungültig: $.auflagen (erwartet Objekt, got " <> Kernel.inspect(other) <> ")"}
 
   defp validate_relaxation_authorities(id, authorities, observers) when is_list(authorities) do
     with :ok <- each_relaxation_entry(id, authorities, observers) do
@@ -506,7 +506,7 @@ defmodule KomkiCli.LabelStore do
   defp validate_relaxation_authorities(id, other, _observers),
     do:
       {:error,
-       "Import ungueltig: $.bindings." <>
+       "Import ungültig: $.bindings." <>
          id <>
          ".relaxation_authorities (expected an array, got " <>
          Kernel.inspect(other) <> ")"}
@@ -532,7 +532,7 @@ defmodule KomkiCli.LabelStore do
     cond do
       not closed_keys? or not strings_ok? ->
         {:error,
-         "Import ungueltig: $.bindings." <>
+         "Import ungültig: $.bindings." <>
            id <>
            ".relaxation_authorities (erwartet Objekte mit genau " <>
            Kernel.inspect(@relaxation_entry_fields) <>
@@ -540,7 +540,7 @@ defmodule KomkiCli.LabelStore do
 
       entry["restriction"] not in @relaxation_restrictions ->
         {:error,
-         "Import ungueltig: $.bindings." <>
+         "Import ungültig: $.bindings." <>
            id <>
            ".relaxation_authorities (restriction erwartet eine aus " <>
            Kernel.inspect(@relaxation_restrictions) <>
@@ -548,14 +548,14 @@ defmodule KomkiCli.LabelStore do
 
       not Registry.kebab_id?(entry["authority"]) or not Registry.kebab_id?(entry["output"]) ->
         {:error,
-         "Import ungueltig: $.bindings." <>
+         "Import ungültig: $.bindings." <>
            id <>
            ".relaxation_authorities (erwartet kebab-Ids, got " <>
            Kernel.inspect(entry) <> ")"}
 
       entry["authority"] not in observers ->
         {:error,
-         "Import ungueltig: $.bindings." <>
+         "Import ungültig: $.bindings." <>
            id <>
            ".relaxation_authorities (unbekannter Beobachter: " <>
            entry["authority"] <> "; erst 'komki label import …')"}
@@ -568,7 +568,7 @@ defmodule KomkiCli.LabelStore do
   defp validate_relaxation_entry(id, other, _observers),
     do:
       {:error,
-       "Import ungueltig: $.bindings." <>
+       "Import ungültig: $.bindings." <>
          id <>
          ".relaxation_authorities (erwartet Objekt, got " <>
          Kernel.inspect(other) <> ")"}
@@ -581,7 +581,7 @@ defmodule KomkiCli.LabelStore do
       :ok
     else
       {:error,
-       "Import ungueltig: $.bindings." <>
+       "Import ungültig: $.bindings." <>
          id <>
          ".relaxation_authorities (doppelte Lockerungsbefugnis: " <>
          Kernel.inspect(hd(authorities -- uniq)) <> ")"}
@@ -645,7 +645,7 @@ defmodule KomkiCli.LabelStore do
 
       {:ok, [stored_type]} ->
         {:error,
-         "Import ungueltig: Beobachtertyp unveraenderlich: " <>
+         "Import ungültig: Beobachtertyp unveränderlich: " <>
            id <> " (" <> stored_type <> " != " <> type <> ")"}
 
       {:error, reason} ->
@@ -700,7 +700,7 @@ defmodule KomkiCli.LabelStore do
 
       stored_type ->
         {:error,
-         "Import ungueltig: fact_field-Konflikt bei " <>
+         "Import ungültig: fact_field-Konflikt bei " <>
            name <>
            " (" <>
            stored_type <>
@@ -739,7 +739,7 @@ defmodule KomkiCli.LabelStore do
         {:ok, :noop}
 
       {:ok, _row} ->
-        {:error, "Import ungueltig: Umgebung unveraenderlich: " <> id <> " (Inhalt weicht ab)"}
+        {:error, "Import ungültig: Umgebung unveränderlich: " <> id <> " (Inhalt weicht ab)"}
     end
   end
 
@@ -809,7 +809,7 @@ operations, auflagen, relaxation_authorities FROM bindings WHERE id = ?",
         if new_row == Enum.to_list(saved_row) do
           {:ok, :noop}
         else
-          {:error, "Import ungueltig: Bindung unveraenderlich: " <> id <> " (Inhalt weicht ab)"}
+          {:error, "Import ungültig: Bindung unveränderlich: " <> id <> " (Inhalt weicht ab)"}
         end
 
       {:error, reason} ->
@@ -928,7 +928,7 @@ operations, auflagen, relaxation_authorities FROM bindings WHERE id = ?",
       {:ok, :processing_domain} ->
         {:error,
          "R.2.5: nur eine berechtigte Person entscheidet; " <>
-           id <> " ist eine Verarbeitungsdomaene und darf nur vorschlagen"}
+           id <> " ist eine Verarbeitungsdomäne und darf nur vorschlagen"}
 
       {:ok, :untyped} ->
         {:error,
@@ -1093,7 +1093,7 @@ operations, auflagen, relaxation_authorities, registered_at FROM bindings WHERE 
           {:error, reason}
       end
     else
-      {:error, "ungueltige Bindungskennung (Form <kebab>@<int>): " <> Kernel.inspect(binding_id)}
+      {:error, "ungültige Bindungskennung (Form <kebab>@<int>): " <> Kernel.inspect(binding_id)}
     end
   end
 
@@ -1210,7 +1210,7 @@ WHERE object_id = ? AND version = ? ORDER BY id",
           {:ok, JSON.encode!(term) <> "\n"}
 
         {:error, %{code: code, path: path, detail: detail}} ->
-          {:error, labeled_engine_error("Γ-Export ungueltig", code, path, detail)}
+          {:error, labeled_engine_error("Γ-Export ungültig", code, path, detail)}
       end
     end
   end
@@ -1338,7 +1338,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?)",
 
       {:ok, stored} ->
         {:error,
-         "Import ungueltig: " <>
+         "Import ungültig: " <>
            key <>
            "_mismatch (Store: " <>
            Kernel.inspect(stored) <>
@@ -1357,8 +1357,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?)",
     if Registry.kebab_id?(value) do
       :ok
     else
-      {:error,
-       "ungueltige " <> label <> ": " <> Kernel.inspect(value) <> " (kebab-case erwartet)"}
+      {:error, "ungültige " <> label <> ": " <> Kernel.inspect(value) <> " (kebab-case erwartet)"}
     end
   end
 

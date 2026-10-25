@@ -84,7 +84,7 @@ defmodule KomkiCli.RuntimeTest do
       :ok
     end
 
-    test "_IS_TTY=0: IO.ANSI.enabled?/0 wird false — auch fuer Optimus-Formatierung" do
+    test "_IS_TTY=0: IO.ANSI.enabled?/0 wird false — auch für Optimus-Formatierung" do
       System.put_env("_IS_TTY", "0")
       on_exit(fn -> System.delete_env("_IS_TTY") end)
 

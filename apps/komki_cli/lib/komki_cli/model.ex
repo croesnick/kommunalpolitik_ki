@@ -32,11 +32,11 @@ defmodule KomkiCli.Model do
       "https://huggingface.co/" <>
         @repo <> "/resolve/" <> @revision <> "/" <> Config.model_filename()
 
-  @doc "Groesse der gepinnten Datei in Byte."
+  @doc "Größe der gepinnten Datei in Byte."
   @spec size() :: pos_integer()
   def size, do: @size
 
-  @doc "Kurzbeschreibung fuer die Rueckfrage vor dem Download."
+  @doc "Kurzbeschreibung für die Rückfrage vor dem Download."
   @spec summary() :: [String.t()]
   def summary do
     [
@@ -66,7 +66,7 @@ defmodule KomkiCli.Model do
             :ok
 
           [_, other] ->
-            {:error, "Quelle meldet eine andere Pruefsumme (" <> other <> "); Pin pruefen"}
+            {:error, "Quelle meldet eine andere Prüfsumme (" <> other <> "); Pin prüfen"}
 
           nil ->
             :unknown
@@ -120,7 +120,7 @@ defmodule KomkiCli.Model do
           {kb, _} ->
             {:error,
              "zu wenig Platz in " <>
-               dir <> ": frei " <> gb(kb * 1024) <> ", noetig etwa " <> gb(missing + @headroom)}
+               dir <> ": frei " <> gb(kb * 1024) <> ", nötig etwa " <> gb(missing + @headroom)}
 
           :error ->
             :ok
@@ -161,7 +161,7 @@ defmodule KomkiCli.Model do
         File.rm(part)
 
         {:error,
-         "Pruefsumme passt nicht (" <> actual <> " statt " <> expected <> "); Datei verworfen"}
+         "Prüfsumme passt nicht (" <> actual <> " statt " <> expected <> "); Datei verworfen"}
 
       {:error, reason} ->
         {:error, reason}

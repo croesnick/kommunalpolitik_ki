@@ -23,7 +23,7 @@ defmodule KomkiCli.Setup do
           render: (Steps.result() -> any())
         }
 
-  @bausteine_hint "im Repo 'make komki' ausfuehren (baut und legt die komki-Bausteine ab)"
+  @bausteine_hint "im Repo 'make komki' ausführen (baut und legt die komki-Bausteine ab)"
 
   @spec run(%{String.t() => String.t()}, ui()) :: {:setup, :ok} | {:error, String.t(), 2..4}
   def run(opts, ui) do
@@ -51,7 +51,7 @@ defmodule KomkiCli.Setup do
         [
           {"llama-server", cfg.llama_server_bin, "brew install llama.cpp"},
           {"node", cfg.node_bin, "brew install node"},
-          {"pi", cfg.cli_js, "npm install -g @earendil-works/pi-coding-agent"},
+          {"pi", cfg.cli_js, "pnpm add -g @earendil-works/pi-coding-agent"},
           runtime_entry(cfg),
           {"komki-mediator", cfg.mediator_bin, @bausteine_hint},
           {"komki-egress", cfg.egress_bin, @bausteine_hint}
@@ -76,7 +76,7 @@ defmodule KomkiCli.Setup do
       ui.say.("Werkzeuge   ok (" <> names <> ")")
 
       unless tmux,
-        do: ui.say.("            tmux fehlt: nur fuer 'komki session' noetig (brew install tmux)")
+        do: ui.say.("            tmux fehlt: nur für 'komki session' nötig (brew install tmux)")
 
       :ok
     else
@@ -94,7 +94,9 @@ defmodule KomkiCli.Setup do
 
   defp instance(base, opts, ui) do
     if File.exists?(Config.config_path(base)) do
-      existing_instance(base, ui)
+      with :ok <- existing_instance(base, ui) do
+        switch_vault(base, opts, ui)
+      end
     else
       with {:ok, vault_dir} <- vault(base, opts, ui) do
         create_instance(base, vault_dir, opts, ui)
@@ -107,7 +109,7 @@ defmodule KomkiCli.Setup do
   defp existing_instance(base, ui) do
     case Steps.refresh_instance() do
       :unchanged ->
-        ui.say.("Instanz     vorhanden: " <> base <> " (unveraendert)")
+        ui.say.("Instanz     vorhanden: " <> base <> " (unverändert)")
         :ok
 
       {:refreshed, items} ->
@@ -117,6 +119,46 @@ defmodule KomkiCli.Setup do
       {:error, _reason, _code} = error ->
         error
     end
+  end
+
+  # Vault einer bestehenden Instanz wechseln, wenn --vault-dir oder --demo
+  # etwas anderes verlangt als eingetragen ist. Ohne beides bleibt er.
+  defp switch_vault(base, opts, ui) do
+    case vault_target(base, opts, ui) do
+      :keep -> :ok
+      {:ok, dir} -> apply_vault(dir, ui)
+      {:error, _reason, _code} = error -> error
+    end
+  end
+
+  defp vault_target(base, opts, ui) do
+    cond do
+      Map.has_key?(opts, "vault-dir") -> own_vault(Map.fetch!(opts, "vault-dir"), ui)
+      Map.has_key?(opts, "demo") -> existing_demo_vault(base, ui)
+      true -> :keep
+    end
+  end
+
+  defp apply_vault(dir, ui) do
+    case Steps.set_vault(dir) do
+      :unchanged ->
+        :ok
+
+      {:switched, _old} ->
+        ui.say.("Vault       gewechselt; komki startet neu")
+        :ok
+
+      {:error, _reason, _code} = error ->
+        error
+    end
+  end
+
+  defp existing_demo_vault(base, ui) do
+    dir = Path.join(base, "vault")
+
+    if File.dir?(dir) and File.ls!(dir) != [],
+      do: {:ok, Config.canonical(dir)},
+      else: demo_vault(base, ui)
   end
 
   defp create_instance(base, vault_dir, opts, ui) do
@@ -150,7 +192,7 @@ defmodule KomkiCli.Setup do
   defp download(ui) do
     case Model.download() do
       {:ok, path} ->
-        ui.say.("Modell      geladen und geprueft: " <> path)
+        ui.say.("Modell      geladen und geprüft: " <> path)
         :ok
 
       {:error, reason} ->
@@ -159,7 +201,7 @@ defmodule KomkiCli.Setup do
   end
 
   defp init_instance(base, vault_dir, opts, ui) do
-    ui.say.("Instanz     wird angelegt unter " <> base <> " (prueft das Modell, etwa 30 s)")
+    ui.say.("Instanz     wird angelegt unter " <> base <> " (prüft das Modell, etwa 30 s)")
 
     init_opts =
       %{"vault-dir" => vault_dir}
@@ -193,7 +235,7 @@ defmodule KomkiCli.Setup do
       cond do
         Map.has_key?(opts, "vault-dir") -> Map.fetch!(opts, "vault-dir")
         Map.has_key?(opts, "demo") -> ""
-        true -> ui.ask.("Vault       Pfad zu deinem Vault, oder Enter fuer den Test-Vault: ", "")
+        true -> ui.ask.("Vault       Pfad zu deinem Vault, oder Enter für den Test-Vault: ", "")
       end
 
     case choice do
@@ -222,7 +264,7 @@ defmodule KomkiCli.Setup do
     dir = Config.canonical(path)
 
     if File.dir?(dir) do
-      ui.say.("Vault       " <> dir <> " (nur Notizen mit komki_labels sind fuer komki sichtbar)")
+      ui.say.("Vault       " <> dir <> " (nur Notizen mit komki_labels sind für komki sichtbar)")
       {:ok, dir}
     else
       {:error, "Vault-Ordner nicht gefunden: " <> dir, 2}
@@ -237,14 +279,14 @@ defmodule KomkiCli.Setup do
 
   defp secret(entry, ui) do
     if Secrets.present?(entry) do
-      ui.say.(pad(entry.name) <> "ok (Schluesselbund-Eintrag '" <> entry.service <> "')")
+      ui.say.(pad(entry.name) <> "ok (Schlüsselbund-Eintrag '" <> entry.service <> "')")
     else
-      ui.say.(pad(entry.name) <> entry.label <> " fehlt im Schluesselbund")
+      ui.say.(pad(entry.name) <> entry.label <> " fehlt im Schlüsselbund")
 
       if ui.confirm.("            jetzt eingeben?", true) do
         ui.say.(pad("") <> store_secret(entry, ui))
       else
-        ui.say.(pad("") <> "uebersprungen; spaeter: komki secret set " <> entry.name)
+        ui.say.(pad("") <> "übersprungen; später: komki secret set " <> entry.name)
       end
     end
   end
@@ -258,13 +300,13 @@ defmodule KomkiCli.Setup do
     with {:ok, first} <- ui.secret.("            Wert (wird nicht angezeigt): "),
          {:ok, ^first} <- ui.secret.("            noch einmal: "),
          :ok <- Keychain.store(entry.service, first) do
-      "gespeichert im Schluesselbund als '" <> entry.service <> "'"
+      "gespeichert im Schlüsselbund als '" <> entry.service <> "'"
     else
       {:ok, _different} ->
-        "die beiden Eingaben stimmen nicht ueberein; nichts gespeichert"
+        "die beiden Eingaben stimmen nicht überein; nichts gespeichert"
 
       {:error, :no_tty} ->
-        "kein Terminal: 'komki secret set " <> entry.name <> "' in einem Terminal ausfuehren"
+        "kein Terminal: 'komki secret set " <> entry.name <> "' in einem Terminal ausführen"
 
       {:error, :empty} ->
         "leere Eingabe; nichts gespeichert"
@@ -296,7 +338,7 @@ defmodule KomkiCli.Setup do
   defp check(ui) do
     case Steps.doctor() do
       {:checks, _checks, :ok} ->
-        ui.say.("Pruefung    doctor ok")
+        ui.say.("Prüfung     doctor ok")
         ui.say.("")
         ui.say.("Fertig. Probier zum Beispiel:")
         ui.say.("  komki run \"Was steht im RIS zum Radverkehrskonzept?\"")
@@ -305,7 +347,7 @@ defmodule KomkiCli.Setup do
 
       {:checks, _checks, _summary} = checks ->
         ui.render.(checks)
-        {:error, "setup: Pruefung nicht gruen, Details oben ('komki doctor')", 3}
+        {:error, "setup: Prüfung nicht grün, Details oben ('komki doctor')", 3}
 
       {:error, _reason, _code} = error ->
         error

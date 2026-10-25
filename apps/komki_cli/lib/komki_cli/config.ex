@@ -153,7 +153,8 @@ defmodule KomkiCli.Config do
   @doc """
   pi-Bundle-Entdeckung (cli.js): zuerst das pi, das neben komki liegt
   (Homebrew-Formel, Ticket #180: gepinnte Version in `libexec/lib`), dann
-  die globalen node_modules-Roots — die zum entdeckten node gehoerige
+  ein globales pnpm (`pnpm add -g`, unter `$PNPM_HOME` oder `~/Library/pnpm`),
+  dann die globalen node_modules-Roots — die zum entdeckten node gehoerige
   (asdf/nvm-Layout: `<install>/lib`), dann Homebrew ARM und Intel. nil,
   wenn das Bundle nirgends liegt.
   """
@@ -161,6 +162,7 @@ defmodule KomkiCli.Config do
   def resolve_cli_js(node_bin) do
     roots =
       bundled_lib_roots() ++
+        pnpm_lib_roots() ++
         install_lib_roots(node_bin) ++ ["/opt/homebrew/lib", "/usr/local/lib"]
 
     Enum.find_value(roots, fn root ->
@@ -170,7 +172,7 @@ defmodule KomkiCli.Config do
     end)
   end
 
-  @doc "llama-server-Entdeckung ueber PATH (Kernel-Realpath). nil, falls fehlt."
+  @doc "llama-server-Entdeckung über PATH (Kernel-Realpath). nil, falls fehlt."
   @spec resolve_llama_server() :: String.t() | nil
   def resolve_llama_server, do: resolve_optional_tool("llama-server")
 
@@ -319,6 +321,16 @@ defmodule KomkiCli.Config do
       nil -> []
       komki -> [Path.join(Path.dirname(komki), "lib")]
     end
+  end
+
+  # Globales pnpm: bis pnpm 10 liegt der Baum unter global/<n>/node_modules,
+  # ab pnpm 11 je Installation unter global/v<n>/<id>/node_modules.
+  defp pnpm_lib_roots do
+    home =
+      System.get_env("PNPM_HOME") || Path.join(System.user_home!(), "Library/pnpm")
+
+    Enum.sort(Path.wildcard(Path.join(home, "global/*"))) ++
+      Enum.sort(Path.wildcard(Path.join(home, "global/*/*")))
   end
 
   # asdf/nvm-Layout: <install>/bin/node -> <install>/lib liegt der globale
@@ -606,7 +618,7 @@ defmodule KomkiCli.Config do
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
 
-  @doc "config.json serialisieren (sortierte Schluessel, genau ein finales Newline beim Speichern)."
+  @doc "config.json serialisieren (sortierte Schlüssel, genau ein finales Newline beim Speichern)."
   @spec encode(t()) :: String.t()
   def encode(%__MODULE__{} = cfg) do
     (@keys ++ @optional_keys)

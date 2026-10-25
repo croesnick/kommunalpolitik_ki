@@ -75,7 +75,7 @@ defmodule KomkiCli.MediatorTest do
   end
 
   describe "spawn_line/1 (Spawn-Maschine, rein)" do
-    test "enthaelt Binary, --base, --socket, --token-file, Log-Umleitung und pid-Ausgabe" do
+    test "enthält Binary, --base, --socket, --token-file, Log-Umleitung und pid-Ausgabe" do
       base = TestSupport.tmp_area!("komki-med-spawn")
       cfg = %{TestSupport.fixture_cfg(base) | mediator_bin: "/opt/bin/komki-mediator"}
 
@@ -135,7 +135,7 @@ defmodule KomkiCli.MediatorTest do
       assert health["fassung_id"] == "f-1"
     end
 
-    test "Vertrag verletzt: nicht-ok status, fehlende/ungueltige tools, kaputtes JSON" do
+    test "Vertrag verletzt: nicht-ok status, fehlende/ungültige tools, kaputtes JSON" do
       assert {:error, _} = Mediator.parse_healthz("kein json{")
 
       assert {:error, _} =

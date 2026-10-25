@@ -355,10 +355,12 @@ llama-server, pi-Session, tmux. Läuft nur unter macOS (Seatbelt). Details:
 **Install:**
 
 ```bash
-brew install llama.cpp tmux      # Inferenz-Server, Session-Host
+brew install llama.cpp tmux pnpm # Inferenz-Server, Session-Host, Paketmanager
 brew install fd ripgrep          # optional: pi's Such-Tools (aktiviert find/grep)
-# node via asdf, Homebrew oder nvm; pi-Bundle global:
-npm install -g @earendil-works/pi-coding-agent
+# node via asdf, Homebrew oder nvm; pi-Bundle global über pnpm (nie plain npm:
+# pnpm führt Install-Skripte fremder Pakete nur nach Freigabe aus):
+pnpm setup                       # einmalig, legt PNPM_HOME an
+pnpm add -g @earendil-works/pi-coding-agent
 ```
 
 **Versionen (llama-server, pi): keine exakten Pins.** komki läuft gegen die

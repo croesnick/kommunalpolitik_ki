@@ -145,283 +145,304 @@ defmodule KomkiCli.CLI do
   defp cli do
     Optimus.new!(
       name: "komki",
-      description:
-        "Launcher fuer die gepinnte Modellkombination (Ticket #74; Entscheidungen: Ticket #70)",
+      description: "komki: KI-Recherche für die Ratsarbeit in einer abgeschotteten Umgebung",
       version: @version,
       author: "Carsten Roesnick-Neugebauer",
-      subcommands: [
-        version: [name: "version", description: "Versiondrucker"],
-        setup: [
-          name: "setup",
-          description:
-            "gefuehrte Einrichtung: Werkzeuge pruefen, Instanz anlegen, Schluessel hinterlegen, starten",
-          options: [
-            vault_dir: [
-              value_name: "PATH",
-              long: "vault-dir",
-              help: "eigener Vault (sonst Frage; Enter waehlt den Test-Vault)"
-            ],
-            gguf_from: [
-              value_name: "PATH",
-              long: "gguf-from",
-              help: "vorhandene Modelldatei (GGUF) verwenden"
-            ],
-            port: [
-              value_name: "N",
-              long: "port",
-              parser: :integer,
-              help: "llama-server-Port (default 49524; anderer Port fuer eine zweite Instanz)"
+      subcommands: with_about(subcommands())
+    )
+  end
+
+  # Optimus listet Unterbefehle mit ihrem `about`; die Kurzbeschreibung ist
+  # dieselbe wie die `description` der jeweiligen Hilfe-Seite.
+  defp with_about(subcommands) do
+    Enum.map(subcommands, fn {key, spec} ->
+      spec =
+        spec
+        |> Keyword.put_new(:about, spec[:description])
+        |> Keyword.update(:subcommands, [], &with_about/1)
+
+      {key, spec}
+    end)
+  end
+
+  defp subcommands do
+    [
+      version: [name: "version", description: "Version anzeigen"],
+      setup: [
+        name: "setup",
+        description:
+          "geführte Einrichtung: Werkzeuge prüfen, Instanz anlegen, Schlüssel hinterlegen, starten",
+        options: [
+          vault_dir: [
+            value_name: "PATH",
+            long: "vault-dir",
+            help: "eigener Vault (sonst Frage; Enter wählt den Test-Vault)"
+          ],
+          gguf_from: [
+            value_name: "PATH",
+            long: "gguf-from",
+            help: "vorhandene Modelldatei (GGUF) verwenden"
+          ],
+          port: [
+            value_name: "N",
+            long: "port",
+            parser: :integer,
+            help: "llama-server-Port (default 49524; anderer Port für eine zweite Instanz)"
+          ]
+        ],
+        flags: [
+          demo: [
+            long: "demo",
+            help: "Test-Vault mit erfundenen Notizen verwenden, ohne zu fragen"
+          ]
+        ]
+      ],
+      secret: [
+        name: "secret",
+        description: "Schlüssel im macOS-Schlüsselbund verwalten (Werte werden nie angezeigt)",
+        subcommands: [
+          set: [
+            name: "set",
+            description:
+              "Schlüssel verdeckt eingeben und ablegen (z.B. 'komki secret set brave')",
+            args: [
+              name: [
+                value_name: "NAME",
+                required: true,
+                help: "Kurzname, siehe 'komki secret list'"
+              ]
             ]
           ],
-          flags: [
-            demo: [
-              long: "demo",
-              help: "Test-Vault mit erfundenen Notizen verwenden, ohne zu fragen"
-            ]
+          list: [name: "list", description: "erwartete Schlüssel und ob sie vorhanden sind"]
+        ]
+      ],
+      journal: [
+        name: "journal",
+        description: "Entscheidungs-Journal des Vermittlers",
+        subcommands: [
+          verify: [
+            name: "verify",
+            description: "prüfen, dass die Kette lückenlos und unverändert ist"
+          ]
+        ]
+      ],
+      init: [
+        name: "init",
+        description:
+          "Instanz von Hand anlegen (macht setup mit; Modell wird per Prüfsumme geprüft)",
+        options: [
+          gguf_from: [
+            value_name: "PATH",
+            long: "gguf-from",
+            help:
+              "GGUF-Quelle (Kopie; default: das Staging-Artefakt unter ~/.local/share/komki/models-staging/)"
+          ],
+          port: [
+            value_name: "N",
+            long: "port",
+            parser: :integer,
+            help: "llama-server-Port (default 49524, gepinnt)"
+          ],
+          ctx: [
+            value_name: "N",
+            long: "ctx",
+            parser: :integer,
+            help: "llama-Kontextgröße (default 131072)"
+          ],
+          vault_dir: [
+            value_name: "PATH",
+            long: "vault-dir",
+            help:
+              "Vault des Vault-Connectors (default <base>/vault, anfangs leer; leer gesetzt: abgeschaltet)"
+          ],
+          ris_base_url: [
+            value_name: "URL",
+            long: "ris-base-url",
+            help: "RIS-API-Basis (default https://risapi1.komuna.net/web/)"
+          ],
+          ris_mock_port: [
+            value_name: "N",
+            long: "ris-mock-port",
+            parser: :integer,
+            help: "RIS-Mock auf 127.0.0.1:N statt echter API (ohne Egress-Proxy)"
           ]
         ],
-        secret: [
-          name: "secret",
-          description:
-            "Schluessel im macOS-Schluesselbund verwalten (Werte werden nie angezeigt)",
-          subcommands: [
-            set: [
-              name: "set",
-              description:
-                "Schluessel verdeckt eingeben und ablegen (z.B. 'komki secret set brave')",
-              args: [
-                name: [
-                  value_name: "NAME",
-                  required: true,
-                  help: "Kurzname, siehe 'komki secret list'"
-                ]
+        flags: [
+          force: [long: "force", help: "bestehende config.json überschreiben"]
+        ]
+      ],
+      doctor: [
+        name: "doctor",
+        description:
+          "alles prüfen: Werkzeuge, Profile, Start in der Sandbox (läuft vor jedem run und jeder session)"
+      ],
+      up: [
+        name: "up",
+        description:
+          "llama-server, Egress, Connectoren und Vermittler starten (prüft vorher kurz, wartet bis alles antwortet)",
+        options: [
+          ctx: [
+            value_name: "N",
+            long: "ctx",
+            parser: :integer,
+            help: "Kontextgröße Override für diesen Start"
+          ]
+        ]
+      ],
+      down: [
+        name: "down",
+        description: "alles stoppen, was komki gestartet hat (fremde Prozesse bleiben unberührt)"
+      ],
+      status: [
+        name: "status",
+        description:
+          "zeigt, was läuft (llama, Egress, Connectoren, Vermittler) und wo die Instanz liegt"
+      ],
+      run: [
+        name: "run",
+        description:
+          "einen Auftrag einmal ausführen und die Antwort ausgeben (startet komki bei Bedarf)",
+        args: [
+          prompt: [
+            value_name: "PROMPT",
+            required: true,
+            help: "Prompt (quoted; nicht mit -- beginnend)"
+          ]
+        ],
+        options: [
+          mode: [
+            value_name: "TEXT|JSON",
+            long: "mode",
+            help: "pi-Ausgabe-Modus (default text)"
+          ],
+          scratch: [
+            value_name: "PATH",
+            long: "scratch",
+            help: "Scratch-Verzeichnis unterhalb base/runs/ (default base/runs/<UTC-Stamp>)"
+          ],
+          timeout: [
+            value_name: "SEKUNDEN",
+            long: "timeout",
+            parser: :integer,
+            help: "Laufzeit-Limit für pi (default 600); danach Abbruch mit Exit 4"
+          ]
+        ]
+      ],
+      session: [
+        name: "session",
+        description: "interaktiv mit pi arbeiten, in tmux (startet komki bei Bedarf)",
+        flags: [
+          continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"],
+          detach: [
+            long: "detach",
+            help: "Session ohne attach starten; später 'tmux -L komki attach -t komki'"
+          ]
+        ]
+      ],
+      session_chain: [
+        name: "session-chain",
+        description: "intern: pi-Kette als Port-Kind (Pane-Einstieg von 'session')",
+        flags: [
+          continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"]
+        ]
+      ],
+      label: [
+        name: "label",
+        description:
+          "SQLite-Registry: Bindungen, Labels, Quarantäne und Γ-Export (Ticket #91; RFC 0003 R.2)",
+        subcommands: [
+          import: [
+            name: "import",
+            description: "Store aus Registry-Datei füllen (komki-label-store/2, Merge)",
+            args: [
+              file: [
+                value_name: "FILE",
+                required: true,
+                help: "Pfad der komki-label-store/2-JSON-Datei"
               ]
             ],
-            list: [name: "list", description: "erwartete Schluessel und ob sie vorhanden sind"]
-          ]
-        ],
-        journal: [
-          name: "journal",
-          description: "Entscheidungs-Journal des Vermittlers",
-          subcommands: [
-            verify: [
-              name: "verify",
-              description: "pruefen, dass die Kette lueckenlos und unveraendert ist"
-            ]
-          ]
-        ],
-        init: [
-          name: "init",
-          description: "KomKI-CLI-Instanz anlegen (config + Profil + pi-home + GGUF-SHA-Gate)",
-          options: [
-            gguf_from: [
-              value_name: "PATH",
-              long: "gguf-from",
-              help:
-                "GGUF-Quelle (Kopie; default: das Staging-Artefakt unter ~/.local/share/komki/models-staging/)"
+            options: [db: db_opt()]
+          ],
+          quarantine: [
+            name: "quarantine",
+            description:
+              "Objekt in Quarantäne (Eingang eines neuen Objekts oder Rückholung; R.2.5)",
+            args: [
+              object: [
+                value_name: "OBJ@VER",
+                required: true,
+                help: "Objektreferenz OBJ@VER (Version kebab, z.B. v42)"
+              ]
             ],
-            port: [
-              value_name: "N",
-              long: "port",
-              parser: :integer,
-              help: "llama-server-Port (default 49524, gepinnt)"
-            ],
-            ctx: [
-              value_name: "N",
-              long: "ctx",
-              parser: :integer,
-              help: "llama-Kontextgroesse (default 131072)"
-            ],
-            vault_dir: [
-              value_name: "PATH",
-              long: "vault-dir",
-              help:
-                "Vault des Vault-Connectors (default <base>/vault, anfangs leer; leer gesetzt: abgeschaltet)"
-            ],
-            ris_base_url: [
-              value_name: "URL",
-              long: "ris-base-url",
-              help: "RIS-API-Basis (default https://risapi1.komuna.net/web/)"
-            ],
-            ris_mock_port: [
-              value_name: "N",
-              long: "ris-mock-port",
-              parser: :integer,
-              help: "RIS-Mock auf 127.0.0.1:N statt echter API (ohne Egress-Proxy)"
+            options: [
+              db: db_opt(),
+              content_ref: content_ref_opt(),
+              origin: origin_opt(),
+              decided_by: decided_by_opt(),
+              basis: basis_opt()
             ]
           ],
-          flags: [
-            force: [long: "force", help: "bestehende config.json ueberschreiben"]
-          ]
-        ],
-        doctor: [name: "doctor", description: "alle Checks; Boot-Gate ist Pflicht vor jedem Lauf"],
-        up: [
-          name: "up",
-          description:
-            "llama-server, Egress, Connectoren und Vermittler starten (doctor-quick zuerst; Health-Poll nach)",
-          options: [
-            ctx: [
-              value_name: "N",
-              long: "ctx",
-              parser: :integer,
-              help: "Kontextgroesse Override fuer diesen Start"
-            ]
-          ]
-        ],
-        down: [
-          name: "down",
-          description:
-            "Vermittler, Connectoren, Egress und llama-server stoppen (Aufraeumweg ohne Boot-Gate; nur eigener pidfile-Prozess)"
-        ],
-        status: [
-          name: "status",
-          description: "Zustandsabfrage (base, gguf, ports, llama, egress, connectoren, mediator)"
-        ],
-        run: [
-          name: "run",
-          description: "pi-Einmallauf unter Profil (+ full doctor zuerst)",
-          args: [
-            prompt: [
-              value_name: "PROMPT",
-              required: true,
-              help: "Prompt (quoted; nicht mit -- beginnend)"
+          classify: [
+            name: "classify",
+            description:
+              "Erstklassifikation/Neuklassifikation (menschlicher Akt; Λ=∅ ist legitimes leeres Label)",
+            args: [
+              object: [
+                value_name: "OBJ@VER",
+                required: true,
+                help: "Objektreferenz OBJ@VER"
+              ]
+            ],
+            options: [
+              db: db_opt(),
+              label: label_opt(),
+              decided_by: decided_by_opt(),
+              basis: basis_opt()
             ]
           ],
-          options: [
-            mode: [
-              value_name: "TEXT|JSON",
-              long: "mode",
-              help: "pi-Ausgabe-Modus (default text)"
-            ],
-            scratch: [
-              value_name: "PATH",
-              long: "scratch",
-              help: "Scratch-Verzeichnis unterhalb base/runs/ (default base/runs/<UTC-Stamp>)"
-            ],
-            timeout: [
-              value_name: "SEKUNDEN",
-              long: "timeout",
-              parser: :integer,
-              help: "Laufzeit-Limit fuer pi (default 600); danach Abbruch mit Exit 4"
-            ]
-          ]
-        ],
-        session: [
-          name: "session",
-          description: "interaktive pi-Session in tmux (full doctor zuerst)",
-          flags: [
-            continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"],
-            detach: [
-              long: "detach",
-              help: "Session ohne attach starten; spaeter 'tmux -L komki attach -t komki'"
-            ]
-          ]
-        ],
-        session_chain: [
-          name: "session-chain",
-          description: "intern: pi-Kette als Port-Kind (Pane-Einstieg von 'session')",
-          flags: [
-            continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"]
-          ]
-        ],
-        label: [
-          name: "label",
-          description:
-            "SQLite-Registry: Bindungen, Labels, Quarantäne und Γ-Export (Ticket #91; RFC 0003 R.2)",
-          subcommands: [
-            import: [
-              name: "import",
-              description: "Store aus Registry-Datei fuellen (komki-label-store/2, Merge)",
-              args: [
-                file: [
-                  value_name: "FILE",
-                  required: true,
-                  help: "Pfad der komki-label-store/2-JSON-Datei"
-                ]
-              ],
-              options: [db: db_opt()]
-            ],
-            quarantine: [
-              name: "quarantine",
-              description:
-                "Objekt in Quarantäne (Eingang eines neuen Objekts oder Rueckholung; R.2.5)",
-              args: [
-                object: [
-                  value_name: "OBJ@VER",
-                  required: true,
-                  help: "Objektreferenz OBJ@VER (Version kebab, z.B. v42)"
-                ]
-              ],
-              options: [
-                db: db_opt(),
-                content_ref: content_ref_opt(),
-                origin: origin_opt(),
-                decided_by: decided_by_opt(),
-                basis: basis_opt()
-              ]
-            ],
-            classify: [
-              name: "classify",
-              description:
-                "Erstklassifikation/Neuklassifikation (menschlicher Akt; Λ=∅ ist legitimes leeres Label)",
-              args: [
-                object: [
-                  value_name: "OBJ@VER",
-                  required: true,
-                  help: "Objektreferenz OBJ@VER"
-                ]
-              ],
-              options: [
-                db: db_opt(),
-                label: label_opt(),
-                decided_by: decided_by_opt(),
-                basis: basis_opt()
-              ]
-            ],
-            list: [
-              name: "list",
-              description: "Uebersicht: Bindungen und Objektstaende",
-              options: [db: db_opt()]
-            ],
-            show: [
-              name: "show",
-              description: "Einzelansichten (Binding R.2.2/Objekt-Historie)",
-              subcommands: [
-                binding: [
-                  name: "binding",
-                  description: "Volle Bindungsdefinition (alle R.2.2-Felder)",
-                  args: [
-                    binding: [
-                      value_name: "BINDUNGS-ID",
-                      required: true,
-                      help: "Bindungskennung <kebab>@<int>"
-                    ]
-                  ],
-                  options: [db: db_opt()]
+          list: [
+            name: "list",
+            description: "Übersicht: Bindungen und Objektstände",
+            options: [db: db_opt()]
+          ],
+          show: [
+            name: "show",
+            description: "Einzelansichten (Binding R.2.2/Objekt-Historie)",
+            subcommands: [
+              binding: [
+                name: "binding",
+                description: "Volle Bindungsdefinition (alle R.2.2-Felder)",
+                args: [
+                  binding: [
+                    value_name: "BINDUNGS-ID",
+                    required: true,
+                    help: "Bindungskennung <kebab>@<int>"
+                  ]
                 ],
-                object: [
-                  name: "object",
-                  description: "Objekt-Metadaten + Entscheidungshistorie",
-                  args: [
-                    object: [
-                      value_name: "OBJ@VER",
-                      required: true,
-                      help: "Objektreferenz OBJ@VER"
-                    ]
-                  ],
-                  options: [db: db_opt()]
-                ]
+                options: [db: db_opt()]
+              ],
+              object: [
+                name: "object",
+                description: "Objekt-Metadaten + Entscheidungshistorie",
+                args: [
+                  object: [
+                    value_name: "OBJ@VER",
+                    required: true,
+                    help: "Objektreferenz OBJ@VER"
+                  ]
+                ],
+                options: [db: db_opt()]
               ]
-            ],
-            export: [
-              name: "export",
-              description: "Γ-Export: komki-registry/2 JSON (stdout oder --out)",
-              options: [db: db_opt(), out: out_opt()]
             ]
+          ],
+          export: [
+            name: "export",
+            description: "Γ-Export: komki-registry/2 JSON (stdout oder --out)",
+            options: [db: db_opt(), out: out_opt()]
           ]
         ]
       ]
-    )
+    ]
   end
 
   defp dispatch(argv) do
@@ -496,7 +517,7 @@ defmodule KomkiCli.CLI do
   end
 
   defp error_line(errors) do
-    "Error: " <> Enum.join(format_errors(errors), ", ") <> "; run \"komki --help\" fuer usage"
+    "Error: " <> Enum.join(format_errors(errors), ", ") <> "; run \"komki --help\" für usage"
   end
 
   # Optimus formatiert Parse-Fehler bedingungslos farbig (IO.ANSI.red/bright/
@@ -582,14 +603,14 @@ defmodule KomkiCli.CLI do
   defp secret_set(name) do
     case KomkiCli.Secrets.fetch(name) do
       {:ok, entry} ->
-        IO.puts(entry.label <> " (Schluesselbund-Eintrag '" <> entry.service <> "')")
+        IO.puts(entry.label <> " (Schlüsselbund-Eintrag '" <> entry.service <> "')")
         message = KomkiCli.Setup.store_secret(entry, setup_ui())
         code = if String.starts_with?(message, "gespeichert"), do: 0, else: 2
         {message <> "\n", code}
 
       :error ->
         names = Enum.map_join(KomkiCli.Secrets.all(), ", ", & &1.name)
-        {"unbekannter Schluessel '" <> name <> "'; bekannt: " <> names <> "\n", 2}
+        {"unbekannter Schlüssel '" <> name <> "'; bekannt: " <> names <> "\n", 2}
     end
   end
 
@@ -658,7 +679,7 @@ defmodule KomkiCli.CLI do
       value_name: "TEXT",
       long: "basis",
       required: true,
-      help: "Begruendung + Quelle (Quellenpflicht, AGENTS.md §6)"
+      help: "Begründung + Quelle (Quellenpflicht, AGENTS.md §6)"
     ]
   end
 
@@ -667,7 +688,7 @@ defmodule KomkiCli.CLI do
       value_name: "BINDUNG",
       long: "label",
       multiple: true,
-      help: "Bindungslabel (wiederholbar; ohne Angabe = ausdruecklich leeres Label Λ=∅)"
+      help: "Bindungslabel (wiederholbar; ohne Angabe = ausdrücklich leeres Label Λ=∅)"
     ]
   end
 
@@ -838,7 +859,7 @@ defmodule KomkiCli.CLI do
       {green() <>
          "Journal ok: " <>
          to_string(result["records"]) <>
-         " Eintraege, lueckenlos verkettet und unveraendert" <>
+         " Einträge, lückenlos verkettet und unverändert" <>
          reset() <> "\n" <> "Kopf: " <> to_string(result["head_hash"]) <> "\n", 0}
 
   defp render({:journal, result}),
@@ -939,7 +960,7 @@ defmodule KomkiCli.CLI do
       " — basis: " <> decision.basis
   end
 
-  defp render_labels([]), do: "(leer; ausdrueckliches Λ=∅)"
+  defp render_labels([]), do: "(leer; ausdrückliches Λ=∅)"
 
   defp render_labels(labels), do: Enum.join(labels, ", ")
 
@@ -967,7 +988,7 @@ defmodule KomkiCli.CLI do
   # wer (authority) welche Einschraenkung (restriction) fuer welche Ausgabe
   # (output) lockern darf.
   defp render_relaxation_authorities([]),
-    do: ["  relaxation_authorities: [] (keine Lockerung zulaessig, R.2.2)"]
+    do: ["  relaxation_authorities: [] (keine Lockerung zulässig, R.2.2)"]
 
   defp render_relaxation_authorities(entries) do
     [
@@ -978,7 +999,7 @@ defmodule KomkiCli.CLI do
               entry["authority"] <>
               " lockert '" <>
               entry["restriction"] <>
-              "' fuer Ausgabe '" <> entry["output"] <> "'"
+              "' für Ausgabe '" <> entry["output"] <> "'"
 
           _flat ->
             "    (unlesbarer Eintrag — Store-Stand vor komki-label-store/2)"

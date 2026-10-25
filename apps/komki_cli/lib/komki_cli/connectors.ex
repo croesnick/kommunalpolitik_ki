@@ -64,7 +64,7 @@ defmodule KomkiCli.Connectors do
   @spec egress_profile_path(Config.t()) :: String.t()
   def egress_profile_path(cfg), do: Path.join(Path.dirname(cfg.profile_path), "egress.sb")
 
-  @doc "Laengster Socket-Pfad der Instanz (Grenze 103 Byte, CONTRACT.md §2)."
+  @doc "Längster Socket-Pfad der Instanz (Grenze 103 Byte, CONTRACT.md §2)."
   @spec longest_socket(String.t()) :: String.t()
   def longest_socket(base) do
     Enum.max_by(
@@ -120,7 +120,7 @@ defmodule KomkiCli.Connectors do
   defp egress_port!(cfg, id) do
     case Map.fetch(cfg.egress_ports, id) do
       {:ok, port} -> port
-      :error -> raise ArgumentError, "egress_ports: kein Port fuer Connector " <> id
+      :error -> raise ArgumentError, "egress_ports: kein Port für Connector " <> id
     end
   end
 
@@ -155,7 +155,7 @@ defmodule KomkiCli.Connectors do
     JSON.encode!(%{"ports" => ports}) <> "\n"
   end
 
-  @doc "Argumente nach dem Binary (CONTRACT.md §4). Enthaelt nie Credentials."
+  @doc "Argumente nach dem Binary (CONTRACT.md §4). Enthält nie Credentials."
   @spec connector_args(Config.t(), Manifest.t()) :: [String.t()]
   def connector_args(%Config{} = cfg, manifest) do
     ["--socket", Manifest.socket_path(cfg.base_dir, manifest.id)] ++
@@ -206,7 +206,7 @@ defmodule KomkiCli.Connectors do
   def egress_binary!(%Config{egress_bin: bin}) when is_binary(bin), do: bin
   def egress_binary!(_cfg), do: raise(ArgumentError, missing_binary(@egress_marker))
 
-  @doc "Hinweistext fuer ein fehlendes Escript."
+  @doc "Hinweistext für ein fehlendes Escript."
   @spec missing_binary(String.t()) :: String.t()
   def missing_binary(name),
     do:
@@ -217,7 +217,7 @@ defmodule KomkiCli.Connectors do
   # Profile
   # ===========================================================================
 
-  @doc "Zu schreibende Profile: `[{name, pfad, generator}]` fuer Egress (falls noetig) und aktive Connectoren."
+  @doc "Zu schreibende Profile: `[{name, pfad, generator}]` für Egress (falls nötig) und aktive Connectoren."
   @spec profiles(Config.t()) :: [{String.t(), String.t(), (-> String.t())}]
   def profiles(%Config{} = cfg) do
     egress =
@@ -260,14 +260,14 @@ defmodule KomkiCli.Connectors do
     end)
   end
 
-  @doc "Startreihenfolge: Egress (falls noetig), dann die aktiven Connectoren in Manifest-Reihenfolge."
+  @doc "Startreihenfolge: Egress (falls nötig), dann die aktiven Connectoren in Manifest-Reihenfolge."
   @spec start_order(Config.t()) :: [String.t()]
   def start_order(cfg) do
     if(egress_needed?(cfg), do: ["egress"], else: []) ++
       Enum.map(enabled(cfg), &("connector-" <> &1.id))
   end
 
-  @doc "Stoppreihenfolge von `down/1`: Connectoren rueckwaerts (alle, idempotent), dann Egress."
+  @doc "Stoppreihenfolge von `down/1`: Connectoren rückwärts (alle, idempotent), dann Egress."
   @spec stop_order() :: [String.t()]
   def stop_order do
     Enum.map(Enum.reverse(Manifest.ids()), &("connector-" <> &1)) ++ ["egress"]

@@ -8,7 +8,7 @@ defmodule KomkiCli.LlamaKeyTest do
     {:ok, cfg: TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-llama-key"))}
   end
 
-  test "write_key! schreibt 0600 und jeder Start bekommt einen neuen Schluessel", %{cfg: cfg} do
+  test "write_key! schreibt 0600 und jeder Start bekommt einen neuen Schlüssel", %{cfg: cfg} do
     k1 = Llama.write_key!(cfg)
     %File.Stat{mode: mode} = File.stat!(Llama.key_path(cfg))
     assert Bitwise.band(mode, 0o777) == 0o600
@@ -23,7 +23,7 @@ defmodule KomkiCli.LlamaKeyTest do
     assert Llama.read_key(cfg) == :none
   end
 
-  test "models.json traegt den Schluessel, ohne Schluessel einen Platzhalter", %{cfg: cfg} do
+  test "models.json trägt den Schlüssel, ohne Schlüssel einen Platzhalter", %{cfg: cfg} do
     path = Path.join([cfg.pi_home, ".pi", "agent", "models.json"])
 
     Steps.write_models(cfg)
@@ -35,7 +35,7 @@ defmodule KomkiCli.LlamaKeyTest do
   end
 
   describe "auth_required/1 gegen einen Fake-Server" do
-    test "401 heisst Schluessel verlangt, 200 heisst offen" do
+    test "401 heisst Schlüssel verlangt, 200 heisst offen" do
       assert {:ok, true} = Llama.auth_required(fake_server("401 Unauthorized"))
       assert {:ok, false} = Llama.auth_required(fake_server("200 OK"))
     end

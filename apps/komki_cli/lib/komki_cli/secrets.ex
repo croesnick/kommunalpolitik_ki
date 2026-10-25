@@ -12,7 +12,7 @@ defmodule KomkiCli.Secrets do
 
   # Kurzname und Beschreibung je Keychain-Service. Ein Service ohne Eintrag
   # heisst wie sein Service-Name.
-  @names %{"brave-search-api" => {"brave", "Brave-Search-API-Key fuer die Websuche"}}
+  @names %{"brave-search-api" => {"brave", "Brave-Search-API-Key für die Websuche"}}
 
   @doc "Alle erwarteten Geheimnisse, sortiert nach Kurzname."
   @spec all() :: [t()]
@@ -34,7 +34,7 @@ defmodule KomkiCli.Secrets do
     end
   end
 
-  @doc "Liegt das Geheimnis im Schluesselbund? Liest nie den Wert."
+  @doc "Liegt das Geheimnis im Schlüsselbund? Liest nie den Wert."
   @spec present?(t(), keyword()) :: boolean()
   def present?(%{service: service}, opts \\ []), do: Keychain.present(service, opts) == :ok
 end

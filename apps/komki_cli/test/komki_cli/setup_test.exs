@@ -12,7 +12,7 @@ defmodule KomkiCli.SetupTest do
 
   alias KomkiCli.{Config, DemoVault, Keychain, Secrets, Setup, TestSupport}
 
-  @kanarie "kanarienwert-fuer-tests"
+  @kanarie "kanarienwert-für-tests"
 
   defp fake!(body) do
     path = Path.join(TestSupport.tmp_area!("komki-setup"), "security")
@@ -47,7 +47,7 @@ defmodule KomkiCli.SetupTest do
   end
 
   describe "Keychain.store/3" do
-    test "Wert geht nur ueber stdin, zweimal; argv enthaelt ihn nie" do
+    test "Wert geht nur über stdin, zweimal; argv enthält ihn nie" do
       {cmd, dir} = recording_fake!()
 
       assert :ok = Keychain.store("brave-search-api", @kanarie, command: cmd, account: "tester")
@@ -93,7 +93,7 @@ defmodule KomkiCli.SetupTest do
     test "verschiedene Eingaben: nichts gespeichert" do
       Application.put_env(:komki_cli, :security, fake!("exit 9"))
       message = Setup.store_secret(@entry, ui([{:ok, "a"}, {:ok, "b"}]))
-      assert message =~ "stimmen nicht ueberein"
+      assert message =~ "stimmen nicht überein"
       refute message =~ "a\""
     end
 
@@ -120,7 +120,7 @@ defmodule KomkiCli.SetupTest do
       missing = for {name, nil, hint} <- required, into: %{}, do: {name, hint}
 
       assert missing["llama-server"] =~ "brew install llama.cpp"
-      assert missing["pi"] =~ "npm install -g @earendil-works/pi-coding-agent"
+      assert missing["pi"] =~ "pnpm add -g @earendil-works/pi-coding-agent"
       assert missing["komki-mediator"] =~ "make komki"
     end
   end

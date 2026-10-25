@@ -19,7 +19,7 @@ defmodule KomkiCli.BurritoLaunchTest do
     }
   end
 
-  test "Startzeile: Binary direkt, KOMKI_INSTALL_DIR zeigt zwei Ebenen ueber die Laufzeit" do
+  test "Startzeile: Binary direkt, KOMKI_INSTALL_DIR zeigt zwei Ebenen über die Laufzeit" do
     cmd =
       Proc.role_cmd(burrito_cfg(), "/p/egress.sb", "/opt/komki-bin", ["komki-egress"], "/home")
 
@@ -44,7 +44,7 @@ defmodule KomkiCli.BurritoLaunchTest do
     refute Enum.any?(cmd, &String.starts_with?(&1, "KOMKI_INSTALL_DIR="))
   end
 
-  test "Profilschicht: Binary ausfuehren, Laufzeit-Verzeichnis anlegen, .burrito lesen, COOKIE schreiben" do
+  test "Profilschicht: Binary ausführen, Laufzeit-Verzeichnis anlegen, .burrito lesen, COOKIE schreiben" do
     rules = EscriptProfile.runtime_for(burrito_cfg(), "/opt/komki-bin")
 
     assert ~s{(allow process-exec (literal "/opt/komki-bin"))} in rules

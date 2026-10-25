@@ -8,7 +8,7 @@ defmodule KomkiCli.KeychainTest do
 
   alias KomkiCli.{Keychain, TestSupport}
 
-  @kanarie "kanarienwert-fuer-tests"
+  @kanarie "kanarienwert-für-tests"
 
   defp fake!(body) do
     path = Path.join(TestSupport.tmp_area!("komki-kc"), "security")

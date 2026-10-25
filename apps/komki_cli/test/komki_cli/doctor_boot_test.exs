@@ -61,7 +61,7 @@ defmodule KomkiCli.DoctorBootTest do
       assert init_out =~ "gguf-sha256:  " <> Config.expected_gguf_sha256()
     end
 
-    test "doctor: alle Checks gruen inklusive Boot-Gate" do
+    test "doctor: alle Checks grün inklusive Boot-Gate" do
       # cfg aus der Instanz der setup_all-Phase: der llama-Boot-Probe-Check
       # heisst "boot " <> llama-server-Pfad (steps.ex: boot_l) — genau
       # gepinnt statt Substring ("llama-server" matcht auch den Tools-Check,

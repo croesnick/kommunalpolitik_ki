@@ -5,7 +5,7 @@ defmodule KomkiCli.RolesTest do
 
   alias KomkiCli.{Config, Roles}
 
-  test "die Rollen heissen wie die frueheren Programme (Marker fuer die ps-Pruefung)" do
+  test "die Rollen heissen wie die frueheren Programme (Marker für die ps-Prüfung)" do
     assert Roles.names() == [
              "komki-connector-ris",
              "komki-connector-vault",

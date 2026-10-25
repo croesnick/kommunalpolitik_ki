@@ -39,7 +39,7 @@ defmodule KomkiCli.Proc do
     end
   end
 
-  @doc "Prueft, ob pid existiert und den `marker` in der ps-Kommandozeile faehrt."
+  @doc "Prüft, ob pid existiert und den `marker` in der ps-Kommandozeile fährt."
   @spec pid_alive?(term(), String.t()) :: boolean()
   def pid_alive?(pid, marker) when is_integer(pid) and pid > 0 do
     case System.cmd("/bin/ps", ["-p", to_string(pid), "-o", "command="]) do
@@ -313,7 +313,7 @@ defmodule KomkiCli.Proc do
     end
   end
 
-  @doc "Log-Tail als Einzeiler kontrolliert fuer Fehlermeldungen."
+  @doc "Log-Tail als Einzeiler kontrolliert für Fehlermeldungen."
   @spec log_tail(String.t(), pos_integer()) :: String.t()
   def log_tail(path, lines) do
     if File.exists?(path) do

@@ -36,18 +36,18 @@ defmodule KomkiCli.ModelTest do
   end
 
   describe "remote_matches?/1" do
-    test "Pruefsumme der Quelle gleich dem Pin: :ok" do
+    test "Prüfsumme der Quelle gleich dem Pin: :ok" do
       dir = TestSupport.tmp_area!("komki-model")
       curl = fake_curl!(dir, headers: ~s(HTTP/2 302\nx-linked-etag: "#{@sha}"\n))
       assert :ok = Model.remote_matches?(command: curl, sha256: @sha)
     end
 
-    test "andere Pruefsumme: Fehler vor jedem Download" do
+    test "andere Prüfsumme: Fehler vor jedem Download" do
       dir = TestSupport.tmp_area!("komki-model")
       other = String.duplicate("a", 64)
       curl = fake_curl!(dir, headers: ~s(x-linked-etag: "#{other}"\n))
       assert {:error, reason} = Model.remote_matches?(command: curl, sha256: @sha)
-      assert reason =~ "andere Pruefsumme"
+      assert reason =~ "andere Prüfsumme"
     end
 
     test "ohne Angabe der Quelle: :unknown; nicht erreichbar: Fehler" do
@@ -69,7 +69,7 @@ defmodule KomkiCli.ModelTest do
   end
 
   describe "download/1" do
-    test "passende Pruefsumme: Datei liegt am Ziel, kein .part bleibt; curl setzt fort (-C -)" do
+    test "passende Prüfsumme: Datei liegt am Ziel, kein .part bleibt; curl setzt fort (-C -)" do
       dir = TestSupport.tmp_area!("komki-model")
       dest = Path.join(dir, "modell.gguf")
 
@@ -87,7 +87,7 @@ defmodule KomkiCli.ModelTest do
       assert File.read!(Path.join(dir, "argv")) =~ "-C - --progress-bar"
     end
 
-    test "falsche Pruefsumme: Datei wird verworfen, nichts liegt am Ziel" do
+    test "falsche Prüfsumme: Datei wird verworfen, nichts liegt am Ziel" do
       dir = TestSupport.tmp_area!("komki-model")
       dest = Path.join(dir, "modell.gguf")
       curl = fake_curl!(dir, body: "manipuliert")
@@ -101,12 +101,12 @@ defmodule KomkiCli.ModelTest do
                  url: "https://x/m"
                )
 
-      assert reason =~ "Pruefsumme passt nicht"
+      assert reason =~ "Prüfsumme passt nicht"
       refute File.exists?(dest)
       refute File.exists?(dest <> ".part")
     end
 
-    test "Abbruch: Teil-Download bleibt fuer den naechsten Versuch liegen" do
+    test "Abbruch: Teil-Download bleibt für den naechsten Versuch liegen" do
       dir = TestSupport.tmp_area!("komki-model")
       dest = Path.join(dir, "modell.gguf")
       curl = fake_curl!(dir, exit: 56)

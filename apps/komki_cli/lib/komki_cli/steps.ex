@@ -175,6 +175,30 @@ defmodule KomkiCli.Steps do
     e -> {:error, "Auffrischen fehlgeschlagen: " <> exception_reason(e), 2}
   end
 
+  @doc """
+  Vault der Instanz wechseln: stoppt komki (der laufende Vault-Connector
+  hat den alten Ordner im Profil), traegt den neuen Ordner ein und schreibt
+  die Profile neu. Gleicher Ordner: `:unchanged`.
+  """
+  @spec set_vault(String.t()) ::
+          :unchanged | {:switched, String.t() | nil} | {:error, String.t(), pos_integer()}
+  def set_vault(dir) do
+    cfg = load_cfg!()
+
+    if cfg.vault_dir == dir do
+      :unchanged
+    else
+      with {:down, _} <- down_with(cfg) do
+        updated = %{cfg | vault_dir: dir}
+        Config.save(updated)
+        write_all_profiles(updated)
+        {:switched, cfg.vault_dir}
+      end
+    end
+  rescue
+    e -> {:error, "Vault-Wechsel fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
   defp write_all_profiles(cfg) do
     Profile.write!(cfg.profile_path, Profile.generate(cfg, Profile.check_scratch(cfg)))
     Profile.write!(Llama.llama_profile_path(cfg), Profile.generate_llama(cfg))
@@ -224,7 +248,7 @@ defmodule KomkiCli.Steps do
   defp tools_error(missing) do
     "Werkzeug nicht entdeckt: " <>
       Enum.join(missing, ", ") <>
-      " — Installation pruefen (node via asdf/brew/nvm, pi-Bundle via npm-global, llama.cpp)" <>
+      " — Installation prüfen (node via asdf/brew/nvm, pi via pnpm add -g, llama.cpp)" <>
       " oder Pfade in der config.json manuell setzen"
   end
 
@@ -259,12 +283,12 @@ defmodule KomkiCli.Steps do
 
     case System.cmd("/bin/cp", ["-c", source, dest], stderr_to_stdout: true) do
       {_, 0} ->
-        "APFS-Klon (kein zusaetzlicher Platz)"
+        "APFS-Klon (kein zusätzlicher Platz)"
 
       {_, _} ->
         File.rm(dest)
         {:ok, _bytes} = File.copy(source, dest)
-        "Kopie (Klon nicht moeglich, etwa anderes Volume)"
+        "Kopie (Klon nicht möglich, etwa anderes Volume)"
     end
   end
 
@@ -277,7 +301,7 @@ defmodule KomkiCli.Steps do
     cond do
       is_nil(source) ->
         {:error,
-         "keine GGUF-Quelle: 'komki setup' laedt das Modell, oder --gguf-from PATH angeben " <>
+         "keine GGUF-Quelle: 'komki setup' lädt das Modell, oder --gguf-from PATH angeben " <>
            "(erwartet unter " <> Config.staging_gguf_path() <> ")", 2}
 
       not File.exists?(source) ->
@@ -437,11 +461,11 @@ defmodule KomkiCli.Steps do
   @spec doctor() :: result()
   def doctor, do: run_checks(:full)
 
-  @doc "Doctor-quick (Profil-Identität + Boot-Gate) fuer up/down."
+  @doc "Doctor-quick (Profil-Identität + Boot-Gate) für up/down."
   @spec doctor_quick() :: result()
   def doctor_quick, do: run_checks(:profile_boot)
 
-  @doc "Checks ausfuehren; Struktur fuer den CLI-Renderer."
+  @doc "Checks ausführen; Struktur für den CLI-Renderer."
   @spec run_checks(:full | :profile_boot) :: result()
   def run_checks(scope) do
     case Config.load(Config.config_path(Config.default_base())) do
@@ -496,7 +520,7 @@ defmodule KomkiCli.Steps do
       Enum.map(tools, fn {name, path} ->
         cond do
           is_nil(path) ->
-            %{name: name, ok: false, reason: "nicht entdeckt (Installation/init pruefen)"}
+            %{name: name, ok: false, reason: "nicht entdeckt (Installation/init prüfen)"}
 
           File.exists?(path) ->
             %{name: name, ok: true, reason: path}
@@ -564,7 +588,7 @@ defmodule KomkiCli.Steps do
           name: "pi version",
           ok: false,
           reason:
-            "pi " <> version <> " (major < 1): MCP-Flags nicht unterstuetzt — pi aktualisieren"
+            "pi " <> version <> " (major < 1): MCP-Flags nicht unterstützt — pi aktualisieren"
         }
 
       {:error, reason} ->
@@ -598,13 +622,13 @@ defmodule KomkiCli.Steps do
     if Config.tools_ready(cfg) do
       profile_identity_checks(cfg) ++ llama_profile_identity_checks(cfg)
     else
-      [%{name: "profile", ok: false, reason: "Werkzeugpfade fehlen (config.json unvollstaendig)"}]
+      [%{name: "profile", ok: false, reason: "Werkzeugpfade fehlen (config.json unvollständig)"}]
     end
   end
 
   # Gemeinsame Drei-Zweig-Kaskade der Profil-Identitaetschecks (missing /
   # byte-stabil / drift); die Wrapper liefern name/Pfad/Erwartung —
-  # Reason-Strings byte-identisch gepinnt (Tippfehler "Profilttext" im
+  # Reason-Strings byte-identisch gepinnt (Tippfehler "Profiltext" im
   # pi-Drift-String ist Bestand).
   defp identity_checks(name, path, expected, drift_reason) do
     if File.exists?(path) do
@@ -623,7 +647,7 @@ defmodule KomkiCli.Steps do
       "profile",
       cfg.profile_path,
       Profile.generate(cfg, Profile.check_scratch(cfg)),
-      "drift: regenerierter Profilttext weicht ab — nach einem Update 'komki setup'; bleibt sie, wurde das Profil veraendert"
+      "drift: regenerierter Profiltext weicht ab — nach einem Update 'komki setup'; bleibt sie, wurde das Profil verändert"
     )
   end
 
@@ -633,7 +657,7 @@ defmodule KomkiCli.Steps do
       "llama profile",
       Llama.llama_profile_path(cfg),
       Profile.generate_llama(cfg),
-      "drift: regenerierter llama-Profiltext weicht ab — nach einem Update 'komki setup'; bleibt sie, wurde das Profil veraendert"
+      "drift: regenerierter llama-Profiltext weicht ab — nach einem Update 'komki setup'; bleibt sie, wurde das Profil verändert"
     )
   end
 
@@ -688,7 +712,7 @@ defmodule KomkiCli.Steps do
             %{
               name: name,
               ok: false,
-              reason: "llama laeuft ohne API-Key — 'komki down' und 'komki up' neu starten"
+              reason: "llama läuft ohne API-Key — 'komki down' und 'komki up' neu starten"
             }
 
           {:error, reason} ->
@@ -779,7 +803,10 @@ defmodule KomkiCli.Steps do
       try do
         case System.cmd(cfg.sandbox_exec, ["-f", profile_path, "--", binary] ++ args,
                env: %{"PATH" => "/usr/bin:/bin"},
-               cd: boot_cwd(cfg, cwd)
+               cd: boot_cwd(cfg, cwd),
+               # llama-server schreibt --version nach stderr; ohne Umleitung
+               # landete es mitten in der Ausgabe von setup/up.
+               stderr_to_stdout: true
              ) do
           {_out, 0} -> {true, "rc0"}
           {out, code} -> {false, rc_reason(code, out)}
@@ -834,7 +861,7 @@ defmodule KomkiCli.Steps do
         end
 
       _ ->
-        {:error, "llama start verweigert: doctor-quick nicht gruen (Boot-Gate)", 3}
+        {:error, "llama start verweigert: doctor-quick nicht grün (Boot-Gate)", 3}
     end
   rescue
     e -> {:error, "up fehlgeschlagen: " <> exception_reason(e), 2}
@@ -1071,7 +1098,7 @@ defmodule KomkiCli.Steps do
         execute_run(opts, mode)
 
       {:checks, _checks, _} ->
-        {:error, "run verweigert: doctor nicht gruen (Boot-Gate ist Pflicht vor jedem Lauf)", 3}
+        {:error, "run verweigert: doctor nicht grün (Boot-Gate ist Pflicht vor jedem Lauf)", 3}
 
       {:error, reason, code} ->
         {:error, reason, code}
@@ -1274,7 +1301,7 @@ defmodule KomkiCli.Steps do
         execute_session(opts)
 
       {:checks, _checks, _} ->
-        {:error, "session verweigert: doctor nicht gruen (Boot-Gate ist Pflicht vor jedem Lauf)",
+        {:error, "session verweigert: doctor nicht grün (Boot-Gate ist Pflicht vor jedem Lauf)",
          3}
 
       {:error, reason, code} ->
@@ -1311,7 +1338,7 @@ defmodule KomkiCli.Steps do
         {:error,
          "port " <>
            to_string(cfg.port) <>
-           " antwortet, aber pidfile fehlt (fremder Prozess?) — 'komki status' pruefen", 2}
+           " antwortet, aber pidfile fehlt (fremder Prozess?) — 'komki status' prüfen", 2}
 
       :stopped ->
         {:error, "llama-server nicht aktiv: 'komki up' zuerst", 2}
@@ -1356,8 +1383,7 @@ defmodule KomkiCli.Steps do
       {:health_only, :no_pidfile} ->
         {:error,
          Channel.socket_path(cfg) <>
-           " antwortet healthz, aber pidfile fehlt (fremder Prozess?) — 'komki status' pruefen",
-         2}
+           " antwortet healthz, aber pidfile fehlt (fremder Prozess?) — 'komki status' prüfen", 2}
 
       :stopped ->
         {:error, "komki-mediator nicht aktiv: 'komki up' zuerst", 2}
@@ -1370,8 +1396,8 @@ defmodule KomkiCli.Steps do
   defp find_tmux do
     case System.find_executable("tmux") do
       nil ->
-        {:error,
-         "tmux nicht gefunden (noetig fuer interaktive Sessions; z.B. 'brew install tmux')", 2}
+        {:error, "tmux nicht gefunden (nötig für interaktive Sessions; z.B. 'brew install tmux')",
+         2}
 
       tmux ->
         {:ok, tmux}
@@ -1414,7 +1440,7 @@ defmodule KomkiCli.Steps do
       {:error,
        "tmux-session '" <>
          @tmux_session <>
-         "' laeuft bereits; ohne --detach via " <> @tmux_attach_hint <> " andocken", 2}
+         "' läuft bereits; ohne --detach via " <> @tmux_attach_hint <> " andocken", 2}
     else
       case run_tmux_inheriting_terminal(tmux, ["attach", "-t", "=" <> @tmux_session]) do
         :ok ->
@@ -1496,14 +1522,14 @@ defmodule KomkiCli.Steps do
     case File.ls(Pi.session_dir(cfg)) do
       {:ok, []} ->
         {:error,
-         "keine fruehere Session in " <> Pi.session_dir(cfg) <> "; ohne --continue starten", 2}
+         "keine frühere Session in " <> Pi.session_dir(cfg) <> "; ohne --continue starten", 2}
 
       {:ok, _sessions} ->
         :ok
 
       {:error, _posix} ->
         {:error,
-         "keine fruehere Session in " <> Pi.session_dir(cfg) <> "; ohne --continue starten", 2}
+         "keine frühere Session in " <> Pi.session_dir(cfg) <> "; ohne --continue starten", 2}
     end
   end
 
@@ -1557,12 +1583,12 @@ defmodule KomkiCli.Steps do
 
           _ ->
             raise ArgumentError,
-              message: "ungueltiger Wert fuer --" <> flag <> ": " <> Kernel.inspect(raw)
+              message: "ungültiger Wert für --" <> flag <> ": " <> Kernel.inspect(raw)
         end
 
       raw ->
         raise ArgumentError,
-          message: "ungueltiger Wert fuer --" <> flag <> ": " <> Kernel.inspect(raw)
+          message: "ungültiger Wert für --" <> flag <> ": " <> Kernel.inspect(raw)
     end
   end
 

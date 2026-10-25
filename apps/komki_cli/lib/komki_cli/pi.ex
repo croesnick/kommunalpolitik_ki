@@ -45,7 +45,7 @@ defmodule KomkiCli.Pi do
 
   @session_term "xterm-256color"
 
-  @incomplete_tools_msg "config unvollstaendig: node/cli/llama-server fehlen — init verweigert unvollstaendige Instanzen"
+  @incomplete_tools_msg "config unvollständig: node/cli/llama-server fehlen — init verweigert unvollständige Instanzen"
 
   @type mode :: :text | :json
 
@@ -347,7 +347,7 @@ defmodule KomkiCli.Pi do
     }
   end
 
-  @doc "argv fuer den sandbox-exec-Aufruf (fuer Doctor/Tests sichtbar)."
+  @doc "argv für den sandbox-exec-Aufruf (für Doctor/Tests sichtbar)."
   @spec argv_for(Config.t(), String.t(), mode(), String.t()) :: [String.t()]
   def argv_for(%Config{} = cfg, scratch_dir, mode, prompt) when Config.tools_ready(cfg) do
     profile_path = profile_path_for(cfg, scratch_dir)

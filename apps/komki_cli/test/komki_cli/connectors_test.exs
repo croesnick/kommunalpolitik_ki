@@ -9,7 +9,7 @@ defmodule KomkiCli.ConnectorsTest do
   alias KomkiCli.{Connectors, Proc, TestSupport}
   alias KomkiConnector.Manifest
 
-  @kanarie "kanarienwert-fuer-tests"
+  @kanarie "kanarienwert-für-tests"
 
   defp cfg(overrides \\ []) do
     base = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-conn"))
@@ -44,7 +44,7 @@ defmodule KomkiCli.ConnectorsTest do
       assert Enum.map(Connectors.enabled(cfg(vault_dir: nil)), & &1.id) == ["ris", "web"]
     end
 
-    test "RIS-Mock: direkter Port, kein Egress-Port fuer ris" do
+    test "RIS-Mock: direkter Port, kein Egress-Port für ris" do
       cfg = cfg(ris_mock_port: 4010)
       assert Connectors.upstream(cfg, Manifest.fetch!("ris")) == {:direct, 4010}
       assert [{49_532, "web", _}] = Connectors.egress_ports(cfg)
@@ -179,7 +179,7 @@ defmodule KomkiCli.ConnectorsTest do
   end
 
   describe "Reihenfolge" do
-    test "Start: egress vor den Connectoren; Stopp: Connectoren rueckwaerts, dann egress" do
+    test "Start: egress vor den Connectoren; Stopp: Connectoren rückwärts, dann egress" do
       assert Connectors.start_order(cfg()) == [
                "egress",
                "connector-ris",

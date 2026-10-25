@@ -40,7 +40,7 @@ defmodule KomkiCli.Channel do
   @spec relay_path(Config.t()) :: String.t()
   def relay_path(%Config{} = cfg), do: Path.join([cfg.pi_home, ".pi", "agent", "komki-relay.js"])
 
-  @doc "Prueft die macOS-Grenze fuer Unix-Socket-Pfade (103 Byte)."
+  @doc "Prüft die macOS-Grenze für Unix-Socket-Pfade (103 Byte)."
   @spec check_socket_path(Config.t()) :: :ok | {:error, String.t()}
   def check_socket_path(%Config{} = cfg) do
     path = socket_path(cfg)
@@ -50,7 +50,7 @@ defmodule KomkiCli.Channel do
       else:
         {:error,
          "Socket-Pfad zu lang (" <>
-           to_string(byte_size(path)) <> " > 103 Byte): " <> path <> " — kuerzere Basis waehlen"}
+           to_string(byte_size(path)) <> " > 103 Byte): " <> path <> " — kürzere Basis wählen"}
   end
 
   @doc "Legt `<base>/run` (0700) an und schreibt ein neues Token (0600)."
@@ -76,7 +76,7 @@ defmodule KomkiCli.Channel do
       {:ok, token} ->
         if Regex.match?(~r/\A[0-9a-f]{64}\z/, token),
           do: {:ok, token},
-          else: {:error, "ungueltiges Token in " <> path <> " — 'komki down' und 'komki up'"}
+          else: {:error, "ungültiges Token in " <> path <> " — 'komki down' und 'komki up'"}
 
       {:error, reason} ->
         {:error,
@@ -85,7 +85,7 @@ defmodule KomkiCli.Channel do
     end
   end
 
-  @doc "Neue Session-ID fuer einen pi-Start (`ses-` plus 16 Hex-Zeichen)."
+  @doc "Neue Session-ID für einen pi-Start (`ses-` plus 16 Hex-Zeichen)."
   @spec new_session_id() :: String.t()
   def new_session_id, do: "ses-" <> Base.encode16(:crypto.strong_rand_bytes(8), case: :lower)
 
@@ -109,7 +109,7 @@ defmodule KomkiCli.Channel do
     File.write!(path, @relay_js)
   end
 
-  @doc "Inhalt des eingebetteten Relays (fuer Tests)."
+  @doc "Inhalt des eingebetteten Relays (für Tests)."
   @spec relay_js() :: String.t()
   def relay_js, do: @relay_js
 end

@@ -81,19 +81,19 @@ defmodule KomkiCli.Keychain do
     end
   end
 
-  @doc "Fehler als Text ohne Wert (fuer Doctor und Logs)."
+  @doc "Fehler als Text ohne Wert (für Doctor und Logs)."
   @spec describe(String.t(), error()) :: String.t()
-  def describe(service, :missing), do: "Schluesselbund-Eintrag '" <> service <> "' fehlt"
+  def describe(service, :missing), do: "Schlüsselbund-Eintrag '" <> service <> "' fehlt"
 
   def describe(service, :timeout),
-    do: "Schluesselbund-Abfrage '" <> service <> "' nach Timeout abgebrochen"
+    do: "Schlüsselbund-Abfrage '" <> service <> "' nach Timeout abgebrochen"
 
   def describe(service, :invalid),
-    do: "Wert fuer '" <> service <> "' ist leer oder enthaelt einen Zeilenumbruch"
+    do: "Wert für '" <> service <> "' ist leer oder enthält einen Zeilenumbruch"
 
   def describe(service, {:failed, code}),
     do:
-      "Schluesselbund-Abfrage '" <> service <> "' fehlgeschlagen (exit " <> to_string(code) <> ")"
+      "Schlüsselbund-Abfrage '" <> service <> "' fehlgeschlagen (exit " <> to_string(code) <> ")"
 
   # Port statt System.cmd: nur so laesst sich ein haengendes `security`
   # nach dem Timeout beenden. stderr wird verworfen (nie in Meldungen).
