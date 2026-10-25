@@ -225,3 +225,21 @@ def test_cli_contract(tmp_path):
     )
     assert corrupted.returncode == 1
     assert "FIDELITY FAILED" in corrupted.stdout
+
+
+def test_osc_links_are_dropped(tmp_path, monkeypatch):
+    capture = "\n".join(
+        [
+            "Quelle: \x1b]8;;https://example.org\x07RIS\x1b]8;;\x07 fertig",
+            "\x1b]8;;https://example.org\x1b\\Link\x1b]8;;\x1b\\ mit ST",
+        ]
+    )
+    src, out = render_capture(tmp_path, monkeypatch, capture=capture)
+    root = ET.parse(out).getroot()
+    text = [
+        "".join(ts.text or "" for ts in row.iter(NS_TSPAN))
+        for row in content_rows(root)
+    ]
+    assert text[0].rstrip() == "Quelle: RIS fertig"
+    assert text[1].rstrip() == "Link mit ST"
+    assert check(src, out) == (True, [])

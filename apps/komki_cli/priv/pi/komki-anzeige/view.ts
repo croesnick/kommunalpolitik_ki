@@ -37,6 +37,8 @@ const LABELS: Record<string, string> = {
 	"vault-oeffentlich@1": "öffentlich",
 	"web-oeffentlich@1": "öffentlich",
 	"vault-vertraulich@1": "vertraulich",
+	"doc-oeffentlich@1": "öffentlich",
+	"doc-vertraulich@1": "vertraulich",
 };
 
 const BLOCKERS: Record<string, string> = {
@@ -57,7 +59,7 @@ const CONNECTOR_ERRORS: Record<string, string> = {
 	"not-found": "nicht gefunden",
 };
 
-const SOURCES: Record<string, string> = { ris: "RIS", vault: "Vault", web: "Web" };
+const SOURCES: Record<string, string> = { ris: "RIS", vault: "Vault", web: "Web", admit: "Arbeitsraum" };
 
 const GATES: Record<string, string> = { emit: "Anfrage (Gate 1)", admit: "Aufnahme der Antwort (Gate 2)" };
 
@@ -87,6 +89,8 @@ export function callLine(toolName: string, args: Json, p: Paint): string | undef
 			return `${title("Im Web suchen")}  ${quote(a.query)}`;
 		case "vault_write_test":
 			return `${title("Testnotiz anlegen")}  ${quote(a.title)}`;
+		case "admit_document":
+			return `${title("Raumdokument lesen")}  ${plain(a.document_id)}`;
 		default:
 			return `${title(`komki: ${tool}`)}  ${p.fg("dim", clean(JSON.stringify(a)))}`;
 	}
@@ -234,6 +238,9 @@ function admittedRows(tool: string, r: Json, o: ViewOptions, p: Paint): Row[] | 
 		case "vault_read":
 			body = vaultRead(r, o, p);
 			break;
+		case "admit_document":
+			body = roomDocument(r, o, p);
+			break;
 		case "vault_write_test":
 			body = [labelled("Angelegt", p.fg("accent", clean(String(r.note_id ?? ""))), p)];
 			break;
@@ -300,6 +307,20 @@ function vaultRead(r: Json, o: ViewOptions, p: Paint): Row[] {
 	return [
 		{ body: p.bold(title) },
 		...excerpt(content, "Die Notiz ist leer.", o, p),
+	];
+}
+
+// Die erste Überschrift wird zum Titel, sonst steht die Objekt-ID da.
+function roomDocument(r: Json, o: ViewOptions, p: Paint): Row[] {
+	const id = clean(String(r.document_id ?? ""));
+	let content = clean(String(r.content ?? "")).trim();
+	const first = content.split("\n", 1)[0];
+	const heading = /^#+\s/.test(first) ? first.replace(/^#+\s*/, "") : "";
+	if (heading) content = content.slice(first.length).trim();
+	return [
+		{ body: p.bold(heading || id) },
+		...(heading ? [{ body: p.fg("dim", id) }] : []),
+		...excerpt(content, "Das Dokument ist leer.", o, p),
 	];
 }
 

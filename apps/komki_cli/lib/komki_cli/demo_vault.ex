@@ -25,13 +25,13 @@ defmodule KomkiCli.DemoVault do
 
   @doc """
   Legt den Test-Vault in `dir` an. Verweigert, wenn `dir` schon Dateien
-  enthaelt: ein vorhandener Vault wird nie ueberschrieben.
+  enthaelt: ein vorhandener Vault wird nie ueberschrieben. Leere Ordner
+  zaehlen nicht, etwa der Schreibordner `komki-test`, den komki selbst
+  anlegt (Ticket #199).
   """
   @spec install(String.t()) :: {:ok, pos_integer()} | {:error, String.t()}
   def install(dir) do
-    if File.dir?(dir) and File.ls!(dir) != [] do
-      {:error, "Vault-Ordner ist nicht leer, Test-Vault nicht angelegt: " <> dir}
-    else
+    if empty?(dir) do
       for {rel, content} <- @files do
         path = Path.join(dir, rel)
         File.mkdir_p!(Path.dirname(path))
@@ -39,6 +39,19 @@ defmodule KomkiCli.DemoVault do
       end
 
       {:ok, count()}
+    else
+      {:error, "Vault-Ordner ist nicht leer, Test-Vault nicht angelegt: " <> dir}
     end
+  end
+
+  @doc """
+  Wahr, wenn `dir` fehlt oder nur leere Ordner enthaelt. Alles andere
+  zaehlt als Inhalt, auch Symlinks: ueber einen Link koennte der
+  Test-Vault sonst ausserhalb von `dir` landen.
+  """
+  @spec empty?(String.t()) :: boolean()
+  def empty?(dir) do
+    entries = Path.wildcard(Path.join(dir, "**"), match_dot: true)
+    not Enum.any?(entries, &(File.lstat!(&1).type != :directory))
   end
 end
