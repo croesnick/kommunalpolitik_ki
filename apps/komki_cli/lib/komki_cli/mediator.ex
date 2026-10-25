@@ -209,10 +209,9 @@ defmodule KomkiCli.Mediator do
     ]
 
     [program | words] =
-      Proc.escript_cmd(
-        cfg.sandbox_exec,
+      Proc.role_cmd(
+        cfg,
         MediatorProfile.path(cfg),
-        cfg.escript_bin,
         cfg.mediator_bin,
         KomkiCli.Roles.prefix(cfg, cfg.mediator_bin, "komki-mediator") ++ args,
         Channel.run_dir(cfg)

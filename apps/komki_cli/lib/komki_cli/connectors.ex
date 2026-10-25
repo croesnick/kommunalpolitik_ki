@@ -334,17 +334,9 @@ defmodule KomkiCli.Connectors do
   """
   @spec spawn_line(Config.t(), String.t(), String.t(), [String.t()], String.t()) :: String.t()
   def spawn_line(%Config{} = cfg, profile, binary, args, log) do
-    [program | words] =
-      Proc.escript_cmd(cfg.sandbox_exec, profile, escript!(cfg), binary, args, run_dir(cfg))
-
+    [program | words] = Proc.role_cmd(cfg, profile, binary, args, run_dir(cfg))
     Proc.spawn_line(program, Enum.map(words, &Proc.quote_bin/1), log, "0<&0")
   end
-
-  defp escript!(%Config{escript_bin: bin}) when is_binary(bin), do: bin
-
-  defp escript!(_cfg),
-    do:
-      raise(ArgumentError, "escript-Laufzeit nicht entdeckt (Erlang installieren, 'komki setup')")
 
   defp await(comp, pid, ready) do
     deadline = System.monotonic_time(:millisecond) + @ready_timeout_ms

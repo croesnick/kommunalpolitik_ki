@@ -143,8 +143,8 @@ defmodule KomkiCli.Steps do
     fresh = Config.defaults(cfg.base_dir)
 
     fields =
-      [:komki_bin, :mediator_bin, :egress_bin, :connector_bins, :escript_bin] ++
-        [:node_bin, :cli_js, :llama_server_bin, :fd_bin, :rg_bin]
+      [:komki_bin, :launcher, :runtime_root, :mediator_bin, :egress_bin, :connector_bins] ++
+        [:escript_bin, :node_bin, :cli_js, :llama_server_bin, :fd_bin, :rg_bin]
 
     # Nur entdeckte Werte uebernehmen; fehlt ein Werkzeug gerade, bleibt
     # der gepinnte Pfad stehen (der Doctor meldet es).
@@ -848,22 +848,25 @@ defmodule KomkiCli.Steps do
   def journal_verify do
     cfg = load_cfg!()
 
+    args =
+      KomkiCli.Roles.prefix(cfg, cfg.mediator_bin, "komki-mediator") ++
+        ["verify-journal", "--base", cfg.base_dir]
+
     cond do
       not is_binary(cfg.mediator_bin) ->
         {:error, "komki-mediator nicht gefunden — 'make komki' im Repo, dann 'komki setup'", 2}
+
+      # Burrito-Einzeldatei (Ticket #181): die Binary direkt aufrufen
+      cfg.launcher == "burrito" and cfg.mediator_bin == cfg.komki_bin ->
+        {out, code} = System.cmd(cfg.komki_bin, args, stderr_to_stdout: true)
+        journal_result(out, code)
 
       not is_binary(cfg.escript_bin) ->
         {:error, "Erlang-escript nicht gefunden (config.json: escript_bin)", 2}
 
       true ->
         {out, code} =
-          System.cmd(
-            cfg.escript_bin,
-            [cfg.mediator_bin] ++
-              KomkiCli.Roles.prefix(cfg, cfg.mediator_bin, "komki-mediator") ++
-              ["verify-journal", "--base", cfg.base_dir],
-            stderr_to_stdout: true
-          )
+          System.cmd(cfg.escript_bin, [cfg.mediator_bin | args], stderr_to_stdout: true)
 
         journal_result(out, code)
     end
@@ -893,7 +896,8 @@ defmodule KomkiCli.Steps do
            " oder in PATH/<base>/bin ablegen ('komki setup' entdeckt neu)"}
 
       # Ticket #137: der Vermittler startet unter seinem Profil ueber escript
-      not is_binary(cfg.escript_bin) ->
+      # (unter der Burrito-Einzeldatei direkt ueber die Binary, Ticket #181)
+      cfg.launcher != "burrito" and not is_binary(cfg.escript_bin) ->
         {:error, "Erlang-escript nicht entdeckt — Erlang installieren, 'komki setup'"}
 
       true ->

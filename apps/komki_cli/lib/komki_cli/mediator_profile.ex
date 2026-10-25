@@ -51,7 +51,7 @@ defmodule KomkiCli.MediatorProfile do
         "Vermittler-Profil (komki-mediator, Tickets #137/#146): kein Netz-Outbound,",
         "nur die Connector-Sockets. Feste Eingaben -> byte-identischer Text."
       ]) ++
-        EscriptProfile.runtime(root, binary) ++
+        EscriptProfile.runtime_for(cfg, binary) ++
         EscriptProfile.log_rules(log) ++
         data_rules(data) ++
         listen_rules(cfg, listen) ++

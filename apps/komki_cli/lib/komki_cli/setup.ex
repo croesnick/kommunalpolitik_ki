@@ -52,13 +52,20 @@ defmodule KomkiCli.Setup do
           {"llama-server", cfg.llama_server_bin, "brew install llama.cpp"},
           {"node", cfg.node_bin, "brew install node"},
           {"pi", cfg.cli_js, "npm install -g @earendil-works/pi-coding-agent"},
-          {"Erlang (escript)", cfg.escript_bin, "brew install elixir (oder per asdf)"},
+          runtime_entry(cfg),
           {"komki-mediator", cfg.mediator_bin, @bausteine_hint},
           {"komki-egress", cfg.egress_bin, @bausteine_hint}
         ] ++ connectors,
       tmux: tmux
     }
   end
+
+  # Burrito-Einzeldatei (Ticket #181) bringt ihre Laufzeit mit
+  defp runtime_entry(%Config{launcher: "burrito"} = cfg),
+    do: {"Laufzeit (eingebaut)", cfg.runtime_root, "komki-Binary neu herunterladen"}
+
+  defp runtime_entry(cfg),
+    do: {"Erlang (escript)", cfg.escript_bin, "brew install erlang (oder per asdf)"}
 
   defp tools(cfg, ui) do
     %{required: required, tmux: tmux} = tool_report(cfg, System.find_executable("tmux"))

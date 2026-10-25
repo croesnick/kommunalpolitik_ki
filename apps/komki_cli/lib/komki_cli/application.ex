@@ -35,9 +35,26 @@ defmodule KomkiCli.Application do
       # formatiert — auch Optimus' eigene Fehler-/Usage-Ausgaben folgen
       # sonst dem erzwungenen ansi_enabled (Pilot-Fund, Regression #234).
       KomkiCli.Runtime.sync_ansi!()
-      KomkiCli.CLI.main(KomkiCli.Runtime.argv())
+      start_burrito(KomkiCli.Runtime.argv())
     else
       Supervisor.start_link([], strategy: :one_for_one)
+    end
+  end
+
+  # Rollen (Ticket #181) laufen in einem eigenen Prozess: ein Vermittler oder
+  # Connector im App-Start selbst blockierte den Application-Controller, und
+  # die Rolle koennte ihre eigenen Abhaengigkeiten nicht mehr starten. Der
+  # App-Start kehrt sofort zurueck; die Rolle beendet die VM selbst.
+  defp start_burrito(argv) do
+    case KomkiCli.Roles.dispatch(argv) do
+      {module, rest} ->
+        Task.start_link(fn ->
+          module.main(rest)
+          System.halt(0)
+        end)
+
+      nil ->
+        KomkiCli.CLI.main(argv)
     end
   end
 end

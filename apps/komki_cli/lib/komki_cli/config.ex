@@ -52,6 +52,8 @@ defmodule KomkiCli.Config do
                 :mediator_bin,
                 # Multicall-Programm (Ticket #179): komki selbst, wenn es alle Rollen traegt
                 :komki_bin,
+                # Burrito-Einzeldatei (Ticket #181): entpackte Laufzeit der Binary
+                :runtime_root,
                 # Connectoren und Egress (Ticket #146): Laufzeit, Binaries, Netz, Vault
                 :escript_bin,
                 :egress_bin,
@@ -59,7 +61,10 @@ defmodule KomkiCli.Config do
                 :vault_dir,
                 connector_bins: %{},
                 egress_ports: %{},
-                ris_base_url: nil
+                ris_base_url: nil,
+                # Wie Rollen starten (Ticket #181): "escript" (escript <komki> <rolle>)
+                # oder "burrito" (<komki-binary> <rolle>)
+                launcher: "escript"
               ]
 
   @type t :: %__MODULE__{
@@ -76,6 +81,8 @@ defmodule KomkiCli.Config do
           rg_bin: String.t() | nil,
           mediator_bin: String.t() | nil,
           komki_bin: String.t() | nil,
+          runtime_root: String.t() | nil,
+          launcher: String.t(),
           sandbox_exec: String.t(),
           profile_path: String.t(),
           escript_bin: String.t() | nil,
@@ -383,6 +390,30 @@ defmodule KomkiCli.Config do
     end
   end
 
+  # Burrito-Einzeldatei (Ticket #181): Rollen starten als `<binary> <rolle>`,
+  # die Laufzeit liegt entpackt unter :code.root_dir(). Sonst Escript.
+  defp launcher(komki) when is_binary(komki) do
+    if KomkiCli.Runtime.burrito?(), do: "burrito", else: "escript"
+  end
+
+  defp launcher(nil), do: "escript"
+
+  defp runtime_root(komki) when is_binary(komki) do
+    if KomkiCli.Runtime.burrito?(), do: canonical(to_string(:code.root_dir())), else: nil
+  end
+
+  defp runtime_root(nil), do: nil
+
+  @doc """
+  Verzeichnis, das der Burrito-Wrapper per `KOMKI_INSTALL_DIR` bekommt, damit
+  er die entpackte Laufzeit findet, obwohl Rollen mit dem HOME der Instanz
+  starten: zwei Ebenen ueber `runtime_root`
+  (`<dir>/.burrito/komki_erts-<v>_<app>`).
+  """
+  @spec burrito_install_dir(t()) :: String.t()
+  def burrito_install_dir(%__MODULE__{runtime_root: root}) when is_binary(root),
+    do: root |> Path.dirname() |> Path.dirname()
+
   @doc """
   Defaults für eine frische KomKI-CLI-Instanz: Modell-Pins plus die zur
   Laufzeit entdeckten Werkzeugpfade (kanonisch; nil, wenn das Werkzeug
@@ -408,6 +439,8 @@ defmodule KomkiCli.Config do
       rg_bin: resolve_optional_tool("rg"),
       mediator_bin: komki || resolve_mediator_bin(base),
       komki_bin: komki,
+      launcher: launcher(komki),
+      runtime_root: runtime_root(komki),
       sandbox_exec: canonical(@default_sandbox_exec),
       profile_path: Path.join([base, "profile", "komki.sb"]),
       escript_bin: resolve_escript_bin(),
@@ -499,6 +532,8 @@ defmodule KomkiCli.Config do
     :rg_bin,
     :mediator_bin,
     :komki_bin,
+    :launcher,
+    :runtime_root,
     :escript_bin,
     :egress_bin,
     :connector_bins,
@@ -541,6 +576,8 @@ defmodule KomkiCli.Config do
       rg_bin: Map.get(map, "rg_bin"),
       mediator_bin: Map.get(map, "mediator_bin"),
       komki_bin: Map.get(map, "komki_bin"),
+      launcher: Map.get(map, "launcher") || "escript",
+      runtime_root: Map.get(map, "runtime_root"),
       sandbox_exec: map["sandbox_exec"],
       profile_path: map["profile_path"],
       # Ticket #146: aeltere Instanzen ohne diese Felder laden mit Defaults;

@@ -24,6 +24,17 @@ defmodule KomkiCli.ConnectorChecks do
       ping_checks(cfg)
   end
 
+  # Burrito-Einzeldatei (Ticket #181): Laufzeit ist die entpackte Wurzel
+  defp escript_check(%Config{launcher: "burrito", runtime_root: root}) do
+    if is_binary(root) and File.dir?(root),
+      do: %{name: "runtime", ok: true, reason: root},
+      else: %{
+        name: "runtime",
+        ok: false,
+        reason: "entpackte Laufzeit fehlt: " <> to_string(root) <> " — 'komki setup' entdeckt neu"
+      }
+  end
+
   defp escript_check(cfg) do
     case cfg.escript_bin do
       bin when is_binary(bin) ->

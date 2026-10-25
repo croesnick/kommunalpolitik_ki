@@ -25,8 +25,15 @@ defmodule KomkiCli.EscriptProfile do
 
   alias KomkiCli.{Config, MachODeps}
 
-  @doc "Erlang-Wurzel aus der config (`escript_bin`); fehlt sie, scheitert die Generierung klar."
+  @doc """
+  Erlang-Wurzel aus der config: unter der Burrito-Einzeldatei (Ticket #181)
+  die entpackte Laufzeit (`runtime_root`), sonst die Wurzel zu `escript_bin`;
+  fehlt sie, scheitert die Generierung klar.
+  """
   @spec erlang_root!(Config.t()) :: String.t()
+  def erlang_root!(%Config{launcher: "burrito", runtime_root: root}) when is_binary(root),
+    do: root
+
   def erlang_root!(%Config{escript_bin: bin}) when is_binary(bin), do: Config.erlang_root(bin)
 
   def erlang_root!(%Config{}),
@@ -52,6 +59,27 @@ defmodule KomkiCli.EscriptProfile do
       beam_rules() ++
       crypto_rules(erlang_root)
   end
+
+  @doc """
+  Grundschicht fuer die Rolle `binary` nach der Startart der Instanz. Im
+  Escript-Betrieb genau `runtime/2` (Profiltext unveraendert); unter der
+  Burrito-Einzeldatei (Ticket #181) zusaetzlich das Ausfuehren der Binary,
+  die als Wrapper die entpackte Laufzeit unter `runtime_root` startet.
+  """
+  @spec runtime_for(Config.t(), String.t()) :: [String.t()]
+  def runtime_for(%Config{} = cfg, binary) do
+    runtime(erlang_root!(cfg), binary) ++ burrito_rules(cfg, binary)
+  end
+
+  defp burrito_rules(%Config{launcher: "burrito", komki_bin: komki}, komki) do
+    [
+      "; Burrito-Einzeldatei (Ticket #181): komki startet als Wrapper und fuehrt",
+      "; die entpackte Laufzeit (Erlang-Wurzel oben) aus",
+      "(allow process-exec (literal \"" <> komki <> "\"))"
+    ]
+  end
+
+  defp burrito_rules(_cfg, _binary), do: []
 
   defp exec_rules(root, escript_file) do
     [

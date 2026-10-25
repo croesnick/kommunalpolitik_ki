@@ -1,4 +1,4 @@
-.PHONY: test lint format ci deps elixir-test python-test install komki komki-paket komki-formel
+.PHONY: test lint format ci deps elixir-test python-test install komki komki-paket komki-formel komki-tap
 
 # Escript bauen und nach /usr/local/bin symlinken.
 # Workspace-Pattern: mix.exs der ratsinfo-App referenziert ../artifacts/deps
@@ -36,11 +36,30 @@ komki-paket:
 	@tar -C dist -czf "$(KOMKI_PAKET).tar.gz" "$(notdir $(KOMKI_PAKET))"
 	@shasum -a 256 "$(KOMKI_PAKET).tar.gz"
 
-# Formel fuer das Tap-Repo aus der Vorlage: Version und Pruefsumme des Pakets.
+# Formel aus der Vorlage: Adresse, Version und Pruefsumme des Pakets.
+KOMKI_RELEASE_URL = https://github.com/croesnick/kommunalpolitik_ki/releases/download/komki-v$(KOMKI_VERSION)/komki-$(KOMKI_VERSION)-macos-arm64.tar.gz
+define komki_formel
+	sha=$$(shasum -a 256 "$(KOMKI_PAKET).tar.gz" | cut -d' ' -f1); \
+	  sed -e "s|@URL@|$(1)|" -e "s/@VERSION@/$(KOMKI_VERSION)/g" -e "s/@SHA256@/$$sha/" packaging/homebrew/komki.rb.in > "$(2)"
+endef
+
+# Formel fuer ein GitHub-Release (Workflow komki-release)
 komki-formel: komki-paket
-	@sha=$$(shasum -a 256 "$(KOMKI_PAKET).tar.gz" | cut -d' ' -f1); \
-	  sed -e "s/@VERSION@/$(KOMKI_VERSION)/g" -e "s/@SHA256@/$$sha/" packaging/homebrew/komki.rb.in > dist/komki.rb
-	@echo "Formel geschrieben: dist/komki.rb (ins Tap-Repo croesnick/homebrew-komki als Formula/komki.rb)"
+	@$(call komki_formel,$(KOMKI_RELEASE_URL),dist/komki.rb)
+	@echo "Formel geschrieben: dist/komki.rb"
+
+# Lokaler Tap croesnick/tap (nur auf diesem Rechner, kein Remote): Paket bauen,
+# Formel mit file://-Adresse in den Tap legen, per Homebrew (neu) installieren.
+KOMKI_TAP = $(shell brew --repository)/Library/Taps/croesnick/homebrew-tap
+komki-tap: komki-paket
+	@mkdir -p "$(KOMKI_TAP)/Formula"
+	@test -d "$(KOMKI_TAP)/.git" || git -C "$(KOMKI_TAP)" init -q
+	@cp packaging/homebrew/TAP-README.md "$(KOMKI_TAP)/README.md"
+	@$(call komki_formel,file://$(PWD)/$(KOMKI_PAKET).tar.gz,$(KOMKI_TAP)/Formula/komki.rb)
+	@git -C "$(KOMKI_TAP)" add README.md Formula/komki.rb
+	@git -C "$(KOMKI_TAP)" diff --cached --quiet || git -C "$(KOMKI_TAP)" commit -q -m "komki $(KOMKI_VERSION) (lokal gebaut)"
+	@rm -f "$$(brew --cache croesnick/tap/komki 2>/dev/null)"
+	@if brew list --formula komki >/dev/null 2>&1; then brew reinstall croesnick/tap/komki; else brew install croesnick/tap/komki; fi
 
 deps:
 	mix deps.get

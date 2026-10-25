@@ -1,17 +1,19 @@
-# Homebrew-Formel fuer komki (Ticket #180). Vorlage: `make komki-formel`
-# setzt Version und Pruefsumme des Pakets ein und schreibt komki.rb fuer das
-# Tap-Repo croesnick/homebrew-komki.
+# Homebrew-Formel fuer komki (Ticket #180). Vorlage mit Platzhaltern fuer
+# Adresse, Version und Pruefsumme des Pakets:
+#   make komki-tap     lokaler Tap croesnick/tap (file://-Adresse), installiert
+#   make komki-formel  Formel fuer ein GitHub-Release (Workflow komki-release)
 class Komki < Formula
   desc "Lokaler KI-Arbeitsraum für die Ratsarbeit, gesandboxt und mit Quellen"
   homepage "https://croesnick.github.io/kommunalpolitik_ki/"
-  url "https://github.com/croesnick/kommunalpolitik_ki/releases/download/komki-v@VERSION@/komki-@VERSION@-macos-arm64.tar.gz"
+  url "@URL@"
+  version "@VERSION@"
   sha256 "@SHA256@"
   license "MIT"
 
   depends_on arch: :arm64
-  depends_on :macos
   depends_on "erlang"
   depends_on "llama.cpp"
+  depends_on :macos
   depends_on "node"
   depends_on "tmux"
 
@@ -29,8 +31,10 @@ class Komki < Formula
     resource("pi").stage do
       system "npm", "install", *std_npm_args(prefix: libexec)
     end
+    # Nur Apple Silicon: vorgebaute x86_64-Module aus pis Abhaengigkeiten entfernen
+    rm_r Dir[libexec/"lib/node_modules/**/prebuilds/darwin-x64"]
     # Das Escript startet mit Homebrews Erlang, auch wenn ein anderes im PATH liegt
-    (bin/"komki").write_env_script libexec/"komki", PATH: "#{Formula["erlang"].opt_bin}:$PATH"
+    (bin/"komki").write_env_script libexec/"komki", PATH: "#{formula_opt_bin("erlang")}:$PATH"
   end
 
   def caveats
