@@ -1086,7 +1086,7 @@ defmodule KomkiCli.CLI do
   defp mediator_tools_line(_), do: "?"
 
   defp down_line(component, :ok),
-    do: green() <> component <> " down: pidfile entfernt, pid abwesend" <> reset()
+    do: green() <> component <> " gestoppt" <> reset()
 
   defp down_line(component, :already),
     do: green() <> component <> ": bereits gestoppt (kein pidfile)" <> reset()
