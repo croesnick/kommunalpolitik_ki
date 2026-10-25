@@ -13,6 +13,7 @@ defmodule KomkiMediator.HTTPTest do
     {"accept", "application/json"}
   ]
   @session "ses-0123456789abcdef"
+  @canary "kanarienvogel-185-Bahnhofstrasse"
 
   setup do
     TestHelpers.stop_named(KomkiMediator.Env)
@@ -141,6 +142,45 @@ defmodule KomkiMediator.HTTPTest do
 
       assert {:ok, %Finch.Response{status: 400}} = mcp_post(socket, initialize(1), headers)
     end
+  end
+
+  describe "Log ohne Inhalte (Ticket #185)" do
+    setup do
+      level = Logger.level()
+      anubis_log = Application.get_env(:anubis_mcp, :log, true)
+      Logger.configure(level: :debug)
+
+      on_exit(fn ->
+        Application.put_env(:anubis_mcp, :log, anubis_log)
+        Logger.configure(level: level)
+      end)
+    end
+
+    test "Gegenprobe: ohne quiet_logging steht der Kanarienwert im Debug-Log", %{
+      socket: socket,
+      token: token
+    } do
+      Application.put_env(:anubis_mcp, :log, true)
+      assert call_with_canary(socket, token) =~ @canary
+    end
+
+    test "mit quiet_logging steht der Kanarienwert nicht im Log", %{
+      socket: socket,
+      token: token
+    } do
+      :ok = KomkiMediator.CLI.quiet_logging()
+      Logger.configure(level: :debug)
+
+      refute call_with_canary(socket, token) =~ @canary
+    end
+  end
+
+  defp call_with_canary(socket, token) do
+    capture_log([level: :debug], fn ->
+      mcp = handshake!(socket, token)
+      call = put_in(call_ping(3), ["params", "arguments"], %{"notiz" => @canary})
+      assert {:ok, %Finch.Response{status: 200}} = mcp_post(socket, call, mcp)
+    end)
   end
 
   # -----------------------------------------------------------------------

@@ -17,6 +17,10 @@ defmodule KomkiConnector.ProtocolTest do
       do: {:ok, %{"params" => params, "context" => context, "state" => state}}
 
     def handle_op("show", %{"top_id" => "boom"}, _context, _state), do: raise("kaputt")
+
+    def handle_op("show", %{"top_id" => "leck" <> _} = params, _context, _state),
+      do: raise(MatchError, term: params)
+
     def handle_op("show", _params, _context, _state), do: {:error, "not-found", "nicht da"}
   end
 
@@ -73,6 +77,17 @@ defmodule KomkiConnector.ProtocolTest do
 
     assert {:error, %{"code" => "internal"}} =
              Client.call(path, "c", "show", %{"top_id" => "boom"})
+  end
+
+  test "Absturz-Logzeile nennt den Fehlertyp, nicht die Parameter (Ticket #185)", %{path: path} do
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:error, %{"code" => "internal"}} =
+                 Client.call(path, "c", "show", %{"top_id" => "leck185kanarie"})
+      end)
+
+    assert log =~ "MatchError"
+    refute log =~ "leck185kanarie"
   end
 
   test "nicht erreichbarer Socket ergibt upstream-error" do

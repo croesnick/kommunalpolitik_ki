@@ -96,6 +96,7 @@ defmodule KomkiMediator.CLI do
 
     with {:ok, token} <- load_token(token_file),
          :ok <- socket_free(socket),
+         :ok <- quiet_logging(),
          :ok <- ensure_runtime_apps(),
          :ok <- provision(base),
          {:ok, gamma} <-
@@ -152,6 +153,19 @@ defmodule KomkiMediator.CLI do
       {:error, _reason} ->
         :ok
     end
+  end
+
+  @doc """
+  Haelt Tool-Argumente und -Ergebnisse aus dem Log (Ticket #185): anubis
+  schreibt auf `debug` jede MCP-Nachricht vollstaendig mit, und ohne
+  Konfiguration gilt Elixirs Standard-Level `:debug`. Der Vermittler
+  schaltet das Protokoll-Logging von anubis ab und hebt das Level auf
+  `:info`; die eigenen Logzeilen (etwa 401) nennen nie Inhalte.
+  """
+  @spec quiet_logging() :: :ok
+  def quiet_logging do
+    Application.put_env(:anubis_mcp, :log, false)
+    Logger.configure(level: :info)
   end
 
   defp ensure_runtime_apps do

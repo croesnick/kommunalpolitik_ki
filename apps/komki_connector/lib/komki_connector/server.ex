@@ -197,7 +197,9 @@ defmodule KomkiConnector.Server do
     end
   rescue
     e ->
-      Logger.error("handle_op #{op} abgestuerzt: #{Exception.message(e)}")
+      # Nur der Fehlertyp: die Meldung kann Werte aus der Anfrage enthalten
+      # (etwa ein MatchError mit den Parametern, Ticket #185).
+      Logger.error("handle_op #{op} abgestuerzt: #{inspect(e.__struct__)}")
       Frame.error(call_id, "internal", "interner Fehler")
   end
 
