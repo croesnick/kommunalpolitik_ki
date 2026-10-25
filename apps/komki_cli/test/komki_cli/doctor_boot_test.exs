@@ -47,7 +47,8 @@ defmodule KomkiCli.DoctorBootTest do
             "komki-egress",
             "komki-connector-ris",
             "komki-connector-web",
-            "komki-connector-vault"
+            "komki-connector-vault",
+            "komki-connector-documents"
           ] do
         File.write!(Path.join([home, "bin", name]), name <> "-platzhalter")
       end

@@ -22,7 +22,8 @@ defmodule KomkiCli.ConnectorsTest do
           connector_bins: %{
             "ris" => "/opt/komki/bin/komki-connector-ris",
             "web" => "/opt/komki/bin/komki-connector-web",
-            "vault" => "/opt/komki/bin/komki-connector-vault"
+            "vault" => "/opt/komki/bin/komki-connector-vault",
+            "documents" => "/opt/komki/bin/komki-connector-documents"
           }
       },
       overrides
@@ -30,9 +31,9 @@ defmodule KomkiCli.ConnectorsTest do
   end
 
   describe "Auswahl" do
-    test "Default: alle drei aktiv, Egress mit ris- und web-Port" do
+    test "Default: alle vier aktiv, Egress mit ris- und web-Port" do
       cfg = cfg()
-      assert Enum.map(Connectors.enabled(cfg), & &1.id) == ["ris", "vault", "web"]
+      assert Enum.map(Connectors.enabled(cfg), & &1.id) == ["documents", "ris", "vault", "web"]
 
       assert Connectors.egress_ports(cfg) == [
                {49_531, "ris", ["risapi1.komuna.net:443"]},
@@ -41,7 +42,11 @@ defmodule KomkiCli.ConnectorsTest do
     end
 
     test "vault_dir nil: Vault-Connector startet nicht" do
-      assert Enum.map(Connectors.enabled(cfg(vault_dir: nil)), & &1.id) == ["ris", "web"]
+      assert Enum.map(Connectors.enabled(cfg(vault_dir: nil)), & &1.id) == [
+               "documents",
+               "ris",
+               "web"
+             ]
     end
 
     test "RIS-Mock: direkter Port, kein Egress-Port für ris" do
@@ -158,7 +163,7 @@ defmodule KomkiCli.ConnectorsTest do
       assert :ok = Connectors.socket_length("/tmp/komki")
       long = "/tmp/" <> String.duplicate("x", 80)
       assert {:error, reason} = Connectors.socket_length(long)
-      assert reason =~ "vault.sock"
+      assert reason =~ "documents.sock"
     end
   end
 
@@ -182,6 +187,7 @@ defmodule KomkiCli.ConnectorsTest do
     test "Start: egress vor den Connectoren; Stopp: Connectoren rückwärts, dann egress" do
       assert Connectors.start_order(cfg()) == [
                "egress",
+               "connector-documents",
                "connector-ris",
                "connector-vault",
                "connector-web"
@@ -189,6 +195,7 @@ defmodule KomkiCli.ConnectorsTest do
 
       assert Connectors.start_order(cfg(vault_dir: nil)) == [
                "egress",
+               "connector-documents",
                "connector-ris",
                "connector-web"
              ]
@@ -197,6 +204,7 @@ defmodule KomkiCli.ConnectorsTest do
                "connector-web",
                "connector-vault",
                "connector-ris",
+               "connector-documents",
                "egress"
              ]
     end
@@ -223,7 +231,7 @@ defmodule KomkiCli.ConnectorsTest do
         for {pidfile, marker} <-
               [{Connectors.egress_pidfile(cfg), "komki-egress"}] ++
                 for(
-                  id <- ["ris", "vault", "web"],
+                  id <- ["documents", "ris", "vault", "web"],
                   do: {Connectors.pidfile(cfg, id), Manifest.fetch!(id).binary}
                 ) do
           # Compound-Kommando, damit der Marker in der ps-Zeile bleibt
@@ -237,7 +245,9 @@ defmodule KomkiCli.ConnectorsTest do
           {pid, marker}
         end
 
-      sockets = for id <- ["ris", "vault", "web"], do: Manifest.socket_path(cfg.base_dir, id)
+      sockets =
+        for id <- ["documents", "ris", "vault", "web"], do: Manifest.socket_path(cfg.base_dir, id)
+
       Enum.each(sockets, &File.write!(&1, ""))
 
       try do

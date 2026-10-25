@@ -16,8 +16,9 @@ defmodule KomkiMediator.FassungTest do
 
   # Die Connector-Tools der Fassung sind genau die des Manifests
   # (Connector-Vertrag §5.1) — kein zweiter Ort fuer Tool-Namen.
+  # admit_document liegt seit #169 im Manifest documents.
   test "Connector-Tools der Fassung == KomkiConnector.Manifest.tools" do
-    assert Enum.drop(KomkiMediator.Fassung.tools(), 2) == KomkiConnector.Manifest.tools()
+    assert Enum.drop(KomkiMediator.Fassung.tools(), 1) == KomkiConnector.Manifest.tools()
   end
 
   test "fassung_id ist die versionierte Kennung" do

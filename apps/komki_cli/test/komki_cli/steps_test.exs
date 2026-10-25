@@ -210,6 +210,7 @@ defmodule KomkiCli.StepsTest do
                [
                  "llama",
                  "egress",
+                 "connector-documents",
                  "connector-ris",
                  "connector-vault",
                  "connector-web",
@@ -222,12 +223,20 @@ defmodule KomkiCli.StepsTest do
                  "connector-web",
                  "connector-vault",
                  "connector-ris",
+                 "connector-documents",
                  "egress",
                  "llama"
                ]
 
       assert Steps.start_order(%{cfg | vault_dir: nil, ris_mock_port: 4010}) ==
-               ["llama", "egress", "connector-ris", "connector-web", "mediator"]
+               [
+                 "llama",
+                 "egress",
+                 "connector-documents",
+                 "connector-ris",
+                 "connector-web",
+                 "mediator"
+               ]
     end
 
     test "down_with/1: stoppt Egress und Connectoren per pidfile, Ergebnis in stop_order, idempotent" do
@@ -260,12 +269,19 @@ defmodule KomkiCli.StepsTest do
                Steps.down_with(cfg)
 
       assert Enum.map(connectors, &elem(&1, 0)) ==
-               ["connector-web", "connector-vault", "connector-ris", "egress"]
+               [
+                 "connector-web",
+                 "connector-vault",
+                 "connector-ris",
+                 "connector-documents",
+                 "egress"
+               ]
 
       assert [
                {"connector-web", :ok},
                {"connector-vault", {:stale, _}},
                {"connector-ris", :ok},
+               {"connector-documents", :already},
                {"egress", :ok}
              ] =
                connectors

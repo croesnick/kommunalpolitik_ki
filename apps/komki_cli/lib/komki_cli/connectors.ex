@@ -100,8 +100,14 @@ defmodule KomkiCli.Connectors do
   @doc "Aktive Connectoren: alle Manifeste, Vault nur mit gesetztem vault_dir."
   @spec enabled(Config.t()) :: [Manifest.t()]
   def enabled(%Config{} = cfg) do
-    Enum.filter(Manifest.all(), fn manifest -> manifest.fs == [] or is_binary(cfg.vault_dir) end)
+    Enum.filter(Manifest.all(), fn manifest ->
+      manifest.id != "vault" or is_binary(cfg.vault_dir)
+    end)
   end
+
+  @doc "Raumdokumente des Vermittlers, die der Dokument-Connector liest (Ticket #169)."
+  @spec documents_dir(Config.t()) :: Path.t()
+  def documents_dir(%Config{base_dir: base}), do: Path.join([base, "mediator", "documents"])
 
   @doc """
   Netzweg eines Connectors: `:none` (keine egress_hosts), `{:proxy, port}`
@@ -161,7 +167,7 @@ defmodule KomkiCli.Connectors do
     ["--socket", Manifest.socket_path(cfg.base_dir, manifest.id)] ++
       proxy_args(upstream(cfg, manifest)) ++
       base_url_args(cfg, manifest) ++
-      vault_args(cfg, manifest)
+      fs_args(cfg, manifest)
   end
 
   defp proxy_args({:proxy, port}), do: ["--proxy", "127.0.0.1:" <> Integer.to_string(port)]
@@ -170,8 +176,9 @@ defmodule KomkiCli.Connectors do
   defp base_url_args(cfg, %{id: "ris"}), do: ["--base-url", Config.ris_url(cfg)]
   defp base_url_args(_cfg, _manifest), do: []
 
-  defp vault_args(_cfg, %{fs: []}), do: []
-  defp vault_args(cfg, _manifest), do: ["--vault-dir", cfg.vault_dir]
+  defp fs_args(cfg, %{id: "vault"}), do: ["--vault-dir", cfg.vault_dir]
+  defp fs_args(cfg, %{id: "documents"}), do: ["--documents-dir", documents_dir(cfg)]
+  defp fs_args(_cfg, _manifest), do: []
 
   @doc """
   Credentials-Zeile fuer stdin: `{"<NAME>": "<wert>"}` aus `fetch`
@@ -196,11 +203,19 @@ defmodule KomkiCli.Connectors do
 
   @spec binary!(Config.t(), String.t()) :: String.t()
   def binary!(%Config{} = cfg, id) do
-    case Map.get(cfg.connector_bins, id) do
+    case binary(cfg, id) do
       bin when is_binary(bin) -> bin
       _ -> raise ArgumentError, missing_binary(Manifest.fetch!(id).binary)
     end
   end
+
+  @doc """
+  Programm eines Connectors: der Eintrag in `connector_bins`, sonst das
+  Multicall-Programm `komki`, das alle Rollen enthaelt (eine Instanz aus der
+  Zeit vor einem neuen Connector kennt dessen Eintrag noch nicht, #169).
+  """
+  @spec binary(Config.t(), String.t()) :: String.t() | nil
+  def binary(%Config{} = cfg, id), do: Map.get(cfg.connector_bins, id) || cfg.komki_bin
 
   @spec egress_binary!(Config.t()) :: String.t()
   def egress_binary!(%Config{egress_bin: bin}) when is_binary(bin), do: bin

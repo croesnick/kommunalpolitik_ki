@@ -149,7 +149,7 @@ jobs:
       - name: Dialyzer (Vermittler, Connectoren, Egress)
         run: |
           set -e
-          for app in komki_mediator komki_connector komki_egress komki_connector_ris komki_connector_web komki_connector_vault; do
+          for app in komki_mediator komki_connector komki_egress komki_connector_ris komki_connector_web komki_connector_vault komki_connector_documents; do
             echo "::group::dialyzer $app"
             (cd "apps/$app" && mix dialyzer)
             echo "::endgroup::"
