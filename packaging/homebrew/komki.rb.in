@@ -17,22 +17,11 @@ class Komki < Formula
   depends_on "node"
   depends_on "tmux"
 
-  # pi in fester Version: komki nutzt genau diese, nicht eine global per npm
-  # installierte (Plan docs/research/2026-10-24-komki-devx-installation.md, V3).
-  resource "pi" do
-    url "https://registry.npmjs.org/@earendil-works/pi-coding-agent/-/pi-coding-agent-1.4.0.tgz"
-    sha256 "d155c16ef6fa00960fbf58b2911536e80b05f33700e0b14fbd08967ede0c7428"
-  end
-
   def install
-    # Escript mit allen Rollen und daneben die SQLite-NIF (lib/exqlite)
+    # Escript mit allen Rollen, daneben die SQLite-NIF (lib/exqlite) und pi
+    # in fester Version samt Abhaengigkeiten (lib/node_modules, im Paket per
+    # pnpm-Lockfile gebaut; komki sucht pi dort zuerst). Nichts wird nachgeladen.
     libexec.install "komki", "lib"
-    # pi nach libexec/lib/node_modules; komki sucht dort zuerst
-    resource("pi").stage do
-      system "npm", "install", *std_npm_args(prefix: libexec)
-    end
-    # Nur Apple Silicon: vorgebaute x86_64-Module aus pis Abhaengigkeiten entfernen
-    rm_r Dir[libexec/"lib/node_modules/**/prebuilds/darwin-x64"]
     # Das Escript startet mit Homebrews Erlang, auch wenn ein anderes im PATH liegt
     (bin/"komki").write_env_script libexec/"komki", PATH: "#{formula_opt_bin("erlang")}:$PATH"
   end

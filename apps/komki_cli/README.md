@@ -63,10 +63,18 @@ mix escript.build   # erzeugt ./komki (Dev-Weg; braucht Elixir/OTP auf dem Host)
 
 ## Veröffentlichen über Homebrew
 
-Nutzende installieren komki mit `brew install croesnick/komki/komki`. Die
+Nutzende installieren komki später mit `brew install croesnick/tap/komki`;
+bis zur Veröffentlichung gibt es den Tap nur lokal (`make komki-tap`). Die
 Formel installiert das Escript mit allen Rollen, daneben die SQLite-NIF und
 pi in fester Version, und zieht `erlang`, `llama.cpp`, `node` und `tmux`
-als Abhängigkeiten nach. Erlang und Elixir des Repos (`.tool-versions`)
+als Abhängigkeiten nach.
+
+pi liegt fertig im Paket: `make komki-paket` installiert es mit pnpm nach
+der Lockfile in `packaging/pi/` (`--frozen-lockfile --ignore-scripts`), samt
+aller Abhängigkeiten in fester Version. Die Formel kopiert nur noch, bei der
+Installation lädt nichts aus der npm-Registry nach. pi aktualisieren heißt:
+Version in `packaging/pi/package.json` ändern, `pnpm install` dort, Lockfile
+prüfen und committen (Renovate schlägt das auch vor). Erlang und Elixir des Repos (`.tool-versions`)
 folgen deshalb Homebrews aktueller `erlang`-Version.
 
 Ein Release in drei Schritten:
@@ -77,10 +85,10 @@ Ein Release in drei Schritten:
    (`make komki-paket`) und die Formel (`make komki-formel`) und hängt
    beides an das GitHub-Release.
 3. `komki.rb` aus dem Release als `Formula/komki.rb` ins Tap-Repo
-   `croesnick/homebrew-komki` legen.
+   `croesnick/homebrew-tap` legen.
 
 Lokal lässt sich beides mit `make komki-formel` bauen (Ergebnis unter
-`dist/`).
+`dist/`). Der Bau braucht pnpm (`brew install pnpm`).
 
 ## Verteilen: eine Datei statt Ordner (Burrito)
 

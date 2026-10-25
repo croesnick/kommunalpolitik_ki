@@ -1,7 +1,7 @@
 # komki-Release (Ticket #180): ein Tag `komki-v<version>` baut das Paket fuer
 # die Homebrew-Formel auf Apple Silicon und haengt Paket und fertige Formel
 # an ein GitHub-Release. Die Formel kommt danach von Hand ins Tap-Repo
-# croesnick/homebrew-komki (Formula/komki.rb). Den Tag setzt der Mensch
+# croesnick/homebrew-tap (Formula/komki.rb). Den Tag setzt der Mensch
 # (GO-Prinzip): git tag komki-v0.1.0 && git push origin komki-v0.1.0
 name: komki-release
 
@@ -27,6 +27,15 @@ jobs:
           version-file: .tool-versions
           version-type: strict
 
+      # pi kommt fertig ins Paket (make komki-paket): pnpm installiert es nach
+      # packaging/pi/pnpm-lock.yaml, ohne Installationsskripte.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: packaging/pi/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .tool-versions
+
       - name: Version pruefen (Tag = mix.exs)
         run: |
           version=$(grep -m1 'version:' apps/komki_cli/mix.exs | sed 's/.*"\(.*\)".*/\1/')
@@ -43,4 +52,4 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" dist/komki-*-macos-arm64.tar.gz dist/komki.rb \
             --title "komki ${GITHUB_REF_NAME#komki-v}" \
-            --notes "Installation: brew install croesnick/komki/komki, danach komki setup. Formel: komki.rb (ins Tap-Repo)."
+            --notes "Installation: brew install croesnick/tap/komki, danach komki setup. Formel: komki.rb (ins Tap-Repo)."

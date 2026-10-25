@@ -24,8 +24,12 @@ komki:
 	@echo "komki gebaut: $(KOMKI_LINK_DIR)/komki"
 	@echo "Weiter mit: komki setup"
 
-# Paket fuer die Homebrew-Formel (Ticket #180): das Escript (prod) und die
-# SQLite-NIF von exqlite nebeneinander, als dist/komki-<version>-macos-arm64.tar.gz.
+# Paket fuer die Homebrew-Formel (Ticket #180): das Escript (prod), die
+# SQLite-NIF von exqlite und pi mit allen Abhaengigkeiten nebeneinander, als
+# dist/komki-<version>-macos-arm64.tar.gz. pi installiert pnpm nach der
+# Lockfile in packaging/pi, ohne Installationsskripte; die Formel kopiert nur
+# noch und laedt nichts nach. Vorgebaute Module fuer andere Plattformen und
+# die .bin-Links fallen weg.
 KOMKI_VERSION = $(shell grep -m1 'version:' apps/komki_cli/mix.exs | sed 's/.*"\(.*\)".*/\1/')
 KOMKI_PAKET = dist/komki-$(KOMKI_VERSION)-macos-arm64
 komki-paket:
@@ -33,6 +37,10 @@ komki-paket:
 	@rm -rf "$(KOMKI_PAKET)" && mkdir -p "$(KOMKI_PAKET)/lib/exqlite"
 	@cp apps/komki_cli/komki "$(KOMKI_PAKET)/komki"
 	@cp -R apps/komki_cli/_build/prod/lib/exqlite/ebin apps/komki_cli/_build/prod/lib/exqlite/priv "$(KOMKI_PAKET)/lib/exqlite/"
+	@cd packaging/pi && pnpm install --frozen-lockfile --prod --ignore-scripts >/dev/null
+	@cp -R packaging/pi/node_modules "$(KOMKI_PAKET)/lib/node_modules"
+	@rm -rf "$(KOMKI_PAKET)/lib/node_modules/.bin"
+	@find "$(KOMKI_PAKET)/lib/node_modules" -type d -path '*/prebuilds/*' ! -path '*/prebuilds/*/*' ! -name darwin-arm64 -exec rm -rf {} +
 	@tar -C dist -czf "$(KOMKI_PAKET).tar.gz" "$(notdir $(KOMKI_PAKET))"
 	@shasum -a 256 "$(KOMKI_PAKET).tar.gz"
 
