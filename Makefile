@@ -1,4 +1,4 @@
-.PHONY: test lint format ci deps elixir-test python-test install komki komki-paket komki-formel komki-tap komki-burrito
+.PHONY: test lint format ci deps elixir-test python-test install komki komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview
 
 # Escript bauen und nach /usr/local/bin symlinken.
 # Workspace-Pattern: mix.exs der ratsinfo-App referenziert ../artifacts/deps
@@ -84,6 +84,28 @@ komki-burrito:
 	    KOMKI_CUSTOM_ERTS="$(PWD)/dist/erts-$$otp-macos-aarch64.tar.gz" mix release --overwrite
 	@cp apps/komki_cli/burrito_out/komki_macos_silicon "$(KOMKI_PAKET)-einzeldatei"
 	@echo "Einzeldatei: $(KOMKI_PAKET)-einzeldatei"
+
+# Doku-Site lokal ansehen (docs/site/README.md). pnpm in der Version aus
+# docs/site/package.json (packageManager), wie in der CI; fehlt es fuer die
+# node-Version aus .tool-versions, hilft einmalig `corepack enable pnpm`.
+DOCS_DIR = docs/site
+DOCS_PNPM_CHECK = @cd $(DOCS_DIR) && pnpm --version >/dev/null 2>&1 || { \
+	echo "pnpm fehlt fuer die node-Version aus .tool-versions."; \
+	echo "Einmalig: corepack enable pnpm (mit asdf danach: asdf reshim nodejs)"; exit 1; }
+
+# Live-Reload unter http://localhost:4321/kommunalpolitik_ki/
+docs:
+	$(DOCS_PNPM_CHECK)
+	@cd $(DOCS_DIR) && pnpm install --frozen-lockfile && pnpm dev
+
+# dist/ bauen wie in der CI (.github/workflows/pages.yml)
+docs-build:
+	$(DOCS_PNPM_CHECK)
+	@cd $(DOCS_DIR) && pnpm install --frozen-lockfile && pnpm build
+
+# dist/ so ansehen, wie GitHub Pages es ausliefert
+docs-preview: docs-build
+	@cd $(DOCS_DIR) && pnpm preview
 
 deps:
 	mix deps.get
