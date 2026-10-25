@@ -1,6 +1,16 @@
 defmodule KomkiCli.MixProject do
   use Mix.Project
 
+  @workspace_deps [
+    :komki_policy,
+    :komki_connector,
+    :komki_mediator,
+    :komki_egress,
+    :komki_connector_ris,
+    :komki_connector_web,
+    :komki_connector_vault
+  ]
+
   def project do
     [
       app: :komki_cli,
@@ -23,7 +33,17 @@ defmodule KomkiCli.MixProject do
       # ignore_warnings zeigt auf eine LEERE, committete Datei: es wird
       # nichts ignoriert — jede Warnung bleibt sichtbar und wird behoben;
       # die Angabe entfernt nur dialyxirs Hinweiszeile.
-      dialyzer: [no_umbrella: true, ignore_warnings: "dialyzer.ignore-warnings"],
+      # Die Workspace-Schwestern (Path-Deps) gehoeren nicht in die PLT:
+      # dialyxir haelt eine gecachte PLT fuer aktuell, solange sich die
+      # Lockfiles nicht aendern, auch wenn eine Schwester neue Module hat
+      # (CI-Fund #98: unknown_function). Sie werden deshalb bei jedem Lauf
+      # mitanalysiert.
+      dialyzer: [
+        no_umbrella: true,
+        ignore_warnings: "dialyzer.ignore-warnings",
+        plt_ignore_apps: @workspace_deps,
+        paths: Enum.map([:komki_cli | @workspace_deps], &"_build/#{Mix.env()}/lib/#{&1}/ebin")
+      ],
       deps: deps()
     ]
   end
