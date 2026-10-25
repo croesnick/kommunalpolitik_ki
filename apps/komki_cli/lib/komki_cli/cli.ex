@@ -335,7 +335,7 @@ defmodule KomkiCli.CLI do
           continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"],
           detach: [
             long: "detach",
-            help: "Session ohne attach starten; später 'tmux -L komki attach -t komki'"
+            help: "Session im Hintergrund starten; der Befehl zum Andocken steht in der Ausgabe"
           ]
         ]
       ],
@@ -811,12 +811,12 @@ defmodule KomkiCli.CLI do
          mediator_tools_line(health) <> ")" <> reset() <> "\n", 0}
 
   # Stoppreihenfolge wie up rueckwaerts: Vermittler-Zeile zuerst.
-  defp render({:down, %{llama: llama, connectors: connectors, mediator: mediator}}),
+  defp render({:down, %{llama: llama, connectors: connectors, mediator: mediator} = down}),
     do:
       {Enum.map_join(
          [{"mediator", mediator}] ++ connectors ++ [{"llama", llama}],
          fn {name, state} -> down_line(name, state) <> "\n" end
-       ), 0}
+       ) <> orphans_line(Map.get(down, :orphans, 0)), 0}
 
   defp render(
          {:status, cfg, %{llama: llama_state, connectors: connectors, mediator: mediator_state}}
@@ -1084,6 +1084,13 @@ defmodule KomkiCli.CLI do
 
   defp mediator_tools_line(%{"tools" => tools}) when is_list(tools), do: Enum.join(tools, ", ")
   defp mediator_tools_line(_), do: "?"
+
+  defp orphans_line(0), do: ""
+
+  defp orphans_line(count),
+    do:
+      green() <>
+        "pi: " <> Integer.to_string(count) <> " verwaiste Session(s) beendet" <> reset() <> "\n"
 
   defp down_line(component, :ok),
     do: green() <> component <> " gestoppt" <> reset()

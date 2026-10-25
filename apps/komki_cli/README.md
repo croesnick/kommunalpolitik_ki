@@ -219,7 +219,7 @@ Hinweise zu den einzelnen Schritten:
 ./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil (startet bei Bedarf alles)
 ./komki session                     # interaktive pi-Session in tmux
 ./komki session --continue          # letzte Session fortsetzen
-./komki session --detach            # im Hintergrund; attach via 'tmux -L komki attach -t komki'
+./komki session --detach            # im Hintergrund; der Befehl zum Andocken steht in der Ausgabe
 ./komki down                        # alles stoppen (Vermittler, Connectoren, Egress, llama)
 ./komki status                      # Zustand (base, gguf, port, Socket, llama, Egress, Connectoren, Vermittler)
 ./komki label …                     # SQLite-Registry: Bindungen, Labels, Γ-Export (siehe unten)
@@ -232,8 +232,10 @@ Konfigurations- oder Bereitschaftsfehler (etwa: fremder Prozess auf dem llama-Po
 `3` Doctor-/Boot-Gate-Fehlschlag, `4` Laufzeitfehler.
 
 Interaktive Sessions laufen in der tmux-Session `komki` auf einem eigenen
-tmux-Server (`tmux -L komki`, ohne persönliche tmux-Config), jeweils eine
-gleichzeitig. Der eigene Server sperrt den Terminal-Ausgang: pi kann weder per
+tmux-Server je Instanz (`tmux -L komki` für die Standard-Instanz, sonst
+`komki-<8 Zeichen aus dem Instanzpfad>`; ohne persönliche tmux-Config), jeweils
+eine gleichzeitig. Schließt sich das tmux-Fenster, beendet komki pi mit; pi-Reste
+früherer Sessions räumt `komki down` auf (Ticket #174). Der eigene Server sperrt den Terminal-Ausgang: pi kann weder per
 OSC 52 die Zwischenablage setzen noch Sequenzen am tmux vorbeischleusen; der
 Copy-Modus schreibt weiterhin in die Zwischenablage. Aus einer laufenden
 tmux-Session heraus startet er verschachtelt (Prefix dann zweimal, etwa

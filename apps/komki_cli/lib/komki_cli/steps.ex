@@ -72,7 +72,8 @@ defmodule KomkiCli.Steps do
              %{
                llama: down_state(),
                connectors: [{String.t(), down_state() | {:error, String.t()}}],
-               mediator: down_state()
+               mediator: down_state(),
+               orphans: non_neg_integer()
              }}
           | {:status, Config.t(),
              %{
@@ -1030,7 +1031,9 @@ defmodule KomkiCli.Steps do
          %{
            mediator: down_state(mediator),
            connectors: Enum.map(connectors, fn {name, state} -> {name, down_state(state)} end),
-           llama: down_state(llama)
+           llama: down_state(llama),
+           # Ticket #174: pi-Waisen frueherer Sessions mit aufraeumen
+           orphans: KomkiCli.Hangup.reap_orphans(Channel.relay_path(cfg))
          }}
 
       _llama ->
@@ -1200,7 +1203,22 @@ defmodule KomkiCli.Steps do
   # OSC 52 von pi; `allow-passthrough off` sperrt rohe Sequenzen am tmux
   # vorbei. Restrisiko: OSC 8 (Hyperlinks) reicht tmux durch, wenn das
   # aeussere Terminal das Feature meldet.
-  @tmux_server ["-L", "komki", "-f", "/dev/null"]
+  # Ein Server je Instanz: die Standard-Instanz heisst "komki", jede andere
+  # (KOMKI_HOME) bekommt einen eigenen Namen aus ihrem Pfad. Sonst teilten
+  # sich zwei Instanzen eine Session.
+  defp tmux_server(cfg), do: ["-L", tmux_socket(cfg), "-f", "/dev/null"]
+
+  @doc "Name des tmux-Servers der Instanz (`tmux -L <name>`)."
+  @spec tmux_socket(Config.t()) :: String.t()
+  def tmux_socket(%Config{base_dir: base}) do
+    default = Path.join(Config.canonical(System.user_home!()), ".local/share/komki")
+
+    if base == default,
+      do: "komki",
+      else:
+        "komki-" <> String.slice(Base.encode16(:crypto.hash(:sha256, base), case: :lower), 0, 8)
+  end
+
   @tmux_lockdown [
     "set-option",
     "-s",
@@ -1213,7 +1231,7 @@ defmodule KomkiCli.Steps do
     "off",
     ";"
   ]
-  @tmux_attach_hint "'tmux -L komki attach -t komki'"
+  defp attach_hint(cfg), do: "'tmux -L " <> tmux_socket(cfg) <> " attach -t komki'"
 
   @doc """
   Interner Pane-Einstieg (tmux-Pane der Session): startet die pi-Kette als
@@ -1281,6 +1299,10 @@ defmodule KomkiCli.Steps do
         ]
       )
 
+    # Ticket #174: schliesst sich das tmux-Fenster, nimmt der BEAM pi mit.
+    {:os_pid, pi_pid} = Port.info(port, :os_pid)
+    KomkiCli.Hangup.install(pi_pid)
+
     receive do
       {^port, {:exit_status, code}} -> {:chain_exit, code}
     end
@@ -1330,8 +1352,8 @@ defmodule KomkiCli.Steps do
     with {:ok, _pid} <- require_llama_up(cfg),
          {:ok, _pid} <- require_mediator_up(cfg),
          {:ok, tmux} <- find_tmux() do
-      if tmux_session_running?(tmux) do
-        attach_or_refuse(tmux, opts)
+      if tmux_session_running?(tmux, cfg) do
+        attach_or_refuse(tmux, cfg, opts)
       else
         start_new_session(cfg, tmux, opts)
       end
@@ -1417,10 +1439,10 @@ defmodule KomkiCli.Steps do
     end
   end
 
-  defp tmux_session_running?(tmux) do
+  defp tmux_session_running?(tmux, cfg) do
     # stderr gefangen: "no server running"-Meldungen sollen das Terminal
     # des Aufrufers nicht zumuellen (Live-Fund aus dem Session-Smoke).
-    case System.cmd(tmux, @tmux_server ++ ["has-session", "-t", "=" <> @tmux_session],
+    case System.cmd(tmux, tmux_server(cfg) ++ ["has-session", "-t", "=" <> @tmux_session],
            stderr_to_stdout: true
          ) do
       {_out, 0} -> true
@@ -1431,14 +1453,14 @@ defmodule KomkiCli.Steps do
   # tmux im Attach-Modus braucht das echte Terminal des Aufrufers; System.cmd
   # gäbe BEAM-Pipes ("open terminal failed: not a terminal" — Live-Fund aus
   # dem Session-Smoke). Ein Port ohne :use_stdio reicht das eigene stdio durch.
-  defp run_tmux_inheriting_terminal(tmux, args) do
+  defp run_tmux_inheriting_terminal(tmux, cfg, args) do
     # TMUX ausgeblendet: aus einer laufenden tmux-Session heraus startet der
     # eigene komki-Server als verschachtelter Client statt abzulehnen.
     port =
       Port.open({:spawn_executable, tmux}, [
         :nouse_stdio,
         :exit_status,
-        {:args, @tmux_server ++ args},
+        {:args, tmux_server(cfg) ++ args},
         {:env, [{~c"TMUX", false}]}
       ])
 
@@ -1448,18 +1470,18 @@ defmodule KomkiCli.Steps do
     end
   end
 
-  defp attach_or_refuse(tmux, opts) do
+  defp attach_or_refuse(tmux, cfg, opts) do
     if Map.has_key?(opts, "detach") do
       {:error,
        "tmux-session '" <>
          @tmux_session <>
-         "' läuft bereits; ohne --detach via " <> @tmux_attach_hint <> " andocken", 2}
+         "' läuft bereits; ohne --detach via " <> attach_hint(cfg) <> " andocken", 2}
     else
-      case run_tmux_inheriting_terminal(tmux, ["attach", "-t", "=" <> @tmux_session]) do
+      case run_tmux_inheriting_terminal(tmux, cfg, ["attach", "-t", "=" <> @tmux_session]) do
         :ok ->
           {:session,
            "session beendet oder abgekoppelt; " <>
-             @tmux_attach_hint <>
+             attach_hint(cfg) <>
              "' zum Weiterarbeiten"}
 
         {:error, code} ->
@@ -1499,12 +1521,12 @@ defmodule KomkiCli.Steps do
   defp create_detached(tmux, cfg, pane) do
     case System.cmd(
            tmux,
-           @tmux_server ++
+           tmux_server(cfg) ++
              @tmux_lockdown ++ ["new-session", "-d", "-s", @tmux_session, "-c", cfg.pi_home, pane],
            stderr_to_stdout: true
          ) do
       {_out, 0} ->
-        {:session, session_started_message(true)}
+        {:session, session_started_message(cfg, true)}
 
       {out, code} ->
         {:error,
@@ -1520,9 +1542,9 @@ defmodule KomkiCli.Steps do
   defp create_with_attach(tmux, cfg, pane) do
     args = @tmux_lockdown ++ ["new-session", "-s", @tmux_session, "-c", cfg.pi_home, pane]
 
-    case run_tmux_inheriting_terminal(tmux, args) do
+    case run_tmux_inheriting_terminal(tmux, cfg, args) do
       :ok ->
-        {:session, session_started_message(false)}
+        {:session, session_started_message(cfg, false)}
 
       {:error, code} ->
         {:error, "tmux new-session fehlgeschlagen (exit " <> to_string(code) <> ")", 4}
@@ -1548,15 +1570,15 @@ defmodule KomkiCli.Steps do
 
   defp continue_precondition(_cfg, false), do: :ok
 
-  defp session_started_message(true = _detach) do
+  defp session_started_message(cfg, true = _detach) do
     "tmux-session '" <>
-      @tmux_session <> "' gestartet (detached); " <> @tmux_attach_hint <> " zum Arbeiten"
+      @tmux_session <> "' gestartet (detached); " <> attach_hint(cfg) <> " zum Arbeiten"
   end
 
-  defp session_started_message(false) do
+  defp session_started_message(cfg, false) do
     "tmux-session '" <>
       @tmux_session <>
-      "' beendet oder abgekoppelt; " <> @tmux_attach_hint <> " zum Weiterarbeiten"
+      "' beendet oder abgekoppelt; " <> attach_hint(cfg) <> " zum Weiterarbeiten"
   end
 
   # ===========================================================================
