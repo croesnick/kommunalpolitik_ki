@@ -331,8 +331,17 @@ Was das leistet und was nicht:
 Ältere Datensätze ohne Kettenfelder (vor #139) sind als Präfix zulässig und
 werden als `legacy` gezählt.
 
-Ein fehlender Raum wird beim Start provisioniert; ein vorhandener wird
-NIEMALS ueberschrieben (Idempotenz).
+Ein fehlender Raum wird beim Start provisioniert. Einen vorhandenen
+ersetzt der Vermittler nur, wenn `registry.json` und `room.json` byte-genau
+aktuelle oder fruehere unveraenderte Vorlagen sind (Ticket #177); eigene
+Aenderungen bleiben unberuehrt.
+
+Jedes Objekt in `room.json` traegt einen Typ (`"type"`, Ticket #134):
+`admit_document` loest nur Objekte vom Typ `document` auf. Ein Objekt ohne
+oder mit anderem Typ endet als `unknown_object`, ohne Entscheidung der
+Engine und ohne Dateizugriff. Eine selbst veraenderte `room.json` aus der
+Zeit vor #134 hat keine Typen; dort lehnt `admit_document` deshalb jedes
+Objekt ab, bis die Typen nachgetragen sind.
 
 ## Gate 1 / Gate 2 / PDR
 

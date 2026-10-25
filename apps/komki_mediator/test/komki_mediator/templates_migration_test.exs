@@ -2,8 +2,8 @@ defmodule KomkiMediator.TemplatesMigrationTest do
   @moduledoc """
   Automatische Migration der Vorlagen (Ticket #177). Die Fixtures unter
   `test/fixtures/vorlagen/<commit>/` sind byte-genau die kanonischen
-  Vorlagen der frueheren Fassungen auf main (#106: ed612a2, #107: d9159ec),
-  erzeugt aus dem Git-Verlauf.
+  Vorlagen der frueheren Fassungen auf main (#106: ed612a2, #107: d9159ec,
+  vor #134: 05b9b2d), erzeugt aus dem Git-Verlauf.
   """
 
   use ExUnit.Case, async: true
@@ -55,6 +55,14 @@ defmodule KomkiMediator.TemplatesMigrationTest do
       # danach stabil
       assert Templates.provision!(base) == :already_provisioned
     end
+  end
+
+  test "aktuelle Registry, alter Raum (05b9b2d, vor #134): Raum wird ersetzt" do
+    {base, dir} = base_with("05b9b2d", "05b9b2d")
+
+    assert {:migrated, _} = Templates.provision!(base)
+    assert File.read!(Path.join(dir, "room.json")) == JSON.canonical(Templates.room())
+    assert Templates.provision!(base) == :already_provisioned
   end
 
   test "alte Registry, aber veraenderter Raum: Abbruch mit Erklaerung, nichts ueberschrieben" do

@@ -46,6 +46,17 @@ defmodule KomkiMediator.RoomTest do
              Room.object_for_call(room, "admit_document", %{"document_id" => "doc-phantom"})
   end
 
+  test "admit_document loest nur Objekte vom Typ document auf (#134)", %{room: room} do
+    assert {:error, :unknown_object, "mediator-ping"} =
+             Room.object_for_call(room, "admit_document", %{"document_id" => "mediator-ping"})
+
+    untyped =
+      put_in(room.objects["doc-oeffentlich"], Map.delete(room.objects["doc-oeffentlich"], "type"))
+
+    assert {:error, :unknown_object, "doc-oeffentlich"} =
+             Room.object_for_call(untyped, "admit_document", %{"document_id" => "doc-oeffentlich"})
+  end
+
   test "admit_document-loeset das Objekt aus den Room-Parametern auf", %{room: room} do
     {:ok, object} =
       Room.object_for_call(room, "admit_document", %{"document_id" => "doc-oeffentlich"})
