@@ -1302,6 +1302,8 @@ defmodule KomkiCli.Steps do
     # Ticket #174: schliesst sich das tmux-Fenster, nimmt der BEAM pi mit.
     {:os_pid, pi_pid} = Port.info(port, :os_pid)
     KomkiCli.Hangup.install(pi_pid)
+    # Ticket #197: ein Terminal-Resize erreicht pi nur ueber den BEAM.
+    KomkiCli.Resize.install(pi_pid)
 
     # Ticket #98: GO-Anfragen des Vermittlers als Popup in dieser Session.
     with tmux when is_binary(tmux) <- System.find_executable("tmux") do
