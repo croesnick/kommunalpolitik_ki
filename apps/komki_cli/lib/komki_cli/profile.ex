@@ -714,8 +714,24 @@ defmodule KomkiCli.Profile do
       "(allow file-read* (subpath \"" <> pi_pkg <> "\"))",
       "; node-module-resolution geht exports/symlinks im Install-Subtree nach",
       "(allow file-read* (subpath \"" <> node_modules_root <> "\"))"
+    ] ++ pi_deps_reads(pi_modules_root(pi_pkg), node_modules_root)
+  end
+
+  # pi aus dem komki-Paket (Homebrew) liegt nicht unter node, sondern in einem
+  # eigenen flachen node_modules neben seinen Abhaengigkeiten. pi laedt von
+  # dort jiti, sobald es eine TypeScript-Extension uebersetzt (die Anzeige,
+  # KomkiCli.Anzeige). Liegt pi unter node, deckt die Regel oben das ab.
+  defp pi_deps_reads(root, root), do: []
+
+  defp pi_deps_reads(root, _node_modules_root) do
+    [
+      "; Abhaengigkeiten des pi-Pakets (flaches node_modules, etwa jiti)",
+      "(allow file-read* (subpath \"" <> root <> "\"))"
     ]
   end
+
+  # <root>/node_modules/@earendil-works/pi-coding-agent -> <root>/node_modules
+  defp pi_modules_root(pi_pkg), do: pi_pkg |> Path.dirname() |> Path.dirname()
 
   ## ---------------------------------------------------------------- Scopes
 

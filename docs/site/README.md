@@ -7,6 +7,20 @@ Warum Starlight: [Report Doku-Site und Bildband](../research/2026-10-24-doku-sit
 
 ## Lokal ansehen
 
+Vom Repo-Root aus:
+
+```sh
+make docs          # http://localhost:4321/kommunalpolitik_ki/ mit Live-Reload, Ende mit Ctrl+C
+make docs-build    # erzeugt dist/ wie in CI
+make docs-preview  # baut und zeigt dist/ so, wie GitHub Pages es ausliefert
+```
+
+Meldet `make`, dass pnpm fehlt: einmalig `corepack enable pnpm` (mit asdf danach `asdf reshim nodejs`). corepack
+liefert dann genau die pnpm-Version aus `package.json`. Erkennt Astro eine KI-Agenten-Umgebung (etwa `AI_AGENT`),
+startet `astro dev` im Hintergrund; anhalten mit `pnpm exec astro dev stop` in `docs/site`.
+
+Oder direkt im Ordner:
+
 ```sh
 cd docs/site
 pnpm install --frozen-lockfile

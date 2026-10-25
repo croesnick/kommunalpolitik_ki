@@ -105,6 +105,32 @@ defmodule KomkiCli.ProfileTest do
     end
   end
 
+  describe "Abhängigkeiten des pi-Pakets (Anzeige-Extension braucht jiti)" do
+    @deps "; Abhaengigkeiten des pi-Pakets"
+
+    test "pi unter node: der node-Baum deckt sie ab, keine Zusatzregel", %{text: text} do
+      assert String.contains?(
+               text,
+               "(allow file-read* (subpath \"/usr/local/lib/node_modules\"))"
+             )
+
+      refute String.contains?(text, @deps)
+    end
+
+    test "pi aus dem komki-Paket: sein flaches node_modules ist lesbar", %{
+      cfg: cfg,
+      scratch: scratch
+    } do
+      packaged = "/opt/komki/libexec/lib/node_modules"
+      cfg = %{cfg | cli_js: packaged <> "/@earendil-works/pi-coding-agent/dist/bundle/cli.js"}
+      text = Profile.generate(cfg, scratch)
+
+      assert String.contains?(text, @deps)
+      assert String.contains?(text, "(allow file-read* (subpath \"" <> packaged <> "\"))")
+      refute text =~ ~r/file-write\* \(subpath "#{packaged}/
+    end
+  end
+
   describe "pi-Such-Werkzeuge (fd/rg-Fundus)" do
     test "exec-Literale für die agent-bin-Kopien", %{text: text, cfg: cfg} do
       bin = Path.join([cfg.pi_home, ".pi", "agent", "bin"])
