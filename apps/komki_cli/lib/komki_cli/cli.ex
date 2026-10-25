@@ -125,7 +125,10 @@ defmodule KomkiCli.CLI do
   @doc "Testbare Kernfunktion: `{output, exit_code}` ohne System.halt."
   @spec run(term()) :: outcome()
   def run(argv) when is_list(argv) do
-    dispatch(argv)
+    # Log-Auszuege der Rollen koennen Latin-1-Bytes tragen (Rollen laufen mit
+    # LANG=C); ungueltiges UTF-8 ersetzen statt beim Ausgeben abzustuerzen.
+    {output, code} = dispatch(argv)
+    {String.replace_invalid(output), code}
   rescue
     exception -> {"internal error: " <> Exception.format(:error, exception) <> "\n", 2}
   catch

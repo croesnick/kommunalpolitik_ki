@@ -59,15 +59,23 @@ defmodule KomkiCli.Proc do
   @spec kill_checked(term(), String.t()) :: :ok | {:error, String.t()}
   def kill_checked(pid, marker) do
     if pid_alive?(pid, marker) do
-      System.cmd("/bin/kill", ["-TERM", to_string(pid)])
+      # Burrito-Einzeldatei (Ticket #181): der Wrapper startet die VM als
+      # Kindprozess. Nur den Wrapper zu beenden liesse die Rolle als Waise
+      # weiterlaufen; deshalb alle Nachfahren mit demselben Marker mit.
+      family = [pid | marked_descendants(pid, marker)]
+      signal(family, "-TERM")
       Process.sleep(800)
 
-      if pid_alive?(pid, marker) do
-        System.cmd("/bin/kill", ["-KILL", to_string(pid)])
-        Process.sleep(300)
+      case Enum.filter(family, &pid_alive?(&1, marker)) do
+        [] ->
+          :ok
+
+        alive ->
+          signal(alive, "-KILL")
+          Process.sleep(300)
       end
 
-      if pid_alive?(pid, marker) do
+      if Enum.any?(family, &pid_alive?(&1, marker)) do
         {:error, marker <> " pid " <> to_string(pid) <> " still alive after SIGKILL"}
       else
         :ok
@@ -75,6 +83,27 @@ defmodule KomkiCli.Proc do
     else
       {:error,
        "pid " <> to_string(pid) <> " is not " <> marker <> " (pidfile stale); not sent any signal"}
+    end
+  end
+
+  defp signal(pids, sig), do: System.cmd("/bin/kill", [sig | Enum.map(pids, &to_string/1)])
+
+  @doc "Nachfahren von `pid` (rekursiv per pgrep -P), die `marker` in der Kommandozeile tragen."
+  @spec marked_descendants(pos_integer(), String.t()) :: [pos_integer()]
+  def marked_descendants(pid, marker) do
+    pid
+    |> descendants()
+    |> Enum.filter(&pid_alive?(&1, marker))
+  end
+
+  defp descendants(pid) do
+    case System.cmd("/usr/bin/pgrep", ["-P", to_string(pid)], stderr_to_stdout: true) do
+      {out, 0} ->
+        children = out |> String.split("\n", trim: true) |> Enum.map(&String.to_integer/1)
+        children ++ Enum.flat_map(children, &descendants/1)
+
+      _ ->
+        []
     end
   end
 

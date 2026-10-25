@@ -62,4 +62,28 @@ defmodule KomkiCli.BurritoLaunchTest do
     assert EscriptProfile.runtime_for(cfg, "/opt/komki-bin") ==
              EscriptProfile.runtime("/erl", "/opt/komki-bin")
   end
+
+  test "marked_descendants/2: findet Kindprozesse mit Marker (wie die VM unter dem Burrito-Wrapper)" do
+    marker = "komki-test-marker-" <> Integer.to_string(System.unique_integer([:positive]))
+
+    # Aeussere Shell (ohne Marker) mit einem Kind, dessen Kommandozeile den
+    # Marker traegt; "; true" verhindert, dass die Shell sich per exec ersetzt.
+    port =
+      Port.open({:spawn_executable, "/bin/sh"}, [
+        :binary,
+        args: ["-c", "/bin/sh -c 'sleep 30; true' #{marker}-kind; true"]
+      ])
+
+    {:os_pid, parent} = Port.info(port, :os_pid)
+    Process.sleep(300)
+
+    try do
+      kids = Proc.marked_descendants(parent, marker)
+      assert kids != []
+      assert Enum.all?(kids, &Proc.pid_alive?(&1, marker))
+    after
+      System.cmd("/bin/kill", ["-KILL", to_string(parent)])
+      System.cmd("/usr/bin/pkill", ["-f", marker])
+    end
+  end
 end
