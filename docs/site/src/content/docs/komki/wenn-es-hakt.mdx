@@ -16,7 +16,7 @@ description: Häufige Meldungen, ihre Ursachen und was hilft. Dazu die ehrlichen
 | Websuche im Raum „vertraulich“ abgelehnt | So gewollt | In den Raum „recherche“ wechseln ([Anleitung](/kommunalpolitik_ki/komki/sicherheitsgrenze/)) |
 | pi sucht nach einer Ablehnung minutenlang weiter | Bekannte Schwäche ([#166](https://github.com/croesnick/kommunalpolitik_ki/issues/166)) | Abbrechen; der Lauf endet spätestens nach 10 Minuten |
 
-Logs liegen unter `~/.local/share/komki/tmp/`: `connector-web.log`, `egress.log`, `mediator.log`. Sie enthalten keine Inhalte und keine Schlüssel, nur was wann entschieden wurde.
+Logs liegen unter `~/.local/share/komki/tmp/`: `mediator.log`, `egress.log` und je Connector eine `connector-<name>.log`. Sie enthalten keine Suchbegriffe, keine Notizinhalte und keine Schlüssel, nur Betriebsdaten: welcher Aufruf wann mit welchem Ergebnis lief und welche Adresse der Egress-Proxy verbunden hat. Was entschieden wurde, steht im Journal.
 
 ## Was noch nicht geht
 
