@@ -1,0 +1,7 @@
+{
+  "args": {
+    "note_id": "Fraktion/Klausur 2026.md"
+  },
+  "text": "{\"decision\":\"deny\",\"decision_id\":\"pdr-88bd395c8d96cb1cb0bc0ac5b76ce18b\",\"emit_decision_id\":\"pdr-9b8c75136bd6a99917d4cc74dc59a022\",\"registry_id\":\"reg-komki-arbeitsraum\",\"relaxation_authorities\":[],\"remedies\":[{\"binding\":null,\"code\":\"label_not_included\",\"condition\":null,\"transitions\":[{\"required_bindings\":[\"vault-vertraulich@1\"],\"required_recipients\":[\"nutzende-person\",\"pi-agent\"],\"type\":\"neuer_raum\"}]}],\"rule\":\"admit\"}",
+  "tool": "vault_read"
+}

@@ -1,0 +1,7 @@
+{
+  "args": {
+    "query": "Bürgerfall 4711 Bahnhofstraße"
+  },
+  "text": "{\"decision\":\"deny\",\"decision_id\":\"pdr-7b9d7c7845ae1309de542547a8140bba\",\"registry_id\":\"reg-komki-arbeitsraum\",\"relaxation_authorities\":[],\"remedies\":[{\"binding\":null,\"code\":\"recipient_not_allowed\",\"condition\":null,\"transitions\":[{\"required_bindings\":[],\"required_recipients\":[\"brave-search\",\"nutzende-person\",\"pi-agent\"],\"type\":\"neuer_raum\"},{\"call_hash\":\"509f26215083ba6899422a5f27ca6e5b7fdb649ee0038c4126fd638b95757050\",\"scope\":\"call\",\"type\":\"aktionsfreigabe\"}]}],\"rule\":\"emit\"}",
+  "tool": "web_search"
+}

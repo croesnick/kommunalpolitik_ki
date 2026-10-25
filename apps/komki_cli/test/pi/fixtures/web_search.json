@@ -1,0 +1,7 @@
+{
+  "args": {
+    "query": "Förderung Radweg Bayern Kommune"
+  },
+  "text": "{\"abrufdatum\":\"2026-10-24T18:20:02Z\",\"decision\":\"permit\",\"decision_id\":\"pdr-e70941ca484b4d0deb464c3391c3fae7\",\"emit_decision_id\":\"pdr-e7f921ca417f5efa635afb6b7ff931d0\",\"labels\":[\"web-oeffentlich@1\"],\"payload_hash\":\"sha256:459bc4cda96f14e565ec8b2cc8ef8db869a9db196a42b42f521279eed260d4b0\",\"results\":[{\"snippet\":\"Der Freistaat fördert Radwege an Staatsstraßen und kommunale Radverkehrsanlagen mit bis zu 80 Prozent der zuwendungsfähigen Kosten.\",\"title\":\"Förderrichtlinie Radverkehr – Bayerisches Staatsministerium\",\"url\":\"https://www.stmb.bayern.de/vum/handlungsfelder/radverkehr/foerderung/index.php\"},{\"snippet\":\"Sonderprogramm für den Ausbau der Radinfrastruktur in Ländern und Kommunen.\",\"title\":\"Stadt und Land – Förderprogramm des Bundes\",\"url\":\"https://www.bmv.de/SharedDocs/DE/Artikel/StV/Radverkehr/stadt-und-land.html\"}],\"rule\":\"admit\"}",
+  "tool": "web_search"
+}

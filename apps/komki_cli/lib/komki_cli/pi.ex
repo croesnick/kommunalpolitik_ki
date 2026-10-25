@@ -40,7 +40,7 @@ defmodule KomkiCli.Pi do
   node -> cli.js gestartet (der asdf-Shim scheitert unter dem Profil stumm).
   """
 
-  alias KomkiCli.Config
+  alias KomkiCli.{Anzeige, Config}
   require Config
 
   @session_term "xterm-256color"
@@ -252,6 +252,7 @@ defmodule KomkiCli.Pi do
         "--offline"
         | mcp_contract_flags()
       ] ++
+        anzeige_flags(cfg) ++
         [
           "--no-skills",
           "--no-context-files",
@@ -285,6 +286,10 @@ defmodule KomkiCli.Pi do
   # reaktiviert NUR die eingebaute Extension MCP fuer die Vermittler-
   # Verbindung (pi >= 1.0; Issue #103: kein Pin).
   defp mcp_contract_flags, do: ["--no-extensions", "-e", "builtin:mcp"]
+
+  # Nur in der Session: lesbare Vermittler-Antworten statt Roh-JSON. Die
+  # Extension zeichnet nur (KomkiCli.Anzeige); der Einmal-Lauf hat keine TUI.
+  defp anzeige_flags(cfg), do: ["-e", Anzeige.entry(cfg)]
 
   # Vermittler-Tools (Ticket #133): pi 1.1.0 blendet MCP-Tools aus, sobald
   # --tools eine Allowlist traegt (Live-Fund: das Modell sah nur `write`).
@@ -343,6 +348,10 @@ defmodule KomkiCli.Pi do
       "XDG_DATA_HOME" => Path.join([cfg.pi_home, ".local", "share"]),
       "XDG_CACHE_HOME" => Path.join([cfg.pi_home, ".cache"]),
       "NODE_COMPILE_CACHE" => Path.join([cfg.pi_home, ".cache", "node-compile"]),
+      # Kein Übersetzungs-Cache für Extensions: er läge im schreibbaren
+      # pi-Home, und eine präparierte Cache-Datei würde statt der frisch
+      # geschriebenen Anzeige geladen (KomkiCli.Anzeige).
+      "JITI_FS_CACHE" => "false",
       "PI_OFFLINE" => "1",
       "LANG" => "C",
       "LC_ALL" => "C"

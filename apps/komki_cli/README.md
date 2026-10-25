@@ -279,6 +279,16 @@ nicht über einen TCP-Port:
   die Antworten (JSON oder SSE) zeilenweise zurück. komki schreibt es vor
   jedem pi-Start neu nach `pi-home/.pi/agent/komki-relay.js`; eine vom Agenten
   veränderte Fassung überlebt damit keinen Lauf.
+* Die Antworten des Vermittlers zeigt die Session lesbar statt als Roh-JSON:
+  Status (zugelassen, abgelehnt mit Grund und Ausweg, zurückgehalten,
+  Quelle nicht erreichbar), Label, Treffer, Quelle mit Abrufzeit und Beleg;
+  ctrl+o klappt volle URLs und alle Belege auf. Das macht die pi-Extension
+  `komki-anzeige` (`priv/pi/komki-anzeige/`). Sie registriert nur Renderer,
+  ändert also weder Entscheidungen noch das, was das Modell sieht. komki
+  schreibt sie wie das Relay vor jedem pi-Start neu ins pi-Home und lädt sie
+  nur in der Session (`-e`); den Übersetzungs-Cache für TypeScript schaltet
+  `JITI_FS_CACHE=false` ab, weil er sonst im schreibbaren pi-Home läge.
+  Tests: `node --test apps/komki_cli/test/pi/*.test.ts`.
 * `komki run` und `komki session` lesen das Token und erzeugen je pi-Start
   eine Session-ID (`ses-` plus 16 Hex-Zeichen). Beides geht über die Umgebung
   an pi (`KOMKI_MEDIATOR_TOKEN`, `KOMKI_SESSION_ID`). Die `mcp.json` enthält

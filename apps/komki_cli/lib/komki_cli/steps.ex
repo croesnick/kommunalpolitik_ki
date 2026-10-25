@@ -38,7 +38,18 @@ defmodule KomkiCli.Steps do
       Boot-Gate, 4 = Runtime (llama/mediator/pi).
   """
 
-  alias KomkiCli.{Channel, Config, ConnectorChecks, Connectors, Llama, Mediator, Pi, Profile}
+  alias KomkiCli.{
+    Anzeige,
+    Channel,
+    Config,
+    ConnectorChecks,
+    Connectors,
+    Llama,
+    Mediator,
+    Pi,
+    Profile
+  }
+
   require Config
 
   @type check :: %{name: String.t(), ok: boolean(), reason: String.t()}
@@ -1352,11 +1363,13 @@ defmodule KomkiCli.Steps do
   # erzeugen, Relay frisch schreiben. Fehlt das Token, ist `komki up` noetig.
   # Auch die mcp.json wird frisch aus der healthz-Antwort geschrieben: das
   # pi-Home ist fuer den Agenten schreibbar, und ein eingetragener
-  # MCP-Server darf keinen Lauf ueberdauern (Labbook S-07).
+  # MCP-Server darf keinen Lauf ueberdauern (Labbook S-07). Aus demselben
+  # Grund wird die Anzeige-Extension neu geschrieben.
   defp prepare_channel(cfg) do
     with {:ok, env} <- Channel.prepare_pi(cfg),
          {:ok, "200", health} <- Mediator.fetch_health(cfg) do
       :ok = Mediator.write_mcp_config(cfg, health["tools"])
+      :ok = Anzeige.write!(cfg)
       {:ok, env}
     else
       {:ok, code, _health} -> {:error, "komki-mediator /healthz returned " <> code, 2}
