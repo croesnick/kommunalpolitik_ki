@@ -54,6 +54,16 @@ Ein **Raum** legt fest, welche Arten von Daten in einer Sitzung zusammenkommen d
 Im Raum „vertraulich“ fehlt jeder Weg nach draußen, solange du nicht selbst einen einzelnen Aufruf freigibst. Selbst ein Agent, der vollständig von einem Angreifer gesteuert würde, kann vertrauliche Inhalte dort nicht weitergeben. Im Raum „recherche“ ist der Weg nach draußen offen, dafür kommt der Agent gar nicht erst an Vertrauliches. Das kannst du [selbst ausprobieren](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
 </Aside>
 
+## Eigene Dokumente in die Session holen
+
+Eine Vorlage, ein Protokoll, eine Notiz: `komki session vorlage.md` bringt eine Datei als Dokument des Arbeitsraums mit. Vorher prüft komki, ob sie hinein darf. Dafür braucht die Datei ein Label im Label-Store (`komki label`), und der Raum braucht einen Startvertrag in `room.json`: wofür er da ist, welche Labels er verträgt, welche Dateien herein dürfen.
+
+- Passt alles, liegt die Datei danach als Dokument im Raum, und pi liest sie über den Vermittler, mit Beleg im Journal.
+- Kennt komki die Datei nicht, kommt sie in Quarantäne, bis du sie einordnest. Die Session startet dann nicht.
+- Passt das Label nicht zum Raum, etwa eine öffentliche Datei in einem Raum mit enger Zweckbindung, lehnt komki ab und sagt, was stattdessen ginge.
+
+Einzelheiten stehen in der [README von komki_cli](https://github.com/croesnick/kommunalpolitik_ki/tree/main/apps/komki_cli#dateien-beim-session-start-aufnehmen-ticket-92).
+
 ## Freigabe: dein GO für genau einen Aufruf
 
 Manchmal ist eine gesperrte Anfrage in Ordnung, etwa eine Websuche nach einem Förderprogramm, während eine vertrauliche Notiz offen ist. Dann entscheidest du. Läuft eine Session und hängt dein Terminal daran, öffnet komki bei einer gesperrten Anfrage ein Fenster:

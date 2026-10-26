@@ -48,10 +48,13 @@ defmodule KomkiCli.Steps do
     ConnectorChecks,
     Connectors,
     Denials,
+    Gamma,
     Llama,
     Mediator,
     Pi,
-    Profile
+    Profile,
+    SessionIntake,
+    StartContract
   }
 
   require Config
@@ -74,6 +77,8 @@ defmodule KomkiCli.Steps do
 
   @type result ::
           {:inited, Config.t(), [String.t()]}
+          | {:session_plan, [String.t()], SessionIntake.intake() | nil}
+          | {:session_refused, [String.t()], [SessionIntake.entry()]}
           | {:checks, [check()], :ok | :fail | :boot_gate_fail}
           | {:up,
              %{
@@ -1526,27 +1531,253 @@ defmodule KomkiCli.Steps do
   "open terminal failed: not a terminal"). `--continue` setzt die letzte
   Session fort (pi-Flag gleichen Namens), `--detach` startet ohne attach.
   """
-  @spec session(%{String.t() => String.t()}, on_start()) :: result()
+  @spec session(%{String.t() => term()}, on_start()) :: result()
   def session(opts, on_start \\ fn _ -> :ok end) do
-    with :ok <- start_if_needed(on_start) do
-      session_checked(opts)
+    case session_plan(opts, on_start) do
+      {:session_plan, _header, intake} -> session_start(intake, opts)
+      other -> other
     end
   end
 
-  defp session_checked(opts) do
-    case run_checks(:full) do
-      {:checks, _checks, :ok} ->
-        execute_session(opts)
+  @doc """
+  Plant die Session (Ticket #92): Dateipfade VOR allem anderen pruefen,
+  dann komki bei Bedarf starten (damit ist Γ aus dem Label-Store
+  synchron, #208), full doctor, dann ohne Dateien nur der
+  Startvertrag-Header, mit Dateien die Aufnahmeentscheidung je Datei.
+  Der CLI-Weg druckt den Header vor `session_start/2`.
 
-      {:checks, _checks, _} ->
-        {:error, "session verweigert: doctor nicht grün (Boot-Gate ist Pflicht vor jedem Lauf)",
-         3}
+  Testnaehte: `:config` (Config statt config.json), `:start` und
+  `:doctor` (0-stellige Funktionen statt Start und Doctor),
+  `:tmux_running?`.
+  """
+  @spec session_plan(%{String.t() => term()}, on_start()) :: result()
+  def session_plan(opts, on_start \\ fn _ -> :ok end) do
+    cfg = session_cfg(opts)
+    db = session_db(opts, cfg)
 
-      {:error, reason, code} ->
-        {:error, reason, code}
+    with {:ok, files} <-
+           SessionIntake.validate_paths(Map.get(opts, "files", []), %{
+             base_dir: cfg.base_dir,
+             pi_home: cfg.pi_home,
+             db: db
+           }),
+         :ok <- SessionIntake.guard_new_start(files, opts),
+         :ok <- check_instance_binding(files, cfg, opts),
+         :ok <- guard_running_session(files, cfg, opts),
+         :ok <- session_start_needed(opts, on_start),
+         :ok <- session_doctor_ok(opts) do
+      if files == [] do
+        {:session_plan, session_header_without_files(cfg, opts), nil}
+      else
+        plan_session_intake(cfg, files, opts)
+      end
+    else
+      {:error, reason, code} -> {:error, reason, code}
+      {:error, reason} -> {:error, reason, 2}
     end
   rescue
     e -> {:error, "session fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  @doc """
+  Startet die geplante Session: Liveness von llama und Vermittler, dann
+  die zugelassenen Dateien als Raumdokumente ablegen und den Vermittler
+  neu starten, damit er den Raum mit ihnen liest; dann tmux.
+  """
+  @spec session_start(SessionIntake.intake() | nil, %{String.t() => term()}) :: result()
+  def session_start(nil, opts), do: execute_session(opts)
+
+  def session_start(intake, opts) do
+    cfg = session_cfg(opts)
+
+    with {:ok, _pid} <- require_llama_up(cfg),
+         {:ok, _pid} <- require_mediator_up(cfg),
+         :ok <- stage_intake(intake),
+         :ok <- reload_mediator(cfg) do
+      execute_session(opts)
+    end
+  rescue
+    e -> {:error, "session fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  defp session_start_needed(opts, on_start) do
+    case Map.get(opts, :start) do
+      fun when is_function(fun, 0) -> fun.()
+      _ -> start_if_needed(on_start)
+    end
+  end
+
+  # Der Doctor-Gate bleibt vor jedem Start; `:doctor` ist eine Testnaht.
+  defp session_doctor_ok(opts) do
+    case Map.get(opts, :doctor) do
+      fun when is_function(fun, 0) -> normalize_doctor(fun.())
+      _ -> normalize_doctor(run_checks(:full))
+    end
+  end
+
+  defp normalize_doctor(:ok), do: :ok
+  defp normalize_doctor({:checks, _checks, :ok}), do: :ok
+
+  defp normalize_doctor({:checks, _checks, _}),
+    do:
+      {:error, "session verweigert: doctor nicht grün (Boot-Gate ist Pflicht vor jedem Lauf)", 3}
+
+  defp normalize_doctor({:error, reason, code}), do: {:error, reason, code}
+
+  # Aufnahme und Vermittler muessen dieselben Dateien sehen: --db/--room
+  # sind Testnaehte und gelten nur, wenn sie auf die Instanzdateien zeigen.
+  defp check_instance_binding([], _cfg, _opts), do: :ok
+
+  defp check_instance_binding(_files, cfg, opts) do
+    with :ok <-
+           same_path(Map.get(opts, "room"), StartContract.default_path(cfg.base_dir), "--room") do
+      same_path(Map.get(opts, "db"), Gamma.db_path(cfg), "--db")
+    end
+  end
+
+  defp same_path(nil, _default, _flag), do: :ok
+
+  defp same_path(path, default, flag) do
+    if Config.canonical(path) == Config.canonical(default),
+      do: :ok,
+      else:
+        {:error,
+         flag <>
+           " ist eine Testnaht und muss auf " <> default <> " zeigen (angegeben: " <> path <> ")"}
+  end
+
+  # Aufnahme nur bei neuem Start: Dateien gehoeren nicht in eine laufende
+  # pi-Sitzung.
+  defp guard_running_session([], _cfg, _opts), do: :ok
+
+  defp guard_running_session(_files, cfg, opts) do
+    if session_tmux_running?(cfg, opts),
+      do:
+        {:error,
+         "tmux-session '" <> @tmux_session <> "' läuft bereits; Dateiaufnahme nur bei neuem Start",
+         2},
+      else: :ok
+  end
+
+  defp session_tmux_running?(cfg, opts) do
+    case Map.get(opts, :tmux_running?) do
+      fun when is_function(fun, 0) ->
+        fun.()
+
+      _ ->
+        case System.find_executable("tmux") do
+          nil -> false
+          tmux -> tmux_session_running?(tmux, cfg)
+        end
+    end
+  end
+
+  defp session_header_without_files(cfg, opts) do
+    room_path = session_room_path(cfg, opts)
+
+    case StartContract.load(room_path, nil) do
+      {:ok, contract} ->
+        StartContract.header(contract)
+
+      {:error, reason} ->
+        [
+          "komki session — kein nutzbarer Startvertrag (room.json: " <> room_path <> ")",
+          "hinweis: " <>
+            reason <> " — Session ohne Dateien läuft; Dateiaufnahme braucht den Vertrag."
+        ]
+    end
+  end
+
+  defp plan_session_intake(cfg, files, opts) do
+    db = session_db(opts, cfg)
+    room_path = session_room_path(cfg, opts)
+
+    # Struktur und Zweck zuerst (kein DB-Zugriff ohne Vertrag), dann Γ aus
+    # dem Label-Store laden und den Vertrag gegen seine Bindungen pruefen.
+    with {:ok, _contract} <- load_session_contract(room_path, nil),
+         {:ok, compiled} <- SessionIntake.load_registry(db),
+         {:ok, contract} <- load_session_contract(room_path, compiled) do
+      intake_opts = %{
+        db: db,
+        room: contract,
+        compiled: compiled,
+        files: files,
+        base_dir: cfg.base_dir,
+        pi_home: cfg.pi_home,
+        decided_by: Map.get(opts, "decided-by") || contract.verantwortliche_person
+      }
+
+      case SessionIntake.plan(intake_opts) do
+        {:ok, intake} ->
+          {:session_plan, StartContract.header(contract) ++ SessionIntake.header(intake), intake}
+
+        {:refused, entries} ->
+          {:session_refused, StartContract.header(contract) ++ SessionIntake.entry_lines(entries),
+           entries}
+
+        {:error, reason} ->
+          {:error, reason, 2}
+      end
+    else
+      {:error, reason} -> {:error, reason, 2}
+    end
+  end
+
+  defp load_session_contract(room_path, compiled) do
+    case StartContract.load(room_path, compiled) do
+      {:ok, %{contract_hash: nil}} ->
+        {:error, StartContract.setup_remedy(room_path, "contract-Block fehlt")}
+
+      {:ok, contract} ->
+        case StartContract.validate_for_intake(contract) do
+          :ok -> {:ok, contract}
+          {:error, reason} -> {:error, StartContract.setup_remedy(room_path, reason)}
+        end
+
+      {:error, reason} ->
+        {:error, StartContract.setup_remedy(room_path, reason)}
+    end
+  end
+
+  defp stage_intake(intake) do
+    case SessionIntake.stage(intake) do
+      :ok -> :ok
+      {:error, reason} -> {:error, reason, 2}
+    end
+  end
+
+  # Der Vermittler liest room.json nur beim Start; neue Raumdokumente
+  # brauchen deshalb einen Neustart (neues Token, die Session startet pi
+  # ohnehin danach).
+  defp reload_mediator(cfg) do
+    _ = Mediator.down(cfg)
+
+    case Mediator.up(cfg) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, "Vermittler-Neustart nach der Aufnahme: " <> reason, 2}
+    end
+  end
+
+  defp session_room_path(cfg, opts) do
+    case Map.get(opts, "room") do
+      nil -> StartContract.default_path(cfg.base_dir)
+      path -> Config.canonical(path)
+    end
+  end
+
+  defp session_db(opts, cfg) do
+    case Map.get(opts, "db") do
+      nil -> Gamma.db_path(cfg)
+      path -> Config.canonical(path)
+    end
+  end
+
+  # Testnaht: `:config` ersetzt die geladene config.json.
+  defp session_cfg(opts) do
+    case Map.get(opts, :config) do
+      %Config{} = cfg -> cfg
+      _ -> load_cfg!()
+    end
   end
 
   defp execute_session(opts) do

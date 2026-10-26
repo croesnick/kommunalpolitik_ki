@@ -443,6 +443,46 @@ Erfolg (Exit 0) und Eingabefehler (Exit 2), kein Boot-Gate. RFC 0003 ist
 Draft und gibt ausdrücklich keine Freigabe für produktive Verarbeitung
 geschützter Daten; alle Bezeichner des Seeds sind synthetisch.
 
+## Dateien beim Session-Start aufnehmen (Ticket #92)
+
+`komki session DATEI …` holt Dateien als Raumdokumente in die Session. Was
+in den Raum darf, legt der **Startvertrag** fest, ein `contract`-Block in
+`<base>/mediator/room.json`:
+
+```json
+"contract": {
+  "bindings": ["vorlage-ausschuss@1"],
+  "auftrag": "Sitzungsvorbereitung Bauausschuss",
+  "verantwortliche_person": "nutzende-person",
+  "eingangsrechte": ["vorlage-radweg@v1"]
+}
+```
+
+`bindings` ist B_W, das Validierungslabel des Raums (R.5.4). `eingangsrechte`
+sind die Objekte, die hinein dürfen. Den Zweck liest komki aus
+`facts.purpose`, nicht aus dem Vertrag. Ohne Vertrag läuft eine Session ohne
+Dateien wie bisher; mit Dateien verweigert der Start und nennt die Felder.
+
+Je Datei:
+
+1. Über den Inhalts-Hash (`sha256:` im Label-Store, `komki label quarantine
+   --content-ref sha256:<hex>`) wird die Datei einem Objekt zugeordnet. Eine
+   unbekannte Datei kommt in Quarantäne, nie mit leerem Label.
+2. Die Engine entscheidet `admit` mit B_W gegen die Labels λ(x) des Objekts,
+   mit demselben Γ wie der Vermittler (Label-Store, #208). Ablehnungen tragen
+   den Remedy-Katalog.
+3. Nur wenn **alle** Dateien `permit` sind, legt komki sie als
+   `<base>/mediator/documents/<objekt>.md` ab, trägt jedes Objekt mit Typ
+   `document`, Version und Labels in `room.json` ein und startet den
+   Vermittler neu. Sonst endet der Start mit Exit 3, und nichts wird
+   abgelegt.
+
+pi liest die Dokumente danach nur über `admit_document`; der Vermittler
+entscheidet jede Aufnahme erneut, der Dokument-Connector liest (#169). Nur
+UTF-8-Text taugt als Raumdokument. Dateien aus dem pi-Home, dem Vermittler-
+Verzeichnis oder der Registry nimmt komki nicht an. Aufnahme gibt es nur bei
+einem neuen Start, nicht mit `--continue` und nicht in eine laufende Session.
+
 ## So sieht eine Session aus
 
 Aufgezeichnet aus einer echten Session: Der Prompt bittet um eine kleine
