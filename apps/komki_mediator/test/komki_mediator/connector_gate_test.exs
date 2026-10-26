@@ -187,13 +187,13 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert Map.take(with_secret, keys) == Map.take(without, keys)
   end
 
-  test "Fake meldet fremde Labels: redacted", %{env: env} do
-    fake(env, "vault", ok(note(["doc-vertraulich@1"])))
+  test "Fake meldet ein Label ausserhalb von Γ: redacted (#211)", %{env: env} do
+    fake(env, "vault", ok(note(["gibt-es-nicht@1"])))
 
     response = ConnectorGate.call(env, "vault_read", %{"note_id" => "a.md"})
 
     assert response["admitted"] == "redacted"
-    assert response["verify"] == ["label_not_importable"]
+    assert response["verify"] == ["label_not_in_gamma"]
     refute Map.has_key?(response, "content")
 
     [_emit, admit] = records(env)

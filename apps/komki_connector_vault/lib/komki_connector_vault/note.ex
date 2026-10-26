@@ -30,17 +30,17 @@ defmodule KomkiConnectorVault.Note do
   end
 
   @doc """
-  Gueltige Labels: nicht leere Liste, alle Eintraege in `allowed`.
+  Gueltige Labels: nicht leere Liste, jeder Eintrag erfuellt `label?`.
   Liefert die Labels sortiert und ohne Dubletten, sonst `:error`.
   """
-  @spec valid_labels(labels(), [String.t()]) :: {:ok, [String.t()]} | :error
-  def valid_labels([_ | _] = labels, allowed) do
-    if Enum.all?(labels, &(&1 in allowed)),
+  @spec valid_labels(labels(), (term() -> boolean())) :: {:ok, [String.t()]} | :error
+  def valid_labels([_ | _] = labels, label?) do
+    if Enum.all?(labels, label?),
       do: {:ok, labels |> Enum.uniq() |> Enum.sort()},
       else: :error
   end
 
-  def valid_labels(_labels, _allowed), do: :error
+  def valid_labels(_labels, _label?), do: :error
 
   # --- Frontmatter abtrennen -------------------------------------------------
 

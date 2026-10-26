@@ -169,15 +169,10 @@ defmodule KomkiConnector.Manifest do
       fs: [{"{vault_dir}", :read}, {"{vault_dir}/komki-test", :write}],
       credentials: %{},
       environment: "vault-lokal@1",
-      # Auch RIS- und Web-Labels: eine von komki geschriebene Notiz traegt
-      # lambda(y) = B_W (CONTRACT §6.3) und muss im selben Raum wieder lesbar
-      # sein. Welche Labels zugelassen werden, entscheidet weiter Gate 2.
-      import_labels: [
-        "ris-oeffentlich@1",
-        "vault-oeffentlich@1",
-        "vault-vertraulich@1",
-        "web-oeffentlich@1"
-      ]
+      # Leer: Vault-Notizen tragen ihre Labels selbst, und es gilt jede
+      # Bindung aus Γ (Gate 2 im Vermittler, Ticket #211). Eine von komki
+      # geschriebene Notiz traegt lambda(y) = B_W (CONTRACT §6.3).
+      import_labels: []
     }
   end
 
