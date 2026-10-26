@@ -605,6 +605,23 @@ allein bildet noch keinen solchen Arbeitsraum.
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
+In komki steht der Startvertrag als `contract`-Block in
+`<base>/mediator/room.json` (Ticket #92).
+
+---
+
+### Raumdokument
+
+**Definition:** Ein Dokument, das zum Arbeitsraum gehört: als Datei unter
+`<base>/mediator/documents/`, als Objekt mit Typ `document`, Version und
+Labels in `room.json`. pi liest es nur über `admit_document`; der Vermittler
+entscheidet jede Aufnahme, der Dokument-Connector liest die Datei. Neue
+Raumdokumente kommen über die Dateiaufnahme beim Session-Start
+(`komki session DATEI`, Ticket #92).
+
+**Siehe:** [Arbeitsraum und Startvertrag](#arbeitsraum-und-startvertrag),
+[Quarantäne](#quarantäne).
+
 ---
 
 ### Ereignis
