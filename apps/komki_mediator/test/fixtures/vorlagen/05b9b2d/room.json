@@ -1,0 +1,65 @@
+{
+  "documents_dir": "documents",
+  "environment": "lokaler-arbeitsraum@1",
+  "facts": {
+    "audit_path_ready": {
+      "source": "journal-verwaltung",
+      "source_kind": "technical",
+      "value": true
+    },
+    "environment_observers_complete": {
+      "source": "umgebungs-verwaltung",
+      "source_kind": "assumption",
+      "value": true
+    },
+    "has_object_access_right": {
+      "source": "objekt-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    "has_operation_right": {
+      "source": "rechte-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    "purpose": {
+      "source": "auftrags-verwaltung",
+      "source_kind": "administered",
+      "value": "offene-recherche"
+    }
+  },
+  "identity": "pi-agent",
+  "objects": {
+    "doc-oeffentlich": {
+      "labels": [
+        "doc-oeffentlich@1"
+      ],
+      "version": "v1"
+    },
+    "doc-pending-freigabe": {
+      "labels": [
+        "doc-pending-freigabe@1"
+      ],
+      "version": "v1"
+    },
+    "doc-vertraulich": {
+      "labels": [
+        "doc-vertraulich@1"
+      ],
+      "version": "v1"
+    },
+    "mediator-ping": {
+      "labels": [
+        "mediator-ping@1"
+      ],
+      "version": "v1"
+    }
+  },
+  "schema": "komki-mediator-room/1",
+  "workspace_bindings": [
+    "ris-oeffentlich@1",
+    "vault-oeffentlich@1",
+    "web-oeffentlich@1"
+  ],
+  "workspace_id": "ws-komki-arbeitsraum"
+}

@@ -112,7 +112,8 @@ defmodule KomkiMediator.Room do
 
   @doc """
   Objektbildung je Toolaufruf: `"ping"` → das Ping-Objekt,
-  `"admit_document"` → das Dokument aus `params["document_id"]`. Ein an
+  `"admit_document"` → das Dokument aus `params["document_id"]`, nur wenn
+  das Objekt den Typ `"document"` traegt (#134). Ein an
   `room.json` unbekanntes Objekt bleibt ein strukturierter Fehler, nicht
   ein Crash.
   """
@@ -120,8 +121,16 @@ defmodule KomkiMediator.Room do
           {:ok, Object.t()} | {:error, :unknown_object, String.t() | nil}
   def object_for_call(room, "ping", _params), do: entry(room, "mediator-ping")
 
+  # Werkzeug und Objekttyp sind gebunden (#134): admit_document loest nur
+  # Objekte vom Typ "document" auf. Alles andere, auch ein Objekt ohne Typ,
+  # endet wie ein unbekanntes Objekt, ohne Entscheidung der Engine.
   def object_for_call(room, "admit_document", params) do
-    entry(room, params["document_id"])
+    object_id = params["document_id"]
+
+    case room.objects[object_id] do
+      %{"type" => "document"} -> entry(room, object_id)
+      _ -> {:error, :unknown_object, object_id}
+    end
   end
 
   defp entry(room, object_id) do

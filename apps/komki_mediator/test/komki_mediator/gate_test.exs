@@ -205,6 +205,24 @@ defmodule KomkiMediator.GateTest do
     assert pdr["intent_hash"] =~ "sha256:"
   end
 
+  test "admit_document auf ein Nicht-Dokument (mediator-ping) -> unknown_object (#134)", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    test = self()
+
+    response =
+      Gate.call(env, "admit_document", %{"document_id" => "mediator-ping"}, fn ->
+        send(test, :executor_called)
+        {:error, :enoent}
+      end)
+
+    assert response["decision"] == "error"
+    assert response["detail"] == "unbekanntes Objekt: \"mediator-ping\""
+    refute_received :executor_called
+    assert [%{"outcome" => "not_admitted"}] = TestHelpers.journal_records(journal_path)
+  end
+
   # -----------------------------------------------------------------------
   # Tor 2 separat: Rueckhaltung bei verfaelschtem Beweis (Orakel)
   # -----------------------------------------------------------------------

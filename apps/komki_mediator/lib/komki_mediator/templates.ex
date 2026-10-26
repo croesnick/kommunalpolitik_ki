@@ -10,8 +10,9 @@ defmodule KomkiMediator.Templates do
   provision!/1 ist idempotent: sobald `registry.json` existiert, wird
   nichts ueberschrieben, was die nutzende Person veraendert haben koennte.
   Einzige Ausnahme (Ticket #177): Sind `registry.json` und `room.json`
-  byte-genau eine fruehere Fassung dieser Vorlagen (SHA-256 in
-  `@outdated`), ersetzt provision!/1 sie durch die aktuelle. Eine Sicherung
+  byte-genau eine fruehere oder die aktuelle Fassung dieser Vorlagen
+  (SHA-256 in `@outdated`, `@current`) und mindestens eine davon alt,
+  ersetzt provision!/1 sie durch die aktuelle. Eine Sicherung
   entfaellt bewusst: der Inhalt einer unveraenderten Vorlage steht
   vollstaendig im Git-Verlauf, und das Seatbelt-Profil des Vermittlers
   erlaubt nur genau diese beiden Dateinamen. Ist nur eine der beiden Dateien
@@ -28,17 +29,22 @@ defmodule KomkiMediator.Templates do
   @mediator_dir "mediator"
 
   # SHA-256 der kanonischen Vorlagen. @outdated: fruehere Fassungen auf main
-  # (#106 und #107 fuer die Registry, beide mit demselben Raum).
+  # (#106 und #107 fuer die Registry, beide mit demselben Raum; #134 nur
+  # fuer den Raum).
   @current %{
     "registry.json" => "38e86ed685b8887ddac4eb1976873b105fb1f272ce6c8ff67ac806370c8ecdf7",
-    "room.json" => "4b3ac34dc5ac6a81ea5cb81178cd1fea9f0045e753a079823aab98f6ea45fe32"
+    "room.json" => "e16da13d5a89a0cf48204c24a3e2ef5c5b13a4fa778949dc6a76fa2e89729298"
   }
   @outdated %{
     "registry.json" => [
       "fed48d30194094c6e84be239ef40bf74be88457b1aaec09cb3dce8b5bb090e4f",
       "d2b6a4e987036711a517a31dc40368dea82f7136b4213fbf9614cf290ba6d22f"
     ],
-    "room.json" => ["127831a737e7f5565d8def234c260ca270056b8954b346725f03ef638ef0b51f"]
+    "room.json" => [
+      "127831a737e7f5565d8def234c260ca270056b8954b346725f03ef638ef0b51f",
+      # 05b9b2d: Objekte noch ohne Typ (vor #134)
+      "4b3ac34dc5ac6a81ea5cb81178cd1fea9f0045e753a079823aab98f6ea45fe32"
+    ]
   }
 
   @observers ["brave-search", "nutzende-person", "pi-agent", "ris-betreiber"]
@@ -152,10 +158,23 @@ defmodule KomkiMediator.Templates do
         }
       },
       "objects" => %{
-        "mediator-ping" => %{"version" => "v1", "labels" => ["mediator-ping@1"]},
-        "doc-oeffentlich" => %{"version" => "v1", "labels" => ["doc-oeffentlich@1"]},
-        "doc-vertraulich" => %{"version" => "v1", "labels" => ["doc-vertraulich@1"]},
+        "mediator-ping" => %{
+          "type" => "ping",
+          "version" => "v1",
+          "labels" => ["mediator-ping@1"]
+        },
+        "doc-oeffentlich" => %{
+          "type" => "document",
+          "version" => "v1",
+          "labels" => ["doc-oeffentlich@1"]
+        },
+        "doc-vertraulich" => %{
+          "type" => "document",
+          "version" => "v1",
+          "labels" => ["doc-vertraulich@1"]
+        },
         "doc-pending-freigabe" => %{
+          "type" => "document",
           "version" => "v1",
           "labels" => ["doc-pending-freigabe@1"]
         }
@@ -210,8 +229,11 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
   defp migrate(mediator_dir) do
     states = Map.new(["registry.json", "room.json"], &{&1, state(mediator_dir, &1)})
 
+    # Ersetzt wird, wenn jede Datei aktuell oder eine unveraenderte alte
+    # Vorlage ist und mindestens eine alt (#134: nur room.json neu).
     cond do
-      Enum.all?(states, fn {_file, state} -> state == :outdated end) ->
+      Enum.all?(states, fn {_file, state} -> state in [:outdated, :current] end) and
+          Enum.any?(states, fn {_file, state} -> state == :outdated end) ->
         write_templates(mediator_dir)
         {:migrated, "unveraenderte Vorlagen einer frueheren Fassung"}
 
