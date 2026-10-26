@@ -61,18 +61,19 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
    ```
 
    ```text frame="terminal" title="Das siehst du"
-   Werkzeuge   ok (llama-server, node, pi, Erlang (escript), komki-mediator, komki-egress, komki-connector-ris, komki-connector-vault, komki-connector-web)
+   Werkzeuge   ok (llama-server, node, pi, Erlang (escript), komki-mediator, komki-egress, komki-connector-documents, komki-connector-ris, komki-connector-vault, komki-connector-web)
    Vault       Test-Vault mit 11 erfundenen Notizen unter ~/.local/share/komki/vault
    Instanz     wird angelegt unter ~/.local/share/komki (prüft das Modell, etwa 30 s)
    Instanz     angelegt
    brave       ok (Schlüsselbund-Eintrag 'brave-search-api')
    Start       llama, Egress, Connectoren und Vermittler (beim ersten Mal bis zu einer Minute)
-   llama up: pid 14861 (health 200)
-   egress up: pid 14918
-   connector-ris up: pid 14949
-   connector-vault up: pid 14980
-   connector-web up: pid 15012
-   mediator up: pid 15043 (tools: ping, admit_document, ris_search, ris_show, vault_read, vault_search, vault_write_test, web_search)
+   llama up: pid 13796 (health 200)
+   egress up: pid 13900
+   connector-documents up: pid 13939
+   connector-ris up: pid 13977
+   connector-vault up: pid 14012
+   connector-web up: pid 14052
+   mediator up: pid 14092 (tools: ping, admit_document, ris_search, ris_show, vault_read, vault_search, vault_write_test, web_search)
    Prüfung     doctor ok
 
    Fertig. Probier zum Beispiel:
@@ -185,7 +186,7 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
    ```
 
    ```text frame="terminal" title="Das siehst du (Anfang)"
-   Werkzeuge   ok (llama-server, node, pi, Erlang (escript), komki-mediator, komki-egress, komki-connector-ris, komki-connector-vault, komki-connector-web)
+   Werkzeuge   ok (llama-server, node, pi, Erlang (escript), komki-mediator, komki-egress, komki-connector-documents, komki-connector-ris, komki-connector-vault, komki-connector-web)
    Instanz     vorhanden: ~/.local/share/komki (unverändert)
    Vault       ~/Documents/MeinVault (nur Notizen mit komki_labels sind für komki sichtbar)
    Vault       gewechselt; komki startet neu
@@ -207,7 +208,7 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
    Zurück zum Test-Vault geht es mit `komki setup --demo`.
 
    <Aside type="caution">
-   Schreiben darf komki auch in deinem Vault: nur in den Ordner `komki-test/`, nie in bestehende Notizen. Eine Bestätigung vor jedem Schreiben kommt noch ([#98](https://github.com/croesnick/kommunalpolitik_ki/issues/98)). Wenn dich das stört, probiere zuerst mit einer Kopie deines Vaults.
+   Schreiben darf komki auch in deinem Vault: nur in den Ordner `komki-test/`, nie in bestehende Notizen. Eine Bestätigung vor jedem Schreiben gibt es noch nicht ([#205](https://github.com/croesnick/kommunalpolitik_ki/issues/205)). Wenn dich das stört, probiere zuerst mit einer Kopie deines Vaults.
    </Aside>
 
 7. ### Nachvollziehen, stoppen, aktualisieren
@@ -226,16 +227,17 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
    Was gerade läuft, zeigt `komki status`:
 
    ```text frame="terminal" title="Das siehst du"
-   base:          ~/.local/share/komki
-   gguf:          ~/.local/share/komki/models/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
-   port:          49600
-   mediator-sock: ~/.local/share/komki/run/mediator.sock
-   llama:         running (pid 14861)
-   egress:          running (pid 14918)
-   connector-ris:   running (pid 14949)
-   connector-vault: running (pid 14980)
-   connector-web:   running (pid 15012)
-   mediator:      running (pid 15043)
+   base:                ~/.local/share/komki
+   gguf:                ~/.local/share/komki/models/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
+   port:                49524
+   mediator-sock:       ~/.local/share/komki/run/mediator.sock
+   llama:               running (pid 13796)
+   egress:              running (pid 13900)
+   connector-documents: running (pid 13939)
+   connector-ris:       running (pid 13977)
+   connector-vault:     running (pid 14012)
+   connector-web:       running (pid 14052)
+   mediator:            running (pid 14092)
    ```
 
    Wenn du fertig bist, stoppt `komki down` alles, was komki gestartet hat, auch llama. Der Arbeitsspeicher des Modells ist danach wieder frei.
