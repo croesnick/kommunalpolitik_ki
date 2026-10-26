@@ -118,7 +118,7 @@ defmodule KomkiCli.MixProject do
     [
       {:optimus, "~> 0.6"},
       {:burrito, "~> 1.6"},
-      {:exqlite, "~> 0.42"},
+      {:exqlite, "~> 0.43"},
       {:komki_policy, path: "../komki_policy"},
       # Connector-Manifeste und Frame-Client (Ticket #146): Profilgenerator,
       # Start-Argumente und der ping im Doctor lesen dasselbe Modul wie der
