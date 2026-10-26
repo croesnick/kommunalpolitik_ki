@@ -39,7 +39,7 @@ defmodule KomkiCli.Mediator do
   Signale — macOS-taugliche Self-Defense gegen pidfile-Wiederverwendung).
   """
 
-  alias KomkiCli.{Channel, Config, MediatorProfile, Proc, Profile}
+  alias KomkiCli.{Channel, Config, Gamma, MediatorProfile, Proc, Profile}
 
   @health_timeout_ms 10_000
   # Vermittler-Boot ist schnell (escript, keine 17-GB-GGUF): kuerzerer
@@ -55,20 +55,33 @@ defmodule KomkiCli.Mediator do
           | {:ok, {:already, health()}}
           | {:error, String.t()}
   def up(%Config{} = cfg) do
-    case fetch_health(cfg) do
-      {:ok, "200", health} ->
-        # Laufender Vermittler mit dem aktuellen Token: kein Neustart, das
-        # Token bleibt (ein neues wuerde ihn aussperren).
-        {:ok, {:already, health}}
+    # Γ aus dem Label-Store (Ticket #208) vor jedem Start; hat sich der
+    # Export geaendert, darf ein laufender Vermittler nicht mit dem alten Γ
+    # weiterentscheiden.
+    with gamma when gamma in [:unchanged, :written] <- Gamma.sync(cfg) do
+      case fetch_health(cfg) do
+        {:ok, "200", health} when gamma == :unchanged ->
+          # Laufender Vermittler mit dem aktuellen Token: kein Neustart, das
+          # Token bleibt (ein neues wuerde ihn aussperren).
+          {:ok, {:already, health}}
 
-      _ ->
-        # Kein Token, falsches Token oder stiller Socket: neues Token, dann
-        # Spawn-Versuch. Bedient ein anderer Prozess den Socket, verweigert
-        # der Vermittler den Start; das faellt am Health-Poll auf.
-        with :ok <- Channel.check_socket_path(cfg) do
-          Channel.write_token!(cfg)
-          spawn_mediator(cfg)
-        end
+        {:ok, "200", _health} ->
+          _ = down(cfg)
+          fresh_start(cfg)
+
+        _ ->
+          fresh_start(cfg)
+      end
+    end
+  end
+
+  # Kein Token, falsches Token oder stiller Socket: neues Token, dann
+  # Spawn-Versuch. Bedient ein anderer Prozess den Socket, verweigert der
+  # Vermittler den Start; das faellt am Health-Poll auf.
+  defp fresh_start(cfg) do
+    with :ok <- Channel.check_socket_path(cfg) do
+      Channel.write_token!(cfg)
+      spawn_mediator(cfg)
     end
   end
 

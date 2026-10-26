@@ -42,8 +42,19 @@ defmodule KomkiMediator.GammaTest do
 
   # Relaxationsbefugnisse stehen nur im rohen Registry-Term; der Zugriff
   # laeuft als Oeffnung ueber Gamma statt als Grab im Term fremden Modulen.
+  # Die Vorlage traegt seit #208 keine Befugnis mehr (Store-Export bis #109
+  # fail-closed); der Zugriff wird an einem eigenen Registry-Term geprueft.
   test "relaxation_authorities liest die Befugnis aus dem rohen Registry-Term", %{base: base} do
-    {:ok, gamma} = Gamma.load(Path.join([base, "mediator", "registry.json"]))
+    path = Path.join([base, "mediator", "registry.json"])
+    {:ok, term} = KomkiPolicy.JSON.parse(File.read!(path))
+
+    term =
+      put_in(term, ["bindings", "doc-pending-freigabe@1", "relaxation_authorities"], [
+        "nutzende-person"
+      ])
+
+    File.write!(path, KomkiPolicy.JSON.canonical(term))
+    {:ok, gamma} = Gamma.load(path)
 
     assert Gamma.relaxation_authorities(gamma, "doc-pending-freigabe@1") == ["nutzende-person"]
   end

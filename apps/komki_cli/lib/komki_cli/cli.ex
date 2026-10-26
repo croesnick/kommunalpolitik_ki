@@ -930,7 +930,8 @@ defmodule KomkiCli.CLI do
        to_string(counts.observers) <>
        " Beobachter, " <>
        to_string(counts.fact_fields) <>
-       " Fakt-Feld(er) neu\n", 0}
+       " Fakt-Feld(er) neu\n" <>
+       "Der Vermittler übernimmt die Änderung beim nächsten 'komki up' (Ticket #208).\n", 0}
   end
 
   defp render({:label_quarantine, state}),

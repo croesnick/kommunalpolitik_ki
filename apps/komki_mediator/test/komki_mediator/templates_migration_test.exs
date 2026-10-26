@@ -65,16 +65,24 @@ defmodule KomkiMediator.TemplatesMigrationTest do
     assert Templates.provision!(base) == :already_provisioned
   end
 
-  test "alte Registry, aber veraenderter Raum: Abbruch mit Erklaerung, nichts ueberschrieben" do
+  test "je Datei (#208): alte Registry wird ersetzt, eigener Raum bleibt" do
     {base, dir} = base_with("d9159ec", "d9159ec")
     room_path = Path.join(dir, "room.json")
     File.write!(room_path, File.read!(room_path) <> " ")
-    before = {File.read!(Path.join(dir, "registry.json")), File.read!(room_path)}
+    own_room = File.read!(room_path)
 
-    assert {:error, detail} = Templates.provision!(base)
-    assert detail =~ "registry.json ist eine unveraenderte alte Vorlage"
-    assert detail =~ "room.json wurde veraendert"
-    assert {File.read!(Path.join(dir, "registry.json")), File.read!(room_path)} == before
+    assert {:migrated, detail} = Templates.provision!(base)
+    assert detail =~ "registry.json"
+    refute detail =~ "room.json"
+    assert File.read!(Path.join(dir, "registry.json")) == JSON.canonical(Templates.registry())
+    assert File.read!(room_path) == own_room
+  end
+
+  test "Seed und Registry: die Projektion entspricht dem Engine-Schema" do
+    assert {:ok, _} = KomkiPolicy.Registry.compile(Templates.registry())
+    seed = Templates.label_store_seed()
+    assert seed["schema"] == "komki-label-store/2"
+    assert Map.keys(seed["bindings"]) == Map.keys(Templates.registry()["bindings"])
   end
 
   test "beide Dateien eigen (weder aktuell noch alt): bleiben unberuehrt" do
