@@ -20,10 +20,10 @@ defmodule KomkiConnectorVault.Writer do
   @max_attempts 100
 
   @doc "Legt die Notiz an; liefert `note_id` und `labels`."
-  @spec write(Path.t(), map(), map(), [String.t()]) ::
+  @spec write(Path.t(), map(), map(), (term() -> boolean())) ::
           {:ok, map()} | {:error, String.t(), String.t()}
-  def write(root, %{"title" => title, "body" => body}, context, allowed) do
-    with {:ok, labels} <- assigned(context, allowed),
+  def write(root, %{"title" => title, "body" => body}, context, label?) do
+    with {:ok, labels} <- assigned(context, label?),
          {:ok, dir} <- test_dir(root) do
       now = DateTime.truncate(DateTime.utc_now(), :second)
       base = Date.to_iso8601(DateTime.to_date(now)) <> "-" <> slug(title)
@@ -35,13 +35,13 @@ defmodule KomkiConnectorVault.Writer do
     end
   end
 
-  defp assigned(%{"assigned_label" => [_ | _] = labels}, allowed) do
-    if Enum.all?(labels, &(is_binary(&1) and &1 in allowed)),
+  defp assigned(%{"assigned_label" => [_ | _] = labels}, label?) do
+    if Enum.all?(labels, label?),
       do: {:ok, labels},
       else: forbidden("assigned_label nicht in den Import-Labels")
   end
 
-  defp assigned(_context, _allowed), do: forbidden("assigned_label fehlt oder ist leer")
+  defp assigned(_context, _label?), do: forbidden("assigned_label fehlt oder ist leer")
 
   defp test_dir(root) do
     dir = Path.join(root, @dir)

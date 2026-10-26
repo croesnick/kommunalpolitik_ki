@@ -4,7 +4,8 @@ defmodule KomkiConnectorVault do
   Suchen in einem lokalen Markdown-Vault, Schreiben nur in den Testordner.
 
   Sichtbar sind nur Notizen mit gueltigem Frontmatter-Feld `komki_labels`
-  (nicht leer, alle Eintraege in `import_labels` des Manifests). Alle
+  (nicht leer, jeder Eintrag in der Form einer Bindungs-ID `kennung@version`).
+  Welche Labels gelten, entscheidet der Vermittler gegen Γ (Ticket #211). Alle
   anderen Notizen sind unsichtbar: nicht in `search`, `read` liefert
   `not-found`. Der Connector liefert oeffentliche und vertrauliche Notizen
   gleichermassen samt Labels — filtern tut der Vermittler (Gate 2).
@@ -43,11 +44,15 @@ defmodule KomkiConnectorVault do
   def handle_op("read", %{"note_id" => note_id}, _context, state), do: read(state.root, note_id)
 
   def handle_op("write_test", params, context, state),
-    do: Writer.write(state.root, params, context, allowed_labels())
+    do: Writer.write(state.root, params, context, &label?/1)
 
-  @doc "Import-Labels aus dem Manifest — die einzige erlaubte Label-Menge."
-  @spec allowed_labels() :: [String.t()]
-  def allowed_labels, do: Manifest.fetch!("vault").import_labels
+  @doc """
+  Form einer Bindungs-ID (`kennung@version`). Ob ein Label gilt, prueft der
+  Vermittler gegen Γ (Gate 2, Ticket #211); der Connector kennt Γ nicht.
+  """
+  @spec label?(term()) :: boolean()
+  def label?(label),
+    do: is_binary(label) and Regex.match?(~r/\A[a-z0-9]+(?:-[a-z0-9]+)*@[1-9][0-9]*\z/, label)
 
   # --- search ----------------------------------------------------------------
 
@@ -129,7 +134,7 @@ defmodule KomkiConnectorVault do
          {:ok, text} <- read_text(path) do
       note = Note.parse(text, Path.basename(note_id, ".md"))
 
-      case Note.valid_labels(note.labels, allowed_labels()) do
+      case Note.valid_labels(note.labels, &label?/1) do
         {:ok, labels} -> {:ok, note, labels}
         :error -> not_found()
       end

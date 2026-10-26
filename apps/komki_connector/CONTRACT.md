@@ -103,7 +103,7 @@ Einzige Quelle für Fassung, Operationen, Netz, Dateisystem, Credentials und Imp
 | `fs` | Platzhalter-Pfade (`{vault_dir}`, `{documents_dir}` = `<base>/mediator/documents`) mit Modus `read` oder `write` |
 | `credentials` | Name → Keychain-Service (`security find-generic-password -s <service> -w`) |
 | `environment` | Umgebung für `emit` (modellierte Empfänger der Anfrage), z. B. `web-suche@1` |
-| `import_labels` | erlaubte Labels für Antworten. Bei RIS und Web genau eines, bei Vault eine Menge, aus der die Notiz wählt. Vault umfasst alle vier Bindungen, weil geschriebene Notizen λ(y) = B_W tragen (§6.3) und im selben Raum wieder lesbar sein müssen |
+| `import_labels` | erlaubte Labels für Antworten. Bei RIS und Web genau eines. Bei Vault leer: die Notiz trägt ihre Labels im Frontmatter, und der Vermittler lässt jede Bindung aus Γ zu (Ticket #211); der Connector prüft nur die Form einer Bindungs-ID. Geschriebene Notizen tragen λ(y) = B_W (§6.3) |
 
 Parameter-Schemas sind geschlossen: Typ `string` (mit `max` Zeichen und optional `pattern`) oder `integer`
 (mit `min`/`max`). Unbekannte Felder sind ein Fehler. Kein Parameter nimmt eine URL, einen absoluten Pfad
@@ -161,8 +161,8 @@ Jeder Connector-Aufruf besteht aus **zwei Entscheidungen** der Engine und **zwei
 
 1. Connector-Antwort gegen die Ergebnisform §5.2 prüfen. Bei Verstoß: zurückhalten (`redacted`).
 2. Labels vergeben: RIS und Web bekommen fest `import_labels` des Manifests. Bei Vault gelten die Labels der
-   Notiz, die ⊆ `import_labels` sein müssen, sonst `redacted`. **Die Selbstauskunft des Connectors wird nie
-   über das Manifest hinaus geglaubt.**
+   Notiz, die Bindungen aus Γ sein müssen, sonst `redacted` (Ticket #211). **Die Selbstauskunft des
+   Connectors wird nie über Manifest und Γ hinaus geglaubt.**
    **Suchoperationen** (`vault.search`): Treffer, deren Labels nicht ⊆ B_W sind, fallen vor der Entscheidung
    still heraus. Sonst wäre „deny“ gegenüber „permit, 0 Treffer“ ein Existenz-Orakel für vertrauliche Inhalte
    (Labbook L-109). Einzelzugriffe (`read`) bleiben eine Entscheidung mit Remedies.

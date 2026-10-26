@@ -16,7 +16,7 @@ defmodule KomkiMediator.ConnectorGate do
     `<connectors_dir>/<id>.sock`. Bei schreibenden Operationen geht
     `context.assigned_label` (= B_W) mit.
   * Gate 2 (`admit`): Ergebnisform (§5.2), Labels allein aus dem Manifest
-    (Vault: Labels der Notiz ⊆ `import_labels`; `write_test`:
+    (Vault: Labels der Notiz ⊆ Bindungen aus Γ, #211; `write_test`:
     zurueckgemeldete Labels = `assigned_label`), Objekt `in-<digest12>` in
     `room.environment`, `Derive.decide` und `Verify.check`. Danach der
     admit-PDR mit derselben `call_id`.
@@ -271,9 +271,9 @@ defmodule KomkiMediator.ConnectorGate do
 
   defp admit(env, call, call_id, emit_decision, result) do
     with :ok <- shape(call, result),
-         {:ok, _labels} <- labels(call, emit_decision, result),
+         {:ok, _labels} <- labels(env, call, emit_decision, result),
          result = visible(call, env.room, result),
-         {:ok, labels} <- labels(call, emit_decision, result) do
+         {:ok, labels} <- labels(env, call, emit_decision, result) do
       d12 = Hash.digest12(PDR.payload_hash(result))
       object = %Object{object_id: "in-" <> d12, version: "v1", labels: labels}
 
@@ -319,8 +319,8 @@ defmodule KomkiMediator.ConnectorGate do
     end
   end
 
-  # Labels allein aus dem Manifest (§6.2.2, §6.3).
-  defp labels(%{kind: :write}, emit_decision, result) do
+  # Labels aus dem Manifest (RIS, Web) oder aus Γ (Vault, #211): §6.2.2, §6.3.
+  defp labels(_env, %{kind: :write}, emit_decision, result) do
     assigned = emit_decision["assigned_label"]
 
     if Enum.sort(result["labels"]) == assigned,
@@ -328,22 +328,26 @@ defmodule KomkiMediator.ConnectorGate do
       else: {:redact, "zurueckgemeldete Labels weichen von assigned_label ab", ["label_mismatch"]}
   end
 
-  defp labels(%{manifest: %{id: "vault"} = manifest, op: op}, _emit_decision, result) do
+  # Vault-Notizen tragen ihre Labels selbst (Frontmatter). Seit Γ aus dem
+  # Label-Store kommt (#208), gilt jede Bindung aus Γ; ein Label ausserhalb
+  # haelt die Antwort zurueck (Ticket #211).
+  defp labels(env, %{manifest: %{id: "vault"}, op: op}, _emit_decision, result) do
     notes =
       if op == "search", do: Enum.map(result["results"], & &1["labels"]), else: [result["labels"]]
 
-    if Enum.all?(notes, &note_labels_ok?(&1, manifest.import_labels)),
+    bindings = Map.keys(env.gamma.term["bindings"])
+
+    if Enum.all?(notes, &note_labels_ok?(&1, bindings)),
       do: {:ok, notes |> List.flatten() |> Enum.uniq() |> Enum.sort()},
-      else: {:redact, "Labels der Notiz ausserhalb der import_labels", ["label_not_importable"]}
+      else: {:redact, "Labels der Notiz ausserhalb von Γ", ["label_not_in_gamma"]}
   end
 
-  defp labels(%{manifest: manifest}, _emit_decision, _result),
+  defp labels(_env, %{manifest: manifest}, _emit_decision, _result),
     do: {:ok, Enum.sort(manifest.import_labels)}
 
-  # Eine Notiz traegt mindestens ein Label, und alle stammen aus den
-  # import_labels des Manifests.
-  defp note_labels_ok?(labels, import_labels),
-    do: labels != [] and Enum.all?(labels, &(&1 in import_labels))
+  # Eine Notiz traegt mindestens ein Label, und alle sind Bindungen aus Γ.
+  defp note_labels_ok?(labels, bindings),
+    do: labels != [] and Enum.all?(labels, &(&1 in bindings))
 
   defp verify(env, call, call_id, result, labels, decision, snapshot, intent) do
     case Verify.check(env.gamma.compiled, snapshot, intent, decision["proof"]) do

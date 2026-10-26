@@ -60,7 +60,10 @@ defmodule KomkiConnectorVault.ConnectorTest do
       big = note([@oeff], "Bahnhofstraße " <> String.duplicate("x", 1_100_000))
       File.write!(Path.join(vault, "Projekte/Gross.md"), big)
 
+      # "Falsches Label" traegt ein unbekanntes, aber korrekt geformtes Label:
+      # der Connector reicht es weiter, der Vermittler haelt es zurueck (#211).
       assert search_ids(sock, "bahnhofstraße") == [
+               "Eingang/Falsches Label.md",
                "Presse/Leserbrief Bahnhofstraße.md",
                "Projekte/Verkehr/Radverkehrskonzept.md",
                "Sitzungen/2026-09-17 Bauausschuss.md",
@@ -149,10 +152,16 @@ defmodule KomkiConnectorVault.ConnectorTest do
                call(sock, "read", %{"note_id" => "Sitzungen/Notizen Haushalt.md"})
     end
 
-    test "ohne Label, ungueltiges Label und fehlende Datei ergeben not-found", %{sock: sock} do
-      for id <- ["Eingang/Ohne Label.md", "Eingang/Falsches Label.md", "Eingang/Gibtsnicht.md"] do
+    test "ohne Label und fehlende Datei ergeben not-found", %{sock: sock} do
+      for id <- ["Eingang/Ohne Label.md", "Eingang/Gibtsnicht.md"] do
         assert error_code(call(sock, "read", %{"note_id" => id})) == "not-found"
       end
+    end
+
+    # Ob ein Label gilt, entscheidet der Vermittler gegen Γ (#211).
+    test "unbekanntes, korrekt geformtes Label reicht der Connector weiter", %{sock: sock} do
+      assert {:ok, %{"labels" => ["vault-geheim@1", "vault-oeffentlich@1"]}} =
+               call(sock, "read", %{"note_id" => "Eingang/Falsches Label.md"})
     end
 
     test "Verzeichnis und grosse Datei ergeben not-found", %{sock: sock, vault: vault} do
@@ -302,8 +311,8 @@ defmodule KomkiConnectorVault.ConnectorTest do
       for ctx <- [
             %{},
             %{"assigned_label" => []},
-            %{"assigned_label" => ["vault-geheim@1"]},
-            %{"assigned_label" => [@oeff, "doc-vertraulich@1"]},
+            %{"assigned_label" => ["Vault Geheim"]},
+            %{"assigned_label" => [@oeff, "vault-geheim"]},
             %{"assigned_label" => @oeff},
             %{"assigned_label" => [1]}
           ] do

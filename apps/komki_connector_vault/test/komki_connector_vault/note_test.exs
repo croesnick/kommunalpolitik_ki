@@ -32,17 +32,23 @@ defmodule KomkiConnectorVault.NoteTest do
     assert labels("---\nx:\n  komki_labels: [a]\n---\n") == :missing
   end
 
-  test "valid_labels: nicht leer, Teilmenge, sortiert ohne Dubletten" do
-    assert Note.valid_labels(["vault-vertraulich@1", "vault-oeffentlich@1"], @allowed) ==
-             {:ok, @allowed}
+  # Seit #211 prueft der Connector nur die Form einer Bindungs-ID; welche
+  # Labels gelten, entscheidet der Vermittler gegen Γ.
+  test "valid_labels: nicht leer, Form einer Bindungs-ID, sortiert ohne Dubletten" do
+    label? = &KomkiConnectorVault.label?/1
 
-    assert Note.valid_labels(["vault-oeffentlich@1", "vault-oeffentlich@1"], @allowed) ==
+    assert Note.valid_labels(["vault-vertraulich@1", "vault-oeffentlich@1"], label?) ==
+             {:ok, ["vault-oeffentlich@1", "vault-vertraulich@1"]}
+
+    assert Note.valid_labels(["vault-oeffentlich@1", "vault-oeffentlich@1"], label?) ==
              {:ok, ["vault-oeffentlich@1"]}
 
-    assert Note.valid_labels([], @allowed) == :error
-    assert Note.valid_labels(["vault-oeffentlich@1", "x"], @allowed) == :error
-    assert Note.valid_labels(:missing, @allowed) == :error
-    assert Note.valid_labels(:invalid, @allowed) == :error
+    assert Note.valid_labels(["vorlage-nichtoeffentlich@1"], label?) ==
+             {:ok, ["vorlage-nichtoeffentlich@1"]}
+
+    assert Note.valid_labels([], label?) == :error
+    assert Note.valid_labels(["Vault Geheim"], label?) == :error
+    assert Note.valid_labels(["vault-geheim"], label?) == :error
   end
 
   test "Titel: Frontmatter, Ueberschrift, Dateiname" do
