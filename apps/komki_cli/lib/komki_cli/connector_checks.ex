@@ -95,7 +95,7 @@ defmodule KomkiCli.ConnectorChecks do
     egress = if Connectors.egress_needed?(cfg), do: [{"komki-egress", cfg.egress_bin}], else: []
 
     connectors =
-      Enum.map(Connectors.enabled(cfg), &{&1.binary, Map.get(cfg.connector_bins, &1.id)})
+      Enum.map(Connectors.enabled(cfg), &{&1.binary, Connectors.binary(cfg, &1.id)})
 
     Enum.map(egress ++ connectors, fn
       {name, nil} ->

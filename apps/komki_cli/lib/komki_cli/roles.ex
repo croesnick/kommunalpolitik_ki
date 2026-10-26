@@ -15,6 +15,7 @@ defmodule KomkiCli.Roles do
   @roles %{
     "komki-mediator" => KomkiMediator.CLI,
     "komki-egress" => KomkiEgress.CLI,
+    "komki-connector-documents" => KomkiConnectorDocuments.CLI,
     "komki-connector-ris" => KomkiConnectorRis.CLI,
     "komki-connector-web" => KomkiConnectorWeb.CLI,
     "komki-connector-vault" => KomkiConnectorVault.CLI

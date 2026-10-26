@@ -140,7 +140,7 @@ defmodule KomkiCli.ConfigTest do
       assert cfg.vault_dir == Path.join(cfg.base_dir, "vault")
       assert Config.ris_url(cfg) == "https://risapi1.komuna.net/web/"
       refute Config.ris_mock?(cfg)
-      assert Map.keys(cfg.connector_bins) == ["ris", "vault", "web"]
+      assert Map.keys(cfg.connector_bins) == ["documents", "ris", "vault", "web"]
     end
 
     test "Overrides: Mock-Port schaltet die URL um, leerer vault_dir schaltet ab" do

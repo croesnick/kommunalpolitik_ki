@@ -833,22 +833,26 @@ defmodule KomkiCli.CLI do
 
   defp render(
          {:status, cfg, %{llama: llama_state, connectors: connectors, mediator: mediator_state}}
-       ),
-       do:
-         {Enum.join(
-            [
-              "base:          " <> cfg.base_dir,
-              "gguf:          " <> cfg.gguf_path,
-              "port:          " <> to_string(cfg.port),
-              "mediator-sock: " <> KomkiCli.Channel.socket_path(cfg),
-              "llama:         " <> state_line(llama_state, "/health")
-            ] ++
-              Enum.map(connectors, fn {name, state} ->
-                String.pad_trailing(name <> ":", 17) <> state_line(state, "")
-              end) ++
-              ["mediator:      " <> state_line(mediator_state, "/healthz")],
-            "\n"
-          ) <> "\n", 0}
+       ) do
+    rows =
+      [
+        {"base", cfg.base_dir},
+        {"gguf", cfg.gguf_path},
+        {"port", to_string(cfg.port)},
+        {"mediator-sock", KomkiCli.Channel.socket_path(cfg)},
+        {"llama", state_line(llama_state, "/health")}
+      ] ++
+        Enum.map(connectors, fn {name, state} -> {name, state_line(state, "")} end) ++
+        [{"mediator", state_line(mediator_state, "/healthz")}]
+
+    # Eine Spalte fuer alle Werte, so breit wie die laengste Bezeichnung
+    # (connector-documents, #169).
+    width = rows |> Enum.map(fn {label, _} -> String.length(label) end) |> Enum.max()
+
+    {Enum.map_join(rows, "", fn {label, value} ->
+       String.pad_trailing(label <> ":", width + 2) <> value <> "\n"
+     end), 0}
+  end
 
   # pi-Ausgabe ist Modell-Output: nie roh aufs Terminal (Ticket #132).
   defp render({:run_ok, scratch, out}),

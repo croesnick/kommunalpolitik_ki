@@ -114,7 +114,8 @@ defmodule KomkiConnector.ProtocolTest do
   test "Manifeste: Tools eindeutig, by_tool, keine URL- oder Host-Parameter" do
     tools = Manifest.tools()
     assert tools == Enum.uniq(tools)
-    assert length(tools) == 6
+    assert length(tools) == 7
+    assert {:ok, %{id: "documents"}, "read"} = Manifest.by_tool("admit_document")
     assert {:ok, %{id: "vault"}, "write_test"} = Manifest.by_tool("vault_write_test")
     assert :error = Manifest.by_tool("exec")
 

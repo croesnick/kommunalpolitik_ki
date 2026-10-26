@@ -58,7 +58,7 @@ als Bild:
   Datei- und Netzweg laeuft durch Gate 1 und Gate 2. Sein Seatbelt-Profil erlaubt
   Netz-Auswaerts nur zum llama-Port und zum Socket-Pfad des Vermittlers.
   Auf pi-Seite heissen die Tools `mcp__komki__<tool>`.
-  Drittens die Connectoren (RIS, Web, Vault): je ein eigener Prozess mit
+  Drittens die Connectoren (Dokumente, RIS, Web, Vault): je ein eigener Prozess mit
   Unix-Socket `<connectors_dir>/<id>.sock` (Default `<base>/run/connectors`,
   einstellbar mit `--connectors-dir`). Der Vermittler ruft sie nur nach
   einem emit-Permit und nur ueber das Frame-Protokoll
@@ -247,7 +247,7 @@ Aufruf hier ist Entwicklung und Debugging vorbehalten.
 | Tool | Ablauf | Parameter |
 |---|---|---|
 | `ping` | Gate (admit) | — |
-| `admit_document` | Gate (admit) | `document_id` |
+| `admit_document` | Gate (admit), Vollzug im Connector `documents` (#169) | `document_id` (max 64, `^[a-z0-9-]+$`) |
 | `ris_search` | ConnectorGate, Connector `ris` | `text` (max 200), `limit` (1..20, Default 10) |
 | `ris_show` | ConnectorGate, Connector `ris` | `top_id` (max 64, `^[A-Za-z0-9_-]+$`) |
 | `vault_read` | ConnectorGate, Connector `vault` | `note_id` (max 200, relativer `.md`-Pfad) |

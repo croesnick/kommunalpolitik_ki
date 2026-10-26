@@ -53,8 +53,12 @@
 (allow file-read-data (literal "/dev/autofs_nowait"))
 ; Log (stderr-Redirect; Write-Scope genau diese Datei)
 (allow file-read* file-write* (literal "/opt/komki-golden/tmp/mediator.log"))
-; Raum lesen (registry.json, room.json, documents)
-(allow file-read* (subpath "/opt/komki-golden/mediator"))
+; Raum lesen (registry.json, room.json). Die Dokumente liest der
+; Dokument-Connector (Ticket #169); hier nur Metadaten fuer die
+; Erstprovisionierung, keine Inhalte.
+(allow file-read* (literal "/opt/komki-golden/mediator") (literal "/opt/komki-golden/mediator/registry.json") (literal "/opt/komki-golden/mediator/room.json"))
+(allow file-read-metadata (subpath "/opt/komki-golden/mediator/documents"))
+(allow file-read* (subpath "/opt/komki-golden/mediator/journal") (subpath "/opt/komki-golden/mediator/go"))
 ; Journal: anhaengen und uappnd setzen (Ticket #139)
 (allow file-write* (subpath "/opt/komki-golden/mediator/journal"))
 (allow process-exec (literal "/usr/bin/chflags"))
@@ -71,6 +75,7 @@
 (allow network-inbound (local unix-socket (path-literal "/opt/komki-golden/run/mediator.sock")))
 (allow file-read* (literal "/opt/komki-golden/run/mediator.token"))
 ; Connector-Sockets (Frame-Protokoll, CONTRACT.md §3) — einziges Outbound
+(allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/documents.sock")))
 (allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/ris.sock")))
 (allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/vault.sock")))
 (allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/web.sock")))
