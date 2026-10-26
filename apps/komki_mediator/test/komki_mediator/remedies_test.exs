@@ -140,9 +140,9 @@ defmodule KomkiMediator.RemediesTest do
     env: env,
     gamma: gamma
   } do
-    assert gamma.term["bindings"]["doc-pending-freigabe@1"]["relaxation_authorities"] == [
-             "nutzende-person"
-           ]
+    # Seit #208 kommt Γ aus dem Label-Store, der Lockerungsbefugnisse bis
+    # #109 als [] exportiert (fail-closed).
+    assert gamma.term["bindings"]["doc-pending-freigabe@1"]["relaxation_authorities"] == []
 
     # Die kompilierte Form traegt sie bewusst nicht — der Katalog der
     # Engine kann sie folglich auch nicht tragen.
@@ -167,7 +167,7 @@ defmodule KomkiMediator.RemediesTest do
         fn -> {:ok, %{"content" => "egal"}} end
       )
 
-    assert pending["relaxation_authorities"] == ["nutzende-person"]
+    assert pending["relaxation_authorities"] == []
     assert vertraulich["relaxation_authorities"] == []
   end
 

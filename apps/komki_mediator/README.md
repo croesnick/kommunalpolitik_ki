@@ -295,7 +295,7 @@ end
 
 ```
 mediator/
-├── registry.json   # Gamma: Verbindungsregeln, Bindungen, Befugnisse
+├── registry.json   # Gamma (Export des Label-Store, #208): Bindungen, Umgebungen, Beobachter
 ├── room.json       # Raum: Identitaet, Arbeitsraum, Fakten, Objekte
 ├── documents/      # die drei Beispieldokumente (doc-oeffentlich u. a.)
 └── journal/pdr.jsonl  # PDR-Auditjournal (ein kanonisches, mehrzeiliges JSON-Dokument je Aufruf)
@@ -332,9 +332,11 @@ Was das leistet und was nicht:
 werden als `legacy` gezählt.
 
 Ein fehlender Raum wird beim Start provisioniert. Einen vorhandenen
-ersetzt der Vermittler nur, wenn `registry.json` und `room.json` byte-genau
-aktuelle oder fruehere unveraenderte Vorlagen sind (Ticket #177); eigene
-Aenderungen bleiben unberuehrt.
+ersetzt der Vermittler nur je Datei, wenn sie byte-genau eine fruehere
+unveraenderte Vorlage ist (Tickets #177, #208); eigene Aenderungen bleiben
+unberuehrt. `registry.json` ist seit #208 der Export des Label-Store:
+`komki up` schreibt sie vor dem Start (`KomkiCli.Gamma.sync/1`), die
+Vorlage dafuer ist `Templates.label_store_seed/0`.
 
 Jedes Objekt in `room.json` traegt einen Typ (`"type"`, Ticket #134):
 `admit_document` loest nur Objekte vom Typ `document` auf. Ein Objekt ohne

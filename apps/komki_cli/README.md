@@ -164,11 +164,17 @@ statt einer 17-GB-Kopie. `run` und `session` starten fehlende Prozesse
 selbst, `komki up` ist nur noch nötig, wenn man ausdrücklich vorab starten
 will.
 
-Instanz von vor den Connectoren: Der Vermittler ersetzt `registry.json`
-und `room.json` beim nächsten Start selbst, wenn sie unveränderte alte
-Vorlagen sind (Prüfung per SHA-256; das Journal bleibt unverändert). Hast du
-eine der beiden Dateien verändert, ersetzt er nichts und erklärt beim Start,
-was zu tun ist.
+**Γ kommt aus dem Label-Store** (Ticket #208). Vor jedem Start des
+Vermittlers importiert `komki up` die Vorlage des Arbeitsraums in
+`<base>/registry.db` (Merge; eigene Bindungen aus `komki label import`
+bleiben) und schreibt `<base>/mediator/registry.json` als Export. Die Datei
+ist generiert, Änderungen gehören in den Store. Hat sich der Export
+geändert, startet `up` einen laufenden Vermittler neu.
+
+Instanz von vor den Connectoren: `room.json` ersetzt der Vermittler beim
+nächsten Start selbst, wenn sie eine unveränderte alte Vorlage ist (Prüfung
+per SHA-256, je Datei; das Journal bleibt unverändert). Eine selbst
+veränderte `room.json` bleibt unberührt.
 
 Hinweise zu den einzelnen Schritten:
 

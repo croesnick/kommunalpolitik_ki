@@ -9,17 +9,16 @@ defmodule KomkiMediator.Templates do
 
   provision!/1 ist idempotent: sobald `registry.json` existiert, wird
   nichts ueberschrieben, was die nutzende Person veraendert haben koennte.
-  Einzige Ausnahme (Ticket #177): Sind `registry.json` und `room.json`
-  byte-genau eine fruehere oder die aktuelle Fassung dieser Vorlagen
-  (SHA-256 in `@outdated`, `@current`) und mindestens eine davon alt,
-  ersetzt provision!/1 sie durch die aktuelle. Eine Sicherung
+  Einzige Ausnahme (Ticket #177): Ist `registry.json` oder `room.json`
+  byte-genau eine fruehere Fassung dieser Vorlagen (SHA-256 in
+  `@outdated`), ersetzt provision!/1 diese Datei durch die aktuelle. Seit
+  #208 entscheidet das je Datei: `registry.json` ist der Export des
+  Label-Store (`label_store_seed/0`), `komki up` schreibt ihn vor dem Start. Eine Sicherung
   entfaellt bewusst: der Inhalt einer unveraenderten Vorlage steht
   vollstaendig im Git-Verlauf, und das Seatbelt-Profil des Vermittlers
-  erlaubt nur genau diese beiden Dateinamen. Ist nur eine der beiden Dateien
-  eine alte Vorlage, die andere aber veraendert, bricht provision!/1 mit
-  Erklaerung ab, statt zu raten.
+  erlaubt nur genau diese beiden Dateinamen.
 
-  Pflege: Wer `registry/0` oder `room/0` aendert, traegt die bisherigen
+  Pflege: Wer `label_store_seed/0` oder `room/0` aendert, traegt die bisherigen
   Hashes aus `@current` in `@outdated` ein und setzt `@current` neu; ein
   Test haelt `@current` an den tatsaechlichen Vorlagen fest.
   """
@@ -32,13 +31,15 @@ defmodule KomkiMediator.Templates do
   # (#106 und #107 fuer die Registry, beide mit demselben Raum; #134 nur
   # fuer den Raum).
   @current %{
-    "registry.json" => "38e86ed685b8887ddac4eb1976873b105fb1f272ce6c8ff67ac806370c8ecdf7",
+    "registry.json" => "2c7391d3c63e5e06a1910372cb8632026f35f288f750cd3d87b2195db575d835",
     "room.json" => "e16da13d5a89a0cf48204c24a3e2ef5c5b13a4fa778949dc6a76fa2e89729298"
   }
   @outdated %{
     "registry.json" => [
       "fed48d30194094c6e84be239ef40bf74be88457b1aaec09cb3dce8b5bb090e4f",
-      "d2b6a4e987036711a517a31dc40368dea82f7136b4213fbf9614cf290ba6d22f"
+      "d2b6a4e987036711a517a31dc40368dea82f7136b4213fbf9614cf290ba6d22f",
+      # bis #208: Lockerungsbefugnis von doc-pending-freigabe in Engine-Form
+      "38e86ed685b8887ddac4eb1976873b105fb1f272ce6c8ff67ac806370c8ecdf7"
     ],
     "room.json" => [
       "127831a737e7f5565d8def234c260ca270056b8954b346725f03ef638ef0b51f",
@@ -49,12 +50,29 @@ defmodule KomkiMediator.Templates do
 
   @observers ["brave-search", "nutzende-person", "pi-agent", "ris-betreiber"]
 
-  @doc "Registry-Term des Default-Arbeitsraums (Gamma der Aufstellung)."
-  def registry do
+  # Beobachtertypen (Label-Store, R.2.5): nur eine Person darf
+  # klassifizieren; Agent und Empfaenger sind Verarbeitungsdomaenen.
+  @observer_types %{
+    "brave-search" => "processing_domain",
+    "nutzende-person" => "person",
+    "pi-agent" => "processing_domain",
+    "ris-betreiber" => "processing_domain"
+  }
+
+  @doc """
+  Vorlage des Arbeitsraums in Store-Form `komki-label-store/2` (Ticket
+  #208): die eine Quelle fuer Γ. `komki setup` und `komki up` importieren
+  sie in den Label-Store; `<base>/mediator/registry.json` ist dessen
+  Export. `registry/0` ist die Projektion dieses Seeds und damit genau das,
+  was der Export liefert.
+  """
+  @spec label_store_seed() :: map()
+  def label_store_seed do
     %{
-      "schema" => "komki-registry/2",
+      "schema" => "komki-label-store/2",
       "registry_id" => "reg-komki-arbeitsraum",
       "observers" => @observers,
+      "observer_types" => @observer_types,
       "fact_fields" => %{
         "output_content_digest" => "string",
         "purpose" => "string",
@@ -68,27 +86,66 @@ defmodule KomkiMediator.Templates do
       },
       "bindings" =>
         Map.merge(connector_bindings(), %{
-          "mediator-ping@1" => %{
-            "readers" => ["nutzende-person", "pi-agent"],
-            "operations" => %{"admit" => true},
-            "relaxation_authorities" => []
-          },
-          "doc-oeffentlich@1" => %{
-            "readers" => ["nutzende-person", "pi-agent"],
-            "operations" => %{"admit" => true},
-            "relaxation_authorities" => []
-          },
-          "doc-vertraulich@1" => %{
-            "readers" => ["nutzende-person", "pi-agent"],
-            "operations" => %{"admit" => %{"eq" => ["purpose", "vertraulich"]}},
-            "relaxation_authorities" => []
-          },
-          "doc-pending-freigabe@1" => %{
-            "readers" => ["nutzende-person", "pi-agent"],
-            "operations" => %{"admit" => %{"eq" => ["vertraulich_freigabe", true]}},
-            "relaxation_authorities" => ["nutzende-person"]
-          }
+          "mediator-ping@1" =>
+            binding("Liveness-Probe des Vermittlers", ["nutzende-person", "pi-agent"], %{
+              "admit" => true
+            }),
+          "doc-oeffentlich@1" =>
+            binding("Öffentliches Raumdokument", ["nutzende-person", "pi-agent"], %{
+              "admit" => true
+            }),
+          "doc-vertraulich@1" =>
+            binding("Vertrauliches Raumdokument", ["nutzende-person", "pi-agent"], %{
+              "admit" => %{"eq" => ["purpose", "vertraulich"]}
+            }),
+          "doc-pending-freigabe@1" =>
+            "Raumdokument in Freigabe-Pause"
+            |> binding(["nutzende-person", "pi-agent"], %{
+              "admit" => %{"eq" => ["vertraulich_freigabe", true]}
+            })
+            |> Map.put("relaxation_authorities", [
+              %{
+                "authority" => "nutzende-person",
+                "restriction" => "operations",
+                "output" => "freigabe-notiz"
+              }
+            ])
         })
+    }
+  end
+
+  @doc """
+  Registry-Term des Default-Arbeitsraums (`komki-registry/2`): die
+  Projektion von `label_store_seed/0` auf die Engine-Form, so wie der
+  Label-Store exportiert. Lockerungsbefugnisse exportiert der Store bis
+  #109 als `[]` (fail-closed).
+  """
+  def registry do
+    seed = label_store_seed()
+
+    seed
+    |> Map.drop(["observer_types"])
+    |> Map.put("schema", "komki-registry/2")
+    |> Map.put(
+      "bindings",
+      Map.new(seed["bindings"], fn {id, b} ->
+        {id,
+         b
+         |> Map.take(["readers", "operations"])
+         |> Map.put("relaxation_authorities", [])}
+      end)
+    )
+  end
+
+  defp binding(bezeichnung, readers, operations) do
+    %{
+      "bezeichnung" => bezeichnung,
+      "geltungsbereich" => "komki-Arbeitsraum (Vorlage)",
+      "verantwortliche_stelle" => "nutzende-person",
+      "readers" => readers,
+      "operations" => operations,
+      "auflagen" => [],
+      "relaxation_authorities" => []
     }
   end
 
@@ -97,13 +154,14 @@ defmodule KomkiMediator.Templates do
   # liest nur nutzende-person und pi-agent, damit faellt in einem Raum mit
   # dieser Bindung jede Anfrage an RIS oder Websuche an recipient_inclusion.
   defp connector_bindings do
-    open = %{"operations" => %{"admit" => true, "emit" => true}, "relaxation_authorities" => []}
+    open = %{"admit" => true, "emit" => true}
 
     %{
-      "ris-oeffentlich@1" => Map.put(open, "readers", @observers),
-      "web-oeffentlich@1" => Map.put(open, "readers", @observers),
-      "vault-oeffentlich@1" => Map.put(open, "readers", @observers),
-      "vault-vertraulich@1" => Map.put(open, "readers", ["nutzende-person", "pi-agent"])
+      "ris-oeffentlich@1" => binding("Öffentliche RIS-Inhalte", @observers, open),
+      "web-oeffentlich@1" => binding("Öffentliche Web-Treffer", @observers, open),
+      "vault-oeffentlich@1" => binding("Öffentliche Vault-Notiz", @observers, open),
+      "vault-vertraulich@1" =>
+        binding("Vertrauliche Vault-Notiz", ["nutzende-person", "pi-agent"], open)
     }
   end
 
@@ -212,8 +270,9 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
   Provisioniert `<base>/mediator/`: legt die Vorlagen an, wenn keine
   `registry.json` vorliegt, und ersetzt unveraenderte fruehere Fassungen
   (Ticket #177). Ergebnis: `:ok` (neu angelegt), `:already_provisioned`,
-  `{:migrated, from}` (alte Vorlagen ersetzt) oder `{:error, detail}`.
+  `{:migrated, from}` (alte Vorlagen ersetzt, je Datei).
   """
+  @spec provision!(Path.t()) :: :ok | :already_provisioned | {:migrated, String.t()}
   def provision!(base_dir) do
     mediator_dir = Path.join(base_dir, @mediator_dir)
     registry_path = Path.join(mediator_dir, "registry.json")
@@ -226,27 +285,17 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
     end
   end
 
+  # Je Datei (Ticket #208): registry.json erzeugt komki_cli als Export des
+  # Label-Store, eine Paarbindung an room.json gibt es deshalb nicht mehr.
+  # Ersetzt wird nur eine unveraenderte alte Vorlage; eigene Dateien bleiben.
   defp migrate(mediator_dir) do
-    states = Map.new(["registry.json", "room.json"], &{&1, state(mediator_dir, &1)})
-
-    # Ersetzt wird, wenn jede Datei aktuell oder eine unveraenderte alte
-    # Vorlage ist und mindestens eine alt (#134: nur room.json neu).
-    cond do
-      Enum.all?(states, fn {_file, state} -> state in [:outdated, :current] end) and
-          Enum.any?(states, fn {_file, state} -> state == :outdated end) ->
-        write_templates(mediator_dir)
-        {:migrated, "unveraenderte Vorlagen einer frueheren Fassung"}
-
-      Enum.any?(states, fn {_file, state} -> state == :outdated end) ->
-        {:error,
-         "registry.json und room.json passen nicht zusammen: " <>
-           describe(states) <>
-           ". komki ersetzt nur unveraenderte alte Vorlagen. Eigene Aenderungen sichern, " <>
-           "beide Dateien aus " <>
-           mediator_dir <> " entfernen; der naechste Start legt die neuen Vorlagen an."}
-
-      true ->
+    case Enum.filter(["registry.json", "room.json"], &(state(mediator_dir, &1) == :outdated)) do
+      [] ->
         :already_provisioned
+
+      files ->
+        write_templates(mediator_dir, files)
+        {:migrated, "unveraenderte Vorlagen einer frueheren Fassung: " <> Enum.join(files, ", ")}
     end
   end
 
@@ -266,20 +315,16 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
     end
   end
 
-  defp describe(states) do
-    Enum.map_join(states, ", ", fn
-      {file, :outdated} -> file <> " ist eine unveraenderte alte Vorlage"
-      {file, :current} -> file <> " ist aktuell"
-      {file, :own} -> file <> " wurde veraendert"
-    end)
-  end
-
   # Dokumente nur anlegen, wenn sie fehlen: vorhandene bleiben unberuehrt.
-  defp write_templates(mediator_dir) do
+  defp write_templates(mediator_dir, files \\ ["registry.json", "room.json"]) do
     documents_dir = Path.join(mediator_dir, room()["documents_dir"])
     File.mkdir_p!(documents_dir)
-    File.write!(Path.join(mediator_dir, "registry.json"), JSON.canonical(registry()))
-    File.write!(Path.join(mediator_dir, "room.json"), JSON.canonical(room()))
+
+    for file <- files do
+      term = if file == "registry.json", do: registry(), else: room()
+      File.write!(Path.join(mediator_dir, file), JSON.canonical(term))
+    end
+
     write_documents(documents_dir)
   end
 

@@ -51,6 +51,7 @@ Single-context: `GLOSSARY.md` am Repo-Root (kanonische Nomenklatur aller Domäne
 Wer Γ erzeugt, prüft oder konsumiert, findet die verbindlichen Daten an drei Orten:
 
 - **Engine-Datenvertrag**: `apps/komki_policy/CONTRACT.md` mit den Γ-Konsumformaten (`komki-registry/2`, Snapshot, Intent, Decision, Proof). Der Vertrag gehört zur Engine, weil `KomkiPolicy.Registry.compile/1` die Formate durchsetzt; Änderungen nur durch den Integrator.
+- **Ein Γ** (#208): Der Label-Store ist die Quelle. Die Vorlage des Arbeitsraums ist `KomkiMediator.Templates.label_store_seed/0`; `komki up` importiert sie und schreibt `<base>/mediator/registry.json` als Export (`KomkiCli.Gamma.sync/1`). `registry.json` nie von Hand pflegen.
 - **Store-Importformat**: Moduledoc in `apps/komki_cli/lib/komki_cli/label_store.ex`, lebendes Beispiel in `apps/komki_cli/priv/fixtures/registry-seed.json`. Format `komki-label-store/2`: die Obermenge mit den R.2.2-Metadaten (Bezeichnung, Geltungsbereich, verantwortliche Stelle, Auflagen, strukturierte Lockerungsbefugnis) und den Beobachtertypen (R.2.5).
 - **Normative Basis**: `docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md` mit ≈ 2 400 Zeilen; Abschnitte per Anker-Grep (`R.N.M`, `B.N`) und gerangelte Reads statt Volltext.
 

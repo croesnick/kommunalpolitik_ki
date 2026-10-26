@@ -177,8 +177,9 @@ defmodule KomkiMediator.GateTest do
            ]
 
     # Γ-L1 (R.2.2): die Lockerungsbefugnis der benannten Bindung bleibt
-    # Teil der Antwort — aus dem rohen Registry-Term, nicht aus dem Katalog.
-    assert response["relaxation_authorities"] == ["nutzende-person"]
+    # Teil der Antwort, aus dem rohen Registry-Term. Der Store exportiert sie
+    # bis #109 als [] (fail-closed, #208).
+    assert response["relaxation_authorities"] == []
 
     assert [pdr] = TestHelpers.journal_records(journal_path)
     assert pdr["decision"] == "indeterminate"

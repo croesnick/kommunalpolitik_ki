@@ -196,9 +196,6 @@ defmodule KomkiMediator.CLI do
       {:migrated, what} ->
         IO.puts(:stderr, JSON.encode!(%{"note" => "Vorlagen aktualisiert", "detail" => what}))
         :ok
-
-      {:error, detail} ->
-        {:error, %{"error" => "vorlagen", "detail" => detail}}
     end
   end
 
