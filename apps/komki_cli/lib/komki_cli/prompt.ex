@@ -26,14 +26,25 @@ defmodule KomkiCli.Prompt do
     end
   end
 
-  @doc "Ja/Nein-Frage; `default_yes?` bestimmt die Antwort auf Enter."
+  @doc """
+  Ja/Nein-Frage; `default_yes?` bestimmt die Antwort auf Enter. Ohne
+  Eingabe (stdin zu Ende, etwa ohne Terminal) ist die Antwort immer nein:
+  Ein Default-Ja darf nur eine Person mit Enter geben, nie ein Skript.
+  """
   @spec confirm(String.t(), boolean()) :: boolean()
   def confirm(question, default_yes? \\ true) do
     hint = if default_yes?, do: " [J/n] ", else: " [j/N] "
 
-    case question |> Kernel.<>(hint) |> ask("") |> String.downcase() do
-      "" -> default_yes?
-      answer -> answer in ["j", "ja", "y", "yes"]
+    case IO.gets(question <> hint) do
+      text when is_binary(text) ->
+        case text |> String.trim() |> String.downcase() do
+          "" -> default_yes?
+          answer -> answer in ["j", "ja", "y", "yes"]
+        end
+
+      _eof ->
+        IO.write("\n")
+        false
     end
   end
 

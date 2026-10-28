@@ -267,21 +267,24 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
   def current_hashes, do: @current
 
   @doc """
-  Provisioniert `<base>/mediator/`: legt die Vorlagen an, wenn keine
-  `registry.json` vorliegt, und ersetzt unveraenderte fruehere Fassungen
-  (Ticket #177). Ergebnis: `:ok` (neu angelegt), `:already_provisioned`,
-  `{:migrated, from}` (alte Vorlagen ersetzt, je Datei).
+  Provisioniert `<base>/mediator/`: legt fehlende Vorlagen je Datei an und
+  ersetzt unveraenderte fruehere Fassungen (Ticket #177). Je Datei, weil
+  `komki up` die `registry.json` als Export des Label-Store schreibt, bevor
+  der Vermittler zum ersten Mal startet (#208); `room.json` und die
+  Beispieldokumente fehlen dann noch. Ergebnis: `:ok` (etwas neu angelegt),
+  `:already_provisioned`, `{:migrated, from}` (alte Vorlagen ersetzt).
   """
   @spec provision!(Path.t()) :: :ok | :already_provisioned | {:migrated, String.t()}
   def provision!(base_dir) do
     mediator_dir = Path.join(base_dir, @mediator_dir)
-    registry_path = Path.join(mediator_dir, "registry.json")
 
-    if File.exists?(registry_path) do
-      migrate(mediator_dir)
-    else
-      write_templates(mediator_dir)
-      :ok
+    case Enum.reject(["registry.json", "room.json"], &File.exists?(Path.join(mediator_dir, &1))) do
+      [] ->
+        migrate(mediator_dir)
+
+      missing ->
+        write_templates(mediator_dir, missing)
+        :ok
     end
   end
 
@@ -316,7 +319,7 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
   end
 
   # Dokumente nur anlegen, wenn sie fehlen: vorhandene bleiben unberuehrt.
-  defp write_templates(mediator_dir, files \\ ["registry.json", "room.json"]) do
+  defp write_templates(mediator_dir, files) do
     documents_dir = Path.join(mediator_dir, room()["documents_dir"])
     File.mkdir_p!(documents_dir)
 

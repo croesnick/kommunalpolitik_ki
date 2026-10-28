@@ -40,7 +40,8 @@ defmodule KomkiConnectorWeb.ConnectorTest do
     path = "/tmp/kmw#{System.unique_integer([:positive])}.sock"
     {:ok, state} = Connector.init(init_arg)
     {:ok, listener} = Server.listen(path)
-    pid = spawn(fn -> Server.accept_loop(listener, Connector, state) end)
+    token = KomkiConnector.Token.provision!(path)
+    pid = spawn(fn -> Server.accept_loop(listener, Connector, state, token) end)
     :ok = :gen_tcp.controlling_process(listener, pid)
 
     on_exit(fn ->
@@ -165,10 +166,19 @@ defmodule KomkiConnectorWeb.ConnectorTest do
     assert {:error, %{"code" => "credential-missing"}} = search(path, %{"query" => "401"})
     assert {:error, %{"code" => "upstream-error"}} = search(path, %{"query" => "403"})
 
-    assert {:error, %{"code" => "upstream-error", "detail" => detail}} =
-             search(path, %{"query" => "429"})
+    # Der genaue Grund steht im Connector-Log, nicht in der Antwort.
+    Logger.configure(level: :info)
+    on_exit(fn -> Logger.configure(level: :warning) end)
 
-    assert detail =~ "Rate-Limit"
+    log =
+      ExUnit.CaptureLog.capture_log([level: :info], fn ->
+        assert {:error, %{"code" => "upstream-error", "detail" => detail}} =
+                 search(path, %{"query" => "429"})
+
+        refute detail =~ "Rate-Limit"
+      end)
+
+    assert log =~ "Rate-Limit"
     assert {:error, %{"code" => "upstream-error"}} = search(path, %{"query" => "500"})
   end
 

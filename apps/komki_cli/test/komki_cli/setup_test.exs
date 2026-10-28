@@ -21,16 +21,19 @@ defmodule KomkiCli.SetupTest do
     path
   end
 
-  # Fake fuer add-generic-password: liest wie security(1) zwei Zeilen von
-  # stdin und schreibt argv und Eingaben zur Kontrolle in Dateien.
+  # Fake-Schluesselbund: `-i` liest eine Befehlszeile von stdin (wie
+  # security(1) im interaktiven Modus) und merkt sich argv, Zeile und Wert;
+  # `find-generic-password -w` liefert den gemerkten Wert.
   defp recording_fake! do
     dir = TestSupport.tmp_area!("komki-setup-rec")
 
     cmd =
       fake!("""
-      read a; read b
-      printf '%s\\n' "$*" > "#{dir}/args"
-      printf '%s|%s' "$a" "$b" > "#{dir}/stdin"
+      case "$1" in
+        -i) read -r line; printf '%s\\n' "$*" > "#{dir}/args"; printf '%s' "$line" > "#{dir}/stdin"
+            printf '%s' "${line##* }" > "#{dir}/value" ;;
+        find-generic-password) [ "$4" = "-w" ] && cat "#{dir}/value" || exit 44 ;;
+      esac
       """)
 
     {cmd, dir}
@@ -47,26 +50,46 @@ defmodule KomkiCli.SetupTest do
   end
 
   describe "Keychain.store/3" do
-    test "Wert geht nur über stdin, zweimal; argv enthält ihn nie" do
+    test "Wert geht nur über stdin an security -i, nie über argv; ganz, auch über 128 Byte" do
       {cmd, dir} = recording_fake!()
+      siegel = "ktv1." <> String.duplicate("A", 1000) <> "+/="
 
-      assert :ok = Keychain.store("brave-search-api", @kanarie, command: cmd, account: "tester")
+      assert :ok = Keychain.store("brave-search-api", siegel, command: cmd, account: "tester")
 
-      args = File.read!(Path.join(dir, "args"))
-      assert args =~ "add-generic-password -s brave-search-api -a tester -U -w"
-      refute args =~ @kanarie
-      assert File.read!(Path.join(dir, "stdin")) == @kanarie <> "|" <> @kanarie
+      assert File.read!(Path.join(dir, "args")) == "-i\n"
+
+      assert File.read!(Path.join(dir, "stdin")) ==
+               "add-generic-password -s brave-search-api -a tester -U -w " <> siegel
     end
 
-    test "leere Werte und Zeilenumbrueche werden abgelehnt, ohne security zu rufen" do
-      cmd = fake!("exit 9")
-      assert {:error, :invalid} = Keychain.store("x", "", command: cmd)
-      assert {:error, :invalid} = Keychain.store("x", "a\nb", command: cmd)
+    test "leere Werte und Sonderzeichen werden abgelehnt, ohne security zu rufen" do
+      cmd = fake!("touch $0.lief; exit 9")
+
+      for value <- ["", "a\nb", "a b", "a;b", "a\"b", @kanarie] do
+        assert {:error, :invalid} = Keychain.store("x", value, command: cmd, account: "t")
+      end
+
+      refute File.exists?(cmd <> ".lief")
+    end
+
+    test "gekuerzter Wert nach dem Schreiben ist ein Fehler" do
+      dir = TestSupport.tmp_area!("komki-kurz")
+
+      cmd =
+        fake!("""
+        case "$1" in
+          -i) read -r line ;;
+          find-generic-password) echo gekuerzt ;;
+        esac
+        """)
+
+      _ = dir
+      assert {:error, :not_stored} = Keychain.store("x", "ktv1.lang", command: cmd, account: "t")
     end
 
     test "Fehler von security wird {:failed, code}" do
       assert {:error, {:failed, 51}} =
-               Keychain.store("x", "wert", command: fake!("read a; exit 51"))
+               Keychain.store("x", "wert", command: fake!("read a; exit 51"), account: "t")
     end
   end
 
@@ -85,9 +108,12 @@ defmodule KomkiCli.SetupTest do
 
       message = Setup.store_secret(@entry, ui([{:ok, @kanarie}, {:ok, @kanarie}]))
 
-      assert message =~ "gespeichert"
+      assert message =~ "versiegelt"
       refute message =~ @kanarie
-      assert File.read!(Path.join(dir, "stdin")) == @kanarie <> "|" <> @kanarie
+      # In den Schluesselbund geht nur das Siegel, nie der Klartext.
+      {:ok, sealed} = KomkiCli.Tresor.seal(@kanarie)
+      assert File.read!(Path.join(dir, "value")) == sealed
+      refute File.read!(Path.join(dir, "stdin")) =~ @kanarie
     end
 
     test "verschiedene Eingaben: nichts gespeichert" do

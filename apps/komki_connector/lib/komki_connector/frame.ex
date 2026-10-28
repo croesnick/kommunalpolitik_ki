@@ -11,7 +11,7 @@ defmodule KomkiConnector.Frame do
   @max_bytes 1_048_576
 
   @error_codes ~w(bad-request unknown-op not-found upstream-error upstream-timeout
-                  credential-missing forbidden-path too-large internal)
+                  credential-missing forbidden-path too-large unauthorized internal)
 
   @doc "Protokollversion."
   @spec version() :: pos_integer()
@@ -25,14 +25,38 @@ defmodule KomkiConnector.Frame do
   @spec error_codes() :: [String.t()]
   def error_codes, do: @error_codes
 
+  @doc """
+  Fester Text je Fehlercode. Nur dieser Text erreicht den Vermittler und
+  damit das Modell; was ein Connector selbst als `detail` schreibt, bleibt
+  in dessen Log.
+  """
+  @spec describe(String.t()) :: String.t()
+  def describe("bad-request"), do: "Anfrage ungültig"
+  def describe("unknown-op"), do: "unbekannte Operation"
+  def describe("not-found"), do: "nicht gefunden"
+  def describe("upstream-error"), do: "Fehler beim angebundenen Dienst"
+  def describe("upstream-timeout"), do: "angebundener Dienst antwortet nicht"
+  def describe("credential-missing"), do: "Zugangsdaten fehlen"
+  def describe("forbidden-path"), do: "Pfad nicht erlaubt"
+  def describe("too-large"), do: "Antwort oder Anfrage zu groß"
+  def describe("unauthorized"), do: "Aufruf nicht berechtigt"
+  def describe(_code), do: "interner Fehler"
+
   @doc "Socket-Optionen fuer beide Seiten (Laengenpraefix plus Groessengrenze)."
   @spec socket_opts() :: list()
   def socket_opts, do: [:binary, packet: 4, packet_size: @max_bytes, active: false]
 
-  @doc "Anfrage-Frame bauen."
-  @spec request(String.t(), String.t(), map(), map()) :: map()
-  def request(call_id, op, params, context \\ %{}) do
-    base = %{"v" => @version, "call_id" => call_id, "op" => op, "params" => params}
+  @doc "Anfrage-Frame bauen; `token` ist das Capability-Token des Connectors."
+  @spec request(String.t(), String.t(), String.t(), map(), map()) :: map()
+  def request(token, call_id, op, params, context \\ %{}) do
+    base = %{
+      "v" => @version,
+      "token" => token,
+      "call_id" => call_id,
+      "op" => op,
+      "params" => params
+    }
+
     if context == %{}, do: base, else: Map.put(base, "context", context)
   end
 

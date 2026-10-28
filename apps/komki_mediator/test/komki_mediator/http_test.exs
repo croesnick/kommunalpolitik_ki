@@ -122,7 +122,7 @@ defmodule KomkiMediator.HTTPTest do
 
       assert JSON.decode!(body)["result"]["isError"] == false
 
-      assert [record] = TestHelpers.journal_records(journal_path)
+      assert [_executing, record] = TestHelpers.journal_records(journal_path)
       assert record["tool"] == "ping"
       assert record["session_id"] == @session
     end
@@ -134,7 +134,9 @@ defmodule KomkiMediator.HTTPTest do
     } do
       mcp = handshake!(socket, token)
       assert {:ok, %Finch.Response{status: 200}} = mcp_post(socket, call_ping(3), mcp)
-      assert [%{"session_id" => nil}] = TestHelpers.journal_records(journal_path)
+
+      assert [%{"session_id" => nil}, %{"session_id" => nil}] =
+               TestHelpers.journal_records(journal_path)
     end
 
     test "ungueltige X-Komki-Session: 400", %{socket: socket, token: token} do

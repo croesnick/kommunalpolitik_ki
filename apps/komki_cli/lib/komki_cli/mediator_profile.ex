@@ -16,14 +16,15 @@ defmodule KomkiCli.MediatorProfile do
       `{:tcp, port}` bleibt fuer Tests und Altinstanzen generierbar,
     * `network-outbound` nur auf die Connector-Sockets
       `<base>/run/connectors/<id>.sock` (alle Manifest-IDs, damit der Text
-      nicht vom Vault-Schalter abhaengt).
+      nicht vom Vault-Schalter abhaengt) und Lesen der zugehoerigen
+      Token-Dateien `<id>.token` (`KomkiConnector.Token`).
 
   Kein Netz-Outbound sonst, kein process-exec fuer Connectoren (Seatbelt
   laesst sich nicht verschachteln; `komki up` startet die Connectoren).
   """
 
   alias KomkiCli.{Channel, Config, ConnectorProfile, EscriptProfile, Mediator}
-  alias KomkiConnector.Manifest
+  alias KomkiConnector.{Manifest, Token}
 
   @type listen :: {:tcp, pos_integer()} | {:unix, String.t()}
 
@@ -120,9 +121,12 @@ defmodule KomkiCli.MediatorProfile do
   defp listen_paths({:unix, socket}, cfg), do: [socket, token_path(cfg)]
 
   defp connector_rules(sockets) do
-    ["; Connector-Sockets (Frame-Protokoll, CONTRACT.md §3) — einziges Outbound"] ++
-      Enum.map(sockets, fn socket ->
-        "(allow network-outbound (remote unix-socket (path-literal \"" <> socket <> "\")))"
+    ["; Connector-Sockets (Frame-Protokoll, CONTRACT.md §3) — einziges Outbound, Token nur lesen"] ++
+      Enum.flat_map(sockets, fn socket ->
+        [
+          "(allow network-outbound (remote unix-socket (path-literal \"" <> socket <> "\")))",
+          "(allow file-read* (literal \"" <> Token.for_socket(socket) <> "\"))"
+        ]
       end)
   end
 

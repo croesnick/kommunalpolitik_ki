@@ -16,9 +16,9 @@ defmodule KomkiConnectorRis.CLI do
     _ = :logger.update_handler_config(:default, :config, %{type: :standard_error})
 
     with {:ok, opts} <- parse(argv),
-         # RIS braucht keine Credentials; die Zeile wird gelesen und verworfen.
-         {:ok, _credentials} <- Server.read_credentials(),
-         {:error, reason} <- Server.run(KomkiConnectorRis, opts.socket, opts) do
+         # RIS braucht keine Credentials; die Zeile traegt nur das Token.
+         {:ok, credentials} <- Server.read_credentials(),
+         {:error, reason} <- Server.run(KomkiConnectorRis, opts.socket, opts, credentials) do
       fail(if is_binary(reason), do: reason, else: inspect(reason))
     else
       {:error, message} -> fail(message)

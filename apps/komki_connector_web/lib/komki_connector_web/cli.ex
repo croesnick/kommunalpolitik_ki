@@ -13,7 +13,7 @@ defmodule KomkiConnectorWeb.CLI do
   vollstaendig gelesen, bevor der Socket bindet. Log geht nach stderr.
   """
 
-  alias KomkiConnector.Server
+  alias KomkiConnector.{Server, Token}
   alias KomkiConnectorWeb.Connector
 
   @spec main([String.t()]) :: no_return()
@@ -22,8 +22,9 @@ defmodule KomkiConnectorWeb.CLI do
 
     with {:ok, opts} <- parse(argv),
          {:ok, creds} <- Server.read_credentials(),
-         init_arg = Map.put(opts, :credentials, creds),
-         {:error, reason} <- Server.run(Connector, opts.socket, init_arg) do
+         # Das Token prueft der Server; der Connector sieht nur seinen API-Key.
+         init_arg = Map.put(opts, :credentials, Map.delete(creds, Token.credential_key())),
+         {:error, reason} <- Server.run(Connector, opts.socket, init_arg, creds) do
       fail("Start fehlgeschlagen: #{format_reason(reason)}")
     else
       {:error, message} when is_binary(message) -> fail(message)

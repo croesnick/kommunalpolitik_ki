@@ -3,9 +3,17 @@ defmodule KomkiConnector.Client do
   Vermittler-Seite des Frame-Protokolls: eine Verbindung je Aufruf
   (verbinden, eine Anfrage, eine Antwort, schliessen). Timeout 15 s
   (CONTRACT.md §3).
+
+  Das Token des Connectors liest der Client je Aufruf aus der Datei neben
+  dem Socket (`KomkiConnector.Token.for_socket/1`); ein neu gestarteter
+  Connector bringt so ohne Neustart des Vermittlers sein neues Token mit.
+
+  Fehlertexte eines Connectors gelangen nie weiter: Der Client ersetzt sie
+  durch den festen Text des Fehlercodes (`KomkiConnector.Frame.describe/1`).
+  Sonst waere der Freitext ein Kanal am Gate 2 vorbei in den Modellkontext.
   """
 
-  alias KomkiConnector.Frame
+  alias KomkiConnector.{Frame, Token}
 
   @default_timeout 15_000
 
@@ -21,13 +29,22 @@ defmodule KomkiConnector.Client do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
     deadline = System.monotonic_time(:millisecond) + timeout
 
-    with {:ok, frame} <- encode(Frame.request(call_id, op, params, context)),
-         {:ok, sock} <- connect(socket_path, timeout) do
+    with {:ok, sock} <- connect(socket_path, timeout) do
       try do
-        exchange(sock, frame, call_id, remaining(deadline))
+        with {:ok, token} <- token(socket_path),
+             {:ok, frame} <- encode(Frame.request(token, call_id, op, params, context)) do
+          exchange(sock, frame, call_id, remaining(deadline))
+        end
       after
         :gen_tcp.close(sock)
       end
+    end
+  end
+
+  defp token(socket_path) do
+    case Token.read(Token.for_socket(socket_path)) do
+      {:ok, token} -> {:ok, token}
+      :error -> err("unauthorized", "Connector-Token fehlt")
     end
   end
 
@@ -83,13 +100,17 @@ defmodule KomkiConnector.Client do
        do: {:ok, result}
 
   defp interpret(
-         %{"call_id" => call_id, "ok" => false, "error" => %{"code" => code} = e},
+         %{"call_id" => call_id, "ok" => false, "error" => %{"code" => code}},
          call_id
        )
        when is_binary(code) do
     code = if code in Frame.error_codes(), do: code, else: "internal"
-    {:error, %{"code" => code, "detail" => to_string(e["detail"] || "")}}
+    {:error, %{"code" => code, "detail" => Frame.describe(code)}}
   end
+
+  # Abweisung ohne Token: der Connector nennt bewusst keine call_id.
+  defp interpret(%{"call_id" => "", "ok" => false, "error" => %{"code" => "unauthorized"}}, _),
+    do: err("unauthorized", Frame.describe("unauthorized"))
 
   defp interpret(_reply, _call_id), do: err("upstream-error", "Antwort passt nicht zur Anfrage")
 

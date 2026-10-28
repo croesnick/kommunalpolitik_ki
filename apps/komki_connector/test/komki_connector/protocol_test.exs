@@ -1,7 +1,7 @@
 defmodule KomkiConnector.ProtocolTest do
   use ExUnit.Case, async: true
 
-  alias KomkiConnector.{Client, Frame, Manifest, Params, Server}
+  alias KomkiConnector.{Client, Frame, Manifest, Params, Server, Token}
 
   defmodule Echo do
     @behaviour KomkiConnector.Server
@@ -21,7 +21,7 @@ defmodule KomkiConnector.ProtocolTest do
     def handle_op("show", %{"top_id" => "leck" <> _} = params, _context, _state),
       do: raise(MatchError, term: params)
 
-    def handle_op("show", _params, _context, _state), do: {:error, "not-found", "nicht da"}
+    def handle_op("show", _params, _context, _state), do: {:error, "not-found", "DETAIL-KANARIE"}
   end
 
   setup do
@@ -29,7 +29,8 @@ defmodule KomkiConnector.ProtocolTest do
     File.mkdir_p!(dir)
     path = Path.join(dir, "ris.sock")
     {:ok, listener} = Server.listen(path)
-    pid = spawn(fn -> Server.accept_loop(listener, Echo, "zustand") end)
+    token = Token.provision!(path)
+    pid = spawn(fn -> Server.accept_loop(listener, Echo, "zustand", token) end)
     _ = :gen_tcp.controlling_process(listener, pid)
 
     on_exit(fn ->
@@ -37,7 +38,18 @@ defmodule KomkiConnector.ProtocolTest do
       File.rm_rf!(dir)
     end)
 
-    %{path: path}
+    %{path: path, token: token}
+  end
+
+  # Roh-Anfrage an den Socket, am Client vorbei (wie ein fremder Prozess).
+  defp raw(path, frame) do
+    {:ok, sock} = :gen_tcp.connect({:local, String.to_charlist(path)}, 0, Frame.socket_opts())
+    {:ok, bin} = Frame.encode(frame)
+    :ok = :gen_tcp.send(sock, bin)
+    {:ok, reply} = :gen_tcp.recv(sock, 0, 5_000)
+    :gen_tcp.close(sock)
+    {:ok, map} = Frame.decode(reply)
+    map
   end
 
   test "Socket-Datei hat Rechte 0600", %{path: path} do
@@ -73,7 +85,9 @@ defmodule KomkiConnector.ProtocolTest do
   end
 
   test "Connector-Fehler und Absturz bleiben geschlossene Codes", %{path: path} do
-    assert {:error, %{"code" => "not-found"}} = Client.call(path, "c", "show", %{"top_id" => "x"})
+    # Der Freitext des Connectors erreicht den Vermittler nicht, nur der feste Text.
+    assert {:error, %{"code" => "not-found", "detail" => "nicht gefunden"}} =
+             Client.call(path, "c", "show", %{"top_id" => "x"})
 
     assert {:error, %{"code" => "internal"}} =
              Client.call(path, "c", "show", %{"top_id" => "boom"})
@@ -97,9 +111,53 @@ defmodule KomkiConnector.ProtocolTest do
 
   test "ungueltige Frames" do
     assert %{"ok" => false, "error" => %{"code" => "bad-request"}} =
-             Server.handle_frame("kein json", Echo, nil)
+             Server.handle_frame("kein json", Echo, nil, Token.generate())
 
-    assert %{"ok" => false} = Server.handle_frame(~s({"v":2,"call_id":"a"}), Echo, nil)
+    assert %{"ok" => false} =
+             Server.handle_frame(~s({"v":2,"call_id":"a"}), Echo, nil, Token.generate())
+  end
+
+  describe "Capability-Token (Negativtests Steuerebene)" do
+    test "Anfrage ohne Token wird abgewiesen, auch ping", %{path: path} do
+      for op <- ["ping", "search"] do
+        reply = raw(path, %{"v" => 1, "call_id" => "x", "op" => op, "params" => %{"text" => "a"}})
+
+        assert %{"ok" => false, "call_id" => "", "error" => %{"code" => "unauthorized"}} =
+                 reply
+      end
+    end
+
+    test "falsches Token wird abgewiesen und verraet keine Ergebnisse", %{path: path} do
+      frame = Frame.request(Token.generate(), "x", "search", %{"text" => "a"})
+      reply = raw(path, frame)
+      assert reply["error"]["code"] == "unauthorized"
+      refute Map.has_key?(reply, "result")
+    end
+
+    test "richtiges Token direkt am Socket wird angenommen", %{path: path, token: token} do
+      assert %{"ok" => true} = raw(path, Frame.request(token, "x", "ping", %{}))
+    end
+
+    test "fehlende Tokendatei: der Client ruft nicht ohne Token", %{path: path} do
+      File.rm!(Token.for_socket(path))
+
+      assert {:error, %{"code" => "unauthorized"}} = Client.call(path, "c", "ping", %{})
+    end
+
+    test "Server startet nicht ohne gueltiges Token" do
+      assert {:error, "kein gueltiges Connector-Token"} =
+               Server.run(Echo, "/tmp/nie.sock", nil, %{})
+
+      assert {:error, _} =
+               Server.run(Echo, "/tmp/nie.sock", nil, %{Token.credential_key() => "kurz"})
+
+      refute File.exists?("/tmp/nie.sock")
+    end
+
+    test "Tokendatei hat Rechte 0600", %{path: path} do
+      assert {:ok, %File.Stat{mode: mode}} = File.stat(Token.for_socket(path))
+      assert Bitwise.band(mode, 0o777) == 0o600
+    end
   end
 
   test "Credentials von stdin" do

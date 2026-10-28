@@ -23,7 +23,7 @@ Jeder gestrichelte Kasten ist eine eigene Sandbox. Pfeile zeigen die einzigen er
 Drei Regeln halten das zusammen:
 
 1. **Feste Fragen statt freier Befehle.** Ein Connector bietet nur eng gefasste Operationen an, etwa „suche im RIS nach Text“. Kein Tool nimmt eine beliebige URL, einen Pfad oder einen Shell-Befehl entgegen.
-2. **Schlüssel bleiben beim Connector.** Der Brave-Key liegt im macOS-Schlüsselbund und geht beim Start nur an den Web-Connector. pi sieht ihn nie.
+2. **Schlüssel bleiben beim Connector.** Der Brave-Key liegt im macOS-Schlüsselbund, versiegelt mit der Secure Enclave deines Macs. Öffnen lässt er sich nur mit Touch ID oder deinem Passwort, deshalb fragt macOS beim Start danach. Dann geht er nur an den Web-Connector. pi sieht ihn nie, und ein anderes Programm auf deinem Mac kommt ohne deine Freigabe nicht an ihn heran.
 3. **Hin und zurück wird geprüft.** Die Anfrage ist eine Ausgabe, die Antwort ein neuer Eingang. Beides entscheidet ein Regelwerk, und jede Entscheidung landet im Journal.
 
 ## Was bei einer Anfrage passiert

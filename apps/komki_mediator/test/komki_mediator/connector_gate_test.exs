@@ -280,11 +280,13 @@ defmodule KomkiMediator.ConnectorGateTest do
   end
 
   test "Connector meldet not-found: admitted false", %{env: env} do
-    fake(env, "ris", fn _op, _params, _context -> {:error, "not-found", "kein TOP"} end)
+    fake(env, "ris", fn _op, _params, _context -> {:error, "not-found", "FREITEXT-KANARIE"} end)
 
     response = ConnectorGate.call(env, "ris_show", %{"top_id" => "t"})
     assert response["admitted"] == false
-    assert response["error"] == %{"code" => "not-found", "detail" => "kein TOP"}
+    # Der Freitext des Connectors erreicht das Modell nicht, nur der feste Text.
+    assert response["error"] == %{"code" => "not-found", "detail" => "nicht gefunden"}
+    refute inspect(response) =~ "FREITEXT-KANARIE"
   end
 
   # -----------------------------------------------------------------------

@@ -100,8 +100,14 @@ defmodule KomkiCli.ConnectorsTest do
       web = Manifest.fetch!("web")
       fetch = fn "brave-search-api" -> {:ok, @kanarie} end
 
-      {line, missing} = Connectors.credentials_line(web, fetch)
-      assert JSON.decode!(line) == %{"BRAVE_API_KEY" => @kanarie}
+      token = KomkiConnector.Token.generate()
+      {line, missing} = Connectors.credentials_line(web, token, fetch)
+
+      assert JSON.decode!(line) == %{
+               "BRAVE_API_KEY" => @kanarie,
+               "KOMKI_CONNECTOR_TOKEN" => token
+             }
+
       assert String.ends_with?(line, "\n")
       assert missing == []
 
@@ -119,19 +125,22 @@ defmodule KomkiCli.ConnectorsTest do
       refute Enum.any?(args, &(&1 =~ @kanarie))
       refute spawn =~ @kanarie
       refute spawn =~ "BRAVE_API_KEY"
+      refute spawn =~ token
     end
 
-    test "fehlendes Credential: {} und der Name (nie ein Wert) in missing" do
-      {line, missing} =
-        Connectors.credentials_line(Manifest.fetch!("web"), fn _ -> {:error, :missing} end)
+    test "fehlendes Credential: nur das Token und der Name (nie ein Wert) in missing" do
+      token = KomkiConnector.Token.generate()
 
-      assert line == "{}\n"
-      assert missing == ["BRAVE_API_KEY"]
+      {line, missing} =
+        Connectors.credentials_line(Manifest.fetch!("web"), token, fn _ -> {:error, :missing} end)
+
+      assert JSON.decode!(line) == %{"KOMKI_CONNECTOR_TOKEN" => token}
+      assert missing == [{"BRAVE_API_KEY", :missing}]
 
       {line, []} =
-        Connectors.credentials_line(Manifest.fetch!("ris"), fn _ -> flunk("kein Abruf") end)
+        Connectors.credentials_line(Manifest.fetch!("ris"), token, fn _ -> flunk("kein Abruf") end)
 
-      assert line == "{}\n"
+      assert JSON.decode!(line) == %{"KOMKI_CONNECTOR_TOKEN" => token}
     end
 
     test "Spawn-Zeile: env -i, sandbox-exec mit Profil, escript, stdin durchgereicht" do
@@ -249,6 +258,8 @@ defmodule KomkiCli.ConnectorsTest do
         for id <- ["documents", "ris", "vault", "web"], do: Manifest.socket_path(cfg.base_dir, id)
 
       Enum.each(sockets, &File.write!(&1, ""))
+      # Laufende Connectoren dieser Version haben ihr Token (sonst Neustart).
+      Enum.each(sockets, &KomkiConnector.Token.provision!/1)
 
       try do
         assert {:ok, entries} = Connectors.up(cfg, fetch: fn _ -> {:error, :missing} end)

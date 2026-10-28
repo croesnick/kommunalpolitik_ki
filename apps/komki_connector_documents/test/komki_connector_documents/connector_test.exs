@@ -15,7 +15,8 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
     socket = "/tmp/kcd-" <> Integer.to_string(System.unique_integer([:positive])) <> ".sock"
     {:ok, state} = KomkiConnectorDocuments.init(dir)
     {:ok, listener} = Server.listen(socket)
-    pid = spawn(fn -> Server.accept_loop(listener, KomkiConnectorDocuments, state) end)
+    token = KomkiConnector.Token.provision!(socket)
+    pid = spawn(fn -> Server.accept_loop(listener, KomkiConnectorDocuments, state, token) end)
     _ = :gen_tcp.controlling_process(listener, pid)
 
     on_exit(fn ->

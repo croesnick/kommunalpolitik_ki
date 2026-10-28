@@ -25,14 +25,17 @@ defmodule KomkiCli.Connectors do
   `<base>/run` und `<base>/run/connectors` mit `0700`.
   """
 
-  alias KomkiCli.{Config, ConnectorProfile, Keychain, Proc, Profile}
-  alias KomkiConnector.{Client, Manifest}
+  alias KomkiCli.{Config, ConnectorProfile, Proc, Profile, Secrets}
+  alias KomkiConnector.{Client, Manifest, Token}
 
   @ready_timeout_ms 15_000
   @egress_marker "komki-egress"
 
   @type state :: {:running, pos_integer()} | :stopped | :disabled | {:error, String.t()}
-  @type up_state :: {:started, pos_integer()} | {:already, pos_integer()}
+  @type up_state ::
+          {:started, pos_integer()}
+          | {:started, pos_integer(), [String.t()]}
+          | {:already, pos_integer()}
   @type down_state :: :ok | :no_pidfile | {:stale, String.t()}
 
   # ===========================================================================
@@ -181,20 +184,27 @@ defmodule KomkiCli.Connectors do
   defp fs_args(_cfg, _manifest), do: []
 
   @doc """
-  Credentials-Zeile fuer stdin: `{"<NAME>": "<wert>"}` aus `fetch`
-  (Default `Keychain.fetch/1`). Fehlt ein Wert, bleibt er weg; die Namen
+  Credentials-Zeile fuer stdin: das Connector-Token unter
+  `KomkiConnector.Token.credential_key/0` und `{"<NAME>": "<wert>"}` aus `fetch`
+  (Default `Secrets.reveal/1`: Siegel aus dem Schluesselbund, per Secure
+  Enclave geoeffnet). Fehlt ein Wert, bleibt er weg; Name und Fehlergrund
   der fehlenden kommen als zweites Element zurueck (nie Werte).
   """
-  @spec credentials_line(Manifest.t(), (String.t() -> {:ok, String.t()} | {:error, term()})) ::
-          {String.t(), [String.t()]}
-  def credentials_line(manifest, fetch \\ &Keychain.fetch/1) do
+  @spec credentials_line(
+          Manifest.t(),
+          String.t(),
+          (String.t() -> {:ok, String.t()} | {:error, term()})
+        ) ::
+          {String.t(), [{String.t(), term()}]}
+  def credentials_line(manifest, token, fetch \\ &Secrets.reveal/1) do
     {found, missing} =
       manifest.credentials
       |> Enum.sort()
-      |> Enum.reduce({%{}, []}, fn {name, service}, {found, missing} ->
+      |> Enum.reduce({%{Token.credential_key() => token}, []}, fn {name, service},
+                                                                  {found, missing} ->
         case fetch.(service) do
           {:ok, value} -> {Map.put(found, name, value), missing}
-          {:error, _} -> {found, missing ++ [name]}
+          {:error, error} -> {found, missing ++ [{name, error}]}
         end
       end)
 
@@ -258,7 +268,7 @@ defmodule KomkiCli.Connectors do
   """
   @spec up(Config.t(), keyword()) :: {:ok, [{String.t(), up_state()}]} | {:error, String.t()}
   def up(%Config{} = cfg, opts \\ []) do
-    fetch = Keyword.get(opts, :fetch, &Keychain.fetch/1)
+    fetch = Keyword.get(opts, :fetch, &Secrets.reveal/1)
     ensure_run_dirs!(cfg)
 
     steps =
@@ -288,7 +298,11 @@ defmodule KomkiCli.Connectors do
     Enum.map(Enum.reverse(Manifest.ids()), &("connector-" <> &1)) ++ ["egress"]
   end
 
-  @doc "`<base>/run` und `<base>/run/connectors` mit 0700 anlegen."
+  @doc """
+  `<base>/run` und `<base>/run/connectors` mit 0700 anlegen, dazu den
+  Dokumentordner des Raums: Der Dokument-Connector startet vor dem
+  Vermittler, der den Ordner sonst erst beim ersten Start befuellt.
+  """
   @spec ensure_run_dirs!(Config.t()) :: :ok
   def ensure_run_dirs!(cfg) do
     for dir <- [run_dir(cfg), connectors_dir(cfg)] do
@@ -296,6 +310,7 @@ defmodule KomkiCli.Connectors do
       File.chmod!(dir, 0o700)
     end
 
+    File.mkdir_p!(documents_dir(cfg))
     :ok
   end
 
@@ -307,10 +322,24 @@ defmodule KomkiCli.Connectors do
     comp = component_for(cfg, step)
 
     case alive(comp) do
-      {:ok, pid} -> {:ok, {comp.name, {:already, pid}}}
+      {:ok, pid} -> keep_or_restart(cfg, step, comp, pid, fetch)
       :none -> start_fresh(cfg, step, comp, fetch)
     end
   end
+
+  # Ein laufender Connector ohne Tokendatei stammt aus einer komki-Version
+  # vor den Connector-Tokens (oder hat sein Token verloren); der Vermittler
+  # erreicht ihn nicht mehr. Er wird neu gestartet statt als laufend zu gelten.
+  defp keep_or_restart(cfg, {:connector, _} = step, comp, pid, fetch) do
+    if File.exists?(Token.for_socket(comp.socket)) do
+      {:ok, {comp.name, {:already, pid}}}
+    else
+      _ = stop(comp)
+      start_fresh(cfg, step, comp, fetch)
+    end
+  end
+
+  defp keep_or_restart(_cfg, _step, comp, pid, _fetch), do: {:ok, {comp.name, {:already, pid}}}
 
   defp component_for(cfg, :egress), do: egress_component(cfg)
   defp component_for(cfg, {:connector, manifest}), do: connector_component(cfg, manifest.id)
@@ -326,10 +355,13 @@ defmodule KomkiCli.Connectors do
   defp start_fresh(cfg, {:connector, manifest}, comp, fetch) do
     Profile.write!(profile_path(cfg, manifest.id), ConnectorProfile.connector(cfg, manifest))
     File.rm(comp.socket)
-    {line, _missing} = credentials_line(manifest, fetch)
+    # Capability-Token je Start (KomkiConnector.Token): Datei fuer den
+    # Vermittler, derselbe Wert in der stdin-Zeile fuer den Connector.
+    token = Token.provision!(comp.socket)
+    {line, missing} = credentials_line(manifest, token, fetch)
 
-    launch(
-      cfg,
+    cfg
+    |> launch(
       comp,
       binary!(cfg, manifest.id),
       connector_args(cfg, manifest),
@@ -337,7 +369,22 @@ defmodule KomkiCli.Connectors do
       line,
       fn -> ping(cfg, manifest) end
     )
+    |> with_warnings(credential_warnings(manifest, missing))
   end
+
+  # Ein nicht gesetzter Schluessel ist eine Wahl (der Doctor meldet ihn);
+  # ein verweigertes oder unversiegeltes Geheimnis meldet `up` sichtbar.
+  defp credential_warnings(manifest, missing) do
+    for {name, error} <- missing, error != :missing do
+      Secrets.describe(Map.fetch!(manifest.credentials, name), error) <>
+        " — " <> manifest.id <> " startet ohne " <> name
+    end
+  end
+
+  defp with_warnings({:ok, {name, {:started, pid}}}, [_ | _] = warnings),
+    do: {:ok, {name, {:started, pid, warnings}}}
+
+  defp with_warnings(result, _warnings), do: result
 
   defp launch(cfg, comp, binary, args, profile, input, ready) do
     case alive(comp) do
@@ -433,7 +480,11 @@ defmodule KomkiCli.Connectors do
         {:error, reason} -> {:error, reason}
       end
 
-    if comp.socket, do: File.rm(comp.socket)
+    if comp.socket do
+      File.rm(comp.socket)
+      File.rm(Token.for_socket(comp.socket))
+    end
+
     {comp.name, state}
   end
 

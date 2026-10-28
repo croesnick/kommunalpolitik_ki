@@ -733,7 +733,12 @@ defmodule KomkiCli.CLI do
     lines =
       Enum.map(KomkiCli.Secrets.all(), fn entry ->
         state =
-          if KomkiCli.Secrets.present?(entry), do: green() <> "vorhanden", else: red() <> "fehlt"
+          case KomkiCli.Secrets.state(entry) do
+            :sealed -> green() <> "versiegelt"
+            :unsealed -> red() <> "Klartext"
+            :damaged -> red() <> "beschädigt"
+            {:error, _} -> red() <> "fehlt"
+          end
 
         String.pad_trailing(entry.name, 10) <>
           state <> reset() <> "  " <> entry.label <> " ('" <> entry.service <> "')"
@@ -1217,6 +1222,14 @@ defmodule KomkiCli.CLI do
     Enum.map_join(connectors, fn
       {name, {:started, pid}} ->
         green() <> name <> " up: pid " <> to_string(pid) <> reset() <> "\n"
+
+      {name, {:started, pid, warnings}} ->
+        green() <>
+          name <>
+          " up: pid " <>
+          to_string(pid) <>
+          reset() <>
+          "\n" <> Enum.map_join(warnings, &(red() <> "  " <> &1 <> reset() <> "\n"))
 
       {name, {:already, pid}} ->
         green() <> name <> ": bereits laufend (pid " <> to_string(pid) <> ")" <> reset() <> "\n"

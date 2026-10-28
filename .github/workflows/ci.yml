@@ -138,6 +138,24 @@ jobs:
       # Lockfile "../workspace.lock" heisst). Apps mit Dialyzer-Pflicht:
       # komki_policy, komki_cli, Vermittler, Connector-Bibliothek, Egress
       # und die drei Connectoren.
+      #
+      # Veraltete Deps-PLTs: Die Pfad-Abhaengigkeiten (komki_connector,
+      # komki_policy, ...) stehen im Deps-PLT der App. Der Cache-Key kennt
+      # nur Lockdateien und mix.exs, und restore-keys holt ein altes PLT ohnehin
+      # zurueck; eine neue Funktion in komki_connector meldete dann
+      # call_to_missing (PR #223). Deshalb: aendern sich Quellen unter
+      # apps/*/lib, wird jedes Deps-PLT neu gebaut (das Kern-PLT bleibt).
+      - name: Dialyzer-PLTs bei geaenderten Pfad-Abhaengigkeiten verwerfen
+        run: |
+          want=$(find apps/*/lib -type f -name '*.ex' -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+          for marker_dir in apps/*/_build/dev; do
+            [ -d "$marker_dir" ] || continue
+            if [ "$(cat "$marker_dir/.pfad-deps.sha256" 2>/dev/null)" != "$want" ]; then
+              rm -f "$marker_dir"/dialyxir_*_deps-dev.plt "$marker_dir"/dialyxir_*_deps-dev.plt.hash
+              echo "$want" > "$marker_dir/.pfad-deps.sha256"
+            fi
+          done
+
       - name: Dialyzer (komki_policy)
         working-directory: apps/komki_policy
         run: mix dialyzer

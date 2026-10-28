@@ -361,7 +361,23 @@ brew install fd ripgrep          # optional: pi's Such-Tools (aktiviert find/gre
 # pnpm führt Install-Skripte fremder Pakete nur nach Freigabe aus):
 pnpm setup                       # einmalig, legt PNPM_HOME an
 pnpm add -g @earendil-works/pi-coding-agent
+xcode-select --install           # swiftc für komki-tresor (nur zum Bauen aus dem Repo)
 ```
+
+**komki-tresor (Secure Enclave):** `make komki` baut neben komki das kleine
+Swift-Programm `komki-tresor` (`apps/komki_cli/native/komki-tresor/main.swift`).
+Es versiegelt Geheimnisse wie den Brave-Key mit einem Schlüssel der Secure
+Enclave; Öffnen geht nur mit Touch ID oder dem Passwort des Macs. Erlang
+erreicht die Secure Enclave nicht, deshalb Swift (Apple-Frameworks CryptoKit,
+LocalAuthentication, Security; keine Fremdbibliothek). Bauen braucht `swiftc`
+aus den Xcode Command Line Tools; das Homebrew-Paket bringt das fertige
+Programm mit. Ohne Secure Enclave (Intel-Mac ohne T2) gibt es keine
+versiegelten Geheimnisse, die Websuche bleibt dann aus.
+
+**Programm-Pins:** `komki setup` hält die SHA-256 der gestarteten Programme
+fest (komki, escript, node, llama-server, komki-tresor, das pi-Paket);
+`komki up` startet nur mit denselben Bytes. Ein Update von llama.cpp, node
+oder pi ist damit eine bewusste Änderung: danach einmal `komki setup`.
 
 **Versionen (llama-server, pi): keine exakten Pins.** komki läuft gegen die
 jeweils installierte Version, Tendenz zur neuesten (GOs aus #103 und #117).
@@ -396,7 +412,8 @@ Staging-Verzeichnis (`~/.local/share/komki/models-staging/`).
 
 | Tool / Workflow | Anmerkung |
 |---|---|
-| `komki init/doctor/up/down/status/run/session` | `init` entdeckt node/pi/llama-server selbst und pinnt die aufgelösten Pfade in die config.json |
+| `komki init/doctor/up/down/status/run/session` | `init` entdeckt node/pi/llama-server selbst und pinnt die aufgelösten Pfade und ihre SHA-256 in die config.json |
+| `komki secret set`, `komki up` (Websuche) | `komki-tresor` neben komki; Mac mit Secure Enclave |
 
 **Fallback:** Fehlt ein Pflicht-Werkzeug (node, pi-Bundle, llama-server),
 verweigert `init` mit klarer Meldung. Fehlen fd/ripgrep, verzichtet pi auf

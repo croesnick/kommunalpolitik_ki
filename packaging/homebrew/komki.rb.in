@@ -18,10 +18,11 @@ class Komki < Formula
   depends_on "tmux"
 
   def install
-    # Escript mit allen Rollen, daneben die SQLite-NIF (lib/exqlite) und pi
-    # in fester Version samt Abhaengigkeiten (lib/node_modules, im Paket per
-    # pnpm-Lockfile gebaut; komki sucht pi dort zuerst). Nichts wird nachgeladen.
-    libexec.install "komki", "lib"
+    # Escript mit allen Rollen, daneben komki-tresor (Secure Enclave, im Paket
+    # gebaut), die SQLite-NIF (lib/exqlite) und pi in fester Version samt
+    # Abhaengigkeiten (lib/node_modules, im Paket per pnpm-Lockfile gebaut;
+    # komki sucht pi dort zuerst). Nichts wird nachgeladen.
+    libexec.install "komki", "komki-tresor", "lib"
     # Das Escript startet mit Homebrews Erlang, auch wenn ein anderes im PATH liegt
     (bin/"komki").write_env_script libexec/"komki", PATH: "#{formula_opt_bin("erlang")}:$PATH"
   end
@@ -39,5 +40,6 @@ class Komki < Formula
   test do
     assert_match "komki @VERSION@", shell_output("#{bin}/komki version")
     assert_match "komki-egress < config.json", shell_output("#{bin}/komki komki-egress --help")
+    assert_match "Aufruf", shell_output("#{libexec}/komki-tresor 2>&1", 2)
   end
 end

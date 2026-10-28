@@ -7,7 +7,8 @@ ausschliesslich durch diesen Vermittler: jeder Aufruf durchlaeuft Gate 1
 durchlaeuft Gate 2 (unabhaengige Beweispruefung und Pruefung des
 realisierten Payloads gegen den Regelstand Γ, BEVOR sie zur MCP-Antwort
 wird). Fuer jeden Aufruf entsteht ein PDR-Auditdatensatz
-im Journal.
+im Journal; ein Permit schreibt zusaetzlich einen Vorbeleg, bevor
+irgendetwas vollzogen wird (Audit vor Wirkung).
 
 Fassung `komki-mediator/2` (Ticket #144): neben `ping` und `admit_document`
 bietet der Vermittler die sechs Connector-Tools `ris_search`, `ris_show`,
@@ -124,6 +125,7 @@ sequenceDiagram
         M->>J: PDR (Entscheidung, intent_hash)
         M-->>P: isError=false + Remedy-Katalog (Engine)
     else permit: Vollzug
+        M->>J: Vorbeleg-PDR (outcome executing), vor dem Vollzug
         M->>M: Connector vollzieht das Tool
         Note over M,K: Gate 2: zwei unabhaengige Pruefungen
         M->>K: Verify.check (Beweis) und payload gegen Γ (object_id-Claim)
@@ -355,6 +357,10 @@ Objekt ab, bis die Typen nachgetragen sind.
   in fester Ordnung — der Vermittler bildet keine eigene Remedy-Abbildung,
   Single-Sourcing #115). Die Relaxationsbefugnisse der benannten Bindungen
   (Γ-L1, R.2.2) schluesselt der Vermittler aus dem rohen Registry-Term auf.
+* **Vorbeleg**: nach einem `permit` schreibt der Vermittler zuerst ein PDR
+  mit `outcome: executing` (beim Connector-Weg: der emit-PDR mit `outcome:
+  emitted`). Erst wenn es gesynct im Journal steht, laeuft der Vollzug;
+  scheitert das Schreiben, stoppt die Vermittlung.
 * **Gate 2**: nur nach einem `permit` vollzieht der Connector. Danach
   laufen zwei unabhaengige Pruefungen: der Beweis durch
   `KomkiPolicy.Verify.check`, und das realisierte Payload gegen den

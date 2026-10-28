@@ -24,8 +24,9 @@ defmodule KomkiMediator.FakeConnector do
     module = module(id)
     path = Path.join(dir, id <> ".sock")
     {:ok, listener} = Server.listen(path)
+    token = KomkiConnector.Token.provision!(path)
     state = %{test: self(), journal_path: journal_path, reply: reply}
-    pid = spawn_link(fn -> Server.accept_loop(listener, module, state) end)
+    pid = spawn_link(fn -> Server.accept_loop(listener, module, state, token) end)
     :ok = :gen_tcp.controlling_process(listener, pid)
     pid
   end

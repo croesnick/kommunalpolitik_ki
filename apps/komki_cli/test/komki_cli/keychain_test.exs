@@ -46,6 +46,22 @@ defmodule KomkiCli.KeychainTest do
     assert System.monotonic_time(:millisecond) - started < 5_000
   end
 
+  test "store/3 behaelt den Account eines vorhandenen Eintrags (kein zweiter Eintrag)" do
+    dir = TestSupport.tmp_area!("komki-kc-acct")
+
+    cmd =
+      fake!("""
+      case "$1$4" in
+        find-generic-password-w) cat #{dir}/value ;;
+        find-generic-password*) echo '    "acct"<blob>="jemand@example.org"' ;;
+        -i) read -r line; printf '%s' "$line" > #{dir}/line; printf '%s' "${line##* }" > #{dir}/value ;;
+      esac
+      """)
+
+    assert :ok = Keychain.store("brave-search-api", "ktv1.siegel", command: cmd)
+    assert File.read!(Path.join(dir, "line")) =~ "-a jemand@example.org -U"
+  end
+
   test "present/2 fragt ohne -w (kein Wert)" do
     cmd = fake!(~s([ "$#" = 3 ] || exit 9\necho attribute))
     assert :ok = Keychain.present("x", command: cmd)

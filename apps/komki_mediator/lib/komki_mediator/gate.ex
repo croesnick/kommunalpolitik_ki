@@ -18,8 +18,10 @@ defmodule KomkiMediator.Gate do
     entschiedenen Objekt passen. Faellt eine Pruefung aus, wird der
     Inhalt zurueckgehalten (`"admitted" => "redacted"`); der
     Modellkontext sieht dann nie den unbelegten Payload.
-  * Jeder Ablauf haengt EINEN PDR-Auditdatensatz an (synchron via Journal)
-    und bettet die `decision_id` in die Antwort ein - zitierfaehig.
+  * Jeder Ablauf haengt einen PDR-Auditdatensatz an (synchron via Journal)
+    und bettet die `decision_id` in die Antwort ein - zitierfaehig. Ein
+    Permit schreibt vorher einen zweiten: `outcome: executing`, bevor der
+    Executor laeuft (Audit vor Wirkung).
 
   Der `payload_hash` bindet die Bytes, die die MCP-Schicht wirklich
   zurueckgibt (den Modellkontext), nicht den ungefilterten
@@ -114,6 +116,7 @@ defmodule KomkiMediator.Gate do
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
+        executing(env, tool, intent_hash, intent, snapshot, decision)
         admit_result(env, tool, intent_hash, intent, snapshot, decision, executor.())
 
       {:ok, %{"decision" => kind} = decision} when kind in ["deny", "indeterminate"] ->
@@ -141,6 +144,24 @@ defmodule KomkiMediator.Gate do
           error_detail(err)
         )
     end
+  end
+
+  # Vorbeleg vor Wirkung (R.11), wie der emit-PDR im ConnectorGate: Der
+  # Permit steht im Journal, bevor der Executor laeuft (etwa der
+  # Dokument-Connector liest). Scheitert das Schreiben, stoppt der
+  # Journal-Writer die Vermittlung und der Executor laeuft nie.
+  defp executing(env, tool, intent_hash, intent, snapshot, decision) do
+    journal_pdr(
+      env,
+      pdr(tool, "permit", "executing", nil, intent_hash, %{
+        decision_id: new_decision_id(),
+        intent_id: intent["intent_id"],
+        snapshot_id: snapshot["snapshot_id"],
+        checked_label: decision["checked_label"],
+        remedies: nil,
+        payload_hash: payload_hash(%{"tool" => tool, "intent_hash" => intent_hash})
+      })
+    )
   end
 
   defp not_admitted(env, tool, intent_hash, intent, snapshot, kind, decision) do

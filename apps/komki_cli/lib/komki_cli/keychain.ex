@@ -19,7 +19,7 @@ defmodule KomkiCli.Keychain do
   # security(1): Exit 44 = errSecItemNotFound
   @not_found 44
 
-  @type error :: :missing | :timeout | :invalid | {:failed, integer()}
+  @type error :: :missing | :timeout | :invalid | :not_stored | {:failed, integer()}
 
   @doc "Wert eines generischen Passworts lesen."
   @spec fetch(String.t(), keyword()) :: {:ok, String.t()} | {:error, error()}
@@ -49,35 +49,76 @@ defmodule KomkiCli.Keychain do
   end
 
   @doc """
-  Wert als generisches Passwort ablegen oder ersetzen (Ticket #176,
-  `komki secret set`). Der Wert steht nie in argv (dort saehe ihn jeder
-  Prozess per `ps`): `security add-generic-password ... -w` ohne Wert liest
-  ohne Terminal zweimal von stdin (Eingabe und Wiederholung), komki
-  schreibt ihn genau dorthin. Ausgaben von `security` werden verworfen.
+  Wert als generisches Passwort ablegen oder ersetzen (`komki secret set`,
+  heute nur Siegel aus `KomkiCli.Tresor`). Der Wert steht nie in argv (dort
+  saehe ihn jeder Prozess per `ps`). `add-generic-password -w` ohne Wert
+  liest ihn ueber eine Passwortabfrage und kuerzt ihn dabei auf 128 Byte;
+  ein Siegel ist laenger. Deshalb geht der ganze Befehl als eine Zeile an
+  `security -i` (Befehle von stdin). Weil `security -i` die Zeile selbst
+  zerlegt, sind fuer Service, Account und Wert nur Zeichen ohne
+  Sonderbedeutung erlaubt. Danach liest komki den Eintrag zurueck und
+  vergleicht: Ein gekuerzter oder fremder Wert ist ein Fehler.
   """
   @spec store(String.t(), String.t(), keyword()) :: :ok | {:error, error()}
   def store(service, value, opts \\ []) when is_binary(service) and is_binary(value) do
-    if value == "" or String.contains?(value, ["\n", "\r"]) do
-      {:error, :invalid}
+    # `-U` ersetzt nur bei gleichem Service UND Account. Ein vorhandener
+    # Eintrag (etwa von Hand unter anderem Account angelegt) behaelt seinen
+    # Account, sonst entstuende ein zweiter Eintrag neben dem alten.
+    account =
+      Keyword.get_lazy(opts, :account, fn ->
+        existing_account(service, opts) || System.get_env("USER") || "komki"
+      end)
+
+    with :ok <- plain_words([service, account, value]),
+         {:ok, _} <- interactive(service, account, value, opts) do
+      verify_stored(service, value, opts)
+    end
+  end
+
+  @word ~r/\A[A-Za-z0-9@._+\/=-]+\z/
+
+  defp plain_words(words) do
+    if Enum.all?(words, &(&1 =~ @word)), do: :ok, else: {:error, :invalid}
+  end
+
+  # `head -n 1` beendet stdin nach der einen Zeile; `security -i` endet dann.
+  defp interactive(service, account, value, opts) do
+    command = Keyword.get(opts, :command, Application.get_env(:komki_cli, :security, @security))
+
+    port =
+      Port.open({:spawn_executable, "/bin/sh"}, [
+        :binary,
+        :exit_status,
+        :use_stdio,
+        args: ["-c", "head -n 1 | exec \"$0\" -i >/dev/null 2>&1", command]
+      ])
+
+    line =
+      Enum.join(["add-generic-password", "-s", service, "-a", account, "-U", "-w", value], " ")
+
+    Port.command(port, line <> "\n")
+    collect(port, [], System.monotonic_time(:millisecond) + @timeout_ms)
+  end
+
+  defp verify_stored(service, value, opts) do
+    case fetch(service, opts) do
+      {:ok, ^value} -> :ok
+      {:ok, _other} -> {:error, :not_stored}
+      {:error, _} = error -> error
+    end
+  end
+
+  @doc """
+  Account des vorhandenen Eintrags zu `service` (aus den Attributen, ohne
+  den Wert zu lesen); nil, wenn es keinen gibt.
+  """
+  @spec existing_account(String.t(), keyword()) :: String.t() | nil
+  def existing_account(service, opts \\ []) do
+    with {:ok, attributes} <- run(["find-generic-password", "-s", service], opts),
+         [_, account] <- Regex.run(~r/"acct"<blob>="([^"]*)"/, attributes) do
+      account
     else
-      command = Keyword.get(opts, :command, Application.get_env(:komki_cli, :security, @security))
-      account = Keyword.get(opts, :account, System.get_env("USER") || "komki")
-
-      port =
-        Port.open({:spawn_executable, command}, [
-          :binary,
-          :exit_status,
-          :use_stdio,
-          :stderr_to_stdout,
-          args: ["add-generic-password", "-s", service, "-a", account, "-U", "-w"]
-        ])
-
-      Port.command(port, value <> "\n" <> value <> "\n")
-
-      case collect(port, [], System.monotonic_time(:millisecond) + @timeout_ms) do
-        {:ok, _prompts} -> :ok
-        {:error, _} = error -> error
-      end
+      _ -> nil
     end
   end
 
@@ -89,7 +130,10 @@ defmodule KomkiCli.Keychain do
     do: "Schlüsselbund-Abfrage '" <> service <> "' nach Timeout abgebrochen"
 
   def describe(service, :invalid),
-    do: "Wert für '" <> service <> "' ist leer oder enthält einen Zeilenumbruch"
+    do: "Wert für '" <> service <> "' ist leer oder enthält unzulässige Zeichen"
+
+  def describe(service, :not_stored),
+    do: "Schlüsselbund-Eintrag '" <> service <> "' enthält nach dem Schreiben einen anderen Wert"
 
   def describe(service, {:failed, code}),
     do:
