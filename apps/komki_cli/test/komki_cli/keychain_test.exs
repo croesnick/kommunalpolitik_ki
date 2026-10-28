@@ -51,14 +51,15 @@ defmodule KomkiCli.KeychainTest do
 
     cmd =
       fake!("""
-      case "$1" in
-        find-generic-password) echo '    "acct"<blob>="jemand@example.org"' ;;
-        add-generic-password) echo "$@" > #{dir}/args; read -r a; read -r b ;;
+      case "$1$4" in
+        find-generic-password-w) cat #{dir}/value ;;
+        find-generic-password*) echo '    "acct"<blob>="jemand@example.org"' ;;
+        -i) read -r line; printf '%s' "$line" > #{dir}/line; printf '%s' "${line##* }" > #{dir}/value ;;
       esac
       """)
 
     assert :ok = Keychain.store("brave-search-api", "ktv1.siegel", command: cmd)
-    assert File.read!(Path.join(dir, "args")) =~ "-a jemand@example.org -U"
+    assert File.read!(Path.join(dir, "line")) =~ "-a jemand@example.org -U"
   end
 
   test "present/2 fragt ohne -w (kein Wert)" do

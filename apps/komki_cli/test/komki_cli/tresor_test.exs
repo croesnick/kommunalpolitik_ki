@@ -26,9 +26,10 @@ defmodule KomkiCli.TresorTest do
     File.write!(path, """
     #!/bin/sh
     echo "$1" >> #{dir}/calls
+    [ -f #{dir}/stored ] || printf '%s' '#{value}' > #{dir}/stored
     case "$1" in
-      find-generic-password) echo '#{value}' ;;
-      add-generic-password) read -r a; read -r b; printf '%s' "$a" > #{dir}/stored ;;
+      find-generic-password) cat #{dir}/stored; echo ;;
+      -i) read -r line; printf '%s' "${line##* }" > #{dir}/stored ;;
     esac
     """)
 
