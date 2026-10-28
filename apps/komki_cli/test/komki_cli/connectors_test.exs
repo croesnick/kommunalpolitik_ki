@@ -258,6 +258,8 @@ defmodule KomkiCli.ConnectorsTest do
         for id <- ["documents", "ris", "vault", "web"], do: Manifest.socket_path(cfg.base_dir, id)
 
       Enum.each(sockets, &File.write!(&1, ""))
+      # Laufende Connectoren dieser Version haben ihr Token (sonst Neustart).
+      Enum.each(sockets, &KomkiConnector.Token.provision!/1)
 
       try do
         assert {:ok, entries} = Connectors.up(cfg, fetch: fn _ -> {:error, :missing} end)

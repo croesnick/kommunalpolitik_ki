@@ -322,10 +322,24 @@ defmodule KomkiCli.Connectors do
     comp = component_for(cfg, step)
 
     case alive(comp) do
-      {:ok, pid} -> {:ok, {comp.name, {:already, pid}}}
+      {:ok, pid} -> keep_or_restart(cfg, step, comp, pid, fetch)
       :none -> start_fresh(cfg, step, comp, fetch)
     end
   end
+
+  # Ein laufender Connector ohne Tokendatei stammt aus einer komki-Version
+  # vor den Connector-Tokens (oder hat sein Token verloren); der Vermittler
+  # erreicht ihn nicht mehr. Er wird neu gestartet statt als laufend zu gelten.
+  defp keep_or_restart(cfg, {:connector, _} = step, comp, pid, fetch) do
+    if File.exists?(Token.for_socket(comp.socket)) do
+      {:ok, {comp.name, {:already, pid}}}
+    else
+      _ = stop(comp)
+      start_fresh(cfg, step, comp, fetch)
+    end
+  end
+
+  defp keep_or_restart(_cfg, _step, comp, pid, _fetch), do: {:ok, {comp.name, {:already, pid}}}
 
   defp component_for(cfg, :egress), do: egress_component(cfg)
   defp component_for(cfg, {:connector, manifest}), do: connector_component(cfg, manifest.id)

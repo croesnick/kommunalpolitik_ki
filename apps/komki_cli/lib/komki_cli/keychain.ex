@@ -61,7 +61,13 @@ defmodule KomkiCli.Keychain do
       {:error, :invalid}
     else
       command = Keyword.get(opts, :command, Application.get_env(:komki_cli, :security, @security))
-      account = Keyword.get(opts, :account, System.get_env("USER") || "komki")
+      # `-U` ersetzt nur bei gleichem Service UND Account. Ein vorhandener
+      # Eintrag (etwa von Hand unter anderem Account angelegt) behaelt seinen
+      # Account, sonst entstuende ein zweiter Eintrag neben dem alten.
+      account =
+        Keyword.get_lazy(opts, :account, fn ->
+          existing_account(service, opts) || System.get_env("USER") || "komki"
+        end)
 
       port =
         Port.open({:spawn_executable, command}, [
@@ -78,6 +84,20 @@ defmodule KomkiCli.Keychain do
         {:ok, _prompts} -> :ok
         {:error, _} = error -> error
       end
+    end
+  end
+
+  @doc """
+  Account des vorhandenen Eintrags zu `service` (aus den Attributen, ohne
+  den Wert zu lesen); nil, wenn es keinen gibt.
+  """
+  @spec existing_account(String.t(), keyword()) :: String.t() | nil
+  def existing_account(service, opts \\ []) do
+    with {:ok, attributes} <- run(["find-generic-password", "-s", service], opts),
+         [_, account] <- Regex.run(~r/"acct"<blob>="([^"]*)"/, attributes) do
+      account
+    else
+      _ -> nil
     end
   end
 
