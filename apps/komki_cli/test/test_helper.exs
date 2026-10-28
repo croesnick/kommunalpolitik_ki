@@ -13,3 +13,21 @@ ExUnit.start(exclude: exclude)
 # Ticket #146: kein Test fragt den echten Schluesselbund ab (auch nicht der
 # volle Doctor im DoctorBootTest). /usr/bin/false: "Abfrage fehlgeschlagen".
 Application.put_env(:komki_cli, :security, "/usr/bin/false")
+
+# Kein Test fragt die echte Secure Enclave: Der Fake-Tresor "versiegelt"
+# per Base64 hinter dem echten Praefix und oeffnet ohne Rueckfrage.
+fake_tresor =
+  Path.join(System.tmp_dir!(), "komki-fake-tresor-#{System.unique_integer([:positive])}")
+
+File.write!(fake_tresor, """
+#!/bin/sh
+case "$1" in
+  check) exit 0 ;;
+  seal) read -r v; printf 'ktv1.%s\n' "$(printf '%s' "$v" | base64 | tr -d '\\n')" ;;
+  open) read -r v; printf '%s' "${v#ktv1.}" | base64 -d; echo ;;
+  *) exit 2 ;;
+esac
+""")
+
+File.chmod!(fake_tresor, 0o755)
+Application.put_env(:komki_cli, :tresor, fake_tresor)

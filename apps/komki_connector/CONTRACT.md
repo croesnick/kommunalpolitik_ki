@@ -1,6 +1,6 @@
 # CONTRACT.md — komki Connector-Vertrag v1
 
-Stand: 2026-10-23. Gemeinsame Grundlage für Vermittler, Connectoren, Egress-Proxy und `komki_cli`.
+Stand: 2026-10-28. Gemeinsame Grundlage für Vermittler, Connectoren, Egress-Proxy und `komki_cli`.
 Begründung und Abwägung: `docs/research/2026-10-20-tool-zugang-entscheidungshandbuch.md` (Abschnitte 1, 6a,
 7.2). Änderungen an diesem Vertrag nur durch den Integrator. Eine Lane, die eine Lücke findet, schreibt
 einen Kommentar ins Ticket und baut nicht daran vorbei.
@@ -35,7 +35,9 @@ not permitted`). Ein gesandboxter Prozess kann keinen Kindprozess mit eigenem Pr
 `sandbox-exec -f <profil>`.
 
 **Annahme:** Der Host ist nicht kompromittiert (kein Gegner mit derselben uid, Handbuch 7.2). Gegner ist
-der prompt-injizierte Agent in pis Sandbox.
+der prompt-injizierte Agent in pis Sandbox. Zwei Maßnahmen engen den Fall „anderer Prozess derselben uid“
+trotzdem ein: Jeder Connector verlangt ein Token je Start (§3), und Geheimnisse liegen im Schlüsselbund nur
+als Siegel der Secure Enclave, die sich nur mit Touch ID oder dem Passwort des Macs öffnen lassen (§5).
 
 ## 2. Laufzeitverzeichnis
 
@@ -45,6 +47,7 @@ Alle Sockets liegen unter `<base>/run/` (Rechte `0700`, angelegt von `komki up`)
 |---|---|---|
 | `<base>/run/mediator.sock` | Vermittler (Bandit, HTTP) | `komki-relay.js`, `komki doctor/status` |
 | `<base>/run/connectors/<id>.sock` | Connector `<id>` | Vermittler, `komki doctor` |
+| `<base>/run/connectors/<id>.token` | — (Datei, `0600`, 32 Byte Zufall als Hex, neu bei jedem Connector-Start) | geschrieben von `komki up`, gelesen von Vermittler und `komki doctor`; der Connector bekommt denselben Wert über stdin (§4) |
 | `<base>/run/mediator.token` | — (Datei, `0600`, 32 Byte Zufall als Hex) | geschrieben von `komki up`, gelesen von Vermittler und `komki run/session` |
 
 macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge. Ist sie zu lang, lehnt
@@ -59,15 +62,23 @@ macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge.
 - Anfrage:
 
   ```json
-  {"v": 1, "call_id": "<pdr-id des emit-PDR>", "op": "<operation>", "params": {...}, "context": {...}}
+  {"v": 1, "token": "<connector-token>", "call_id": "<pdr-id des emit-PDR>", "op": "<operation>", "params": {...}, "context": {...}}
   ```
+
+  `token` ist Pflicht und muss dem Token des Connectors entsprechen (Vergleich in konstanter Zeit,
+  `KomkiConnector.Token`). Sonst antwortet der Connector `unauthorized` mit leerer `call_id`, noch vor
+  `ping`, Schema-Prüfung und Operation. Der Client liest das Token je Aufruf aus `<id>.token` neben dem
+  Socket.
 
   `context` ist optional und kommt nur vom Vermittler, nie aus pis Argumenten. Heute einziges Feld:
   `assigned_label` (Liste) für schreibende Operationen (§6.3).
 - Antwort, Erfolg: `{"v": 1, "call_id": "...", "ok": true, "result": {...}}`
 - Antwort, Fehler: `{"v": 1, "call_id": "...", "ok": false, "error": {"code": "<kebab>", "detail": "<text>"}}`
 - Fehlercodes (geschlossen): `bad-request`, `unknown-op`, `not-found`, `upstream-error`, `upstream-timeout`,
-  `credential-missing`, `forbidden-path`, `too-large`, `internal`.
+  `credential-missing`, `forbidden-path`, `too-large`, `unauthorized`, `internal`.
+- `detail` bleibt beim Connector: Der Client ersetzt ihn durch den festen Text des Codes
+  (`KomkiConnector.Frame.describe/1`), sodass kein Freitext eines Connectors am Gate 2 vorbei in den
+  Modellkontext gelangt. Der Connector schreibt seinen `detail` in sein Log.
 - Reservierte Operation `ping` (ohne Parameter) liefert `{"fassung": "<fassung-id>", "ops": [...]}`. Sie
   dient `komki doctor` und ist **kein** MCP-Tool.
 - Timeout auf Vermittler-Seite: 15 s je Aufruf, danach `upstream-timeout`.
@@ -79,13 +90,14 @@ macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge.
 sandbox-exec -f <base>/profile/connector-<id>.sb <binary> --socket <base>/run/connectors/<id>.sock [--proxy 127.0.0.1:<port>] [--base-url <url>] [--vault-dir <pfad>] [--documents-dir <pfad>]
 ```
 
-- **Credentials kommen über stdin**: genau eine JSON-Zeile `{"<NAME>": "<wert>", ...}`, danach schließt
-  `komki up` stdin. Ein Connector ohne Credentials liest `{}`. Credentials stehen nie in argv, nie in der
-  Umgebung, nie in Logs und nie in Antworten.
+- **Credentials kommen über stdin**: genau eine JSON-Zeile `{"KOMKI_CONNECTOR_TOKEN": "<token>", "<NAME>":
+  "<wert>", ...}`, danach schließt `komki up` stdin. Das Token ist Pflicht; ohne gültiges Token startet der
+  Connector nicht. Credentials und Token stehen nie in argv, nie in der Umgebung, nie in Logs und nie in
+  Antworten.
 - Der Connector liest stdin vollständig, bevor er den Socket bindet. Nach dem Binden setzt er die
   Socket-Datei auf `0600`.
 - Log: stderr, umgeleitet nach `<base>/tmp/connector-<id>.log`. Payloads werden nicht geloggt, nur
-  Operation, Dauer und Fehlercode.
+  Operation, Dauer, Fehlercode und der eigene Fehlertext des Connectors.
 - Beendet wird der Connector über SIGTERM (pidfile `<base>/tmp/connector-<id>.pid`).
 
 ## 5. Manifeste (`KomkiConnector.Manifest`)
@@ -101,7 +113,7 @@ Einzige Quelle für Fassung, Operationen, Netz, Dateisystem, Credentials und Imp
 | `ops` | Operation → Parameter-Schema (geschlossen, siehe unten) und `kind` (`read` oder `write`) |
 | `egress_hosts` | Host-Allowlist für den Egress-Proxy (`host:port`). Leer heißt: kein Netz, kein Proxy-Port |
 | `fs` | Platzhalter-Pfade (`{vault_dir}`, `{documents_dir}` = `<base>/mediator/documents`) mit Modus `read` oder `write` |
-| `credentials` | Name → Keychain-Service (`security find-generic-password -s <service> -w`) |
+| `credentials` | Name → Keychain-Service. Der Eintrag enthält nur das Siegel (`ktv1.…`); `komki up` öffnet es mit `komki-tresor` über die Secure Enclave (Touch ID oder Passwort) und schreibt den Klartext nur in die stdin-Zeile. Ein Klartext-Eintrag wird nicht benutzt |
 | `environment` | Umgebung für `emit` (modellierte Empfänger der Anfrage), z. B. `web-suche@1` |
 | `import_labels` | erlaubte Labels für Antworten. Bei RIS und Web genau eines. Bei Vault leer: die Notiz trägt ihre Labels im Frontmatter, und der Vermittler lässt jede Bindung aus Γ zu (Ticket #211); der Connector prüft nur die Form einer Bindungs-ID. Geschriebene Notizen tragen λ(y) = B_W (§6.3) |
 

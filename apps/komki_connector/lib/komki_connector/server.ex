@@ -2,14 +2,17 @@ defmodule KomkiConnector.Server do
   @moduledoc """
   Connector-Seite des Frame-Protokolls (CONTRACT.md §3, §4).
 
-  Ein Connector implementiert das Behaviour und ruft `run/3` aus seinem
+  Ein Connector implementiert das Behaviour und ruft `run/4` aus seinem
   Escript-Einstieg auf:
 
-      creds = KomkiConnector.Server.read_credentials()
-      KomkiConnector.Server.run(MyConnector, socket_path, init_arg)
+      {:ok, creds} = KomkiConnector.Server.read_credentials()
+      KomkiConnector.Server.run(MyConnector, socket_path, init_arg, creds)
 
-  `run/3` bindet den Unix-Socket (Datei danach `0600`), nimmt
-  Verbindungen an und beantwortet je Verbindung genau eine Anfrage. Die
+  `run/4` bindet den Unix-Socket (Datei danach `0600`), nimmt
+  Verbindungen an und beantwortet je Verbindung genau eine Anfrage. Jede
+  Anfrage muss das Token aus der stdin-Zeile tragen (`KomkiConnector.Token`);
+  ohne gueltiges Token verweigert `run/4` den Start, eine Anfrage ohne
+  passendes Token bekommt `unauthorized`, noch vor `ping`. Die
   reservierte Operation `ping` beantwortet der Server selbst aus dem
   Manifest. Parameter werden vor `handle_op/4` gegen das Manifest-Schema
   geprueft (`KomkiConnector.Params`) — ein Connector sieht nie
@@ -18,7 +21,7 @@ defmodule KomkiConnector.Server do
 
   require Logger
 
-  alias KomkiConnector.{Frame, Manifest, Params}
+  alias KomkiConnector.{Frame, Manifest, Params, Token}
 
   @recv_timeout 15_000
 
@@ -68,16 +71,25 @@ defmodule KomkiConnector.Server do
 
   @doc """
   Bindet den Socket und bedient Anfragen, bis der Prozess beendet wird.
-  Mit `opts[:once]` (Tests) kehrt `listen/3` mit dem Listener zurueck,
-  statt zu blockieren — dann `serve/3` selbst aufrufen.
+  `creds` ist die stdin-Zeile aus `read_credentials/1`; ihr Token-Eintrag
+  ist Pflicht (fail-closed).
   """
-  @spec run(module(), Path.t(), term()) :: no_return() | {:error, term()}
-  def run(module, socket_path, init_arg) do
-    with {:ok, state} <- module.init(init_arg),
+  @spec run(module(), Path.t(), term(), %{String.t() => String.t()}) ::
+          no_return() | {:error, term()}
+  def run(module, socket_path, init_arg, creds) do
+    with {:ok, token} <- fetch_token(creds),
+         {:ok, state} <- module.init(init_arg),
          {:ok, listener} <- listen(socket_path) do
       Logger.info("connector #{module.manifest_id()} lauscht auf #{socket_path}")
-      accept_loop(listener, module, state)
+      accept_loop(listener, module, state, token)
     end
+  end
+
+  @doc "Token aus der stdin-Zeile; ohne gueltiges Token kein Start."
+  @spec fetch_token(map()) :: {:ok, String.t()} | {:error, String.t()}
+  def fetch_token(creds) do
+    token = Map.get(creds, Token.credential_key())
+    if Token.valid?(token), do: {:ok, token}, else: {:error, "kein gueltiges Connector-Token"}
   end
 
   @doc "Socket binden (stale Datei wird entfernt), Rechte auf 0600 setzen."
@@ -94,31 +106,31 @@ defmodule KomkiConnector.Server do
   end
 
   @doc "Annahmeschleife: je Verbindung ein Prozess, eine Anfrage."
-  @spec accept_loop(port(), module(), term()) :: no_return()
-  def accept_loop(listener, module, state) do
+  @spec accept_loop(port(), module(), term(), String.t()) :: no_return()
+  def accept_loop(listener, module, state, token) do
     case :gen_tcp.accept(listener) do
       {:ok, sock} ->
-        {:ok, pid} = Task.start(fn -> serve(sock, module, state) end)
+        {:ok, pid} = Task.start(fn -> serve(sock, module, state, token) end)
         _ = :gen_tcp.controlling_process(sock, pid)
-        accept_loop(listener, module, state)
+        accept_loop(listener, module, state, token)
 
       {:error, :closed} ->
         exit(:normal)
 
       {:error, reason} ->
         Logger.error("accept fehlgeschlagen: #{inspect(reason)}")
-        accept_loop(listener, module, state)
+        accept_loop(listener, module, state, token)
     end
   end
 
   @doc "Eine Verbindung bedienen: Anfrage lesen, beantworten, schliessen."
-  @spec serve(port(), module(), term()) :: :ok
-  def serve(sock, module, state) do
+  @spec serve(port(), module(), term(), String.t()) :: :ok
+  def serve(sock, module, state, token) do
     started = System.monotonic_time(:millisecond)
 
     reply =
       case :gen_tcp.recv(sock, 0, @recv_timeout) do
-        {:ok, bin} -> handle_frame(bin, module, state)
+        {:ok, bin} -> handle_frame(bin, module, state, token)
         {:error, _} -> nil
       end
 
@@ -135,8 +147,10 @@ defmodule KomkiConnector.Server do
             bin
         end
 
-      _ = :gen_tcp.send(sock, bin)
+      # Erst loggen, dann senden: hat der Aufrufer die Antwort, steht die
+      # Logzeile schon.
       log(module, reply, started)
+      _ = :gen_tcp.send(sock, bin)
     end
 
     :gen_tcp.close(sock)
@@ -144,14 +158,27 @@ defmodule KomkiConnector.Server do
 
   @doc false
   # Oeffentlich fuer Tests: ein Frame (Binary) zur Antwort-Map.
-  @spec handle_frame(binary(), module(), term()) :: map()
-  def handle_frame(bin, module, state) do
+  @spec handle_frame(binary(), module(), term(), String.t()) :: map()
+  def handle_frame(bin, module, state, token) do
     with {:ok, frame} <- Frame.decode(bin),
+         :ok <- authorize(frame, token),
          {:ok, call_id, op, params, context} <- shape(frame) do
       dispatch(module, call_id, op, params, context, state)
     else
       {:error, :bad_frame} -> Frame.error("", "bad-request", "ungueltiger Frame")
+      {:error, :unauthorized} -> Frame.error("", "unauthorized", "Token fehlt oder passt nicht")
       {:error, call_id, detail} -> Frame.error(call_id, "bad-request", detail)
+    end
+  end
+
+  # Vor allem anderen, auch vor ping: ohne Token erfaehrt der Aufrufer
+  # nichts ueber den Connector, nicht einmal seine call_id kommt zurueck.
+  defp authorize(frame, token) do
+    if Token.equal?(frame["token"], token) do
+      :ok
+    else
+      Logger.warning("Anfrage ohne gueltiges Token abgewiesen")
+      {:error, :unauthorized}
     end
   end
 
@@ -204,9 +231,15 @@ defmodule KomkiConnector.Server do
   end
 
   # Log ohne Payload: Operation (aus call_id nicht ableitbar), Ergebnis, Dauer.
+  # Bei Fehlern steht der eigene Fehlertext des Connectors nur hier: der
+  # Client gibt ihn nicht weiter (KomkiConnector.Frame.describe/1).
   defp log(module, reply, started) do
     ms = System.monotonic_time(:millisecond) - started
-    outcome = if reply["ok"], do: "ok", else: get_in(reply, ["error", "code"])
+
+    outcome =
+      if reply["ok"],
+        do: "ok",
+        else: get_in(reply, ["error", "code"]) <> " detail=" <> inspect(reply["error"]["detail"])
 
     Logger.info(
       "connector=#{module.manifest_id()} call=#{reply["call_id"]} outcome=#{outcome} ms=#{ms}"

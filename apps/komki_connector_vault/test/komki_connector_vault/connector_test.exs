@@ -23,7 +23,8 @@ defmodule KomkiConnectorVault.ConnectorTest do
     sock = Path.join(dir, "v.sock")
     {:ok, state} = KomkiConnectorVault.init(vault)
     {:ok, listener} = Server.listen(sock)
-    pid = spawn(fn -> Server.accept_loop(listener, KomkiConnectorVault, state) end)
+    token = KomkiConnector.Token.provision!(sock)
+    pid = spawn(fn -> Server.accept_loop(listener, KomkiConnectorVault, state, token) end)
     _ = :gen_tcp.controlling_process(listener, pid)
 
     on_exit(fn ->

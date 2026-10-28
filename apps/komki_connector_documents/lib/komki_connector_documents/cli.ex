@@ -16,8 +16,8 @@ defmodule KomkiConnectorDocuments.CLI do
     log_to_stderr()
 
     with {:ok, socket, dir} <- parse(argv),
-         {:ok, _creds} <- Server.read_credentials() do
-      case Server.run(KomkiConnectorDocuments, socket, dir) do
+         {:ok, creds} <- Server.read_credentials() do
+      case Server.run(KomkiConnectorDocuments, socket, dir, creds) do
         {:error, reason} -> fail(to_string_reason(reason))
       end
     else

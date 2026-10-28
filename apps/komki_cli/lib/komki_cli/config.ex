@@ -61,6 +61,8 @@ defmodule KomkiCli.Config do
                 :vault_dir,
                 connector_bins: %{},
                 egress_ports: %{},
+                # Programm-Pins (KomkiCli.Pins): Name -> %{"path", "sha256"}
+                pins: %{},
                 ris_base_url: nil,
                 # Wie Rollen starten (Ticket #181): "escript" (escript <komki> <rolle>)
                 # oder "burrito" (<komki-binary> <rolle>)
@@ -91,7 +93,8 @@ defmodule KomkiCli.Config do
           egress_ports: %{String.t() => pos_integer()},
           ris_base_url: String.t() | nil,
           ris_mock_port: pos_integer() | nil,
-          vault_dir: String.t() | nil
+          vault_dir: String.t() | nil,
+          pins: %{String.t() => %{String.t() => String.t()}}
         }
 
   # Felder, deren Werkzeug-Pfade bei init entdeckt wurden (nil, wenn das
@@ -552,7 +555,8 @@ defmodule KomkiCli.Config do
     :egress_ports,
     :ris_base_url,
     :ris_mock_port,
-    :vault_dir
+    :vault_dir,
+    :pins
   ]
 
   @spec from_map(%{String.t() => term()}) :: {:ok, t()} | {:error, String.t()}
@@ -600,7 +604,8 @@ defmodule KomkiCli.Config do
       egress_ports: ports(Map.get(map, "egress_ports", @default_egress_ports)),
       ris_base_url: Map.get(map, "ris_base_url") || @default_ris_base_url,
       ris_mock_port: optional_pos(:ris_mock_port, Map.get(map, "ris_mock_port")),
-      vault_dir: blank_to_nil(Map.get(map, "vault_dir"))
+      vault_dir: blank_to_nil(Map.get(map, "vault_dir")),
+      pins: Map.get(map, "pins") || %{}
     }
   end
 

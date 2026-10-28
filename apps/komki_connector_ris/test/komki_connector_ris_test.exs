@@ -19,7 +19,8 @@ defmodule KomkiConnectorRisTest do
 
     {:ok, cfg} = KomkiConnectorRis.init(Map.merge(%{base_url: base_url}, overrides))
     {:ok, listener} = Server.listen(path)
-    pid = spawn(fn -> Server.accept_loop(listener, KomkiConnectorRis, cfg) end)
+    token = KomkiConnector.Token.provision!(path)
+    pid = spawn(fn -> Server.accept_loop(listener, KomkiConnectorRis, cfg, token) end)
     :ok = :gen_tcp.controlling_process(listener, pid)
 
     on_exit(fn ->
@@ -124,7 +125,7 @@ defmodule KomkiConnectorRisTest do
           error
         end
 
-      assert [%{"code" => "not-found", "detail" => "TOP nicht gefunden"}] = Enum.uniq(errors)
+      assert [%{"code" => "not-found", "detail" => "nicht gefunden"}] = Enum.uniq(errors)
     end
 
     test "Parameterverstoesse weist schon der Server ab", %{path: path} do

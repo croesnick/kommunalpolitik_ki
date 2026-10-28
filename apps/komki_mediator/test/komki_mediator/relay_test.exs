@@ -56,8 +56,10 @@ defmodule KomkiMediator.RelayTest do
 
     assert %{"id" => 3, "result" => %{"isError" => false}} = read_line(relay)
 
-    assert [%{"tool" => "ping", "session_id" => @session}] =
-             TestHelpers.journal_records(journal_path)
+    assert [
+             %{"tool" => "ping", "outcome" => "executing", "session_id" => @session},
+             %{"tool" => "ping", "outcome" => "admitted", "session_id" => @session}
+           ] = TestHelpers.journal_records(journal_path)
 
     Port.close(relay)
   end

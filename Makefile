@@ -1,4 +1,4 @@
-.PHONY: test lint format ci deps elixir-test python-test install komki komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview
+.PHONY: test lint format ci deps elixir-test python-test install komki komki-tresor komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview
 
 # Escript bauen und nach /usr/local/bin symlinken.
 # Workspace-Pattern: mix.exs der ratsinfo-App referenziert ../artifacts/deps
@@ -16,13 +16,19 @@ install:
 # komki bauen und in den PATH legen (Tickets #176, #179): ein Programm, das
 # Vermittler, Egress-Proxy und Connectoren als Rollen enthaelt.
 KOMKI_LINK_DIR ?= $(HOME)/.local/bin
-komki:
+komki: komki-tresor
 	@cd apps/komki_cli && mix deps.get >/dev/null && mix escript.build
 	@mkdir -p "$(KOMKI_LINK_DIR)"
 	@ln -sf "$(PWD)/apps/komki_cli/komki" "$(KOMKI_LINK_DIR)/komki"
 	@echo ""
 	@echo "komki gebaut: $(KOMKI_LINK_DIR)/komki"
 	@echo "Weiter mit: komki setup"
+
+# komki-tresor: versiegelt Geheimnisse mit der Secure Enclave (Swift, weil
+# Erlang die Enclave nicht erreicht; Quelle apps/komki_cli/native). komki
+# sucht es neben sich selbst. Bau braucht swiftc (Xcode Command Line Tools).
+komki-tresor:
+	@swiftc -O -o apps/komki_cli/komki-tresor apps/komki_cli/native/komki-tresor/main.swift
 
 # Paket fuer die Homebrew-Formel (Ticket #180): das Escript (prod), die
 # SQLite-NIF von exqlite und pi mit allen Abhaengigkeiten nebeneinander, als
@@ -32,10 +38,10 @@ komki:
 # die .bin-Links fallen weg.
 KOMKI_VERSION = $(shell grep -m1 'version:' apps/komki_cli/mix.exs | sed 's/.*"\(.*\)".*/\1/')
 KOMKI_PAKET = dist/komki-$(KOMKI_VERSION)-macos-arm64
-komki-paket:
+komki-paket: komki-tresor
 	@cd apps/komki_cli && MIX_ENV=prod mix deps.get >/dev/null && MIX_ENV=prod mix escript.build
 	@rm -rf "$(KOMKI_PAKET)" && mkdir -p "$(KOMKI_PAKET)/lib/exqlite"
-	@cp apps/komki_cli/komki "$(KOMKI_PAKET)/komki"
+	@cp apps/komki_cli/komki apps/komki_cli/komki-tresor "$(KOMKI_PAKET)/"
 	@cp -R apps/komki_cli/_build/prod/lib/exqlite/ebin apps/komki_cli/_build/prod/lib/exqlite/priv "$(KOMKI_PAKET)/lib/exqlite/"
 	@cd packaging/pi && pnpm install --frozen-lockfile --prod --ignore-scripts >/dev/null
 	@cp -R packaging/pi/node_modules "$(KOMKI_PAKET)/lib/node_modules"
@@ -75,15 +81,16 @@ komki-tap: komki-paket
 # hat fuer die aktuelle OTP-Version keine vorgebaute). Bau braucht zig 0.16.0
 # und xz (docs/prerequisites.md). Ergebnis: dist/komki-<version>-macos-arm64-einzeldatei
 KOMKI_ZIG ?= $(HOME)/.local/opt/zig-aarch64-macos-0.16.0
-komki-burrito:
+komki-burrito: komki-tresor
 	@mkdir -p dist
+	@cp apps/komki_cli/komki-tresor dist/komki-tresor
 	@root=$$(erl -noshell -eval 'io:format("~s",[code:root_dir()]), halt().'); \
 	  otp=$$(cat "$$root"/releases/*/OTP_VERSION | head -1); \
 	  tar -czf dist/erts-$$otp-macos-aarch64.tar.gz -C "$$root" -s ",^\.,otp-$$otp-macos-aarch64," . ; \
 	  cd apps/komki_cli && PATH="$(KOMKI_ZIG):$$PATH" MIX_ENV=prod BURRITO_TARGET=macos_silicon \
 	    KOMKI_CUSTOM_ERTS="$(PWD)/dist/erts-$$otp-macos-aarch64.tar.gz" mix release --overwrite
 	@cp apps/komki_cli/burrito_out/komki_macos_silicon "$(KOMKI_PAKET)-einzeldatei"
-	@echo "Einzeldatei: $(KOMKI_PAKET)-einzeldatei"
+	@echo "Einzeldatei: $(KOMKI_PAKET)-einzeldatei (dist/komki-tresor gehört daneben)"
 
 # Doku-Site lokal ansehen (docs/site/README.md). pnpm in der Version aus
 # docs/site/package.json (packageManager), wie in der CI; fehlt es fuer die

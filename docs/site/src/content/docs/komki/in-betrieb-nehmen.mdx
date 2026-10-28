@@ -12,7 +12,7 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
 - **Einen Mac mit Apple Silicon.** komki nutzt die Sandbox von macOS, auf Linux oder Windows läuft es nicht.
 - **Arbeitsspeicher für das Modell.** Gemma belegt rund 17 GB. Mit 32 GB läuft es entspannt, mit 16 GB nicht.
 - **Rund 20 GB freien Platz.** Fast alles davon ist das Modell. Die Instanz bekommt nur einen APFS-Klon der Datei, also keine zweite Kopie.
-- **Homebrew und asdf** für die Werkzeuge, **pnpm** für pi.
+- **Homebrew und asdf** für die Werkzeuge, **pnpm** für pi, die **Xcode Command Line Tools** (`xcode-select --install`) für ein kleines Swift-Programm, das Schlüssel mit der Secure Enclave schützt.
 - **Optional einen Brave-Search-API-Schlüssel** für die Websuche ([brave.com/search/api](https://brave.com/search/api/), Konditionen dort). Ohne ihn funktionieren RIS und Vault, nur die Websuche fehlt.
 
 <Steps>
@@ -85,7 +85,7 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
 
    - **Werkzeuge**: Alles, was komki braucht, ist gefunden. Die fünf `komki-…`-Namen sind die Rollen im Programm komki.
    - **Instanz**: Unter `~/.local/share/komki` liegen Einstellungen, Sandbox-Profile, Journal und die Kopie des Modells. komki rechnet dabei die Prüfsumme des Modells nach, daher die halbe Minute.
-   - **brave**: Der Schlüssel liegt im macOS-Schlüsselbund. komki zeigt ihn nie an.
+   - **brave**: Der Schlüssel liegt im macOS-Schlüsselbund, versiegelt mit der Secure Enclave deines Macs. komki zeigt ihn nie an. Beim Start des Web-Connectors fragt macOS per Touch ID oder Passwort, ob komki ihn öffnen darf.
    - **up**: llama rechnet das Modell, der Egress-Proxy ist die einzige Tür nach draußen, die Connectoren holen die Daten, der Vermittler entscheidet über jeden Zugriff. Hinter `tools` steht, was pi aufrufen darf.
    - **Prüfung**: `doctor` hat alle Werkzeuge und Profile geprüft und jedes Profil einmal in der Sandbox gestartet.
 
@@ -99,7 +99,9 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
 
    Die Revision ist fest, du bekommst also genau die geprüfte Datei. Bricht der Download ab, macht der nächste Aufruf an derselben Stelle weiter. Verwendet wird die Datei nur, wenn ihre Prüfsumme exakt stimmt. Hast du das Modell schon, gibst du es mit `--gguf-from PFAD` an.
 
-   **Fehlt der Brave-Schlüssel**, fragt `setup` ihn verdeckt ab: Die Eingabe erscheint nicht auf dem Bildschirm und geht direkt in den Schlüsselbund. Du kannst die Frage mit Enter überspringen und ihn später mit `komki secret set brave` nachtragen. Beim ersten Zugriff fragt macOS, ob komki den Eintrag lesen darf. Wähle dann „Immer erlauben“.
+   **Fehlt der Brave-Schlüssel**, fragt `setup` ihn verdeckt ab: Die Eingabe erscheint nicht auf dem Bildschirm. komki versiegelt sie mit der Secure Enclave und legt nur das Siegel im Schlüsselbund ab. Du kannst die Frage mit Enter überspringen und ihn später mit `komki secret set brave` nachtragen. Liegt dort noch ein Schlüssel im Klartext aus einer älteren Version, bietet `setup` an, ihn zu versiegeln.
+
+   **Bei jedem Start fragt macOS einmal nach Touch ID oder deinem Passwort**, mit dem Grund „komki startet den Connector web“. Das ist der Schutz: Den Eintrag im Schlüsselbund kann jedes Programm deines Nutzers lesen, das Siegel öffnet aber nur die Secure Enclave, und die nur mit deiner Freigabe. Fragt macOS, ohne dass du gerade komki startest, lehnst du ab.
 
 4. ### Die erste Frage
 
@@ -242,7 +244,7 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
 
    Wenn du fertig bist, stoppt `komki down` alles, was komki gestartet hat, auch llama. Der Arbeitsspeicher des Modells ist danach wieder frei.
 
-   **Aktualisieren:** neuen Stand holen, neu bauen, `setup` erneut aufrufen. Deine Instanz bleibt dabei erhalten, mit Vault, Journal und Schlüssel. `setup` trägt nur die neuen Programmpfade und Sandbox-Profile ein und sagt, was es aufgefrischt hat.
+   **Aktualisieren:** neuen Stand holen, neu bauen, `setup` erneut aufrufen. Deine Instanz bleibt dabei erhalten, mit Vault, Journal und Schlüssel. `setup` trägt nur die neuen Programmpfade und Sandbox-Profile ein und sagt, was es aufgefrischt hat. Außerdem hält komki für jedes Programm, das es startet, eine Prüfsumme fest und startet nur, wenn sie noch stimmt. Nach einem Neubau fragt `setup` deshalb, ob es das veränderte komki übernehmen soll. Bestätige mit `j`, wenn du selbst gebaut hast.
 
    ```sh
    git pull && make komki && komki setup

@@ -52,6 +52,7 @@ defmodule KomkiCli.Steps do
     Llama,
     Mediator,
     Pi,
+    Pins,
     Profile,
     SessionIntake,
     StartContract
@@ -147,7 +148,7 @@ defmodule KomkiCli.Steps do
       # Ticket #100: llama-server-Profil neben dem pi-Profil schreiben
       Profile.write!(Llama.llama_profile_path(cfg), Profile.generate_llama(cfg))
       write_sandbox_profiles(cfg)
-      Config.save(cfg)
+      Config.save(%{cfg | pins: Pins.compute(cfg)})
       {:inited, cfg, gguf_lines}
     else
       # place_gguf liefert {:error, reason, 2}; create_dirs wirft bei Misserfolg
@@ -185,18 +186,24 @@ defmodule KomkiCli.Steps do
           value != Map.fetch!(cfg, field),
           do: {field, value}
 
+    updated = struct!(cfg, changes)
+    pinned = pin_new(updated, cfg)
+
     cond do
       changes != [] ->
-        updated = struct!(cfg, changes)
-        Config.save(updated)
-        write_all_profiles(updated)
-        {:refreshed, Enum.map(changes, fn {field, _} -> Atom.to_string(field) end)}
+        write_all_profiles(pinned.cfg)
+
+        {:refreshed,
+         Enum.map(changes, fn {field, _} -> Atom.to_string(field) end) ++ pinned.names}
 
       # Gleiche Pfade, aber der Profil-Generator einer neuen komki-Version
       # erzeugt anderen Text (neue Regeln): neu schreiben und das benennen.
       not profiles_current?(cfg) ->
         write_all_profiles(cfg)
-        {:refreshed, ["Sandbox-Profile (neue komki-Version)"]}
+        {:refreshed, ["Sandbox-Profile (neue komki-Version)"] ++ pinned.names}
+
+      pinned.names != [] ->
+        {:refreshed, pinned.names}
 
       true ->
         :unchanged
@@ -227,6 +234,33 @@ defmodule KomkiCli.Steps do
     end
   rescue
     e -> {:error, "Vault-Wechsel fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  # Neu entdeckte Programme (neuer Pfad, etwa nach `brew upgrade`, oder
+  # noch nie festgehalten) pinnt setup selbst: Das Entdecken ist der
+  # Bedienschritt. Gleicher Pfad mit anderen Bytes bleibt stehen; das
+  # bestaetigt die Person einzeln (`changed_pins/0`, `accept_pins/1`).
+  defp pin_new(cfg, original) do
+    current = Pins.compute(cfg)
+    %{new: new} = Pins.drift(cfg, current)
+    updated = %{cfg | pins: Map.merge(cfg.pins, Map.take(current, new))}
+    if updated != original, do: Config.save(updated)
+    %{cfg: updated, names: Enum.map(new, &("Pin " <> &1))}
+  end
+
+  @doc "Programme, die sich am festgehaltenen Pfad verändert haben (Name, Pfad)."
+  @spec changed_pins() :: [{String.t(), String.t()}]
+  def changed_pins do
+    cfg = load_cfg!()
+    current = Pins.compute(cfg)
+    for name <- Pins.drift(cfg, current).changed, do: {name, current[name]["path"]}
+  end
+
+  @doc "Bestaetigte Programme mit ihrem aktuellen Hash festhalten."
+  @spec accept_pins([String.t()]) :: :ok
+  def accept_pins(names) do
+    cfg = load_cfg!()
+    Config.save(%{cfg | pins: Map.merge(cfg.pins, Map.take(Pins.compute(cfg), names))})
   end
 
   defp write_all_profiles(cfg) do
@@ -528,6 +562,8 @@ defmodule KomkiCli.Steps do
       tools_checks(cfg, scope),
       pi_version_checks(cfg, scope),
       profile_checks(cfg),
+      # Programm-Pins: auch im Kurz-Doctor, `up` startet nur mit gleichen Bytes.
+      Pins.checks(cfg),
       gguf_checks(cfg, scope),
       boot_gate(cfg),
       llama_boot_gate(cfg),
@@ -893,8 +929,11 @@ defmodule KomkiCli.Steps do
           {:error, reason} -> {:error, reason, 4}
         end
 
-      _ ->
-        {:error, "llama start verweigert: doctor-quick nicht grün (Boot-Gate)", 3}
+      {:checks, checks, _summary} ->
+        {:error, "Start verweigert: " <> not_green(checks), 3}
+
+      {:error, reason, _code} ->
+        {:error, "Start verweigert: " <> reason, 3}
     end
   rescue
     e -> {:error, "up fehlgeschlagen: " <> exception_reason(e), 2}
@@ -1132,8 +1171,8 @@ defmodule KomkiCli.Steps do
       {:checks, _checks, :ok} ->
         execute_run(opts, mode)
 
-      {:checks, _checks, _} ->
-        {:error, "run verweigert: doctor nicht grün (Boot-Gate ist Pflicht vor jedem Lauf)", 3}
+      {:checks, checks, _} ->
+        {:error, "run verweigert: " <> not_green(checks), 3}
 
       {:error, reason, code} ->
         {:error, reason, code}
@@ -1618,9 +1657,8 @@ defmodule KomkiCli.Steps do
   defp normalize_doctor(:ok), do: :ok
   defp normalize_doctor({:checks, _checks, :ok}), do: :ok
 
-  defp normalize_doctor({:checks, _checks, _}),
-    do:
-      {:error, "session verweigert: doctor nicht grün (Boot-Gate ist Pflicht vor jedem Lauf)", 3}
+  defp normalize_doctor({:checks, checks, _}),
+    do: {:error, "session verweigert: " <> not_green(checks), 3}
 
   defp normalize_doctor({:error, reason, code}), do: {:error, reason, code}
 
@@ -2020,6 +2058,12 @@ defmodule KomkiCli.Steps do
   # ===========================================================================
   # Helfer
   # ===========================================================================
+
+  # Die roten Checks beim Namen nennen statt pauschal "Boot-Gate".
+  defp not_green(checks) do
+    failing = for %{ok: false, name: name} <- checks, do: name
+    "nicht grün: " <> Enum.join(failing, ", ") <> " — 'komki doctor' nennt die Gründe"
+  end
 
   @doc "Streamed SHA-256 (1-MiB-Chunks; kein OOM beim 469-MiB-Artefakt)."
   @spec sha256(String.t()) :: {:ok, String.t()} | {:error, String.t()}

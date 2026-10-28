@@ -16,8 +16,8 @@ defmodule KomkiConnectorVault.CLI do
     log_to_stderr()
 
     with {:ok, socket, vault_dir} <- parse(argv),
-         {:ok, _creds} <- Server.read_credentials() do
-      case Server.run(KomkiConnectorVault, socket, vault_dir) do
+         {:ok, creds} <- Server.read_credentials() do
+      case Server.run(KomkiConnectorVault, socket, vault_dir, creds) do
         {:error, reason} -> fail(to_string_reason(reason))
       end
     else

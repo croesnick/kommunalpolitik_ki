@@ -13,6 +13,7 @@ apps/komki_connector_vault/komki-connector-vault
 apps/komki_connector_documents/komki-connector-documents
 apps/komki_connector_ris/komki-connector-ris
 apps/komki_cli/komki
+apps/komki_cli/komki-tresor
 apps/komki_cli/burrito_out/
 apps/komki_cli/.build-report.md
 /docs/rfcs/0001-scratchpad.md

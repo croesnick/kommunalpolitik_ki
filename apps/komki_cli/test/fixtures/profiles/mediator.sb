@@ -71,11 +71,15 @@
 ; Kanal pi -> Vermittler: Loopback-TCP (Altform vor #143)
 (allow network-bind (local ip "localhost:49525"))
 (allow network-inbound (local ip))
-; Connector-Sockets (Frame-Protokoll, CONTRACT.md §3) — einziges Outbound
+; Connector-Sockets (Frame-Protokoll, CONTRACT.md §3) — einziges Outbound, Token nur lesen
 (allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/documents.sock")))
+(allow file-read* (literal "/opt/komki-golden/run/connectors/documents.token"))
 (allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/ris.sock")))
+(allow file-read* (literal "/opt/komki-golden/run/connectors/ris.token"))
 (allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/vault.sock")))
+(allow file-read* (literal "/opt/komki-golden/run/connectors/vault.token"))
 (allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/web.sock")))
+(allow file-read* (literal "/opt/komki-golden/run/connectors/web.token"))
 (allow file-read-metadata (literal "/"))
 (allow file-read-metadata (literal "/opt"))
 (allow file-read-metadata (literal "/opt/erl"))

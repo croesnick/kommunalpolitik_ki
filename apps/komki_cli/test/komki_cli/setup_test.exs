@@ -85,9 +85,12 @@ defmodule KomkiCli.SetupTest do
 
       message = Setup.store_secret(@entry, ui([{:ok, @kanarie}, {:ok, @kanarie}]))
 
-      assert message =~ "gespeichert"
+      assert message =~ "versiegelt"
       refute message =~ @kanarie
-      assert File.read!(Path.join(dir, "stdin")) == @kanarie <> "|" <> @kanarie
+      # In den Schluesselbund geht nur das Siegel, nie der Klartext.
+      {:ok, sealed} = KomkiCli.Tresor.seal(@kanarie)
+      assert File.read!(Path.join(dir, "stdin")) == sealed <> "|" <> sealed
+      refute File.read!(Path.join(dir, "stdin")) =~ @kanarie
     end
 
     test "verschiedene Eingaben: nichts gespeichert" do

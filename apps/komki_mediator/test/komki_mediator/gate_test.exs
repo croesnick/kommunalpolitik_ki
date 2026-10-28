@@ -37,8 +37,14 @@ defmodule KomkiMediator.GateTest do
   } do
     response = Gate.call(env, "ping", %{}, TestHelpers.ping_executor(env.gamma))
 
-    [chunk] = TestHelpers.journal_chunks_raw(journal_path)
-    assert [pdr] = TestHelpers.journal_records(journal_path)
+    [_pre_chunk, chunk] = TestHelpers.journal_chunks_raw(journal_path)
+    assert [pre, pdr] = TestHelpers.journal_records(journal_path)
+
+    # Vorbeleg vor dem Executor (Audit vor Wirkung)
+    assert pre["outcome"] == "executing"
+    assert pre["decision"] == "permit"
+    assert pre["admitted"] == nil
+    assert pre["intent_id"] == pdr["intent_id"]
 
     # Der Eintrag ist selbst byte-kanonisch.
     assert JSON.canonical(pdr) == chunk
@@ -57,6 +63,40 @@ defmodule KomkiMediator.GateTest do
     assert pdr["fassung_id"] == "komki-mediator/2"
 
     {:ok, _, _} = DateTime.from_iso8601(pdr["abrufdatum"])
+  end
+
+  test "Vorbeleg steht im Journal, bevor der Executor laeuft", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    test = self()
+
+    executor = fn ->
+      send(test, {:executor_sah, TestHelpers.journal_records(journal_path)})
+      TestHelpers.admit_executor(env.room, "doc-oeffentlich").()
+    end
+
+    Gate.call(env, "admit_document", %{"document_id" => "doc-oeffentlich"}, executor)
+
+    assert_received {:executor_sah, [%{"outcome" => "executing", "tool" => "admit_document"}]}
+  end
+
+  test "Negativtest: ohne schreibbares Journal laeuft der Executor nie", %{env: env} do
+    test = self()
+    {:ok, journal} = Agent.start(fn -> nil end)
+    Agent.stop(journal)
+    executor = fn -> send(test, :executor_lief) end
+
+    catch_exit(
+      Gate.call(
+        %{env | journal: journal},
+        "admit_document",
+        %{"document_id" => "doc-oeffentlich"},
+        executor
+      )
+    )
+
+    refute_received :executor_lief
   end
 
   # -----------------------------------------------------------------------
@@ -402,9 +442,11 @@ defmodule KomkiMediator.GateTest do
     JSON.parse(chunk)
   end
 
+  # Ein Hash je Ablauf: der Vorbeleg (`executing`) traegt denselben Hash.
   defp intent_hashes_from_journal(journal_path) do
     journal_path
     |> TestHelpers.journal_records()
+    |> Enum.reject(&(&1["outcome"] == "executing"))
     |> Enum.map(fn pdr -> pdr["intent_hash"] end)
   end
 

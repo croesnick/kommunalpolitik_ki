@@ -13,7 +13,7 @@ defmodule KomkiCli.Setup do
   Tests die Antworten vorgeben koennen.
   """
 
-  alias KomkiCli.{Config, DemoVault, Keychain, Model, Secrets, Steps}
+  alias KomkiCli.{Config, DemoVault, Model, Secrets, Steps, Tresor}
 
   @type ui :: %{
           say: (String.t() -> any()),
@@ -55,7 +55,9 @@ defmodule KomkiCli.Setup do
           runtime_entry(cfg),
           {"komki-mediator", cfg.mediator_bin, @bausteine_hint},
           {"komki-egress", cfg.egress_bin, @bausteine_hint}
-        ] ++ connectors,
+        ] ++
+          connectors ++
+          [{"komki-tresor", Tresor.binary(), "xcode-select --install, dann 'make komki'"}],
       tmux: tmux
     }
   end
@@ -110,15 +112,35 @@ defmodule KomkiCli.Setup do
     case Steps.refresh_instance() do
       :unchanged ->
         ui.say.("Instanz     vorhanden: " <> base <> " (unverändert)")
-        :ok
+        confirm_changed_pins(ui)
 
       {:refreshed, items} ->
         ui.say.("Instanz     vorhanden: " <> base <> "; aufgefrischt: " <> Enum.join(items, ", "))
-        :ok
+        confirm_changed_pins(ui)
 
       {:error, _reason, _code} = error ->
         error
     end
+  end
+
+  # Ein Programm mit anderen Bytes am selben Pfad: nur auf ausdrueckliches
+  # Ja festhalten (Default nein). Ohne Ja startet komki nicht (Doctor-Pin).
+  defp confirm_changed_pins(ui) do
+    for {name, path} <- Steps.changed_pins() do
+      ui.say.(pad("Programm") <> name <> " hat sich verändert: " <> path)
+
+      if ui.confirm.(
+           "            übernehmen? Nur wenn du es selbst aktualisiert hast",
+           false
+         ) do
+        Steps.accept_pins([name])
+        ui.say.(pad("") <> "festgehalten")
+      else
+        ui.say.(pad("") <> "nicht übernommen; komki startet erst nach Prüfung")
+      end
+    end
+
+    :ok
   end
 
   # Vault einer bestehenden Instanz wechseln, wenn --vault-dir oder --demo
@@ -278,16 +300,38 @@ defmodule KomkiCli.Setup do
   end
 
   defp secret(entry, ui) do
-    if Secrets.present?(entry) do
-      ui.say.(pad(entry.name) <> "ok (Schlüsselbund-Eintrag '" <> entry.service <> "')")
-    else
-      ui.say.(pad(entry.name) <> entry.label <> " fehlt im Schlüsselbund")
+    case Secrets.state(entry) do
+      :sealed ->
+        ui.say.(
+          pad(entry.name) <>
+            "ok (Schlüsselbund-Eintrag '" <>
+            entry.service <> "', versiegelt mit der Secure Enclave)"
+        )
 
-      if ui.confirm.("            jetzt eingeben?", true) do
-        ui.say.(pad("") <> store_secret(entry, ui))
-      else
-        ui.say.(pad("") <> "übersprungen; später: komki secret set " <> entry.name)
-      end
+      :unsealed ->
+        ui.say.(pad(entry.name) <> entry.label <> " liegt im Klartext im Schlüsselbund")
+
+        if ui.confirm.("            jetzt mit der Secure Enclave versiegeln?", true) do
+          ui.say.(pad("") <> seal_existing(entry))
+        else
+          ui.say.(pad("") <> "übersprungen; komki benutzt den Schlüssel erst versiegelt")
+        end
+
+      {:error, _} ->
+        ui.say.(pad(entry.name) <> entry.label <> " fehlt im Schlüsselbund")
+
+        if ui.confirm.("            jetzt eingeben?", true) do
+          ui.say.(pad("") <> store_secret(entry, ui))
+        else
+          ui.say.(pad("") <> "übersprungen; später: komki secret set " <> entry.name)
+        end
+    end
+  end
+
+  defp seal_existing(entry) do
+    case Secrets.seal_existing(entry) do
+      :ok -> "versiegelt; im Schlüsselbund steht jetzt nur noch das Siegel"
+      {:error, error} -> Secrets.describe(entry.service, error)
     end
   end
 
@@ -299,8 +343,8 @@ defmodule KomkiCli.Setup do
   def store_secret(entry, ui) do
     with {:ok, first} <- ui.secret.("            Wert (wird nicht angezeigt): "),
          {:ok, ^first} <- ui.secret.("            noch einmal: "),
-         :ok <- Keychain.store(entry.service, first) do
-      "gespeichert im Schlüsselbund als '" <> entry.service <> "'"
+         :ok <- Secrets.store(entry, first) do
+      "versiegelt mit der Secure Enclave, Siegel im Schlüsselbund als '" <> entry.service <> "'"
     else
       {:ok, _different} ->
         "die beiden Eingaben stimmen nicht überein; nichts gespeichert"
@@ -312,7 +356,7 @@ defmodule KomkiCli.Setup do
         "leere Eingabe; nichts gespeichert"
 
       {:error, error} ->
-        Keychain.describe(entry.service, error)
+        Secrets.describe(entry.service, error)
     end
   end
 
