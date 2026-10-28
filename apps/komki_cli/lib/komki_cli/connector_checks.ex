@@ -10,6 +10,7 @@ defmodule KomkiCli.ConnectorChecks do
   """
 
   alias KomkiCli.{Config, Connectors, Keychain, Mediator, MediatorProfile, Secrets, Tresor}
+  alias KomkiCli.Tresor.Core
   alias KomkiConnector.Manifest
 
   @type check :: %{name: String.t(), ok: boolean(), reason: String.t()}
@@ -169,10 +170,15 @@ defmodule KomkiCli.ConnectorChecks do
     do: %{name: "komki-tresor", ok: false, reason: Tresor.describe(:missing_bin)}
 
   defp tresor_check(bin) do
-    case System.cmd(bin, ["check"], stderr_to_stdout: true) do
-      {_, 0} -> %{name: "komki-tresor", ok: true, reason: bin <> " (Secure Enclave verfügbar)"}
-      {_, 3} -> %{name: "komki-tresor", ok: false, reason: Tresor.describe(:no_enclave)}
-      {_, code} -> %{name: "komki-tresor", ok: false, reason: Tresor.describe({:failed, code})}
+    case Core.check(bin) do
+      :ok ->
+        %{name: "komki-tresor", ok: true, reason: bin <> " (Secure Enclave verfügbar)"}
+
+      {:error, :no_enclave} ->
+        %{name: "komki-tresor", ok: false, reason: Tresor.describe(:no_enclave)}
+
+      {:error, {:failed, code}} ->
+        %{name: "komki-tresor", ok: false, reason: Tresor.describe({:failed, code})}
     end
   end
 

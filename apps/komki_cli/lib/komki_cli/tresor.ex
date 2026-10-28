@@ -1,57 +1,37 @@
 defmodule KomkiCli.Tresor do
   @moduledoc """
-  Geheimnisse mit der Secure Enclave versiegeln und oeffnen, ueber das
-  Hilfsprogramm `komki-tresor` (Quelle `native/komki-tresor/main.swift`).
+  Geheimnisse mit der Secure Enclave versiegeln und oeffnen — Adapter auf
+  `KomkiCli.Tresor.Core` (Ticket #224): Der Kern (Ports, Exit-Codes,
+  Siegel-Form) ist komki-frei und soll spaeter als eigenstaendiges Paket
+  herausgezogen werden. Hier wohnt die komki-Seite: die Programmsuche neben
+  dem laufenden komki (Quellbaum, Homebrew `libexec`, Burrito `dist/`) und
+  die Application-Env `:komki_cli, :tresor` (Tests).
 
   Der Schluesselbund enthaelt danach nur noch das Siegel. Oeffnen geht nur
   ueber die Secure Enclave dieses Macs und nur mit Touch ID oder dem
   Passwort des Macs. Das gilt fuer jeden Prozess, der den Eintrag liest,
   nicht nur fuer komki. Erlang erreicht die Secure Enclave nicht selbst,
   deshalb das eigene Programm (AGENTS.md, Elixir-first, Ausnahme).
-
-  Klartext geht nur ueber stdin hinein und stdout heraus, nie ueber argv,
-  Umgebung oder Log. `opts[:command]` (oder die Application-Env
-  `:komki_cli, :tresor`) ersetzt das Programm in Tests.
   """
 
-  @prefix "ktv1."
-  @seal_timeout_ms 10_000
-  # Oeffnen wartet auf Touch ID oder Passwort.
-  @open_timeout_ms 120_000
+  alias KomkiCli.Tresor.Core
 
-  @type error ::
-          :missing_bin | :no_enclave | :refused | :invalid | :timeout | {:failed, integer()}
-
-  @doc "Ist `text` ein Siegel (und kein Klartext)?"
-  @spec sealed?(String.t()) :: boolean()
-  def sealed?(text), do: String.starts_with?(text, @prefix)
-
-  @doc """
-  Ist das Siegel vollstaendig (Base64, JSON mit `key`, `eph`, `box`)?
-  Prueft nur die Form, oeffnet nichts. Ein gekuerztes Siegel faellt durch.
-  """
-  @spec well_formed?(String.t()) :: boolean()
-  def well_formed?(@prefix <> encoded) do
-    with {:ok, json} <- Base.decode64(encoded),
-         {:ok, %{"key" => k, "eph" => e, "box" => b}} <- JSON.decode(json) do
-      Enum.all?([k, e, b], &(is_binary(&1) and match?({:ok, _}, Base.decode64(&1))))
-    else
-      _ -> false
-    end
-  end
-
-  def well_formed?(_text), do: false
+  @type error :: Core.error()
 
   @doc """
   `komki-tresor` neben dem laufenden komki (Homebrew: `libexec`, Quellbaum:
-  `apps/komki_cli`), sonst im PATH. nil, wenn es fehlt. Die Application-Env
-  `:komki_cli, :tresor` gewinnt (Tests).
+  `apps/komki_cli`), sonst im PATH (kanonisch, fuer die Seatbelt-Pfadform),
+  sonst das mitgebaute Programm aus dem priv-Verzeichnis (Kern). nil, wenn
+  es nirgends liegt. Die Application-Env `:komki_cli, :tresor` gewinnt
+  (Tests).
   """
   @spec binary() :: String.t() | nil
   def binary do
     Application.get_env(:komki_cli, :tresor) || discover()
   end
 
+  # komki-Kopplung lebt nur hier: neben dem laufenden komki, sonst PATH,
+  # sonst der Kern (priv-Verzeichnis).
   defp discover do
     beside =
       case KomkiCli.Config.self_komki() do
@@ -62,90 +42,37 @@ defmodule KomkiCli.Tresor do
     cond do
       beside && File.exists?(beside) -> beside
       path = System.find_executable("komki-tresor") -> KomkiCli.Config.canonical(path)
-      true -> nil
+      true -> Core.binary()
     end
   end
+
+  @doc "Ist `text` ein Siegel (und kein Klartext)?"
+  @spec sealed?(String.t()) :: boolean()
+  def sealed?(text), do: Core.sealed?(text)
+
+  @doc """
+  Ist das Siegel vollstaendig (Base64, JSON mit `key`, `eph`, `box`)?
+  Prueft nur die Form, oeffnet nichts. Ein gekuerztes Siegel faellt durch.
+  """
+  @spec well_formed?(String.t()) :: boolean()
+  def well_formed?(text), do: Core.well_formed?(text)
 
   @doc "Klartext versiegeln. Keine Rueckfrage: Versiegeln braucht nur den oeffentlichen Schluessel."
   @spec seal(String.t(), keyword()) :: {:ok, String.t()} | {:error, error()}
-  def seal(value, opts \\ []) when is_binary(value) do
-    with :ok <- one_line(value),
-         {:ok, out} <- run(["seal"], value, Keyword.get(opts, :timeout, @seal_timeout_ms), opts) do
-      if sealed?(out), do: {:ok, out}, else: {:error, :invalid}
-    end
-  end
-
-  defp one_line(value) do
-    if value == "" or String.contains?(value, ["\n", "\r"]), do: {:error, :invalid}, else: :ok
-  end
+  def seal(value, opts \\ []) when is_binary(value), do: Core.seal(value, inject(opts))
 
   @doc "Siegel oeffnen; macOS fragt mit `reason` nach Touch ID oder Passwort."
   @spec open(String.t(), String.t(), keyword()) :: {:ok, String.t()} | {:error, error()}
-  def open(sealed, reason, opts \\ []) when is_binary(sealed) and is_binary(reason) do
-    if sealed?(sealed) and not String.contains?(sealed, "\n") do
-      run(
-        ["open", "--reason", reason],
-        sealed,
-        Keyword.get(opts, :timeout, @open_timeout_ms),
-        opts
-      )
-    else
-      {:error, :invalid}
-    end
-  end
+  def open(sealed, reason, opts \\ []) when is_binary(sealed) and is_binary(reason),
+    do: Core.open(sealed, reason, inject(opts))
 
   @doc "Fehler als Text ohne Wert."
   @spec describe(error()) :: String.t()
-  def describe(:missing_bin), do: "komki-tresor nicht gefunden (Installation prüfen)"
-  def describe(:no_enclave), do: "dieser Mac hat keine Secure Enclave"
-  def describe(:refused), do: "Freigabe per Touch ID oder Passwort verweigert oder abgebrochen"
-  def describe(:invalid), do: "Siegel ungültig oder von einem anderen Mac"
-  def describe(:timeout), do: "keine Freigabe innerhalb von zwei Minuten"
+  def describe(error), do: Core.describe(error)
 
-  def describe({:failed, code}),
-    do: "komki-tresor fehlgeschlagen (exit " <> to_string(code) <> ")"
-
-  defp run(args, input, timeout, opts) do
-    case Keyword.get_lazy(opts, :command, &binary/0) do
-      nil -> {:error, :missing_bin}
-      command -> spawn(command, args, input, timeout)
-    end
-  end
-
-  # stderr des Programms bleibt im Terminal (Meldungen ohne Werte); stdout
-  # traegt genau eine Zeile.
-  defp spawn(command, args, input, timeout) do
-    port =
-      Port.open({:spawn_executable, command}, [:binary, :exit_status, :use_stdio, args: args])
-
-    Port.command(port, input <> "\n")
-    collect(port, [], System.monotonic_time(:millisecond) + timeout)
-  end
-
-  defp collect(port, acc, deadline) do
-    left = max(deadline - System.monotonic_time(:millisecond), 0)
-
-    receive do
-      {^port, {:data, data}} -> collect(port, [acc, data], deadline)
-      {^port, {:exit_status, 0}} -> {:ok, acc |> IO.iodata_to_binary() |> String.trim_trailing()}
-      {^port, {:exit_status, 3}} -> {:error, :no_enclave}
-      {^port, {:exit_status, 4}} -> {:error, :refused}
-      {^port, {:exit_status, 5}} -> {:error, :invalid}
-      {^port, {:exit_status, code}} -> {:error, {:failed, code}}
-    after
-      left -> kill(port)
-    end
-  end
-
-  defp kill(port) do
-    case Port.info(port, :os_pid) do
-      {:os_pid, pid} -> System.cmd("/bin/kill", ["-KILL", to_string(pid)])
-      nil -> :ok
-    end
-
-    Port.close(port)
-    {:error, :timeout}
-  catch
-    :error, :badarg -> {:error, :timeout}
+  # Explizites opts[:command] (Tests) gewinnt; sonst einmal hier aufloesen.
+  # nil (nirgends gefunden) bleibt nil: der Kern meldet dann :missing_bin.
+  defp inject(opts) do
+    if Keyword.has_key?(opts, :command), do: opts, else: Keyword.put(opts, :command, binary())
   end
 end

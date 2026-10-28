@@ -364,8 +364,9 @@ pnpm add -g @earendil-works/pi-coding-agent
 xcode-select --install           # swiftc für komki-tresor (nur zum Bauen aus dem Repo)
 ```
 
-**komki-tresor (Secure Enclave):** `make komki` baut neben komki das kleine
-Swift-Programm `komki-tresor` (`apps/komki_cli/native/komki-tresor/main.swift`).
+**komki-tresor (Secure Enclave):** `mix compile` baut das kleine Swift-Programm
+`komki-tresor` (`apps/komki_cli/native/komki-tresor/main.swift`) nach
+`apps/komki_cli/priv/`; `make komki` kopiert es neben das Escript.
 Es versiegelt Geheimnisse wie den Brave-Key mit einem Schlüssel der Secure
 Enclave; Öffnen geht nur mit Touch ID oder dem Passwort des Macs. Erlang
 erreicht die Secure Enclave nicht, deshalb Swift (Apple-Frameworks CryptoKit,
