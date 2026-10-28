@@ -39,10 +39,18 @@ defmodule Mix.Tasks.Compile.KomkiTresor do
 
   defp swiftc_bauen(swiftc, source, target) do
     File.mkdir_p!(Path.dirname(target))
+    tmp = target <> ".tmp"
 
-    case System.cmd(swiftc, ["-O", "-o", target, source], stderr_to_stdout: true) do
-      {_, 0} -> {:ok, []}
-      {out, _} -> Mix.raise("swiftc für komki-tresor fehlgeschlagen:\n" <> out)
+    case System.cmd(swiftc, ["-O", "-o", tmp, source], stderr_to_stdout: true) do
+      {_, 0} ->
+        # Atomar ersetzen: Ein abgebrochener Bau hinterlaesst kein halbfertiges
+        # Ziel, das der Mtime-Vergleich spaeter fuer frisch haelt.
+        File.rename!(tmp, target)
+        {:ok, []}
+
+      {out, _} ->
+        File.rm(tmp)
+        Mix.raise("swiftc für komki-tresor fehlgeschlagen:\n" <> out)
     end
   end
 

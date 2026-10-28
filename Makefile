@@ -29,11 +29,13 @@ komki: komki-tresor
 # sucht es neben sich selbst. `mix compile` baut es nach apps/komki_cli/priv
 # (Ticket #224, braucht swiftc aus den Xcode Command Line Tools); hier nur
 # noch neben das Escript kopieren, damit es in allen Kanälen neben komki
-# liegt. Der Test bewahrt den lauteren Fehler, wenn swiftc fehlt.
+# liegt. Der -nt-Test schlägt fehl, wenn das Ziel fehlt oder aelterer ist als
+# die Quelle (etwa ohne swiftc) — kein stiller Versand eines alten Binaries.
 komki-tresor:
 	@cd apps/komki_cli && mix deps.get >/dev/null && mix compile
+	@if [ apps/komki_cli/native/komki-tresor/main.swift -nt apps/komki_cli/priv/komki-tresor ]; then \
+	  echo "komki-tresor fehlt oder ist veraltet: swiftc (xcode-select --install) prüfen"; exit 1; fi
 	@cp apps/komki_cli/priv/komki-tresor apps/komki_cli/komki-tresor
-	@test -f apps/komki_cli/komki-tresor
 
 # Paket fuer die Homebrew-Formel (Ticket #180): das Escript (prod), die
 # SQLite-NIF von exqlite und pi mit allen Abhaengigkeiten nebeneinander, als

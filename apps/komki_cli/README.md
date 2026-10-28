@@ -382,8 +382,9 @@ selbst alle Prozesse, und nur der Egress-Proxy darf nach außen:
   Fehlt der Eintrag, wird die Freigabe verweigert oder liegt er im Klartext vor,
   startet der Connector ohne Key und meldet `credential-missing`; `up` nennt
   den Grund, `komki doctor` warnt.
-* **komki-tresor** (`native/komki-tresor/main.swift`, gebaut von `make komki`
-  und `make komki-paket`, liegt neben komki): ein kleines Swift-Programm, weil
+* **komki-tresor** (`native/komki-tresor/main.swift`, bei `mix compile` nach
+  `priv/` gebaut und von `make komki`/`make komki-paket` neben komki kopiert):
+  ein kleines Swift-Programm, weil
   Erlang die Secure Enclave nicht erreicht. `seal` erzeugt je Geheimnis einen
   P-256-Schlüssel in der Secure Enclave mit der Zugriffsregel „userPresence“
   (nur dieses Gerät, nur entsperrt) und verschlüsselt per ECIES (ECDH,

@@ -20,18 +20,19 @@ defmodule KomkiCli.Tresor do
 
   @doc """
   `komki-tresor` neben dem laufenden komki (Homebrew: `libexec`, Quellbaum:
-  `apps/komki_cli`), sonst im PATH (kanonisch, fuer die Seatbelt-Pfadform),
-  sonst das mitgebaute Programm aus dem priv-Verzeichnis (Kern). nil, wenn
-  es nirgends liegt. Die Application-Env `:komki_cli, :tresor` gewinnt
-  (Tests).
+  `apps/komki_cli`), sonst im PATH (kanonisch, fuer die Seatbelt-Pfadform).
+  nil, wenn es nirgends liegt. Die Application-Env `:komki_cli, :tresor`
+  gewinnt (Tests).
   """
   @spec binary() :: String.t() | nil
   def binary do
     Application.get_env(:komki_cli, :tresor) || discover()
   end
 
-  # komki-Kopplung lebt nur hier: neben dem laufenden komki, sonst PATH,
-  # sonst der Kern (priv-Verzeichnis).
+  # komki-Kopplung lebt nur hier: neben dem laufenden komki, sonst PATH
+  # (kanonisch). Ohne Treffer nil — Core.binary/0 (priv-Verzeichnis, PATH)
+  # gilt hier bewusst nicht: _build-Pfade sollen nicht in Pins und Doctor
+  # geraten; sie bleiben die Standard-Aufloesung des spaeteren Pakets.
   defp discover do
     beside =
       case KomkiCli.Config.self_komki() do
@@ -42,7 +43,7 @@ defmodule KomkiCli.Tresor do
     cond do
       beside && File.exists?(beside) -> beside
       path = System.find_executable("komki-tresor") -> KomkiCli.Config.canonical(path)
-      true -> Core.binary()
+      true -> nil
     end
   end
 
