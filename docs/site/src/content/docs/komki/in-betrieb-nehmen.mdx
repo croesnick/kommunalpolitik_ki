@@ -61,11 +61,11 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
    ```
 
    ```text frame="terminal" title="Das siehst du"
-   Werkzeuge   ok (llama-server, node, pi, Erlang (escript), komki-mediator, komki-egress, komki-connector-documents, komki-connector-ris, komki-connector-vault, komki-connector-web)
+   Werkzeuge   ok (llama-server, node, pi, Erlang (escript), komki-mediator, komki-egress, komki-connector-documents, komki-connector-ris, komki-connector-vault, komki-connector-web, komki-tresor)
    Vault       Test-Vault mit 11 erfundenen Notizen unter ~/.local/share/komki/vault
    Instanz     wird angelegt unter ~/.local/share/komki (prüft das Modell, etwa 30 s)
    Instanz     angelegt
-   brave       ok (Schlüsselbund-Eintrag 'brave-search-api')
+   brave       ok (Schlüsselbund-Eintrag 'brave-search-api', versiegelt mit der Secure Enclave)
    Start       llama, Egress, Connectoren und Vermittler (beim ersten Mal bis zu einer Minute)
    llama up: pid 13796 (health 200)
    egress up: pid 13900
@@ -83,7 +83,7 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
 
    Zeile für Zeile:
 
-   - **Werkzeuge**: Alles, was komki braucht, ist gefunden. Die fünf `komki-…`-Namen sind die Rollen im Programm komki.
+   - **Werkzeuge**: Alles, was komki braucht, ist gefunden. Die `komki-…`-Namen sind die Rollen im Programm komki, dazu `komki-tresor`, das kleine Programm für die Secure Enclave.
    - **Instanz**: Unter `~/.local/share/komki` liegen Einstellungen, Sandbox-Profile, Journal und die Kopie des Modells. komki rechnet dabei die Prüfsumme des Modells nach, daher die halbe Minute.
    - **brave**: Der Schlüssel liegt im macOS-Schlüsselbund, versiegelt mit der Secure Enclave deines Macs. komki zeigt ihn nie an. Beim Start des Web-Connectors fragt macOS per Touch ID oder Passwort, ob komki ihn öffnen darf.
    - **up**: llama rechnet das Modell, der Egress-Proxy ist die einzige Tür nach draußen, die Connectoren holen die Daten, der Vermittler entscheidet über jeden Zugriff. Hinter `tools` steht, was pi aufrufen darf.
@@ -188,11 +188,11 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
    ```
 
    ```text frame="terminal" title="Das siehst du (Anfang)"
-   Werkzeuge   ok (llama-server, node, pi, Erlang (escript), komki-mediator, komki-egress, komki-connector-documents, komki-connector-ris, komki-connector-vault, komki-connector-web)
+   Werkzeuge   ok (llama-server, node, pi, Erlang (escript), komki-mediator, komki-egress, komki-connector-documents, komki-connector-ris, komki-connector-vault, komki-connector-web, komki-tresor)
    Instanz     vorhanden: ~/.local/share/komki (unverändert)
    Vault       ~/Documents/MeinVault (nur Notizen mit komki_labels sind für komki sichtbar)
    Vault       gewechselt; komki startet neu
-   brave       ok (Schlüsselbund-Eintrag 'brave-search-api')
+   brave       ok (Schlüsselbund-Eintrag 'brave-search-api', versiegelt mit der Secure Enclave)
    ```
 
    Im Testlauf lagen im Vault zwei erfundene Notizen über einen Spielplatz, eine mit Label und eine ohne. Gefunden hat komki nur die mit Label:
