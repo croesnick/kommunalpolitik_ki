@@ -736,6 +736,7 @@ defmodule KomkiCli.CLI do
           case KomkiCli.Secrets.state(entry) do
             :sealed -> green() <> "versiegelt"
             :unsealed -> red() <> "Klartext"
+            :damaged -> red() <> "beschädigt"
             {:error, _} -> red() <> "fehlt"
           end
 

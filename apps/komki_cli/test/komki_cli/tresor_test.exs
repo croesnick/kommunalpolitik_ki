@@ -88,6 +88,13 @@ defmodule KomkiCli.TresorTest do
       assert {:error, :unsealed} = Secrets.reveal("brave-search-api", command_kc(cmd))
     end
 
+    test "gekuerztes Siegel ist beschaedigt, nicht versiegelt" do
+      {:ok, sealed} = Tresor.seal(@kanarie)
+      {kc, _} = keychain!(String.slice(sealed, 0, 40))
+      assert Secrets.state(@entry, command: kc) == :damaged
+      refute Tresor.well_formed?(String.slice(sealed, 0, 40))
+    end
+
     test "state unterscheidet versiegelt, Klartext und fehlend" do
       {:ok, sealed} = Tresor.seal(@kanarie)
       {kc_sealed, _} = keychain!(sealed)

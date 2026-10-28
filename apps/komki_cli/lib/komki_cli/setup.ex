@@ -308,6 +308,15 @@ defmodule KomkiCli.Setup do
             entry.service <> "', versiegelt mit der Secure Enclave)"
         )
 
+      :damaged ->
+        ui.say.(pad(entry.name) <> entry.label <> ": Siegel im Schlüsselbund beschädigt")
+
+        if ui.confirm.("            jetzt neu eingeben?", true) do
+          ui.say.(pad("") <> store_secret(entry, ui))
+        else
+          ui.say.(pad("") <> "übersprungen; später: komki secret set " <> entry.name)
+        end
+
       :unsealed ->
         ui.say.(pad(entry.name) <> entry.label <> " liegt im Klartext im Schlüsselbund")
 

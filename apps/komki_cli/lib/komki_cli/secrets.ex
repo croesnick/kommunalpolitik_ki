@@ -41,20 +41,29 @@ defmodule KomkiCli.Secrets do
     end
   end
 
-  @type error :: Keychain.error() | {:tresor, Tresor.error()} | :unsealed
+  @type error :: Keychain.error() | {:tresor, Tresor.error()} | :unsealed | :damaged
 
   @doc """
   Zustand des Eintrags: versiegelt, Klartext (aus der Zeit vor dem Tresor)
   oder fehlend. Liest den Eintrag, gibt aber nie seinen Wert heraus.
   """
-  @spec state(t() | String.t(), keyword()) :: :sealed | :unsealed | {:error, Keychain.error()}
+  @spec state(t() | String.t(), keyword()) ::
+          :sealed | :unsealed | :damaged | {:error, Keychain.error()}
   def state(entry_or_service, opts \\ [])
   def state(%{service: service}, opts), do: state(service, opts)
 
   def state(service, opts) when is_binary(service) do
     case Keychain.fetch(service, opts) do
-      {:ok, value} -> if Tresor.sealed?(value), do: :sealed, else: :unsealed
+      {:ok, value} -> classify(value)
       {:error, _} = error -> error
+    end
+  end
+
+  defp classify(value) do
+    cond do
+      Tresor.well_formed?(value) -> :sealed
+      Tresor.sealed?(value) -> :damaged
+      true -> :unsealed
     end
   end
 
@@ -107,6 +116,9 @@ defmodule KomkiCli.Secrets do
     do:
       "Schlüsselbund-Eintrag '" <>
         service <> "' liegt im Klartext vor; komki benutzt ihn erst versiegelt"
+
+  def describe(service, :damaged),
+    do: "Schlüsselbund-Eintrag '" <> service <> "' enthält ein beschädigtes Siegel; neu eingeben"
 
   def describe(service, {:tresor, error}), do: "'" <> service <> "': " <> Tresor.describe(error)
 

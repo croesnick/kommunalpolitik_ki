@@ -27,6 +27,22 @@ defmodule KomkiCli.Tresor do
   def sealed?(text), do: String.starts_with?(text, @prefix)
 
   @doc """
+  Ist das Siegel vollstaendig (Base64, JSON mit `key`, `eph`, `box`)?
+  Prueft nur die Form, oeffnet nichts. Ein gekuerztes Siegel faellt durch.
+  """
+  @spec well_formed?(String.t()) :: boolean()
+  def well_formed?(@prefix <> encoded) do
+    with {:ok, json} <- Base.decode64(encoded),
+         {:ok, %{"key" => k, "eph" => e, "box" => b}} <- JSON.decode(json) do
+      Enum.all?([k, e, b], &(is_binary(&1) and match?({:ok, _}, Base.decode64(&1))))
+    else
+      _ -> false
+    end
+  end
+
+  def well_formed?(_text), do: false
+
+  @doc """
   `komki-tresor` neben dem laufenden komki (Homebrew: `libexec`, Quellbaum:
   `apps/komki_cli`), sonst im PATH. nil, wenn es fehlt. Die Application-Env
   `:komki_cli, :tresor` gewinnt (Tests).

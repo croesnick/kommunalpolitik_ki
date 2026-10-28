@@ -15,7 +15,7 @@ defmodule KomkiCli.ConnectorChecks do
   @type check :: %{name: String.t(), ok: boolean(), reason: String.t()}
 
   @typedoc "Zustand eines Geheimnisses, wie `KomkiCli.Secrets.state/2` ihn liefert."
-  @type secret_state :: :sealed | :unsealed | {:error, Keychain.error()}
+  @type secret_state :: :sealed | :unsealed | :damaged | {:error, Keychain.error()}
 
   @doc "Alle Checks; `keychain` ersetzt `Secrets.state/2` je Service (Testnaht)."
   @spec all(Config.t(), (String.t() -> secret_state())) :: [check()]
@@ -187,6 +187,16 @@ defmodule KomkiCli.ConnectorChecks do
             name: check,
             ok: true,
             reason: "Schlüsselbund-Eintrag '" <> service <> "' versiegelt (Secure Enclave)"
+          }
+
+        :damaged ->
+          %{
+            name: check,
+            ok: true,
+            reason:
+              "WARNUNG: " <>
+                Secrets.describe(service, :damaged) <>
+                " mit 'komki secret set " <> Secrets.short_name(service) <> "'"
           }
 
         # Warnung wie beim fehlenden Schluessel: komki benutzt den Klartext
