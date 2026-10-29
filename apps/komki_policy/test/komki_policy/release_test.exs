@@ -201,6 +201,51 @@ defmodule KomkiPolicy.ReleaseTest do
                )
     end
 
+    # #120: handgebaute Proposals werden vor dem Commit abgelehnt — die
+    # Ausgabe-Invariante (to_record validiert als komki-stand/1) hält ohne
+    # Nachvalidierung.
+    test "Nicht-Kebab-Nonce im Proposal -> invalid_reference_id (kein Commit)" do
+      stand = fixture("case_release_permit/stand.json")
+
+      assert {:error, %{code: :invalid_reference_id, path: "$.nonce"}} =
+               Stand.advance(
+                 stand,
+                 proposal("go-ausgabe-4711", "Nonce_Falsch_1", "stand-4711@5", 6, "cafe")
+               )
+    end
+
+    test "Nicht-Kebab-release_id im Proposal -> invalid_reference_id (Ausgabe-Invariante)" do
+      stand = fixture("case_release_permit/stand.json")
+
+      assert {:error, %{code: :invalid_reference_id, path: "$.release_id"}} =
+               Stand.advance(
+                 stand,
+                 proposal("GO_FALSCH_1", "go-nonce-4711-a", "stand-4711@5", 6, "cafe")
+               )
+    end
+
+    test "stand_version_after != version + 1 -> refused stand_version_conflict (kein Commit)" do
+      stand = fixture("case_release_permit/stand.json")
+
+      assert {:refused, %{code: :stand_version_conflict}} =
+               Stand.advance(
+                 stand,
+                 proposal("go-ausgabe-4711", "go-nonce-4711-a", "stand-4711@5", 7, "cafe")
+               )
+    end
+
+    test "Ausgabe-Invariante: to_record des fortgeschriebenen Standes validiert als komki-stand/1" do
+      stand = fixture("case_release_permit/stand.json")
+
+      {:ok, next} =
+        Stand.advance(
+          stand,
+          proposal("go-ausgabe-4711", "go-nonce-4711-a", "stand-4711@5", 6, "cafe")
+        )
+
+      assert {:ok, ^next} = Stand.validate(Stand.to_record(next))
+    end
+
     test "unvollständige/übertypische Proposal-Form -> invalid_proposal (Eingabefehler)" do
       stand = fixture("case_release_permit/stand.json")
 

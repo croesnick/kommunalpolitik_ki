@@ -8,7 +8,8 @@ defmodule KomkiPolicy.Stand do
   verbrauchte Noncen auf die verbrauchende release-id. `advance/2` ist
   rein und atomar (Compare-and-Swap über die Version): Erfolg nur, wenn
   `stand_ref` exakt `<stand_id>@<version>` des übergebenen Standes
-  adressiert und die Nonce noch nicht verbraucht ist. Zwei konkurrierende
+  adressiert, `stand_version_after` genau `version + 1` beträgt und die
+  Nonce noch nicht verbraucht ist. Zwei konkurrierende
   Ausführungen desselben GOs können nicht beide committet werden — das
   Führen des aktuellen Standes ist Vollzug außerhalb des Kerns (B.8).
   """
@@ -80,8 +81,12 @@ defmodule KomkiPolicy.Stand do
     end
   end
 
+  # CAS (§ 2.7): der Vorschlag muss exakt den NÄCHSTEN Stand adressieren —
+  # `stand_ref` auf den aktuellen Stand und `stand_version_after == version + 1`
+  # (#120). Ein handgemachter Vorschlag mit abweichender Zielversion ist ein
+  # Versionskonflikt, kein Commit.
   defp do_advance(current, proposal) do
-    if proposal.stand_ref == current.stand_id <> "@" <> Integer.to_string(current.version) do
+    if addresses_next_version?(current, proposal) do
       claim_nonce(current, proposal)
     else
       {:refused,
@@ -90,10 +95,17 @@ defmodule KomkiPolicy.Stand do
          :detail =>
            "proposal stand_ref " <>
              Kernel.inspect(proposal.stand_ref) <>
+             " with stand_version_after " <>
+             Integer.to_string(proposal.stand_version_after) <>
              " does not address current version " <>
              Integer.to_string(current.version)
        }}
     end
+  end
+
+  defp addresses_next_version?(current, proposal) do
+    proposal.stand_ref == current.stand_id <> "@" <> Integer.to_string(current.version) and
+      proposal.stand_version_after == current.version + 1
   end
 
   defp claim_nonce(current, proposal) do
@@ -169,7 +181,6 @@ defmodule KomkiPolicy.Stand do
   # -------------------------------------------------------------------------
 
   @proposal_fields ["release_id", "nonce", "stand_ref", "stand_version_after", "call_hash"]
-  @proposal_string_fields ["release_id", "nonce", "stand_ref", "call_hash"]
 
   defp validate_proposal(term) when is_map(term) do
     with :ok <- closed_proposal_fields(term) do
@@ -200,12 +211,17 @@ defmodule KomkiPolicy.Stand do
     end
   end
 
+  # Ausgabe-Invariante (#120): `release_id` und `nonce` landen im
+  # fortgeschriebenen `consumed`-Ledger — beide müssen Kebab sein, sonst
+  # validiert `to_record/1` des Ergebnisses nicht als `komki-stand/1`.
+  # `stand_ref`/`call_hash` sind reine Strings; die CAS-Bindung von
+  # `stand_ref`/`stand_version_after` prüft `do_advance/2`.
   defp proposal_shape(term) do
-    strings_ok = Enum.all?(@proposal_string_fields, fn field -> is_binary(term[field]) end)
-
-    version_ok = is_integer(term["stand_version_after"]) and term["stand_version_after"] >= 0
-
-    if strings_ok and version_ok do
+    with :ok <- Validations.require_kebab(term["release_id"], "$.release_id"),
+         :ok <- Validations.require_kebab(term["nonce"], "$.nonce"),
+         :ok <- require_proposal_string(term["stand_ref"], "$.stand_ref"),
+         :ok <- require_proposal_string(term["call_hash"], "$.call_hash"),
+         :ok <- require_proposal_version_after(term["stand_version_after"]) do
       {:ok,
        %{
          release_id: term["release_id"],
@@ -214,10 +230,24 @@ defmodule KomkiPolicy.Stand do
          stand_version_after: term["stand_version_after"],
          call_hash: term["call_hash"]
        }}
+    end
+  end
+
+  defp require_proposal_string(value, path) do
+    if is_binary(value) do
+      :ok
+    else
+      {:error, {:invalid_proposal, path, "expected a string, got " <> Kernel.inspect(value)}}
+    end
+  end
+
+  defp require_proposal_version_after(value) do
+    if is_integer(value) and value >= 0 do
+      :ok
     else
       {:error,
-       {:invalid_proposal, "$",
-        "release proposal fields must be strings (except stand_version_after)"}}
+       {:invalid_proposal, "$.stand_version_after",
+        "expected a non-negative integer, got " <> Kernel.inspect(value)}}
     end
   end
 
