@@ -4,7 +4,7 @@ argument-hint: "[Thema oder Dokument-Kennungen]"
 ---
 Erstelle eine knappe Sitzungsmappe zur Vorbereitung auf die nächste Sitzung. Grundlage: ${@:-die Raumdokumente dieses Arbeitsraums}.
 
-Lies die Dokumente mit admit_document. Kennst du ihre Kennungen nicht, frag mich danach, statt zu raten.
+Welche Dokumente bereitliegen, erfährst du mit list_documents; lies sie mit admit_document. Rate keine Kennungen.
 
 Gliedere je Tagesordnungspunkt oder Dokument:
 
