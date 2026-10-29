@@ -100,7 +100,7 @@ defmodule KomkiCli.ConnectorsTest do
       web = Manifest.fetch!("web")
       fetch = fn "brave-search-api" -> {:ok, @kanarie} end
 
-      token = KomkiConnector.Token.generate()
+      token = Sidecar.Token.generate()
       {line, missing} = Connectors.credentials_line(web, token, fetch)
 
       assert JSON.decode!(line) == %{
@@ -129,7 +129,7 @@ defmodule KomkiCli.ConnectorsTest do
     end
 
     test "fehlendes Credential: nur das Token und der Name (nie ein Wert) in missing" do
-      token = KomkiConnector.Token.generate()
+      token = Sidecar.Token.generate()
 
       {line, missing} =
         Connectors.credentials_line(Manifest.fetch!("web"), token, fn _ -> {:error, :missing} end)
@@ -259,7 +259,7 @@ defmodule KomkiCli.ConnectorsTest do
 
       Enum.each(sockets, &File.write!(&1, ""))
       # Laufende Connectoren dieser Version haben ihr Token (sonst Neustart).
-      Enum.each(sockets, &KomkiConnector.Token.provision!/1)
+      Enum.each(sockets, &Sidecar.Token.provision!/1)
 
       try do
         assert {:ok, entries} = Connectors.up(cfg, fetch: fn _ -> {:error, :missing} end)

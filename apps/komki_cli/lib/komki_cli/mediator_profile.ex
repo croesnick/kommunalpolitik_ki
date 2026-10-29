@@ -24,8 +24,9 @@ defmodule KomkiCli.MediatorProfile do
   """
 
   alias KomkiCli.{Channel, Config, ConnectorProfile, EscriptProfile, Mediator}
-  alias KomkiConnector.{Manifest, Token}
+  alias KomkiConnector.Manifest
   alias Seatbelt.SBPL
+  alias Sidecar.Token
 
   @type listen :: {:tcp, pos_integer()} | {:unix, String.t()}
 
