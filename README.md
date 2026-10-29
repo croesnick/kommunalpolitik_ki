@@ -1,60 +1,85 @@
 # Kommunalpolitik KI
 
-Werkzeuge für die Stadtratsarbeit: das Ratsinformationssystem lokal durchsuchen, Drucksachen auswerten, Fördermöglichkeiten prüfen, Sitzungsmappen anlegen, Projekte strukturieren, Anträge entwerfen. Gebaut für die Ratsarbeit in der Verwaltungsgemeinschaft Buchloe.
+KI-Werkzeuge für die ehrenamtliche Ratsarbeit: recherchieren mit Quellen, ohne Vertrauliches aus der Hand zu geben. Entstanden in und für die Ratsarbeit der Verwaltungsgemeinschaft Buchloe im Allgäu, offen unter MIT-Lizenz.
 
-> **Neugierig auf komki, den lokalen KI-Arbeitsraum, der Vertrauliches nicht nach draußen trägt?** Der bebilderte Guide steht unter [croesnick.github.io/kommunalpolitik_ki](https://croesnick.github.io/kommunalpolitik_ki/), der Einstieg ohne Technik unter [Worum es geht](https://croesnick.github.io/kommunalpolitik_ki/komki/worum-es-geht/).
+**Zum Lesen und Ausprobieren:** [croesnick.github.io/kommunalpolitik_ki](https://croesnick.github.io/kommunalpolitik_ki/). Den Einstieg ohne Technik bietet die Seite [Worum es geht](https://croesnick.github.io/kommunalpolitik_ki/komki/worum-es-geht/).
 
-Orchestriert wird alles von [OpenCode](https://opencode.ai). Die KI ruft die CLI-Tools und MCP-Server auf und folgt den Anleitungen aus `skills/`. Antworten stammen aus der lokal synchronisierten RIS-Datenbank, aus den ausgelesenen PDFs, aus dem Obsidian-Vault und aus dem Archiv der Lokalzeitung. Eine maschinenlesbare Schnittstelle wie OParl gibt es am Ratsinformationssystem der Verwaltungsgemeinschaft nicht. Deshalb synchronisiert `ratsinfo` die öffentlichen Seiten in eine lokale SQLite-Datenbank und macht Sitzungen, Drucksachen und Beschlüsse volltextdurchsuchbar.
+## Worum es geht
 
-## Was dieses Setup anders macht
+Ratsarbeit ist Ehrenamt. In Bayern werden Gemeinderatsmitglieder „in ehrenamtlicher Eigenschaft gewählt“ ([Art. 31 Abs. 2 Satz 1 GO](https://www.gesetze-bayern.de/Content/Document/BayGO-31)). Vor jeder Sitzung liegen Vorlagen, Anlagen und Haushaltszahlen auf dem Tisch, gelesen wird abends nach dem Beruf. Eine KI kann dabei viel abnehmen: zusammenfassen, im Ratsinformationssystem nachsehen, Förderprogramme finden.
 
-**Quellen statt Behauptungen.** Jede politisch relevante Aussage aus diesen Tools nennt ihre Herkunft: URL, Abrufdatum, Sitzung und TOP oder Paragraf. In den Datenmodellen sind Quellen ein eigener Typ, die Recherche-Skills führen sie mit. Damit ist Belegen in jedes Werkzeug eingebaut.
+Ein Teil der Unterlagen ist aber nichtöffentlich, und darüber gilt Verschwiegenheit, auch nach dem Mandat ([Art. 20 Abs. 2 GO](https://www.gesetze-bayern.de/Content/Document/BayGO-20); beide Normen abgerufen am 29.10.2026). Solche Unterlagen gehören nicht in einen KI-Dienst im Internet. Ein lokales Modell allein reicht dabei nicht: Sobald ein Agent private Daten kennt, fremde Inhalte liest und nach draußen senden kann (die [lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/) nach Simon Willison), genügt ein präparierter Satz auf einer Webseite, und er trägt Vertrauliches hinaus.
 
-**Die KI berät, der Mensch entscheidet.** In ratsprojekte kann die KI Projekte nicht direkt ändern. Sie legt Vorschläge an, der Stadtrat nimmt an oder verwirft. Beides ist endgültig und wird protokolliert. Lesezugriffe sind frei, alle Schreibzugriffe laufen durch dieses GO-Gate. Die Entscheidung kann im Chat fallen und dort über das MCP-Werkzeug `decide_proposal` ausgeführt werden, oder gleich im Dashboard.
+Dieses Repo hat deshalb zwei Teile: **komki**, einen lokalen KI-Arbeitsraum, der genau diese Kombination verhindert, und einen **Werkzeugkasten** für die tägliche Ratsarbeit, der nach und nach in komki aufgeht.
 
-**Ein Gedächtnis, ein Destillat.** Der Obsidian-Vault ist das rohe Gedächtnis: Notizen, Mails, Artikel, Protokolle. ratsprojekte ist das Destillat: konsolidierte Projekte mit Realisierungssträngen, rechtlichen Vorbedingungen, Quellen und Beschlussvorschlag. Nur in eine Richtung läuft der Fluss, vom Vault nach ratsprojekte, nie zurück. Der Verbindungspunkt ist ein Slug, etwa `#ratsprojekt/marktplatz-umgestalten` im Vault und `/projekte/marktplatz-umgestalten` im Dashboard.
+## komki: der lokale KI-Arbeitsraum
 
-**Alles liegt lokal.** Die Datenbank ist SQLite auf dem eigenen Rechner, Drucksachen liegen als PDF vor Ort, der Vault ist ein lokales Verzeichnis. Zugriffe auf das RIS sind reine Lesezugriffe.
+![Terminal mit einer komki-Sitzung: eine Frage, Werkzeugaufrufe mit der Entscheidung des Vermittlers, eine Antwort mit Quellen](docs/site/src/assets/session.svg)
 
-**Der Zustand ist ehrlich dokumentiert.** `docs/workflows.md` ordnet jedes Tool einem der elf Rats-Workflows zu und hält fest, was davon Lücke ist. Der Abschnitt [Grenzen](#grenzen) führt die offenen Stellen auf.
+*Echte Sitzung vom 25.10.2026 mit erfundenen Test-Notizen und dem echten Ratsinformationssystem.*
 
-## Aufgaben und Skills
+- **Das Sprachmodell läuft auf dem eigenen Mac.** Fragen und Notizen gehen an keinen KI-Anbieter.
+- **Der Agent ist eingesperrt.** Er erreicht nur das Sprachmodell und einen Vermittler, kein Internet, keine Dateien, keine Befehle.
+- **Der Vermittler entscheidet jeden Zugriff, bevor er passiert.** Jeder Inhalt trägt ein Label, das sagt, woher er stammt. Ein Raum legt fest, welche Labels zusammenkommen dürfen. Liegt Vertrauliches im Raum, bleibt der Weg nach draußen zu, auch wenn der Agent manipuliert ist.
+- **Die KI berät, der Mensch entscheidet.** Eine gesperrte Anfrage geht nur mit deinem GO hinaus, und das gilt für genau diesen einen Aufruf.
+- **Alles steht im Journal**, verkettet und gegen nachträgliche Änderung geprüft.
 
-OpenCode lädt die Ablauf-Anleitungen aus `skills/`. Im Chat genügt die Aufgabe, etwa „Bereite die nächste Sitzung vor“.`
+Angebunden sind heute das öffentliche Ratsinformationssystem, die Websuche (Brave), der eigene Obsidian-Vault und Dokumente, die man in eine Sitzung mitbringt.
 
-- **Sitzung vorbereiten.** `sitzungsvorbereitung` holt die Agenda aus dem RIS, nimmt die Vorlagen-PDFs auseinander, zieht passende Artikel der Allgäuer Zeitung und eigene Vault-Notizen bei und schreibt daraus die Sitzungsmappe als Notiz im Vault. Sie sagt, was drankommt, was zu lesen ist und wo es Querbezüge gibt.
-- **Rückblick halten.** `bericht_aus_dem_stadtrat` sammelt die Sitzungen und Notizen seit dem letzten Bericht und verdichtet sie zu einer Notiz für Stammtisch, Fraktionssitzung oder Vorstand.
-- **Fördermöglichkeiten prüfen.** `foerdermittel_recherche` recherchiert für ein konkretes Vorhaben, welche Programme infrage kommen, mit Eigenanteilen, Fristen und Kumulierungsregeln. Schwerpunkt Bayern: BayFAG, KommKlimaFöR, Städtebauförderung, SUMP. Jede Angabe mit Quelle.
-- **Neue Informationen einordnen.** `ratsprojekt_delta` hält eine Mail, einen Artikel oder eine geänderte Förderrichtlinie gegen den Stand eines Projekts und liefert ein strukturiertes Delta: was sich ändert, welche Quellen dazukommen, ob die Antragsreife steigt. `ratsprojekt_stand` liefert den Ist-Zustand.
-- **Projekt anlegen.** `ratsprojekt_proposal` konsolidiert das Material zu einer Vault-Notiz, prüft die Antragsreife-Gates und bringt den Vorschlag in ratsprojekte ein. Ob er angenommen wird, entscheidet der Stadtrat.
-- **Antrag entwerfen.** `antrag_generieren` schreibt einen fraktionsneutralen Entwurf, aufbauend auf einer Struktur aus realen Anträgen. Die Vorlage der eigenen Fraktion kommt über den Vault-Tag `#antragsvorlage`. Die KI formuliert, finalisiert wird von Hand.
-- **Im Vault suchen.** `vault_suche` durchsucht die eigenen Notizen und liefert Treffer mit Kontext. Read-only.
+**Stand:** Prototyp, im Alltag erprobt. komki braucht einen Mac mit Apple Silicon und rund 32 GB Arbeitsspeicher und wird aus dem Repo gebaut. Die Anleitung steht unter [In Betrieb nehmen](https://croesnick.github.io/kommunalpolitik_ki/komki/in-betrieb-nehmen/). Wie die Grenze hält, kann man [selbst ausprobieren](https://croesnick.github.io/kommunalpolitik_ki/komki/sicherheitsgrenze/). Die Sicherheitsprüfungen stehen im [Labbook](docs/research/2026-10-23-labbook-komki-connectoren.md), das Konzept in [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
-Daneben laufen die Einzelwerkzeuge direkt: `ratsinfo` für das RIS, `pdf_ingest` für Drucksachen, die AZ- und die ODS-Anbindung für Zeitung und Tabellen. Sie stehen auch ohne Skill im Chat bereit.
+```sh
+# Werkzeuge wie in der Anleitung installiert, dann:
+make komki && komki setup --demo
+komki run "Was steht im RIS zum Radverkehrskonzept?"
+```
+
+## Der Werkzeugkasten für die Ratsarbeit
+
+Vor komki entstanden die Werkzeuge für den Alltag. Orchestriert werden sie von [OpenCode](https://opencode.ai): Die KI ruft CLI-Tools und MCP-Server auf und folgt den Abläufen aus `skills/`. Im Chat genügt die Aufgabe, etwa „Bereite die nächste Sitzung vor“. Dieser Weg ist ein Übergang. Die Werkzeuge ziehen nach und nach als Connectoren hinter den komki-Vermittler, denn nur dort gelten dessen Zusagen.
+
+- **Sitzung vorbereiten** (`sitzungsvorbereitung`): Agenda aus dem RIS, Vorlagen-PDFs, passende Artikel der Allgäuer Zeitung und eigene Notizen werden zur Sitzungsmappe im Vault.
+- **Rückblick halten** (`bericht_aus_dem_stadtrat`): Sitzungen und Notizen seit dem letzten Bericht als Notiz für Fraktion, Vorstand oder Stammtisch.
+- **Fördermöglichkeiten prüfen** (`foerdermittel_recherche`): Programme für ein konkretes Vorhaben mit Eigenanteilen, Fristen und Kumulierungsregeln, Schwerpunkt Bayern, jede Angabe mit Quelle.
+- **Projekte strukturieren** (`ratsprojekt_proposal`, `ratsprojekt_stand`, `ratsprojekt_delta`): Material zu einem Ratsprojekt bündeln, Stand bestimmen, neue Informationen einordnen. Die KI schlägt vor, der Stadtrat nimmt an oder verwirft.
+- **Antrag entwerfen** (`antrag_generieren`): fraktionsneutraler Entwurf, die eigene Vorlage kommt über den Vault-Tag `#antragsvorlage`. Finalisiert wird von Hand.
+- **Im Vault suchen** (`vault_suche`): die eigenen Notizen durchsuchen, nur lesend.
+
+Das Ratsinformationssystem der Verwaltungsgemeinschaft hat keine maschinenlesbare Schnittstelle wie OParl. `ratsinfo` synchronisiert deshalb die öffentlichen Seiten in eine lokale SQLite-Datenbank und macht Sitzungen, Drucksachen und Beschlüsse durchsuchbar.
+
+## Grundsätze
+
+- **Quellen statt Behauptungen.** Jede politisch relevante Aussage nennt ihre Herkunft: URL, Abrufdatum, Sitzung und TOP oder Paragraf.
+- **Die KI berät, der Mensch entscheidet.** Kein Werkzeug ändert Projekte oder trifft Entscheidungen ohne ausdrückliches GO.
+- **Lokal und nur lesend nach außen.** Daten liegen auf dem eigenen Rechner. Ins RIS wird nie geschrieben, abgerufen wird nur, was als Ratsmitglied oder öffentlich regulär zugänglich ist.
+- **Ehrlich dokumentiert.** Was fehlt, steht unter [Grenzen](#grenzen) und in den Issues.
+
+Vollständig stehen Prinzipien, Guardrails und Tooling-Vorgaben in [AGENTS.md](AGENTS.md).
 
 ## Bausteine
 
 | Baustein | Zweck | Schnittstelle |
 |---|---|---|
-| `apps/ratsinfo` | RIS synchronisieren, Volltextsuche über Sitzungen, Drucksachen und Beschlüsse, Drucksache im Browser öffnen | CLI |
-| `apps/ratsprojekte` | Projekt-Dashboard: Stränge, Vorbedingungen, Quellen, Antragsreife | LiveView und MCP |
-| `apps/komki_cli` | lokal gesandboxter AI-Arbeitsraum für macOS: Modell nur auf Loopback, Seatbelt-Profil, Boot-Gate vor jedem Start | CLI |
-| `apps/komki_policy` | rechnet aus, ob eine Absicht nach den Regeln zulässig ist, und prüft die Begründung nach; führt selbst nichts aus | CLI |
+| `apps/komki_cli` | komki: richtet den Arbeitsraum ein, startet Modell, Vermittler und Connectoren in eigenen Sandboxen | CLI |
+| `apps/komki_mediator` | Vermittler: entscheidet jeden Werkzeugaufruf des Agenten und führt das Journal | MCP |
+| `apps/komki_policy` | Regel-Prüfkern: rechnet aus, ob eine Absicht zulässig ist, und prüft die Begründung nach | CLI |
+| `apps/komki_egress` | einzige Tür ins Internet, je Connector nur zu freigegebenen Adressen | CLI |
+| `apps/komki_connector*` | Connectoren für RIS, Websuche, Vault und Sitzungsdokumente, plus gemeinsamer Vertrag | Connector-Socket |
+| `apps/ratsinfo` | RIS synchronisieren und volltextdurchsuchbar machen | CLI |
+| `apps/ratsprojekte` | Projekt-Dashboard: Realisierungsstränge, Vorbedingungen, Quellen, Antragsreife | LiveView und MCP |
 | `apps/shared` | gemeinsame Domain-Models der Elixir-Apps | Bibliothek |
 | `tools/allgaeuer_zeitung_mcp` | Allgäuer Zeitung durchsuchen und Artikel lesen | MCP |
-| `tools/pdf_ingest` | PDF-Text und Markierungen extrahieren; OCR nur für gescannte PDFs | MCP |
-| `tools/nextcloud_ods_mcp` | ODS-Tabellen lesen: Blätter, Bereiche, Zellen, Suche | MCP |
-| Nextcloud-MCP (extern) | Nextcloud-Dateien, Kalender, Notizen, Deck | MCP |
+| `tools/pdf_ingest` | PDF-Text und Markierungen extrahieren, OCR für gescannte PDFs | MCP |
+| `tools/nextcloud_ods_mcp` | ODS-Tabellen lesen | MCP |
+| `tools/obsidian_mcp`, `tools/ratsinfo_mcp` | Vault und RIS als MCP-Server | MCP |
+| `skills/` | Abläufe für den AI-Harness, siehe oben | Agent Skill |
+| `docs/site/` | Doku-Site zu komki (GitHub Pages) | Website |
 
-KomKI ist der Baustein für AI-Arbeit ohne Cloud. Das Modell läuft ausschließlich auf dem Loopback-Interface. Vor jedem Lauf verlangt ein Boot-Gate die Bestätigung, und ein Seatbelt-Profil begrenzt Datei- und Netzwerkzugriffe. Modell, llama.cpp und Coding-Agent sind gepinnt, der Download wird per SHA-256 geprüft. `komki_policy` gehört dazu und bleibt rein rechnend: Es entscheidet, ob eine Absicht zulässig ist, und verifiziert die Begründung, führt aber selbst nichts aus.
+Die vollständige Übersicht mit Status steht in [AGENTS.md](AGENTS.md#tool-übersicht).
 
-## Verzeichnisse
+## Werkzeugkasten einrichten
 
-`apps/` enthält die Elixir-Apps, `tools/` die Python-Werkzeuge, `skills/` die Ablauf-Anleitungen für OpenCode und `docs/` die kanonische Dokumentation. Prinzipien, Guardrails und Tooling-Vorgaben stehen vollständig in [AGENTS.md](AGENTS.md).
-
-## Einrichten
-
-Vorausgesetzt werden Elixir, `uv` für die Python-Werkzeuge und SQLite. Für die Vault-Workflows braucht es den `obsidian` CLI und eine laufende Obsidian-App. Alle externen Abhängigkeiten mit Installationswegen und Fallbacks stehen in [docs/prerequisites.md](docs/prerequisites.md).
+Für komki genügt die [Anleitung auf der Doku-Site](https://croesnick.github.io/kommunalpolitik_ki/komki/in-betrieb-nehmen/). Für den Werkzeugkasten werden Elixir, `uv` für die Python-Werkzeuge und SQLite vorausgesetzt, für die Vault-Workflows der `obsidian` CLI mit laufender Obsidian-App. Alle externen Abhängigkeiten mit Installationswegen und Fallbacks stehen in [docs/prerequisites.md](docs/prerequisites.md).
 
 ```bash
 # einmalig pro Clone: Secret-Scan vor jedem Commit
@@ -82,20 +107,30 @@ Ohne laufenden `obsidian` CLI legen die Vault-Skills ihre Notizen unter `artifac
 
 ## Grenzen
 
-- Beschlussnachverfolgung fehlt. ratsprojekte verknüpft Projekte nicht mit RIS-Sitzungen und trackt keine Fristen. Die Issues #32 bis #34 sammeln, was dafür gebraucht wird.
-- Öffentlichkeitsarbeit hat kein Werkzeug. Für Presse, Newsletter und kanalgebundene Texte liegen keine Vorlagen vor.
-- Der Lebenszyklus ist teils Spezifikation. Im Code erzwungen ist die Proposal-Entscheidung. Die übrigen Statusübergänge verlassen sich bislang auf die Disziplin der Skills, nicht auf Guards. Details: [docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md).
-- Zwei MCP-Server sind nicht eingebunden. `obsidian_mcp` und `ratsinfo_mcp` liegen im Repo, `opencode.json` nutzt sie nicht. Der Vault-Zugriff läuft über den `obsidian` CLI.
-- Zwei Antragsreife-Gates sind noch Richtlinie. Value Proposition und Success Metrics prüfen vorerst die Skills, Felder in ratsprojekte folgen mit Issue #37.
+**komki**
+
+- Nur macOS mit Apple Silicon, kein Installer. Eine Installation über Homebrew ist geplant.
+- Das RIS liefert ohne Zugangsdaten nur Titel, keine Texte der Tagesordnungspunkte ([#148](https://github.com/croesnick/kommunalpolitik_ki/issues/148)).
+- Schreiben in den Vault geht nur in den Ordner `komki-test/`, eine Bestätigung vor jedem Schreiben fehlt noch ([#205](https://github.com/croesnick/kommunalpolitik_ki/issues/205)).
+- Schutz vor einem manipulierten Agenten, nicht vor Schadsoftware, die schon auf dem Rechner läuft. Ein unabhängiges Audit gibt es nicht.
+
+**Werkzeugkasten**
+
+- Der OpenCode-Weg hat die Sicherheitsgrenze von komki nicht. Nichtöffentliche Unterlagen gehören dort nicht hinein.
+- Beschlussnachverfolgung fehlt: ratsprojekte verknüpft Projekte noch nicht mit RIS-Sitzungen und trackt keine Fristen ([#32](https://github.com/croesnick/kommunalpolitik_ki/issues/32), [#33](https://github.com/croesnick/kommunalpolitik_ki/issues/33), [#34](https://github.com/croesnick/kommunalpolitik_ki/issues/34)).
+- Der Projektlebenszyklus ist teils Spezifikation. Im Code erzwungen ist die Proposal-Entscheidung, die übrigen Übergänge sichern bislang die Skills ([docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md)). Value Proposition und Success Metrics sind noch keine harten Gates ([#37](https://github.com/croesnick/kommunalpolitik_ki/issues/37)).
+- `obsidian_mcp` und `ratsinfo_mcp` liegen im Repo, `opencode.json` bindet sie nicht ein. Der Vault-Zugriff läuft über den `obsidian` CLI.
+- Für Öffentlichkeitsarbeit (Presse, Newsletter) gibt es noch kein Werkzeug.
 
 ## Doku und Verweise
 
-- [AGENTS.md](AGENTS.md) benennt Prinzipien, Architektur, Guardrails und Tooling-Vorgaben.
-- [docs/workflows.md](docs/workflows.md) ordnet die elf Rats-Workflows ihren Tools zu und führt die Lücken auf.
-- [GLOSSARY.md](GLOSSARY.md) definiert die kanonischen Fachbegriffe des Repos.
-- [docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md) beschreibt Status, Übergänge und Gates.
-- [docs/prerequisites.md](docs/prerequisites.md) listet externe Abhängigkeiten mit Installation und Fallbacks.
-- [GitHub Projects](https://github.com/users/croesnick/projects) sammelt Issues, Meilensteine und Priorisierung.
+- [Doku-Site zu komki](https://croesnick.github.io/kommunalpolitik_ki/): Einstieg, Funktionsweise, Inbetriebnahme, Sicherheitsgrenze.
+- [AGENTS.md](AGENTS.md): Prinzipien, Architektur, Guardrails, Tooling-Vorgaben.
+- [docs/rfcs/](docs/rfcs/): Konzepte, allen voran [RFC 0003, vertrauliche KI-Arbeitsräume](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+- [docs/workflows.md](docs/workflows.md): die elf Rats-Workflows, ihre Werkzeuge und Lücken.
+- [GLOSSARY.md](GLOSSARY.md): die Fachbegriffe des Repos.
+- [docs/prerequisites.md](docs/prerequisites.md): externe Abhängigkeiten mit Installation und Fallbacks.
+- [Issues](https://github.com/croesnick/kommunalpolitik_ki/issues): offene Aufgaben, Ideen und Fragen.
 
 ## Lizenz
 
