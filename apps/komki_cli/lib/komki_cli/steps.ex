@@ -1768,12 +1768,9 @@ defmodule KomkiCli.Steps do
   end
 
   # Der Vermittler liest room.json nur beim Start; neue Raumdokumente
-  # brauchen deshalb einen Neustart (neues Token, die Session startet pi
-  # ohnehin danach).
+  # brauchen deshalb einen Neustart. Das Token bleibt (Ticket #216).
   defp reload_mediator(cfg) do
-    _ = Mediator.down(cfg)
-
-    case Mediator.up(cfg) do
+    case Mediator.restart(cfg) do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, "Vermittler-Neustart nach der Aufnahme: " <> reason, 2}
     end

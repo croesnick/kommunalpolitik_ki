@@ -6,7 +6,9 @@ defmodule KomkiCli.Channel do
       <base>/run/                 0700, angelegt von `komki up`
       <base>/run/mediator.sock    Vermittler (Bandit, HTTP), Rechte 0600
       <base>/run/mediator.token   32 Byte Zufall als Hex, 0600, neu bei jedem
-                                  Vermittler-Start durch `komki up`
+                                  Kaltstart durch `komki up`; ein geplanter
+                                  Neustart (neues Γ, neue Raumdokumente)
+                                  behaelt es (Ticket #216)
 
   Das Token steht nie in argv: der Vermittler liest es per `--token-file`,
   pi bekommt es ueber die Umgebung (`KOMKI_MEDIATOR_TOKEN`) und reicht es

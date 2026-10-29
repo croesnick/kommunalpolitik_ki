@@ -17,8 +17,9 @@ defmodule KomkiCli.Config do
     * `escript_bin` — aufgeloeste Erlang-`escript`-Laufzeit; jedes komki-Escript
       startet unter Seatbelt als `escript <datei>`.
     * `egress_bin`, `connector_bins` (id → Pfad) — entdeckt wie der Vermittler.
-    * `egress_ports` — Loopback-Port je Connector mit Netz (Default ris 49531,
-      web 49532).
+    * `egress_ports` — Loopback-Port je Connector mit Netz; `init` leitet sie
+      aus `port` ab (ris `port + 7`, web `port + 8`, beim Default-Port
+      49531/49532). Eine bestehende config.json behaelt ihre Ports (#203).
     * `ris_base_url` — Default die echte RIS-API; `ris_mock_port` schaltet auf
       `http://127.0.0.1:<port>/` ohne Proxy um.
     * `vault_dir` — Default `<base>/vault` (synthetischer Test-Vault); leer
@@ -116,8 +117,11 @@ defmodule KomkiCli.Config do
   # Gemma 4 hält den KV-Cache via SWA klein.
   @default_ctx 131_072
   # Connectoren (Ticket #146): je Connector mit egress_hosts ein eigener
-  # Loopback-Port am Egress-Proxy (CONTRACT.md §9).
-  @default_egress_ports %{"ris" => 49_531, "web" => 49_532}
+  # Loopback-Port am Egress-Proxy (CONTRACT.md §9). Ticket #203: relativ zu
+  # `port`, damit eine Wegwerf-Instanz mit eigenem --port neben der
+  # Hauptinstanz startet. Beim Default-Port: ris 49531, web 49532.
+  @egress_port_offsets %{"ris" => 7, "web" => 8}
+  @default_egress_ports %{"ris" => @default_port + 7, "web" => @default_port + 8}
   # Echte RIS-API (dieselbe Basis wie apps/ratsinfo); der Host steht im
   # Manifest als egress_hosts-Eintrag.
   @default_ris_base_url "https://risapi1.komuna.net/web/"
@@ -252,6 +256,11 @@ defmodule KomkiCli.Config do
   @doc "Default der Egress-Ports je Connector (CONTRACT.md §9)."
   @spec default_egress_ports() :: %{String.t() => pos_integer()}
   def default_egress_ports, do: @default_egress_ports
+
+  @doc "Egress-Ports zu einem llama-Port (Ticket #203: ris `port + 7`, web `port + 8`)."
+  @spec egress_ports_for(pos_integer()) :: %{String.t() => pos_integer()}
+  def egress_ports_for(port) when is_integer(port) and port > 0,
+    do: Map.new(@egress_port_offsets, fn {id, offset} -> {id, port + offset} end)
 
   @doc "Default-Basis der RIS-API (echter Betrieb)."
   @spec default_ris_base_url() :: String.t()
@@ -417,10 +426,11 @@ defmodule KomkiCli.Config do
     base = canonical(base_dir)
     node_bin = resolve_node_bin()
     komki = Keyword.get_lazy(opts, :komki_bin, &self_komki/0)
+    port = opts[:port] || @default_port
 
     %__MODULE__{
       base_dir: base,
-      port: opts[:port] || @default_port,
+      port: port,
       ctx: opts[:ctx] || @default_ctx,
       gguf_path: Path.join([base, "models", @model_filename]),
       gguf_sha256: @expected_gguf_sha256,
@@ -443,7 +453,7 @@ defmodule KomkiCli.Config do
           KomkiConnector.Manifest.all(),
           &{&1.id, komki || resolve_escript(&1.binary, base)}
         ),
-      egress_ports: @default_egress_ports,
+      egress_ports: egress_ports_for(port),
       ris_base_url: opts[:ris_base_url] || @default_ris_base_url,
       ris_mock_port: opts[:ris_mock_port],
       # Default: synthetischer Test-Vault unter der Basis (init legt ihn an)

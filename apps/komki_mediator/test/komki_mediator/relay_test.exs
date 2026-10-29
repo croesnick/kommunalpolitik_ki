@@ -79,6 +79,34 @@ defmodule KomkiMediator.RelayTest do
     Port.close(relay)
   end
 
+  # Ticket #216: geplanter Neustart mit gleichem Token. Die MCP-Session des
+  # alten Vermittlers ist weg; anubis legt zur unbekannten Mcp-Session-Id
+  # eine neue an, pi merkt nichts. Bricht diese Annahme (etwa 404 nach
+  # Streamable-HTTP-Spec), faellt es hier auf.
+  test "Vermittler-Neustart mit gleichem Token: Relay verbindet sich neu", %{
+    base: base,
+    socket: socket,
+    token: token
+  } do
+    relay = start_relay(socket, token)
+    handshake(relay)
+
+    :ok = stop_supervised(KomkiMediator.Supervisor)
+    File.rm(socket)
+    TestHelpers.start_socket_server!(base: base, socket: socket, token: token)
+
+    send_line(relay, %{
+      "jsonrpc" => "2.0",
+      "id" => 4,
+      "method" => "tools/call",
+      "params" => %{"name" => "ping", "arguments" => %{}}
+    })
+
+    assert %{"id" => 4, "result" => %{"isError" => false}} = read_line(relay)
+
+    Port.close(relay)
+  end
+
   test "Vermittler nicht erreichbar: JSON-RPC-Fehler statt Absturz", %{token: token} do
     relay = start_relay("/tmp/kmt-gibt-es-nicht.sock", token)
 
@@ -102,6 +130,22 @@ defmodule KomkiMediator.RelayTest do
          {~c"KOMKI_SESSION_ID", String.to_charlist(@session)}
        ]}
     ])
+  end
+
+  defp handshake(relay) do
+    send_line(relay, %{
+      "jsonrpc" => "2.0",
+      "id" => 1,
+      "method" => "initialize",
+      "params" => %{
+        "protocolVersion" => "2025-06-18",
+        "capabilities" => %{},
+        "clientInfo" => %{"name" => "relay-test", "version" => "0"}
+      }
+    })
+
+    assert %{"id" => 1, "result" => _} = read_line(relay)
+    send_line(relay, %{"jsonrpc" => "2.0", "method" => "notifications/initialized"})
   end
 
   defp send_line(port, message), do: Port.command(port, JSON.encode!(message) <> "\n")

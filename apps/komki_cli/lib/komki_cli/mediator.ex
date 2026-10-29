@@ -27,8 +27,9 @@ defmodule KomkiCli.Mediator do
   bleibt verborgen.
 
   Kanal (Ticket #143, `KomkiCli.Channel`): Der Vermittler lauscht nur auf
-  dem Unix-Socket und verlangt das Token, das `up` vor jedem Start neu
-  schreibt. pi erreicht ihn ueber `komki-relay.js` (stdio-MCP-Server); das
+  dem Unix-Socket und verlangt das Token, das `up` vor jedem Kaltstart neu
+  schreibt; ein geplanter Neustart (`restart/1`, neues Γ) behaelt es, damit
+  laufende pi-Sessions verbunden bleiben (Ticket #216). pi erreicht ihn ueber `komki-relay.js` (stdio-MCP-Server); das
   pi-Profil erlaubt Netz-Auswaerts nur zu diesem Socket-Pfad und zum
   llama-Port. Die mcp.json enthaelt kein Token, nur den Verweis
   `${KOMKI_MEDIATOR_TOKEN}` auf pis Umgebung.
@@ -66,12 +67,40 @@ defmodule KomkiCli.Mediator do
           {:ok, {:already, health}}
 
         {:ok, "200", _health} ->
-          _ = down(cfg)
-          fresh_start(cfg)
+          restart_same_token(cfg)
 
         _ ->
           fresh_start(cfg)
       end
+    end
+  end
+
+  @doc """
+  Geplanter Neustart eines laufenden Vermittlers (Ticket #216), etwa damit
+  er neue Raumdokumente oder ein neues Γ liest: Das Token bleibt, damit
+  eine laufende pi-Session weiterarbeitet. Laeuft keiner, wie `up`.
+  """
+  @spec restart(Config.t()) ::
+          {:ok, {:started, pos_integer(), health()}}
+          | {:ok, {:already, health()}}
+          | {:error, String.t()}
+  def restart(%Config{} = cfg) do
+    with gamma when gamma in [:unchanged, :written] <- Gamma.sync(cfg) do
+      case fetch_health(cfg) do
+        {:ok, "200", _health} -> restart_same_token(cfg)
+        _ -> fresh_start(cfg)
+      end
+    end
+  end
+
+  # Der Vermittler hat mit dem Token gerade geantwortet: es ist gueltig
+  # und steht schon in der Umgebung laufender pi-Sessions. Ein neues Token
+  # gaebe dem Agenten nichts, was er nicht hat, und saeumte ihn nur aus.
+  defp restart_same_token(cfg) do
+    _ = down(cfg)
+
+    with :ok <- Channel.check_socket_path(cfg) do
+      spawn_mediator(cfg)
     end
   end
 
