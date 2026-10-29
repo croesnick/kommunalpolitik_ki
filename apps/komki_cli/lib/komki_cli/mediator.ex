@@ -26,8 +26,8 @@ defmodule KomkiCli.Mediator do
   Die pi-seitige Freigabe erfolgt via `write_mcp_config/2`: alles zweite
   bleibt verborgen.
 
-  Kanal (Ticket #143, `KomkiCli.Channel`): Der Vermittler lauscht nur auf
-  dem Unix-Socket und verlangt das Token, das `up` vor jedem Kaltstart neu
+  Socket (Ticket #143, `KomkiCli.Channel`): Der Vermittler lauscht nur auf
+  dem Unix-Socket und verlangt das Socket-Token, das `up` vor jedem Kaltstart neu
   schreibt; ein geplanter Neustart (`restart/1`, neues Γ) behaelt es, damit
   laufende pi-Sessions verbunden bleiben (Ticket #216). pi erreicht ihn ueber `komki-relay.js` (stdio-MCP-Server); das
   pi-Profil erlaubt Netz-Auswaerts nur zu diesem Socket-Pfad und zum
@@ -262,7 +262,7 @@ defmodule KomkiCli.Mediator do
     Proc.spawn_line(program, Enum.map(words, &Proc.quote_bin/1), log_path(cfg), "< /dev/null")
   end
 
-  @doc "Kanal des Vermittlers für sein Profil (Ticket #137): der Unix-Socket aus #143."
+  @doc "Socket des Vermittlers für sein Profil (Ticket #137): der Unix-Socket aus #143."
   @spec listen(Config.t()) :: MediatorProfile.listen()
   def listen(%Config{} = cfg), do: {:unix, Channel.socket_path(cfg)}
 

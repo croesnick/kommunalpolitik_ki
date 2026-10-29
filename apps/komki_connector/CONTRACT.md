@@ -232,7 +232,7 @@ Zwei Referenzräume für Tests:
   (`recipient_not_allowed`: brave-search bzw. ris-betreiber ∉ R(vault-vertraulich@1)). Das ist die
   Lethal-Trifecta-Sperre.
 
-## 8. Kanal pi → Vermittler
+## 8. Unix-Socket pi → Vermittler
 
 - Der Vermittler lauscht **nur** auf `<base>/run/mediator.sock` (Bandit `ip: {:local, path}`), nicht mehr auf
   Loopback-TCP.

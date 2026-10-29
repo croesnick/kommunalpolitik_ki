@@ -21,7 +21,7 @@ defmodule KomkiCli.Pi do
       PI_OFFLINE         = 1
       LANG / LC_ALL      = C
 
-  Dazu kommt der Kanal zum Vermittler (Ticket #143, `KomkiCli.Channel`):
+  Dazu kommt der Socket zum Vermittler (Ticket #143, `KomkiCli.Channel`):
   `KOMKI_MEDIATOR_TOKEN` und `KOMKI_SESSION_ID`. pi reicht beide ueber die
   `env`-Felder der mcp.json an `komki-relay.js` weiter. Das Token steht nie
   in argv.
@@ -207,7 +207,7 @@ defmodule KomkiCli.Pi do
   def env_list(%Config{} = cfg), do: cfg |> env_for() |> Map.to_list() |> Enum.sort()
 
   @doc """
-  Session-Umgebung fuer den Port-Replace: Lauf-Umgebung plus Kanal
+  Session-Umgebung fuer den Port-Replace: Lauf-Umgebung plus Socket-Zugang
   (`KOMKI_MEDIATOR_TOKEN`, `KOMKI_SESSION_ID`, Ticket #143) plus `TERM` fuer
   die TUI. Der Port-Env ersetzt die geerbte Umgebung komplett — dieselbe
   Konvention wie beim Einmal-Lauf via `System.cmd`-env-Replace.

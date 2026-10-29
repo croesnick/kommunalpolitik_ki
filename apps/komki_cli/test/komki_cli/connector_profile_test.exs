@@ -210,7 +210,7 @@ defmodule KomkiCli.ConnectorProfileTest do
              ]
     end
 
-    test "Ziel-Kanal (#143): Socket binden, Token lesen, kein TCP-Bind" do
+    test "Unix-Socket des Vermittlers (#143): Socket binden, Token lesen, kein TCP-Bind" do
       cfg = cfg()
       text = MediatorProfile.generate(cfg, {:unix, MediatorProfile.socket_path(cfg)})
 

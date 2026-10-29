@@ -1206,7 +1206,7 @@ defmodule KomkiCli.Steps do
   pi-Ausgaengen (`{:ok, out}` und `{:error, out, code}`).
 
   `:pi_fun` ist Pflicht (der Lauf reicht `Pi.run/6` mit Timeout und
-  Kanal herein), `:capture_fun` injizierbar (Tests ohne echtes
+  Socket-Zugang herein), `:capture_fun` injizierbar (Tests ohne echtes
   llama/pi/log). Ohne `capture?: true` wird weder `log show` gerufen noch
   ein Bericht geschrieben.
   """
@@ -1835,7 +1835,7 @@ defmodule KomkiCli.Steps do
     end
   end
 
-  # Kanal fuer einen pi-Start (Ticket #143): Token lesen, Session-ID
+  # Socket-Zugang fuer einen pi-Start (Ticket #143): Token lesen, Session-ID
   # erzeugen, Relay frisch schreiben. Fehlt das Token, ist `komki up` noetig.
   # Auch die mcp.json wird frisch aus der healthz-Antwort geschrieben: das
   # pi-Home ist fuer den Agenten schreibbar, und ein eingetragener

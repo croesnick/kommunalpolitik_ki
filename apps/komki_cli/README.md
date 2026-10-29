@@ -293,7 +293,7 @@ ihn in pis `models.json` ein. Ohne den Schlüssel antwortet llama mit 401, damit
 keine Website im Browser das lokale Modell nutzen kann. `komki doctor` meldet
 einen llama, der ohne Schlüssel läuft.
 
-### Kanal zum Vermittler (Ticket #143)
+### Unix-Socket zum Vermittler (Ticket #143)
 
 pi erreicht den Vermittler (`komki-mediator`) nur über einen Unix-Socket,
 nicht über einen TCP-Port:
