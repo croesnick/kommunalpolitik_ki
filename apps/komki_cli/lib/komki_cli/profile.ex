@@ -178,8 +178,8 @@ defmodule KomkiCli.Profile do
   defp llama_exec_read_rules(bin) do
     [
       "; llama-server-Binaer: exec + read (config haelt den kernel-kanonischen Pfad).",
-      "(allow process-exec (literal \"" <> bin <> "\"))",
-      "(allow file-read* (literal \"" <> bin <> "\"))"
+      "(allow process-exec (literal " <> SBPL.quote!(bin) <> "))",
+      "(allow file-read* (literal " <> SBPL.quote!(bin) <> "))"
     ]
   end
 
@@ -192,7 +192,7 @@ defmodule KomkiCli.Profile do
         "libggml-base) und des ggml-Backend-Scan-Verzeichnisses libexec (Fund exp6/exp7/exp14: " <>
         "ohne libexec-Leserecht bleibt die Backend-Registry leer)"
     ] ++
-      Enum.map(dirs, fn dir -> "(allow file-read* (subpath \"" <> dir <> "\"))" end)
+      Enum.map(dirs, fn dir -> "(allow file-read* (subpath " <> SBPL.quote!(dir) <> "))" end)
   end
 
   defp llama_dev_rules do
@@ -206,22 +206,22 @@ defmodule KomkiCli.Profile do
   defp llama_model_rules(gguf_path) do
     [
       "; Modell (mmap)",
-      "(allow file-read* (literal \"" <> gguf_path <> "\"))"
+      "(allow file-read* (literal " <> SBPL.quote!(gguf_path) <> "))"
     ]
   end
 
   defp llama_log_rules(log_path) do
     [
       "; Log (Redirect-Ziel des Spawn-Shells; Write-Scope ausschliesslich diese Datei)",
-      "(allow file-read* (literal \"" <> log_path <> "\"))",
-      "(allow file-write* (literal \"" <> log_path <> "\"))"
+      "(allow file-read* (literal " <> SBPL.quote!(log_path) <> "))",
+      "(allow file-write* (literal " <> SBPL.quote!(log_path) <> "))"
     ]
   end
 
   defp llama_key_rules(key_path) do
     [
       "; API-Key-Datei (Ticket #136, --api-key-file; nur lesend)",
-      "(allow file-read* (literal \"" <> key_path <> "\"))"
+      "(allow file-read* (literal " <> SBPL.quote!(key_path) <> "))"
     ]
   end
 
@@ -230,7 +230,7 @@ defmodule KomkiCli.Profile do
       "; Netz: Management-Port, loopback-bind + inbound, KEIN outbound (--offline wird",
       "; profilseitig erzwungen). SBPL-Grammatik-Fund exp7/exp8: host muss * oder localhost",
       "; sein; \"localhost:PORT\" ist die engste Form und matcht den 127.0.0.1-Bind.",
-      "(allow network-bind (local ip \"localhost:" <> to_string(port) <> "\"))",
+      "(allow network-bind (local ip " <> SBPL.quote!("localhost:" <> to_string(port)) <> "))",
       "(allow network-inbound (local ip))"
     ]
   end
@@ -260,7 +260,7 @@ defmodule KomkiCli.Profile do
       "; memsize/pagesize_compat/logicalcpu degradiert der Memory-Fitter/Threadpool)"
     ] ++
       Enum.map(@llama_sysctls, fn name ->
-        "(allow sysctl-read (sysctl-name \"" <> name <> "\"))"
+        "(allow sysctl-read (sysctl-name " <> SBPL.quote!(name) <> "))"
       end)
   end
 
@@ -283,7 +283,7 @@ defmodule KomkiCli.Profile do
   defp llama_mach_shm_rules do
     ["; Mach-Lookups + shm (Pi-Pin-Klasse; exp14-Runde-2-Denials)"] ++
       Enum.map(@llama_mach_names, fn name ->
-        "(allow mach-lookup (global-name \"" <> name <> "\"))"
+        "(allow mach-lookup (global-name " <> SBPL.quote!(name) <> "))"
       end) ++
       [
         "(allow ipc-posix-shm (ipc-posix-name \"apple.shm.notification_center\"))"
@@ -350,10 +350,12 @@ defmodule KomkiCli.Profile do
       "; CFPreferences-Global-Read (CoreFoundation-Init)",
       "(allow file-read* (literal \"/Library/Preferences/.GlobalPreferences.plist\"))",
       "(allow file-read-metadata (literal \"/Library/Preferences\"))",
-      "(allow file-read* (literal \"" <>
-        user_home <> "/Library/Preferences/.GlobalPreferences.plist\"))",
-      "(allow file-read-metadata (literal \"" <> user_home <> "/Library/Preferences\"))",
-      "(allow file-read-metadata (literal \"" <> user_home <> "/Library/Preferences/ByHost\"))",
+      "(allow file-read* (literal " <>
+        SBPL.quote!(user_home <> "/Library/Preferences/.GlobalPreferences.plist") <> "))",
+      "(allow file-read-metadata (literal " <>
+        SBPL.quote!(user_home <> "/Library/Preferences") <> "))",
+      "(allow file-read-metadata (literal " <>
+        SBPL.quote!(user_home <> "/Library/Preferences/ByHost") <> "))",
       "(allow file-read-metadata (literal \"/private/var/db/.AppleSetupDone\"))"
     ]
   end
@@ -417,11 +419,12 @@ defmodule KomkiCli.Profile do
     # Netz-Exceptions am Dateiende, deterministisch: llama zuerst, der
     # Vermittler-Socket (Ticket #143) danach — kein Wildcard-Port, kein
     # weiteres Ziel (byte-stabil, vom Doctor-Check kontrolliert).
-    port_rule = "(allow network-outbound (remote tcp \"localhost:" <> port <> "\"))"
+    port_rule =
+      "(allow network-outbound (remote tcp " <> SBPL.quote!("localhost:" <> port) <> "))"
 
     mediator_socket_rule =
-      "(allow network-outbound (remote unix-socket (path-literal \"" <>
-        Channel.socket_path(cfg) <> "\")))"
+      "(allow network-outbound (remote unix-socket (path-literal " <>
+        SBPL.quote!(Channel.socket_path(cfg)) <> ")))"
 
     base_rules ++
       Preset.macos_exec_boot() ++
@@ -467,14 +470,14 @@ defmodule KomkiCli.Profile do
       "(allow process-exec (literal \"/usr/bin/true\"))",
       "(allow process-exec (literal \"/bin/sh\"))",
       "(allow process-exec (literal \"/bin/bash\"))",
-      "(allow process-exec (literal \"" <> node <> "\"))",
-      "(allow process-exec (literal \"" <> pi_launcher <> "\"))",
-      "(allow process-exec* (literal \"" <> pi_launcher <> "\"))",
+      "(allow process-exec (literal " <> SBPL.quote!(node) <> "))",
+      "(allow process-exec (literal " <> SBPL.quote!(pi_launcher) <> "))",
+      "(allow process-exec* (literal " <> SBPL.quote!(pi_launcher) <> "))",
       "; pi's Such-Werkzeuge fd/rg: Kopien im agent-bin-Fundus (init schreibt sie)",
-      "(allow process-exec (literal \"" <> tools_fd <> "\"))",
-      "(allow process-exec* (literal \"" <> tools_fd <> "\"))",
-      "(allow process-exec (literal \"" <> tools_rg <> "\"))",
-      "(allow process-exec* (literal \"" <> tools_rg <> "\"))",
+      "(allow process-exec (literal " <> SBPL.quote!(tools_fd) <> "))",
+      "(allow process-exec* (literal " <> SBPL.quote!(tools_fd) <> "))",
+      "(allow process-exec (literal " <> SBPL.quote!(tools_rg) <> "))",
+      "(allow process-exec* (literal " <> SBPL.quote!(tools_rg) <> "))",
       "(allow process-fork)",
       "(allow file-read* (subpath \"/System/Library\"))",
       "(allow file-read* (subpath \"/usr/lib\"))",
@@ -482,8 +485,8 @@ defmodule KomkiCli.Profile do
       "(allow file-read* (literal \"/usr/bin/true\"))",
       "(allow file-read* (literal \"/bin/sh\"))",
       "(allow file-read* (literal \"/bin/bash\"))",
-      "(allow file-read* (literal \"" <> node <> "\"))",
-      "(allow file-read* (literal \"" <> pi_launcher <> "\"))",
+      "(allow file-read* (literal " <> SBPL.quote!(node) <> "))",
+      "(allow file-read* (literal " <> SBPL.quote!(pi_launcher) <> "))",
       "(allow file-read* (literal \"/dev/null\"))",
       "(allow file-read* (literal \"/dev/random\"))",
       "(allow file-read* (literal \"/dev/urandom\"))",
@@ -576,18 +579,18 @@ defmodule KomkiCli.Profile do
       Kernel.++(
         [
           "; asdf-Shim-Layer bleibt erlaubt (validiert); der Runtime-Aufruf nutzt die Direktkette nicht.",
-          "(allow file-read* (literal \"" <> Path.join([shims_root, "pi"]) <> "\"))",
-          "(allow file-read* (literal \"" <> Path.join([shims_root, "node"]) <> "\"))",
-          "(allow process-exec (literal \"" <> Path.join([shims_root, "pi"]) <> "\"))",
-          "(allow process-exec* (literal \"" <> Path.join([shims_root, "pi"]) <> "\"))",
-          "(allow process-exec (literal \"" <> Path.join([shims_root, "node"]) <> "\"))",
-          "(allow process-exec* (literal \"" <> Path.join([shims_root, "node"]) <> "\"))",
-          "(allow file-read* (subpath \"" <> installs_root <> "\"))",
-          "(allow file-read-metadata (subpath \"" <> installs_root <> "\"))",
-          "(allow file-read* (subpath \"" <> shims_root <> "\"))",
-          "(allow file-read-metadata (subpath \"" <> shims_root <> "\"))",
-          "(allow file-read* (subpath \"" <> plugins_root <> "\"))",
-          "(allow file-read-metadata (subpath \"" <> plugins_root <> "\"))",
+          "(allow file-read* (literal " <> SBPL.quote!(Path.join([shims_root, "pi"])) <> "))",
+          "(allow file-read* (literal " <> SBPL.quote!(Path.join([shims_root, "node"])) <> "))",
+          "(allow process-exec (literal " <> SBPL.quote!(Path.join([shims_root, "pi"])) <> "))",
+          "(allow process-exec* (literal " <> SBPL.quote!(Path.join([shims_root, "pi"])) <> "))",
+          "(allow process-exec (literal " <> SBPL.quote!(Path.join([shims_root, "node"])) <> "))",
+          "(allow process-exec* (literal " <> SBPL.quote!(Path.join([shims_root, "node"])) <> "))",
+          "(allow file-read* (subpath " <> SBPL.quote!(installs_root) <> "))",
+          "(allow file-read-metadata (subpath " <> SBPL.quote!(installs_root) <> "))",
+          "(allow file-read* (subpath " <> SBPL.quote!(shims_root) <> "))",
+          "(allow file-read-metadata (subpath " <> SBPL.quote!(shims_root) <> "))",
+          "(allow file-read* (subpath " <> SBPL.quote!(plugins_root) <> "))",
+          "(allow file-read-metadata (subpath " <> SBPL.quote!(plugins_root) <> "))",
           "; asdf-Go-Runtime CPU-Feature-Proben (Probe-Beleg 10:52:46/56 UTC)",
           "(allow sysctl-read (sysctl-name \"hw.optional.armv8_1_atomics\"))",
           "(allow sysctl-read (sysctl-name \"hw.optional.armv8_crc32\"))",
@@ -625,8 +628,8 @@ defmodule KomkiCli.Profile do
 
   defp asdf_exec_literals(bin) do
     [
-      "(allow process-exec (literal \"" <> bin <> "\"))",
-      "(allow file-read* (literal \"" <> bin <> "\"))"
+      "(allow process-exec (literal " <> SBPL.quote!(bin) <> "))",
+      "(allow file-read* (literal " <> SBPL.quote!(bin) <> "))"
     ]
   end
 
@@ -658,8 +661,8 @@ defmodule KomkiCli.Profile do
         "(allow sysctl-read (sysctl-name \"hw.machine\"))",
         "(allow sysctl-read (sysctl-name \"machdep.cpu.brand_string\"))",
         "(allow file-read-data (literal \"/dev/autofs_nowait\"))",
-        "(allow file-read-data (literal \"" <>
-          Path.join([user_home, ".CFUserTextEncoding"]) <> "\"))",
+        "(allow file-read-data (literal " <>
+          SBPL.quote!(Path.join([user_home, ".CFUserTextEncoding"])) <> "))",
         "(allow network-outbound (remote unix-socket (literal \"/private/var/run/syslog\")))",
         "; ICU/tz-Zugriffe (Beleg 10:37:40 UTC)",
         "(allow file-read* (subpath \"/private/var/db/timezone\"))",
@@ -672,9 +675,9 @@ defmodule KomkiCli.Profile do
   defp pi_pkg_reads(pi_pkg, node_modules_root) do
     [
       "; pi-Paket-Installations-Subtree (self-contained Bundle + Runtime-Daten)",
-      "(allow file-read* (subpath \"" <> pi_pkg <> "\"))",
+      "(allow file-read* (subpath " <> SBPL.quote!(pi_pkg) <> "))",
       "; node-module-resolution geht exports/symlinks im Install-Subtree nach",
-      "(allow file-read* (subpath \"" <> node_modules_root <> "\"))"
+      "(allow file-read* (subpath " <> SBPL.quote!(node_modules_root) <> "))"
     ] ++ pi_deps_reads(pi_modules_root(pi_pkg), node_modules_root)
   end
 
@@ -687,7 +690,7 @@ defmodule KomkiCli.Profile do
   defp pi_deps_reads(root, _node_modules_root) do
     [
       "; Abhaengigkeiten des pi-Pakets (flaches node_modules, etwa jiti)",
-      "(allow file-read* (subpath \"" <> root <> "\"))"
+      "(allow file-read* (subpath " <> SBPL.quote!(root) <> "))"
     ]
   end
 
@@ -699,11 +702,11 @@ defmodule KomkiCli.Profile do
   defp scope_rules(%Config{} = cfg, scratch) do
     [
       "; isoliertes HOME (agentDir ~/.pi/agent, Sessions) + Scratch-Write-Scope",
-      "(allow file-read* (subpath \"" <> cfg.pi_home <> "\"))",
-      "(allow file-write* (subpath \"" <> cfg.pi_home <> "\"))",
+      "(allow file-read* (subpath " <> SBPL.quote!(cfg.pi_home) <> "))",
+      "(allow file-write* (subpath " <> SBPL.quote!(cfg.pi_home) <> "))",
       "; Scratch: lesend (Tool-Ergebnis) und schreibend (Run-Ziel)",
-      "(allow file-read* (subpath \"" <> scratch <> "\"))",
-      "(allow file-write* (subpath \"" <> scratch <> "\"))",
+      "(allow file-read* (subpath " <> SBPL.quote!(scratch) <> "))",
+      "(allow file-write* (subpath " <> SBPL.quote!(scratch) <> "))",
       "; stdio/dev-Schreibscope (Phase-1-Ansatz)",
       "(allow file-write* (literal \"/dev/null\"))",
       "; /private/var/select/sh: npm-Link-Aufloeser (Phase-1-Beleg)",

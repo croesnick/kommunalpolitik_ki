@@ -23,6 +23,7 @@ defmodule KomkiCli.ConnectorProfile do
 
   alias KomkiCli.{Config, Connectors, EscriptProfile}
   alias KomkiConnector.Manifest
+  alias Seatbelt.SBPL
 
   @doc "Profiltext eines Connectors."
   @spec connector(Config.t(), Manifest.t()) :: String.t()
@@ -80,8 +81,8 @@ defmodule KomkiCli.ConnectorProfile do
   def socket_bind_rules(socket) do
     [
       "; eigener Unix-Socket (binden, 0600 setzen, alten Socket entfernen)",
-      "(allow network-bind (local unix-socket (path-literal \"" <> socket <> "\")))",
-      "(allow file-read* file-write* (literal \"" <> socket <> "\"))"
+      "(allow network-bind (local unix-socket (path-literal " <> SBPL.quote!(socket) <> ")))",
+      "(allow file-read* file-write* (literal " <> SBPL.quote!(socket) <> "))"
     ]
   end
 
@@ -121,8 +122,8 @@ defmodule KomkiCli.ConnectorProfile do
   defp fs_rules(fs) do
     ["; Dateisystem nach Manifest (fs)"] ++
       Enum.map(fs, fn
-        {path, :read} -> "(allow file-read* (subpath \"" <> path <> "\"))"
-        {path, :write} -> "(allow file-read* file-write* (subpath \"" <> path <> "\"))"
+        {path, :read} -> "(allow file-read* (subpath " <> SBPL.quote!(path) <> "))"
+        {path, :write} -> "(allow file-read* file-write* (subpath " <> SBPL.quote!(path) <> "))"
       end)
   end
 

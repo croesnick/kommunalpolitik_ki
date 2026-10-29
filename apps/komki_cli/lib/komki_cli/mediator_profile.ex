@@ -25,6 +25,7 @@ defmodule KomkiCli.MediatorProfile do
 
   alias KomkiCli.{Channel, Config, ConnectorProfile, EscriptProfile, Mediator}
   alias KomkiConnector.{Manifest, Token}
+  alias Seatbelt.SBPL
 
   @type listen :: {:tcp, pos_integer()} | {:unix, String.t()}
 
@@ -75,26 +76,27 @@ defmodule KomkiCli.MediatorProfile do
       "; Raum lesen (registry.json, room.json). Die Dokumente liest der",
       "; Dokument-Connector (Ticket #169); hier nur Metadaten fuer die",
       "; Erstprovisionierung, keine Inhalte.",
-      "(allow file-read* (literal \"" <>
-        data <>
-        "\") (literal \"" <>
-        Path.join(data, "registry.json") <>
-        "\") (literal \"" <> Path.join(data, "room.json") <> "\"))",
-      "(allow file-read-metadata (subpath \"" <> documents <> "\"))",
-      "(allow file-read* (subpath \"" <> journal <> "\") (subpath \"" <> go <> "\"))",
+      "(allow file-read* (literal " <>
+        SBPL.quote!(data) <>
+        ") (literal " <>
+        SBPL.quote!(Path.join(data, "registry.json")) <>
+        ") (literal " <> SBPL.quote!(Path.join(data, "room.json")) <> "))",
+      "(allow file-read-metadata (subpath " <> SBPL.quote!(documents) <> "))",
+      "(allow file-read* (subpath " <>
+        SBPL.quote!(journal) <> ") (subpath " <> SBPL.quote!(go) <> "))",
       "; Journal: anhaengen und uappnd setzen (Ticket #139)",
-      "(allow file-write* (subpath \"" <> journal <> "\"))",
+      "(allow file-write* (subpath " <> SBPL.quote!(journal) <> "))",
       "(allow process-exec (literal \"/usr/bin/chflags\"))",
       "(allow file-read* (literal \"/usr/bin/chflags\"))",
       "; Erstprovisionierung beim ersten Start (Templates.provision!/1)",
-      "(allow file-write* (literal \"" <>
-        data <>
-        "\") (literal \"" <>
-        Path.join(data, "registry.json") <>
-        "\") (literal \"" <> Path.join(data, "room.json") <> "\"))",
-      "(allow file-write* (subpath \"" <> documents <> "\"))",
+      "(allow file-write* (literal " <>
+        SBPL.quote!(data) <>
+        ") (literal " <>
+        SBPL.quote!(Path.join(data, "registry.json")) <>
+        ") (literal " <> SBPL.quote!(Path.join(data, "room.json")) <> "))",
+      "(allow file-write* (subpath " <> SBPL.quote!(documents) <> "))",
       "; GO-Anfragen und Offenlegungsstand (Ticket #98)",
-      "(allow file-write* (subpath \"" <> go <> "\"))"
+      "(allow file-write* (subpath " <> SBPL.quote!(go) <> "))"
     ]
   end
 
@@ -112,8 +114,8 @@ defmodule KomkiCli.MediatorProfile do
     ["; Kanal pi -> Vermittler: Unix-Socket (CONTRACT.md §8), Token nur lesen"] ++
       ConnectorProfile.socket_bind_rules(socket) ++
       [
-        "(allow network-inbound (local unix-socket (path-literal \"" <> socket <> "\")))",
-        "(allow file-read* (literal \"" <> token_path(cfg) <> "\"))"
+        "(allow network-inbound (local unix-socket (path-literal " <> SBPL.quote!(socket) <> ")))",
+        "(allow file-read* (literal " <> SBPL.quote!(token_path(cfg)) <> "))"
       ]
   end
 
@@ -124,8 +126,9 @@ defmodule KomkiCli.MediatorProfile do
     ["; Connector-Sockets (Frame-Protokoll, CONTRACT.md §3) — einziges Outbound, Token nur lesen"] ++
       Enum.flat_map(sockets, fn socket ->
         [
-          "(allow network-outbound (remote unix-socket (path-literal \"" <> socket <> "\")))",
-          "(allow file-read* (literal \"" <> Token.for_socket(socket) <> "\"))"
+          "(allow network-outbound (remote unix-socket (path-literal " <>
+            SBPL.quote!(socket) <> ")))",
+          "(allow file-read* (literal " <> SBPL.quote!(Token.for_socket(socket)) <> "))"
         ]
       end)
   end
