@@ -14,12 +14,12 @@ defmodule KomkiConnectorDocuments do
   Zustand: `%{dir: <documents_dir>}`.
   """
 
-  @behaviour KomkiConnector.Server
+  @behaviour Sidecar.Server
 
   @max_bytes 1_048_576
 
   @impl true
-  def manifest_id, do: "documents"
+  def manifest, do: KomkiConnector.Manifest.sidecar!("documents")
 
   @impl true
   def init(dir) when is_binary(dir) do

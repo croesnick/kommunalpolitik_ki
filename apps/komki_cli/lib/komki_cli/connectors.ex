@@ -26,7 +26,8 @@ defmodule KomkiCli.Connectors do
   """
 
   alias KomkiCli.{Config, ConnectorProfile, Proc, Profile, Secrets}
-  alias KomkiConnector.{Client, Manifest, Token}
+  alias KomkiConnector.{Launch, Manifest, Text}
+  alias Sidecar.{Client, Token}
 
   @ready_timeout_ms 15_000
   @egress_marker "komki-egress"
@@ -185,7 +186,7 @@ defmodule KomkiCli.Connectors do
 
   @doc """
   Credentials-Zeile fuer stdin: das Connector-Token unter
-  `KomkiConnector.Token.credential_key/0` und `{"<NAME>": "<wert>"}` aus `fetch`
+  `KomkiConnector.Launch.credential_key/0` und `{"<NAME>": "<wert>"}` aus `fetch`
   (Default `Secrets.reveal/1`: Siegel aus dem Schluesselbund, per Secure
   Enclave geoeffnet). Fehlt ein Wert, bleibt er weg; Name und Fehlergrund
   der fehlenden kommen als zweites Element zurueck (nie Werte).
@@ -200,8 +201,8 @@ defmodule KomkiCli.Connectors do
     {found, missing} =
       manifest.credentials
       |> Enum.sort()
-      |> Enum.reduce({%{Token.credential_key() => token}, []}, fn {name, service},
-                                                                  {found, missing} ->
+      |> Enum.reduce({%{Launch.credential_key() => token}, []}, fn {name, service},
+                                                                   {found, missing} ->
         case fetch.(service) do
           {:ok, value} -> {Map.put(found, name, value), missing}
           {:error, error} -> {found, missing ++ [{name, error}]}
@@ -355,7 +356,7 @@ defmodule KomkiCli.Connectors do
   defp start_fresh(cfg, {:connector, manifest}, comp, fetch) do
     Profile.write!(profile_path(cfg, manifest.id), ConnectorProfile.connector(cfg, manifest))
     File.rm(comp.socket)
-    # Capability-Token je Start (KomkiConnector.Token): Datei fuer den
+    # Capability-Token je Start (Sidecar.Token): Datei fuer den
     # Vermittler, derselbe Wert in der stdin-Zeile fuer den Connector.
     token = Token.provision!(comp.socket)
     {line, missing} = credentials_line(manifest, token, fetch)
@@ -434,12 +435,12 @@ defmodule KomkiCli.Connectors do
     socket = Manifest.socket_path(cfg.base_dir, manifest.id)
     call_id = "komki-cli-ping-" <> Integer.to_string(System.unique_integer([:positive]))
 
-    case Client.call(socket, call_id, "ping", %{}, %{}, timeout: 3_000) do
-      {:ok, %{"fassung" => fassung} = result} when fassung == manifest.fassung ->
+    case Client.call(socket, call_id, "ping", %{}, %{}, timeout: 3_000, texts: Text) do
+      {:ok, %{"version" => fassung} = result} when fassung == manifest.fassung ->
         {:ok, result}
 
       {:ok, result} ->
-        {:error, "ping: falsche Fassung " <> Kernel.inspect(result["fassung"])}
+        {:error, "ping: falsche Fassung " <> Kernel.inspect(result["version"])}
 
       {:error, %{"code" => code, "detail" => detail}} ->
         {:error, "ping: " <> code <> " " <> detail}

@@ -9,7 +9,8 @@ defmodule KomkiConnectorRis.CLI do
   stderr, ohne Payload.
   """
 
-  alias KomkiConnector.Server
+  alias KomkiConnector.Launch
+  alias Sidecar.Server
 
   @spec main([String.t()]) :: no_return()
   def main(argv) do
@@ -18,7 +19,7 @@ defmodule KomkiConnectorRis.CLI do
     with {:ok, opts} <- parse(argv),
          # RIS braucht keine Credentials; die Zeile traegt nur das Token.
          {:ok, credentials} <- Server.read_credentials(),
-         {:error, reason} <- Server.run(KomkiConnectorRis, opts.socket, opts, credentials) do
+         {:error, reason} <- Launch.run(KomkiConnectorRis, opts.socket, opts, credentials) do
       fail(if is_binary(reason), do: reason, else: inspect(reason))
     else
       {:error, message} -> fail(message)

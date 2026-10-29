@@ -25,6 +25,7 @@ defmodule KomkiConnectorDocuments.MixProject do
   defp deps do
     [
       {:komki_connector, path: "../komki_connector"},
+      {:sidecar, path: "../sidecar"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]

@@ -11,7 +11,7 @@ defmodule KomkiConnectorWeb.Connector do
   den Connector ueber `ping`).
   """
 
-  @behaviour KomkiConnector.Server
+  @behaviour Sidecar.Server
 
   require Logger
 
@@ -41,7 +41,7 @@ defmodule KomkiConnectorWeb.Connector do
   def default_base_url, do: @default_base_url
 
   @impl true
-  def manifest_id, do: "web"
+  def manifest, do: KomkiConnector.Manifest.sidecar!("web")
 
   @doc """
   Init-Argument: Map mit `:credentials` (von stdin), optional `:proxy`,

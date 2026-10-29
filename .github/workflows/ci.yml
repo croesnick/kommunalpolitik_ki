@@ -144,7 +144,7 @@ jobs:
       # crasht (dialyxir haelt die App fuer ein Umbrella-Child, weil das
       # Lockfile "../workspace.lock" heisst). Apps mit Dialyzer-Pflicht:
       # komki_policy, komki_cli, Vermittler, Connector-Bibliothek, Egress,
-      # die drei Connectoren und die Seatbelt-Library.
+      # die drei Connectoren, die Seatbelt- und die Sidecar-Library.
       #
       # Veraltete Deps-PLTs: Die Pfad-Abhaengigkeiten (komki_connector,
       # komki_policy, ...) stehen im Deps-PLT der App. dialyxir prueft das
@@ -168,10 +168,10 @@ jobs:
         working-directory: apps/seatbelt
         run: mix dialyzer --force-check
 
-      - name: Dialyzer (Vermittler, Connectoren, Egress)
+      - name: Dialyzer (Vermittler, Connectoren, Egress, Sidecar)
         run: |
           set -e
-          for app in komki_mediator komki_connector komki_egress komki_connector_ris komki_connector_web komki_connector_vault komki_connector_documents; do
+          for app in komki_mediator komki_connector komki_egress komki_connector_ris komki_connector_web komki_connector_vault komki_connector_documents sidecar; do
             echo "::group::dialyzer $app"
             (cd "apps/$app" && mix dialyzer --force-check)
             echo "::endgroup::"

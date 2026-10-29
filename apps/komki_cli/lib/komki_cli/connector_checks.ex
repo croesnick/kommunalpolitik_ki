@@ -238,7 +238,7 @@ defmodule KomkiCli.ConnectorChecks do
 
     if File.exists?(Manifest.socket_path(cfg.base_dir, manifest.id)) do
       case Connectors.ping(cfg, manifest) do
-        {:ok, %{"fassung" => fassung}} -> %{name: name, ok: true, reason: fassung}
+        {:ok, %{"version" => fassung}} -> %{name: name, ok: true, reason: fassung}
         {:error, reason} -> %{name: name, ok: false, reason: reason}
       end
     else
