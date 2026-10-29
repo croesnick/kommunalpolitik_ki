@@ -62,4 +62,21 @@ defmodule KomkiConnectorRis.MockRisReplayTest do
 
     assert :json.decode(body) == %{"token" => "beispiel-token"}
   end
+
+  test "parse_cli meldet fehlendes Kassettenverzeichnis" do
+    assert {:error, missing} =
+             MockRis.parse_cli([
+               "--port",
+               "4010",
+               "--mode",
+               "replay",
+               "--cassette",
+               "/gibt-es-nicht"
+             ])
+
+    assert missing =~ "existiert nicht"
+
+    assert {:ok, _opts} =
+             MockRis.parse_cli(["--port", "4010", "--mode", "replay", "--cassette", @cassettes])
+  end
 end

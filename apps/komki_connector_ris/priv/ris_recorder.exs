@@ -50,7 +50,14 @@ defmodule KomkiConnectorRis.RisRecorder do
   @spec start(keyword()) :: {:ok, pid(), :inet.port_number(), String.t()} | {:error, term()}
   def start(opts \\ []) do
     port = Keyword.get(opts, :port, 0)
-    upstream = Keyword.get(opts, :upstream, @default_upstream)
+
+    # Ohne abschliessenden Schraegstrich wuerde jeder Pfad verlorengehen
+    # (https://host/webguestmeetings) — wie bei Ratsinfo.Config.base_url/0.
+    upstream =
+      Keyword.get(opts, :upstream, @default_upstream)
+      |> String.trim_trailing("/")
+      |> then(&(&1 <> "/"))
+
     out = Keyword.get(opts, :out) || default_out()
     File.mkdir_p!(out)
 
@@ -337,7 +344,7 @@ defmodule KomkiConnectorRis.RisRecorder do
   end
 
   defp cassette_num(file) do
-    case Regex.run(~r/^(\d{4})-/, file) do
+    case Regex.run(~r/^(\d+)-/, file) do
       [_full, num] -> String.to_integer(num)
       _other -> 0
     end
@@ -367,33 +374,21 @@ defmodule KomkiConnectorRis.RisRecorder do
   end
 end
 
-case System.argv() do
-  [] ->
-    :ok
+KomkiConnectorRis.RisHttp.cli(System.argv(), fn argv ->
+  case KomkiConnectorRis.RisRecorder.parse_cli(argv) do
+    {:ok, opts} ->
+      case KomkiConnectorRis.RisRecorder.start(opts) do
+        {:ok, _pid, actual, out} ->
+          IO.puts("ris_recorder lauscht auf http://127.0.0.1:#{actual}/ (Kassetten nach #{out})")
+          Process.sleep(:infinity)
 
-  argv ->
-    if "--port" in argv do
-      case KomkiConnectorRis.RisRecorder.parse_cli(argv) do
-        {:ok, opts} ->
-          case KomkiConnectorRis.RisRecorder.start(opts) do
-            {:ok, _pid, actual, out} ->
-              IO.puts(
-                "ris_recorder lauscht auf http://127.0.0.1:#{actual}/ (Kassetten nach #{out})"
-              )
-
-              Process.sleep(:infinity)
-
-            {:error, reason} ->
-              IO.puts(:stderr, "ris_recorder: Start fehlgeschlagen: #{inspect(reason)}")
-              exit({:shutdown, 1})
-          end
-
-        {:error, usage} ->
-          IO.puts(:stderr, "ris_recorder: #{usage}")
+        {:error, reason} ->
+          IO.puts(:stderr, "ris_recorder: Start fehlgeschlagen: #{inspect(reason)}")
           exit({:shutdown, 1})
       end
-    else
-      # Unter `mix test` und aehnlich: keine CLI-Argumente fuer den Recorder.
-      :ok
-    end
-end
+
+    {:error, usage} ->
+      IO.puts(:stderr, "ris_recorder: #{usage}")
+      exit({:shutdown, 1})
+  end
+end)

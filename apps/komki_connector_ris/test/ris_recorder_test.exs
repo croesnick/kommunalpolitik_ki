@@ -119,6 +119,27 @@ defmodule KomkiConnectorRis.RisRecorderTest do
            ]
   end
 
+  test "Upstream ohne abschliessenden Schraegstrich funktioniert" do
+    # Tippfehler-Klasse wie bei Ratsinfo.Config.base_url/0: der Recorder
+    # ergaenzt den Slash, statt jeden Pfad ins Leere laufen zu lassen.
+    {:ok, upstream, upstream_port} = MockRis.start()
+    out = Path.join(System.tmp_dir!(), "ris-recorder-#{System.unique_integer([:positive])}")
+
+    {:ok, rec, port, _out} =
+      RisRecorder.start(upstream: "http://127.0.0.1:#{upstream_port}", out: out)
+
+    on_exit(fn ->
+      RisRecorder.stop(rec)
+      MockRis.stop(upstream)
+      File.rm_rf(out)
+    end)
+
+    :ok = Http.start(nil)
+
+    assert {:ok, %{"items" => [_, _]}} =
+             Http.get_json("http://127.0.0.1:#{port}/guestmeetings", @headers, 5_000)
+  end
+
   test "Geheimnisse werden nur in der Kassette redigiert" do
     headers = [{"authorization", "Bearer geheim"}, {"accept", "application/json"}]
 

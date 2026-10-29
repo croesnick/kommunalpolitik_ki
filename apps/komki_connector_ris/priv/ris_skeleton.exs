@@ -13,6 +13,8 @@
 #
 # --compare extrahiert zwei Kassettenverzeichnisse und meldet Abweichungen
 # (Endpunkte, Query-Schluessel, Status, Schema-Drift); Exit-Code 1 bei Drift.
+# Toleriert werden optionale Schluessel und ueberlappende Array-Laengen — die
+# schwanken mit den Aufnahmen; driftig ist nur das strukturell andere Format.
 # Damit laesst sich pruefen, ob der synthetische Mock formatgetreu ist.
 #
 # Nur OTP, keine Deps — wie mock_ris.exs.
@@ -38,7 +40,8 @@ defmodule KomkiConnectorRis.RisSkeleton do
 
   @doc """
   Vergleicht zwei Extrakte und liefert die sortierten Abweichungen als
-  Klartextzeilen (leer = formatgetreu).
+  Klartextzeilen (leer = formatgetreu). Toleriert werden optionale Schluessel
+  und ueberlappende Array-Laengen; gemeldet wird nur struktureller Drift.
   """
   @spec compare(map(), map()) :: [String.t()]
   def compare(a, b) do
@@ -53,7 +56,20 @@ defmodule KomkiConnectorRis.RisSkeleton do
   def parse_cli(argv) do
     case parse_flags(argv, []) do
       {:ok, opts} ->
-        if Keyword.has_key?(opts, :cassette), do: {:ok, opts}, else: {:error, @usage}
+        cond do
+          not Keyword.has_key?(opts, :cassette) ->
+            {:error, @usage}
+
+          # Tippfehler hier melden, nicht erst als File.ls!-Stacktrace.
+          not File.dir?(opts[:cassette]) ->
+            {:error, "Kassettenverzeichnis existiert nicht: #{opts[:cassette]}"}
+
+          not is_nil(opts[:compare]) and not File.dir?(opts[:compare]) ->
+            {:error, "Vergleichsverzeichnis existiert nicht: #{opts[:compare]}"}
+
+          true ->
+            {:ok, opts}
+        end
 
       {:error, _} ->
         {:error, @usage}
@@ -144,9 +160,11 @@ defmodule KomkiConnectorRis.RisSkeleton do
 
   defp query_keys(request) do
     case Map.get(request, "query") do
-      # JSON-null dekodiert :json als :null; beide heissen: kein Query.
+      # JSON-null dekodiert :json als :null; aeltere Kassetten (vor dem
+      # nil-Fix) trugen den String "nil" — alle heissen: kein Query.
       nil -> []
       :null -> []
+      "nil" -> []
       query -> query |> URI.decode_query() |> Map.keys() |> Enum.sort()
     end
   end
@@ -256,9 +274,17 @@ defmodule KomkiConnectorRis.RisSkeleton do
     if type_a == type_b do
       merge_same(a, b)
     else
-      %{"type" => "mixed", "types" => Enum.uniq([type_a, type_b]) |> Enum.sort()}
+      # "mixed" kann selbst wieder gemergt werden: die Mitglieder zaehlen,
+      # nicht der Marker — sonst gehen fruehere Typen verloren.
+      %{
+        "type" => "mixed",
+        "types" => Enum.uniq(member_types(a) ++ member_types(b)) |> Enum.sort()
+      }
     end
   end
+
+  defp member_types(%{"type" => "mixed", "types" => types}), do: types
+  defp member_types(%{"type" => type}), do: [type]
 
   defp merge_same(%{"type" => "object"} = a, %{"type" => "object"} = b) do
     keys = Map.merge(a["keys"], b["keys"], fn _k, x, y -> merge_schema(x, y) end)
@@ -289,6 +315,10 @@ defmodule KomkiConnectorRis.RisSkeleton do
 
   defp merge_same(%{"type" => "string"} = a, %{"type" => "string"} = b) do
     %{"type" => "string", "formats" => Enum.uniq(a["formats"] ++ b["formats"]) |> Enum.sort()}
+  end
+
+  defp merge_same(%{"type" => "mixed"} = a, %{"type" => "mixed"} = b) do
+    %{"type" => "mixed", "types" => Enum.uniq(a["types"] ++ b["types"]) |> Enum.sort()}
   end
 
   defp merge_same(a, _b), do: a
@@ -344,12 +374,23 @@ defmodule KomkiConnectorRis.RisSkeleton do
   defp schema_diff_same(path, %{"type" => "object"} = a, %{"type" => "object"} = b) do
     a_keys = Map.keys(a["keys"])
     b_keys = Map.keys(b["keys"])
+    optional_a = Map.get(a, "optional", [])
+    optional_b = Map.get(b, "optional", [])
 
     only_left = a_keys -- b_keys
     only_right = b_keys -- a_keys
 
-    left_msgs = Enum.map(only_left, &"#{path}.#{&1}: Schluessel nur in links")
-    right_msgs = Enum.map(only_right, &"#{path}.#{&1}: Schluessel nur in rechts")
+    # Optionale Schluessel duerfen auf der Gegenseite fehlen (real antwortet
+    # sie nur manchmal). Verpflichtende fehlen heisst Format-Drift.
+    left_msgs =
+      only_left
+      |> Enum.reject(&(&1 in optional_a))
+      |> Enum.map(&"#{path}.#{&1}: Schluessel nur in links")
+
+    right_msgs =
+      only_right
+      |> Enum.reject(&(&1 in optional_b))
+      |> Enum.map(&"#{path}.#{&1}: Schluessel nur in rechts")
 
     common =
       Enum.flat_map(a_keys -- only_left, fn key ->
@@ -360,16 +401,18 @@ defmodule KomkiConnectorRis.RisSkeleton do
   end
 
   defp schema_diff_same(path, %{"type" => "array"} = a, %{"type" => "array"} = b) do
+    # Beobachtete Laengen schwanken mit den Aufnahmen; driftig ist nur, wenn
+    # die Bereiche sich gar nicht ueberlappen.
     range =
-      if a["min_items"] == b["min_items"] and a["max_items"] == b["max_items"] do
-        []
-      else
+      if a["max_items"] < b["min_items"] or b["max_items"] < a["min_items"] do
         [
-          "#{path}: Kardinalitaet #{a["min_items"]}..#{a["max_items"]} vs #{b["min_items"]}..#{b["max_items"]}"
+          "#{path}: Kardinalitaet entkoppelt: #{a["min_items"]}..#{a["max_items"]} vs #{b["min_items"]}..#{b["max_items"]}"
         ]
+      else
+        []
       end
 
-    range ++ schema_diff("#{path}[]", a["items"], b["items"])
+    range ++ schema_diff("#{path}[]", Map.get(a, "items"), Map.get(b, "items"))
   end
 
   defp schema_diff_same(path, %{"type" => "string"} = a, %{"type" => "string"} = b) do
@@ -382,48 +425,47 @@ defmodule KomkiConnectorRis.RisSkeleton do
     end
   end
 
+  defp schema_diff_same(path, %{"type" => "mixed"} = a, %{"type" => "mixed"} = b) do
+    if Enum.sort(a["types"]) == Enum.sort(b["types"]) do
+      []
+    else
+      ["#{path}: Typen #{inspect(Enum.sort(a["types"]))} vs #{inspect(Enum.sort(b["types"]))}"]
+    end
+  end
+
   defp schema_diff_same(_path, _a, _b), do: []
 end
 
-case System.argv() do
-  [] ->
-    :ok
+KomkiConnectorRis.RisHttp.cli(System.argv(), fn argv ->
+  case KomkiConnectorRis.RisSkeleton.parse_cli(argv) do
+    {:ok, opts} ->
+      report = KomkiConnectorRis.RisSkeleton.extract(opts[:cassette])
+      json = report |> :json.encode() |> IO.iodata_to_binary()
 
-  argv ->
-    if "--cassette" in argv do
-      case KomkiConnectorRis.RisSkeleton.parse_cli(argv) do
-        {:ok, opts} ->
-          report = KomkiConnectorRis.RisSkeleton.extract(opts[:cassette])
-          json = report |> :json.encode() |> IO.iodata_to_binary()
-
-          if out = opts[:out] do
-            File.write!(out, json <> "\n")
-            IO.puts("ris_skeleton: Bericht nach #{out}")
-          else
-            IO.puts(json)
-          end
-
-          if compare_dir = opts[:compare] do
-            differences =
-              KomkiConnectorRis.RisSkeleton.compare(
-                report,
-                KomkiConnectorRis.RisSkeleton.extract(compare_dir)
-              )
-
-            if differences == [] do
-              IO.puts("ris_skeleton: keine Abweichungen")
-            else
-              Enum.each(differences, &IO.puts("ris_skeleton: #{&1}"))
-              exit({:shutdown, 1})
-            end
-          end
-
-        {:error, usage} ->
-          IO.puts(:stderr, "ris_skeleton: #{usage}")
-          exit({:shutdown, 1})
+      if out = opts[:out] do
+        File.write!(out, json <> "\n")
+        IO.puts("ris_skeleton: Bericht nach #{out}")
+      else
+        IO.puts(json)
       end
-    else
-      # Unter `mix test` und aehnlich: keine CLI-Argumente fuer das Werkzeug.
-      :ok
-    end
-end
+
+      if compare_dir = opts[:compare] do
+        differences =
+          KomkiConnectorRis.RisSkeleton.compare(
+            report,
+            KomkiConnectorRis.RisSkeleton.extract(compare_dir)
+          )
+
+        if differences == [] do
+          IO.puts("ris_skeleton: keine Abweichungen")
+        else
+          Enum.each(differences, &IO.puts("ris_skeleton: #{&1}"))
+          exit({:shutdown, 1})
+        end
+      end
+
+    {:error, usage} ->
+      IO.puts(:stderr, "ris_skeleton: #{usage}")
+      exit({:shutdown, 1})
+  end
+end)

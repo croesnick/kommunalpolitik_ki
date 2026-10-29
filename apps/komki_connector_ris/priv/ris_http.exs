@@ -104,4 +104,32 @@ defmodule KomkiConnectorRis.RisHttp do
   @spec method_label(atom() | String.t()) :: String.t()
   def method_label(method) when is_atom(method), do: Atom.to_string(method)
   def method_label(method) when is_binary(method), do: method
+
+  @doc """
+  CLI-Einsprung der priv-Skripte: `runner` laeuft nur, wenn Argumente da sind
+  und kein Testlauf vorliegt (`mix test` laedt die Skripte per
+  Code.require_file — ohne Argumente oder im Test nichts tun). Alles andere
+  fuehrt zum Runner, der fuer eine klare Meldung sorgen muss — nie still
+  enden. `:force` ruft den Runner auch im Test auf (fuer Tests des Runners).
+  """
+  @spec cli([String.t()], (keyword() -> any()), boolean()) :: any()
+  def cli(argv, runner, force \\ false) do
+    cond do
+      argv == [] -> :ok
+      not force and under_mix_test?() -> :ok
+      true -> runner.(argv)
+    end
+  end
+
+  # Mix.env() crasht ohne gestartetes Mix (plain `elixir`): dann ist es kein
+  # Testlauf.
+  defp under_mix_test? do
+    Code.ensure_loaded?(Mix) and function_exported?(Mix, :env, 0) and mix_env() == :test
+  end
+
+  defp mix_env do
+    Mix.env()
+  rescue
+    _ -> :dev
+  end
 end

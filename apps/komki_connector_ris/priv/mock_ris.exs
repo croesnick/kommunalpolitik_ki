@@ -119,7 +119,13 @@ defmodule KomkiConnectorRis.MockRis do
         {:ok, [port: port, mode: String.to_atom(mode)]}
 
       mode == "replay" and is_binary(cassette) ->
-        {:ok, [port: port, mode: {:replay, cassette}]}
+        # Tippfehler im Kassettenverzeichnis hier melden, nicht erst als
+        # File.ls!-Stacktrace aus dem Start.
+        if File.dir?(cassette) do
+          {:ok, [port: port, mode: {:replay, cassette}]}
+        else
+          {:error, "Kassettenverzeichnis existiert nicht: #{cassette}"}
+        end
 
       true ->
         {:error, @usage}
@@ -383,28 +389,16 @@ defmodule KomkiConnectorRis.MockRis do
   end
 end
 
-case System.argv() do
-  [] ->
-    :ok
+KomkiConnectorRis.RisHttp.cli(System.argv(), fn argv ->
+  case KomkiConnectorRis.MockRis.parse_cli(argv) do
+    {:ok, opts} ->
+      {:ok, _pid, actual} = KomkiConnectorRis.MockRis.start(opts)
 
-  argv ->
-    if "--port" in argv do
-      case KomkiConnectorRis.MockRis.parse_cli(argv) do
-        {:ok, opts} ->
-          {:ok, _pid, actual} = KomkiConnectorRis.MockRis.start(opts)
+      IO.puts("mock_ris lauscht auf http://127.0.0.1:#{actual}/ (Modus #{inspect(opts[:mode])})")
+      Process.sleep(:infinity)
 
-          IO.puts(
-            "mock_ris lauscht auf http://127.0.0.1:#{actual}/ (Modus #{inspect(opts[:mode])})"
-          )
-
-          Process.sleep(:infinity)
-
-        {:error, usage} ->
-          IO.puts(:stderr, "mock_ris: #{usage}")
-          exit({:shutdown, 1})
-      end
-    else
-      # Unter `mix test` und aehnlich: keine CLI-Argumente fuer den Mock.
-      :ok
-    end
-end
+    {:error, usage} ->
+      IO.puts(:stderr, "mock_ris: #{usage}")
+      exit({:shutdown, 1})
+  end
+end)
