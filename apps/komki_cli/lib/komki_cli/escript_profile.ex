@@ -79,6 +79,17 @@ defmodule KomkiCli.EscriptProfile do
        when is_binary(root),
        do: %{wrapper: komki, runtime_root: root}
 
+  # Burrito-Startart, aber keine entpackte Laufzeit eingetragen: klar
+  # scheitern statt still die Wrapper-Regeln wegzulassen — sonst bootet
+  # die Binary spaeter am Boot-Gate mit verwirrendem rc statt hier mit
+  # einer klaren Meldung (Vor-Umbau-Verhalten: lauter Crash).
+  defp burrito_opts(%Config{launcher: "burrito", komki_bin: komki}, komki),
+    do:
+      raise(
+        ArgumentError,
+        "burrito-Instanz ohne runtime_root — config.json prüfen ('komki setup')"
+      )
+
   defp burrito_opts(_cfg, _binary), do: nil
 
   @doc "Log-Datei (Redirect-Ziel der Spawn-Shell) lesen und schreiben."
