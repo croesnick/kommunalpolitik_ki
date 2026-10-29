@@ -1,0 +1,40 @@
+---
+title: Worum es geht
+description: Warum ehrenamtliche Ratsarbeit eine KI braucht, die Vertrauliches nicht hinausträgt, und was komki heute kann.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Ratsarbeit ist Ehrenamt
+
+Gemeinderätinnen und Stadträte machen ihre Arbeit nebenbei. In Bayern werden sie „in ehrenamtlicher Eigenschaft gewählt“ ([Art. 31 Abs. 2 Satz 1 GO](https://www.gesetze-bayern.de/Content/Document/BayGO-31), abgerufen am 29.10.2026). Vor jeder Sitzung liegen Vorlagen, Anlagen, Gutachten und Haushaltszahlen auf dem Tisch, dazu Mails, Zeitungsartikel und eigene Notizen. Gelesen wird abends, nach dem eigentlichen Beruf.
+
+Eine KI könnte dabei viel abnehmen: Unterlagen zusammenfassen, im Ratsinformationssystem nachsehen, was früher beschlossen wurde, Förderprogramme finden. Genau das macht komki, und zu jeder Aussage nennt es die Quelle.
+
+## Das Problem: Vertrauliches gehört nicht in die Cloud
+
+Ein Teil der Unterlagen ist nichtöffentlich: Grundstücksgeschäfte, Personalfragen, Verträge. Darüber haben Ratsmitglieder „Verschwiegenheit zu bewahren“, auch nach dem Ende ihres Mandats ([Art. 20 Abs. 2 GO](https://www.gesetze-bayern.de/Content/Document/BayGO-20), abgerufen am 29.10.2026). Wer solche Unterlagen in einen KI-Dienst im Internet lädt, gibt sie an einen Anbieter weiter.
+
+Ein lokales Sprachmodell löst nur die Hälfte. Ein KI-Agent, der recherchieren soll, braucht Zugang zum Internet. Gefährlich wird es, wenn drei Dinge zusammenkommen: Der Agent kennt private Daten, er liest fremde Inhalte, und er kann nach draußen senden. Simon Willison nennt das die [lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/) (abgerufen am 29.10.2026). Dann reicht ein präparierter Satz auf einer Webseite, und der Agent schickt die vertraulichen Notizen mit der nächsten Suchanfrage hinaus.
+
+## Was komki anders macht
+
+- **Das Sprachmodell läuft auf dem eigenen Rechner.** Fragen und Notizen gehen an keinen KI-Anbieter.
+- **Jeder Inhalt trägt ein Label**, das sagt, woher er stammt und wie vertraulich er ist.
+- **Ein Vermittler prüft jeden Zugriff, bevor er passiert.** Liegt etwas Vertrauliches im Arbeitsraum, ist der Weg nach draußen zu. Das gilt auch dann, wenn der Agent selbst manipuliert ist.
+- **Die KI berät, der Mensch entscheidet.** Soll eine gesperrte Anfrage doch hinaus, entscheidest du, und zwar für genau diesen einen Aufruf.
+- **Alles steht im Journal.** Was erlaubt oder abgelehnt wurde, lässt sich hinterher nachvollziehen.
+
+Wie das technisch zusammenspielt, zeigt [So funktioniert komki](/kommunalpolitik_ki/komki/so-funktioniert-es/). Dass die Grenze hält, kannst du [selbst ausprobieren](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
+
+## Wo komki heute steht
+
+komki ist ein Prototyp. Es entsteht als Open-Source-Projekt (MIT-Lizenz) für die Ratsarbeit in der Verwaltungsgemeinschaft Buchloe im Allgäu und wird dort im Alltag ausprobiert.
+
+- **Es läuft.** Recherche im öffentlichen Ratsinformationssystem, im Web und in den eigenen Obsidian-Notizen funktioniert, mit Quellen und Journal. Die Beispiele auf diesen Seiten stammen aus echten Läufen.
+- **Es braucht einen Mac mit Apple Silicon und viel Arbeitsspeicher**, und die Einrichtung geht über das Terminal. Einen Installer gibt es noch nicht.
+- **Es ist kein geprüftes Produkt.** Die Sicherheitsprüfungen stehen offen im [Labbook](https://github.com/croesnick/kommunalpolitik_ki/blob/main/docs/research/2026-10-23-labbook-komki-connectoren.md), was noch fehlt, unter [Wenn etwas hakt](/kommunalpolitik_ki/komki/wenn-es-hakt/#was-noch-nicht-geht).
+
+<Aside type="note" title="Für wen das interessant ist">
+Für alle, die ehrenamtlich politisch arbeiten und KI nutzen wollen, ohne Vertrauliches aus der Hand zu geben: Rats- und Kreistagsmitglieder, Fraktionen, Vereine. Und für alle, die sich fragen, wie man KI-Agenten Grenzen setzt, die auch halten, wenn der Agent getäuscht wird.
+</Aside>

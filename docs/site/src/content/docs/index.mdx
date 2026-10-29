@@ -6,10 +6,10 @@ hero:
   title: Recherchieren, ohne Vertrauliches nach draußen zu tragen.
   tagline: komki ist ein lokaler KI-Arbeitsraum für die Ratsarbeit. Er sucht im Ratsinformationssystem, im Web und in deinen Notizen und nennt zu jeder Aussage die Quelle. Das Sprachmodell läuft auf deinem Rechner. Was vertraulich ist, bleibt dort.
   actions:
+    - text: Worum es geht
+      link: /kommunalpolitik_ki/komki/worum-es-geht/
     - text: So funktioniert komki
       link: /kommunalpolitik_ki/komki/so-funktioniert-es/
-    - text: In Betrieb nehmen
-      link: /kommunalpolitik_ki/komki/in-betrieb-nehmen/
       variant: secondary
 ---
 
@@ -17,16 +17,18 @@ import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 import Architektur from '../../assets/architektur.svg';
 import Session from '../../assets/session.svg';
 
+<p class="komki-lead">Ratsarbeit ist Ehrenamt, und vor jeder Sitzung wartet ein Stapel Unterlagen. Eine KI könnte beim Lesen und Recherchieren helfen. Nur gehört ein Teil dieser Unterlagen nicht in die Cloud: Über nichtöffentliche Angelegenheiten gilt Verschwiegenheit. komki ist ein Versuch, beides zusammenzubringen. Es ist ein Prototyp, offen auf GitHub und im Alltag erprobt. Den Hintergrund erzählt <a href="/kommunalpolitik_ki/komki/worum-es-geht/">Worum es geht</a>.</p>
+
 ## So sieht eine Sitzung aus
 
 <div class="komki-session">
   <figure class="komki-session-bild">
     <Session role="img" aria-label="Terminal mit einer komki-Sitzung: eine Frage, zwei Tool-Aufrufe, darunter jeweils die Entscheidung des Vermittlers mit Label, Treffern, Quelle und Beleg, und eine Zusammenfassung mit Quellen" />
-    <figcaption>Echte Sitzung vom 25.10.2026 mit dem Test-Vault und dem echten RIS. Sie lief vollständig auf dem eigenen Rechner.</figcaption>
+    <figcaption>Echte Sitzung vom 25.10.2026 mit erfundenen Test-Notizen und dem echten Ratsinformationssystem (RIS). Sie lief vollständig auf dem eigenen Rechner.</figcaption>
   </figure>
   <ol class="komki-schritte">
     <li><strong>Du fragst in normaler Sprache.</strong> „Suche im RIS nach Radverkehrskonzept und im Vault nach Radverkehr …“</li>
-    <li><strong>pi holt sich, was es braucht.</strong> Jede fette Zeile ist ein Werkzeug, etwa „RIS durchsuchen“. Darunter steht, was der Vermittler entschieden hat: „zugelassen“ heißt, der Raum erlaubt den Aufruf, „öffentlich“ ist das Label des Inhalts. Die graue Zeile nennt Quelle, Abrufzeit und den Beleg im Journal. Mit ctrl+o siehst du die vollen Adressen und alle Belege.</li>
+    <li><strong>pi, der KI-Agent, holt sich, was er braucht.</strong> Jede fette Zeile ist ein Werkzeug, etwa „RIS durchsuchen“. Darunter steht, was der Vermittler entschieden hat: „zugelassen“ heißt, der Raum erlaubt den Aufruf, „öffentlich“ ist das Label des Inhalts. Die graue Zeile nennt Quelle, Abrufzeit und den Beleg im Journal. Mit ctrl+o siehst du die vollen Adressen und alle Belege.</li>
     <li><strong>Am Ende steht die Antwort,</strong> jede Aussage mit Quelle.</li>
   </ol>
 </div>
@@ -35,7 +37,7 @@ import Session from '../../assets/session.svg';
 
 <ul class="komki-erwartung">
   <li><strong>Recherche mit Quellen.</strong> komki sucht im RIS, im Web und in deinen Notizen und sagt zu jeder Aussage, woher sie stammt.</li>
-  <li><strong>Ein Sprachmodell auf deinem Rechner.</strong> Deine Fragen und Notizen gehen an keinen KI-Anbieter.</li>
+  <li><strong>Ein Sprachmodell auf deinem Rechner.</strong> Deine Fragen und Notizen (etwa aus Obsidian) gehen an keinen KI-Anbieter.</li>
   <li><strong>Feste Regeln je Raum.</strong> Vorher steht fest, welche Quellen in einer Sitzung zusammenkommen dürfen. Vertrauliche Notizen und das Internet treffen sich nie.</li>
   <li><strong>Ein Journal.</strong> Jede Anfrage wird vor der Ausführung geprüft und festgehalten. Später siehst du, was wann erlaubt oder abgelehnt wurde und warum.</li>
 </ul>
@@ -63,6 +65,7 @@ Jeder gestrichelte Kasten ist eine eigene Sandbox. pi erreicht nur das Sprachmod
 ## Weiterlesen
 
 <CardGrid>
+  <LinkCard title="Worum es geht" description="Ehrenamt, Verschwiegenheit und KI: das Problem, die Idee und wo komki heute steht." href="/kommunalpolitik_ki/komki/worum-es-geht/" />
   <LinkCard title="So funktioniert komki" description="Agent, Vermittler, Connectoren und Räume in fünf Minuten." href="/kommunalpolitik_ki/komki/so-funktioniert-es/" />
   <LinkCard title="In Betrieb nehmen" description="Elf Schritte vom Repo bis zur ersten Recherche, mit allem, was du im Terminal siehst." href="/kommunalpolitik_ki/komki/in-betrieb-nehmen/" />
   <LinkCard title="Die Sicherheitsgrenze sehen" description="Lass den Agenten ein Geheimnis hinaustragen und sieh zu, wie es scheitert." href="/kommunalpolitik_ki/komki/sicherheitsgrenze/" />

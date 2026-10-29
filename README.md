@@ -2,6 +2,8 @@
 
 Werkzeuge für die Stadtratsarbeit: das Ratsinformationssystem lokal durchsuchen, Drucksachen auswerten, Fördermöglichkeiten prüfen, Sitzungsmappen anlegen, Projekte strukturieren, Anträge entwerfen. Gebaut für die Ratsarbeit in der Verwaltungsgemeinschaft Buchloe.
 
+> **Neugierig auf komki, den lokalen KI-Arbeitsraum, der Vertrauliches nicht nach draußen trägt?** Der bebilderte Guide steht unter [croesnick.github.io/kommunalpolitik_ki](https://croesnick.github.io/kommunalpolitik_ki/), der Einstieg ohne Technik unter [Worum es geht](https://croesnick.github.io/kommunalpolitik_ki/komki/worum-es-geht/).
+
 Orchestriert wird alles von [OpenCode](https://opencode.ai). Die KI ruft die CLI-Tools und MCP-Server auf und folgt den Anleitungen aus `skills/`. Antworten stammen aus der lokal synchronisierten RIS-Datenbank, aus den ausgelesenen PDFs, aus dem Obsidian-Vault und aus dem Archiv der Lokalzeitung. Eine maschinenlesbare Schnittstelle wie OParl gibt es am Ratsinformationssystem der Verwaltungsgemeinschaft nicht. Deshalb synchronisiert `ratsinfo` die öffentlichen Seiten in eine lokale SQLite-Datenbank und macht Sitzungen, Drucksachen und Beschlüsse volltextdurchsuchbar.
 
 ## Was dieses Setup anders macht

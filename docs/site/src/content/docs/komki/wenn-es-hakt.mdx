@@ -21,6 +21,9 @@ Logs liegen unter `~/.local/share/komki/tmp/`: `mediator.log`, `egress.log` und 
 
 ## Was noch nicht geht
 
+- **Nur auf dem Mac.** komki braucht einen Mac mit Apple Silicon und rund 32 GB Arbeitsspeicher, weil es die Sandbox von macOS nutzt und das Sprachmodell lokal rechnet.
+- **Kein Installer.** komki wird aus dem Repo gebaut und im Terminal eingerichtet. Eine Installation über Homebrew ist geplant.
+- **Ein Prototyp, kein geprüftes Produkt.** Die Sicherheitsprüfungen sind offen dokumentiert, ein unabhängiges Audit gibt es nicht.
 - **RIS liefert nur Titel.** Ohne Zugangsdaten gibt die Ratsinformations-API keine Texte der Tagesordnungspunkte heraus ([#148](https://github.com/croesnick/kommunalpolitik_ki/issues/148)).
 - **Schreiben ohne Freigabe-Dialog.** Notizen landen nur im Ordner `komki-test/`; eine Bestätigung vor jedem Schreiben fehlt noch ([#205](https://github.com/croesnick/kommunalpolitik_ki/issues/205)). Ein GO gibt es bisher nur für gesperrte Aufrufe ([So funktioniert es](/kommunalpolitik_ki/komki/so-funktioniert-es/)).
 - **Gegner auf dem eigenen Rechner sind nicht abgedeckt.** komki schützt vor einem manipulierten Agenten, nicht vor Schadsoftware, die schon unter deinem Benutzer läuft.
