@@ -20,6 +20,10 @@ defmodule KomkiCli.MixProject do
       # test/support (Fixtures) nur in :test kompiliert — weder Escript (:dev)
       # noch Release sehen die Test-Helfer.
       elixirc_paths: elixirc_paths(Mix.env()),
+      # komki-tresor (Swift) beim Kompilieren nach priv/ bauen (Ticket #224);
+      # NACH den Standard-Compilern, damit der Task selbst schon kompiliert ist.
+      # Ohne macOS/swiftc ueberspringt der Task mit Info statt Fehler.
+      compilers: Mix.compilers() ++ [:komki_tresor],
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",
       start_permanent: Mix.env() == :prod,
@@ -41,6 +45,9 @@ defmodule KomkiCli.MixProject do
       # mitanalysiert.
       dialyzer: [
         no_umbrella: true,
+        # :mix gehoert in die PLT, weil der Compile-Task komki_tresor die
+        # Mix-API nutzt (Mix.raise, Mix.shell, Mix.Project).
+        plt_add_apps: [:mix],
         ignore_warnings: "dialyzer.ignore-warnings",
         plt_ignore_apps: @workspace_deps,
         paths: Enum.map([:komki_cli | @workspace_deps], &"_build/#{Mix.env()}/lib/#{&1}/ebin")

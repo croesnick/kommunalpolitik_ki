@@ -7,6 +7,7 @@ defmodule KomkiCli.TresorTest do
   use ExUnit.Case, async: true
 
   alias KomkiCli.{Secrets, TestSupport, Tresor}
+  alias KomkiCli.Tresor.Core
 
   @kanarie "kanarienwert-für-tests"
   @entry %{name: "brave", service: "brave-search-api", connector: "web", label: "Brave"}
@@ -73,6 +74,12 @@ defmodule KomkiCli.TresorTest do
     test "leere oder mehrzeilige Werte werden nicht versiegelt" do
       assert {:error, :invalid} = Tresor.seal("")
       assert {:error, :invalid} = Tresor.seal("a\nb")
+    end
+
+    test "check meldet die Secure-Enclave-Verfuegbarkeit (Exit 0/3/9)" do
+      assert :ok = Core.check(script!("tresor", "exit 0"))
+      assert {:error, :no_enclave} = Core.check(script!("tresor", "exit 3"))
+      assert {:error, {:failed, 9}} = Core.check(script!("tresor", "exit 9"))
     end
   end
 
