@@ -14,7 +14,7 @@ Jetzt der eigentliche Beweis. Du schaltest in den Raum „vertraulich“ und bea
    Welche Daten zusammenkommen dürfen, steht in `room.json`, Feld `workspace_bindings`. Für „vertraulich“ kommt `vault-vertraulich@1` dazu.
 
    ```sh
-   python3 -c 'import json,os; p=os.path.expanduser("~/.local/share/komki/mediator/room.json"); d=json.load(open(p)); d["workspace_bindings"]=["ris-oeffentlich@1","vault-oeffentlich@1","vault-vertraulich@1","web-oeffentlich@1"]; open(p,"w").write(json.dumps(d,indent=2,sort_keys=True)+"\n"); print("Raum: vertraulich")'
+   python3 -c 'import json,os; p=os.path.expanduser("~/.local/share/komki/mediator/room.json"); d=json.load(open(p)); d["workspace_bindings"]=["doc-oeffentlich@2","ris-oeffentlich@1","vault-oeffentlich@1","vault-vertraulich@1","web-oeffentlich@1"]; open(p,"w").write(json.dumps(d,indent=2,sort_keys=True)+"\n"); print("Raum: vertraulich")'
    komki down && komki up
    ```
 
@@ -46,7 +46,7 @@ Jetzt der eigentliche Beweis. Du schaltest in den Raum „vertraulich“ und bea
 3. ### Zurück in den Raum „recherche“
 
    ```sh
-   python3 -c 'import json,os; p=os.path.expanduser("~/.local/share/komki/mediator/room.json"); d=json.load(open(p)); d["workspace_bindings"]=["ris-oeffentlich@1","vault-oeffentlich@1","web-oeffentlich@1"]; open(p,"w").write(json.dumps(d,indent=2,sort_keys=True)+"\n"); print("Raum: recherche")'
+   python3 -c 'import json,os; p=os.path.expanduser("~/.local/share/komki/mediator/room.json"); d=json.load(open(p)); d["workspace_bindings"]=["doc-oeffentlich@2","ris-oeffentlich@1","vault-oeffentlich@1","web-oeffentlich@1"]; open(p,"w").write(json.dumps(d,indent=2,sort_keys=True)+"\n"); print("Raum: recherche")'
    komki down && komki up
    ```
 

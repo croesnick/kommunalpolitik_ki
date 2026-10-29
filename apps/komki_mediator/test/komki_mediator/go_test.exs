@@ -126,6 +126,8 @@ defmodule KomkiMediator.GoTest do
 
     assert response["decision"] == "deny"
     assert response["go"] == "abgelehnt"
+    # Nach einem Nein ist fuer das Modell Schluss (#166)
+    assert response["hinweis"] == KomkiMediator.Hinweis.text(:go_refused)
     assert "recipient_not_allowed" in Enum.map(response["remedies"], & &1["code"])
     refute_received :web_called
     assert outcomes(env) == ["not_admitted", "go_refused"]
@@ -138,6 +140,7 @@ defmodule KomkiMediator.GoTest do
 
     assert response["decision"] == "deny"
     assert response["go"] == "keine Antwort"
+    assert response["hinweis"] == KomkiMediator.Hinweis.text(:go_timeout)
     refute_received :web_called
     assert outcomes(env) == ["not_admitted", "go_timeout"]
     assert Go.pending(env.go.dir) == []

@@ -143,11 +143,12 @@ oder einen Host an.
 | vault | `vault_read` | `read` | `note_id` (string, max 200, pattern `^[A-Za-z0-9äöüÄÖÜß _./-]+\.md$`) | read |
 | vault | `vault_write_test` | `write_test` | `title` (string, max 120), `body` (string, max 20000) | write |
 
-Der Vermittler bietet damit `ping` und diese sieben Tools an. `admit_document` ist ein Sonderfall
-(Ticket #169): Der Vermittler entscheidet es über die Objekt-Labels aus `room.json` (Regelzweig `admit`,
-`KomkiMediator.Gate`), bevor er den Connector ruft. Der Connector führt nur das Lesen aus; Gate 1 (`emit`) und
-die Labels aus dem Manifest gelten dafür nicht. Das ist Fassung
-`komki-mediator/2`, und der D.9-Pin bricht absichtlich.
+Der Vermittler bietet damit `ping`, `list_documents` und diese sieben Tools an. `admit_document` ist ein
+Sonderfall (Ticket #169): Der Vermittler entscheidet es über die Objekt-Labels aus `room.json` gegen das B_W
+des Raums (Regelzweig `admit`, `KomkiMediator.Gate`, R.5.4, #213), bevor er den Connector ruft. Der Connector
+führt nur das Lesen aus; Gate 1 (`emit`) und die Labels aus dem Manifest gelten dafür nicht. `ping` und
+`list_documents` (#218) beantwortet der Vermittler selbst, ohne Connector. Das ist Fassung
+`komki-mediator/3`, und der D.9-Pin bricht absichtlich.
 
 ### 5.2 Ergebnisformen (Connector → Vermittler)
 

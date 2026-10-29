@@ -5,10 +5,12 @@ defmodule KomkiMediator.Room do
   Identitaet, Arbeitsraum, Umfeld, Fakten und die Objektbelegung —
   Objekt-IDs auf Version und Labels abgebildet.
 
-  Optional `workspace_bindings`: B_W fuer Connector-Operationen
-  (sortierte Liste, Connector-Vertrag §7). Fehlt das Feld, ist es `nil`,
-  und der Raum bietet keine Connector-Operationen an (fail-closed).
-  `admit_document` und `ping` nutzen es nicht.
+  Optional `workspace_bindings`: B_W des Raums (sortierte Liste,
+  Connector-Vertrag §7). Danach entscheiden die Connector-Operationen und
+  seit #213 auch `admit_document` und `list_documents` (R.5.4: das
+  Validierungslabel ist B_W, nicht bloss λ(x)). Fehlt das Feld, ist es
+  `nil`, und der Raum bietet keine dieser Operationen an (fail-closed).
+  Nur `ping` entscheidet mit den Labels seines Objekts.
   """
 
   @schema "komki-mediator-room/1"
@@ -152,14 +154,38 @@ defmodule KomkiMediator.Room do
   def object_for_claim(room, object_id), do: entry(room, object_id)
 
   @doc """
+  Die Bindungen, gegen die ein Raum-Tool entscheidet: `ping` gegen die
+  Labels seines Objekts, `admit_document` und `list_documents` gegen B_W
+  (R.5.4, #213). Ohne `workspace_bindings` gibt es keine Raumdokumente.
+  """
+  @spec bindings_for(t(), String.t(), Object.t() | nil) ::
+          {:ok, [String.t()]} | {:error, String.t()}
+  def bindings_for(_room, "ping", %Object{labels: labels}), do: {:ok, labels}
+
+  def bindings_for(%__MODULE__{workspace_bindings: bindings}, _tool, _object)
+      when is_list(bindings),
+      do: {:ok, bindings}
+
+  def bindings_for(_room, _tool, _object),
+    do: {:error, "Raum ohne workspace_bindings: keine Raumdokumente"}
+
+  @doc """
+  Objekt-IDs der Raumdokumente (Objekte vom Typ `"document"`), sortiert.
+  """
+  @spec document_ids(t()) :: [String.t()]
+  def document_ids(room) do
+    Enum.sort(for {object_id, %{"type" => "document"}} <- room.objects, do: object_id)
+  end
+
+  @doc """
   Baut den vollstaendigen komki-Snapshot eines Aufrufs. `workspace.bindings`
-  sind GENAU die Objekt-Labels — `checked_label` faellt damit mit den
-  Prueflabels zusammen (Bedingung, die `Verify.check` an den Beweis stellt).
+  sind die Bindungen aus `bindings_for/3`; `checked_label` faellt damit mit
+  ihnen zusammen (Bedingung, die `Verify.check` an den Beweis stellt).
   Klassifikation ist fest `"classified"`; die Fakten kommen unveraendert
   aus dem Raum.
   """
-  @spec snapshot_for(t(), KomkiMediator.Gamma.t(), Object.t(), String.t()) :: map()
-  def snapshot_for(room, gamma, object, digest12) do
+  @spec snapshot_for(t(), KomkiMediator.Gamma.t(), Object.t(), String.t(), [String.t()]) :: map()
+  def snapshot_for(room, gamma, object, digest12, bindings) do
     %{
       "schema" => "komki-snapshot/1",
       "snapshot_id" => "snap-" <> digest12,
@@ -167,7 +193,7 @@ defmodule KomkiMediator.Room do
       "identity" => room.identity,
       "workspace" => %{
         "workspace_id" => room.workspace_id,
-        "bindings" => object.labels,
+        "bindings" => bindings,
         "valid" => true,
         "environment" => room.environment
       },

@@ -10,11 +10,16 @@ wird). Fuer jeden Aufruf entsteht ein PDR-Auditdatensatz
 im Journal; ein Permit schreibt zusaetzlich einen Vorbeleg, bevor
 irgendetwas vollzogen wird (Audit vor Wirkung).
 
-Fassung `komki-mediator/2` (Ticket #144): neben `ping` und `admit_document`
-bietet der Vermittler die sechs Connector-Tools `ris_search`, `ris_show`,
-`web_search`, `vault_search`, `vault_read` und `vault_write_test` an. Jeder
-Connector-Aufruf laeuft als emit → Vollzug → admit mit zwei PDR
-(`apps/komki_connector/CONTRACT.md` §6).
+Fassung `komki-mediator/3` (Tickets #144, #218): neben `ping`,
+`list_documents` und `admit_document` bietet der Vermittler die sechs
+Connector-Tools `ris_search`, `ris_show`, `web_search`, `vault_search`,
+`vault_read` und `vault_write_test` an. Jeder Connector-Aufruf laeuft als
+emit → Vollzug → admit mit zwei PDR (`apps/komki_connector/CONTRACT.md` §6).
+
+Gesperrte Aufrufe (`deny`, `indeterminate`, abgelehntes oder ausgebliebenes
+GO) tragen neben dem Remedy-Katalog das Feld `hinweis`: ein fester Satz an
+das Modell, dass Umwege nicht zum Ziel fuehren (Ticket #166,
+`KomkiMediator.Hinweis`).
 
 ## Architektur im komki-Lauf
 
@@ -242,14 +247,15 @@ Aufruf hier ist Entwicklung und Debugging vorbehalten.
 | Route | Zweck |
 |---|---|
 | `GET /healthz` | Status + Fassung (`fassung_id`, `tools`, `registry_id`, `gamma_hash`) |
-| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/2` (siehe unten) |
+| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/3` (siehe unten) |
 
-## Tools (Fassung `komki-mediator/2`)
+## Tools (Fassung `komki-mediator/3`)
 
 | Tool | Ablauf | Parameter |
 |---|---|---|
-| `ping` | Gate (admit) | — |
-| `admit_document` | Gate (admit), Vollzug im Connector `documents` (#169) | `document_id` (max 64, `^[a-z0-9-]+$`) |
+| `ping` | Gate (admit) gegen die Labels des Ping-Objekts | — |
+| `list_documents` | Gate: je Raumdokument eine admit-Entscheidung gegen B_W, nur `permit` erscheint; ein PDR (#218) | — |
+| `admit_document` | Gate (admit) gegen B_W des Raums (R.5.4, #213), Vollzug im Connector `documents` (#169) | `document_id` (max 64, `^[a-z0-9-]+$`) |
 | `ris_search` | ConnectorGate, Connector `ris` | `text` (max 200), `limit` (1..20, Default 10) |
 | `ris_show` | ConnectorGate, Connector `ris` | `top_id` (max 64, `^[A-Za-z0-9_-]+$`) |
 | `vault_read` | ConnectorGate, Connector `vault` | `note_id` (max 200, relativer `.md`-Pfad) |
@@ -346,6 +352,20 @@ oder mit anderem Typ endet als `unknown_object`, ohne Entscheidung der
 Engine und ohne Dateizugriff. Eine selbst veraenderte `room.json` aus der
 Zeit vor #134 hat keine Typen; dort lehnt `admit_document` deshalb jedes
 Objekt ab, bis die Typen nachgetragen sind.
+
+Seit #213 entscheidet `admit_document` gegen das B_W des Raums
+(`workspace_bindings`), nicht gegen die Labels des Dokuments allein
+(R.5.4: das Validierungslabel ist B_W). Ein Dokument, dessen Labels nicht
+in B_W liegen, endet mit `label_not_included`; jede Bindung in B_W wirkt
+mit ihren Bedingungen auf jede Aufnahme des Raums. Fehlt
+`workspace_bindings`, gibt es keine Raumdokumente (fail-closed). Im
+Default-Raum recherche ist nur `doc-oeffentlich` zulaessig: Es traegt seit
+#213 `doc-oeffentlich@2` (oeffentlicher Empfaengerkreis), das in B_W
+steht. `doc-oeffentlich@1` bleibt unveraendert in Γ, weil Bindungen
+unveraenderlich sind (R.2.1). Eine selbst veraenderte `room.json` braucht
+die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
+`admit_document` sie; die Dateiaufnahme prueft bis #214 noch gegen
+`contract.bindings`.
 
 ## Gate 1 / Gate 2 / PDR
 

@@ -26,9 +26,11 @@ defmodule KomkiMediator.RemediesTest do
 
   test "deny: Antwort-Katalog ist byte-gleich dem Katalog aus KomkiPolicy.Remedies", %{
     env: env,
-    gamma: gamma,
-    room: room
+    gamma: gamma
   } do
+    env = own_room(env, "doc-vertraulich")
+    room = env.room
+
     response =
       Gate.call(
         env,
@@ -57,9 +59,11 @@ defmodule KomkiMediator.RemediesTest do
 
   test "indeterminate: Antwort-Katalog ist byte-gleich dem Katalog aus KomkiPolicy.Remedies", %{
     env: env,
-    gamma: gamma,
-    room: room
+    gamma: gamma
   } do
+    env = own_room(env, "doc-pending-freigabe")
+    room = env.room
+
     response =
       Gate.call(
         env,
@@ -92,6 +96,8 @@ defmodule KomkiMediator.RemediesTest do
   test "Ordnung im Katalog: fakt_nachreichen VOR neuer_raum, kein GO am admit-Pfad", %{
     env: env
   } do
+    env = own_room(env, "doc-vertraulich")
+
     response =
       Gate.call(
         env,
@@ -115,6 +121,8 @@ defmodule KomkiMediator.RemediesTest do
   test "indeterminate kennt kein aktionsfreigabe: ein GO stellt keine Belege her", %{
     env: env
   } do
+    env = own_room(env, "doc-pending-freigabe")
+
     response =
       Gate.call(
         env,
@@ -153,7 +161,7 @@ defmodule KomkiMediator.RemediesTest do
 
     pending =
       Gate.call(
-        env,
+        own_room(env, "doc-pending-freigabe"),
         "admit_document",
         %{"document_id" => "doc-pending-freigabe"},
         fn -> {:ok, %{"content" => "egal"}} end
@@ -161,7 +169,7 @@ defmodule KomkiMediator.RemediesTest do
 
     vertraulich =
       Gate.call(
-        env,
+        own_room(env, "doc-vertraulich"),
         "admit_document",
         %{"document_id" => "doc-vertraulich"},
         fn -> {:ok, %{"content" => "egal"}} end
@@ -176,9 +184,16 @@ defmodule KomkiMediator.RemediesTest do
   # bilden (reine Funktion der Entscheidungslage, § 2.8)
   # -----------------------------------------------------------------------
 
+  # Raum, dessen B_W genau die Labels des Dokuments sind: so zeigt die
+  # Engine den Blocker der Dokument-Bindung selbst (seit #213 entscheidet
+  # admit_document gegen B_W).
+  defp own_room(env, document_id) do
+    put_in(env.room.workspace_bindings, env.room.objects[document_id]["labels"])
+  end
+
   defp derive_decision(gamma, room, document_id) do
     {:ok, object} = Room.object_for_call(room, "admit_document", %{"document_id" => document_id})
-    snapshot = Room.snapshot_for(room, gamma, object, "remediestest")
+    snapshot = Room.snapshot_for(room, gamma, object, "remediestest", room.workspace_bindings)
     intent = intent(room, document_id)
     Derive.decide(gamma.compiled, snapshot, intent)
   end
@@ -189,7 +204,7 @@ defmodule KomkiMediator.RemediesTest do
     %{
       rule: :admit,
       object_labels: object.labels,
-      checked: object.labels,
+      checked: room.workspace_bindings,
       rho: Calculus.actual_recipients(gamma.compiled, room.environment),
       object_ref: object.object_id <> "@" <> object.version,
       call_hash: nil

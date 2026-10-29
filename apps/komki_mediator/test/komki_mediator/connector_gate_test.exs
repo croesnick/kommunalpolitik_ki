@@ -4,7 +4,12 @@ defmodule KomkiMediator.ConnectorGateTest do
   alias Anubis.Server.Frame
   alias KomkiMediator.{ConnectorGate, FakeConnector, Journal, Templates, TestHelpers, Tools}
 
-  @recherche ["ris-oeffentlich@1", "vault-oeffentlich@1", "web-oeffentlich@1"]
+  @recherche [
+    "doc-oeffentlich@2",
+    "ris-oeffentlich@1",
+    "vault-oeffentlich@1",
+    "web-oeffentlich@1"
+  ]
 
   setup do
     base = TestHelpers.provisioned_base()
@@ -118,6 +123,8 @@ defmodule KomkiMediator.ConnectorGateTest do
       assert response["decision"] == "deny"
       assert response["rule"] == "emit"
       assert "recipient_not_allowed" in remedy_codes(response)
+      # Endpunkt fuers Modell (#166)
+      assert response["hinweis"] == KomkiMediator.Hinweis.text(:deny)
       refute_received {:connector_called, _, _, _, _, _}
 
       [pdr] = records(env)

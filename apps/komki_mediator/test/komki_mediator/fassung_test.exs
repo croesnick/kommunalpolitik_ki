@@ -4,6 +4,7 @@ defmodule KomkiMediator.FassungTest do
   test "tools sind die festgedrehte Fassung (geordnet)" do
     assert KomkiMediator.Fassung.tools() == [
              "ping",
+             "list_documents",
              "admit_document",
              "ris_search",
              "ris_show",
@@ -16,13 +17,17 @@ defmodule KomkiMediator.FassungTest do
 
   # Die Connector-Tools der Fassung sind genau die des Manifests
   # (Connector-Vertrag §5.1) — kein zweiter Ort fuer Tool-Namen.
-  # admit_document liegt seit #169 im Manifest documents.
+  # admit_document liegt seit #169 im Manifest documents; ping und
+  # list_documents (#218) beantwortet der Vermittler selbst.
   test "Connector-Tools der Fassung == KomkiConnector.Manifest.tools" do
-    assert Enum.drop(KomkiMediator.Fassung.tools(), 1) == KomkiConnector.Manifest.tools()
+    own = KomkiMediator.Fassung.own_tools()
+
+    assert own == ["ping", "list_documents"]
+    assert KomkiMediator.Fassung.tools() == own ++ KomkiConnector.Manifest.tools()
   end
 
   test "fassung_id ist die versionierte Kennung" do
-    assert KomkiMediator.Fassung.fassung_id() == "komki-mediator/2"
+    assert KomkiMediator.Fassung.fassung_id() == "komki-mediator/3"
   end
 
   # D.9: Die vom anubis-Server advertised Tool-Namen muessen exakt der

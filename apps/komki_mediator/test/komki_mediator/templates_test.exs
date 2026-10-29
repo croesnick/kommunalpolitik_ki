@@ -69,24 +69,35 @@ defmodule KomkiMediator.TemplatesTest do
     assert decisions["mediator-ping"]["decision"] == "permit"
   end
 
-  test "Raum fuehrt deny mit binding_condition_false (doc-vertraulich) her", %{base: base} do
+  # R.5.4 (#213): Im Default-Raum recherche liegen die Labels der beiden
+  # anderen Dokumente ausserhalb von B_W.
+  test "Raum recherche: doc-vertraulich und doc-pending-freigabe nicht in B_W", %{base: base} do
     decisions = room_decisions(base)
 
-    assert decisions["doc-vertraulich"]["decision"] == "deny"
+    for object_id <- ["doc-vertraulich", "doc-pending-freigabe"] do
+      assert decisions[object_id]["decision"] == "deny"
+      assert %{"code" => "label_not_included"} = hd(decisions[object_id]["blockers"])
+    end
+  end
 
-    assert List.first(decisions["doc-vertraulich"]["blockers"]) == %{
+  test "Raum mit doc-vertraulich@1 in B_W: deny mit binding_condition_false", %{base: base} do
+    decision = room_decisions(base, ["doc-vertraulich@1"])["doc-vertraulich"]
+
+    assert decision["decision"] == "deny"
+
+    assert List.first(decision["blockers"]) == %{
              "code" => "binding_condition_false",
              "binding" => "doc-vertraulich@1",
              "condition" => "purpose"
            }
   end
 
-  test "Raum fuehrt indeterminate mit missing_fact (doc-pending-freigabe) her", %{base: base} do
-    decisions = room_decisions(base)
+  test "Raum mit doc-pending-freigabe@1 in B_W: indeterminate mit missing_fact", %{base: base} do
+    decision = room_decisions(base, ["doc-pending-freigabe@1"])["doc-pending-freigabe"]
 
-    assert decisions["doc-pending-freigabe"]["decision"] == "indeterminate"
+    assert decision["decision"] == "indeterminate"
 
-    assert List.first(decisions["doc-pending-freigabe"]["missing_evidence"]) == %{
+    assert List.first(decision["missing_evidence"]) == %{
              "code" => "missing_fact",
              "fact" => "vertraulich_freigabe",
              "binding" => "doc-pending-freigabe@1"
@@ -118,7 +129,12 @@ defmodule KomkiMediator.TemplatesTest do
              "ris-betreiber"
            ]
 
-    for binding <- ["ris-oeffentlich@1", "web-oeffentlich@1", "vault-oeffentlich@1"] do
+    for binding <- [
+          "doc-oeffentlich@2",
+          "ris-oeffentlich@1",
+          "web-oeffentlich@1",
+          "vault-oeffentlich@1"
+        ] do
       assert registry["bindings"][binding]["readers"] == registry["observers"]
       assert registry["bindings"][binding]["operations"] == %{"admit" => true, "emit" => true}
     end
@@ -131,9 +147,11 @@ defmodule KomkiMediator.TemplatesTest do
     assert {:ok, _} = KomkiPolicy.Registry.compile(registry)
   end
 
-  defp room_decisions(base) do
+  # `bindings` ersetzt B_W des Default-Raums (nil: recherche).
+  defp room_decisions(base, bindings \\ nil) do
     {:ok, gamma} = Gamma.load(Path.join([base, "mediator", "registry.json"]))
     {:ok, room} = Room.load(Path.join(base, "mediator"))
+    room = if bindings, do: %{room | workspace_bindings: bindings}, else: room
 
     object_ids = ["mediator-ping", "doc-oeffentlich", "doc-vertraulich", "doc-pending-freigabe"]
 
@@ -142,7 +160,8 @@ defmodule KomkiMediator.TemplatesTest do
       tool = if object_id == "mediator-ping", do: "ping", else: "admit_document"
 
       {:ok, object} = Room.object_for_call(room, tool, params)
-      snapshot = Room.snapshot_for(room, gamma, object, "aaaabbbbcccc")
+      {:ok, checked} = Room.bindings_for(room, tool, object)
+      snapshot = Room.snapshot_for(room, gamma, object, "aaaabbbbcccc", checked)
 
       intent = %{
         "schema" => "komki-intent/1",

@@ -60,7 +60,7 @@ defmodule KomkiMediator.GateTest do
     assert pdr["payload_hash"] =~ "sha256:"
     assert pdr["intent_id"] =~ "intent-"
     assert pdr["snapshot_id"] =~ "snap-"
-    assert pdr["fassung_id"] == "komki-mediator/2"
+    assert pdr["fassung_id"] == "komki-mediator/3"
 
     {:ok, _, _} = DateTime.from_iso8601(pdr["abrufdatum"])
   end
@@ -143,10 +143,54 @@ defmodule KomkiMediator.GateTest do
     assert Enum.count(Enum.uniq(intent_hashes)) == 2
   end
 
+  # R.5.4 (#213): das Validierungslabel ist B_W des Raums, nicht λ(x).
+  test "recherche: doc-vertraulich liegt nicht in B_W -> deny label_not_included", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    response =
+      Gate.call(
+        env,
+        "admit_document",
+        %{"document_id" => "doc-vertraulich"},
+        fn -> flunk("Executor darf nach einem deny nicht laufen") end
+      )
+
+    assert response["decision"] == "deny"
+    assert [%{"code" => "label_not_included"} | _] = response["remedies"]
+    assert response["hinweis"] == KomkiMediator.Hinweis.text(:deny)
+
+    assert [pdr] = TestHelpers.journal_records(journal_path)
+    assert pdr["checked_label"] == env.room.workspace_bindings
+  end
+
+  test "Raum ohne workspace_bindings: admit_document faellt fail-closed aus", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    env = put_in(env.room.workspace_bindings, nil)
+
+    response =
+      Gate.call(
+        env,
+        "admit_document",
+        %{"document_id" => "doc-oeffentlich"},
+        fn -> flunk("Executor darf ohne B_W nicht laufen") end
+      )
+
+    assert response["decision"] == "error"
+    assert response["detail"] =~ "workspace_bindings"
+
+    assert [%{"outcome" => "error", "admitted" => false}] =
+             TestHelpers.journal_records(journal_path)
+  end
+
   test "doc-vertraulich -> deny mit Engine-Remedy-Katalog (kein nackter Fehler)", %{
     env: env,
     journal_path: journal_path
   } do
+    env = put_in(env.room.workspace_bindings, ["doc-vertraulich@1"])
+
     response =
       Gate.call(
         env,
@@ -190,6 +234,8 @@ defmodule KomkiMediator.GateTest do
     env: env,
     journal_path: journal_path
   } do
+    env = put_in(env.room.workspace_bindings, ["doc-pending-freigabe@1"])
+
     response =
       Gate.call(
         env,
@@ -442,6 +488,53 @@ defmodule KomkiMediator.GateTest do
     JSON.parse(chunk)
   end
 
+  # -----------------------------------------------------------------------
+  # list_documents (#218)
+  # -----------------------------------------------------------------------
+
+  test "list_documents: recherche nennt nur doc-oeffentlich, ohne Inhalt, mit PDR", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    response = Gate.list_documents(env)
+
+    assert response["decision"] == "permit"
+
+    assert response["documents"] == [
+             %{"document_id" => "doc-oeffentlich", "labels" => ["doc-oeffentlich@2"]}
+           ]
+
+    assert response["labels"] == env.room.workspace_bindings
+    refute inspect(response) =~ "Notiz"
+
+    assert [pdr] = TestHelpers.journal_records(journal_path)
+    assert pdr["tool"] == "list_documents"
+    assert pdr["outcome"] == "admitted"
+    assert pdr["checked_label"] == env.room.workspace_bindings
+    assert pdr["payload_hash"] == response["payload_hash"]
+  end
+
+  test "list_documents: zulaessig ist, was die Engine fuer B_W erlaubt", %{env: env} do
+    env = put_in(env.room.facts["purpose"]["value"], "vertraulich")
+    env = put_in(env.room.workspace_bindings, ["doc-oeffentlich@2", "doc-vertraulich@1"])
+
+    ids = Enum.map(Gate.list_documents(env)["documents"], & &1["document_id"])
+    assert ids == ["doc-oeffentlich", "doc-vertraulich"]
+  end
+
+  test "list_documents ohne workspace_bindings: Fehler mit PDR", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    response = Gate.list_documents(put_in(env.room.workspace_bindings, nil))
+
+    assert response["decision"] == "error"
+    refute Map.has_key?(response, "documents")
+
+    assert [%{"tool" => "list_documents", "outcome" => "error"}] =
+             TestHelpers.journal_records(journal_path)
+  end
+
   # Ein Hash je Ablauf: der Vorbeleg (`executing`) traegt denselben Hash.
   defp intent_hashes_from_journal(journal_path) do
     journal_path
@@ -455,7 +548,13 @@ defmodule KomkiMediator.GateTest do
     {:ok, object} =
       Room.object_for_call(env.room, "admit_document", %{"document_id" => document_id})
 
-    Room.snapshot_for(env.room, env.gamma, object, KomkiMediator.Hash.digest12(intent_hash))
+    Room.snapshot_for(
+      env.room,
+      env.gamma,
+      object,
+      KomkiMediator.Hash.digest12(intent_hash),
+      env.room.workspace_bindings
+    )
   end
 
   defp build_intent(env, document_id) do

@@ -15,6 +15,7 @@ defmodule KomkiMediator.Server do
   use Anubis.Server, name: "komki", version: "0.1.0", capabilities: [:tools]
 
   component(KomkiMediator.Tools.Ping)
+  component(KomkiMediator.Tools.ListDocuments)
   component(KomkiMediator.Tools.AdmitDocument)
   component(KomkiMediator.Tools.RisSearch)
   component(KomkiMediator.Tools.RisShow)

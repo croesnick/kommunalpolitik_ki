@@ -38,7 +38,7 @@ defmodule KomkiMediator.Gate do
   selbst.
   """
 
-  alias KomkiMediator.{Gamma, Hash, PDR, Room}
+  alias KomkiMediator.{Gamma, Hash, Hinweis, PDR, Room}
   alias KomkiPolicy.{Derive, JSON, Verify}
 
   @typedoc "Ablauf-Umgebung: Gamma-Stand, Raum, Journal-Anbindung."
@@ -64,15 +64,82 @@ defmodule KomkiMediator.Gate do
     # (String-Schluessel). Jedes kuenftige Schema-Feld landet damit
     # mechanisch im intent_hash.
     rendered = rendered_params(params)
-    intent_hash = Hash.sha256_hex(JSON.canonical(%{"tool" => tool, "params" => rendered}))
+    intent_hash = call_hash(tool, rendered)
 
-    case Room.object_for_call(env.room, tool, rendered) do
-      {:ok, object} ->
-        decide(env, tool, intent_hash, object, executor)
-
+    with {:ok, object} <- Room.object_for_call(env.room, tool, rendered),
+         {:ok, bindings} <- Room.bindings_for(env.room, tool, object) do
+      decide(env, tool, intent_hash, object, bindings, executor)
+    else
       {:error, :unknown_object, object_id} ->
         unknown_object(env, tool, intent_hash, object_id)
+
+      {:error, detail} ->
+        error_path(env, tool, intent_hash, nil, nil, "error", detail)
     end
+  end
+
+  # -------------------------------------------------------------------------
+  # Raumdokumente auflisten (Ticket #218)
+  # -------------------------------------------------------------------------
+
+  @doc """
+  `list_documents`: nennt pi die Raumdokumente, die es mit `admit_document`
+  zulassen koennte — document_id und Labels, keine Inhalte. Je Dokument
+  entscheidet die Engine die Aufnahme gegen B_W; nur ein `permit` kommt
+  in die Liste. Was gesperrt waere, bleibt unsichtbar, auch in der Anzahl
+  (wie die Suche im Vault-Connector): sonst verriete die Liste die
+  Existenz vertraulicher Dokumente. Die Antwort traegt B_W als Labels,
+  ein PDR belegt sie.
+  """
+  @spec list_documents(env()) :: map()
+  def list_documents(env) do
+    intent_hash = call_hash("list_documents", %{})
+
+    case Room.bindings_for(env.room, "list_documents", nil) do
+      {:ok, bindings} ->
+        listed(env, intent_hash, bindings)
+
+      {:error, detail} ->
+        error_path(env, "list_documents", intent_hash, nil, nil, "error", detail)
+    end
+  end
+
+  defp listed(env, intent_hash, bindings) do
+    documents =
+      for object_id <- Room.document_ids(env.room),
+          {:ok, object} <- [Room.object_for_claim(env.room, object_id)],
+          admissible?(env, object, bindings) do
+        %{"document_id" => object_id, "labels" => object.labels}
+      end
+
+    base = %{
+      "decision" => "permit",
+      "decision_id" => new_decision_id(),
+      "documents" => documents,
+      "labels" => bindings
+    }
+
+    payload_hash = payload_hash(base)
+
+    journal_pdr(
+      env,
+      pdr("list_documents", "permit", "admitted", true, intent_hash, %{
+        decision_id: base["decision_id"],
+        checked_label: bindings,
+        remedies: nil,
+        payload_hash: payload_hash
+      })
+    )
+
+    Map.put(base, "payload_hash", payload_hash)
+  end
+
+  defp admissible?(env, object, bindings) do
+    probe = Hash.sha256_hex(object.object_id <> "@" <> object.version)
+    intent = intent(env.room, probe, object)
+    snapshot = Room.snapshot_for(env.room, env.gamma, object, Hash.digest12(probe), bindings)
+
+    match?({:ok, %{"decision" => "permit"}}, Derive.decide(env.gamma.compiled, snapshot, intent))
   end
 
   # -------------------------------------------------------------------------
@@ -110,9 +177,11 @@ defmodule KomkiMediator.Gate do
   # Entscheidungspfade
   # -------------------------------------------------------------------------
 
-  defp decide(env, tool, intent_hash, object, executor) do
+  defp decide(env, tool, intent_hash, object, bindings, executor) do
     intent = intent(env.room, intent_hash, object)
-    snapshot = Room.snapshot_for(env.room, env.gamma, object, Hash.digest12(intent_hash))
+
+    snapshot =
+      Room.snapshot_for(env.room, env.gamma, object, Hash.digest12(intent_hash), bindings)
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
@@ -178,7 +247,8 @@ defmodule KomkiMediator.Gate do
       "decision_id" => decision_id,
       "registry_id" => env.gamma.registry_id,
       "remedies" => remedies,
-      "relaxation_authorities" => Gamma.relaxation_authorities_for(env.gamma, remedies)
+      "relaxation_authorities" => Gamma.relaxation_authorities_for(env.gamma, remedies),
+      "hinweis" => Hinweis.text(:deny)
     }
 
     journal_pdr(
@@ -396,6 +466,10 @@ defmodule KomkiMediator.Gate do
         {:payload_mismatch, ["payload_object_unknown"]}
     end
   end
+
+  # Hash-Basis eines Aufrufs: Tool samt vollstaendig gerenderten Parametern.
+  defp call_hash(tool, rendered),
+    do: Hash.sha256_hex(JSON.canonical(%{"tool" => tool, "params" => rendered}))
 
   # Exakte Parameter-Fassung des Calls: der vollstaendig gerenderte Call
   # ist die Hash-Basis fuer den intent_hash - nicht eine Projektion.

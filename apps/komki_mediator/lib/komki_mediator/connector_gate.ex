@@ -35,7 +35,7 @@ defmodule KomkiMediator.ConnectorGate do
   """
 
   alias KomkiConnector.{Manifest, Text}
-  alias KomkiMediator.{Gamma, Gate, Go, GoStand, Hash, PDR, ResultShape, Room}
+  alias KomkiMediator.{Gamma, Gate, Go, GoStand, Hash, Hinweis, PDR, ResultShape, Room}
   alias KomkiMediator.Room.Object
   alias KomkiPolicy.{Derive, JSON, Verify}
   alias Sidecar.{Client, Params}
@@ -203,6 +203,9 @@ defmodule KomkiMediator.ConnectorGate do
   # Nein oder keine Antwort: es bleibt beim deny, der Katalog bleibt
   # sichtbar; das PDR haelt fest, dass gefragt wurde.
   defp go_not_given(env, call, intent, response, outcome) do
+    hinweis = if outcome == "go_refused", do: :go_refused, else: :go_timeout
+    response = Map.put(response, "hinweis", Hinweis.text(hinweis))
+
     PDR.append(env, %{
       "decision_id" => PDR.new_id(),
       "tool" => call.tool,
@@ -414,7 +417,8 @@ defmodule KomkiMediator.ConnectorGate do
            %{
              "decision" => kind,
              "remedies" => remedies,
-             "relaxation_authorities" => Gamma.relaxation_authorities_for(env.gamma, remedies)
+             "relaxation_authorities" => Gamma.relaxation_authorities_for(env.gamma, remedies),
+             "hinweis" => Hinweis.text(:deny)
            }}
 
         {:unsupported, info} ->
