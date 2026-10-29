@@ -247,7 +247,7 @@ defmodule KomkiCli.Config do
 
   @doc "Erlang-Wurzel zu einem `escript`-Pfad (`<root>/bin/escript`)."
   @spec erlang_root(String.t()) :: String.t()
-  def erlang_root(escript_bin), do: escript_bin |> Path.dirname() |> Path.dirname()
+  def erlang_root(escript_bin), do: Seatbelt.erlang_root(escript_bin)
 
   @doc "Default der Egress-Ports je Connector (CONTRACT.md §9)."
   @spec default_egress_ports() :: %{String.t() => pos_integer()}
@@ -376,34 +376,12 @@ defmodule KomkiCli.Config do
   Symlink-Form matchen nicht), unter anderen Hosts bleibt z.B. `/tmp/...`
   einfach `/tmp/...`. Die Definition liest das Dateisystem selbst, keine
   Plattform-Weichen. Idempotent.
+
+  Implementierung lebt seit Ticket #226 in der Library (`Seatbelt.canonical/1`);
+  dieser Einstieg bleibt als komki-API erhalten.
   """
   @spec canonical(String.t()) :: String.t()
-  def canonical(path) when is_binary(path) do
-    path
-    |> Path.expand()
-    |> resolve_realpath()
-  end
-
-  # Kernel-Sicht via readlink(1) (kein :file.realpath in diesem OTP).
-  # BSD-readlink (macOS) scheitert an fehlenden Pfaden, GNU erlaubt
-  # fehlende letzte Komponente — deshalb Fallback: tiefsten existierenden
-  # Vorfahren aufloesen und den Rest wieder anfuegen. Ohne readlink
-  # degradiert die Aufloesung auf die expandierte Form.
-  defp resolve_realpath(expanded) do
-    if bin = System.find_executable("readlink") do
-      resolve(bin, expanded)
-    else
-      expanded
-    end
-  end
-
-  defp resolve(bin, path) do
-    case System.cmd(bin, ["-f", path]) do
-      {real, 0} -> String.trim_trailing(real)
-      {_, _} when path == "/" -> path
-      {_, _} -> Path.join(resolve(bin, Path.dirname(path)), Path.basename(path))
-    end
-  end
+  def canonical(path) when is_binary(path), do: Seatbelt.canonical(path)
 
   # Burrito-Einzeldatei (Ticket #181): Rollen starten als `<binary> <rolle>`,
   # die Laufzeit liegt entpackt unter :code.root_dir(). Sonst Escript.
