@@ -67,7 +67,8 @@ double-quoted YAML-Strings werden als String-Ende interpretiert →
 ungültiges YAML → Properties in Obsidian nicht sichtbar.
 
 **Mitigation:** Single-Quote-Regel als Pflicht in Skills mit strukturiertem
-Vault-Write. Post-Write-Validierung via `pyyaml`. Siehe #53.
+Vault-Write. Post-Write-Validierung via Prüfskript
+`skills/sitzungsvorbereitung/scripts/check_frontmatter.py`. Siehe #53.
 
 > **Abgrenzung:** Anträge und Änderungsanträge formulieren ist *nicht* Teil
 > der Sitzungsvorbereitung. Das ist ein nachgelagerter Schritt, der auf der
@@ -343,7 +344,7 @@ vorschlägt. Direkt als Vortragsgrundlage nutzbar.
 | Vault-Notizen zu TOPs sammeln | `obsidian search` / `vault_suche` | ✅ (Fallback: nachfragen falls keine Treffer) |
 | AZ-Artikel (optional, nur Top-Themen) | `allgaeuer_zeitung_mcp` | ✅ |
 | Bericht im Vault persistieren | `obsidian-cli` write | ✅ |
-| YAML-Frontmatter validieren | pyyaml-Check | ✅ (analog sitzungsvorbereitung) |
+| YAML-Frontmatter validieren | `check_frontmatter.py` | ✅ (analog sitzungsvorbereitung) |
 
 ### Lücken
 

@@ -495,74 +495,31 @@ obsidian vault="<vault-name>" eval code="app.vault.create('1 - Projects/Stadtrat
 Vor dem Schreiben prüfen, ob die Datei bereits existiert — ggf. überschreiben
 (nur nach Bestätigung, siehe GO-Prinzip) oder mit Suffix `_v2` anlegen.
 
-### YAML-Frontmatter: Quoting-Regel
+### YAML-Frontmatter: Quoting-Regel und Prüfung nach dem Write
 
 Das Frontmatter enthält externe Strings (AZ-Artikel-Titel, RIS-Titel,
-Vault-Notiz-Titel). Diese sind **unkontrolliert** — sie können Zeichen
-enthalten, die YAML bricht. Im deutschen Sprachraum sind typografische
-Anführungszeichen („...", »...«) der häufigste Fall: ein schließendes
-deutsches Anführungszeichen `"` innerhalb eines double-quoted YAML-Strings
-wird als String-Ende interpretiert → danach folgt unparserbarer Text → das
-gesamte Frontmatter ist kaputt. Obsidian zeigt dann keine Properties mehr
-an oder dropped sie still.
+Vault-Notiz-Titel) — unkontrolliert und YAML-gefährdet. Kern der Regel:
+YAML-Werte mit externem Text **immer in Single-Quotes** (`'...'`, ein `'`
+im Wert als `''` verdoppelt), nie in Double-Quotes. Die vollständige
+Regel — Beispiele, Ausnahmen, mehrzeilige Werte — steht an einer Stelle:
+im Docstring von
+[`scripts/check_frontmatter.py`](scripts/check_frontmatter.py). Sie gilt
+für alle Skills mit strukturiertem Vault-Write.
 
-**Regel:** Alle YAML-String-Werte mit externem Text **immer in
-Single-Quotes** (`'...'`) setzen, nie in Double-Quotes. Innerhalb von
-Single-Quotes sind Double-Quotes, deutsche Anführungszeichen und
-Sonderzeichen sicher. Der einzige Escape-Fall: ein `'` im Wert wird
-durch Verdopplung `''` escaped.
-
-```yaml
-# FALSCH — bricht bei deutschen Anführungszeichen im Titel:
-titel: "„Völlig konsterniert" – Anwohner zwischen Verzweiflung"
-
-# RICHTIG — Single-Quotes als Wrapper:
-titel: '„Völlig konsterniert" – Anwohner zwischen Verzweiflung'
-
-# RICHTIG — einfache Werte ohne Sonderzeichen brauchen keine Quotes:
-gremium: Stadtrat
-ort: Buchloe
-```
-
-Ausnahme: Wenn ein Wert ein `'` (Apostroph) enthält, entweder mit
-Double-Quotes wrappen (wenn der Wert sonst keine `"` hat) oder das `'`
-verdoppeln: `'It''s a test'`.
-
-### Validierung nach dem Vault-Write
-
-Nach jedem Schreiben der Sitzungsmappe **muss** das Frontmatter
-re-validiert werden. Falls das YAML kaputt ist: nicht still weitermachen,
-sondern Fehler melden und fixen.
+Nach jedem Schreiben der Sitzungsmappe **muss** das Frontmatter geprüft
+werden — das Skript meldet Zeile und Grund:
 
 ```bash
-# Validierung via Python (pyyaml):
-uv run --with pyyaml python3 -c "
-import yaml, sys
-with open('<pfad zur temp-datei>') as f:
-    content = f.read()
-parts = content.split('---', 2)
-if len(parts) < 3:
-    print('FEHLER: Kein Frontmatter gefunden'); sys.exit(1)
-try:
-    data = yaml.safe_load(parts[1])
-    if data is None:
-        print('FEHLER: Frontmatter ist leer'); sys.exit(1)
-    print('OK: ' + str(len(data)) + ' Keys geparst')
-except yaml.YAMLError as e:
-    print('FEHLER: YAML kaputt: ' + str(e)); sys.exit(1)
-"
+python3 skills/sitzungsvorbereitung/scripts/check_frontmatter.py <datei>
+# oder direkt aus dem Vault, ohne Temp-Datei:
+obsidian vault="<vault-name>" read file="<notiz>" | python3 skills/sitzungsvorbereitung/scripts/check_frontmatter.py -
 ```
 
-Praxis-Workflow:
-1. Mappe in eine Temp-Datei schreiben
-2. YAML validieren (obiger Check)
-3. Bei OK: Temp-Datei in den Vault übernehmen (`obsidian eval` + `adapter.write`)
-4. Bei Fehler: Quoting fixen, wieder von vorne
-
- Dieser Check eliminiert eine ganze Bug-Klasse. Wenn andere Skills
-ebenfalls strukturiertes Frontmatter in den Vault schreiben (z.B.
-`ratsprojekt_proposal` bei Vault-Konsolidierung), gilt dort dieselbe Regel
-und Validierung.
+Falls das Frontmatter kaputt ist: nicht still weitermachen, sondern
+Fehler melden und fixen. Praxis-Workflow: Mappe in eine Temp-Datei
+schreiben, prüfen, bei OK in den Vault übernehmen und dort nochmal
+prüfen, bei Fehler Quoting fixen und neu prüfen. Dieser Check
+eliminiert eine ganze Bug-Klasse.
 
 ## Sitzungsmappe-Struktur
 
@@ -826,7 +783,7 @@ nutzenden Person.
 | 2 | `ratsinfo open` ist Stub | Kein automatischer PDF-Download aus ratsinfo | PDFs ggf. manuell aus dem RIS herunterladen, Pfad an `pdf_ingest` übergeben |
 | 3 | Kein automatischer RIS↔Ratsprojekt-Link | TOPs und Projekte sind isoliert | Ad-hoc-Zuordnung über Titel/Begriffe; in der Mappe als Querverweis dokumentieren |
 | 4 | RIS-Volltextsuche findet nicht immer alle TOPs (ein konkretes TOP-Stichwort wurde trotz lokalem Cache nicht gefunden) | Cross-Ref kann TOPs verfehlen | Statt Suche immer `ratsinfo show <sitzungs_id>` für die konkrete Sitzung verwenden |
-| 5 | YAML-Frontmatter kann durch externe Strings (deutsche Anführungszeichen in AZ-Titeln) brechen | Properties in Obsidian nicht sichtbar / kaputt | Single-Quotes für alle YAML-Strings mit externem Text; YAML nach Vault-Write re-validieren (siehe "Validierung nach dem Vault-Write") |
+| 5 | YAML-Frontmatter kann durch externe Strings (deutsche Anführungszeichen in AZ-Titeln) brechen | Properties in Obsidian nicht sichtbar / kaputt | Single-Quotes für alle YAML-Strings mit externem Text; nach dem Schreiben `check_frontmatter.py` laufen lassen (siehe "YAML-Frontmatter: Quoting-Regel und Prüfung nach dem Write") |
 | 6 | Bei umfangreichen Sitzungsunterlagen (50+ Seiten, 10+ BVS pro TOP) verdeckt die flache TOP-für-TOP-Erzählung Querschnittsthemen, wiederkehrende Akteure, Klage-Risiken und Cross-TOP-Bezüge | Muster werden übersehen (z.B. mehrfach übergangene Forderungen desselben städtischen Gremiums in zwei TOPs); politisch starke Querschnitts-Anträge bleiben ungestellt | **Schritt 8b: Graph-Repräsentation als Zwischenschicht** bei umfangreichen Unterlagen. Mappe bekommt Anhang B mit Mermaid-Diagrammen + Synthese aus der Graph-Sicht + optional Q1/Q2/Q3-Querschnitts-Anträge. Trigger-Kriterien siehe Schritt 8b. Bei kleinen Sitzungen entfällt der Schritt. |
 | 7 | Fehlklassifikation von Stellungnahmen (Briefkopf-Rätsel: Anwohner auf Briefkopf einer anderen Behörde als Behördenstellungnahme nach § 4 BauGB fehlklassifiziert) | Politische Fehleinschätzung (Behörden-Ablehnung vs. Anwohner-Stellungnahme); ggf. unnötige Aufklärung in der Sitzung | `stellungnahme.typ` als Enum in Graph (Schritt 8b) zwingt zur Klassifikation; `briefkopf_raetsel: true` + Audit-Trail bei Abweichungen. GO-Prinzip: KI dokumentiert Rätsel, nutzende Person entscheidet. |
 
