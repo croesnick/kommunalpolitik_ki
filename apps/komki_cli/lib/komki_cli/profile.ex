@@ -29,7 +29,8 @@ defmodule KomkiCli.Profile do
       Profil).
   """
 
-  alias KomkiCli.{Channel, Config, Llama, MachODeps}
+  alias KomkiCli.{Channel, Config, Llama}
+  alias Seatbelt.{MachODeps, Preset, SBPL}
   require Config
 
   @doc """
@@ -53,8 +54,14 @@ defmodule KomkiCli.Profile do
     # waere dort unvollstaendig (CI-Fund: fehlende asdf-Sysctl-Pins).
     {user_home, asdf_root_dir} = pinned_chain_roots(cfg.node_bin)
 
+    # asdf-Binary einmalig entdecken und sichtbar durchreichen: Der
+    # Generator soll keine versteckten Host-Eingaben haben (vorher rief
+    # die Regelschicht selbst find_executable — gleiche Bytes, aber
+    # unsichtbarer Input in einer "deterministischen" Funktion).
+    asdf_bin = System.find_executable("asdf")
+
     asdf_root_dir
-    |> rules_for(cfg, scratch, user_home)
+    |> rules_for(cfg, scratch, user_home, asdf_bin)
     |> Enum.join("\n")
     |> Kernel.<>("\n")
   end
@@ -141,7 +148,7 @@ defmodule KomkiCli.Profile do
         llama_metal_rules() ++
         llama_probe_rules() ++
         llama_prefs_rules(user_home) ++
-        meta_ancestors(llama_meta_paths(cfg, log_path, dylib_dirs, user_home)) ++
+        SBPL.metadata_ancestors(llama_meta_paths(cfg, log_path, dylib_dirs, user_home)) ++
         llama_closing_rules()
 
     # Pfad-Sonden-Block und meta_ancestors enden auf denselben
@@ -160,14 +167,13 @@ defmodule KomkiCli.Profile do
     ]
   end
 
-  # Startup-Schicht: common_boot_rules() wiederverwendet (die validierte
-  # Ticket-#70-Schicht; ohne sie stirbt jeder exec auf macOS 27.2 mit
-  # SIGABRT rc=134). Die pi-spezifische Kopfzeile
-  # ("asdf-Boot-Proben") entfaellt — das llama-Profil hat keine asdf-Schicht
-  # und der Profil-Test prueft das hart.
-  defp llama_start_layer do
-    Enum.reject(common_boot_rules(), &String.starts_with?(&1, "; env/bash/asdf"))
-  end
+  # Startup-Schicht: die validierte Boot-Schicht aus der Library
+  # (Seatbelt.Preset.macos_exec_boot; ohne sie stirbt jeder exec auf
+  # macOS 27.2 mit SIGABRT rc=134). Der fruehere Kopfzeilen-Filter
+  # ("asdf-Boot-Proben" wegwerfen) ist entfaellt: Der Preset-Kopf ist
+  # asdf-frei, das llama-Profil hat die asdf-Schicht nie gehabt, und der
+  # Profil-Test prueft das hart weiter (refute "asdf").
+  defp llama_start_layer, do: Preset.macos_exec_boot()
 
   defp llama_exec_read_rules(bin) do
     [
@@ -335,7 +341,8 @@ defmodule KomkiCli.Profile do
   ]
 
   defp llama_probe_rules do
-    ["; Pfad-Sonden-Metadaten (benign, exp15)"] ++ metadata_literals(@llama_probe_paths)
+    ["; Pfad-Sonden-Metadaten (benign, exp15)"] ++
+      Enum.map(@llama_probe_paths, &SBPL.metadata_literal/1)
   end
 
   defp llama_prefs_rules(user_home) do
@@ -381,15 +388,9 @@ defmodule KomkiCli.Profile do
     ]
   end
 
-  defp metadata_literals(paths) do
-    Enum.map(paths, fn path ->
-      "(allow file-read-metadata (literal \"" <> path <> "\"))"
-    end)
-  end
-
   ## ---------------------------------------------------------------- Regelaufbau
 
-  defp rules_for(asdf_root_dir, cfg, scratch, user_home) do
+  defp rules_for(asdf_root_dir, cfg, scratch, user_home, asdf_bin) do
     node = cfg.node_bin
     # node installiert im asdf-Schema <asdf-root>/installs/nodejs/<v>/bin/node:
     # bin_dir = .../bin, install_root = .../<v>.
@@ -409,7 +410,8 @@ defmodule KomkiCli.Profile do
           node_modules_root,
           pi_pkg,
           asdf_root_dir,
-          user_home
+          user_home,
+          asdf_bin
         )
 
     # Netz-Exceptions am Dateiende, deterministisch: llama zuerst, der
@@ -422,52 +424,22 @@ defmodule KomkiCli.Profile do
         Channel.socket_path(cfg) <> "\")))"
 
     base_rules ++
-      common_boot_rules() ++
-      asdf_rules(asdf_root_dir) ++
+      Preset.macos_exec_boot() ++
+      asdf_rules(asdf_root_dir, asdf_bin) ++
       node_boot_rules(pi_pkg, node_modules_root, user_home) ++
-      tui_rules() ++
+      Preset.tui() ++
       scope_rules(cfg, scratch) ++
       [port_rule, mediator_socket_rule]
   end
 
   ## ---------------------------------------------------------------- TUI/Terminal-Klasse
 
-  # Muster aus anthropic-experimental/sandbox-runtime (macos-sandbox-utils.ts)
-  # und srt-Issue #419: TUIs (raw mode, Terminalgroesse, Signale) scheitern
-  # unter deny-default STILL, wenn die Terminal-Klasse nicht explizit erlaubt
-  # ist. Die Headless-Sonden brauchten diese Regeln nie; die interaktive
-  # Session (pi-TUI auf der tmux-Pty) schon. Scopes: Prozesssteuerung nur
-  # innerhalb desselben Sandkastens, Terminal-Zugriff nur auf echte tty-Geraete.
-  # Restrisiko (Ticket #132): distributed-notification-post ist ein Kanal zu
-  # jedem Prozess des Nutzers (braucht einen Empfaenger ausserhalb der
-  # Grenze). Streichen erst nach Messung, ob die pi-TUI ohne die Regel
-  # bootet. Bewusst als Elixir-Kommentar: ein Profiltext-Kommentar braeche
-  # die Byte-Identitaet bestehender Instanzen.
-  defp tui_rules do
-    [
-      "; TUI/Terminal-Klasse (sandbox-runtime-Muster; srt #419)",
-      "(allow file-ioctl (literal \"/dev/tty\"))",
-      "(allow file-ioctl (regex #\"^/dev/ttys[0-9]+$\"))",
-      "(allow pseudo-tty)",
-      "(allow process-info* (target same-sandbox))",
-      "(allow signal (target same-sandbox))",
-      "(allow mach-priv-task-port (target same-sandbox))",
-      "(allow user-preference-read)",
-      "(allow distributed-notification-post)",
-      "(allow ipc-posix-sem)",
-      "; hw.*/kern.proc.* versionsfest: neue OS-Versionen lesen neue Felder",
-      "; (zsh-5.9-Regressionsklasse auf darwin25+)",
-      "(allow sysctl-read (sysctl-name-prefix \"hw.\"))",
-      "(allow sysctl-read (sysctl-name-prefix \"kern.proc.\"))",
-      "; /dev/fd/0-Redirect unter Burrito (Pilot 2026-10-11): Das BEAM-stdout ist",
-      "; dort die Wrapper-Pipe; die Session-Kette leitet stdout auf das lebende",
-      "; stdin-PTY um (Pi.argv_session/3, tty_redirect). Kontextfrei im Profil, damit",
-      "; die Profil-Identitaet nicht vom Laufkontext abhaengt (Einmal-Drift fuer",
-      "; bestehende Instanzen: einmalig 'komki init --force').",
-      "(allow file-read-metadata (literal \"/dev/fd\"))",
-      "(allow file-write* (literal \"/dev/fd/0\"))"
-    ]
-  end
+  # Die Terminal-Klasse (sandbox-runtime-Muster, srt #419) lebt seit
+  # Ticket #226 als Preset in der Library (Seatbelt.Preset.tui/0) — die
+  # Begruendung je Regel dort. Restrisiko (Ticket #132)
+  # distributed-notification-post bleibt bewusst: ein Kanal zu jedem
+  # Prozess des Nutzers; streichen erst nach Messung, ob die pi-TUI ohne
+  # die Regel bootet.
 
   defp basis_and_exec_rules(cfg, node, pi_launcher) do
     tools_fd = Path.join([cfg.pi_home, ".pi", "agent", "bin", "fd"])
@@ -507,7 +479,16 @@ defmodule KomkiCli.Profile do
 
   ## ---------------------------------------------------------------- Metadaten-Kette
 
-  defp meta_rules(cfg, scratch, node_install, node_modules_root, pi_pkg, asdf_root_dir, user_home) do
+  defp meta_rules(
+         cfg,
+         scratch,
+         node_install,
+         node_modules_root,
+         pi_pkg,
+         asdf_root_dir,
+         user_home,
+         asdf_bin
+       ) do
     # Install-Pfade (brew, asdf, nvm) entstehen hier NUR aus den entdeckten
     # Werkzeugpfaden (Vorfahr-Kette des jeweiligen Pfads) — keine hartkodierten
     # System-Roots (Portabilitaets-Regel).
@@ -540,7 +521,7 @@ defmodule KomkiCli.Profile do
       user_home
     ]
 
-    base_meta = meta_ancestors(paths)
+    base_meta = SBPL.metadata_ancestors(paths)
 
     asdf_meta =
       if is_binary(asdf_root_dir) do
@@ -554,9 +535,9 @@ defmodule KomkiCli.Profile do
             node_install
             # asdf-Binary (z.B. brew-installiert): Metadaten-Vorfahrn aus dem
             # entdeckten Pfad statt hartkodierter brew-Roots.
-          ] ++ asdf_binary_paths()
+          ] ++ asdf_binary_paths(asdf_bin)
 
-        meta_ancestors(asdf_paths)
+        SBPL.metadata_ancestors(asdf_paths)
       else
         []
       end
@@ -564,43 +545,15 @@ defmodule KomkiCli.Profile do
     base_meta ++ asdf_meta
   end
 
-  defp meta_ancestors(paths) do
-    paths
-    |> Enum.flat_map(fn path ->
-      abs = String.trim_leading(path, "/")
-      segments = String.split(abs, "/", trim: true)
-
-      Enum.map(1..length(segments), fn i ->
-        "/" <> Enum.join(Enum.take(segments, i), "/")
-      end)
-    end)
-    |> MapSet.new()
-    |> MapSet.put("/")
-    |> MapSet.to_list()
-    |> Enum.sort()
-    |> Enum.map(fn c -> "(allow file-read-metadata (literal \"" <> c <> "\"))" end)
-  end
-
   ## ---------------------------------------------------------------- Boot-Schicht
 
-  defp common_boot_rules do
-    [
-      "; env/bash/asdf-Boot-Proben (Beleg 10:52:46/56 UTC)",
-      "(allow sysctl-read (sysctl-name \"security.mac.lockdown_mode_state\"))",
-      "(allow file-read-metadata (literal \"/System/Cryptexes/Rosetta\"))",
-      "(allow file-read-metadata (literal \"/System/Cryptexes/App\"))",
-      "(allow file-read-metadata (literal \"/System/Cryptexes/OS\"))",
-      "(allow file-read-metadata (literal \"/var\"))",
-      "(allow file-read-data (literal \"/\"))",
-      "(allow file-write-data (literal \"/dev/dtracehelper\"))",
-      "; dtracehelper-Dreifach-Grant (Grammatik aus system.sb:122)",
-      "(allow file-read* file-test-existence file-write-data file-ioctl (literal \"/dev/dtracehelper\"))",
-      "; disk-space-Probe (fstatfs; Grammatik aus system.sb:202)",
-      "(allow system-info (info-type \"vfs.disk-space\"))"
-    ]
-  end
+  # Die validierte Boot-Schicht (Ticket #70) lebt seit Ticket #226 als
+  # Preset in der Library (Seatbelt.Preset.macos_exec_boot/0); die
+  # Begruendung je Regel dort. Der Preset-Kopf ist bewusst asdf-frei —
+  # das llama-Profil uebernimmt die Schicht vollstaendig und der
+  # Profil-Test refutiert "asdf" hart weiter.
 
-  defp asdf_rules(asdf_root_dir) do
+  defp asdf_rules(asdf_root_dir, asdf_bin) do
     if is_binary(asdf_root_dir) do
       shims_root = Path.join([asdf_root_dir, "shims"])
       installs_root = Path.join([asdf_root_dir, "installs"])
@@ -632,26 +585,23 @@ defmodule KomkiCli.Profile do
           "(allow sysctl-read (sysctl-name \"hw.ephemeral_storage\"))",
           "(allow sysctl-read (sysctl-name \"hw.pagesize_compat\"))"
         ],
-        asdf_exec_rules()
+        asdf_exec_rules(asdf_bin)
       )
     else
       []
     end
   end
 
-  # asdf-Binary: zur Generierungszeit entdeckt (find_executable) — keine
-  # hartkodierten Systempfade im Projekt (Portabilitaets-Regel). Zwei Formen
-  # wie im Probe-Beleg: die PATH-Form (Hop) und der Realpath.
-  defp asdf_exec_rules do
-    case System.find_executable("asdf") do
-      nil ->
-        []
+  # asdf-Binary: einmalig in generate/2 entdeckt (find_executable) und
+  # sichtbar durchgereicht — keine hartkodierten Systempfade im Projekt
+  # (Portabilitaets-Regel). Zwei Formen wie im Probe-Beleg: die PATH-Form
+  # (Hop) und der Realpath.
+  defp asdf_exec_rules(nil), do: []
 
-      asdf_path ->
-        asdf_path
-        |> path_forms()
-        |> Enum.flat_map(&asdf_exec_literals/1)
-    end
+  defp asdf_exec_rules(asdf_bin) do
+    asdf_bin
+    |> path_forms()
+    |> Enum.flat_map(&asdf_exec_literals/1)
   end
 
   # Beide Pfadformen: die PATH-Form, wie der Aufrufer sie nutzt, plus der
@@ -667,12 +617,9 @@ defmodule KomkiCli.Profile do
   end
 
   # Metadaten-Pfad(e) der asdf-Binary: entdeckt statt hartkodiert.
-  defp asdf_binary_paths do
-    case System.find_executable("asdf") do
-      nil -> []
-      path -> [Config.canonical(path)]
-    end
-  end
+  defp asdf_binary_paths(nil), do: []
+
+  defp asdf_binary_paths(asdf_bin), do: [Config.canonical(asdf_bin)]
 
   defp node_boot_rules(pi_pkg, node_modules_root, user_home) do
     Kernel.++(
