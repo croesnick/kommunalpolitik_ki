@@ -50,7 +50,7 @@ defmodule KomkiConnectorVault.ConnectorTest do
 
   describe "ping" do
     test "liefert Fassung und Operationen aus dem Manifest", %{sock: sock} do
-      assert {:ok, %{"fassung" => "komki-vault/1", "ops" => ["read", "search", "write_test"]}} =
+      assert {:ok, %{"version" => "komki-vault/1", "ops" => ["read", "search", "write_test"]}} =
                call(sock, "ping", %{})
     end
   end

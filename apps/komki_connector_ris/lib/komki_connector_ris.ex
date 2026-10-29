@@ -51,7 +51,7 @@ defmodule KomkiConnectorRis do
   def defaults, do: @defaults
 
   @impl true
-  def manifest, do: Manifest.fetch!("ris")
+  def manifest, do: Manifest.sidecar!("ris")
 
   @impl true
   def init(opts) do

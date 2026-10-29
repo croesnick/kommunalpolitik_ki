@@ -41,7 +41,7 @@ defmodule KomkiConnectorWeb.Connector do
   def default_base_url, do: @default_base_url
 
   @impl true
-  def manifest, do: KomkiConnector.Manifest.fetch!("web")
+  def manifest, do: KomkiConnector.Manifest.sidecar!("web")
 
   @doc """
   Init-Argument: Map mit `:credentials` (von stdin), optional `:proxy`,

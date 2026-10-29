@@ -19,7 +19,7 @@ defmodule KomkiConnectorDocuments do
   @max_bytes 1_048_576
 
   @impl true
-  def manifest, do: KomkiConnector.Manifest.fetch!("documents")
+  def manifest, do: KomkiConnector.Manifest.sidecar!("documents")
 
   @impl true
   def init(dir) when is_binary(dir) do

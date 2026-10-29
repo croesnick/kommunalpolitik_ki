@@ -85,8 +85,9 @@ macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge.
   (`KomkiConnector.Text.describe/1`, deutsche Implementierung des `Sidecar.Texts`-Verhaltens), sodass
   kein Freitext eines Connectors am Gate 2 vorbei in den Modellkontext gelangt. Der Connector schreibt
   seinen `detail` in sein Log.
-- Reservierte Operation `ping` (ohne Parameter) liefert `{"fassung": "<fassung-id>", "ops": [...]}`. Sie
-  dient `komki doctor` und ist **kein** MCP-Tool.
+- Reservierte Operation `ping` (ohne Parameter) liefert `{"version": "<fassung-id>", "ops": [...]}`. Sie
+  dient `komki doctor` und ist **kein** MCP-Tool. Der Schlüssel heißt `version`, weil die Library englisch
+  spricht; der Wert ist die Fassung des Manifests (`KomkiConnector.Manifest.sidecar!/1` übersetzt).
 - Timeout auf Vermittler-Seite: 15 s je Aufruf, danach `upstream-timeout`.
 - Implementierung: die Library-App `apps/sidecar` (`Sidecar.Frame`, `Sidecar.Client`, `Sidecar.Server`,
   `Sidecar.Token`, `Sidecar.Params`, `Sidecar.Peer`), extrahiert aus `komki_connector` (Ticket #225).

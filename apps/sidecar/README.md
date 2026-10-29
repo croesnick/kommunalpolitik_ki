@@ -51,7 +51,7 @@ defmodule MySidecar do
   @impl true
   def manifest do
     %{
-      fassung: "my-sidecar/1",
+      version: "my-sidecar/1",
       ops: %{
         "search" => %{
           params: %{"text" => %{type: :string, max: 200, required: true}},
@@ -86,7 +86,8 @@ Sidecar.Client.call(socket_path, call_id, "search", %{"text" => "hello"})
 ```
 
 The reserved operation `ping` is answered by the server itself, from the
-manifest: it reports the manifest's `fassung` and its operation names.
+manifest: it reports the manifest's `version` and its operation names:
+`{"version" => "my-sidecar/1", "ops" => ["search"]}`.
 
 ## Texts
 
@@ -94,9 +95,8 @@ Every string that a caller may surface to its own users — the fixed text per
 error code, transport failure details, parameter-validation details — comes
 from a `Sidecar.Texts` module. The library ships English defaults; pass your
 own implementation to `Sidecar.Client.call/6` (`texts:` option) and
-`Sidecar.Params.check/3` (third argument) to control the language of those texts. The wire
-`"fassung"` key of `ping` is historical protocol vocabulary and stays as-is
-for compatibility.
+`Sidecar.Params.check/3` (third argument) to control the language of those
+texts.
 
 ## Options
 

@@ -22,7 +22,7 @@ defmodule KomkiConnectorVault do
   @max_results 20
 
   @impl true
-  def manifest, do: Manifest.fetch!("vault")
+  def manifest, do: Manifest.sidecar!("vault")
 
   @impl true
   def init(vault_dir) when is_binary(vault_dir) do

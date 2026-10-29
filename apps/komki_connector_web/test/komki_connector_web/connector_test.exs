@@ -145,7 +145,7 @@ defmodule KomkiConnectorWeb.ConnectorTest do
 
     assert {:error, %{"code" => "credential-missing"}} = search(path, %{"query" => "x"})
 
-    assert {:ok, %{"fassung" => "komki-web/1", "ops" => ["search"]}} =
+    assert {:ok, %{"version" => "komki-web/1", "ops" => ["search"]}} =
              Client.call(path, "c", "ping", %{})
 
     refute_received {:mock_request, _}

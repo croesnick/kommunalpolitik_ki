@@ -150,7 +150,7 @@ defmodule KomkiConnectorRisTest do
     end
 
     test "ping meldet die Fassung", %{path: path} do
-      assert {:ok, %{"fassung" => "komki-ris/1", "ops" => ["search", "show"]}} =
+      assert {:ok, %{"version" => "komki-ris/1", "ops" => ["search", "show"]}} =
                Client.call(path, "c", "ping", %{})
     end
 

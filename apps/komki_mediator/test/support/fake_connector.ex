@@ -47,7 +47,7 @@ defmodule KomkiMediator.FakeConnector do
   defmodule Documents do
     @moduledoc false
     @behaviour Sidecar.Server
-    def manifest, do: Manifest.fetch!("documents")
+    def manifest, do: Manifest.sidecar!("documents")
     def init(arg), do: {:ok, arg}
 
     def handle_op(op, params, context, state),
@@ -57,7 +57,7 @@ defmodule KomkiMediator.FakeConnector do
   defmodule Ris do
     @moduledoc false
     @behaviour Sidecar.Server
-    def manifest, do: Manifest.fetch!("ris")
+    def manifest, do: Manifest.sidecar!("ris")
     def init(arg), do: {:ok, arg}
 
     def handle_op(op, params, context, state),
@@ -67,7 +67,7 @@ defmodule KomkiMediator.FakeConnector do
   defmodule Web do
     @moduledoc false
     @behaviour Sidecar.Server
-    def manifest, do: Manifest.fetch!("web")
+    def manifest, do: Manifest.sidecar!("web")
     def init(arg), do: {:ok, arg}
 
     def handle_op(op, params, context, state),
@@ -77,7 +77,7 @@ defmodule KomkiMediator.FakeConnector do
   defmodule Vault do
     @moduledoc false
     @behaviour Sidecar.Server
-    def manifest, do: Manifest.fetch!("vault")
+    def manifest, do: Manifest.sidecar!("vault")
     def init(arg), do: {:ok, arg}
 
     def handle_op(op, params, context, state),

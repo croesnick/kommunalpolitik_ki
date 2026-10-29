@@ -51,7 +51,7 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
   end
 
   test "ping meldet die Fassung", %{socket: socket} do
-    assert {:ok, %{"fassung" => "komki-documents/1", "ops" => ["read"]}} =
+    assert {:ok, %{"version" => "komki-documents/1", "ops" => ["read"]}} =
              Client.call(socket, "c5", "ping", %{})
   end
 end

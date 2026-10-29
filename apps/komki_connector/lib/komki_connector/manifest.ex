@@ -40,6 +40,17 @@ defmodule KomkiConnector.Manifest do
   @spec all() :: [t()]
   def all, do: Enum.map(@ids, &fetch!/1)
 
+  @doc """
+  Das Manifest als `Sidecar.Server.manifest()`: unveraendert, plus
+  `version` = Fassung. Die Library spricht englisch (`version`, auch im
+  `ping`), komki bleibt bei der Fassung; uebersetzt wird nur hier.
+  """
+  @spec sidecar!(String.t()) :: Sidecar.Server.manifest()
+  def sidecar!(id) do
+    manifest = fetch!(id)
+    Map.put(manifest, :version, manifest.fassung)
+  end
+
   @doc "Manifest zu einer ID; unbekannte ID ist ein Programmierfehler."
   @spec fetch!(String.t()) :: t()
   # Raumdokumente (Ticket #169): nur der Vollzug von admit_document. Die

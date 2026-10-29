@@ -436,11 +436,11 @@ defmodule KomkiCli.Connectors do
     call_id = "komki-cli-ping-" <> Integer.to_string(System.unique_integer([:positive]))
 
     case Client.call(socket, call_id, "ping", %{}, %{}, timeout: 3_000, texts: Text) do
-      {:ok, %{"fassung" => fassung} = result} when fassung == manifest.fassung ->
+      {:ok, %{"version" => fassung} = result} when fassung == manifest.fassung ->
         {:ok, result}
 
       {:ok, result} ->
-        {:error, "ping: falsche Fassung " <> Kernel.inspect(result["fassung"])}
+        {:error, "ping: falsche Fassung " <> Kernel.inspect(result["version"])}
 
       {:error, %{"code" => code, "detail" => detail}} ->
         {:error, "ping: " <> code <> " " <> detail}

@@ -47,12 +47,12 @@ defmodule Sidecar.Server do
   @type op_spec :: %{required(:params) => Params.schema(), optional(atom()) => term()}
 
   @typedoc """
-  The sidecar's manifest as data: a `fassung` label and the operations
-  with their schemas. Hosts pass their own (richer) manifest maps —
+  The sidecar's manifest as data: a `version` label (e.g. `"my-sidecar/1"`,
+  reported by `ping`) and the operations with their schemas. Hosts pass their own (richer) manifest maps —
   this library reads only what it names here.
   """
   @type manifest :: %{
-          required(:fassung) => String.t(),
+          required(:version) => String.t(),
           required(:ops) => %{(op :: String.t()) => op_spec()},
           optional(atom()) => term()
         }
@@ -117,7 +117,7 @@ defmodule Sidecar.Server do
          {:ok, listener} <- listen(socket_path) do
       peer = expected_uid(peer, socket_path)
       manifest = module.manifest()
-      Logger.info("sidecar #{manifest.fassung} listening on #{socket_path}")
+      Logger.info("sidecar #{manifest.version} listening on #{socket_path}")
       accept_loop(listener, module, state, token, peer: peer)
     end
   end
@@ -304,7 +304,7 @@ defmodule Sidecar.Server do
   defp dispatch(module, call_id, "ping", _params, _context, _state) do
     manifest = module.manifest()
 
-    Frame.ok(call_id, %{"fassung" => manifest.fassung, "ops" => Enum.sort(Map.keys(manifest.ops))})
+    Frame.ok(call_id, %{"version" => manifest.version, "ops" => Enum.sort(Map.keys(manifest.ops))})
   end
 
   defp dispatch(module, call_id, op, params, context, state) do
@@ -351,7 +351,7 @@ defmodule Sidecar.Server do
         else: get_in(reply, ["error", "code"]) <> " detail=" <> inspect(reply["error"]["detail"])
 
     Logger.info(
-      "sidecar=#{module.manifest().fassung} call=#{reply["call_id"]} outcome=#{outcome} ms=#{ms}"
+      "sidecar=#{module.manifest().version} call=#{reply["call_id"]} outcome=#{outcome} ms=#{ms}"
     )
   end
 

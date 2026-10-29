@@ -11,6 +11,18 @@ defmodule KomkiConnector.ManifestTest do
   alias KomkiConnector.Manifest
   alias Sidecar.Params
 
+  test "sidecar!/1: unveraendertes Manifest plus version = Fassung" do
+    # Kein Vergleich der ganzen Maps: getrennt kompilierte Regexe in den
+    # Schemas sind unter OTP 28 nie gleich.
+    for id <- Manifest.ids() do
+      manifest = Manifest.fetch!(id)
+      sidecar = Manifest.sidecar!(id)
+      assert sidecar.version == manifest.fassung
+      assert Map.keys(Map.delete(sidecar, :version)) == Map.keys(manifest)
+      assert Map.keys(sidecar.ops) == Map.keys(manifest.ops)
+    end
+  end
+
   test "Tools: eindeutig, by_tool, keine URL- oder Host-Parameter" do
     tools = Manifest.tools()
     assert tools == Enum.uniq(tools)
