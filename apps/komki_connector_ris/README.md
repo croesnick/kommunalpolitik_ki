@@ -74,7 +74,83 @@ Seine Daten enthalten öffentliche und nicht-öffentliche TOPs. „Bahnhofstraß
 geschützten Sitzungsteil. Damit lässt sich prüfen, dass die Trefferzahl nichts verrät. TOP `1001-3`
 trägt eine Prompt-Injection im öffentlichen Text für Red-Team-Tests. Anders als die echte Gast-API
 liefert der Mock auch nicht-öffentliche TOPs samt Text aus, damit der Filter des Connectors geprüft
-wird. Modus `error500` antwortet immer mit HTTP 500, `slow` antwortet erst nach 3 s.
+wird. Modus `error500` antwortet immer mit HTTP 500, `slow` antwortet erst nach 3 s, `replay` spielt
+Aufzeichnungen des Recorders zurück (siehe unten).
+
+## Aufzeichnung und Replay echter Antwortformate
+
+Die Daten des Mocks sind handgespiegelt. Um die Antwortformate gegen das echte RIS zu verifizieren
+und komki ohne echtes RIS testen zu können, gibt es einen Aufzeichnungs-Proxy
+(`priv/ris_recorder.exs`, Ticket #231). Er ist rein deterministischer Code ohne LLM.
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_recorder.exs --port 4020 \
+  [--upstream https://risapi1.komuna.net/web/] [--out <verzeichnis>]
+```
+
+Der Proxy reicht Anfragen 1:1 an das echte RIS weiter und schreibt jeden Austausch als Kassette
+(JSON, Body base64). Kassette heißt hier: eine aufgezeichnete Anfrage samt Antwort, wie bei VCR
+oder ExVCR.
+
+**Die Kassetten enthalten echte, auch nicht-öffentliche Inhalte.** Deshalb gilt:
+
+- Sie liegen nie im Repo-Baum. Standard ist `~/.local/share/kommunalpolitik_ki/ris-cassettes/<zeitstempel>/`;
+  ein `--out` innerhalb eines Git-Repos (auch eines Worktrees) weist der Recorder ab. So kann kein
+  Werkzeug, das im Repo arbeitet, die Aufzeichnungen nebenbei lesen.
+- Verzeichnis und Dateien sind nur für den Eigentümer lesbar (`0700`/`0600`).
+- Geschwärzt wird beim Schreiben (`"<redacted>"`): die Kopfzeilen `authorization`, `cookie` und
+  `set-cookie`; beim Login (`auth`) jeder Wert in Anfrage und Antwort, auch in Feldern, die
+  niemand vorhergesehen hat (die Struktur bleibt); sonst die Felder `token`/`access_token`/`jwt`.
+  Client und Upstream erhalten alles ungeschwärzt, nur die Datei ist geschwärzt.
+
+Gegen den Recorder aufzeichnen:
+
+- komki: `"ris_mock_port": 4020` in komkis `config.json`. Loopback gilt als Mock, der
+  Egress-Proxy bleibt aus.
+- `ratsinfo`: `RIS_BASE_URL=http://127.0.0.1:4020/` (ohne `/web/`; der Proxy ergänzt den Präfix
+  upstream-seitig). `ratsinfo` nimmt hier nur Loopback-Adressen an, weil an diese Adresse auch die
+  Zugangsdaten gehen.
+
+Zurückspielen, sodass komki gegen die Aufzeichnung statt gegen das echte RIS läuft:
+
+```bash
+elixir apps/komki_connector_ris/priv/mock_ris.exs --port 4010 --mode replay --cassette <verzeichnis>
+```
+
+Replay sucht den exakten Treffer für `(Methode, Pfad, Query)`. Nur bei `guestmeetings`, wo die Query
+lediglich das Zeitfenster wählt, greift es bei abweichender Query auf die erste Aufnahme desselben
+Pfads zurück. Überall sonst, etwa bei `fulltextsearch` mit anderem Suchbegriff, gibt es 404 statt
+der Antwort auf eine andere Frage. Nicht Aufgezeichnetes antwortet ebenfalls mit 404.
+
+### Was der Recorder erfasst
+
+Er ist ein transparenter Proxy: Kassette wird, was die Clients wirklich abfragen. Das sind Methode,
+Pfad, Query, Kopfzeilen und Body der Anfrage sowie Status, Kopfzeilen und Body der Antwort.
+Binärkörper (PDF-Downloads) stehen bytetreu base64 in der Kassette. gzip fordert er nicht an, damit
+die Kassetten deterministisch bleiben. Grenzen:
+
+- Umleitungen reicht er unverändert an den Client weiter. Zeigt `Location` auf eine absolute
+  Upstream-URL, folgt der Client ihr direkt zum echten RIS, und dieser Hop fehlt in der Aufzeichnung.
+- Chunked Request-Bodies versteht er nicht (kein Client hier sendet sie).
+
+Damit sind alle Endpunkte erfasst, die komki und ratsinfo nutzen:
+
+| Client | Endpunkt | Anmerkung |
+|---|---|---|
+| beide | `guestmeetings`, `guestmeetings/{id}`, `guestagendaitems/{id}` | Gast-API, ohne Anmeldung |
+| ratsinfo | `POST auth` | Login; in der Kassette ist jeder Wert geschwärzt |
+| ratsinfo | `meetings/{id}`, `agendaitems/{id}`, `committees` | authentifiziert |
+| ratsinfo | `fulltextsearch` | Suchterme stehen in der Query und werden mit aufgezeichnet |
+| ratsinfo | `agendaitems/documents/{docId}` | Binär-Download, bytetreu |
+
+Nicht erfasst wird, was kein Client abfragt, denn der Recorder ist passiv. Für vollständige
+Abdeckung eine Aufzeichnungs-Session mit allen Flows fahren und die Suchterme variieren: komki
+`search`/`show` (mehrere Terme, auch nicht-öffentliche Treffer), ratsinfo-Login (Zugangsdaten wie
+üblich aus `RIS_EMAIL`/`RIS_PASSWORD`), Sitzungsliste, TOP-Details, Volltextsuche mit mehreren
+Termen, Anlagen-Downloads, Gremienliste.
+
+Committbare Testdaten entstehen nie aus den Kassetten selbst, sondern aus synthetischen Inhalten im
+echten Format. Format-Extraktion und Generator dafür sind Ticket #232.
 
 ## Grenzen
 

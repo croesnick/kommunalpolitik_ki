@@ -1,4 +1,5 @@
-# Der Mock ist ein eigenstaendiges Skript (auch ausserhalb der Tests
-# startbar) und wird hier nur geladen, nicht gestartet.
+# Mock und Aufzeichnungs-Proxy sind eigenstaendige Skripte (auch ausserhalb
+# der Tests startbar) und werden hier nur geladen.
 Code.require_file("../priv/mock_ris.exs", __DIR__)
+Code.require_file("../priv/ris_recorder.exs", __DIR__)
 ExUnit.start(capture_log: true)
