@@ -38,6 +38,7 @@ const LABELS: Record<string, string> = {
 	"web-oeffentlich@1": "öffentlich",
 	"vault-vertraulich@1": "vertraulich",
 	"doc-oeffentlich@1": "öffentlich",
+	"doc-oeffentlich@2": "öffentlich",
 	"doc-vertraulich@1": "vertraulich",
 };
 
