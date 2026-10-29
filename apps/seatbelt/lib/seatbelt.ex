@@ -1,6 +1,6 @@
 defmodule Seatbelt do
   @moduledoc """
-  Host path helpers and profile file I/O for macOS Seatbelt (sandbox-exec)
+  Host path helpers for macOS Seatbelt (sandbox-exec)
   sandboxes.
 
   Seatbelt rules match kernel-canonical path forms: a rule written in
@@ -48,12 +48,4 @@ defmodule Seatbelt do
   @doc "Erlang root for an `escript` path (`<root>/bin/escript`)."
   @spec erlang_root(String.t()) :: String.t()
   def erlang_root(escript_bin), do: escript_bin |> Path.dirname() |> Path.dirname()
-
-  @doc "Write a profile file, creating its directory (parent of the profile path)."
-  @spec write!(String.t(), String.t()) :: :ok
-  def write!(path, text) do
-    File.mkdir_p!(Path.dirname(path))
-    File.write!(path, text)
-    :ok
-  end
 end

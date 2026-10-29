@@ -428,6 +428,7 @@ defmodule KomkiCli.Profile do
       asdf_rules(asdf_root_dir, asdf_bin) ++
       node_boot_rules(pi_pkg, node_modules_root, user_home) ++
       Preset.tui() ++
+      tty_redirect_rules() ++
       scope_rules(cfg, scratch) ++
       [port_rule, mediator_socket_rule]
   end
@@ -440,6 +441,19 @@ defmodule KomkiCli.Profile do
   # distributed-notification-post bleibt bewusst: ein Kanal zu jedem
   # Prozess des Nutzers; streichen erst nach Messung, ob die pi-TUI ohne
   # die Regel bootet.
+
+  # komki-eigene Ergaenzung zur Terminal-Klasse, darum nicht im Preset.
+  defp tty_redirect_rules do
+    [
+      "; /dev/fd/0-Redirect unter Burrito (Pilot 2026-10-11): Das BEAM-stdout ist",
+      "; dort die Wrapper-Pipe; die Session-Kette leitet stdout auf das lebende",
+      "; stdin-PTY um (Pi.argv_session/3, tty_redirect). Kontextfrei im Profil, damit",
+      "; die Profil-Identitaet nicht vom Laufkontext abhaengt (Einmal-Drift fuer",
+      "; bestehende Instanzen: einmalig 'komki init --force').",
+      "(allow file-read-metadata (literal \"/dev/fd\"))",
+      "(allow file-write* (literal \"/dev/fd/0\"))"
+    ]
+  end
 
   defp basis_and_exec_rules(cfg, node, pi_launcher) do
     tools_fd = Path.join([cfg.pi_home, ".pi", "agent", "bin", "fd"])

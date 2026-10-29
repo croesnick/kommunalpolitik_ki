@@ -57,7 +57,6 @@ defmodule Seatbelt.PresetTest do
     assert "(allow signal (target same-sandbox))" in rules
     assert "(allow sysctl-read (sysctl-name-prefix \"hw.\"))" in rules
     assert "(allow sysctl-read (sysctl-name-prefix \"kern.proc.\"))" in rules
-    assert "(allow file-write* (literal \"/dev/fd/0\"))" in rules
   end
 
   test "tui/0: no unscoped mach-lookup, no network, no allow-default" do
@@ -66,5 +65,7 @@ defmodule Seatbelt.PresetTest do
     refute text =~ "(allow default)"
     refute text =~ "mach-lookup"
     refute text =~ "network-"
+    # stdio plumbing of a specific launcher is caller knowledge
+    refute text =~ "/dev/fd/0"
   end
 end

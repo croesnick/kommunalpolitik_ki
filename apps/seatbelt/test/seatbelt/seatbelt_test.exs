@@ -1,7 +1,7 @@
 defmodule SeatbeltTest do
   @moduledoc """
   Host path helpers: `canonical/1` (kernel view, the load-bearing
-  invariant for every path in a profile), `erlang_root/1`, `write!/2`.
+  invariant for every path in a profile), `erlang_root/1`.
   """
 
   use ExUnit.Case, async: true
@@ -49,13 +49,5 @@ defmodule SeatbeltTest do
 
   test "erlang_root/1: two dirnames of the escript path" do
     assert Seatbelt.erlang_root("/opt/erlang/bin/escript") == "/opt/erlang"
-  end
-
-  test "write!/2: creates the directory and writes the text verbatim" do
-    dir = TestSupport.tmp_area!("write")
-    path = Path.join([dir, "profile", "tool.sb"])
-
-    assert Seatbelt.write!(path, "(version 1)\n(deny default)\n") == :ok
-    assert File.read!(path) == "(version 1)\n(deny default)\n"
   end
 end

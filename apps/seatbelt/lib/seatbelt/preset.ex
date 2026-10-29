@@ -82,7 +82,9 @@ defmodule Seatbelt.Preset do
   Terminal/TUI class: ioctls on real ttys, pseudo-ttys, in-sandbox
   process control, the `hw.*`/`kern.proc.*` sysctl prefixes (version
   robust: new OS versions read new fields — the zsh 5.9 regression
-  class on darwin25+) and the `/dev/fd` redirect pair.
+  class on darwin25+). Launcher-specific stdio plumbing (e.g. redirecting
+  stdout onto a pty via `/dev/fd/0`) is caller knowledge and not part of
+  this class.
   """
   @spec tui() :: [String.t()]
   def tui do
@@ -99,13 +101,7 @@ defmodule Seatbelt.Preset do
       "(allow ipc-posix-sem)",
       "; hw.*/kern.proc.* pinned by prefix: new OS versions read new fields",
       "(allow sysctl-read (sysctl-name-prefix \"hw.\"))",
-      "(allow sysctl-read (sysctl-name-prefix \"kern.proc.\"))",
-      "; stdout-to-stdin pty redirect: the session chain redirects stdout onto",
-      "; the live stdin pty. Kept context-free in the profile so its identity",
-      "; does not depend on the run context (one-time drift for existing",
-      "; instances: re-generate profiles with your init command).",
-      "(allow file-read-metadata (literal \"/dev/fd\"))",
-      "(allow file-write* (literal \"/dev/fd/0\"))"
+      "(allow sysctl-read (sysctl-name-prefix \"kern.proc.\"))"
     ]
   end
 end

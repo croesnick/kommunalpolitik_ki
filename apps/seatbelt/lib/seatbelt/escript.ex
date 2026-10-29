@@ -61,14 +61,15 @@ defmodule Seatbelt.Escript do
     [
       "; Burrito single file: the program runs as a wrapper that starts the",
       "; unpacked runtime (Erlang root above)",
-      "(allow process-exec (literal \"" <> wrapper <> "\"))",
+      "(allow process-exec (literal " <> SBPL.quote!(wrapper) <> "))",
       "; the wrapper re-creates its runtime directory on every start (mkdir -p; it exists)",
-      "(allow file-write-create (literal \"" <> root <> "\"))",
+      "(allow file-write-create (literal " <> SBPL.quote!(root) <> "))",
       "; and lists .burrito to find old versions",
-      "(allow file-read* (literal \"" <> Path.dirname(root) <> "\"))",
+      "(allow file-read* (literal " <> SBPL.quote!(Path.dirname(root)) <> "))",
       "; releases/COOKIE is opened read-write but only read from",
-      "; (the roles do not use distributed Erlang)",
-      "(allow file-write-data (literal \"" <> Path.join([root, "releases", "COOKIE"]) <> "\"))"
+      "; (no distributed Erlang inside the sandbox)",
+      "(allow file-write-data (literal " <>
+        SBPL.quote!(Path.join([root, "releases", "COOKIE"])) <> "))"
     ]
   end
 
@@ -76,8 +77,8 @@ defmodule Seatbelt.Escript do
     [
       "; Erlang runtime chain: escript -> erl (sh) -> erlexec -> beam.smp -> erl_child_setup",
       "(allow process-fork)",
-      "(allow process-exec (subpath \"" <> root <> "\"))",
-      "(allow file-read* (subpath \"" <> root <> "\"))",
+      "(allow process-exec (subpath " <> SBPL.quote!(root) <> "))",
+      SBPL.read_subpath(root),
       "; erl is an sh script (dirname/basename); /bin/sh is a variant selector",
       "; that reads /private/var/select/sh and execs /bin/bash",
       ~s{(allow process-exec (literal "/bin/sh") (literal "/bin/bash")} <>
@@ -87,7 +88,7 @@ defmodule Seatbelt.Escript do
       "(allow file-read-metadata (literal \"/private/var/select\"))",
       "(allow file-read* (literal \"/private/var/select/sh\"))",
       "; the Escript itself (zip archive with a shebang; read-only)",
-      "(allow file-read* (literal \"" <> escript_file <> "\"))"
+      "(allow file-read* (literal " <> SBPL.quote!(escript_file) <> "))"
     ]
   end
 

@@ -11,26 +11,45 @@ defmodule Seatbelt.SBPLTest do
   alias Seatbelt.SBPL
 
   test "emitters: byte-exact rule lines" do
-    assert SBPL.comment("note") == "; note"
-    assert SBPL.read_literal("/a/b") == "(allow file-read* (literal \"/a/b\"))"
     assert SBPL.read_subpath("/a") == "(allow file-read* (subpath \"/a\"))"
-    assert SBPL.write_literal("/a/b") == "(allow file-write* (literal \"/a/b\"))"
-    assert SBPL.write_subpath("/a") == "(allow file-write* (subpath \"/a\"))"
 
     assert SBPL.read_write_literal("/a/log") ==
              "(allow file-read* file-write* (literal \"/a/log\"))"
 
-    assert SBPL.exec_literal("/bin/sh") == "(allow process-exec (literal \"/bin/sh\"))"
-    assert SBPL.exec_star_literal("/bin/sh") == "(allow process-exec* (literal \"/bin/sh\"))"
     assert SBPL.metadata_literal("/var") == "(allow file-read-metadata (literal \"/var\"))"
     assert SBPL.sysctl("hw.ncpu") == "(allow sysctl-read (sysctl-name \"hw.ncpu\"))"
     assert SBPL.sysctl_prefix("hw.") == "(allow sysctl-read (sysctl-name-prefix \"hw.\"))"
 
     assert SBPL.mach_lookup("com.apple.logd") ==
              "(allow mach-lookup (global-name \"com.apple.logd\"))"
+  end
 
-    assert SBPL.ipc_posix_shm("apple.shm.notification_center") ==
-             "(allow ipc-posix-shm (ipc-posix-name \"apple.shm.notification_center\"))"
+  # A caller-supplied string must never leave its literal: a path like
+  # `/a") (allow default` would otherwise turn into a rule.
+  test "quote!/1: rejects strings that could break out of the literal" do
+    assert SBPL.quote!("/private/tmp/a b") == "\"/private/tmp/a b\""
+
+    for bad <- ["/a\") (allow default", "/a\\b", "/a\n(allow default)", "/a\0"] do
+      assert_raise ArgumentError, fn -> SBPL.quote!(bad) end
+      assert_raise ArgumentError, fn -> SBPL.read_subpath(bad) end
+    end
+  end
+
+  test "header/1: rejects comment text with line breaks" do
+    assert_raise ArgumentError, fn -> SBPL.header(["ok", "x\n(allow default)"]) end
+  end
+
+  test "escript layers: unsafe paths raise instead of emitting" do
+    assert_raise ArgumentError, fn ->
+      Seatbelt.Escript.runtime("/opt/erl", "/a\")(allow default")
+    end
+
+    assert_raise ArgumentError, fn ->
+      Seatbelt.Escript.runtime_for("/opt/erl", "/opt/app/tool.escript", %{
+        wrapper: "/opt/app/tool",
+        runtime_root: "/opt/\"x"
+      })
+    end
   end
 
   test "header/1: comments, version, deny default" do

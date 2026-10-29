@@ -30,6 +30,10 @@ pieces that usually cost a weekend of denial-log archaeology already in place:
 - Kernel-canonical paths only: the caller resolves every path with
   `Seatbelt.canonical/1` before it enters a profile (Seatbelt rules in
   symlink form do not match).
+- No injection through inputs: every caller-supplied string passes
+  `Seatbelt.SBPL.quote!/1`, which raises on `"`, `\` and control
+  characters, and header comments must not contain line breaks. A path can
+  never close its literal and smuggle in a rule.
 - Fixed inputs → byte-identical output, enforced by goldens and determinism
   tests.
 - All emitted profile text — comments included — is ASCII/English. Comment
