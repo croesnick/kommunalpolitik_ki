@@ -76,6 +76,12 @@ defmodule KomkiPolicy.Stand do
          {:ok, proposal} <- validate_proposal(vorschlag) do
       do_advance(current, proposal)
     else
+      # validate/1 liefert die strukturierte Fehler-Map direkt — sonst krachte
+      # ein schema-ungültiger Stand in WithClauseError (CLI-Exit 4 statt 2);
+      # validate_proposal/1 liefert das Reason-Tupel.
+      {:error, %{} = error} ->
+        {:error, error}
+
       {:error, {code, path, detail}} ->
         {:error, %{code: code, path: path, detail: detail}}
     end
@@ -130,7 +136,7 @@ defmodule KomkiPolicy.Stand do
 
   defp validate_reason(term) do
     with {:ok, _} <- Validations.require_map(term, "$"),
-         :ok <- Validations.require_schema(term, "komki-stand/1"),
+         :ok <- Validations.require_schema(term, "komki-stand/1", :missing_field),
          :ok <- Validations.closed_fields(term, @fields, "$"),
          :ok <- Validations.require_kebab(term["stand_id"], "$.stand_id"),
          :ok <-
@@ -165,10 +171,13 @@ defmodule KomkiPolicy.Stand do
         :ok
 
       {{nonce, _}, _} ->
-        {:error, {:invalid_reference_id, path, "not a kebab-case nonce: " <> nonce}}
+        {:error,
+         {:invalid_reference_id, path, "not a kebab-case nonce: " <> Kernel.inspect(nonce)}}
 
       {_, {_, release_id}} ->
-        {:error, {:invalid_reference_id, path, "not a kebab-case release_id: " <> release_id}}
+        {:error,
+         {:invalid_reference_id, path,
+          "not a kebab-case release_id: " <> Kernel.inspect(release_id)}}
     end
   end
 
@@ -211,17 +220,24 @@ defmodule KomkiPolicy.Stand do
     end
   end
 
-  # Ausgabe-Invariante (#120): `release_id` und `nonce` landen im
-  # fortgeschriebenen `consumed`-Ledger — beide müssen Kebab sein, sonst
-  # validiert `to_record/1` des Ergebnisses nicht als `komki-stand/1`.
-  # `stand_ref`/`call_hash` sind reine Strings; die CAS-Bindung von
-  # `stand_ref`/`stand_version_after` prüft `do_advance/2`.
+  # Intake nach der geschlossenen § 4.6-Form (#120): `release_id` und `nonce`
+  # landen im fortgeschriebenen `consumed`-Ledger (Kebab, sonst verletzt
+  # `to_record/1` des Ergebnisses die Ausgabe-Invariante), `stand_ref` trägt
+  # die `<stand_id>@<version>`-Form (`Registry.reference_id?/1`), `call_hash`
+  # ist SHA-256-Hex und `stand_version_after` eine nicht-negative Ganzzahl.
+  # Die Bindung von `stand_ref`/`stand_version_after` an den aktuellen Stand
+  # prüft `do_advance/2` — hier geht es nur um die Form der Eingabe.
   defp proposal_shape(term) do
     with :ok <- Validations.require_kebab(term["release_id"], "$.release_id"),
          :ok <- Validations.require_kebab(term["nonce"], "$.nonce"),
-         :ok <- require_proposal_string(term["stand_ref"], "$.stand_ref"),
-         :ok <- require_proposal_string(term["call_hash"], "$.call_hash"),
-         :ok <- require_proposal_version_after(term["stand_version_after"]) do
+         :ok <- require_stand_ref(term["stand_ref"]),
+         :ok <- Validations.require_hex64(term["call_hash"], "$.call_hash", :invalid_proposal),
+         :ok <-
+           Validations.require_nonneg_integer(
+             term["stand_version_after"],
+             "$.stand_version_after",
+             :invalid_proposal
+           ) do
       {:ok,
        %{
          release_id: term["release_id"],
@@ -233,21 +249,13 @@ defmodule KomkiPolicy.Stand do
     end
   end
 
-  defp require_proposal_string(value, path) do
-    if is_binary(value) do
-      :ok
-    else
-      {:error, {:invalid_proposal, path, "expected a string, got " <> Kernel.inspect(value)}}
-    end
-  end
-
-  defp require_proposal_version_after(value) do
-    if is_integer(value) and value >= 0 do
+  defp require_stand_ref(value) do
+    if Registry.reference_id?(value) do
       :ok
     else
       {:error,
-       {:invalid_proposal, "$.stand_version_after",
-        "expected a non-negative integer, got " <> Kernel.inspect(value)}}
+       {:invalid_reference_id, "$.stand_ref",
+        "expected <stand_id>@<version>, got " <> Kernel.inspect(value)}}
     end
   end
 

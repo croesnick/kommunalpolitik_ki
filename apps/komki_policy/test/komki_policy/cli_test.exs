@@ -527,7 +527,7 @@ defmodule KomkiPolicy.CLITest do
       "nonce" => "go-nonce-4711-a",
       "stand_ref" => "stand-4711@5",
       "stand_version_after" => 6,
-      "call_hash" => "cafe"
+      "call_hash" => "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
     }
 
     {output, code} = run_advance("case_release_replay/stand.json", proposal)
@@ -545,6 +545,27 @@ defmodule KomkiPolicy.CLITest do
     assert code == 2
     parsed = assert_canonical(output)
     assert parsed["code"] == "usage"
+  end
+
+  test "advance mit schema-ungültigem Stand -> Exit 2 statt Exit 4 (kein Crash-Pfad, #120)" do
+    {permit_output, 0} = run_release_decide("permit")
+    proposal = proposal_from_decision(permit_output)
+
+    bad_stand = Map.delete(fixture("case_release_permit/stand.json"), "schema")
+    stand_path = Path.join(System.tmp_dir!(), "komki-policy-stand-invalid-schema.json")
+    File.write!(stand_path, JSON.canonical(bad_stand))
+
+    proposal_path =
+      Path.join(System.tmp_dir!(), "komki-policy-advance-proposal-invalid-stand.json")
+
+    File.write!(proposal_path, JSON.canonical(proposal))
+
+    {output, code} = CLI.run(["advance", "--stand", stand_path, "--proposal", proposal_path])
+
+    assert code == 2
+    parsed = assert_canonical(output)
+    assert parsed["result"] == "error"
+    assert parsed["code"] == "missing_field"
   end
 
   test "usage-String erwähnt advance und die Freigabe-Flags" do

@@ -76,7 +76,7 @@ defmodule KomkiPolicy.Registry do
   # ---------------------------------------------------------------------
 
   defp validate(term) do
-    with :ok <- Validations.require_schema(term, "komki-registry/2"),
+    with :ok <- Validations.require_schema(term, "komki-registry/2", :invalid_schema),
          :ok <- Validations.closed_fields(term, @registry_fields, "$"),
          :ok <- validate_registry_id(term),
          {:ok, observers} <- validate_observers(term),
@@ -323,8 +323,6 @@ defmodule KomkiPolicy.Registry do
         fail(:invalid_transformations, "$.transformations", "expected an object")
     end
   end
-
-  defp collect_transformations([], _binding_ids, _path), do: {:ok, %{}}
 
   defp collect_transformations(entries, binding_ids, path) do
     Enum.reduce_while(entries, {:ok, %{}}, fn {id, spec}, {:ok, acc} ->

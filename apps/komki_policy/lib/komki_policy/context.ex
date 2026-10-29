@@ -93,7 +93,7 @@ defmodule KomkiPolicy.Context do
          :ok <- Validations.require_kebab(intent["intent_id"], "$.intent_id"),
          :ok <- Validations.require_object_ref(intent["object"], "$.object"),
          :ok <- Validations.require_kebab(intent["workspace"], "$.workspace"),
-         :ok <- require_operation(intent["operation"]) do
+         :ok <- Validations.require_operation(intent["operation"], @known_operations) do
       {:ok,
        %{
          operation: intent["operation"],
@@ -187,14 +187,6 @@ defmodule KomkiPolicy.Context do
         "$.schema",
         "expected " <> schema <> ", got " <> Kernel.inspect(term["schema"])
       )
-
-  defp require_operation(operation) do
-    if operation in @known_operations do
-      :ok
-    else
-      fail(:invalid_operation, "$.operation", "unknown operation: " <> Kernel.inspect(operation))
-    end
-  end
 
   defp require_registry_ref(snapshot, registry) do
     if snapshot["registry_ref"] == registry.registry_id do

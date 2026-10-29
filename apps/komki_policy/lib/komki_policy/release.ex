@@ -38,7 +38,6 @@ defmodule KomkiPolicy.Release do
   ]
   @kinds ["aktionsfreigabe", "offenlegungsfreigabe"]
   @known_operations ["start", "admit", "emit", "transfer", "store"]
-  @hex_re ~r/\A[0-9a-f]{64}\z/
 
   @type t() :: %{
           required(:release_id) => String.t(),
@@ -94,15 +93,16 @@ defmodule KomkiPolicy.Release do
 
   defp validate_reason(term) do
     with {:ok, _} <- Validations.require_map(term, "$"),
-         :ok <- Validations.require_schema(term, "komki-release/1"),
+         :ok <- Validations.require_schema(term, "komki-release/1", :missing_field),
          :ok <- Validations.closed_fields(term, @fields, "$"),
          :ok <- Validations.require_kebab(term["release_id"], "$.release_id"),
          :ok <- require_kind(term["kind"]),
-         :ok <- require_operation(term["operation"]),
+         :ok <- Validations.require_operation(term["operation"], @known_operations),
          :ok <- Validations.require_object_ref(term["object"], "$.object"),
          :ok <- Validations.require_kebab(term["workspace"], "$.workspace"),
-         :ok <- require_hex64(term["content_digest"], "$.content_digest"),
-         :ok <- require_hex64(term["call_hash"], "$.call_hash"),
+         :ok <-
+           Validations.require_hex64(term["content_digest"], "$.content_digest", :invalid_digest),
+         :ok <- Validations.require_hex64(term["call_hash"], "$.call_hash", :invalid_digest),
          :ok <- Validations.require_kebab(term["scope"], "$.scope"),
          :ok <- Validations.require_kebab(term["authority"], "$.authority"),
          :ok <- require_window(term),
@@ -131,22 +131,6 @@ defmodule KomkiPolicy.Release do
     {:error,
      {:invalid_kind, "$.kind",
       "expected one of " <> Kernel.inspect(@kinds) <> ", got " <> Kernel.inspect(value)}}
-  end
-
-  defp require_operation(value) when value in @known_operations, do: :ok
-
-  defp require_operation(value) do
-    {:error, {:invalid_operation, "$.operation", "unknown operation: " <> Kernel.inspect(value)}}
-  end
-
-  defp require_hex64(value, path) do
-    if is_binary(value) and Regex.match?(@hex_re, value) do
-      :ok
-    else
-      {:error,
-       {:invalid_digest, path,
-        "expected a lowercase sha256 hex string (64 hex digits), got " <> Kernel.inspect(value)}}
-    end
   end
 
   defp require_window(term) do

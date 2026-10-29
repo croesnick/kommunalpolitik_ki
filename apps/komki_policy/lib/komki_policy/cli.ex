@@ -261,7 +261,8 @@ defmodule KomkiPolicy.CLI do
     end
   end
 
-  # Unbekanntes Flag MIT Wert: eigenes Detail statt "requires a value".
+  # Unbekanntes Flag — mit oder ohne folgenden Wert: eigenes Detail statt
+  # "requires a value".
   defp collect_opts(["--" <> flag | _rest], _acc, _allowed),
     do: {:error, usage_error("unknown option --" <> flag <> "; " <> @usage)}
 

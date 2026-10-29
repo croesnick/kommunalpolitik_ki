@@ -75,6 +75,12 @@ defmodule KomkiPolicy.ReleaseTest do
 
       assert {:ok, %{operation: "admit"}} = Release.validate(Map.put(base, "operation", "admit"))
     end
+
+    test "fehlendes schema-Feld -> missing_field (Release)" do
+      release = Map.delete(fixture("case_release_permit/release.json"), "schema")
+
+      assert {:error, %{code: :missing_field, path: "$.schema"}} = Release.validate(release)
+    end
   end
 
   # =====================================================================
@@ -147,6 +153,18 @@ defmodule KomkiPolicy.ReleaseTest do
       assert {:error, %{code: :invalid_stand_version}} =
                Stand.validate(Map.put(fixture("case_release_permit/stand.json"), "version", -1))
     end
+
+    test "fehlendes schema-Feld -> missing_field (kein invalid_schema-Drift durch den Dedup)" do
+      stand = Map.delete(fixture("case_release_permit/stand.json"), "schema")
+
+      assert {:error, %{code: :missing_field, path: "$.schema"}} = Stand.validate(stand)
+    end
+
+    test "consumed mit Nicht-String-Schlüssel -> invalid_reference_id statt Crash" do
+      stand = Map.put(fixture("case_release_permit/stand.json"), "consumed", %{123 => "go-x"})
+
+      assert {:error, %{code: :invalid_reference_id, path: "$.consumed"}} = Stand.validate(stand)
+    end
   end
 
   describe "advance (§ 2.7, Compare-and-Swap über die Version)" do
@@ -156,7 +174,13 @@ defmodule KomkiPolicy.ReleaseTest do
       {:ok, next} =
         Stand.advance(
           stand,
-          proposal("go-ausgabe-4711", "go-nonce-4711-a", "stand-4711@5", 6, "cafe")
+          proposal(
+            "go-ausgabe-4711",
+            "go-nonce-4711-a",
+            "stand-4711@5",
+            6,
+            "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+          )
         )
 
       assert next.version == 6
@@ -166,7 +190,15 @@ defmodule KomkiPolicy.ReleaseTest do
 
     test "CAS: zweiter Commit desselben GOs gegen stand@v+1 wird refused (stand_version_conflict)" do
       stand = fixture("case_release_permit/stand.json")
-      p = proposal("go-ausgabe-4711", "go-nonce-4711-a", "stand-4711@5", 6, "cafe")
+
+      p =
+        proposal(
+          "go-ausgabe-4711",
+          "go-nonce-4711-a",
+          "stand-4711@5",
+          6,
+          "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+        )
 
       {:ok, next} = Stand.advance(stand, p)
       next_record = Stand.to_record(next)
@@ -187,7 +219,13 @@ defmodule KomkiPolicy.ReleaseTest do
       assert {:refused, %{code: :nonce_already_consumed}} =
                Stand.advance(
                  stand,
-                 proposal("go-ausgabe-4711", "go-nonce-4711-a", "stand-4711@5", 6, "cafe")
+                 proposal(
+                   "go-ausgabe-4711",
+                   "go-nonce-4711-a",
+                   "stand-4711@5",
+                   6,
+                   "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+                 )
                )
     end
 
@@ -197,7 +235,13 @@ defmodule KomkiPolicy.ReleaseTest do
       assert {:refused, %{code: :stand_version_conflict}} =
                Stand.advance(
                  stand,
-                 proposal("go-ausgabe-4711", "go-nonce-4711-a", "phantom@7", 8, "cafe")
+                 proposal(
+                   "go-ausgabe-4711",
+                   "go-nonce-4711-a",
+                   "phantom@7",
+                   8,
+                   "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+                 )
                )
     end
 
@@ -210,7 +254,13 @@ defmodule KomkiPolicy.ReleaseTest do
       assert {:error, %{code: :invalid_reference_id, path: "$.nonce"}} =
                Stand.advance(
                  stand,
-                 proposal("go-ausgabe-4711", "Nonce_Falsch_1", "stand-4711@5", 6, "cafe")
+                 proposal(
+                   "go-ausgabe-4711",
+                   "Nonce_Falsch_1",
+                   "stand-4711@5",
+                   6,
+                   "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+                 )
                )
     end
 
@@ -220,7 +270,13 @@ defmodule KomkiPolicy.ReleaseTest do
       assert {:error, %{code: :invalid_reference_id, path: "$.release_id"}} =
                Stand.advance(
                  stand,
-                 proposal("GO_FALSCH_1", "go-nonce-4711-a", "stand-4711@5", 6, "cafe")
+                 proposal(
+                   "GO_FALSCH_1",
+                   "go-nonce-4711-a",
+                   "stand-4711@5",
+                   6,
+                   "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+                 )
                )
     end
 
@@ -230,7 +286,13 @@ defmodule KomkiPolicy.ReleaseTest do
       assert {:refused, %{code: :stand_version_conflict}} =
                Stand.advance(
                  stand,
-                 proposal("go-ausgabe-4711", "go-nonce-4711-a", "stand-4711@5", 7, "cafe")
+                 proposal(
+                   "go-ausgabe-4711",
+                   "go-nonce-4711-a",
+                   "stand-4711@5",
+                   7,
+                   "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+                 )
                )
     end
 
@@ -240,10 +302,58 @@ defmodule KomkiPolicy.ReleaseTest do
       {:ok, next} =
         Stand.advance(
           stand,
-          proposal("go-ausgabe-4711", "go-nonce-4711-a", "stand-4711@5", 6, "cafe")
+          proposal(
+            "go-ausgabe-4711",
+            "go-nonce-4711-a",
+            "stand-4711@5",
+            6,
+            "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+          )
         )
 
       assert {:ok, ^next} = Stand.validate(Stand.to_record(next))
+    end
+
+    test "schema-ungültiger Stand -> strukturierter Eingabefehler statt WithClauseError-Crash" do
+      stand = Map.delete(fixture("case_release_permit/stand.json"), "schema")
+
+      assert {:error, %{code: :missing_field}} =
+               Stand.advance(
+                 stand,
+                 proposal(
+                   "go-ausgabe-4711",
+                   "go-nonce-4711-a",
+                   "stand-4711@5",
+                   6,
+                   "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+                 )
+               )
+    end
+
+    test "stand_ref ohne <stand_id>@<version>-Form -> invalid_reference_id (Eingabefehler, kein CAS-Replay)" do
+      stand = fixture("case_release_permit/stand.json")
+
+      assert {:error, %{code: :invalid_reference_id, path: "$.stand_ref"}} =
+               Stand.advance(
+                 stand,
+                 proposal(
+                   "go-ausgabe-4711",
+                   "go-nonce-4711-a",
+                   "ohne-at-zeichen",
+                   6,
+                   "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+                 )
+               )
+    end
+
+    test "call_hash ohne Hex64-Form -> invalid_proposal (§ 4.6-Form, kein Commit)" do
+      stand = fixture("case_release_permit/stand.json")
+
+      assert {:error, %{code: :invalid_proposal, path: "$.call_hash"}} =
+               Stand.advance(
+                 stand,
+                 proposal("go-ausgabe-4711", "go-nonce-4711-a", "stand-4711@5", 6, "zu-kurz")
+               )
     end
 
     test "unvollständige/übertypische Proposal-Form -> invalid_proposal (Eingabefehler)" do
@@ -259,9 +369,18 @@ defmodule KomkiPolicy.ReleaseTest do
       stand = fixture("case_release_permit/stand.json")
 
       proposal =
-        Map.merge(proposal("go-ausgabe-4711", "go-nonce-4711-a", "stand-4711@5", 6, "cafe"), %{
-          "kommentar" => "unbekanntes Extra-Feld"
-        })
+        Map.merge(
+          proposal(
+            "go-ausgabe-4711",
+            "go-nonce-4711-a",
+            "stand-4711@5",
+            6,
+            "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+          ),
+          %{
+            "kommentar" => "unbekanntes Extra-Feld"
+          }
+        )
 
       assert {:error, %{code: :unknown_field, path: "$.kommentar"}} =
                Stand.advance(stand, proposal)
@@ -269,7 +388,15 @@ defmodule KomkiPolicy.ReleaseTest do
 
     test "advance ist rein: der übergebene Stand bleibt unverändert" do
       stand = fixture("case_release_permit/stand.json")
-      p = proposal("go-ausgabe-4711", "go-nonce-4711-a", "stand-4711@5", 6, "cafe")
+
+      p =
+        proposal(
+          "go-ausgabe-4711",
+          "go-nonce-4711-a",
+          "stand-4711@5",
+          6,
+          "cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe"
+        )
 
       Stand.advance(stand, p)
 
