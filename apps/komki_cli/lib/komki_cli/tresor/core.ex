@@ -6,6 +6,8 @@ defmodule KomkiCli.Tresor.Core do
   weder komki noch den Schluesselbund und ist als Kern eines
   eigenstaendigen Pakets (`enclave_seal`) gedacht; die komki-spezifische
   Programmsuche (neben dem laufenden komki) lebt im Adapter `KomkiCli.Tresor`.
+  Der Programmname `komki-tresor` und die Fehlertexte werden erst beim
+  Herausloesen umbenannt; das Siegel-Praefix `ktv1.` bleibt (Format-Label).
 
   Der private Schluessel verlaesst die Enclave nie; im Siegel steht nur seine
   von der Enclave verschluesselte Form. Klartext geht nur ueber stdin hinein
@@ -72,8 +74,9 @@ defmodule KomkiCli.Tresor.Core do
   end
 
   @doc """
-  Secure-Enclave-Verfuegbarkeit pruefen (`check`-Subkommando). stderr bleibt
-  beim Terminal (Meldungen ohne Werte), stdout wird nicht benutzt.
+  Secure-Enclave-Verfuegbarkeit pruefen (`check`-Subkommando). Die Ausgabe
+  (stdout und stderr) wird verworfen, nur der Exit-Code zaehlt. `command`
+  muss existieren; die Suche ist Sache des Aufrufers (`binary/1`).
   """
   @spec check(String.t()) :: :ok | {:error, :no_enclave | {:failed, integer()}}
   def check(command) do
