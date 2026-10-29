@@ -129,6 +129,15 @@ defmodule KomkiCli.PiTest do
       refute "--prompt-template" in Pi.argv_for(cfg, "/scratch", :text, "hallo")
     end
 
+    test "Raumbild nur in der Session, aus dem pi-Home (Ticket #242)", %{cfg: cfg} do
+      argv = Pi.argv_session(cfg, false)
+      value = Enum.at(argv, Enum.find_index(argv, &(&1 == "--komki-raum")) + 1)
+
+      assert value == KomkiCli.Anzeige.raum_path(cfg)
+      assert String.starts_with?(value, cfg.pi_home)
+      refute "--komki-raum" in Pi.argv_for(cfg, "/scratch", :text, "hallo")
+    end
+
     test "Direktkette ohne sh-Hop; session-dir unter pi-home", %{cfg: cfg} do
       argv = Pi.argv_session(cfg, false)
 

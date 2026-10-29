@@ -1,0 +1,5 @@
+{
+  "args": {},
+  "text": "{\"decision\":\"permit\",\"decision_id\":\"pdr-ea64061e8b46f760710a67867bc38023\",\"documents\":[],\"labels\":[\"ris-oeffentlich@1\",\"web-oeffentlich@1\"],\"payload_hash\":\"sha256:4688206f05f3104b0dbaddc32a7eea6729eb8c98c609261daf06bf0e05c3be0b\"}",
+  "tool": "list_documents"
+}

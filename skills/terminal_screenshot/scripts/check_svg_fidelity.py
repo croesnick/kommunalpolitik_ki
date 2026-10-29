@@ -5,7 +5,7 @@ strukturell per XML-Parser."""
 import sys
 import xml.etree.ElementTree as ET
 
-from render_terminal_svg import collapse_blanks, color_for, parse_line
+from render_terminal_svg import collapse_blanks, color_for, parse_line, set_theme
 
 SVG_NS = "http://www.w3.org/2000/svg"
 NS_TEXT = f"{{{SVG_NS}}}text"
@@ -131,6 +131,7 @@ def check(capture_path, svg_path):
 
 def main() -> None:
     src, svg = sys.argv[1], sys.argv[2]
+    set_theme(sys.argv[3] if len(sys.argv) > 3 else None)
     ok, problems = check(src, svg)
     for problem in problems:
         print(problem)

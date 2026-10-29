@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Render a tmux capture-pane (with ANSI SGR) into a terminal-style SVG.
 
-Usage: render_terminal_svg.py <capture.txt> <out.svg> <title>
+Usage: render_terminal_svg.py <capture.txt> <out.svg> <title> [hell]
 Blank-line runs > 4 are collapsed to 2 (crops empty screen area, keeps content).
+"hell" draws a light terminal (for captures of a light pi theme).
 """
 
 import html
@@ -20,6 +21,27 @@ BASE_FG = "#c9d1d9"
 BG = "#0d1117"
 TITLE_FG = "#6e7681"
 DIM_DEFAULT = "#6e7681"
+BOLD_FG = "#ffffff"
+RULE = "#21262d"
+
+# Light terminal: default colors for text without an explicit SGR color.
+LIGHT = {
+    "BASE_FG": "#1f2328",
+    "BG": "#ffffff",
+    "TITLE_FG": "#6e7781",
+    "DIM_DEFAULT": "#6e7781",
+    "BOLD_FG": "#1f2328",
+    "RULE": "#d0d7de",
+}
+
+
+def set_theme(name):
+    """Switch the default colors; renderer and fidelity check share them."""
+    if name == "hell":
+        globals().update(LIGHT)
+    elif name is not None:
+        raise SystemExit(f"unknown theme: {name}")
+
 
 XTERM = [
     "#000000",
@@ -154,7 +176,7 @@ def collapse_blanks(lines):
 def color_for(style):
     fg = style["fg"]
     if fg is None:
-        fg = BRIGHT[7] if style["bold"] else (DIM_DEFAULT if style["dim"] else BASE_FG)
+        fg = BOLD_FG if style["bold"] else (DIM_DEFAULT if style["dim"] else BASE_FG)
     return fg
 
 
@@ -164,6 +186,7 @@ def esc(s):
 
 def main():
     src, dst, title = sys.argv[1], sys.argv[2], sys.argv[3]
+    set_theme(sys.argv[4] if len(sys.argv) > 4 else None)
     with open(src, encoding="utf-8") as f:
         raw_lines = f.read().split("\n")
     lines = collapse_blanks(raw_lines)
@@ -186,7 +209,7 @@ def main():
     )
     parts.append(
         f'<line x1="0" y1="{CHROME_H}" x2="{width:.0f}" '
-        f'y2="{CHROME_H}" stroke="#21262d" stroke-width="1"/>'
+        f'y2="{CHROME_H}" stroke="{RULE}" stroke-width="1"/>'
     )
     for i, c in enumerate(["#ff5f57", "#febc2e", "#28c840"]):
         parts.append(f'<circle cx="{18 + i * 22}" cy="17" r="6" fill="{c}"/>')
