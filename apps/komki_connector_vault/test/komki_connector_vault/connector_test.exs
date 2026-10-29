@@ -3,7 +3,7 @@ defmodule KomkiConnectorVault.ConnectorTest do
   # synthetischen Test-Vaults. Symlinks legt erst der Test an (nie im Repo).
   use ExUnit.Case, async: true
 
-  alias KomkiConnector.{Client, Server}
+  alias Sidecar.{Client, Server}
 
   @test_vault Path.expand("../../priv/test-vault", __DIR__)
   @oeff "vault-oeffentlich@1"
@@ -23,9 +23,9 @@ defmodule KomkiConnectorVault.ConnectorTest do
     sock = Path.join(dir, "v.sock")
     {:ok, state} = KomkiConnectorVault.init(vault)
     {:ok, listener} = Server.listen(sock)
-    token = KomkiConnector.Token.provision!(sock)
+    token = Sidecar.Token.provision!(sock)
     pid = spawn(fn -> Server.accept_loop(listener, KomkiConnectorVault, state, token) end)
-    _ = :gen_tcp.controlling_process(listener, pid)
+    _ = :socket.setopt(listener, {:otp, :controlling_process}, pid)
 
     on_exit(fn ->
       Process.exit(pid, :kill)

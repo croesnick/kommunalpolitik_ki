@@ -1,7 +1,7 @@
 defmodule KomkiConnectorDocuments.ConnectorTest do
   use ExUnit.Case, async: true
 
-  alias KomkiConnector.{Client, Server}
+  alias Sidecar.{Client, Server}
 
   setup do
     root = Path.join(System.tmp_dir!(), "kcd-#{System.unique_integer([:positive])}")
@@ -15,9 +15,9 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
     socket = "/tmp/kcd-" <> Integer.to_string(System.unique_integer([:positive])) <> ".sock"
     {:ok, state} = KomkiConnectorDocuments.init(dir)
     {:ok, listener} = Server.listen(socket)
-    token = KomkiConnector.Token.provision!(socket)
+    token = Sidecar.Token.provision!(socket)
     pid = spawn(fn -> Server.accept_loop(listener, KomkiConnectorDocuments, state, token) end)
-    _ = :gen_tcp.controlling_process(listener, pid)
+    _ = :socket.setopt(listener, {:otp, :controlling_process}, pid)
 
     on_exit(fn ->
       Process.exit(pid, :kill)

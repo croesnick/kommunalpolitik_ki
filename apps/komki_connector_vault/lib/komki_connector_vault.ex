@@ -13,7 +13,7 @@ defmodule KomkiConnectorVault do
   Zustand: `%{root: <kanonischer Vault-Root>}`.
   """
 
-  @behaviour KomkiConnector.Server
+  @behaviour Sidecar.Server
 
   alias KomkiConnector.Manifest
   alias KomkiConnectorVault.{Note, Paths, Writer}
@@ -22,7 +22,7 @@ defmodule KomkiConnectorVault do
   @max_results 20
 
   @impl true
-  def manifest_id, do: "vault"
+  def manifest, do: Manifest.fetch!("vault")
 
   @impl true
   def init(vault_dir) when is_binary(vault_dir) do

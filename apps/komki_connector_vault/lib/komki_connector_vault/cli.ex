@@ -9,7 +9,8 @@ defmodule KomkiConnectorVault.CLI do
   auf stderr, ohne Payloads. Bei Fehlern: Meldung auf stderr, Exit 1.
   """
 
-  alias KomkiConnector.Server
+  alias KomkiConnector.Launch
+  alias Sidecar.Server
 
   @spec main([String.t()]) :: no_return()
   def main(argv) do
@@ -17,7 +18,7 @@ defmodule KomkiConnectorVault.CLI do
 
     with {:ok, socket, vault_dir} <- parse(argv),
          {:ok, creds} <- Server.read_credentials() do
-      case Server.run(KomkiConnectorVault, socket, vault_dir, creds) do
+      case Launch.run(KomkiConnectorVault, socket, vault_dir, creds) do
         {:error, reason} -> fail(to_string_reason(reason))
       end
     else

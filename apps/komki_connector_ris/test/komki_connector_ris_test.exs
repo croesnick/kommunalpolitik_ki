@@ -4,8 +4,9 @@ defmodule KomkiConnectorRisTest do
 
   import ExUnit.CaptureLog
 
-  alias KomkiConnector.{Client, Server}
+  alias KomkiConnector.Text
   alias KomkiConnectorRis.MockRis
+  alias Sidecar.{Client, Server}
 
   @search_keys ~w(datum sitzung titel top_id url)
   @show_keys ~w(abrufdatum datum sitzung text titel top_id url)
@@ -19,9 +20,9 @@ defmodule KomkiConnectorRisTest do
 
     {:ok, cfg} = KomkiConnectorRis.init(Map.merge(%{base_url: base_url}, overrides))
     {:ok, listener} = Server.listen(path)
-    token = KomkiConnector.Token.provision!(path)
+    token = Sidecar.Token.provision!(path)
     pid = spawn(fn -> Server.accept_loop(listener, KomkiConnectorRis, cfg, token) end)
-    :ok = :gen_tcp.controlling_process(listener, pid)
+    :ok = :socket.setopt(listener, {:otp, :controlling_process}, pid)
 
     on_exit(fn ->
       Process.exit(pid, :kill)
@@ -32,8 +33,13 @@ defmodule KomkiConnectorRisTest do
     %{path: path, base_url: base_url}
   end
 
-  defp search(path, params), do: Client.call(path, "pdr-s", "search", params)
-  defp show(path, top_id), do: Client.call(path, "pdr-v", "show", %{"top_id" => top_id})
+  # So ruft auch der Vermittler: die deutschen Texte der komki-Seite.
+  defp search(path, params),
+    do: Client.call(path, "pdr-s", "search", params, %{}, texts: Text)
+
+  defp show(path, top_id),
+    do: Client.call(path, "pdr-v", "show", %{"top_id" => top_id}, %{}, texts: Text)
+
   defp ids(%{"results" => results}), do: Enum.map(results, & &1["top_id"])
 
   describe "gegen den Mock" do

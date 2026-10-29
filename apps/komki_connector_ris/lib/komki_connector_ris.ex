@@ -28,8 +28,9 @@ defmodule KomkiConnectorRis do
   Anzahl auf.
   """
 
-  @behaviour KomkiConnector.Server
+  @behaviour Sidecar.Server
 
+  alias KomkiConnector.Manifest
   alias KomkiConnectorRis.{Api, Http, Top}
 
   @defaults %{
@@ -50,7 +51,7 @@ defmodule KomkiConnectorRis do
   def defaults, do: @defaults
 
   @impl true
-  def manifest_id, do: "ris"
+  def manifest, do: Manifest.fetch!("ris")
 
   @impl true
   def init(opts) do

@@ -4,8 +4,8 @@ defmodule KomkiConnectorWeb.ConnectorTest do
 
   import ExUnit.CaptureLog
 
-  alias KomkiConnector.{Client, Server}
   alias KomkiConnectorWeb.{Connector, MockHttp}
+  alias Sidecar.{Client, Server}
 
   @key "BSA-geheim-0123456789abcdef"
 
@@ -40,9 +40,9 @@ defmodule KomkiConnectorWeb.ConnectorTest do
     path = "/tmp/kmw#{System.unique_integer([:positive])}.sock"
     {:ok, state} = Connector.init(init_arg)
     {:ok, listener} = Server.listen(path)
-    token = KomkiConnector.Token.provision!(path)
+    token = Sidecar.Token.provision!(path)
     pid = spawn(fn -> Server.accept_loop(listener, Connector, state, token) end)
-    :ok = :gen_tcp.controlling_process(listener, pid)
+    :ok = :socket.setopt(listener, {:otp, :controlling_process}, pid)
 
     on_exit(fn ->
       Process.exit(pid, :kill)
@@ -226,7 +226,7 @@ defmodule KomkiConnectorWeb.ConnectorTest do
             do: search(path, %{"query" => q})
       end)
 
-    assert log =~ "connector=web"
+    assert log =~ "sidecar=komki-web/1"
     refute log =~ @key
     refute inspect(replies) =~ @key
     assert Enum.count(replies, &match?({:error, _}, &1)) == 6
