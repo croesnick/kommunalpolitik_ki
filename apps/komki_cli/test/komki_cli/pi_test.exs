@@ -109,6 +109,26 @@ defmodule KomkiCli.PiTest do
       end
     end
 
+    test "Vorlagen und Themes nur aus dem pi-Home, Entdeckung bleibt aus (Ticket #244)", %{
+      cfg: cfg
+    } do
+      for continue? <- [false, true] do
+        argv = Pi.argv_session(cfg, continue?)
+        value = fn flag -> Enum.at(argv, Enum.find_index(argv, &(&1 == flag)) + 1) end
+
+        assert "--no-prompt-templates" in argv
+        assert "--no-themes" in argv
+
+        assert value.("--prompt-template") ==
+                 Path.join([cfg.pi_home, ".pi", "agent", "komki-vorlagen"])
+
+        assert value.("--theme") == Path.join([cfg.pi_home, ".pi", "agent", "komki-themes"])
+        assert value.("--use-theme") == "komki-hell/komki-dunkel"
+      end
+
+      refute "--prompt-template" in Pi.argv_for(cfg, "/scratch", :text, "hallo")
+    end
+
     test "Direktkette ohne sh-Hop; session-dir unter pi-home", %{cfg: cfg} do
       argv = Pi.argv_session(cfg, false)
 

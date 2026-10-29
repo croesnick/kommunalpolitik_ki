@@ -285,9 +285,12 @@ defmodule KomkiCli.Pi do
   # Verbindung (pi >= 1.0; Issue #103: kein Pin).
   defp mcp_contract_flags, do: ["--no-extensions", "-e", "builtin:mcp"]
 
-  # Nur in der Session: lesbare Vermittler-Antworten statt Roh-JSON. Die
-  # Extension zeichnet nur (KomkiCli.Anzeige); der Einmal-Lauf hat keine TUI.
-  defp anzeige_flags(cfg), do: ["-e", Anzeige.entry(cfg)]
+  # Nur in der Session: lesbare Vermittler-Antworten statt Roh-JSON, die
+  # Vorlagen für die Ratsarbeit und das komki-Theme (KomkiCli.Anzeige). Die
+  # Extension zeichnet nur; der Einmal-Lauf hat keine TUI. Die expliziten
+  # Pfade laden trotz --no-prompt-templates und --no-themes, entdeckte
+  # Vorlagen und Themes bleiben aus.
+  defp anzeige_flags(cfg), do: Anzeige.flags(cfg)
 
   # Gate-2-Schliessung (Ticket #104, identisch in Session und Einmal-Lauf):
   # pis Built-ins (read, write, ls, find, grep, bash, ...) sind aus; jeder
