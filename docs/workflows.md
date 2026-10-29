@@ -36,7 +36,7 @@ bündelt. Die Sitzungsmappe ist ein Vault-Tool, nicht Teil von ratsprojekte.
 | Querverweis: hängt ein TOP an einem Ratsprojekt? | `ratsinfo search` + `ratsprojekte search_projekte` | ❌ Kein automatischer Link RIS-Sitzung ↔ Ratsprojekt (#32) |
 | AZ-Artikel zum Thema finden | `allgaeuer_zeitung_mcp search_articles` | ✅ |
 | Vault-Notizen zum Thema | `vault_suche` | ✅ |
-| Sitzungsmappe im Vault erstellen | `obsidian-cli` (externer Skill) | ✅ |
+| Sitzungsmappe im Vault erstellen | `obsidian_mcp` (`create_note`) | ✅ |
 
 ### Lücken
 
@@ -57,7 +57,7 @@ Vault-Suche     → obsidian CLI (Text)
                          ↓
            KI komponiert → Markdown + YAML-Frontmatter
                          ↓
-                  obsidian write → Vault-Datei
+           obsidian_mcp: create_note → Vault-Datei
                          ↓
               ⚠ Validierung (Single-Quote-Regel)
 ```
@@ -342,7 +342,7 @@ vorschlägt. Direkt als Vortragsgrundlage nutzbar.
 | TOPs pro Sitzung abrufen | `ratsinfo show <id>` | ✅ |
 | Vault-Notizen zu TOPs sammeln | `obsidian search` / `vault_suche` | ✅ (Fallback: nachfragen falls keine Treffer) |
 | AZ-Artikel (optional, nur Top-Themen) | `allgaeuer_zeitung_mcp` | ✅ |
-| Bericht im Vault persistieren | `obsidian-cli` write | ✅ |
+| Bericht im Vault persistieren | `obsidian_mcp` (`create_note`) | ✅ |
 | YAML-Frontmatter validieren | pyyaml-Check | ✅ (analog sitzungsvorbereitung) |
 
 ### Lücken

@@ -119,7 +119,7 @@ Ohne laufenden `obsidian` CLI legen die Vault-Skills ihre Notizen unter `artifac
 - Der OpenCode-Weg hat die Sicherheitsgrenze von komki nicht. Nichtöffentliche Unterlagen gehören dort nicht hinein.
 - Beschlussnachverfolgung fehlt: ratsprojekte verknüpft Projekte noch nicht mit RIS-Sitzungen und trackt keine Fristen ([#32](https://github.com/croesnick/kommunalpolitik_ki/issues/32), [#33](https://github.com/croesnick/kommunalpolitik_ki/issues/33), [#34](https://github.com/croesnick/kommunalpolitik_ki/issues/34)).
 - Der Projektlebenszyklus ist teils Spezifikation. Im Code erzwungen ist die Proposal-Entscheidung, die übrigen Übergänge sichern bislang die Skills ([docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md)). Value Proposition und Success Metrics sind noch keine harten Gates ([#37](https://github.com/croesnick/kommunalpolitik_ki/issues/37)).
-- `obsidian_mcp` und `ratsinfo_mcp` liegen im Repo, `opencode.json` bindet sie nicht ein. Der Vault-Zugriff läuft über den `obsidian` CLI.
+- `ratsinfo_mcp` liegt im Repo, `opencode.json` bindet es nicht ein (Ratsinfo läuft über die CLI). Vault-Zugriff: Lesen über den `obsidian` CLI, Schreiben über `obsidian_mcp`, das `opencode.json` einbindet (Vault-Pfad aus `OBSIDIAN_VAULT_PATH`).
 - Für Öffentlichkeitsarbeit (Presse, Newsletter) gibt es noch kein Werkzeug.
 
 ## Doku und Verweise

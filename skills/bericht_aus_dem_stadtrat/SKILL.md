@@ -86,6 +86,13 @@ Session.
 > aus `config.local.yml` oder — falls nicht gesetzt — aus der expliziten
 > Antwort der nutzenden Person.
 
+**Schreiben über `obsidian_mcp`:** Das Schreiben läuft über den MCP-Server
+`obsidian_mcp` (bindet `opencode.json` ein). Er braucht den **absoluten
+Pfad** des Vaults in der Umgebungsvariable `OBSIDIAN_VAULT_PATH` — nicht den
+Anzeigenamen. Fehlt sie, die nutzende Person fragen; der Pfad wird nicht
+erraten und nicht gespeichert. Lesen bleibt beim `obsidian`-CLI mit dem
+Vault-Namen aus `config.local.yml`.
+
 ## Arbeitsweise
 
 ### 1. Konfiguration lesen
@@ -230,7 +237,7 @@ lesen. AZ-Artikel sind Belege, nicht Hauptinhalt.
 
 ### 8. Zusammenfassung in den Vault schreiben
 
-Die Berichtsnotiz wird über die `obsidian`-CLI direkt in den Vault
+Die Berichtsnotiz wird über den MCP-Server `obsidian_mcp` in den Vault
 geschrieben. Ziel-Pfad:
 
 ```
@@ -241,30 +248,18 @@ Beispiel: `1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Sta
 
 `<YYYY-MM-DD>` = Datum des anstehenden Termins.
 
-**Ordner sicherstellen** (falls noch nicht vorhanden):
+**Datei schreiben** — ein Aufruf, der Inhalt kommt als Parameter: kein
+Shell-Quoting, keine Newline-Kodierung. Fehlende Ordner legt `create_note`
+selbst an, ein separates Anlegen entfällt:
 
-```bash
-obsidian vault="<vault-name>" eval code="require('fs').mkdirSync('1 - Projects/Stadtrat Buchloe/Berichte', { recursive: true })"
+```
+create_note(path: "1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Stadtrat.md", content: "<vollständiger Inhalt der Berichtsnotiz>")
 ```
 
-**Datei schreiben** — zwei Varianten:
-
-Variante A (Empfehlung, wenn der Inhalt sauber übergeben werden kann):
-
-```bash
-obsidian vault="<vault-name>" create path="1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Stadtrat.md" content="..."
-```
-
-Dabei Newlines im Content als `\n` kodieren.
-
-Variante B (für mehrzeilige Inhalte robuster):
-
-```bash
-obsidian vault="<vault-name>" eval code="app.vault.create('1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Stadtrat.md', `<inhalt-mit-backticks>`)"
-```
-
-Vor dem Schreiben prüfen, ob die Datei bereits existiert — ggf. überschreiben
-(nur nach Bestätigung, siehe GO-Prinzip) oder mit Suffix `_v2` anlegen.
+Vor dem Schreiben prüfen, ob die Datei bereits existiert — `read_note` meldet
+„Notiz nicht gefunden", wenn sie fehlt. Ggf. überschreiben (nur nach
+Bestätigung, siehe GO-Prinzip) oder mit Suffix `_v2` anlegen;
+`create_note` überschreibt Bestehendes ohne Rückfrage.
 
 ### YAML-Frontmatter: Quoting-Regel
 

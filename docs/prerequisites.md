@@ -13,8 +13,11 @@
 
 ## `obsidian` CLI
 
-**Zweck:** Vault-Read (`search`, `read`) und Vault-Write (`create`, `append`,
-`eval`). Obsidian-App muss laufen.
+**Zweck:** Vault-Read (`search`, `read`). Obsidian-App muss laufen.
+Vault-Write läuft nicht mehr über die CLI, sondern über den MCP-Server
+`obsidian_mcp` aus diesem Repo (`opencode.json` bindet ihn ein): `create_note`
+legt fehlende Ordner selbst an und bekommt den Inhalt als Parameter — kein
+Shell-Quoting, keine `\n`-Escapes.
 
 **Install:**
 
@@ -23,24 +26,29 @@ brew install obsidian-cli
 # oder via Obsidian Community Plugin (siehe https://help.obsidian.md/cli)
 ```
 
-**Konfiguration:** Vault-Name in `config.local.yml` (nicht-getrackt, Repo-Root):
+**Konfiguration:** Vault-Name in `config.local.yml` (nicht-getrackt, Repo-Root) — für die CLI:
 
 ```yaml
 obsidian:
   vault: "MeinVaultName"
 ```
 
+Für `obsidian_mcp`: absoluter Vault-Pfad in der Umgebungsvariable
+`OBSIDIAN_VAULT_PATH` (in der Shell setzen; `opencode.json` reicht sie als
+`${OBSIDIAN_VAULT_PATH}` durch). Die Obsidian-App muss dafür nicht laufen.
+
 **Benötigt von:**
 
 | Skill / Workflow | Read | Write | Anmerkung |
 |---|---|---|---|
 | `vault_suche` | ✅ | — | Read-only, kein Vault-Write |
-| `sitzungsvorbereitung` | ✅ | ✅ | Sitzungsmappe im Vault erstellen |
-| `ratsprojekt_proposal` | ✅ | ✅ | Konsolidierte Notiz in Vault schreiben |
-| `foerdermittel_recherche` | — | ✅ | Report an Vault-Notiz anhängen (WF 6, #36) |
+| `sitzungsvorbereitung` | ✅ | ✅ `obsidian_mcp` | Sitzungsmappe über `create_note` |
+| `bericht_aus_dem_stadtrat` | ✅ | ✅ `obsidian_mcp` | Berichtsnotiz über `create_note` |
+| `ratsprojekt_proposal` | ✅ | ✅ (noch CLI) | Konsolidierte Notiz in Vault schreiben |
+| `foerdermittel_recherche` | — | ✅ (noch CLI) | Report an Vault-Notiz anhängen (WF 6, #36) |
 | Bürgeranliegen (geplant, WF 8) | ✅ | ✅ | Anliegen im Vault erfassen |
 
-**Fallback (wenn `obsidian` CLI nicht verfügbar):**
+**Fallback (wenn der Vault nicht erreichbar ist):**
 
 Skills, die Vault-Write benötigen, degradieren gracefully: sie emitieren die
 Notiz als Markdown-Artifact im Verzeichnis `artifacts/vault-staging/`. Die
@@ -48,9 +56,8 @@ nutzende Person kopiert die Datei manuell in den Vault.
 
 **Bekannte Limitierungen:**
 
-- `obsidian create` legt keine Parent-Folder automatisch an. Vorab `fs.mkdirSync(dir, {recursive: true})` via `obsidian eval` aufrufen. Siehe Issue #43.
 - `obsidian read path="..."` ist unzuverlässig bei Pfaden aus `search`-Ergebnissen. Stattdessen `read file="<name>"` (Wikilink-Auflösung) verwenden.
-- `obsidian create path="..." content="..."` ist für kurze Inhalte mit `\n`-Escapes gedacht. Für lange Inhalte (z.B. Sitzungsmappen): `obsidian eval` mit `fs.readFileSync` + `app.vault.create` verwenden.
+- `obsidian create` legt keine Parent-Folder automatisch an und braucht `\n`-Escapes für Newlines — die Schreibwege, die `obsidian_mcp` nutzen, haben beides nicht mehr (#43, #52). Die CLI bleibt für kurze Inhalte und `eval`-Notfälle.
 
 **Skill-Referenz:** `~/.agents/skills/obsidian-cli/SKILL.md` (global installiert,
 nicht im Repo). Dokumentiert alle CLI-Befehle und Syntax.

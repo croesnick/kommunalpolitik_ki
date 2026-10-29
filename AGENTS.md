@@ -195,7 +195,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 
 | Abhängigkeit | Rolle | Verwendung von |
 |---|---|---|
-| `obsidian` CLI | Vault-Read/Write (Obsidian-App muss laufen) | `vault_suche`, `sitzungsvorbereitung`, `ratsprojekt_proposal` |
+| `obsidian` CLI | Vault-Read (`search`, `read`; Obsidian-App muss laufen). Schreiben läuft über `obsidian_mcp` aus dem Repo | `vault_suche`, `sitzungsvorbereitung`, `ratsprojekt_proposal` |
 | `obsidian-cli` Skill | Anleitung für `obsidian` CLI (global installiert unter `~/.agents/skills/obsidian-cli/`) | alle Vault-Workflows |
 | `RENOVATE_TOKEN` (Fine-grained PAT) | Dependency-Updates via self-hosted Renovate (Rechte-Anforderungen: [`docs/prerequisites.md`](docs/prerequisites.md)) | `.github/workflows/renovate.yml` (CI, alle 6 h) |
 | `zig` 0.16.0 + `xz` | komki-Einzeldatei-Binary via Burrito (nur Release-Bau; Versionsprüfung auf Gleichheit) | `apps/komki_cli` (Ticket #75, Details: [`docs/prerequisites.md`](docs/prerequisites.md)) |

@@ -30,6 +30,21 @@
       ],
       "timeout": 300
     },
+    "obsidian_mcp": {
+      "type": "local",
+      "command": [
+        "uv",
+        "run",
+        "--directory",
+        "tools/obsidian_mcp",
+        "python",
+        "-m",
+        "obsidian_mcp"
+      ],
+      "environment": {
+        "OBSIDIAN_VAULT_PATH": "${OBSIDIAN_VAULT_PATH}"
+      }
+    },
     "nextcloud": {
       "type": "local",
       "command": [
