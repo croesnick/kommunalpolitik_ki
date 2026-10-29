@@ -59,6 +59,40 @@ defmodule KomkiCli.GoStepsTest do
              KomkiPolicy.JSON.parse(File.read!(answer_file(dir, ctx.request)))
   end
 
+  # Ticket #217: Auch ein harmlos aussehender Aufruf verrät den Empfängern,
+  # dass und wann aus dem Raum gefragt wird.
+  test "Vorschau nennt Empfaenger und warnt vor dem Existenz-Leck", %{base: base} do
+    File.write!(
+      Path.join([base, "mediator", "registry.json"]),
+      JSON.encode!(KomkiMediator.Templates.registry())
+    )
+
+    GoSteps.run(base, ui(false))
+    assert_received {:said, preview}
+
+    assert preview =~ "Sichtbar für: Brave (Websuche)"
+    assert preview =~ "Schon der Aufruf selbst zeigt Brave (Websuche), dass und wann"
+    assert preview =~ "auch wenn die Parameter harmlos aussehen"
+    assert preview =~ ~r/aussehen\.\n  Ein GO gilt nur/
+  end
+
+  test "Empfaenger je Tool aus Γ; lokale Werkzeuge und fehlendes Γ ohne Warnung" do
+    envs = KomkiMediator.Templates.registry()["environments"]
+
+    assert GoSteps.recipients("web_search", envs) == ["brave-search"]
+    assert GoSteps.recipients("ris_search", envs) == ["ris-betreiber"]
+    assert GoSteps.recipients("vault_read", envs) == []
+    assert GoSteps.recipients("web_search", %{}) == []
+
+    refute GoSteps.describe(%{
+             "decision_id" => "d",
+             "tool" => "x",
+             "params" => %{},
+             "blockers" => []
+           }) =~
+             "Sichtbar"
+  end
+
   test "keine Anfragen" do
     assert {"keine offenen GO-Anfragen\n", 0} = GoSteps.run("/nonexistent", ui(true))
   end
