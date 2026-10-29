@@ -9,7 +9,7 @@ Ein Ticket bekommt die Stufe seiner anspruchsvollsten Teilaufgabe. Im Zweifel gi
 | Label | Kurz | Verlangt | Typische Tickets |
 |---|---|---|---|
 | `ai:s-tier` | Grenze und Urteil | Ändert die Sicherheitsgrenze oder entscheidet über sie (Policy, Γ, Journal, Sandbox-Profile, Zugangsdaten, Connector-Filter) oder trifft eine offene Entwurfsentscheidung über mehrere Apps oder gegen den RFC. Fehler bleiben leicht unbemerkt und wiegen schwer. | #205, #213, #215, #240, #148 |
-| `ai:a-tier` | Feature mit Vertrag | Ein abgegrenztes Feature oder ein Bugfix in ein, zwei Apps, nach vorhandenen Mustern. Die Abnahme braucht einen echten Lauf, nicht nur Tests. Berührt keine geschützten Pfade (unten). | #242, #217, #164, #158, #151 |
+| `ai:a-tier` | Feature mit Vertrag | Ein abgegrenztes Feature oder ein Bugfix in ein, zwei Apps, nach vorhandenen Mustern. Die Abnahme braucht einen echten Lauf, nicht nur Tests. Berührt keine geschützten Pfade (unten). | #242, #262, #164, #158, #151 |
 | `ai:b-tier` | Handwerk | Lokal und eher mechanisch: Doku, Konfiguration, Felder, Python-Tools außerhalb von komki, Umbenennungen. Die Abnahme lässt sich vollständig mit Tests, Lint oder einem kurzen Befehl prüfen. | #172, #37, #43, #53 |
 
 Tickets mit `ready-for-human` brauchen zuerst eine Entscheidung der nutzenden Person. Die Stufe gilt für die Umsetzung danach.
