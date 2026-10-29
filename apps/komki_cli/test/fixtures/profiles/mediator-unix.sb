@@ -2,19 +2,19 @@
 ; nur die Connector-Sockets. Feste Eingaben -> byte-identischer Text.
 (version 1)
 (deny default)
-; Erlang-Runtime: escript -> erl (sh) -> erlexec -> beam.smp -> erl_child_setup
+; Erlang runtime chain: escript -> erl (sh) -> erlexec -> beam.smp -> erl_child_setup
 (allow process-fork)
 (allow process-exec (subpath "/opt/erl"))
 (allow file-read* (subpath "/opt/erl"))
-; erl ist ein sh-Skript (dirname/basename); /bin/sh ist ein Variantenwaehler,
-; der /private/var/select/sh liest und /bin/bash startet
+; erl is an sh script (dirname/basename); /bin/sh is a variant selector
+; that reads /private/var/select/sh and execs /bin/bash
 (allow process-exec (literal "/bin/sh") (literal "/bin/bash") (literal "/usr/bin/dirname") (literal "/usr/bin/basename"))
 (allow file-read* (literal "/bin/sh") (literal "/bin/bash") (literal "/usr/bin/dirname") (literal "/usr/bin/basename"))
 (allow file-read-metadata (literal "/private/var/select"))
 (allow file-read* (literal "/private/var/select/sh"))
-; das Escript selbst (Zip-Archiv mit Shebang; nur lesen)
+; the Escript itself (zip archive with a shebang; read-only)
 (allow file-read* (literal "/opt/komki/bin/komki-mediator"))
-; Boot-Schicht (macOS 27.2: ohne sie SIGABRT rc=134 beim exec)
+; Boot layer (macOS 27.2: without it every exec dies with SIGABRT rc=134)
 (allow file-read* (subpath "/System/Library"))
 (allow file-read* (subpath "/usr/lib"))
 (allow file-read* (subpath "/System/Volumes/Preboot"))
@@ -29,7 +29,7 @@
 (allow file-read-data (literal "/"))
 (allow file-read* file-test-existence file-write-data file-ioctl (literal "/dev/dtracehelper"))
 (allow system-info (info-type "vfs.disk-space"))
-; BEAM-Initialisierung: CPU-/OS-Sonden, Benutzerauflösung, Zeitzone, Protokolle
+; BEAM initialization: CPU/OS probes, user resolution, timezone, protocols
 (allow sysctl-read (sysctl-name "kern.bootargs"))
 (allow sysctl-read (sysctl-name "kern.hostname"))
 (allow sysctl-read (sysctl-name "kern.iossupportversion"))
@@ -48,10 +48,10 @@
 (allow file-read* (literal "/private/etc/localtime"))
 (allow file-read* (subpath "/private/var/db/timezone"))
 (allow file-read* (literal "/private/etc/protocols"))
-; erl_child_setup schliesst geerbte Deskriptoren ueber /dev/fd
+; erl_child_setup closes inherited descriptors via /dev/fd
 (allow file-read-data (literal "/dev/fd"))
 (allow file-read-data (literal "/dev/autofs_nowait"))
-; Log (stderr-Redirect; Write-Scope genau diese Datei)
+; Log (stderr redirect; write scope is exactly this file)
 (allow file-read* file-write* (literal "/opt/komki-golden/tmp/mediator.log"))
 ; Raum lesen (registry.json, room.json). Die Dokumente liest der
 ; Dokument-Connector (Ticket #169); hier nur Metadaten fuer die

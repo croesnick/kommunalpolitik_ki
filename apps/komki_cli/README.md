@@ -340,6 +340,15 @@ nicht über einen TCP-Port:
 
 ### Egress, Connectoren und Vermittler-Profil (Tickets #146, #137)
 
+Die Grundschichten der Profile (Escript: exec-Kette, Boot-Schicht,
+BEAM-Initialisierung, Log; pi und llama: Boot-Schicht, Terminal-Klasse)
+kommen seit #226 aus der Library [`apps/seatbelt`](../seatbelt/README.md)
+und sind dort auf Englisch kommentiert; die Regelzeilen selbst sind
+byte-identisch. Weil sich die Kommentarzeilen ändern, meldet der Doctor
+nach dem Update Profil-Drift, bis `komki setup` die Profile neu schreibt
+(das geschieht dort automatisch, sobald der Generator anderen Text
+erzeugt; `komki init --force` ist nicht nötig).
+
 Werkzeuge mit Außenwirkung (RIS, Websuche, Vault) laufen als eigene
 Prozesse, jeder unter einem eigenen, generierten Seatbelt-Profil
 (Vertrag: [`apps/komki_connector/CONTRACT.md`](../komki_connector/CONTRACT.md)).

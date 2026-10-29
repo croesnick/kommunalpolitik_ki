@@ -58,6 +58,9 @@ defmodule KomkiCli.Steps do
     StartContract
   }
 
+  # Seatbelt-Kern (Ticket #226): Boot-Gate-Sonde aus der Library.
+  alias Seatbelt.BootCheck
+
   require Config
 
   @denial_epistemic_limit "Keine Denials im Fenster sind kein Konfinement-Beweis; das Boot-Gate bleibt die positive Kontrolle."
@@ -868,26 +871,11 @@ defmodule KomkiCli.Steps do
   defp boot_l(cfg, profile_path, binary, args \\ [], cwd \\ nil)
 
   defp boot_l(cfg, profile_path, binary, args, cwd) do
-    {ok, reason} =
-      try do
-        case System.cmd(cfg.sandbox_exec, ["-f", profile_path, "--", binary] ++ args,
-               env: %{"PATH" => "/usr/bin:/bin"},
-               cd: boot_cwd(cfg, cwd),
-               # llama-server schreibt --version nach stderr; ohne Umleitung
-               # landete es mitten in der Ausgabe von setup/up.
-               stderr_to_stdout: true
-             ) do
-          {_out, 0} -> {true, "rc0"}
-          {out, code} -> {false, rc_reason(code, out)}
-        end
-      rescue
-        e -> {false, "exec error: " <> exception_reason(e)}
-      catch
-        kind, thrown ->
-          {false, "exec error " <> Kernel.inspect(kind) <> ": " <> Kernel.inspect(thrown)}
-      end
+    # Sonde aus der Library (Ticket #226); das minimale PATH, die
+    # stderr-Umleitung und die rc-Begrundung sind dort Teil des Vertrags.
+    result = BootCheck.run(cfg.sandbox_exec, profile_path, binary, args, cwd: boot_cwd(cfg, cwd))
 
-    %{name: "boot " <> binary, ok: ok, reason: reason}
+    %{name: "boot " <> binary, ok: result.ok, reason: result.reason}
   end
 
   # Arbeitsverzeichnis in den erlaubten Bereich legen (pi-home, sonst
@@ -899,11 +887,6 @@ defmodule KomkiCli.Steps do
 
   defp boot_cwd(cfg, nil) do
     if File.exists?(cfg.pi_home), do: cfg.pi_home, else: cfg.base_dir
-  end
-
-  defp rc_reason(code, out) do
-    excerpt = out |> String.trim_trailing() |> String.slice(0, 200)
-    "rc=" <> to_string(code) <> " " <> excerpt
   end
 
   # ===========================================================================

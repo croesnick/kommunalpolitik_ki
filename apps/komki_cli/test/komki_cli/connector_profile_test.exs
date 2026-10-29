@@ -139,6 +139,17 @@ defmodule KomkiCli.ConnectorProfileTest do
         ConnectorProfile.connector(cfg(vault_dir: nil), Manifest.fetch!("vault"))
       end
     end
+
+    # vault_dir kommt aus der config.json: ein Anfuehrungszeichen darf das
+    # Literal nicht schliessen und eine eigene Regel anhaengen.
+    test "Vault-Pfad mit Anfuehrungszeichen: Generierung scheitert statt Regel-Injection" do
+      assert_raise ArgumentError, ~r/unsafe SBPL string/, fn ->
+        ConnectorProfile.connector(
+          cfg(vault_dir: ~s{/opt/v")) (allow default}),
+          Manifest.fetch!("vault")
+        )
+      end
+    end
   end
 
   describe "Egress-Profil" do

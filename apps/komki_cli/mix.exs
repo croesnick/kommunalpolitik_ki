@@ -9,7 +9,8 @@ defmodule KomkiCli.MixProject do
     :komki_connector_ris,
     :komki_connector_web,
     :komki_connector_vault,
-    :komki_connector_documents
+    :komki_connector_documents,
+    :seatbelt
   ]
 
   def project do
@@ -140,6 +141,10 @@ defmodule KomkiCli.MixProject do
       {:komki_connector_web, path: "../komki_connector_web"},
       {:komki_connector_vault, path: "../komki_connector_vault"},
       {:komki_connector_documents, path: "../komki_connector_documents"},
+      # Seatbelt-Kern (Ticket #226): Profil-Emitter, Presets, Escript-Schicht,
+      # Boot-Gate-Sonde, Pins — komki-unabhaengige Library, Path-Dep auf die
+      # Workspace-Schwester ohne Hex-Lock-Eintrag (wie komki_policy).
+      {:seatbelt, path: "../seatbelt"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]

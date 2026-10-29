@@ -54,11 +54,7 @@ defmodule KomkiCli.Pins do
 
   @doc "Aktuelle Pins aller Programme."
   @spec compute(Config.t()) :: pins()
-  def compute(%Config{} = cfg) do
-    for {name, path} <- artifacts(cfg), {:ok, hash} <- [hash(path)], into: %{} do
-      {name, %{"path" => path, "sha256" => hash}}
-    end
-  end
+  def compute(%Config{} = cfg), do: Seatbelt.Pins.compute(artifacts(cfg))
 
   @doc """
   Abweichungen gegenueber `cfg.pins`: `:new` (noch nicht festgehalten oder
@@ -66,16 +62,7 @@ defmodule KomkiCli.Pins do
   Pfad, andere Bytes). Entfallene Programme zaehlen nicht.
   """
   @spec drift(Config.t(), pins()) :: %{new: [String.t()], changed: [String.t()]}
-  def drift(%Config{pins: pinned}, current) do
-    Enum.reduce(Enum.sort(current), %{new: [], changed: []}, fn
-      {name, %{"path" => path} = pin}, acc ->
-        case Map.get(pinned, name) do
-          ^pin -> acc
-          %{"path" => ^path} -> %{acc | changed: acc.changed ++ [name]}
-          _ -> %{acc | new: acc.new ++ [name]}
-        end
-    end)
-  end
+  def drift(%Config{pins: pinned}, current), do: Seatbelt.Pins.drift(pinned, current)
 
   @doc "Doctor- und Start-Checks: jedes Programm muss seinem Pin entsprechen."
   @spec checks(Config.t()) :: [check()]
@@ -114,62 +101,12 @@ defmodule KomkiCli.Pins do
     end
   end
 
-  @doc "SHA-256 einer Datei oder, fuer ein Verzeichnis, ueber den ganzen Baum."
+  @doc """
+  SHA-256 einer Datei oder, fuer ein Verzeichnis, ueber den ganzen Baum.
+
+  Implementierung lebt seit Ticket #226 in der Library
+  (`Seatbelt.Pins.hash/1`); dieser Einstieg bleibt als komki-API.
+  """
   @spec hash(String.t()) :: {:ok, String.t()} | {:error, String.t()}
-  def hash(path) do
-    case File.lstat(path) do
-      {:ok, %File.Stat{type: :directory}} ->
-        {:ok, hex(:crypto.hash(:sha256, tree_lines(path, "")))}
-
-      {:ok, %File.Stat{type: :regular}} ->
-        {:ok, hex(file_digest(path))}
-
-      {:ok, %File.Stat{type: :symlink}} ->
-        hash(Config.canonical(path))
-
-      {:ok, _} ->
-        {:error, "weder Datei noch Verzeichnis"}
-
-      {:error, reason} ->
-        {:error, List.to_string(:file.format_error(reason))}
-    end
-  end
-
-  # Eine Zeile je Eintrag, sortiert: Typ, relativer Pfad, Inhalt-Hash bzw.
-  # Symlink-Ziel. Umbenennen, Hinzufuegen, Entfernen und Umbiegen eines
-  # Links aendern den Baum-Hash ebenso wie geaenderte Bytes.
-  defp tree_lines(root, rel) do
-    root
-    |> Path.join(rel)
-    |> File.ls!()
-    |> Enum.sort()
-    |> Enum.map(fn entry ->
-      rel_entry = if rel == "", do: entry, else: Path.join(rel, entry)
-      full = Path.join(root, rel_entry)
-
-      case File.lstat!(full) do
-        %File.Stat{type: :directory} ->
-          ["d\0", rel_entry, "\n", tree_lines(root, rel_entry)]
-
-        %File.Stat{type: :symlink} ->
-          {:ok, target} = :file.read_link(full)
-          ["l\0", rel_entry, "\0", to_string(target), "\n"]
-
-        %File.Stat{type: :regular} ->
-          ["f\0", rel_entry, "\0", hex(file_digest(full)), "\n"]
-
-        _ ->
-          ["o\0", rel_entry, "\n"]
-      end
-    end)
-  end
-
-  defp file_digest(path) do
-    path
-    |> File.stream!(1024 * 1024)
-    |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
-    |> :crypto.hash_final()
-  end
-
-  defp hex(digest), do: Base.encode16(digest, case: :lower)
+  def hash(path), do: Seatbelt.Pins.hash(path)
 end

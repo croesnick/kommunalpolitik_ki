@@ -1,58 +1,54 @@
-defmodule KomkiCli.MachODeps do
+defmodule Seatbelt.MachODeps do
   @moduledoc """
-  otool-basierter Mach-O-Dependency-Scanner fuer das llama-server-Profil.
+  otool-based Mach-O dependency scanner for sandbox profiles.
 
-  Der Scanner zieht aus einem Mach-O-Binaer:
+  From a Mach-O binary the scanner collects:
 
-    * die deklarierten Deps (`otool -L`),
-    * die LC_RPATH-Eintraege fuer die @rpath-Aufloesung (`otool -l`),
-    * die transitiven Deps (rekursiver otool-Walk),
+    * the declared dependencies (`otool -L`),
+    * the LC_RPATH entries for @rpath resolution (`otool -l`),
+    * transitive dependencies (recursive otool walk),
 
-  und liefert je aufgeloester Dep das deklarierte UND das kanonische
-  Pfadverzeichnis (Pfadform-Cave in beide Richtungen — exp6: Regeln nur in
-  kanonischer Form matchen nicht) sowie pro Dep-Verzeichnis dessen
-  Geschwister-libexec, wenn vorhanden (ggml-Backend-Scan-Ort: dort liegen
-  die Backend-Bundles libggml-cpu-apple_m*.so, libggml-metal.so; ohne das
-  bleibt die Backend-Registry leer — exp14).
+  and yields, per resolved dependency, the declared AND the canonical
+  path directory (the path-form caveat cuts both ways: rules written
+  only in canonical form do not match) plus, per dependency directory,
+  its sibling `libexec` when present (the ggml backend scan location:
+  the backend bundles libggml-cpu-apple_m*.so, libggml-metal.so live
+  there; without it the backend registry stays empty).
 
-  Aufrufer: `KomkiCli.Profile.generate_llama/1` (dylib-Baum-Regelschicht).
+  Fallback: otool missing or file unreadable -> [] (CI on Linux; the
+  profile stays generatable).
 
-  Fallback: otool fehlt oder Datei unlesbar -> [] (CI-Linux; das Profil
-  bleibt generierbar).
-
-  Belege: Experimentserie 14.10.2026, exp6/exp7/exp14 (Tickets
-  #100/#111); Nachweis-Konsolidierung:
-  `docs/research/2026-10-14-llama-server-confinement.md`.
+  Evidence: experiment series 14 Oct 2026, exp6/exp7/exp14; consolidated
+  in the llama-server confinement research report of the komki project.
   """
 
-  alias KomkiCli.Config
+  alias Seatbelt
 
-  # Dylib-Verzeichnisse des llama-server-Binaers: rekursiver otool-Walk.
-  # - otool -L liefert die deklarierten Deps (dyld oeffnet genau diese Pfadformen);
-  # - otool -l liefert die LC_RPATH-Eintraege fuer @rpath-Aufloesung;
-  # - transitive Deps werden mitgegangen (Fund: libomp via libggml-base);
-  # - je aufgeloester Dep: dirname(deklariert) UND dirname(canonical) (Pfadform-Cave
-  #   in beide Richtungen — exp6: Regeln nur in kanonischer Form matchen nicht);
-  # - pro Dep-Verzeichnis dessen Geschwister-libexec, wenn vorhanden (ggml legt
-  #   dort die Backend-Bundles ab: libggml-cpu-apple_m*.so, libggml-metal.so;
-  #   ohne das bleibt die Backend-Registry leer — exp14);
-  # - otool fehlend oder Datei unlesbar: [] (CI-Linux; Profil bleibt generierbar).
+  # Dylib directories of the binary: recursive otool walk.
+  # - otool -L yields the declared deps (dyld opens exactly these path forms);
+  # - otool -l yields the LC_RPATH entries for @rpath resolution;
+  # - transitive deps are walked too (finding: libomp via libggml-base);
+  # - per resolved dep: dirname(declared) AND dirname(canonical) (path-form
+  #   caveat cuts both ways — exp6: rules in canonical form only do not match);
+  # - per dep directory its sibling libexec, when present (ggml puts the
+  #   backend bundles there; without it the backend registry stays empty);
+  # - otool missing or file unreadable: [] (CI on Linux; profile stays generatable).
   @doc """
-  Dylib-Verzeichnisse des Binaers samt libexec-Geschwistern; Details zur
-  Methodik im Moduledoc und im Kommentar unten.
+  Dylib directories of the binary including libexec siblings; see the
+  moduledoc for the methodology.
   """
   @spec dylib_dirs(String.t()) :: [String.t()]
   def dylib_dirs(bin) do
     if System.find_executable("otool") == nil or not File.exists?(bin) do
       []
     else
-      # queue = [bin], visited leer — das Bin wird beim ersten Durchlauf
-      # verarbeitet und erst dann als besucht markiert (Seed-Fund: ein
-      # vorbelegtes visited skipped den Root und leert die Queue sofort;
-      # die Dep-Liste blieb leer). Accumulatoren als einfache Listen:
-      # dialyzer sieht MapSet.t() in den rekursiven Positionen als opaken
-      # Term mit auseinanderlaufenden Subtypen (call_without_opaque,
-      # Verify-Fund); die Mengen sind winzig, uniq/sort sitzt am Ende.
+      # queue = [bin], visited empty — the binary is processed on the first
+      # pass and only then marked visited (seed finding: a pre-seeded
+      # visited skipped the root and drained the queue immediately;
+      # the dep list stayed empty). Accumulators as plain lists: dialyzer
+      # sees MapSet.t() in recursive positions as an opaque term with
+      # diverging subtypes (call_without_opaque, verification finding);
+      # the sets are tiny, uniq/sort sits at the end.
       bin
       |> dylib_walk([bin], [], [])
       |> libexec_forms()
@@ -75,7 +71,7 @@ defmodule KomkiCli.MachODeps do
   defp dylib_walk(_bin, [], _visited, dirs), do: dirs
 
   defp dylib_walk(bin, [macho | queue], visited, dirs) do
-    canonical_macho = Config.canonical(macho)
+    canonical_macho = Seatbelt.canonical(macho)
 
     if canonical_macho in visited do
       dylib_walk(bin, queue, visited, dirs)
@@ -98,12 +94,12 @@ defmodule KomkiCli.MachODeps do
         {queue, dirs}
 
       {:dep, declared, resolved} ->
-        # Rohform des deklarierten Verzeichnisses behalten (dyld oeffnet genau
-        # diese Pfadform — Pfadform-Cave exp6) plus die kanonische Form.
+        # Keep the raw form of the declared directory (dyld opens exactly
+        # this path form — path-form caveat exp6) plus the canonical form.
         dirs = Enum.uniq([Path.dirname(declared) | dirs])
 
         if resolved != nil do
-          dirs = Enum.uniq([Config.canonical(Path.dirname(resolved)) | dirs])
+          dirs = Enum.uniq([Seatbelt.canonical(Path.dirname(resolved)) | dirs])
           {queue ++ [resolved], dirs}
         else
           {queue, dirs}
@@ -117,7 +113,7 @@ defmodule KomkiCli.MachODeps do
         rpath_dep(dep, rpaths, macho, bin)
 
       String.starts_with?(dep, "/usr/lib") or String.starts_with?(dep, "/System/Library") ->
-        # Basis-Layer deckt die System-Haeuser ab; auch nicht rekursieren.
+        # The base layer covers the system houses; do not recurse either.
         :skip
 
       String.starts_with?(dep, "@executable_path/") or String.starts_with?(dep, "@loader_path/") ->
@@ -143,11 +139,12 @@ defmodule KomkiCli.MachODeps do
     end)
   end
 
-  # RPATH-Werte sind selbst loader-relativ: llama.cpp 0.6.0 pinnt
-  # "@loader_path/../lib" (Review-Fund: ohne diese Expansion bleiben alle
-  # @rpath-Deps unloesbar und der Eigenbau-Lib-Baum faellt aus dem Profil).
-  # @loader_path bezieht sich auf das gerade geladene Mach-O, @executable_path
-  # auf die Root-Binary; lexikalische Normalisierung via Path.expand.
+  # RPATH values are themselves loader-relative: llama.cpp 0.6.0 pins
+  # "@loader_path/../lib" (review finding: without this expansion all
+  # @rpath deps stay unresolved and the self-built lib tree drops out of
+  # the profile). @loader_path refers to the Mach-O currently being
+  # loaded, @executable_path to the root binary; lexical normalization
+  # via Path.expand.
   defp rpath_roots(rpath, macho, bin) do
     cond do
       String.starts_with?(rpath, "@loader_path/") ->
@@ -167,7 +164,7 @@ defmodule KomkiCli.MachODeps do
       |> String.replace_prefix("@loader_path/", "")
       |> String.replace_prefix("@executable_path/", "")
 
-    # Loader-Verzeichnis zuerst, dann das Bin-Verzeichnis (@executable_path).
+    # Loader directory first, then the binary directory (@executable_path).
     candidates = [Path.join(Path.dirname(macho), rest), Path.join(Path.dirname(bin), rest)]
 
     Enum.find_value(candidates, :skip, fn candidate ->
@@ -177,13 +174,14 @@ defmodule KomkiCli.MachODeps do
   end
 
   defp maybe_canonical(path) do
-    if File.exists?(path), do: Config.canonical(path), else: nil
+    if File.exists?(path), do: Seatbelt.canonical(path), else: nil
   end
 
-  # Deps aus `otool -L`: Kopfzeile (Binaer-Selbstname) weg, pro Zeile das erste
-  # Whitespace-Token = der deklarierte Installationspfad. otool rückt Dep-Zeilen
-  # mit Tab ein — erst trimmen, sonst startet jedes Token mit "\t" und fällt
-  # in resolve_dep durch alle Pfad-Präfixe (Review-Fund: leere Dep-Liste).
+  # Deps from `otool -L`: drop the header line (the binary's own name);
+  # per line the first whitespace token is the declared install path.
+  # otool indents dep lines with a tab — trim first, otherwise every
+  # token starts with "\t" and falls through all path prefixes in
+  # resolve_dep (review finding: empty dep list).
   defp otool_deps(macho) do
     case otool_output(["-L", macho]) do
       nil ->
@@ -200,8 +198,8 @@ defmodule KomkiCli.MachODeps do
 
   defp first_token(line), do: line |> String.trim() |> String.split(" ") |> List.first()
 
-  # LC_RPATH-Eintraege aus `otool -l`: nach "cmd LC_RPATH" folgt (hinter
-  # cmdsize) die "path"-Zeile; Reihenfolge wie gedruckt.
+  # LC_RPATH entries from `otool -l`: after "cmd LC_RPATH" the "path"
+  # line follows (behind cmdsize); order as printed.
   defp otool_rpaths(macho) do
     case otool_output(["-l", macho]) do
       nil -> []
@@ -230,22 +228,23 @@ defmodule KomkiCli.MachODeps do
         otool_rpaths_scan(rest, [rpath_value(value) | acc])
 
       String.starts_with?(trimmed, "cmd ") or String.starts_with?(trimmed, "Load command") ->
-        # Naechster Load-Command-Block ohne gefundene path-Zeile: zurueck zum
-        # Header-Scan (unvollstaendiger RPATH-Block).
+        # Next load-command block without a found path line: back to the
+        # header scan (incomplete RPATH block).
         otool_rpaths_scan([line | rest], acc)
 
       true ->
-        # Zwischenfeld (cmdsize u.a.) im selben RPATH-Block: weitersuchen —
-        # die path-Zeile folgt erst danach (Review-Fund: Fruehrueckkehr zum
-        # Header-Scan uebersprang sie und liess alle @rpath-Deps unloesbar).
+        # In-between field (cmdsize etc.) in the same RPATH block: keep
+        # looking — the path line follows only after it (review finding:
+        # an early return to the header scan skipped it and left all
+        # @rpath deps unresolved).
         otool_rpath_value(rest, acc)
     end
   end
 
   defp rpath_value(value), do: value |> String.split(" (", parts: 2) |> List.first()
 
-  # Geschwister-libexec je Dep-Verzeichnis (ggml-Backend-Scan-Ort); beide
-  # Pfadformen bleiben stehen, wenn kanonisch und deklariert auseinanderlaufen.
+  # Sibling libexec per dep directory (ggml backend scan location); both
+  # path forms stay when canonical and declared diverge.
   defp libexec_forms(dirs) do
     (dirs ++ Enum.flat_map(dirs, &dir_libexec_forms/1))
     |> Enum.uniq()
@@ -254,7 +253,7 @@ defmodule KomkiCli.MachODeps do
 
   defp dir_libexec_forms(dir) do
     declared = Path.join(Path.dirname(dir), "libexec")
-    sibling = Config.canonical(declared)
+    sibling = Seatbelt.canonical(declared)
 
     if File.exists?(sibling) do
       Enum.uniq([sibling, declared])
