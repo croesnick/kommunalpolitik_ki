@@ -9,26 +9,33 @@ defmodule Mix.Tasks.Compile.KomkiTresor do
 
   Ohne macOS oder swiftc: Info statt Fehler — Linux-CI und Escript-Bau
   laufen weiter, komki meldet `:missing_bin`, wenn das Programm fehlt.
-  Mtime-idempotent: ein frisches Ziel baut nicht neu.
+  Mtime-idempotent: ein frisches Ziel baut nicht neu und meldet `:noop`.
+  `mix clean` entfernt das gebaute Programm wieder.
   """
 
-  use Mix.Task
+  use Mix.Task.Compiler
 
+  @impl true
   def run(_args) do
     if match?({:unix, :darwin}, :os.type()), do: build(), else: skip("kein macOS")
   end
 
+  @impl true
+  def clean, do: File.rm(target())
+
   defp build do
-    root = Path.dirname(Mix.Project.project_file())
-    source = Path.join(root, "native/komki-tresor/main.swift")
-    target = Path.join(root, "priv/komki-tresor")
+    source = Path.join(root(), "native/komki-tresor/main.swift")
+    target = target()
 
     if fresh?(source, target) do
-      {:ok, []}
+      {:noop, []}
     else
       kompilieren(source, target)
     end
   end
+
+  defp root, do: Path.dirname(Mix.Project.project_file())
+  defp target, do: Path.join(root(), "priv/komki-tresor")
 
   defp kompilieren(source, target) do
     case System.find_executable("swiftc") do
@@ -69,6 +76,6 @@ defmodule Mix.Tasks.Compile.KomkiTresor do
 
   defp skip(reason) do
     Mix.shell().info("komki-tresor: #{reason} — Bau übersprungen")
-    {:ok, []}
+    {:noop, []}
   end
 end

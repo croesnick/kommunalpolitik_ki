@@ -29,7 +29,7 @@ komki: komki-tresor
 # sucht es neben sich selbst. `mix compile` baut es nach apps/komki_cli/priv
 # (Ticket #224, braucht swiftc aus den Xcode Command Line Tools); hier nur
 # noch neben das Escript kopieren, damit es in allen Kanälen neben komki
-# liegt. Der Test verweigert, wenn das Ziel fehlt oder aelterer ist als die
+# liegt. Der Test verweigert, wenn das Ziel fehlt oder aelter ist als die
 # Quelle (etwa ohne swiftc) — kein stiller Versand eines alten Binaries.
 komki-tresor:
 	@cd apps/komki_cli && mix deps.get >/dev/null && mix compile

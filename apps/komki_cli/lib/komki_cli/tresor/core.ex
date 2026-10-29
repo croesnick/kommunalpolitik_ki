@@ -3,8 +3,8 @@ defmodule KomkiCli.Tresor.Core do
   Tresor-Kern ohne komki (Ticket #224): versiegelt Geheimnisse ueber das
   Hilfsprogramm `komki-tresor` (Quelle `native/komki-tresor/main.swift`) und
   oeffnet sie nur nach Freigabe durch die Secure Enclave. Dieser Kern kennt
-  weder komki noch den Schluesselbund und ist der Kandidat fuer ein
-  eigenstaendiges Paket (`enclave_seal`) gedacht; die komki-spezifische
+  weder komki noch den Schluesselbund und ist als Kern eines
+  eigenstaendigen Pakets (`enclave_seal`) gedacht; die komki-spezifische
   Programmsuche (neben dem laufenden komki) lebt im Adapter `KomkiCli.Tresor`.
 
   Der private Schluessel verlaesst die Enclave nie; im Siegel steht nur seine
@@ -16,6 +16,7 @@ defmodule KomkiCli.Tresor.Core do
   """
 
   @prefix "ktv1."
+  @program "komki-tresor"
   @seal_timeout_ms 10_000
   # Oeffnen wartet auf Touch ID oder Passwort.
   @open_timeout_ms 120_000
@@ -45,21 +46,28 @@ defmodule KomkiCli.Tresor.Core do
 
   @doc """
   Standard-Aufloesung ohne komki: das mitgebaute Programm im priv-Verzeichnis
-  der App, sonst PATH. nil, wenn es nirgends liegt. Die kanonische Pfadform
-  (Seatbelt) ist Angelegenheit des Aufrufers.
+  von `app` (Standard: die App, zu der dieser Kern gehoert), sonst PATH. nil,
+  wenn es nirgends liegt. Die kanonische Pfadform (Seatbelt) ist
+  Angelegenheit des Aufrufers.
   """
-  @spec binary() :: String.t() | nil
-  def binary do
-    priv =
-      case :code.priv_dir(:komki_cli) do
-        {:error, _} -> nil
-        dir -> Path.join(dir, "komki-tresor")
-      end
-
+  @spec binary(atom() | nil) :: String.t() | nil
+  def binary(app \\ Application.get_application(__MODULE__)) do
     cond do
-      is_binary(priv) and File.exists?(priv) -> priv
-      path = System.find_executable("komki-tresor") -> path
+      priv = priv_program(app) -> priv
+      path = System.find_executable(@program) -> path
       true -> nil
+    end
+  end
+
+  defp priv_program(nil), do: nil
+
+  defp priv_program(app) do
+    with dir when is_list(dir) <- :code.priv_dir(app),
+         path = Path.join(dir, @program),
+         true <- File.exists?(path) do
+      path
+    else
+      _ -> nil
     end
   end
 

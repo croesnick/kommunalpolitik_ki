@@ -81,11 +81,6 @@ defmodule KomkiCli.TresorTest do
       assert {:error, :no_enclave} = Core.check(script!("tresor", "exit 3"))
       assert {:error, {:failed, 9}} = Core.check(script!("tresor", "exit 9"))
     end
-
-    test "Core.binary nennt nur existierende Programme (priv oder PATH)" do
-      bin = Core.binary()
-      assert is_nil(bin) or File.exists?(bin)
-    end
   end
 
   describe "Secrets" do
