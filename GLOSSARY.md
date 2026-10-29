@@ -783,6 +783,80 @@ im Audit-Journal: Intent-Hash, Payload-Hash und Γ-Stand-Hash des Aufrufs.
 
 ---
 
+## komki-Bausteine
+
+Begriffe aus der Umsetzung von komki, die über eine App hinaus vorkommen.
+
+### Seatbelt-Profil
+
+**Definition:** Die Sandbox-Regeln (SBPL, Sandbox Profile Language), unter
+denen macOS einen komki-Prozess startet. Jeder Prozess hat ein eigenes
+Profil: pi, llama-server, Vermittler, Egress-Proxy und jeder Connector.
+komki erzeugt die Profile deterministisch, und `komki doctor` prüft, dass
+die Neuerzeugung byte-gleich ist. Eine Abweichung (Drift) heißt: Das Profil
+wurde verändert oder stammt aus einer anderen komki-Version.
+
+**Wo:** `apps/seatbelt` (Library), Profile unter `<base>/profile/`.
+
+**Sprache:** Seatbelt und Sandbox bleiben englisch.
+
+---
+
+### Programm-Pin
+
+**Definition:** Die festgehaltene SHA-256-Prüfsumme eines Programms, das
+komki startet (komki, escript, node, llama-server, komki-tresor, das
+pi-Paket). Weicht die Prüfsumme ab, verweigert komki den Start, bis
+`komki setup` die neue Prüfsumme nach Rückfrage übernimmt.
+
+**Wo:** `pins` in `config.json`; `Seatbelt.Pins`.
+
+---
+
+### komki-tresor
+
+**Definition:** Das kleine Swift-Programm, das Schlüssel (etwa den
+Brave-API-Key) mit der Secure Enclave versiegelt und nur nach Freigabe per
+Touch ID oder Passwort öffnet. Im Schlüsselbund liegt nur das Siegel.
+
+**Abgrenzung:** Ein Programmname, keine Übersetzung von Vault. Der Vault
+bleibt Vault (siehe Sprachregel unter „Harness- und Werkzeugbegriffe“).
+
+**Wo:** `apps/komki_cli/native/komki-tresor/`, gebaut von `mix compile`.
+
+---
+
+### Sidecar
+
+**Definition:** Das Frame-Protokoll zwischen Vermittler und Connector als
+eigene Library: Frames über Unix-Sockets, ein Capability-Token je Aufruf,
+geschlossene Fehlercodes. Der Name folgt dem etablierten Sidecar-Muster: Ein
+Hilfsprozess läuft neben dem Hauptprozess und spricht mit ihm über eine
+schmale Schnittstelle.
+
+**Wo:** `apps/sidecar`; Vertrag in
+[`apps/komki_connector/CONTRACT.md`](apps/komki_connector/CONTRACT.md) § 3.
+
+**Sprache:** Bleibt englisch, Code und Doku der Library sind englisch.
+
+---
+
+### Kassette
+
+**Definition:** Eine aufgezeichnete Anfrage samt Antwort an das echte RIS,
+als JSON-Datei, wie bei VCR oder ExVCR. Der Aufzeichnungs-Proxy (Recorder)
+schreibt sie, der Mock spielt sie im Replay-Modus zurück, der
+Skelett-Extraktor gewinnt daraus einen inhaltsfreien Formatbericht
+(Skelett-Bericht).
+
+**Abgrenzung:** Kassetten enthalten echte, auch nicht-öffentliche Inhalte.
+Sie liegen nie im Repo; committbar ist nur der Skelett-Bericht.
+
+**Wo:** [`apps/komki_connector_ris/README.md`](apps/komki_connector_ris/README.md)
+§ „Aufzeichnung und Replay echter Antwortformate“.
+
+---
+
 ## Sprachregeln und Festlegungen
 
 Beschlossen in der Sprach-Session am 2026-10-14; Belege und
