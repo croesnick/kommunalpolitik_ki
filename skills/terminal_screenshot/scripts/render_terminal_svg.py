@@ -59,7 +59,10 @@ def build_256_palette():
 
 
 PAL256 = build_256_palette()
-ANSI_RE = re.compile(r"\x1b\[([0-9;?]*)([a-zA-Z])")
+# CSI-Sequenzen (SGR wird ausgewertet, der Rest verworfen) und OSC-Sequenzen
+# wie OSC-8-Links, beendet mit BEL oder ESC \. Ohne die OSC-Alternative
+# landeten BEL und Link-Ziel im SVG, und das XML war ungueltig.
+ANSI_RE = re.compile(r"\x1b\[([0-9;?]*)([a-zA-Z])|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
 
 
 def parse_line(raw):

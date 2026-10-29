@@ -178,9 +178,10 @@ defmodule KomkiCli.Setup do
   defp existing_demo_vault(base, ui) do
     dir = Path.join(base, "vault")
 
-    if File.dir?(dir) and File.ls!(dir) != [],
-      do: {:ok, Config.canonical(dir)},
-      else: demo_vault(base, ui)
+    # Nur leere Ordner wie komki-test: der Test-Vault fehlt noch (#199)
+    if DemoVault.empty?(dir),
+      do: demo_vault(base, ui),
+      else: {:ok, Config.canonical(dir)}
   end
 
   defp create_instance(base, vault_dir, opts, ui) do

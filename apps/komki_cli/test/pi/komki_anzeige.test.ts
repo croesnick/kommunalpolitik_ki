@@ -213,3 +213,21 @@ function hardWrap(text: string, width: number): string[] {
 		return parts;
 	});
 }
+
+test("Raumdokument: Aufrufzeile, Überschrift als Titel, Inhalt, Quelle Arbeitsraum", () => {
+	assert.equal(
+		strip(callLine("mcp__komki__admit_document", { document_id: "doc-oeffentlich" }, paint)!),
+		"Raumdokument lesen  doc-oeffentlich",
+	);
+	const out = strip(render("admit_document"));
+	assert.match(out, /✓ zugelassen · öffentlich/);
+	assert.match(out, /^Offentliche Notiz$/m);
+	assert.doesNotMatch(out, /# Offentliche Notiz/);
+	assert.match(out, /│ Diese Notiz ist allgemein zugaenglich\./);
+	assert.match(out, /Quelle: Arbeitsraum · Beleg pdr-53ece2c1…/);
+
+	const deny = strip(render("admit_document_deny"));
+	assert.match(deny, /✗ abgelehnt +Der Inhalt hat das Modell nicht erreicht\./);
+	assert.match(deny, /Eine Bedingung der Bindung ist nicht erfüllt\./);
+	assert.match(strip(render("admit_document_unknown")), /✗ Prüffehler[\s\S]*unbekanntes Objekt: "doc-phantom"/);
+});

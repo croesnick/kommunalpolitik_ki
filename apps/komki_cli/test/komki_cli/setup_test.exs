@@ -169,6 +169,25 @@ defmodule KomkiCli.SetupTest do
       assert reason =~ "nicht leer"
       assert File.read!(Path.join(dir, "eigene.md")) == "meins"
     end
+
+    test "leere Ordner wie komki-test zaehlen nicht als Vault" do
+      dir = TestSupport.tmp_area!("komki-demo-leer")
+      File.mkdir_p!(Path.join(dir, "komki-test"))
+
+      assert {:ok, _} = DemoVault.install(dir)
+      assert File.exists?(Path.join(dir, "Projekte/Verkehr/Radverkehrskonzept.md"))
+    end
+
+    test "ein Symlink zaehlt als Inhalt" do
+      area = TestSupport.tmp_area!("komki-demo-link")
+      dir = Path.join(area, "vault")
+      File.mkdir_p!(Path.join(area, "anderswo"))
+      File.mkdir_p!(dir)
+      File.ln_s!(Path.join(area, "anderswo"), Path.join(dir, "Projekte"))
+
+      assert {:error, _} = DemoVault.install(dir)
+      assert File.ls!(Path.join(area, "anderswo")) == []
+    end
   end
 
   describe "Secrets" do

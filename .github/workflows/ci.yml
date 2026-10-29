@@ -183,3 +183,26 @@ jobs:
       # Skript bei Abweichung laut ab. Abnahme-Referenz: priv/demo.sh
       - name: Demo (komki-policy Akzeptanz)
         run: bash apps/komki_policy/priv/demo.sh
+
+  # Anzeige-Extension fuer pi (apps/komki_cli/priv/pi/komki-anzeige): reine
+  # Node-Tests ohne Abhaengigkeiten, node 24 fuehrt TypeScript direkt aus.
+  # Node-Version zentral aus .tool-versions (wie in pages.yml).
+  anzeige:
+    name: komki-anzeige (Node-Tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Node-Version aus .tool-versions lesen
+        id: node
+        run: |
+          version="$(awk '$1 == "nodejs" { print $2; exit }' .tool-versions)"
+          if [ -z "$version" ]; then
+            >&2 echo "Keine nodejs-Zeile in .tool-versions gefunden."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+      - name: Node-Tests
+        run: node --test apps/komki_cli/test/pi/*.test.ts
