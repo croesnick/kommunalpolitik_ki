@@ -11,12 +11,17 @@ Jetzt der eigentliche Beweis. Du schaltest in den Raum „vertraulich“ und bea
 
 1. ### In den Raum „vertraulich“ wechseln
 
-   Welche Daten zusammenkommen dürfen, steht in `room.json`, Feld `workspace_bindings`. Für „vertraulich“ kommt `vault-vertraulich@1` dazu.
-
    ```sh
-   python3 -c 'import json,os; p=os.path.expanduser("~/.local/share/komki/mediator/room.json"); d=json.load(open(p)); d["workspace_bindings"]=["doc-oeffentlich@2","ris-oeffentlich@1","vault-oeffentlich@1","vault-vertraulich@1","web-oeffentlich@1"]; open(p,"w").write(json.dumps(d,indent=2,sort_keys=True)+"\n"); print("Raum: vertraulich")'
-   komki down && komki up
+   komki raum vertraulich
    ```
+
+   ```text frame="terminal" title="Das siehst du"
+   Raum        recherche → vertraulich
+               Auch vertrauliche Notizen. Nach draußen geht nichts ohne dein GO für den einzelnen Aufruf.
+   Vermittler  neu gestartet, er entscheidet jetzt im neuen Raum.
+   ```
+
+   Technisch kommt dabei die Bindung `vault-vertraulich@1` in den Raum, gespeichert in `room.json`, Feld `workspace_bindings`. Den Wechsel hält das Journal fest: Der Vermittler schreibt bei jedem Start auf, mit welchen Bindungen er ab jetzt entscheidet. `komki raum` ohne Angabe zeigt, in welchem Raum du gerade bist.
 
 2. ### Den Abfluss versuchen lassen
 
@@ -45,12 +50,33 @@ Jetzt der eigentliche Beweis. Du schaltest in den Raum „vertraulich“ und bea
 
 3. ### Zurück in den Raum „recherche“
 
-   ```sh
-   python3 -c 'import json,os; p=os.path.expanduser("~/.local/share/komki/mediator/room.json"); d=json.load(open(p)); d["workspace_bindings"]=["doc-oeffentlich@2","ris-oeffentlich@1","vault-oeffentlich@1","web-oeffentlich@1"]; open(p,"w").write(json.dumps(d,indent=2,sort_keys=True)+"\n"); print("Raum: recherche")'
-   komki down && komki up
+   Läuft noch eine Session oder ein `komki run`, lehnt komki den Rückweg ab. pi hat die vertrauliche Notiz in seinem Kontext, und im Raum „recherche“ wäre die Websuche offen:
+
+   ```text frame="terminal" title="Das siehst du, solange eine Session läuft"
+   Eine Session läuft noch. Der Raum recherche ist weniger streng, ihr Kontext käme dorthin mit. Beende die Session (in pi: /quit), dann noch einmal komki raum recherche.
    ```
 
-   Probier hier dieselbe Aufgabe. Jetzt wäre die Websuche erlaubt, aber die vertrauliche Notiz ist gesperrt, und die Suche zeigt sie nicht einmal an. pi kommt also gar nicht erst an das Geheimnis.
+   Ohne laufende Session geht es:
+
+   ```sh
+   komki raum recherche
+   ```
+
+   ```text frame="terminal" title="Das siehst du"
+   Raum        vertraulich → recherche
+               RIS, Websuche und öffentliche Notizen. Vertrauliche Notizen sind unsichtbar.
+   Vermittler  neu gestartet, er entscheidet jetzt im neuen Raum.
+   ```
+
+   Aus demselben Grund setzt `komki session --continue` die vertrauliche Unterhaltung hier nicht fort:
+
+   ```text frame="terminal" title="Das siehst du"
+   Die letzte Session lief im Raum vertraulich. Im Raum recherche fortgesetzt, käme ihr Kontext in einen Raum mit weniger Schutz. Starte eine neue Session ohne --continue oder wechsle zurück: komki raum vertraulich
+   ```
+
+   In den strengeren Raum darfst du dagegen jederzeit wechseln, auch mitten in einer Session.
+
+   Probier hier dieselbe Aufgabe wie in Schritt 2. Jetzt wäre die Websuche erlaubt, aber die vertrauliche Notiz ist gesperrt, und die Suche zeigt sie nicht einmal an. pi kommt also gar nicht erst an das Geheimnis.
 
 </Steps>
 

@@ -16,6 +16,12 @@ defmodule KomkiMediator.PDR do
     * `assigned_label` — bei emit-Permits die zugeordnete Ausgabe-Menge
       λ(y) = B_W.
 
+  Neben den Entscheidungen schreibt der Vermittler bei jedem Start einen
+  Datensatz mit `tool: "workspace"`, `decision: "loaded"`: `checked_label` ist
+  das B_W, mit dem er ab jetzt entscheidet, `payload_hash` der SHA-256 von
+  `room.json`. Ein Raumwechsel (Ticket #268) zeigt sich als zwei solche
+  Datensaetze mit verschiedenem B_W.
+
   `seq` und `prev_hash` setzt allein der Journal-Writer (Ticket #139).
   """
 

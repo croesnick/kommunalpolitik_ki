@@ -18,6 +18,7 @@ defmodule KomkiCli.CLI do
       komki up    [--ctx N]
       komki down
       komki status
+      komki raum [recherche|vertraulich]
       komki go
       komki run "PROMPT" [--mode text|json] [--scratch PATH] [--timeout SEKUNDEN] [--capture-denials]
       komki session [FILE ...] [--continue] [--detach] [--decided-by ID]
@@ -306,6 +307,18 @@ defmodule KomkiCli.CLI do
         name: "go",
         description:
           "gesperrte Aufrufe ansehen und einzeln freigeben (GO gilt einmal, nur für diesen Aufruf)"
+      ],
+      raum: [
+        name: "raum",
+        description:
+          "zeigt den Raum oder wechselt zwischen recherche und vertraulich (lockern nur ohne laufende Session)",
+        args: [
+          name: [
+            value_name: "NAME",
+            required: false,
+            help: "recherche oder vertraulich; ohne Angabe nur anzeigen"
+          ]
+        ]
       ],
       status: [
         name: "status",
@@ -676,6 +689,8 @@ defmodule KomkiCli.CLI do
   defp dispatch_command(:down, _result), do: render(KomkiCli.Steps.down())
   defp dispatch_command(:status, _result), do: render(KomkiCli.Steps.status())
 
+  defp dispatch_command(:raum, result), do: render(KomkiCli.Steps.raum(result.args[:name]))
+
   defp dispatch_command(:go, _result),
     do:
       KomkiCli.GoSteps.run(KomkiCli.Config.default_base(), %{
@@ -1024,6 +1039,8 @@ defmodule KomkiCli.CLI do
 
   defp render({:journal, result}),
     do: {red() <> "Journal UNGUELTIG: " <> JSON.encode!(result) <> reset() <> "\n", 4}
+
+  defp render({:raum, text}), do: {text <> "\n", 0}
 
   defp render({:session, message}),
     do: {green() <> String.trim_trailing(message) <> reset() <> "\n", 0}
