@@ -4,7 +4,7 @@ defmodule KomkiMediator.ConnectorGate do
   zwei Entscheidungen der Engine, zwei PDR.
 
   * Vorpruefung: Parameter gegen das Manifest-Schema
-    (`KomkiConnector.Params.check/2`) und B_W des Raums
+    (`Sidecar.Params.check/3`) und B_W des Raums
     (`workspace_bindings`). Verstoss oder fehlendes B_W: `decision: error`,
     PDR, kein Vollzug (fail-closed).
   * Gate 1 (`emit`): die Anfrage ist eine Ausgabe an die Empfaenger der
@@ -12,7 +12,7 @@ defmodule KomkiMediator.ConnectorGate do
     `output_content_digest = intent_hash`. Kein Permit: Remedies, PDR,
     kein Vollzug. Permit: der emit-PDR wird geschrieben, **bevor** der
     Connector gerufen wird; seine `decision_id` ist die `call_id`.
-  * Vollzug: `KomkiConnector.Client.call/6` gegen
+  * Vollzug: `Sidecar.Client.call/6` gegen
     `<connectors_dir>/<id>.sock`. Bei schreibenden Operationen geht
     `context.assigned_label` (= B_W) mit.
   * Gate 2 (`admit`): Ergebnisform (§5.2), Labels allein aus dem Manifest
@@ -34,10 +34,11 @@ defmodule KomkiMediator.ConnectorGate do
   keine Antwort oder eine ungueltige Freigabe lassen es beim deny.
   """
 
-  alias KomkiConnector.{Client, Manifest, Params}
+  alias KomkiConnector.{Manifest, Text}
   alias KomkiMediator.{Gamma, Gate, Go, GoStand, Hash, PDR, ResultShape, Room}
   alias KomkiMediator.Room.Object
   alias KomkiPolicy.{Derive, JSON, Verify}
+  alias Sidecar.{Client, Params}
 
   @doc "Vermittelt einen Aufruf des Connector-Tools `tool` (z. B. `\"ris_search\"`)."
   @spec call(Gate.env(), String.t(), map()) :: map()
@@ -67,8 +68,9 @@ defmodule KomkiMediator.ConnectorGate do
   # Vorpruefung
   # -------------------------------------------------------------------------
 
+  # Die deutschen Parameter-Fehler erreichen das Modell (Gate-2-Texte).
   defp check_params(spec, rendered) do
-    case Params.check(spec.params, rendered) do
+    case Params.check(spec.params, rendered, Text) do
       {:ok, checked} -> {:ok, checked}
       {:error, {:params, detail}} -> {:error, "Parameter: " <> detail}
     end
@@ -258,7 +260,7 @@ defmodule KomkiMediator.ConnectorGate do
     case Map.get(env, :connectors_dir) do
       dir when is_binary(dir) ->
         socket = Path.join(dir, call.manifest.id <> ".sock")
-        Client.call(socket, call_id, call.op, call.params, context)
+        Client.call(socket, call_id, call.op, call.params, context, texts: Text)
 
       _ ->
         {:error, %{"code" => "upstream-error", "detail" => "kein Connector-Verzeichnis"}}

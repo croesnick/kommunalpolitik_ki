@@ -11,8 +11,9 @@ defmodule KomkiMediator.Tools.AdmitDocument do
   use Anubis.Server.Component, type: :tool
 
   alias Anubis.Server.Response
-  alias KomkiConnector.{Client, Manifest}
+  alias KomkiConnector.Manifest
   alias KomkiMediator.{Env, Gate, PDR}
+  alias Sidecar.Client
 
   # Schema und Beschreibung wie im Manifest `documents` (Ticket #169);
   # KomkiMediator.FassungTest haelt beide gleich.
