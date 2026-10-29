@@ -322,6 +322,7 @@ kommunalpolitik_ki/
 │   ├── komki_mediator/     # Vermittler: MCP-Gates + PDR-Journal für pis Tool-Aufrufe (AI: MCP)
 │   ├── komki_connector/    # Connector-Vertrag, Manifeste, deutsche Texte, Launch (Bibliothek)
 │   ├── sidecar/            # Frame-Protokoll + Capability-Token als eigene Library (bewusst englisch, #225)
+│   ├── seatbelt/           # macOS-Seatbelt-Profile, Boot-Gate, Programm-Pins als eigene Library (bewusst englisch, #226)
 │   ├── komki_egress/       # Egress-Proxy: freigegebene Ziele je Connector (AI: CLI)
 │   ├── komki_connector_web/ # Connector web: Brave-Websuche hinter dem Vermittler
 │   ├── komki_connector_vault/ # Vault-Connector: Notizen suchen/lesen, Testnotizen schreiben (via Vermittler)

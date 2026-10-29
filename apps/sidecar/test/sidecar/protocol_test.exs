@@ -15,7 +15,7 @@ defmodule Sidecar.ProtocolTest do
     @impl true
     def manifest do
       %{
-        fassung: "sidecar-test/1",
+        version: "sidecar-test/1",
         ops: %{
           "search" => %{
             kind: :read,
@@ -103,6 +103,12 @@ defmodule Sidecar.ProtocolTest do
     end
   end
 
+  # The test process's uid as the OS reports it, independent of Sidecar.Peer.
+  defp own_uid do
+    {out, 0} = System.cmd("id", ["-u"])
+    out |> String.trim() |> String.to_integer()
+  end
+
   # Raw request to the socket, bypassing the client (like a foreign process).
   defp raw(path, frame) do
     {:ok, sock} = :gen_tcp.connect({:local, String.to_charlist(path)}, 0, Frame.socket_opts())
@@ -129,7 +135,7 @@ defmodule Sidecar.ProtocolTest do
   end
 
   test "ping is answered by the server from the manifest", %{path: path} do
-    assert {:ok, %{"fassung" => "sidecar-test/1", "ops" => ["search", "show"]}} =
+    assert {:ok, %{"version" => "sidecar-test/1", "ops" => ["search", "show"]}} =
              Client.call(path, "pdr-2", "ping", %{})
   end
 
@@ -276,14 +282,32 @@ defmodule Sidecar.ProtocolTest do
   describe "peer credentials" do
     @describetag :peer
 
+    test "peer_uid/1 decodes the caller's real uid from the kernel" do
+      dir = Path.join(System.tmp_dir!(), "sc-peer-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      path = Path.join(dir, "sidecar.sock")
+      on_exit(fn -> File.rm_rf!(dir) end)
+
+      {:ok, listener} = Server.listen(path)
+      {:ok, caller} = :gen_tcp.connect({:local, String.to_charlist(path)}, 0, Frame.socket_opts())
+      {:ok, accepted} = :socket.accept(listener, 5_000)
+
+      # Without this, a decoder that returns zeros or garbage would still
+      # make the mismatch test below pass.
+      assert Peer.peer_uid(accepted) == {:ok, own_uid()}
+
+      :gen_tcp.close(caller)
+      :socket.close(accepted)
+      :socket.close(listener)
+    end
+
     test "a caller of the sidecar's own uid is served" do
       dir = Path.join(System.tmp_dir!(), "sc-peer-#{System.unique_integer([:positive])}")
       File.mkdir_p!(dir)
       path = Path.join(dir, "sidecar.sock")
-      own_uid = File.stat!(File.cwd!()).uid
-      harness(path, own_uid)
+      harness(path, own_uid())
 
-      assert {:ok, %{"fassung" => "sidecar-test/1"}} = Client.call(path, "c", "ping", %{})
+      assert {:ok, %{"version" => "sidecar-test/1"}} = Client.call(path, "c", "ping", %{})
     end
 
     test "a caller with a different uid is rejected before any reply" do
@@ -315,7 +339,7 @@ defmodule Sidecar.ProtocolTest do
       end)
 
       wait_for_socket(path)
-      assert {:ok, %{"fassung" => "sidecar-test/1"}} = Client.call(path, "c", "ping", %{})
+      assert {:ok, %{"version" => "sidecar-test/1"}} = Client.call(path, "c", "ping", %{})
     end
 
     test "an invalid peer_credentials option fails before the socket is bound" do
