@@ -112,9 +112,10 @@ defmodule Sidecar.Server do
     credential_key = Keyword.get(opts, :credential_key, @default_credential_key)
 
     with {:ok, token} <- fetch_token(creds, credential_key),
+         {:ok, peer} <- peer_config(opts),
          {:ok, state} <- module.init(init_arg),
-         {:ok, listener} <- listen(socket_path),
-         {:ok, peer} <- peer_config(opts, socket_path) do
+         {:ok, listener} <- listen(socket_path) do
+      peer = expected_uid(peer, socket_path)
       manifest = module.manifest()
       Logger.info("sidecar #{manifest.fassung} listening on #{socket_path}")
       accept_loop(listener, module, state, token, peer: peer)
@@ -152,10 +153,7 @@ defmodule Sidecar.Server do
 
     case :socket.accept(listener) do
       {:ok, sock} ->
-        {:ok, pid} = Task.start(fn -> serve(sock, module, state, token, peer) end)
-        # The accepted socket belongs to this process; hand it over so
-        # its lifetime follows the serving process and all io runs there.
-        _ = :socket.setopt(sock, {:otp, :controlling_process}, pid)
+        hand_over(sock, fn -> serve(sock, module, state, token, peer) end)
         accept_loop(listener, module, state, token, peer: peer)
 
       {:error, :closed} ->
@@ -164,6 +162,23 @@ defmodule Sidecar.Server do
       {:error, reason} ->
         Logger.error("accept failed: #{inspect(reason)}")
         accept_loop(listener, module, state, token, peer: peer)
+    end
+  end
+
+  # The accepted socket belongs to this process. The serving process
+  # waits until it owns the socket, so the socket's lifetime follows it
+  # from the first byte on — a crash in serve/5 closes the connection.
+  defp hand_over(sock, fun) do
+    {:ok, pid} = Task.start(fn -> receive(do: (:handed_over -> fun.())) end)
+
+    case :socket.setopt(sock, {:otp, :controlling_process}, pid) do
+      :ok ->
+        send(pid, :handed_over)
+
+      {:error, reason} ->
+        Logger.error("socket handover failed: #{inspect(reason)}")
+        Process.exit(pid, :kill)
+        :socket.close(sock)
     end
   end
 
@@ -340,27 +355,30 @@ defmodule Sidecar.Server do
     )
   end
 
-  # Resolves the peer_credentials option to the uid the caller must
-  # match: false (off), true (the sidecar's own uid, i.e. the owner of
-  # the socket file this server just created), or an explicit uid.
-  defp peer_config(opts, socket_path) do
+  # Validates the peer_credentials option before anything is bound:
+  # false (off), :own (the sidecar's own uid), or an explicit uid.
+  defp peer_config(opts) do
     case Keyword.get(opts, :peer_credentials, false) do
       false ->
         {:ok, false}
 
       true ->
         if Peer.supported?() do
-          {:ok, File.stat!(socket_path).uid}
+          {:ok, :own}
         else
           Logger.warning("peer credentials unavailable on this platform; check disabled")
           {:ok, false}
         end
 
-      uid when is_integer(uid) ->
+      uid when is_integer(uid) and uid >= 0 ->
         {:ok, uid}
 
       other ->
         {:error, {:invalid_peer_credentials, other}}
     end
   end
+
+  # The sidecar's own uid is the owner of the socket file it just created.
+  defp expected_uid(:own, socket_path), do: File.stat!(socket_path).uid
+  defp expected_uid(peer, _socket_path), do: peer
 end

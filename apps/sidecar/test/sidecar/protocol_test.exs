@@ -88,6 +88,21 @@ defmodule Sidecar.ProtocolTest do
     %{path: path, token: token}
   end
 
+  # run/5 binds asynchronously in its own process. The chmod to 0600 comes
+  # after listen, so a 0600 socket file is one that accepts connections.
+  defp wait_for_socket(path, tries \\ 100) do
+    cond do
+      match?({:ok, %File.Stat{mode: m}} when Bitwise.band(m, 0o777) == 0o600, File.stat(path)) ->
+        :ok
+
+      tries == 0 ->
+        flunk("socket #{path} never appeared")
+
+      true ->
+        Process.sleep(10) && wait_for_socket(path, tries - 1)
+    end
+  end
+
   # Raw request to the socket, bypassing the client (like a foreign process).
   defp raw(path, frame) do
     {:ok, sock} = :gen_tcp.connect({:local, String.to_charlist(path)}, 0, Frame.socket_opts())
@@ -283,6 +298,34 @@ defmodule Sidecar.ProtocolTest do
         end)
 
       assert log =~ "peer_uid_mismatch"
+    end
+
+    test "run/5 with peer_credentials: true serves a caller of its own uid" do
+      dir = Path.join(System.tmp_dir!(), "sc-peer-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      path = Path.join(dir, "sidecar.sock")
+      token = Token.provision!(path)
+      creds = %{"SIDECAR_TOKEN" => token}
+
+      pid = spawn(fn -> Server.run(Echo, path, "state", creds, peer_credentials: true) end)
+
+      on_exit(fn ->
+        Process.exit(pid, :kill)
+        File.rm_rf!(dir)
+      end)
+
+      wait_for_socket(path)
+      assert {:ok, %{"fassung" => "sidecar-test/1"}} = Client.call(path, "c", "ping", %{})
+    end
+
+    test "an invalid peer_credentials option fails before the socket is bound" do
+      path = Path.join(System.tmp_dir!(), "sc-peer-#{System.unique_integer([:positive])}.sock")
+      creds = %{"SIDECAR_TOKEN" => Token.generate()}
+
+      assert {:error, {:invalid_peer_credentials, "yes"}} =
+               Server.run(Echo, path, nil, creds, peer_credentials: "yes")
+
+      refute File.exists?(path)
     end
 
     test "Peer.supported?/0 matches the platform's ability to report credentials" do
