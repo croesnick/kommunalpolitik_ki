@@ -136,8 +136,8 @@ jobs:
       # Umbrella-Child-Bootstrap, der auf frischem Runner ebenfalls
       # crasht (dialyxir haelt die App fuer ein Umbrella-Child, weil das
       # Lockfile "../workspace.lock" heisst). Apps mit Dialyzer-Pflicht:
-      # komki_policy, komki_cli, Vermittler, Connector-Bibliothek, Egress
-      # und die drei Connectoren.
+      # komki_policy, komki_cli, Vermittler, Connector-Bibliothek, Egress,
+      # die drei Connectoren und die Seatbelt-Library.
       #
       # Veraltete Deps-PLTs: Die Pfad-Abhaengigkeiten (komki_connector,
       # komki_policy, ...) stehen im Deps-PLT der App. Der Cache-Key kennt
@@ -162,6 +162,10 @@ jobs:
 
       - name: Dialyzer (komki_cli)
         working-directory: apps/komki_cli
+        run: mix dialyzer
+
+      - name: Dialyzer (seatbelt)
+        working-directory: apps/seatbelt
         run: mix dialyzer
 
       - name: Dialyzer (Vermittler, Connectoren, Egress)
