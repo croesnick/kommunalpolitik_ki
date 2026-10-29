@@ -81,7 +81,7 @@ Aufzeichnungen des Recorders zurück (siehe unten).
 
 Die Daten des Mocks sind handgespiegelt. Um die Antwortformate gegen das echte RIS zu verifizieren
 und komki ohne echtes RIS testen zu können, gibt es einen Aufzeichnungs-Proxy
-(`priv/ris_recorder.exs`): rein deterministischer Code, kein LLM sieht die Aufzeichnungen.
+(`priv/ris_recorder.exs`, Ticket #231). Er ist rein deterministischer Code ohne LLM.
 
 ```bash
 elixir apps/komki_connector_ris/priv/ris_recorder.exs --port 4020 \
@@ -89,71 +89,68 @@ elixir apps/komki_connector_ris/priv/ris_recorder.exs --port 4020 \
 ```
 
 Der Proxy reicht Anfragen 1:1 an das echte RIS weiter und schreibt jeden Austausch als Kassette
-(JSON, Body base64). `authorization`-/`cookie`-Kopfzeilen, `set-cookie` sowie
-`login`/`password`/`token`-Felder in JSON-Bodies werden beim Schreiben redigiert (`"<redacted>"`);
-Client und Upstream erhalten alles unredigiert. Die Kassetten enthalten trotzdem echte Daten und
-bleiben deshalb lokal (`priv/cassettes/` liegt in der `.gitignore`).
+(JSON, Body base64). Kassette heißt hier: eine aufgezeichnete Anfrage samt Antwort, wie bei VCR
+oder ExVCR.
+
+**Die Kassetten enthalten echte, auch nicht-öffentliche Inhalte.** Deshalb gilt:
+
+- Sie liegen nie im Repo-Baum. Standard ist `~/.local/share/kommunalpolitik_ki/ris-cassettes/<zeitstempel>/`;
+  ein `--out` innerhalb eines Git-Repos (auch eines Worktrees) weist der Recorder ab. So kann kein
+  Werkzeug, das im Repo arbeitet, die Aufzeichnungen nebenbei lesen.
+- Verzeichnis und Dateien sind nur für den Eigentümer lesbar (`0700`/`0600`).
+- Geschwärzt wird beim Schreiben (`"<redacted>"`): die Kopfzeilen `authorization`, `cookie` und
+  `set-cookie`; beim Login (`auth`) jeder Wert in Anfrage und Antwort, auch in Feldern, die
+  niemand vorhergesehen hat (die Struktur bleibt); sonst die Felder `token`/`access_token`/`jwt`.
+  Client und Upstream erhalten alles ungeschwärzt, nur die Datei ist geschwärzt.
 
 Gegen den Recorder aufzeichnen:
 
-- komki: `"ris_mock_port": 4020` in komkis `config.json` — Loopback gilt als Mock, der
+- komki: `"ris_mock_port": 4020` in komkis `config.json`. Loopback gilt als Mock, der
   Egress-Proxy bleibt aus.
 - `ratsinfo`: `RIS_BASE_URL=http://127.0.0.1:4020/` (ohne `/web/`; der Proxy ergänzt den Präfix
-  upstream-seitig).
+  upstream-seitig). `ratsinfo` nimmt hier nur Loopback-Adressen an, weil an diese Adresse auch die
+  Zugangsdaten gehen.
 
-Zurückspielen — komki läuft gegen die Aufzeichnung statt gegen das echte RIS:
+Zurückspielen, sodass komki gegen die Aufzeichnung statt gegen das echte RIS läuft:
 
 ```bash
 elixir apps/komki_connector_ris/priv/mock_ris.exs --port 4010 --mode replay --cassette <verzeichnis>
 ```
 
-Replay matcht `(Methode, Pfad, Query)`; bei abweichendem Query (z. B. anderem Zeitfenster) greift
-die erste Aufnahme für `(Methode, Pfad)`. Nicht aufgezeichnete Pfade antworten mit 404.
+Replay sucht den exakten Treffer für `(Methode, Pfad, Query)`. Nur bei `guestmeetings`, wo die Query
+lediglich das Zeitfenster wählt, greift es bei abweichender Query auf die erste Aufnahme desselben
+Pfads zurück. Überall sonst, etwa bei `fulltextsearch` mit anderem Suchbegriff, gibt es 404 statt
+der Antwort auf eine andere Frage. Nicht Aufgezeichnetes antwortet ebenfalls mit 404.
 
 ### Was der Recorder erfasst
 
-Er ist ein transparenter Proxy: Kassette wird, was die Clients wirklich abfragen — Methode, Pfad,
-Query, Kopfzeilen und Body der Anfrage sowie Status, Kopfzeilen und Body der Antwort. Binärkörper
-(PDF-Downloads) stehen bytetreu base64 in der Kassette; Umleitungen reicht er an den Client weiter
-(jeder Hop wird zur eigenen Kassette); gzip fordert er nicht an, damit die Kassetten deterministisch
-bleiben. Chunked Request-Bodies versteht er nicht (kein Client hier sendet sie).
+Er ist ein transparenter Proxy: Kassette wird, was die Clients wirklich abfragen. Das sind Methode,
+Pfad, Query, Kopfzeilen und Body der Anfrage sowie Status, Kopfzeilen und Body der Antwort.
+Binärkörper (PDF-Downloads) stehen bytetreu base64 in der Kassette. gzip fordert er nicht an, damit
+die Kassetten deterministisch bleiben. Grenzen:
+
+- Umleitungen reicht er unverändert an den Client weiter. Zeigt `Location` auf eine absolute
+  Upstream-URL, folgt der Client ihr direkt zum echten RIS, und dieser Hop fehlt in der Aufzeichnung.
+- Chunked Request-Bodies versteht er nicht (kein Client hier sendet sie).
 
 Damit sind alle Endpunkte erfasst, die komki und ratsinfo nutzen:
 
 | Client | Endpunkt | Anmerkung |
 |---|---|---|
 | beide | `guestmeetings`, `guestmeetings/{id}`, `guestagendaitems/{id}` | Gast-API, ohne Anmeldung |
-| ratsinfo | `POST auth` | Login; Login/Passwort stehen nur redigiert in der Kassette |
+| ratsinfo | `POST auth` | Login; in der Kassette ist jeder Wert geschwärzt |
 | ratsinfo | `meetings/{id}`, `agendaitems/{id}`, `committees` | authentifiziert |
-| ratsinfo | `fulltextsearch` | Suchterme stehen im Query und werden mit aufgezeichnet |
+| ratsinfo | `fulltextsearch` | Suchterme stehen in der Query und werden mit aufgezeichnet |
 | ratsinfo | `agendaitems/documents/{docId}` | Binär-Download, bytetreu |
 
-Nicht erfasst wird, was kein Client abfragt — der Recorder ist passiv. Für vollständige Abdeckung
-eine Aufzeichnungs-Session mit allen Flows fahren und die Suchterme variieren: komki `search`/
-`show` (mehrere Terme, auch nicht-öffentliche Treffer), ratsinfo-Login (Credentials wie üblich
-aus `RIS_EMAIL`/`RIS_PASSWORD`), Sitzungsliste, TOP-Details, Volltextsuche mit mehreren Termen,
-Anlagen-Downloads, Gremienliste. Danach liegen alle Antwortformate als Kassetten vor.
+Nicht erfasst wird, was kein Client abfragt, denn der Recorder ist passiv. Für vollständige
+Abdeckung eine Aufzeichnungs-Session mit allen Flows fahren und die Suchterme variieren: komki
+`search`/`show` (mehrere Terme, auch nicht-öffentliche Treffer), ratsinfo-Login (Zugangsdaten wie
+üblich aus `RIS_EMAIL`/`RIS_PASSWORD`), Sitzungsliste, TOP-Details, Volltextsuche mit mehreren
+Termen, Anlagen-Downloads, Gremienliste.
 
-### Skelett-Extraktor: Format ohne Inhalte
-
-`priv/ris_skeleton.exs` gewinnt aus Kassetten eine rein strukturelle Formatspezifikation —
-rekursive Schluesselmengen, Typen, Formen (ISO-Datum, ID-Muster, Base64-HTML) und
-Array-Kardinalitaeten, ohne jegliche Inhalte:
-
-```bash
-elixir apps/komki_connector_ris/priv/ris_skeleton.exs --cassette <dir> \
-  [--out <datei>] [--compare <dir2>]
-```
-
-Der Bericht ist committbar und der Vertrag zwischen echtem RIS und Mock.
-`--compare` meldet Abweichungen zwischen zwei Kassettenverzeichnissen
-(Exit-Code 1 bei Drift) — damit laesst sich pruefen, ob der synthetische Mock
-oder der spaetere Generator formatgetreu ist.
-
-Für committbare Testdaten gilt weiterhin: echte Inhalte verwerfen und Kassetten mit synthetischen
-Inhalten im echten Format erzeugen. Der Skelett-Bericht ist die Vorlage dieses deterministischen
-Generators; ein Verifier (N-Gramm-Check gegen die Aufzeichnungen, Formatshape-Pruefung) ist als
-Freigabetor vor jedem Committen von Kassetten geplant.
+Committbare Testdaten entstehen nie aus den Kassetten selbst, sondern aus synthetischen Inhalten im
+echten Format. Format-Extraktion und Generator dafür sind Ticket #232.
 
 ## Grenzen
 

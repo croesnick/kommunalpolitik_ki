@@ -57,10 +57,6 @@ config.local.yml
 # (ratsinfo lädt PDFs in seinen Cache; pdf_ingest legt .txt/.meta.json daneben)
 *.pdf
 
-# RIS-Aufzeichnungen des Recorders (echte Antwortformate des RIS, bleiben lokal;
-# siehe apps/komki_connector_ris/priv/ris_recorder.exs)
-apps/komki_connector_ris/priv/cassettes/
-
 # Skill eval workspace (local only — enthaelt reale Vault-Referenzen, nie tracken)
 vault_suche-workspace/
 

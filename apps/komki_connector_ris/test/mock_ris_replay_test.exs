@@ -46,6 +46,22 @@ defmodule KomkiConnectorRis.MockRisReplayTest do
     assert {:error, :not_found} = Http.get_json(base <> "gibtsnicht", @headers, 5_000)
   end
 
+  test "greift bei abweichender Query nur fuer Zeitfenster-Endpunkte zurueck" do
+    {:ok, mock, port} = MockRis.start(mode: {:replay, @cassettes})
+    on_exit(fn -> MockRis.stop(mock) end)
+    :ok = Http.start(nil)
+
+    # Aufgezeichnet ist guestmeetings/4711 ohne Query. Eine andere Frage an
+    # denselben Pfad bekommt keine fremde Antwort, sondern 404 — wie es eine
+    # Volltextsuche mit anderem Suchbegriff braeuchte.
+    assert {:error, :not_found} =
+             Http.get_json(
+               "http://127.0.0.1:#{port}/guestmeetings/4711?searchterm=anders",
+               @headers,
+               5_000
+             )
+  end
+
   test "spielt auch POST-Anfragen zurueck (Login)" do
     {:ok, mock, port} = MockRis.start(mode: {:replay, @cassettes})
     on_exit(fn -> MockRis.stop(mock) end)

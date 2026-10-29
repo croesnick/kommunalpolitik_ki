@@ -16,14 +16,32 @@ defmodule Ratsinfo.Config do
   z. B. für den Aufzeichnungs-Proxy `apps/komki_connector_ris/priv/ris_recorder.exs`
   oder den Replay-Modus des Mocks (jeweils ohne `/web/`-Präfix). Ein
   abschließender Schrägstrich wird ergänzt, wenn er fehlt.
+
+  Nur Loopback ist erlaubt: An die Base URL gehen auch E-Mail und Passwort
+  des Logins, eine Umgebungsvariable darf sie nicht an fremde Hosts leiten.
   """
   def base_url do
     case System.get_env("RIS_BASE_URL") do
       url when is_binary(url) and url != "" ->
+        loopback!(url)
         String.trim_trailing(url, "/") <> "/"
 
       _ ->
         @base_url
+    end
+  end
+
+  @loopback_hosts ["127.0.0.1", "localhost", "::1"]
+
+  defp loopback!(url) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host}
+      when scheme in ["http", "https"] and host in @loopback_hosts ->
+        :ok
+
+      _ ->
+        raise ArgumentError,
+              "RIS_BASE_URL muss auf Loopback zeigen (http://127.0.0.1:<port>/), war: #{url}"
     end
   end
 

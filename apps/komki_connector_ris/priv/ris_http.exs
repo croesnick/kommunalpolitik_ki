@@ -76,9 +76,6 @@ defmodule KomkiConnectorRis.RisHttp do
     end)
   end
 
-  # Ohne List.keyfind: dessen Position-Semantik hat sich in Elixir 1.20
-  # geaendert (0-basiert, Default nil statt false).
-
   # Bekannte Kopfzeilen kommen als Atom, unbekannte (X-Orgkey & Co.) als
   # Binaer-String oder Zeichenliste (auch :httpc-Antworten nutzen das Format).
   @doc false

@@ -9,12 +9,17 @@
 # Kassette: <out>/<nr>-<methode>-<pfad>.json mit Anfrage (Methode, Pfad,
 # Query, Kopfzeilen) und Antwort (Status, Kopfzeilen, Body base64).
 #
-# Die Kassetten enthalten echte Daten und bleiben deshalb lokal
-# (.gitignore: priv/cassettes/). Bestimmt redigiert, ohne jedes LLM:
-# authorization-/cookie-Kopfzeilen, set-cookie sowie die Felder
-# login/password/token/access_token/jwt in JSON-Bodies werden beim Schreiben
-# durch "<redacted>" ersetzt. Dem Client und dem Upstream reicht der Proxy
-# alles unveraendert durch — nur die Datei auf der Platte ist redigiert.
+# Die Kassetten enthalten echte, auch nicht-oeffentliche Daten. Sie liegen
+# deshalb nie im Repo-Baum (sonst koennte jedes Werkzeug, das im Repo
+# arbeitet, sie lesen): Standard ist ~/.local/share/kommunalpolitik_ki/
+# ris-cassettes/<zeitstempel>, ein --out innerhalb eines Git-Repos wird
+# abgewiesen, Verzeichnis und Dateien sind nur fuer den Eigentuemer lesbar.
+#
+# Bestimmt geschwaerzt, ohne jedes LLM: authorization-/cookie-Kopfzeilen,
+# set-cookie, beim Login (/auth) jeder Wert in Anfrage und Antwort, sonst die
+# Felder token/access_token/jwt in JSON-Bodies. Dem Client und dem Upstream
+# reicht der Proxy alles unveraendert durch — nur die Datei auf der Platte
+# ist geschwaerzt.
 #
 # Pfade ohne /web/-Praefix geben (Basis also http://127.0.0.1:<port>/, nicht
 # .../<port>/web/); der Proxy ergaenzt den Praefix upstream-seitig.
@@ -44,8 +49,12 @@ defmodule KomkiConnectorRis.RisRecorder do
   # Geheimnisse: Werte werden nur in der Kassette redigiert.
   @secret_request_headers ~w(authorization cookie proxy-authorization)
   @secret_response_headers ~w(set-cookie)
-  @secret_request_body_keys ~w(login password token access_token jwt)
-  @secret_response_body_keys ~w(token access_token jwt)
+  @secret_body_keys ~w(login password token access_token jwt)
+
+  # Login: hier ist praktisch alles geheim (Zugangsdaten, Token, womoeglich
+  # Refresh-Token und Profildaten in unbekannten Feldern). Statt einer
+  # Sperrliste wird jeder Wert geschwaerzt; die Struktur bleibt erhalten.
+  @auth_path "/auth"
 
   @spec start(keyword()) :: {:ok, pid(), :inet.port_number(), String.t()} | {:error, term()}
   def start(opts \\ []) do
@@ -58,10 +67,11 @@ defmodule KomkiConnectorRis.RisRecorder do
       |> String.trim_trailing("/")
       |> then(&(&1 <> "/"))
 
-    out = Keyword.get(opts, :out) || default_out()
-    File.mkdir_p!(out)
+    out = Path.expand(Keyword.get(opts, :out) || default_out())
 
-    with {:ok, _} <- Application.ensure_all_started([:inets, :ssl, :public_key]) do
+    with :ok <- check_out(out),
+         :ok <- prepare_out(out),
+         {:ok, _} <- Application.ensure_all_started([:inets, :ssl, :public_key]) do
       _ = :inets.stop(:httpc, @profile)
       {:ok, _pid} = :inets.start(:httpc, profile: @profile)
 
@@ -155,6 +165,13 @@ defmodule KomkiConnectorRis.RisRecorder do
 
   def redact_json(list, keys) when is_list(list), do: Enum.map(list, &redact_json(&1, keys))
   def redact_json(other, _keys), do: other
+
+  @doc "Ersetzt jeden String-Wert rekursiv durch \"<redacted>\" (Struktur bleibt)."
+  @spec redact_all(term()) :: term()
+  def redact_all(map) when is_map(map), do: Map.new(map, fn {k, v} -> {k, redact_all(v)} end)
+  def redact_all(list) when is_list(list), do: Enum.map(list, &redact_all/1)
+  def redact_all(value) when is_binary(value), do: @redacted
+  def redact_all(other), do: other
 
   # --- Server ----------------------------------------------------------------
 
@@ -289,24 +306,34 @@ defmodule KomkiConnectorRis.RisRecorder do
         # :json kodiert nil als String "nil" — JSON-null heisst :null.
         "query" => query || :null,
         "headers" => req_headers |> scrub_headers(@secret_request_headers) |> json_headers(),
-        "body_b64" => Base.encode64(scrub_json_body(req_body, @secret_request_body_keys))
+        "body_b64" => Base.encode64(scrub_body(path, req_body))
       },
       "response" => %{
         "status" => status,
         "headers" => resp_headers |> scrub_headers(@secret_response_headers) |> json_headers(),
-        "body_b64" => Base.encode64(scrub_json_body(resp_body, @secret_response_body_keys))
+        "body_b64" => Base.encode64(scrub_body(path, resp_body))
       }
     }
 
     file = Path.join(out, filename(n, method, path))
     File.write!(file, IO.iodata_to_binary(:json.encode(cassette)) <> "\n")
+    File.chmod!(file, 0o600)
   end
 
-  # JSON-Bodies werden dekodiert, redigiert und neu kodiert; alles andere
-  # (z. B. PDF-Downloads) bleibt bytetreu.
-  defp scrub_json_body(body, keys) do
+  # JSON-Bodies werden dekodiert, geschwaerzt und neu kodiert; alles andere
+  # (z. B. PDF-Downloads) bleibt bytetreu — ausser beim Login, dort wird ein
+  # Nicht-JSON-Body ganz ersetzt.
+  defp scrub_body(@auth_path, body) do
     case decode_json(body) do
-      {:ok, term} -> IO.iodata_to_binary(:json.encode(redact_json(term, keys)))
+      {:ok, term} -> IO.iodata_to_binary(:json.encode(redact_all(term)))
+      :error when body == "" -> body
+      :error -> @redacted
+    end
+  end
+
+  defp scrub_body(_path, body) do
+    case decode_json(body) do
+      {:ok, term} -> IO.iodata_to_binary(:json.encode(redact_json(term, @secret_body_keys)))
       :error -> body
     end
   end
@@ -352,7 +379,34 @@ defmodule KomkiConnectorRis.RisRecorder do
 
   defp default_out do
     stamp = Calendar.strftime(NaiveDateTime.utc_now(), "%Y%m%dT%H%M%SZ")
-    Path.join([Path.dirname(__ENV__.file), "cassettes", stamp])
+    Path.join([System.user_home!(), ".local/share/kommunalpolitik_ki/ris-cassettes", stamp])
+  end
+
+  @doc """
+  `:ok`, wenn `out` ausserhalb jedes Git-Repos liegt (auch Worktrees, deren
+  `.git` eine Datei ist), sonst `{:error, {:out_in_repo, repo}}`.
+  """
+  @spec check_out(Path.t()) :: :ok | {:error, {:out_in_repo, Path.t()}}
+  def check_out(out) do
+    out
+    |> Path.expand()
+    |> ancestors()
+    |> Enum.find(&File.exists?(Path.join(&1, ".git")))
+    |> case do
+      nil -> :ok
+      repo -> {:error, {:out_in_repo, repo}}
+    end
+  end
+
+  defp ancestors(path) do
+    parent = Path.dirname(path)
+    if parent == path, do: [path], else: [path | ancestors(parent)]
+  end
+
+  # Nur fuer den Eigentuemer: die Kassetten tragen nicht-oeffentliche Inhalte.
+  defp prepare_out(out) do
+    File.mkdir_p!(out)
+    File.chmod!(out, 0o700)
   end
 
   # --- Antwort an den Client ------------------------------------------------------
@@ -381,6 +435,15 @@ KomkiConnectorRis.RisHttp.cli(System.argv(), fn argv ->
         {:ok, _pid, actual, out} ->
           IO.puts("ris_recorder lauscht auf http://127.0.0.1:#{actual}/ (Kassetten nach #{out})")
           Process.sleep(:infinity)
+
+        {:error, {:out_in_repo, repo}} ->
+          IO.puts(
+            :stderr,
+            "ris_recorder: --out liegt im Git-Repo #{repo}; Kassetten enthalten " <>
+              "nicht-oeffentliche Daten und gehoeren ausserhalb jedes Repos"
+          )
+
+          exit({:shutdown, 1})
 
         {:error, reason} ->
           IO.puts(:stderr, "ris_recorder: Start fehlgeschlagen: #{inspect(reason)}")

@@ -38,6 +38,12 @@ defmodule KomkiConnectorRis.MockRis do
   @hop_by_hop ~w(connection keep-alive proxy-authenticate proxy-authorization te trailer
                 transfer-encoding upgrade content-length)
 
+  # Endpunkte, deren Query nur ein Zeitfenster waehlt: hier darf das Replay
+  # bei abweichender Query auf eine Aufnahme desselben Pfads zurueckgreifen.
+  # Ueberall sonst (z. B. fulltextsearch) wuerde der Rueckgriff still die
+  # Antwort auf eine andere Frage liefern — dort gilt nur der exakte Treffer.
+  @query_fallback_paths ~w(/guestmeetings)
+
   @usage "Aufruf: --port <port> [--mode ok|error500|slow] | --port <port> --mode replay --cassette <dir>"
 
   @spec start(keyword()) :: {:ok, pid(), :inet.port_number()} | {:error, term()}
@@ -223,16 +229,20 @@ defmodule KomkiConnectorRis.MockRis do
     end
   end
 
-  # Erst exakter Treffer (Methode, Pfad, Query), sonst der erste Treffer fuer
-  # (Methode, Pfad): ein abweichendes Zeitfenster greift auf die gleiche
-  # Aufzeichnung zurueck. Nichts Aufgezeichnetes antwortet mit 404.
+  # Erst exakter Treffer (Methode, Pfad, Query), sonst — nur fuer
+  # @query_fallback_paths — der erste Treffer fuer (Methode, Pfad).
+  # Nichts Passendes antwortet mit 404.
   defp find_entry(entries, method, path, query) do
     method = method |> RisHttp.method_label() |> String.upcase()
 
     exact = Enum.find(entries, &(&1.method == method and &1.path == path and &1.query == query))
-    fuzzy = Enum.find(entries, &(&1.method == method and &1.path == path))
 
-    case exact || fuzzy do
+    fallback =
+      path in @query_fallback_paths and
+        Enum.find(entries, &(&1.method == method and &1.path == path))
+
+    case exact || fallback do
+      false -> :error
       nil -> :error
       entry -> {:ok, entry}
     end
