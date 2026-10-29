@@ -190,6 +190,17 @@ def test_title_not_a_content_row(tmp_path, monkeypatch):
     assert check(src, out) == (True, [])
 
 
+def test_truecolor_and_background_codes(tmp_path, monkeypatch):
+    # pi-Themes färben mit 38;2;r;g;b. Ein 48;2-Hintergrund darf seine
+    # Farbwerte nicht als eigene Codes einschleusen (eine 2 wäre sonst dim).
+    capture = "\x1b[38;2;255;154;143mX\x1b[0m \x1b[48;2;2;2;2mY\x1b[0m\n"
+    src, out = render_capture(tmp_path, monkeypatch, capture=capture)
+    tspans = {ts.text: ts for ts in all_tspans(ET.parse(out).getroot())}
+    assert tspans["X"].get("fill") == "#ff9a8f"
+    assert tspans["Y"].get("fill-opacity") is None
+    assert check(src, out) == (True, [])
+
+
 def test_cli_contract(tmp_path):
     src = tmp_path / "capture.txt"
     src.write_text(CAPTURE, encoding="utf-8")

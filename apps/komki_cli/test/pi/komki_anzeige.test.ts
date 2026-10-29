@@ -22,6 +22,8 @@ const paint: Paint = {
 	bold: (text) => `<b>${text}</>`,
 };
 const strip = (s: string) => s.replace(/<[^>]*>/g, "");
+// Umbruch und Spalteneinzug eingeebnet: für Sätze, die über Zeilen laufen.
+const flat = (s: string) => strip(s).replace(/\s+/g, " ");
 const measure = (s: string) => [...strip(s)].length;
 
 // Einfacher Wortumbruch auf sichtbarer Breite (im Betrieb: pi-tui).
@@ -82,7 +84,29 @@ test("Ablehnung: rot, mit Grund, Ausweg und Beleg; Gate benannt", () => {
 	const web = strip(render("web_search_deny"));
 	assert.match(web, /Die Anfrage hat komki nicht verlassen\./);
 	assert.match(web, /brave-search/);
-	assert.match(web, /Freigabe \(GO\) für genau diesen Aufruf/);
+	assert.match(flat(render("web_search_deny")), /mit deinem GO für genau diesen Aufruf, im komki-Fenster/);
+});
+
+test("GO: was aus der Freigabe wurde, ohne dass pi selbst fragt", () => {
+	const nein = flat(render("web_search_go_abgelehnt"));
+	assert.match(nein, /✗ abgelehnt Die Anfrage hat komki nicht verlassen\./);
+	assert.match(nein, /GO Du hast die Freigabe abgelehnt\. Es bleibt beim Nein\./);
+
+	const still = flat(render("web_search_go_keine_antwort"));
+	assert.match(still, /GO Auf die Freigabe-Frage kam keine Antwort\. Es bleibt beim Nein\./);
+
+	// Angeboten, aber niemand war angedockt: der Vermittler hat nicht gefragt.
+	const ungefragt = flat(render("web_search_deny"));
+	assert.match(ungefragt, /GO Nicht gefragt, weil kein komki-Fenster bereit war\. Freigeben geht nur dort oder mit komki go\./);
+
+	// Ohne Call-GO im Katalog (Gate 2) kein GO-Satz.
+	assert.doesNotMatch(strip(render("vault_read_deny")), /^GO /m);
+});
+
+test("nichts in der Anzeige sieht wie eine Frage aus, die man in pi beantwortet", () => {
+	for (const out of names.flatMap((n) => [strip(render(n)), strip(render(n, true))])) {
+		assert.doesNotMatch(out, /\[j\/N\]|\(j\/n\)|\?\s*$|GO für genau diesen Aufruf\?/m);
+	}
 });
 
 test("Zurückhaltung und Fehler sind von Zulassung unterscheidbar", () => {

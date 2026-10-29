@@ -38,6 +38,7 @@ const LABELS: Record<string, string> = {
 	"web-oeffentlich@1": "öffentlich",
 	"vault-vertraulich@1": "vertraulich",
 	"doc-oeffentlich@1": "öffentlich",
+	"doc-oeffentlich@2": "öffentlich",
 	"doc-vertraulich@1": "vertraulich",
 };
 
@@ -137,7 +138,8 @@ function outcome(tool: string, r: Json, p: Paint): Row[] | undefined {
 			r.decision === "deny"
 				? p.fg("error", p.bold("✗ abgelehnt"))
 				: p.fg("warning", p.bold("? nicht entscheidbar"));
-		return [{ body: `${head}  ${p.fg("muted", gate)}` }, ...remedyRows(r, p)];
+		const go = goRow(r, p);
+		return [{ body: `${head}  ${p.fg("muted", gate)}` }, ...remedyRows(r, p), ...(go ? [go] : [])];
 	}
 
 	if (r.decision === "error") {
@@ -167,6 +169,30 @@ function outcome(tool: string, r: Json, p: Paint): Row[] | undefined {
 
 	if (r.decision !== "permit") return [];
 	return undefined;
+}
+
+// Was aus der Freigabe-Möglichkeit wurde. Das GO selbst fragt komki
+// außerhalb von pi (Popup `komki go`); hier steht nur, was geschah, und
+// nichts darf wie eine Frage aussehen, die man in pi beantwortet.
+// Ein erteiltes GO sieht pi als gewöhnliche Zulassung.
+function goRow(r: Json, p: Paint): Row | undefined {
+	if (r.go === "abgelehnt") return labelled("GO", "Du hast die Freigabe abgelehnt. Es bleibt beim Nein.", p);
+	if (r.go === "keine Antwort") return labelled("GO", "Auf die Freigabe-Frage kam keine Antwort. Es bleibt beim Nein.", p);
+	if (callGoOffered(r))
+		return labelled(
+			"GO",
+			p.fg("muted", "Nicht gefragt, weil kein komki-Fenster bereit war. Freigeben geht nur dort oder mit komki go."),
+			p,
+		);
+	return undefined;
+}
+
+function callGoOffered(r: Json): boolean {
+	return (Array.isArray(r.remedies) ? r.remedies : []).some((remedy: Json) =>
+		(Array.isArray(remedy?.transitions) ? remedy.transitions : []).some(
+			(t: Json) => t?.type === "aktionsfreigabe" && t.scope === "call",
+		),
+	);
 }
 
 function remedyRows(r: Json, p: Paint): Row[] {
@@ -201,7 +227,7 @@ function transition(t: Json): string {
 		case "aktionsfreigabe":
 			return t.scope === "object"
 				? `nach Einstufung von ${clean(String(t.object))} (GO)`
-				: "mit einer Freigabe (GO) für genau diesen Aufruf";
+				: "mit deinem GO für genau diesen Aufruf, im komki-Fenster";
 		case "fakt_nachreichen":
 			return `nach Nachreichen von ${(t.facts ?? []).map((f: unknown) => clean(String(f))).join(", ")}`;
 		case "registrierte_transformation":

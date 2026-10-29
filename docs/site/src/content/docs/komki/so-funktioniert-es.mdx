@@ -6,6 +6,7 @@ description: Agent, Vermittler, Connectoren und Räume, kurz hergeleitet.
 import { Aside } from '@astrojs/starlight/components';
 import Architektur from '../../../assets/architektur.svg';
 import Anfrage from '../../../assets/anfrage.svg';
+import GoAbgelehnt from '../../../assets/go-abgelehnt.svg';
 
 Ein KI-Agent, der recherchieren darf, ist praktisch. Gefährlich wird er, wenn drei Dinge zusammenkommen: Er kennt private Daten, er liest fremde Inhalte, und er hat einen Weg nach draußen. Simon Willison nennt das die [lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/). Dann reicht ein präparierter Text auf einer Webseite, und der Agent trägt deine Notizen hinaus. komki ist so gebaut, dass diese Kombination nicht entstehen kann.
 
@@ -82,3 +83,19 @@ GO für genau diesen Aufruf? [j/N]
 Mit `j` läuft genau diese Anfrage, einmal. Fragt pi danach etwas anderes oder dasselbe noch einmal, wird wieder gesperrt. Enter oder `n` heißt Nein. Antwortest du zwei Minuten lang nicht, bleibt es ebenfalls beim Nein. Jede Freigabe und jede Ablehnung steht im Journal.
 
 Ohne angedocktes Terminal, also bei `komki run` oder einer Session im Hintergrund, fragt komki nicht und lehnt sofort ab. Offene Anfragen kannst du auch in einem zweiten Terminal mit `komki go` beantworten.
+
+In pi steht danach unter der Sperre, was aus der Freigabe wurde: abgelehnt, ohne Antwort geblieben oder gar nicht gefragt, weil kein Fenster bereit war. Eine Frage zum Beantworten zeigt pi nie. Das GO kommt nur aus dem komki-Fenster, damit ein gekaperter Agent keinen Freigabe-Dialog vortäuschen kann. Das Bild zeigt beide Fälle aus einer echten Session: Erst war kein Fenster angedockt, beim zweiten Versuch lautete die Antwort Nein.
+
+<div class="komki-figure"><GoAbgelehnt /></div>
+
+## Vorlagen für die Ratsarbeit
+
+Typische Aufgaben startest du mit einem Befehl statt mit einem selbst formulierten Auftrag. Tipp in pi `/` und wähle:
+
+| Befehl | Was pi tut |
+|---|---|
+| `/sitzungsmappe [Thema]` | fasst die Raumdokumente je Tagesordnungspunkt zusammen: Worum es geht, Beschlussvorschlag, Kosten und Fristen, offene Fragen |
+| `/zusammenfassen <Dokument>` | fasst ein Raumdokument, einen Tagesordnungspunkt oder eine Notiz knapp zusammen |
+| `/quellen` | listet alle Quellen aus dem bisherigen Gespräch auf, ohne neue Abfrage |
+
+Jede Vorlage verlangt Quellen und erlaubt keine Websuche, um die du nicht gebeten hast. Vorlagen sind nur Text: Was pi damit tut, läuft wie jeder andere Auftrag durch den Vermittler.
