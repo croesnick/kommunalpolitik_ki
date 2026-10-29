@@ -12,7 +12,7 @@ defmodule KomkiMediator.PDR do
       emit- und admit-PDR eines Aufrufs tragen dieselbe `call_id`
       (Connector-Vertrag §6).
     * `session_id` — Zuordnung zur pi-Sitzung (aus der Umgebung, darf
-      `null` sein; der Kanal fuellt sie, Connector-Vertrag §8).
+      `null` sein; der Socket-Zugang fuellt sie, Connector-Vertrag §8).
     * `assigned_label` — bei emit-Permits die zugeordnete Ausgabe-Menge
       λ(y) = B_W.
 

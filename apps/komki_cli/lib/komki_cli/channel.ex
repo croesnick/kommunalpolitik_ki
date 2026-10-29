@@ -1,6 +1,6 @@
 defmodule KomkiCli.Channel do
   @moduledoc """
-  Kanal pi → Vermittler (Ticket #143, CONTRACT §2 und §8): Laufzeitverzeichnis,
+  Unix-Socket pi → Vermittler (Ticket #143, CONTRACT §2 und §8): Laufzeitverzeichnis,
   Token, Session-ID und das stdio-Relay.
 
       <base>/run/                 0700, angelegt von `komki up`

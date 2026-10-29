@@ -34,6 +34,7 @@
 | zugelassene Fähigkeiten | zugelassene Operationen | RFC0003, B.3-Feld |
 | spezialisierte / generischere Operation | eng begrenzte / weiter gefasste Operation | RFC0003, R.4.3 + D.9 |
 | Sicherheitspolitik | Sicherheitsregeln („neu gegliedert, führt aber keine neuen … ein“) | RFC0003, Z. 11 |
+| Kanal-Token; Kanal (pi → Vermittler) | Socket-Token; Unix-Socket (Entscheidung 2026-10-29, „Niemand versteht Kanal“) | komki_cli, komki_mediator, Connector-Vertrag § 8 |
 
 ### Konventionen
 

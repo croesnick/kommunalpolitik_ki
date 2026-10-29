@@ -1,6 +1,6 @@
 defmodule KomkiCli.ChannelTest do
   @moduledoc """
-  Kanal pi → Vermittler (Ticket #143): Laufzeitverzeichnis, Token-Datei,
+  Unix-Socket pi → Vermittler (Ticket #143): Laufzeitverzeichnis, Token-Datei,
   Session-ID, Relay und Socket-Pfad-Grenze.
   """
 

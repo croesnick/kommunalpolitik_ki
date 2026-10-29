@@ -100,7 +100,7 @@ defmodule KomkiMediator.TestHelpers do
     "/tmp/kmt-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"
   end
 
-  @doc "Zufaelliges Kanal-Token (64 Hex-Zeichen, wie komki up es schreibt)."
+  @doc "Zufaelliges Socket-Token (64 Hex-Zeichen, wie komki up es schreibt)."
   def new_token, do: Base.encode16(:crypto.strong_rand_bytes(32), case: :lower)
 
   @doc """

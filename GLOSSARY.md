@@ -813,6 +813,29 @@ pi-Paket). Weicht die Prüfsumme ab, verweigert komki den Start, bis
 
 ---
 
+### Socket-Token
+
+**Definition:** Das geheime Zufallstoken (32 Byte, als Hex), mit dem sich pi
+am Unix-Socket des Vermittlers ausweist. `komki up` schreibt es nach
+`<base>/run/mediator.token` (0600). pi bekommt es über die Umgebung
+(`KOMKI_MEDIATOR_TOKEN`) und reicht es an `komki-relay.js` weiter. Jede
+Anfrage an den Socket trägt es als `Authorization: Bearer <token>`; ohne
+oder mit falschem Token antwortet der Vermittler mit 401.
+
+**Abgrenzung:** Nicht zu verwechseln mit dem Capability-Token des
+[Sidecar](#sidecar)-Protokolls, das der Vermittler je Aufruf an einen
+Connector gibt.
+
+**Sprache:** „Kanal-Token“ ist eine Fehlform, ebenso „Kanal“ für die
+Verbindung pi → Vermittler: Das Wort sagt nicht, was gemeint ist. Es heißt
+Socket-Token bzw. Unix-Socket (Entscheidung 2026-10-29). Code-Bezeichner
+wie `KomkiCli.Channel` bleiben englisch.
+
+**Wo:** `KomkiCli.Channel`; Vertrag in
+[`apps/komki_connector/CONTRACT.md`](apps/komki_connector/CONTRACT.md) § 8.
+
+---
+
 ### komki-tresor
 
 **Definition:** Das kleine Swift-Programm, das Schlüssel (etwa den

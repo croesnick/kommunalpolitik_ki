@@ -10,7 +10,7 @@ defmodule KomkiCli.MediatorProfile do
     * Erstprovisionierung: registry.json, room.json und documents/ anlegen
       (`KomkiMediator.Templates.provision!/1` schreibt sie beim ersten Start),
     * Log schreiben,
-    * den eigenen Kanal binden (#143): den Unix-Socket
+    * den eigenen Unix-Socket binden (#143):
       `<base>/run/mediator.sock` (binden, annehmen, 0600, alten entfernen)
       und die Token-Datei `<base>/run/mediator.token` lesen; die Variante
       `{:tcp, port}` bleibt fuer Tests und Altinstanzen generierbar,
@@ -34,13 +34,13 @@ defmodule KomkiCli.MediatorProfile do
   @spec path(Config.t()) :: String.t()
   def path(%Config{} = cfg), do: Path.join(Path.dirname(cfg.profile_path), "mediator.sb")
 
-  @doc "Socket-Pfad des Kanals (CONTRACT.md §2, #143; Quelle `KomkiCli.Channel`)."
+  @doc "Socket-Pfad des Vermittlers (CONTRACT.md §2, #143; Quelle `KomkiCli.Channel`)."
   @spec socket_path(Config.t()) :: String.t()
   def socket_path(%Config{} = cfg), do: Channel.socket_path(cfg)
 
   defp token_path(cfg), do: Channel.token_path(cfg)
 
-  @doc "Profiltext fuer den Kanal `listen`."
+  @doc "Profiltext fuer `listen`: wie pi den Vermittler erreicht."
   @spec generate(Config.t(), listen()) :: String.t()
   def generate(%Config{} = cfg, listen) do
     binary = mediator_bin!(cfg)
@@ -104,7 +104,7 @@ defmodule KomkiCli.MediatorProfile do
   # Altform: Loopback-TCP auf einem Port (vor #143).
   defp listen_rules(_cfg, {:tcp, port}) do
     [
-      "; Kanal pi -> Vermittler: Loopback-TCP (Altform vor #143)",
+      "; pi -> Vermittler: Loopback-TCP (Altform vor #143)",
       "(allow network-bind (local ip \"localhost:" <> Integer.to_string(port) <> "\"))",
       "(allow network-inbound (local ip))"
     ]
@@ -112,7 +112,7 @@ defmodule KomkiCli.MediatorProfile do
 
   # #143: Unix-Socket unter <base>/run mit Bearer-Token-Datei.
   defp listen_rules(cfg, {:unix, socket}) do
-    ["; Kanal pi -> Vermittler: Unix-Socket (CONTRACT.md §8), Token nur lesen"] ++
+    ["; pi -> Vermittler: Unix-Socket (CONTRACT.md §8), Token nur lesen"] ++
       ConnectorProfile.socket_bind_rules(socket) ++
       [
         "(allow network-inbound (local unix-socket (path-literal " <> SBPL.quote!(socket) <> ")))",

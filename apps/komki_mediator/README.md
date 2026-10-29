@@ -198,7 +198,7 @@ verbraucht) ist ein neues deny des Freigabe-Zweigs.
 
 ### Bewusste Grenzen
 
-* Kein Token in der mcp.json. Das Kanal-Token reist ueber pis Umgebung
+* Kein Token in der mcp.json. Das Socket-Token reist ueber pis Umgebung
   zum Relay; Connector-Zugangsdaten leben nur im Vermittler (Forschung
   ticket/102, R.4.3).
 * Host nicht kompromittiert (Annahme aus #143). Das Token haelt lokale

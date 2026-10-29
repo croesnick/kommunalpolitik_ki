@@ -128,7 +128,7 @@ defmodule KomkiMediator.CLI do
   defp connectors_dir(%{base: base}), do: Path.join([base, "run", "connectors"])
 
   @doc """
-  Liest das Kanal-Token (Ticket #143): genau 64 Hex-Zeichen (klein), ein
+  Liest das Socket-Token (Ticket #143): genau 64 Hex-Zeichen (klein), ein
   abschliessender Zeilenumbruch ist erlaubt. Fehler nennen den Pfad, nie
   den Inhalt.
   """

@@ -68,7 +68,7 @@
 (allow file-write* (subpath "/opt/komki-golden/mediator/documents"))
 ; GO-Anfragen und Offenlegungsstand (Ticket #98)
 (allow file-write* (subpath "/opt/komki-golden/mediator/go"))
-; Kanal pi -> Vermittler: Unix-Socket (CONTRACT.md §8), Token nur lesen
+; pi -> Vermittler: Unix-Socket (CONTRACT.md §8), Token nur lesen
 ; eigener Unix-Socket (binden, 0600 setzen, alten Socket entfernen)
 (allow network-bind (local unix-socket (path-literal "/opt/komki-golden/run/mediator.sock")))
 (allow file-read* file-write* (literal "/opt/komki-golden/run/mediator.sock"))

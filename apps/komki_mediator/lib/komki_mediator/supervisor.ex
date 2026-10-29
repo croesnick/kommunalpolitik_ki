@@ -25,7 +25,7 @@ defmodule KomkiMediator.Supervisor do
   use Supervisor
 
   @typedoc """
-  Kanal: Socket-Pfad und Token (CONTRACT §8), optional das Verzeichnis
+  Socket-Zugang: Socket-Pfad und Socket-Token (CONTRACT §8), optional das Verzeichnis
   der Connector-Sockets (CONTRACT §2; fehlt es, sind Connector-Aufrufe
   Connector-Fehler).
   """
