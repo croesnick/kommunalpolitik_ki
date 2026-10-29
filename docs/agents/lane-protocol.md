@@ -41,3 +41,5 @@ Run the gates from the tooling table in [AGENTS.md](../../AGENTS.md) before you 
 ## Escalate instead of reinterpreting
 
 If the ticket's wording conflicts with what is implementable, comment on the ticket and leave it blocked. Decisions that belong to the human, such as pins, releases, and boundary raises, go into a comment as a proposal (GO-Prinzip, AGENTS.md). A lane proposes, the human decides.
+
+If the ticket carries `ai:a-tier` or `ai:b-tier` and the work turns out to touch a protected path listed in [ai-tiers.md](ai-tiers.md), stop, comment on the ticket, and propose `ai:s-tier`. Read the `## Zielbild` comment as part of the contract.
