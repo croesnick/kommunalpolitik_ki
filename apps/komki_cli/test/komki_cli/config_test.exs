@@ -143,6 +143,12 @@ defmodule KomkiCli.ConfigTest do
       assert Map.keys(cfg.connector_bins) == ["documents", "ris", "vault", "web"]
     end
 
+    test "Ticket #203: --port verlegt auch die Egress-Ports" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-port"), port: 49_800)
+      assert cfg.egress_ports == %{"ris" => 49_807, "web" => 49_808}
+      assert Config.egress_ports_for(49_524) == Config.default_egress_ports()
+    end
+
     test "Overrides: Mock-Port schaltet die URL um, leerer vault_dir schaltet ab" do
       cfg =
         Config.defaults(TestSupport.tmp_area!("komki-cfg-conn"),

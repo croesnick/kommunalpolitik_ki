@@ -108,11 +108,11 @@ defmodule KomkiMediator.TestHelpers do
   (Besitz beim Test-Supervisor: start_supervised reisst den Baum mit jedem
   Test deterministisch ab — benanntes Journal, Env, anubis-Registry, Socket).
   """
-  def start_socket_server! do
-    base = provisioned_base()
+  def start_socket_server!(opts \\ []) do
+    base = Keyword.get_lazy(opts, :base, &provisioned_base/0)
     {gamma, room} = load_room_env(base)
-    socket = tmp_socket()
-    token = new_token()
+    socket = Keyword.get_lazy(opts, :socket, &tmp_socket/0)
+    token = Keyword.get_lazy(opts, :token, &new_token/0)
     journal_path = Path.join([base, "mediator", "journal", "pdr.jsonl"])
 
     ExUnit.Callbacks.start_supervised!(

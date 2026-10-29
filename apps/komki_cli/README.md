@@ -304,10 +304,12 @@ nicht über einen TCP-Port:
 <base>/run/mediator.token   32 Byte Zufall als Hex, Rechte 0600
 ```
 
-* `komki up` schreibt bei jedem Vermittler-Start ein neues Token und startet
-  den Vermittler mit `--socket` und `--token-file`. Das Token steht nie in
+* `komki up` schreibt bei jedem Kaltstart des Vermittlers ein neues Token und
+  startet ihn mit `--socket` und `--token-file`. Das Token steht nie in
   einer Kommandozeile. Läuft der Vermittler schon und antwortet mit dem
-  aktuellen Token, bleibt beides unverändert.
+  aktuellen Token, bleibt beides unverändert. Muss ein laufender Vermittler
+  neu starten (neues Γ nach `komki label import`, neue Raumdokumente), behält
+  er das Token, und eine offene pi-Session arbeitet weiter (Ticket #216).
 * Jede Anfrage braucht `Authorization: Bearer <token>`, auch `/healthz`.
   Ohne oder mit falschem Token antwortet der Vermittler mit 401 und schreibt
   eine Logzeile (ohne Token-Wert) nach `tmp/mediator.log`. Das hält andere
@@ -406,7 +408,9 @@ selbst alle Prozesse, und nur der Egress-Proxy darf nach außen:
   Token wird abgewiesen, auch `ping`. pis Sandbox kann weder die Tokendateien
   lesen noch einen Connector-Socket erreichen.
 * **Konfiguration** (`config.json`, Defaults): `egress_ports`
-  (`{"ris": 49531, "web": 49532}`), `ris_base_url`
+  (`{"ris": 49531, "web": 49532}`; `init --port N` legt sie auf `N + 7` und
+  `N + 8`, damit eine Wegwerf-Instanz neben der Hauptinstanz startet; eine
+  bestehende `config.json` behält ihre Ports, Ticket #203), `ris_base_url`
   (`https://risapi1.komuna.net/web/`), `ris_mock_port` (aus; gesetzt spricht der
   RIS-Connector direkt mit `http://127.0.0.1:<port>/`, ohne Proxy), `vault_dir`
   (`<base>/vault`, anfangs leer, Test-Vault siehe Schnellstart; leer gesetzt: Vault-Connector aus).
