@@ -134,9 +134,26 @@ eine Aufzeichnungs-Session mit allen Flows fahren und die Suchterme variieren: k
 aus `RIS_EMAIL`/`RIS_PASSWORD`), Sitzungsliste, TOP-Details, Volltextsuche mit mehreren Termen,
 Anlagen-Downloads, Gremienliste. Danach liegen alle Antwortformate als Kassetten vor.
 
+### Skelett-Extraktor: Format ohne Inhalte
+
+`priv/ris_skeleton.exs` gewinnt aus Kassetten eine rein strukturelle Formatspezifikation —
+rekursive Schluesselmengen, Typen, Formen (ISO-Datum, ID-Muster, Base64-HTML) und
+Array-Kardinalitaeten, ohne jegliche Inhalte:
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_skeleton.exs --cassette <dir> \
+  [--out <datei>] [--compare <dir2>]
+```
+
+Der Bericht ist committbar und der Vertrag zwischen echtem RIS und Mock.
+`--compare` meldet Abweichungen zwischen zwei Kassettenverzeichnissen
+(Exit-Code 1 bei Drift) — damit laesst sich pruefen, ob der synthetische Mock
+oder der spaetere Generator formatgetreu ist.
+
 Für committbare Testdaten gilt weiterhin: echte Inhalte verwerfen und Kassetten mit synthetischen
-Inhalten im echten Format erzeugen. Ein tragfähiger, deterministischer Anonymisierungs-Ansatz dafür
-steht noch aus; die Aufzeichnungen sind seine Grundlage.
+Inhalten im echten Format erzeugen. Der Skelett-Bericht ist die Vorlage dieses deterministischen
+Generators; ein Verifier (N-Gramm-Check gegen die Aufzeichnungen, Formatshape-Pruefung) ist als
+Freigabetor vor jedem Committen von Kassetten geplant.
 
 ## Grenzen
 
