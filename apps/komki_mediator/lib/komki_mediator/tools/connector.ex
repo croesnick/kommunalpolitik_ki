@@ -10,7 +10,7 @@ defmodule KomkiMediator.Tools.Connector do
   Abbildung des Manifest-Schemas: `string` mit `max_length` und
   `pattern` (als JSON-Schema-Angabe), `integer` mit `min`/`max` und
   `default`, Pflichtfelder als `required`. Die Muster prueft das Gate
-  (`KomkiConnector.Params.check/2`), damit ein Verstoss als `error` mit
+  (`Sidecar.Params.check/3`), damit ein Verstoss als `error` mit
   PDR endet.
 
   `execute/2` entscheidet nichts selbst: der Aufruf geht unveraendert an

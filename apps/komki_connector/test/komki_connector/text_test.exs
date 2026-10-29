@@ -2,7 +2,7 @@ defmodule KomkiConnector.TextTest do
   @moduledoc """
   Die deutschen Modell- und Nutzer-Texte, exakt gepinnt: das Vokabular,
   das der Vermittler in den Modellkontext laesst, lebt seit der
-  Sidecar-Extraktion hier statt in `KomkiConnector.Frame.describe/1`.
+  Sidecar-Extraktion hier statt wie frueher in `Frame.describe/1`.
   """
 
   use ExUnit.Case, async: true

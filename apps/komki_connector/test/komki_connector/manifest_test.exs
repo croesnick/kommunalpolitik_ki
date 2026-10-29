@@ -8,7 +8,8 @@ defmodule KomkiConnector.ManifestTest do
 
   use ExUnit.Case, async: true
 
-  alias KomkiConnector.{Manifest, Params}
+  alias KomkiConnector.Manifest
+  alias Sidecar.Params
 
   test "Tools: eindeutig, by_tool, keine URL- oder Host-Parameter" do
     tools = Manifest.tools()

@@ -63,7 +63,7 @@ als Bild:
   Unix-Socket `<connectors_dir>/<id>.sock` (Default `<base>/run/connectors`,
   einstellbar mit `--connectors-dir`). Der Vermittler ruft sie nur nach
   einem emit-Permit und nur ueber das Frame-Protokoll
-  (`KomkiConnector.Client`, eine Verbindung je Aufruf).
+  (`Sidecar.Client`, eine Verbindung je Aufruf).
 * Wem gibt er Daten zurueck? Zwei Senken. pi erhaelt die MCP-Antwort:
   permit-Inhalt, Remedy-Katalog (bei deny) oder Zurueckhaltung
   (`"admitted" => "redacted"`, ohne content) — immer mit eingebetteter
@@ -261,7 +261,7 @@ Schemas und Beschreibungen der Connector-Tools entstehen zur Compile-Zeit aus
 `KomkiConnector.Manifest` (`KomkiMediator.Tools.Connector`); ein Test
 gleicht sie mit dem Manifest ab. anubis prueft Typ, Laenge, Bereich und
 Pflichtfelder schon auf Protokollebene und verwirft unbekannte Felder; das
-Gate prueft alles noch einmal mit `KomkiConnector.Params.check/2` (Muster
+Gate prueft alles noch einmal mit `Sidecar.Params.check/3` (Muster
 nur dort).
 
 Vor jeder Route prueft `KomkiMediator.HTTP.guard_caller/2`:

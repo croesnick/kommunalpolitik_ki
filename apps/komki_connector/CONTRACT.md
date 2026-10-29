@@ -35,9 +35,10 @@ not permitted`). Ein gesandboxter Prozess kann keinen Kindprozess mit eigenem Pr
 `sandbox-exec -f <profil>`.
 
 **Annahme:** Der Host ist nicht kompromittiert (kein Gegner mit derselben uid, Handbuch 7.2). Gegner ist
-der prompt-injizierte Agent in pis Sandbox. Zwei Maßnahmen engen den Fall „anderer Prozess derselben uid“
-trotzdem ein: Jeder Connector verlangt ein Token je Start (§3), und Geheimnisse liegen im Schlüsselbund nur
-als Siegel der Secure Enclave, die sich nur mit Touch ID oder dem Passwort des Macs öffnen lassen (§5).
+der prompt-injizierte Agent in pis Sandbox. Drei Maßnahmen engen den Fall „anderer Prozess derselben uid“
+trotzdem ein: Jeder Connector verlangt ein Token je Start und prüft die Peer-uid der Verbindung (§3), und
+Geheimnisse liegen im Schlüsselbund nur als Siegel der Secure Enclave, die sich nur mit Touch ID oder dem
+Passwort des Macs öffnen lassen (§5).
 
 ## 2. Laufzeitverzeichnis
 
@@ -57,8 +58,9 @@ macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge.
 
 - Transport: Unix-Domain-Socket, Stream. **Eine Verbindung je Aufruf**: verbinden, eine Anfrage, eine
   Antwort, schließen.
-- Framing: 4 Byte Länge (Big Endian, `:gen_tcp` `packet: 4`), dann UTF-8-JSON. Maximal 1 MiB je Frame. Ein
-  größerer Frame ist ein Protokollfehler, und die Verbindung wird geschlossen.
+- Framing: 4 Byte Länge (Big Endian; beim Aufrufer `:gen_tcp` `packet: 4`, im Connector manuell auf
+  `:socket`), dann UTF-8-JSON. Maximal 1 MiB je Frame. Ein größerer Frame ist ein Protokollfehler, und die
+  Verbindung wird geschlossen.
 - Anfrage:
 
   ```json
@@ -66,9 +68,10 @@ macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge.
   ```
 
   `token` ist Pflicht und muss dem Token des Connectors entsprechen (Vergleich in konstanter Zeit,
-  `KomkiConnector.Token`). Sonst antwortet der Connector `unauthorized` mit leerer `call_id`, noch vor
+  `Sidecar.Token`). Sonst antwortet der Connector `unauthorized` mit leerer `call_id`, noch vor
   `ping`, Schema-Prüfung und Operation. Der Client liest das Token je Aufruf aus `<id>.token` neben dem
-  Socket.
+  Socket. Zusätzlich weist der Connector Verbindungen zurück, deren Peer-uid nicht die eigene ist
+  (`Sidecar.Peer`, Defense-in-depth neben dem Token).
 
   `context` ist optional und kommt nur vom Vermittler, nie aus pis Argumenten. Heute einziges Feld:
   `assigned_label` (Liste) für schreibende Operationen (§6.3).
@@ -77,12 +80,14 @@ macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge.
 - Fehlercodes (geschlossen): `bad-request`, `unknown-op`, `not-found`, `upstream-error`, `upstream-timeout`,
   `credential-missing`, `forbidden-path`, `too-large`, `unauthorized`, `internal`.
 - `detail` bleibt beim Connector: Der Client ersetzt ihn durch den festen Text des Codes
-  (`KomkiConnector.Frame.describe/1`), sodass kein Freitext eines Connectors am Gate 2 vorbei in den
-  Modellkontext gelangt. Der Connector schreibt seinen `detail` in sein Log.
+  (`KomkiConnector.Text.describe/1`, deutsche Implementierung des `Sidecar.Texts`-Verhaltens), sodass
+  kein Freitext eines Connectors am Gate 2 vorbei in den Modellkontext gelangt. Der Connector schreibt
+  seinen `detail` in sein Log.
 - Reservierte Operation `ping` (ohne Parameter) liefert `{"fassung": "<fassung-id>", "ops": [...]}`. Sie
   dient `komki doctor` und ist **kein** MCP-Tool.
 - Timeout auf Vermittler-Seite: 15 s je Aufruf, danach `upstream-timeout`.
-- Implementierung: `KomkiConnector.Frame`, `KomkiConnector.Client`, `KomkiConnector.Server`.
+- Implementierung: die Library-App `apps/sidecar` (`Sidecar.Frame`, `Sidecar.Client`, `Sidecar.Server`,
+  `Sidecar.Token`, `Sidecar.Params`, `Sidecar.Peer`), extrahiert aus `komki_connector` (Ticket #225).
 
 ## 4. Start eines Connectors
 
@@ -99,6 +104,8 @@ sandbox-exec -f <base>/profile/connector-<id>.sb <binary> --socket <base>/run/co
 - Log: stderr, umgeleitet nach `<base>/tmp/connector-<id>.log`. Payloads werden nicht geloggt, nur
   Operation, Dauer, Fehlercode und der eigene Fehlertext des Connectors.
 - Beendet wird der Connector über SIGTERM (pidfile `<base>/tmp/connector-<id>.pid`).
+- Implementierung des Starts: `KomkiConnector.Launch.run/4` — Komposition aus `Sidecar.Server.run/5`
+  mit `credential_key: "KOMKI_CONNECTOR_TOKEN"` und Peer-uid-Check.
 
 ## 5. Manifeste (`KomkiConnector.Manifest`)
 
@@ -252,5 +259,6 @@ Zwei Referenzräume für Tests:
 ## 10. Nicht in v1 (bewusst offen)
 
 GO-Flow für schreibende Operationen (#98; `write_test` schreibt nur in den Testordner), Page-Fetch-Connector,
-AZ und Nextcloud, Peer-PID-Prüfung (nicht nötig unter der Host-Annahme), Vereinheitlichung von
-`admit_document` mit `workspace_bindings`.
+AZ und Nextcloud, Vereinheitlichung von `admit_document` mit `workspace_bindings`. Die Peer-PID-Prüfung ist
+seit der Sidecar-Extraktion (#225) als Peer-uid-Check enthalten (§3); eine Prüfung je Prozessexemplar bleibt
+offen.

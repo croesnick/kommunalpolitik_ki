@@ -160,7 +160,8 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `apps/komki_policy` | Elixir | Regel-Prüfkern: rechnet aus, ob eine Absicht nach den Regeln zulässig ist, und verifiziert die Begründung unabhängig nach; rein, führt selbst nichts aus | CLI (`komki-policy validate/decide/verify/advance`) | Funktionsfähig |
 | `apps/seatbelt` | Elixir | Library für macOS-Seatbelt-Sandboxen: deterministische Profil-Generierung, Escript-/BEAM-Grundschicht, Boot-Gate-Sonden und Programm-Pins (Prüfsummen); komki-unabhängig, Code und Doku auf Englisch (Kandidat für eine Veröffentlichung auf hex.pm, Ticket #226) | — (Bibliothek) | Funktionsfähig |
 | `apps/komki_mediator` | Elixir | Vermittler: MCP-Server für pis Tool-Aufrufe — jede Operation wird vor der Ausführung von komki_policy entschieden (Gate 1), jede Antwort vor der Aufnahme in den Kontext geprüft und gelabelt (Gate 2), jede Entscheidung im PDR-Journal festgehalten | MCP (von `komki up` gestartet, Unix-Socket mit Token) | Funktionsfähig |
-| `apps/komki_connector` | Elixir | Gemeinsame Grundlage aller Connectoren: wie Vermittler und Connector miteinander sprechen, welche Operationen jeder Connector anbietet, welche Internet-Adressen und Ordner er braucht und welches Label seine Antworten bekommen | — (Bibliothek, Vertrag in `CONTRACT.md`) | Funktionsfähig |
+| `apps/komki_connector` | Elixir | Komki-Seite des Connector-Vertrags: die Manifeste (einzige Quelle für Operationen, Netz, Ordner, Labels), die deutschen Modell-Texte, der Start-Einstieg und die CA-Zertifikate; das Frame-Protokoll selbst lebt in `apps/sidecar` | — (Bibliothek, Vertrag in `CONTRACT.md`) | Funktionsfähig |
+| `apps/sidecar` | Elixir | Das Frame-Protokoll mit Capability-Token als eigene Bibliothek: 1-MiB-Frames über Unix-Sockets, geschlossene Fehlercodes, Parameter-Schemas, optionaler Peer-uid-Check — bewusst komplett englisch in Code und Doku (Hex-Kandidat, #225) | — (Bibliothek) | Funktionsfähig |
 | `apps/komki_egress` | Elixir | Ausgangstür ins Internet für die Connectoren: jeder Connector bekommt einen eigenen lokalen Port und erreicht darüber nur die Adressen, die für ihn freigegeben sind; alles andere wird abgewiesen und protokolliert, ohne Inhalte mitzuschreiben | CLI (`komki-egress`, Konfiguration per stdin; später von `komki up` gestartet) | Funktionsfähig |
 | `apps/komki_connector_web` | Elixir | Websuche über Brave Search für den Vermittler: liefert Titel, Link und Kurztext je Treffer; der API-Schlüssel kommt aus dem Schlüsselbund und erscheint nirgends | Rolle `komki-connector-web` im Programm komki (von `komki up` gestartet, Aufruf nur über den Vermittler) | Funktionsfähig |
 | `apps/komki_connector_vault` | Elixir | Vault-Anschluss für komki: durchsucht und liest Notizen eines lokalen Markdown-Vaults (nur Notizen mit gültigem Label) und legt Testnotizen in einem eigenen Ordner an; Symlinks und Pfade aus dem Vault heraus werden abgewiesen; mit erfundenem Test-Vault | Frame-Protokoll über Unix-Socket (von `komki up` gestartet, aufgerufen vom Vermittler) | Funktionsfähig |
@@ -319,7 +320,8 @@ kommunalpolitik_ki/
 │   ├── shared/             # Geteilte Domain-Models
 │   ├── komki_policy/       # Regel-Prüfkern für Zulässigkeits-Entscheidungen (AI: CLI)
 │   ├── komki_mediator/     # Vermittler: MCP-Gates + PDR-Journal für pis Tool-Aufrufe (AI: MCP)
-│   ├── komki_connector/    # Connector-Vertrag, Frame-Protokoll, Manifeste (Bibliothek)
+│   ├── komki_connector/    # Connector-Vertrag, Manifeste, deutsche Texte, Launch (Bibliothek)
+│   ├── sidecar/            # Frame-Protokoll + Capability-Token als eigene Library (bewusst englisch, #225)
 │   ├── komki_egress/       # Egress-Proxy: freigegebene Ziele je Connector (AI: CLI)
 │   ├── komki_connector_web/ # Connector web: Brave-Websuche hinter dem Vermittler
 │   ├── komki_connector_vault/ # Vault-Connector: Notizen suchen/lesen, Testnotizen schreiben (via Vermittler)

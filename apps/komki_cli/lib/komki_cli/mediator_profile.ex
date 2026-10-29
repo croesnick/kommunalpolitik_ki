@@ -17,7 +17,7 @@ defmodule KomkiCli.MediatorProfile do
     * `network-outbound` nur auf die Connector-Sockets
       `<base>/run/connectors/<id>.sock` (alle Manifest-IDs, damit der Text
       nicht vom Vault-Schalter abhaengt) und Lesen der zugehoerigen
-      Token-Dateien `<id>.token` (`KomkiConnector.Token`).
+      Token-Dateien `<id>.token` (`Sidecar.Token`).
 
   Kein Netz-Outbound sonst, kein process-exec fuer Connectoren (Seatbelt
   laesst sich nicht verschachteln; `komki up` startet die Connectoren).

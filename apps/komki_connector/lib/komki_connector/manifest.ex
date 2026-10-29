@@ -14,7 +14,7 @@ defmodule KomkiConnector.Manifest do
   @type op_spec :: %{
           tool: String.t(),
           kind: :read | :write,
-          params: KomkiConnector.Params.schema(),
+          params: Sidecar.Params.schema(),
           description: String.t()
         }
 
