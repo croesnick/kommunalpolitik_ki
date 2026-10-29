@@ -116,7 +116,8 @@ def parse_line(raw):
             elif c == 38 and i + 1 < len(codes) and codes[i + 1] == 2:
                 # Truecolor (pi-Themes): 38;2;r;g;b
                 if i + 4 < len(codes):
-                    style["fg"] = "#%02x%02x%02x" % tuple(codes[i + 2 : i + 5])
+                    r, g, b = codes[i + 2 : i + 5]
+                    style["fg"] = f"#{r:02x}{g:02x}{b:02x}"
                 i += 4
             elif c == 48 and i + 1 < len(codes):
                 # Hintergrund wird nicht gezeichnet; die Farbwerte nicht als
