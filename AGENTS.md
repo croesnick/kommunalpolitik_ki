@@ -42,6 +42,10 @@ Wie eine Session ein Wayfinder-Ticket bearbeitet, verifiziert und abschließt (A
 
 Fünf kanonische Triage-Rollen als Labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Siehe `docs/agents/triage-labels.md`.
 
+### AI-Stufen
+
+`ai:s-tier`, `ai:a-tier` und `ai:b-tier` sagen, was ein Ticket verlangt: Grenze und Urteil, Feature mit Vertrag oder Handwerk. Daraus folgt, welche Modellklasse es bekommt. Berührt eine A- oder B-Aufgabe einen geschützten Pfad, hört die Session auf und eskaliert. Kriterien, geschützte Pfade, Zielbild-Vorlage und die aktuelle Zuordnung der Modelle: [docs/agents/ai-tiers.md](docs/agents/ai-tiers.md).
+
 ### Domain docs
 
 Single-context: `GLOSSARY.md` am Repo-Root (kanonische Nomenklatur aller Domänen — ersetzt die frühere `docs/nomenklatur.md`), ADRs unter `docs/adr/`. Siehe `docs/agents/domain.md`.
