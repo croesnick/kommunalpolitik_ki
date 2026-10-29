@@ -17,9 +17,9 @@ deliberately English.
 - **Framed JSON.** 4 bytes of big-endian length, then UTF-8 JSON, at most
   1 MiB per frame. A larger frame is a protocol error and closes the
   connection.
-- **Capability token before anything else.** `komki up` — or whatever starts
-  the sidecar — generates a 32-byte random token per start, hands it to the
-  sidecar over stdin and keeps it in a `0600` file beside the socket. Every
+- **Capability token before anything else.** Whatever starts the sidecar
+  generates a 32-byte random token per start, hands it to the sidecar over
+  stdin and keeps it in a `0600` file beside the socket. Every
   request must carry it; the comparison runs in constant time and happens
   before `ping`, before schema validation, before any operation. An
   unauthorized caller does not even learn the `call_id` it sent.
@@ -36,7 +36,9 @@ deliberately English.
 - **Optional peer-credential check.** Where the platform allows it
   (`SO_PEERCRED` on Linux, `LOCAL_PEERCRED` on macOS) the server can
   additionally require that a caller's peer uid matches the sidecar's own —
-  defense in depth against other processes of a loosened socket directory.
+  defense in depth against other users if socket or directory permissions
+  are loosened. It cannot tell processes of the same uid apart; the token
+  is what keeps those out.
 
 ## Quick start
 
@@ -92,7 +94,7 @@ Every string that a caller may surface to its own users — the fixed text per
 error code, transport failure details, parameter-validation details — comes
 from a `Sidecar.Texts` module. The library ships English defaults; pass your
 own implementation to `Sidecar.Client.call/6` (`texts:` option) and
-`Sidecar.Params.check/3` to control the language of those texts. The wire
+`Sidecar.Params.check/3` (third argument) to control the language of those texts. The wire
 `"fassung"` key of `ping` is historical protocol vocabulary and stays as-is
 for compatibility.
 
@@ -103,7 +105,7 @@ for compatibility.
   (default) | `true` | an expected uid integer).
 - `Sidecar.Client.call/6` — `timeout:` (default 15 s), `texts:` (default
   `Sidecar.Texts`).
-- `Sidecar.Params.check/3` — `texts:` (default `Sidecar.Texts`).
+- `Sidecar.Params.check/3` — third argument `texts` (default `Sidecar.Texts`).
 
 ## Layout
 

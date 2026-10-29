@@ -2,8 +2,9 @@ defmodule Sidecar.Peer do
   @moduledoc """
   Optional peer-credential check: the caller's peer uid must match the
   sidecar's own — defense in depth on top of the capability token,
-  against other processes of the same user reaching for a socket whose
-  file permissions have been loosened.
+  against processes of *other* users reaching a socket whose file or
+  directory permissions have been loosened. It cannot tell processes of
+  the same uid apart; against those, only the token helps.
 
   Verified against a C reference on macOS (Darwin 27, OTP 29.1.2):
   `:socket.getopt_native/3` returns the kernel's credential structure

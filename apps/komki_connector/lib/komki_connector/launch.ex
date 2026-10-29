@@ -6,8 +6,9 @@ defmodule KomkiConnector.Launch do
   gebuendelt, damit alle vier Connectoren identisch starten.
 
   `peer_credentials: true` weist Verbindungen zurueck, deren Peer-uid
-  nicht die eigene ist — zusätzlich zum Token, wirksam gegen andere
-  Prozesse derselben uid (Issue #225).
+  nicht die eigene ist (Issue #225): Defense-in-depth gegen fremde uids,
+  falls die Rechte von Socket oder Verzeichnis gelockert sind. Gegen
+  Prozesse derselben uid wirkt allein das Token (CONTRACT.md §1).
   """
 
   alias Sidecar.Server

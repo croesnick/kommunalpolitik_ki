@@ -35,10 +35,11 @@ not permitted`). Ein gesandboxter Prozess kann keinen Kindprozess mit eigenem Pr
 `sandbox-exec -f <profil>`.
 
 **Annahme:** Der Host ist nicht kompromittiert (kein Gegner mit derselben uid, Handbuch 7.2). Gegner ist
-der prompt-injizierte Agent in pis Sandbox. Drei Maßnahmen engen den Fall „anderer Prozess derselben uid“
-trotzdem ein: Jeder Connector verlangt ein Token je Start und prüft die Peer-uid der Verbindung (§3), und
-Geheimnisse liegen im Schlüsselbund nur als Siegel der Secure Enclave, die sich nur mit Touch ID oder dem
-Passwort des Macs öffnen lassen (§5).
+der prompt-injizierte Agent in pis Sandbox. Zwei Maßnahmen engen den Fall „anderer Prozess derselben uid“
+trotzdem ein: Jeder Connector verlangt ein Token je Start (§3), und Geheimnisse liegen im Schlüsselbund nur
+als Siegel der Secure Enclave, die sich nur mit Touch ID oder dem Passwort des Macs öffnen lassen (§5).
+Der Peer-uid-Check (§3) gehört nicht dazu: Er weist nur Prozesse *anderer* uids ab, falls die Rechte von
+Socket oder Verzeichnis einmal gelockert sind. Gegen dieselbe uid, also auch gegen pi, wirkt er nicht.
 
 ## 2. Laufzeitverzeichnis
 
@@ -71,7 +72,8 @@ macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge.
   `Sidecar.Token`). Sonst antwortet der Connector `unauthorized` mit leerer `call_id`, noch vor
   `ping`, Schema-Prüfung und Operation. Der Client liest das Token je Aufruf aus `<id>.token` neben dem
   Socket. Zusätzlich weist der Connector Verbindungen zurück, deren Peer-uid nicht die eigene ist
-  (`Sidecar.Peer`, Defense-in-depth neben dem Token).
+  (`Sidecar.Peer`), noch bevor er die Anfrage liest. Das ist Defense-in-depth gegen fremde uids bei
+  gelockerten Dateirechten neben `0600`; Prozesse derselben uid hält allein das Token ab.
 
   `context` ist optional und kommt nur vom Vermittler, nie aus pis Argumenten. Heute einziges Feld:
   `assigned_label` (Liste) für schreibende Operationen (§6.3).
@@ -259,6 +261,5 @@ Zwei Referenzräume für Tests:
 ## 10. Nicht in v1 (bewusst offen)
 
 GO-Flow für schreibende Operationen (#98; `write_test` schreibt nur in den Testordner), Page-Fetch-Connector,
-AZ und Nextcloud, Vereinheitlichung von `admit_document` mit `workspace_bindings`. Die Peer-PID-Prüfung ist
-seit der Sidecar-Extraktion (#225) als Peer-uid-Check enthalten (§3); eine Prüfung je Prozessexemplar bleibt
-offen.
+AZ und Nextcloud, Peer-PID-Prüfung (nicht nötig unter der Host-Annahme; der Peer-uid-Check aus §3
+unterscheidet Prozesse derselben uid nicht), Vereinheitlichung von `admit_document` mit `workspace_bindings`.
