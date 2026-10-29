@@ -3,7 +3,7 @@ defmodule KomkiMediator.TemplatesMigrationTest do
   Automatische Migration der Vorlagen (Ticket #177). Die Fixtures unter
   `test/fixtures/vorlagen/<commit>/` sind byte-genau die kanonischen
   Vorlagen der frueheren Fassungen auf main (#106: ed612a2, #107: d9159ec,
-  vor #134: 05b9b2d), erzeugt aus dem Git-Verlauf.
+  vor #134: 05b9b2d, vor #213: 8dc75f9), erzeugt aus dem Git-Verlauf.
   """
 
   use ExUnit.Case, async: true
@@ -36,7 +36,7 @@ defmodule KomkiMediator.TemplatesMigrationTest do
            }
   end
 
-  for rev <- ["ed612a2", "d9159ec"] do
+  for rev <- ["ed612a2", "d9159ec", "8dc75f9"] do
     test "unveraenderte Vorlagen aus #{rev} werden ersetzt; Journal und Dokumente bleiben" do
       {base, dir} = base_with(unquote(rev), unquote(rev))
       journal = Path.join([dir, "journal", "pdr.jsonl"])

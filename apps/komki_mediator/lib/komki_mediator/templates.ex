@@ -29,22 +29,26 @@ defmodule KomkiMediator.Templates do
 
   # SHA-256 der kanonischen Vorlagen. @outdated: fruehere Fassungen auf main
   # (#106 und #107 fuer die Registry, beide mit demselben Raum; #134 nur
-  # fuer den Raum).
+  # fuer den Raum; 8dc75f9 vor #213 fuer beide).
   @current %{
-    "registry.json" => "2c7391d3c63e5e06a1910372cb8632026f35f288f750cd3d87b2195db575d835",
-    "room.json" => "e16da13d5a89a0cf48204c24a3e2ef5c5b13a4fa778949dc6a76fa2e89729298"
+    "registry.json" => "038a1756f2be26e6a13b844e802d15afbb6b9d65fc5b05a19ffb168066ffcc62",
+    "room.json" => "8bb7a156134d43ebd4cc0027fc66ec27c26e00ae696d0d65f83b8ad8c9d57469"
   }
   @outdated %{
     "registry.json" => [
       "fed48d30194094c6e84be239ef40bf74be88457b1aaec09cb3dce8b5bb090e4f",
       "d2b6a4e987036711a517a31dc40368dea82f7136b4213fbf9614cf290ba6d22f",
       # bis #208: Lockerungsbefugnis von doc-pending-freigabe in Engine-Form
-      "38e86ed685b8887ddac4eb1976873b105fb1f272ce6c8ff67ac806370c8ecdf7"
+      "38e86ed685b8887ddac4eb1976873b105fb1f272ce6c8ff67ac806370c8ecdf7",
+      # 8dc75f9: vor #213 (ohne doc-oeffentlich@2)
+      "2c7391d3c63e5e06a1910372cb8632026f35f288f750cd3d87b2195db575d835"
     ],
     "room.json" => [
       "127831a737e7f5565d8def234c260ca270056b8954b346725f03ef638ef0b51f",
       # 05b9b2d: Objekte noch ohne Typ (vor #134)
-      "4b3ac34dc5ac6a81ea5cb81178cd1fea9f0045e753a079823aab98f6ea45fe32"
+      "4b3ac34dc5ac6a81ea5cb81178cd1fea9f0045e753a079823aab98f6ea45fe32",
+      # 8dc75f9: vor #213 (Dokument-Label nicht in B_W)
+      "e16da13d5a89a0cf48204c24a3e2ef5c5b13a4fa778949dc6a76fa2e89729298"
     ]
   }
 
@@ -94,6 +98,13 @@ defmodule KomkiMediator.Templates do
             binding("Öffentliches Raumdokument", ["nutzende-person", "pi-agent"], %{
               "admit" => true
             }),
+          # Seit #213 steht das Dokument-Label in B_W und gilt damit fuer
+          # jede Operation des Raums. Mit Empfaengerkreis und Operationen
+          # von @1 sperrte das in recherche RIS und Websuche; Bindungen sind
+          # unveraenderlich (R.2.1), darum eine neue Fassung, offen wie die
+          # oeffentlichen Connector-Bindungen.
+          "doc-oeffentlich@2" =>
+            binding("Öffentliches Raumdokument", @observers, %{"admit" => true, "emit" => true}),
           "doc-vertraulich@1" =>
             binding("Vertrauliches Raumdokument", ["nutzende-person", "pi-agent"], %{
               "admit" => %{"eq" => ["purpose", "vertraulich"]}
@@ -167,18 +178,28 @@ defmodule KomkiMediator.Templates do
 
   @doc "B_W des Referenzraums recherche (Default-Raum)."
   @spec recherche_bindings() :: [String.t()]
-  def recherche_bindings, do: ["ris-oeffentlich@1", "vault-oeffentlich@1", "web-oeffentlich@1"]
+  def recherche_bindings,
+    do: ["doc-oeffentlich@2", "ris-oeffentlich@1", "vault-oeffentlich@1", "web-oeffentlich@1"]
 
   @doc "B_W des Referenzraums vertraulich (Connector-Vertrag §7)."
   @spec vertraulich_bindings() :: [String.t()]
   def vertraulich_bindings,
-    do: ["ris-oeffentlich@1", "vault-oeffentlich@1", "vault-vertraulich@1", "web-oeffentlich@1"]
+    do: [
+      "doc-oeffentlich@2",
+      "ris-oeffentlich@1",
+      "vault-oeffentlich@1",
+      "vault-vertraulich@1",
+      "web-oeffentlich@1"
+    ]
 
   @doc """
-  Raum-Term des Default-Arbeitsraums. Bewusst OHNE die
-  `vertraulich_freigabe`-Fakt: `doc-pending-freigabe` faehrt damit die
-  indeterminate-Route (missing_fact) — die Freigabe ist nachzuholen.
-  `workspace_bindings` ist B_W des Referenzraums recherche.
+  Raum-Term des Default-Arbeitsraums. `workspace_bindings` ist B_W des
+  Referenzraums recherche. Darin liegt nur `doc-oeffentlich`; die beiden
+  anderen Beispieldokumente tragen Labels ausserhalb von B_W und sind hier
+  nicht zulaessig (R.5.4, #213), `list_documents` nennt sie nicht. Bewusst
+  OHNE die `vertraulich_freigabe`-Fakt: in einem Raum mit
+  `doc-pending-freigabe@1` in B_W faehrt die Aufnahme damit die
+  indeterminate-Route (missing_fact).
   """
   def room do
     %{
@@ -224,7 +245,7 @@ defmodule KomkiMediator.Templates do
         "doc-oeffentlich" => %{
           "type" => "document",
           "version" => "v1",
-          "labels" => ["doc-oeffentlich@1"]
+          "labels" => ["doc-oeffentlich@2"]
         },
         "doc-vertraulich" => %{
           "type" => "document",

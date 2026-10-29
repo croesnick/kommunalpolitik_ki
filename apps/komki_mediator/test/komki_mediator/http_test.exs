@@ -71,7 +71,7 @@ defmodule KomkiMediator.HTTPTest do
 
       health = JSON.decode!(body)
       assert health["status"] == "ok"
-      assert health["fassung_id"] == "komki-mediator/2"
+      assert health["fassung_id"] == "komki-mediator/3"
       assert health["tools"] == KomkiMediator.Fassung.tools()
       assert health["registry_id"] == "reg-komki-arbeitsraum"
       assert health["gamma_hash"] =~ "sha256:"

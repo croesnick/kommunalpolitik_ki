@@ -209,9 +209,10 @@ Hinweise zu den einzelnen Schritten:
   `komki init --force --ris-mock-port 49640`.
 * **Raum wechseln:** Welche Daten in einer Session zusammenkommen dürfen,
   steht in `~/.local/share/komki/mediator/room.json`, Feld `workspace_bindings`. Default ist
-  **recherche** (`ris-oeffentlich@1`, `vault-oeffentlich@1`,
-  `web-oeffentlich@1`): Websuche und RIS erlaubt, vertrauliche Notizen
-  gesperrt. Für **vertraulich** `vault-vertraulich@1` ergänzen: Dann sind
+  **recherche** (`doc-oeffentlich@2`, `ris-oeffentlich@1`,
+  `vault-oeffentlich@1`, `web-oeffentlich@1`): Websuche und RIS erlaubt,
+  vertrauliche Notizen gesperrt. Raumdokumente liest pi nur, wenn ihre
+  Labels hier stehen (`list_documents` zeigt, welche). Für **vertraulich** `vault-vertraulich@1` ergänzen: Dann sind
   vertrauliche Notizen lesbar und jede Web- und RIS-Suche gesperrt. Nach der
   Änderung `komki down && komki up`.
 * **Nachvollziehen:** Jede Entscheidung steht im Journal

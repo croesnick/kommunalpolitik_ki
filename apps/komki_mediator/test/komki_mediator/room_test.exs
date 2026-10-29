@@ -21,6 +21,7 @@ defmodule KomkiMediator.RoomTest do
 
   test "workspace_bindings: recherche im Default-Raum, nil wenn das Feld fehlt", %{room: room} do
     assert room.workspace_bindings == [
+             "doc-oeffentlich@2",
              "ris-oeffentlich@1",
              "vault-oeffentlich@1",
              "web-oeffentlich@1"
@@ -61,14 +62,14 @@ defmodule KomkiMediator.RoomTest do
     {:ok, object} =
       Room.object_for_call(room, "admit_document", %{"document_id" => "doc-oeffentlich"})
 
-    assert object.labels == ["doc-oeffentlich@1"]
+    assert object.labels == ["doc-oeffentlich@2"]
   end
 
   test "object_for_claim loest Objekt-Claims aus dem realisierten Payload auf", %{room: room} do
     assert {:ok, object} = Room.object_for_claim(room, "doc-oeffentlich")
     assert object.object_id == "doc-oeffentlich"
     assert object.version == "v1"
-    assert object.labels == ["doc-oeffentlich@1"]
+    assert object.labels == ["doc-oeffentlich@2"]
 
     assert {:error, :unknown_object, "doc-phantom"} = Room.object_for_claim(room, "doc-phantom")
   end
@@ -79,7 +80,8 @@ defmodule KomkiMediator.RoomTest do
     {:ok, object} =
       Room.object_for_call(room, "admit_document", %{"document_id" => "doc-oeffentlich"})
 
-    snapshot = Room.snapshot_for(room, gamma, object, "abc123def456")
+    {:ok, bindings} = Room.bindings_for(room, "admit_document", object)
+    snapshot = Room.snapshot_for(room, gamma, object, "abc123def456", bindings)
 
     intent = %{
       "schema" => "komki-intent/1",
@@ -92,16 +94,39 @@ defmodule KomkiMediator.RoomTest do
     assert {:ok, %{"decision" => "permit", "proof" => proof}} =
              Derive.decide(gamma.compiled, snapshot, intent)
 
-    assert proof["checked_label"] == object.labels
+    assert proof["checked_label"] == room.workspace_bindings
   end
 
-  test "checked_label == workspace bindings == Objekt-Labels", %{gamma: gamma, room: room} do
+  test "ping entscheidet mit seinen Objekt-Labels", %{gamma: gamma, room: room} do
     {:ok, object} = Room.object_for_call(room, "ping", %{})
-    snapshot = Room.snapshot_for(room, gamma, object, "abc123def456")
+    {:ok, bindings} = Room.bindings_for(room, "ping", object)
+    snapshot = Room.snapshot_for(room, gamma, object, "abc123def456", bindings)
 
     assert snapshot["workspace"]["bindings"] == object.labels
     assert snapshot["object"]["labels"] == object.labels
     assert snapshot["object"]["classification"] == "classified"
+  end
+
+  # R.5.4 (#213): Das Validierungslabel eines Raumdokuments ist B_W.
+  test "admit_document und list_documents entscheiden mit B_W, ohne B_W gar nicht", %{
+    room: room
+  } do
+    {:ok, object} =
+      Room.object_for_call(room, "admit_document", %{"document_id" => "doc-oeffentlich"})
+
+    assert Room.bindings_for(room, "admit_document", object) == {:ok, room.workspace_bindings}
+    assert Room.bindings_for(room, "list_documents", nil) == {:ok, room.workspace_bindings}
+
+    assert {:error, "Raum ohne workspace_bindings" <> _} =
+             Room.bindings_for(%{room | workspace_bindings: nil}, "admit_document", object)
+  end
+
+  test "document_ids: nur Objekte vom Typ document, sortiert", %{room: room} do
+    assert Room.document_ids(room) == [
+             "doc-oeffentlich",
+             "doc-pending-freigabe",
+             "doc-vertraulich"
+           ]
   end
 
   test "falsches Schema faellt in einen strukturierten Schema-Fehler" do

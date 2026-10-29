@@ -21,7 +21,7 @@ defmodule KomkiCli.Mediator do
                          Server-Name "komki" -> pi-Tool-IDs
                          mcp__komki__<tool>
 
-  Die Fassung (aktuell ["ping", "admit_document"]) wird bei `up` AUS
+  Die Fassung (Tool-Liste, z. B. ["ping", "list_documents", …]) wird bei `up` AUS
   healthz GELESEN, nicht hartkodiert — komki_cli kennt keine Tool-Namen.
   Die pi-seitige Freigabe erfolgt via `write_mcp_config/2`: alles zweite
   bleibt verborgen.
