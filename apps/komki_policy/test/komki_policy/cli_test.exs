@@ -608,6 +608,53 @@ defmodule KomkiPolicy.CLITest do
     assert String.contains?(parsed["detail"], "--registry requires a value")
   end
 
+  # Flag-Menge je Befehl geschlossen (#119): die drei Review-Beispiele plus
+  # die verbliebenen Kombinationen — bekannt am falschen Befehl ist usage.
+  test "bekanntes Flag am falschen Befehl -> Exit 2, usage (nicht still ignoriert)" do
+    cases = [
+      {[
+         "decide",
+         "--registry",
+         fixture_path("registry.json"),
+         "--snapshot",
+         fixture_path("case_permit/snapshot.json"),
+         "--intent",
+         fixture_path("case_permit/intent.json"),
+         "--proposal",
+         fixture_path("case_release_permit/release.json")
+       ], "--proposal"},
+      {[
+         "verify",
+         "--registry",
+         fixture_path("registry.json"),
+         "--snapshot",
+         fixture_path("case_permit/snapshot.json"),
+         "--intent",
+         fixture_path("case_permit/intent.json"),
+         "--stand",
+         fixture_path("case_release_permit/stand.json")
+       ], "--stand"},
+      {[
+         "advance",
+         "--stand",
+         fixture_path("case_release_permit/stand.json"),
+         "--release",
+         fixture_path("case_release_permit/release.json")
+       ], "--release"},
+      {["validate", "--registry", fixture_path("registry.json"), "--snapshot", "x.json"],
+       "--snapshot"}
+    ]
+
+    Enum.each(cases, fn {argv, flag} ->
+      {output, code} = run_cli(argv)
+
+      assert code == 2, flag
+      parsed = assert_canonical(output)
+      assert parsed["code"] == "usage", flag
+      assert String.contains?(parsed["detail"], flag <> " is not valid for this command"), flag
+    end)
+  end
+
   test "unerwarteter argv-Typ fließt in dem Crash-Handler -> Exit 4, code internal_error (MIN-5, kein Abort)" do
     {output, code} =
       run_cli([

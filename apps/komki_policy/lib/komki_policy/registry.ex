@@ -11,6 +11,8 @@ defmodule KomkiPolicy.Registry do
   wird nicht durch Annahmen verborgen.
   """
 
+  alias KomkiPolicy.Validations
+
   @registry_fields [
     "schema",
     "registry_id",
@@ -74,8 +76,8 @@ defmodule KomkiPolicy.Registry do
   # ---------------------------------------------------------------------
 
   defp validate(term) do
-    with :ok <- require_schema(term),
-         :ok <- closed_fields(term, @registry_fields, "$"),
+    with :ok <- Validations.require_schema(term, "komki-registry/2"),
+         :ok <- Validations.closed_fields(term, @registry_fields, "$"),
          :ok <- validate_registry_id(term),
          {:ok, observers} <- validate_observers(term),
          {:ok, fact_fields} <- validate_fact_fields(term),
@@ -98,25 +100,6 @@ defmodule KomkiPolicy.Registry do
   defp wrap_reason({code, path, detail}), do: {:error, %{code: code, path: path, detail: detail}}
 
   defp fail(code, path, detail), do: {:error, {code, path, detail}}
-
-  defp require_schema(%{"schema" => "komki-registry/2"}), do: :ok
-
-  defp require_schema(%{"schema" => other}),
-    do: fail(:invalid_schema, "$.schema", "expected \"komki-registry/2\", got " <> inspect(other))
-
-  defp require_schema(_term), do: fail(:invalid_schema, "$.schema", "missing field \"schema\"")
-
-  defp closed_fields(map, allowed, path) do
-    unknown = Enum.reject(Map.keys(map), fn key -> key in allowed end)
-
-    case Enum.sort(unknown) do
-      [] ->
-        :ok
-
-      [first | _] ->
-        fail(:unknown_field, path <> "." <> first, "field not part of the closed schema")
-    end
-  end
 
   defp validate_registry_id(term) do
     if kebab_id?(term["registry_id"]) do
@@ -196,8 +179,8 @@ defmodule KomkiPolicy.Registry do
   end
 
   defp environment_part(spec, observers, path) do
-    with {:ok, _} <- require_map(spec, path),
-         :ok <- closed_fields(spec, @environment_fields, path),
+    with {:ok, _} <- Validations.require_map(spec, path),
+         :ok <- Validations.closed_fields(spec, @environment_fields, path),
          :ok <- subset_observers(spec["observers"], observers, path <> ".observers") do
       {:ok, %{observers: Enum.sort(spec["observers"])}}
     else
@@ -260,8 +243,8 @@ defmodule KomkiPolicy.Registry do
   end
 
   defp binding_part(spec, fact_fields, observers, path) do
-    with {:ok, _} <- require_map(spec, path),
-         :ok <- closed_fields(spec, @binding_fields, path),
+    with {:ok, _} <- Validations.require_map(spec, path),
+         :ok <- Validations.closed_fields(spec, @binding_fields, path),
          :ok <- subset_observers(spec["readers"], observers, path <> ".readers"),
          :ok <- relaxations_list?(spec["relaxation_authorities"], path),
          {:ok, operations} <- validate_operations(spec["operations"], fact_fields, path) do
@@ -334,21 +317,16 @@ defmodule KomkiPolicy.Registry do
         {:ok, %{}}
 
       %{} = transformations ->
-        collect_transformations(
-          transformations,
-          Map.to_list(transformations),
-          binding_ids,
-          "$.transformations"
-        )
+        collect_transformations(Map.to_list(transformations), binding_ids, "$.transformations")
 
       _other ->
         fail(:invalid_transformations, "$.transformations", "expected an object")
     end
   end
 
-  defp collect_transformations(_map, [], _binding_ids, _path), do: {:ok, %{}}
+  defp collect_transformations([], _binding_ids, _path), do: {:ok, %{}}
 
-  defp collect_transformations(_map, entries, binding_ids, path) do
+  defp collect_transformations(entries, binding_ids, path) do
     Enum.reduce_while(entries, {:ok, %{}}, fn {id, spec}, {:ok, acc} ->
       result = transformation_part(id, spec, binding_ids, path)
 
@@ -366,8 +344,8 @@ defmodule KomkiPolicy.Registry do
   end
 
   defp do_transformation_part(spec, binding_ids, path) do
-    with {:ok, _} <- require_map(spec, path),
-         :ok <- closed_fields(spec, @transformation_fields, path),
+    with {:ok, _} <- Validations.require_map(spec, path),
+         :ok <- Validations.closed_fields(spec, @transformation_fields, path),
          :ok <-
            require_sorted_unique_bindings(
              spec["input_labels"],
@@ -421,11 +399,6 @@ defmodule KomkiPolicy.Registry do
   # ---------------------------------------------------------------------
   # Zeichenketten-/Listenprüfungen
   # ---------------------------------------------------------------------
-
-  defp require_map(%{} = map, _path), do: {:ok, map}
-
-  defp require_map(other, path),
-    do: fail(:invalid_record, path, "expected an object, got " <> inspect(other))
 
   defp nonempty_unique_strings(list, path) when is_list(list) do
     uniq = Enum.uniq(list)

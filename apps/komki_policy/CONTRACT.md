@@ -483,7 +483,7 @@ Ungültige Eingaben (Eingabefehler, keine Entscheidungen):
 | `invalid/intent_version_mismatch.json` | Kohärenzfehler `intent_snapshot_mismatch` |
 | `invalid/release_unknown_field.json` | Validierungsfehler `unknown_field` (Release-Schema § 2.6) |
 | `invalid/release_bad_window.json` | Validierungsfehler `invalid_window` (`valid_from > valid_until`) |
-| `invalid/emit_digest_missing.json` | `decide` auf `emit` ohne Fakt `output_content_digest` → Eingabefehler `emit_digest_missing` (§ 4.5) |
+| `invalid/emit_digest_missing_intent.json` + `invalid/emit_digest_missing_snapshot.json` | `decide` auf `emit` ohne Fakt `output_content_digest` → Eingabefehler `emit_digest_missing` (§ 4.5) |
 
 Manipulierte Beweise (alle von `verify` zu verwerfen):
 

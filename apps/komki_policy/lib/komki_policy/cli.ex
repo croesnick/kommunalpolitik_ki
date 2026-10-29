@@ -26,7 +26,7 @@ defmodule KomkiPolicy.CLI do
   Deterministische Wahl für Grenzfälle:
 
   * `plan` wird als `unsupported` (Exit 3) beantwortet — der Regelzweig
-    `plan`/`infer_plan` ist in Lieferung 1 bewusst nicht geliefert, kein
+    `plan`/`infer_plan` ist bewusst nicht geliefert, kein
     Bedienfehler; zusätzliche Argumente nach `plan` werden deterministisch ignoriert.
   * Jeder sonstige unbekannte Befehl (auch leeres argv) ist ein Usage-Fehler
     (Exit 2) mit `code: "unknown_command"` bzw. `code: "usage"`.
@@ -34,6 +34,9 @@ defmodule KomkiPolicy.CLI do
     ist das `code: "usage"` (Exit 2); fehlt ein Pflicht-Flag, ebenfalls
     `code: "usage"`. Wird ein Flag zweimal angegeben, gewinnt der letzte Wert
     (deterministisch).
+  * Die Flag-Menge ist je Befehl geschlossen: ein bekanntes Flag am falschen
+    Befehl (`decide --proposal`, `verify --stand`, `advance --release`) ist
+    ebenso `usage` (Exit 2) — es wird nicht still akzeptiert und ignoriert.
   * Eine fehlende/unlesbare Datei ist kein Crash, sondern
     `code: "read_error"` (Exit 2).
 
@@ -146,7 +149,7 @@ defmodule KomkiPolicy.CLI do
 
   @spec cmd_decide([binary()]) :: outcome()
   defp cmd_decide(argv) do
-    with {:ok, opts} <- parse_opts(argv, ["registry", "snapshot", "intent"]),
+    with {:ok, opts} <- parse_opts(argv, ["registry", "snapshot", "intent"], ["release", "stand"]),
          {:ok, registry} <- load_registry(Map.fetch!(opts, "registry")),
          {:ok, snapshot} <- load_json(Map.fetch!(opts, "snapshot")),
          {:ok, intent} <- load_json(Map.fetch!(opts, "intent")) do
@@ -229,35 +232,48 @@ defmodule KomkiPolicy.CLI do
   # Optionen
   # ===========================================================================
 
-  @spec parse_opts([binary()], [String.t()]) ::
+  # `required` sind die Pflicht-Flags des Befehls, `optional` die zusätzlich
+  # erlaubten (z. B. `--release`/`--stand` bei `decide`): die Flag-Menge je
+  # Befehl ist geschlossen — ein bekanntes Flag außerhalb dieser Menge ist
+  # ein Usage-Fehler, kein still akzeptiertes Argument.
+  @spec parse_opts([binary()], [String.t()], [String.t()]) ::
           {:ok, %{String.t() => String.t()}} | {:error, error_detail()}
-  defp parse_opts(args, required) do
-    case collect_opts(args, %{}) do
+  defp parse_opts(args, required, optional \\ []) do
+    case collect_opts(args, %{}, required ++ optional) do
       {:ok, opts} -> require_opts(opts, required)
       {:error, _} = error -> error
     end
   end
 
-  @spec collect_opts([binary()], %{String.t() => String.t()}) ::
+  @spec collect_opts([binary()], %{String.t() => String.t()}, [String.t()]) ::
           {:ok, %{String.t() => String.t()}} | {:error, error_detail()}
-  defp collect_opts([], acc), do: {:ok, acc}
 
-  # Flag mit Wert; Wiederholung: letzter Wert gewinnt (deterministisch).
-  defp collect_opts(["--" <> flag, value | rest], acc) when flag in @flags,
-    do: collect_opts(rest, Map.put(acc, flag, value))
+  defp collect_opts([], acc, _allowed), do: {:ok, acc}
+
+  # Bekanntes Flag, das nicht zur erlaubten Menge des Befehls gehört:
+  # Ablehnung unabhängig davon, ob ein Wert folgt. (`allowed` ist eine
+  # Laufzeitliste, deshalb Prüfung im Body statt im Guard.)
+  defp collect_opts(["--" <> flag | _rest] = argv, acc, allowed) when flag in @flags do
+    if flag in allowed do
+      collect_known_flag(argv, acc, allowed, flag)
+    else
+      {:error, usage_error("option --" <> flag <> " is not valid for this command; " <> @usage)}
+    end
+  end
 
   # Unbekanntes Flag MIT Wert: eigenes Detail statt "requires a value".
-  defp collect_opts(["--" <> flag, _value | _rest], _acc) when flag not in @flags,
+  defp collect_opts(["--" <> flag | _rest], _acc, _allowed),
     do: {:error, usage_error("unknown option --" <> flag <> "; " <> @usage)}
 
-  defp collect_opts(["--" <> flag | _rest], _acc) when flag in @flags,
-    do: {:error, usage_error("option --" <> flag <> " requires a value; " <> @usage)}
-
-  defp collect_opts(["--" <> flag | _rest], _acc),
-    do: {:error, usage_error("unknown option --" <> flag <> "; " <> @usage)}
-
-  defp collect_opts([arg | _rest], _acc),
+  defp collect_opts([arg | _rest], _acc, _allowed),
     do: {:error, usage_error("unexpected argument " <> Kernel.inspect(arg) <> "; " <> @usage)}
+
+  # Erlaubtes Flag mit Wert; Wiederholung: letzter Wert gewinnt (deterministisch).
+  defp collect_known_flag([_flag, value | rest], acc, allowed, flag),
+    do: collect_opts(rest, Map.put(acc, flag, value), allowed)
+
+  defp collect_known_flag(_argv, _acc, _allowed, flag),
+    do: {:error, usage_error("option --" <> flag <> " requires a value; " <> @usage)}
 
   @spec require_opts(%{String.t() => String.t()}, [String.t()]) ::
           {:ok, %{String.t() => String.t()}} | {:error, error_detail()}

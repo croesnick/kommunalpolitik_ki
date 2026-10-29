@@ -13,7 +13,7 @@ defmodule KomkiPolicy.Stand do
   Führen des aktuellen Standes ist Vollzug außerhalb des Kerns (B.8).
   """
 
-  alias KomkiPolicy.Registry
+  alias KomkiPolicy.{Registry, Validations}
 
   @fields ["schema", "stand_id", "version", "scope", "as_of", "consumed"]
 
@@ -117,13 +117,18 @@ defmodule KomkiPolicy.Stand do
   # -------------------------------------------------------------------------
 
   defp validate_reason(term) do
-    with {:ok, _} <- require_map(term, "$"),
-         :ok <- require_schema(term),
-         :ok <- closed_fields(term, @fields, "$"),
-         :ok <- require_kebab(term["stand_id"], "$.stand_id"),
-         :ok <- nonneg_integer(term["version"], "$.version"),
-         :ok <- require_kebab(term["scope"], "$.scope"),
-         :ok <- require_integer(term["as_of"], "$.as_of"),
+    with {:ok, _} <- Validations.require_map(term, "$"),
+         :ok <- Validations.require_schema(term, "komki-stand/1"),
+         :ok <- Validations.closed_fields(term, @fields, "$"),
+         :ok <- Validations.require_kebab(term["stand_id"], "$.stand_id"),
+         :ok <-
+           Validations.require_nonneg_integer(
+             term["version"],
+             "$.version",
+             :invalid_stand_version
+           ),
+         :ok <- Validations.require_kebab(term["scope"], "$.scope"),
+         :ok <- Validations.require_integer(term["as_of"], "$.as_of", :invalid_as_of),
          :ok <- validate_consumed(term["consumed"], "$.consumed") do
       {:ok,
        %{
@@ -217,53 +222,4 @@ defmodule KomkiPolicy.Stand do
   end
 
   # -------------------------------------------------------------------------
-
-  defp require_map(%{} = map, _path), do: {:ok, map}
-
-  defp require_map(other, path),
-    do: {:error, {:invalid_record, path, "expected an object, got " <> Kernel.inspect(other)}}
-
-  defp require_schema(%{"schema" => "komki-stand/1"}), do: :ok
-
-  defp require_schema(%{"schema" => other}) do
-    {:error,
-     {:invalid_schema, "$.schema", "expected \"komki-stand/1\", got " <> Kernel.inspect(other)}}
-  end
-
-  defp require_schema(_other),
-    do: {:error, {:missing_field, "$.schema", "missing field \"schema\""}}
-
-  defp closed_fields(map, allowed, path) do
-    unknown = Enum.sort(Enum.reject(Map.keys(map), &(&1 in allowed)))
-
-    case unknown do
-      [] ->
-        :ok
-
-      [first | _] ->
-        {:error, {:unknown_field, path <> "." <> first, "field not part of the closed schema"}}
-    end
-  end
-
-  defp require_kebab(value, path) do
-    if is_binary(value) and Registry.kebab_id?(value),
-      do: :ok,
-      else:
-        {:error,
-         {:invalid_reference_id, path, "expected kebab-case id, got " <> Kernel.inspect(value)}}
-  end
-
-  defp nonneg_integer(value, _path) when is_integer(value) and value >= 0, do: :ok
-
-  defp nonneg_integer(value, path) do
-    {:error,
-     {:invalid_stand_version, path,
-      "expected a non-negative integer, got " <> Kernel.inspect(value)}}
-  end
-
-  defp require_integer(value, _path) when is_integer(value), do: :ok
-
-  defp require_integer(value, path) do
-    {:error, {:invalid_as_of, path, "expected an integer, got " <> Kernel.inspect(value)}}
-  end
 end

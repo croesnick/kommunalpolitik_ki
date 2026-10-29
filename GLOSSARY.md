@@ -723,7 +723,7 @@ Lockern von Bindungen (Herabstufungsbefugnis); sie ist in
 
 ---
 
-### call hash
+### Call Hash
 
 **Definition:** SHA-256 (Hex, kleingeschrieben) über die kanonische
 JSON-Darstellung des Objekts `{content_digest, object, operation,
@@ -755,8 +755,11 @@ legaler Fortsetzungen aus **genau vier Übergangstypen** — `fakt_nachreichen`,
 Engine zu jeder `deny`-/`indeterminate`-Entscheidung mitliefert. Der Katalog ist **beratend,
 erzeugt keine Autorität**: keine Eingabe akzeptiert ihn, keine Fortsetzung
 wird ausgeführt. Normative Ordnung: fakt < transformation < neuer Raum <
-aktionsfreigabe — ein GO steht nie an erster Stelle. Im Code als
-Remedy-Katalog (`KomkiPolicy.Remedies`, CONTRACT § 2.8).
+aktionsfreigabe — ein GO steht nie an erster Stelle. Einzige Ausnahme:
+`object_quarantine` (CONTRACT § 2.8-Anwendbarkeitstabelle) — das
+Objekt-Level-GO der Erstklassifikation ist dort der einzige Katalog-Eintrag,
+weil es für ein Quarantäne-Objekt keine nicht-verletzende Fortsetzung gibt.
+Im Code als Remedy-Katalog (`KomkiPolicy.Remedies`, CONTRACT § 2.8).
 
 **Siehe:** [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.8; RFC 0003 R.6;
 `docs/research/2026-10-13-agent-policy-models-openappa-pace.md` (Move 1).
