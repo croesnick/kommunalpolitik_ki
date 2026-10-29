@@ -39,7 +39,9 @@ defmodule Mix.Tasks.Compile.KomkiTresor do
 
   defp swiftc_bauen(swiftc, source, target) do
     File.mkdir_p!(Path.dirname(target))
-    tmp = target <> ".tmp"
+    # Eindeutiger Name: Gleichzeitige Laeufe (etwa dev und test) teilen sich
+    # keine Datei; das Gitignore-Muster komki-tresor* deckt ihn ab.
+    tmp = target <> "." <> Integer.to_string(System.unique_integer([:positive])) <> ".tmp"
 
     case System.cmd(swiftc, ["-O", "-o", tmp, source], stderr_to_stdout: true) do
       {_, 0} ->

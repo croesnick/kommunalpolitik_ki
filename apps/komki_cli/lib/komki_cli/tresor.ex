@@ -12,6 +12,11 @@ defmodule KomkiCli.Tresor do
   Passwort des Macs. Das gilt fuer jeden Prozess, der den Eintrag liest,
   nicht nur fuer komki. Erlang erreicht die Secure Enclave nicht selbst,
   deshalb das eigene Programm (AGENTS.md, Elixir-first, Ausnahme).
+
+  Klartext geht nur ueber stdin hinein und stdout heraus, nie ueber argv,
+  Umgebung oder Log. `opts[:command]` ersetzt das Programm und
+  `opts[:timeout]` begrenzt die Laufzeit (Tests); die Application-Env
+  `:komki_cli, :tresor` gilt dauerhaft.
   """
 
   alias KomkiCli.Tresor.Core
