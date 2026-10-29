@@ -14,9 +14,18 @@ defmodule Ratsinfo.Config do
   @doc """
   Base URL der RIS-API. Überschreibbar über die Umgebungsvariable `RIS_BASE_URL`,
   z. B. für den Aufzeichnungs-Proxy `apps/komki_connector_ris/priv/ris_recorder.exs`
-  oder den Replay-Modus des Mocks (jeweils ohne `/web/`-Präfix).
+  oder den Replay-Modus des Mocks (jeweils ohne `/web/`-Präfix). Ein
+  abschließender Schrägstrich wird ergänzt, wenn er fehlt.
   """
-  def base_url, do: System.get_env("RIS_BASE_URL") || @base_url
+  def base_url do
+    case System.get_env("RIS_BASE_URL") do
+      url when is_binary(url) and url != "" ->
+        String.trim_trailing(url, "/") <> "/"
+
+      _ ->
+        @base_url
+    end
+  end
 
   @doc "Erforderliche Custom-Header für alle API-Requests"
   def headers do

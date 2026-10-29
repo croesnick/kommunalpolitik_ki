@@ -22,13 +22,19 @@
 #
 # Nur OTP (gen_tcp, httpc, ssl, json), keine Deps — wie mock_ris.exs.
 
+Code.require_file("./ris_http.exs", __DIR__)
+
 defmodule KomkiConnectorRis.RisRecorder do
   @moduledoc false
+
+  alias KomkiConnectorRis.RisHttp
 
   @redacted "<redacted>"
   @default_upstream "https://risapi1.komuna.net/web/"
   @profile :ris_recorder
   @timeout_ms 60_000
+
+  @usage "Aufruf: --port <port> [--upstream <url>] [--out <verzeichnis>]"
 
   # Hop-by-hop-Kopfzeilen und Rahmenfelder: weder aufzeichnen noch
   # weiterreichen (content-length wird aus dem Body neu gesetzt).
@@ -54,6 +60,9 @@ defmodule KomkiConnectorRis.RisRecorder do
 
       parent = self()
       counter = :atomics.new(1, signed: false)
+      # Nummerierung schliesst an vorhandene Kassetten an, damit eine zweite
+      # Session in dasselbe --out-Verzeichnis nichts ueberschreibt.
+      :atomics.put(counter, 1, next_index(out))
 
       pid =
         spawn(fn ->
@@ -87,6 +96,37 @@ defmodule KomkiConnectorRis.RisRecorder do
 
   @spec stop(pid()) :: true
   def stop(pid), do: Process.exit(pid, :kill)
+
+  @doc false
+  @spec parse_cli([String.t()]) :: {:ok, keyword()} | {:error, String.t()}
+  def parse_cli(argv) do
+    case parse_flags(argv, []) do
+      {:ok, opts} ->
+        if Keyword.has_key?(opts, :port), do: {:ok, opts}, else: {:error, @usage}
+
+      {:error, _} ->
+        {:error, @usage}
+    end
+  end
+
+  # Flags in beliebiger Reihenfolge; Unbekanntes oder Ungueltiges fuehrt zur
+  # Meldung statt zum stillen Nichtstun.
+  defp parse_flags([], acc), do: {:ok, acc}
+
+  defp parse_flags(["--port", value | rest], acc) do
+    case Integer.parse(value) do
+      {port, ""} -> parse_flags(rest, Keyword.put(acc, :port, port))
+      _ -> {:error, @usage}
+    end
+  end
+
+  defp parse_flags(["--upstream", value | rest], acc),
+    do: parse_flags(rest, Keyword.put(acc, :upstream, value))
+
+  defp parse_flags(["--out", value | rest], acc),
+    do: parse_flags(rest, Keyword.put(acc, :out, value))
+
+  defp parse_flags(_other, _acc), do: {:error, @usage}
 
   @doc "Ersetzt die Werte der Kopfzeilen in `secret` durch \"<redacted>\"."
   @spec scrub_headers([{String.t(), String.t()}], [String.t()]) :: [{String.t(), String.t()}]
@@ -124,7 +164,7 @@ defmodule KomkiConnectorRis.RisRecorder do
       :go -> :ok
     end
 
-    case read_request(sock) do
+    case RisHttp.read_request(sock) do
       {:ok, method, target, headers, body} ->
         case forward(method, target, headers, body, upstream) do
           {:ok, status, resp_headers, resp_body} ->
@@ -145,80 +185,11 @@ defmodule KomkiConnectorRis.RisRecorder do
     :gen_tcp.close(sock)
   end
 
-  defp read_request(sock) do
-    case :gen_tcp.recv(sock, 0, 5_000) do
-      {:ok, {:http_request, method, {:abs_path, target}, _version}} ->
-        case read_headers(sock, []) do
-          {:ok, headers} -> read_body(sock, method, target, headers)
-          :error -> :error
-        end
-
-      _ ->
-        :error
-    end
-  end
-
-  defp read_headers(sock, acc) do
-    case :gen_tcp.recv(sock, 0, 5_000) do
-      {:ok, :http_eoh} ->
-        {:ok, Enum.reverse(acc)}
-
-      {:ok, {:http_header, _, key, _, value}} ->
-        read_headers(sock, [{header_name(key), value} | acc])
-
-      _ ->
-        :error
-    end
-  end
-
-  # Der Body wird gelesen, auch wenn ihn nur die Kassette braucht: ein Socket
-  # mit ungelesenen Daten sendet beim Schliessen RST, die Antwort kaeme beim
-  # Client nie an.
-  defp read_body(sock, method, target, headers) do
-    case content_length(headers) do
-      n when n > 0 ->
-        case :gen_tcp.recv(sock, n, 5_000) do
-          {:ok, body} -> {:ok, method, target, headers, body}
-          _ -> :error
-        end
-
-      _ ->
-        {:ok, method, target, headers, ""}
-    end
-  end
-
-  # Ohne List.keyfind: dessen Position-Semantik hat sich in Elixir 1.20
-  # geaendert (0-basiert, Default nil statt false). Eigenes Lookup ist
-  # versionssicher.
-  defp content_length(headers) do
-    case header(headers, "content-length") do
-      nil ->
-        0
-
-      value ->
-        case Integer.parse(value) do
-          {n, _rest} -> n
-          :error -> 0
-        end
-    end
-  end
-
-  defp header(headers, name) do
-    Enum.find_value(headers, fn
-      {^name, value} -> value
-      _other -> nil
-    end)
-  end
-
-  # Bekannte Kopfzeilen kommen als Atom, unbekannte (X-Orgkey & Co.) als
-  # Binaer-String oder Zeichenliste.
-  defp header_name(key) when is_atom(key), do: key |> Atom.to_string() |> String.downcase()
-  defp header_name(key) when is_binary(key), do: String.downcase(key)
-  defp header_name(key) when is_list(key), do: key |> List.to_string() |> String.downcase()
-
   # --- Weiterleitung -----------------------------------------------------------
 
-  # httpc will Kleinbuchstaben; das HTTP-Paket liefert :GET/:POST.
+  # httpc will Kleinbuchstaben. Standardmethoden liefert das HTTP-Paket als
+  # Atom (:GET, :POST ...), ungewoehnliche als Binaer-String — beides landet
+  # hier als charlist bei httpc.
   defp http_method(:GET), do: :get
   defp http_method(:POST), do: :post
   defp http_method(:HEAD), do: :head
@@ -226,6 +197,7 @@ defmodule KomkiConnectorRis.RisRecorder do
   defp http_method(:DELETE), do: :delete
   defp http_method(:OPTIONS), do: :options
   defp http_method(:PATCH), do: :patch
+  defp http_method(other), do: other |> RisHttp.method_label() |> String.downcase()
 
   defp forward(method, target, headers, body, upstream) do
     url = upstream <> String.trim_leading(target, "/")
@@ -236,10 +208,10 @@ defmodule KomkiConnectorRis.RisRecorder do
       end
 
     request =
-      if method == :GET do
+      if RisHttp.method_label(method) == "GET" do
         {String.to_charlist(url), fwd}
       else
-        content_type = header(headers, "content-type") || "application/octet-stream"
+        content_type = RisHttp.header(headers, "content-type") || "application/octet-stream"
         {String.to_charlist(url), fwd, String.to_charlist(content_type), body}
       end
 
@@ -284,7 +256,7 @@ defmodule KomkiConnectorRis.RisRecorder do
 
   defp normalize_headers(headers) do
     for {key, value} <- headers do
-      {header_name(key), to_string(value)}
+      {RisHttp.header_name(key), to_string(value)}
     end
   end
 
@@ -301,13 +273,14 @@ defmodule KomkiConnectorRis.RisRecorder do
          resp_headers,
          resp_body
        ) do
-    {path, query} = split_target(target)
+    {path, query} = RisHttp.split_target(target)
 
     cassette = %{
       "request" => %{
-        "method" => String.upcase(Atom.to_string(method)),
+        "method" => method |> RisHttp.method_label() |> String.upcase(),
         "path" => path,
-        "query" => query,
+        # :json kodiert nil als String "nil" — JSON-null heisst :null.
+        "query" => query || :null,
         "headers" => req_headers |> scrub_headers(@secret_request_headers) |> json_headers(),
         "body_b64" => Base.encode64(scrub_json_body(req_body, @secret_request_body_keys))
       },
@@ -340,13 +313,6 @@ defmodule KomkiConnectorRis.RisRecorder do
   # :json.encode kennt keine Tupel: Kopfzeilen als [name, value]-Listen.
   defp json_headers(headers), do: Enum.map(headers, &Tuple.to_list/1)
 
-  defp split_target(target) do
-    case String.split(target, "?", parts: 2) do
-      [path] -> {path, nil}
-      [path, query] -> {path, query}
-    end
-  end
-
   defp filename(n, method, path) do
     slug =
       path
@@ -354,8 +320,27 @@ defmodule KomkiConnectorRis.RisRecorder do
       |> String.replace(~r/[^A-Za-z0-9]+/, "-")
       |> String.trim_trailing("-")
 
-    name = String.downcase(Atom.to_string(method))
+    name = method |> RisHttp.method_label() |> String.downcase()
     "#{String.pad_leading(Integer.to_string(n), 4, "0")}-#{name}-#{slug}.json"
+  end
+
+  defp next_index(out) do
+    case File.ls(out) do
+      {:ok, files} ->
+        files
+        |> Enum.map(&cassette_num/1)
+        |> Enum.max(fn -> 0 end)
+
+      _ ->
+        0
+    end
+  end
+
+  defp cassette_num(file) do
+    case Regex.run(~r/^(\d{4})-/, file) do
+      [_full, num] -> String.to_integer(num)
+      _other -> 0
+    end
   end
 
   defp default_out do
@@ -383,25 +368,32 @@ defmodule KomkiConnectorRis.RisRecorder do
 end
 
 case System.argv() do
-  ["--port", port | rest] ->
-    opts =
-      case rest do
-        ["--upstream", upstream, "--out", out] -> [upstream: upstream, out: out]
-        ["--upstream", upstream] -> [upstream: upstream]
-        ["--out", out] -> [out: out]
-        [] -> []
-      end
-
-    case KomkiConnectorRis.RisRecorder.start(Keyword.put(opts, :port, String.to_integer(port))) do
-      {:ok, _pid, actual, out} ->
-        IO.puts("ris_recorder lauscht auf http://127.0.0.1:#{actual}/ (Kassetten nach #{out})")
-        Process.sleep(:infinity)
-
-      {:error, reason} ->
-        IO.puts(:stderr, "ris_recorder: Start fehlgeschlagen: #{inspect(reason)}")
-        exit({:shutdown, 1})
-    end
-
-  _ ->
+  [] ->
     :ok
+
+  argv ->
+    if "--port" in argv do
+      case KomkiConnectorRis.RisRecorder.parse_cli(argv) do
+        {:ok, opts} ->
+          case KomkiConnectorRis.RisRecorder.start(opts) do
+            {:ok, _pid, actual, out} ->
+              IO.puts(
+                "ris_recorder lauscht auf http://127.0.0.1:#{actual}/ (Kassetten nach #{out})"
+              )
+
+              Process.sleep(:infinity)
+
+            {:error, reason} ->
+              IO.puts(:stderr, "ris_recorder: Start fehlgeschlagen: #{inspect(reason)}")
+              exit({:shutdown, 1})
+          end
+
+        {:error, usage} ->
+          IO.puts(:stderr, "ris_recorder: #{usage}")
+          exit({:shutdown, 1})
+      end
+    else
+      # Unter `mix test` und aehnlich: keine CLI-Argumente fuer den Recorder.
+      :ok
+    end
 end

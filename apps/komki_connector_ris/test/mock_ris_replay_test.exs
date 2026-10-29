@@ -45,4 +45,21 @@ defmodule KomkiConnectorRis.MockRisReplayTest do
     # Nicht Aufgezeichnetes antwortet mit eigenem 404.
     assert {:error, :not_found} = Http.get_json(base <> "gibtsnicht", @headers, 5_000)
   end
+
+  test "spielt auch POST-Anfragen zurueck (Login)" do
+    {:ok, mock, port} = MockRis.start(mode: {:replay, @cassettes})
+    on_exit(fn -> MockRis.stop(mock) end)
+    :ok = Http.start(nil)
+
+    {:ok, {{_, 200, _}, _headers, body}} =
+      :httpc.request(
+        :post,
+        {"http://127.0.0.1:#{port}/auth", [], ~c"application/json", ~s({"login":"x"})},
+        [ssl: [], timeout: 5_000],
+        [body_format: :binary],
+        Http.profile()
+      )
+
+    assert :json.decode(body) == %{"token" => "beispiel-token"}
+  end
 end
