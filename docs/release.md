@@ -80,10 +80,13 @@ KOMKI_HOME=/private/tmp/komki-test /tmp/komki-bin/komki down
 ```
 
 - Der `KOMKI_HOME`-Pfad muss kurz sein: Unix-Sockets dürfen höchstens 103
-  Byte lang sein, `setup` lehnt längere Basen ab.
-- `--port` verlegt heute nur den llama-Port. Läuft die Hauptinstanz, muss
-  man `egress_ports` in `<KOMKI_HOME>/config.json` von Hand ändern (etwa
-  50007/50008) und `setup` erneut aufrufen (#203).
+  Byte lang sein. `setup` prüft das zuerst und nennt Länge und Abhilfe
+  (#246); der Scratchpad eines Agenten ist dafür meist zu lang.
+- `--port N` legt die Egress-Ports auf N+7 und N+8 (#203), eine
+  Wegwerf-Instanz kollidiert also nicht mit der Hauptinstanz.
+- `komki session` bindet das tmux-Pane ausdrücklich an seine Basis (#251).
+  Jede Instanz hat ihren eigenen tmux-Server; zeigt `KOMKI_HOME` im Pane
+  auf eine andere Basis, startet die Session nicht.
 - Der Brave-Schlüssel liegt im Schlüsselbund unter einem festen Namen. Die
   Wegwerf-Instanz benutzt also denselben Schlüssel, und macOS fragt beim
   Start des Web-Connectors nach Touch ID.

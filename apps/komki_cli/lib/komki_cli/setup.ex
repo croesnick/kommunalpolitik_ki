@@ -29,10 +29,20 @@ defmodule KomkiCli.Setup do
   def run(opts, ui) do
     base = Config.default_base()
 
-    with :ok <- tools(Config.defaults(base), ui),
+    # Ticket #246: Die Basis-Laenge zuerst pruefen, damit eine zu lange Basis
+    # nicht erst einen halben Test-Vault hinterlaesst.
+    with :ok <- base_length(base),
+         :ok <- tools(Config.defaults(base), ui),
          :ok <- instance(base, opts, ui),
          :ok <- secrets(ui) do
       start(ui)
+    end
+  end
+
+  defp base_length(base) do
+    case KomkiCli.Connectors.socket_length(base) do
+      :ok -> :ok
+      {:error, reason} -> {:error, "Basis abgelehnt: " <> reason, 2}
     end
   end
 

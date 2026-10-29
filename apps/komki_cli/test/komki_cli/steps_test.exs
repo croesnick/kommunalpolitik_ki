@@ -10,6 +10,31 @@ defmodule KomkiCli.StepsTest do
 
   @denials_fixture Path.expand("../fixtures/denials/log-show.txt", __DIR__)
 
+  describe "chain_base/2 (Ticket #251: Basis des Panes)" do
+    @tag :tmp_dir
+    test "die Basis kommt aus --base, auch ohne KOMKI_HOME im Pane", %{tmp_dir: dir} do
+      assert Steps.chain_base(%{"base" => dir}, nil) == {:ok, Config.canonical(dir)}
+    end
+
+    @tag :tmp_dir
+    test "KOMKI_HOME mit derselben Basis ist in Ordnung", %{tmp_dir: dir} do
+      assert Steps.chain_base(%{"base" => dir}, dir) == {:ok, Config.canonical(dir)}
+    end
+
+    @tag :tmp_dir
+    test "KOMKI_HOME einer anderen Instanz bricht ab", %{tmp_dir: dir} do
+      other = Path.join(dir, "andere")
+
+      assert {:error, reason, 2} = Steps.chain_base(%{"base" => dir}, other)
+      assert reason =~ "Basis des Panes weicht ab"
+    end
+
+    test "ohne --base kein Rückfall auf die Standard-Basis" do
+      assert {:error, reason, 2} = Steps.chain_base(%{}, nil)
+      assert reason =~ "ohne --base"
+    end
+  end
+
   describe "write_pi_home/1" do
     test "Trust-Schlüssel ist das Instanz-Root (deckt arbeit und pi-home ab)" do
       cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-steps"))

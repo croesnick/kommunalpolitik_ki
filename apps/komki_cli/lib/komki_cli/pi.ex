@@ -220,7 +220,13 @@ defmodule KomkiCli.Pi do
   Pane-Kommando fuer `tmux new-session … <command>`: der Pfad des
   komki-Programms (Escript oder Burrito-Standalone-Binary, vom Aufrufer
   übergeben — `KomkiCli.Runtime.self_path/0`) plus dem internen
-  `session-chain`-Befehl.
+  `session-chain`-Befehl mit der Basis der Instanz.
+
+  Die Basis steht ausdrücklich im Kommando (Ticket #251): Die Umgebung des
+  Panes stammt vom tmux-Server, nicht vom Aufruf. Wurde der Server ohne
+  `KOMKI_HOME` gestartet, fiele das Pane sonst auf die Standard-Basis
+  zurück, und eine Wegwerf-Instanz spräche mit dem Vermittler der
+  Hauptinstanz.
 
   Statt die Sandbox-Kette direkt in die Pane zu legen, startet die Pane
   einen eigenen Mini-BEAM (das komki-Programm selbst). Hintergrund ist ein
@@ -231,10 +237,12 @@ defmodule KomkiCli.Pi do
   haelt die Seatbelt-Grenze unverletzt: sandbox-exec bleibt der Anfang
   des gepinnten Kettenstücks.
   """
-  @spec pane_command(String.t(), boolean()) :: String.t()
-  def pane_command(script_path, continue?) when is_binary(script_path) do
+  @spec pane_command(String.t(), String.t(), boolean()) :: String.t()
+  def pane_command(script_path, base, continue?)
+      when is_binary(script_path) and is_binary(base) do
     args =
-      [Path.expand(script_path), "session-chain"] ++ if(continue?, do: ["--continue"], else: [])
+      [Path.expand(script_path), "session-chain", "--base", base] ++
+        if(continue?, do: ["--continue"], else: [])
 
     Enum.map_join(args, " ", &sh_quote/1)
   end

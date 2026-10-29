@@ -87,14 +87,9 @@ defmodule KomkiCli.Connectors do
   def socket_length(base) do
     longest = longest_socket(base)
 
-    if byte_size(longest) <= @max_socket_bytes do
-      :ok
-    else
-      {:error,
-       "Socket-Pfad zu lang (" <>
-         Integer.to_string(byte_size(longest)) <>
-         " > " <> Integer.to_string(@max_socket_bytes) <> " Byte): " <> longest}
-    end
+    if byte_size(longest) <= @max_socket_bytes,
+      do: :ok,
+      else: {:error, KomkiCli.Channel.socket_too_long(longest)}
   end
 
   # ===========================================================================

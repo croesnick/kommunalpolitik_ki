@@ -364,6 +364,11 @@ pnpm add -g @earendil-works/pi-coding-agent
 xcode-select --install           # swiftc für komki-tresor (nur zum Bauen aus dem Repo)
 ```
 
+**Instanzpfad:** Die Basis (`~/.local/share/komki`, überschreibbar mit
+`KOMKI_HOME`) muss kurz sein, weil macOS Unix-Socket-Pfade auf 103 Byte
+begrenzt. `komki setup` prüft das als Erstes und schlägt einen kürzeren
+Pfad vor, etwa `/private/tmp/komki-test` für eine Wegwerf-Instanz (#246).
+
 **komki-tresor (Secure Enclave):** `mix compile` baut das kleine Swift-Programm
 `komki-tresor` (`apps/komki_cli/native/komki-tresor/main.swift`) nach
 `apps/komki_cli/priv/`; `make komki` kopiert es neben das Escript.

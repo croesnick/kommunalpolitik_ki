@@ -78,8 +78,13 @@ defmodule KomkiCli.CLITest do
       assert out =~ "config"
     end
 
-    test "session-chain ohne config verweigert (Exit 2)" do
+    test "session-chain ohne --base verweigert (Exit 2, Ticket #251)" do
       {out, 2} = CLI.run(["session-chain"])
+      assert out =~ "ohne --base"
+    end
+
+    test "session-chain ohne config verweigert (Exit 2)" do
+      {out, 2} = CLI.run(["session-chain", "--base", System.get_env("KOMKI_HOME")])
       assert out =~ "config"
     end
   end
