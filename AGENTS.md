@@ -132,8 +132,9 @@ Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Ab
 | [`docs/workflows.md`](docs/workflows.md) | Use Cases & Lückenanalyse für die Ratsarbeit | Workflows, Lücken, Priorisierung |
 | [`GLOSSARY.md`](GLOSSARY.md) (Repo-Root) | Kanonische Nomenklatur des Repos | Begriffsdefinitionen (Sitzungsmappe, Ratsprojekt, Vault, etc.) |
 | [`docs/prerequisites.md`](docs/prerequisites.md) | Externe Abhängigkeiten (nicht im Repo) | Installationsanleitungen, Fallbacks, benötigt von |
+| [`docs/release.md`](docs/release.md) | Bau und Release von komki | lokaler Bau aus dem Checkout (gültig), Release-Kette (später) |
 
-Diese vier Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows, Begriffen oder Voraussetzungen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
+Diese fünf Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows, Begriffen oder Voraussetzungen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
 
 ### Doku-Site aktuell halten
 
@@ -348,6 +349,8 @@ kommunalpolitik_ki/
 │   ├── ratsprojekte-lifecycle.md  # Projektlebenszyklus (Mermaid-Chart)
 │   ├── workflows.md               # Use Cases & Lückenanalyse der Ratsarbeit
 │   ├── prerequisites.md           # Externe Abhängigkeiten
+│   ├── release.md                 # Bau aus dem Checkout, Release-Kette (später)
+│   ├── adr/                       # ADRs (Entscheidungen mit Begründung)
 │   ├── research/                  # Recherchen zu Architektur-Entscheidungen
 │   ├── site/                      # Doku-Site komki (Astro Starlight, GitHub Pages)
 │   └── rfcs/                      # RFCs (Sandbox, vertrauliche KI-Arbeitsräume)

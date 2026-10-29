@@ -103,8 +103,10 @@ defmodule KomkiCli.CLI do
   # Code-Pfad; im Escript-Kontext ist exqlite im Zip und der Pfad zeigt in
   # das Zip-Archiv — die NIF muss aber vom realen Dateisystem laden. Die
   # Build-Tree-Pfade decken den Escript-Alltag ab (`mix escript.build`).
+  # Symlinks aufloesen: `make komki` legt `~/.local/bin/komki` als Link an,
+  # der Build-Tree liegt neben dem Ziel (Ticket #241).
   defp exqlite_ebin_paths do
-    base = Path.dirname(:escript.script_name())
+    base = :escript.script_name() |> to_string() |> KomkiCli.Config.canonical() |> Path.dirname()
 
     paths = [
       # Paket-Layout (Ticket #180): komki und lib/exqlite nebeneinander
