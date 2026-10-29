@@ -110,6 +110,30 @@ elixir apps/komki_connector_ris/priv/mock_ris.exs --port 4010 --mode replay --ca
 Replay matcht `(Methode, Pfad, Query)`; bei abweichendem Query (z. B. anderem Zeitfenster) greift
 die erste Aufnahme für `(Methode, Pfad)`. Nicht aufgezeichnete Pfade antworten mit 404.
 
+### Was der Recorder erfasst
+
+Er ist ein transparenter Proxy: Kassette wird, was die Clients wirklich abfragen — Methode, Pfad,
+Query, Kopfzeilen und Body der Anfrage sowie Status, Kopfzeilen und Body der Antwort. Binärkörper
+(PDF-Downloads) stehen bytetreu base64 in der Kassette; Umleitungen reicht er an den Client weiter
+(jeder Hop wird zur eigenen Kassette); gzip fordert er nicht an, damit die Kassetten deterministisch
+bleiben. Chunked Request-Bodies versteht er nicht (kein Client hier sendet sie).
+
+Damit sind alle Endpunkte erfasst, die komki und ratsinfo nutzen:
+
+| Client | Endpunkt | Anmerkung |
+|---|---|---|
+| beide | `guestmeetings`, `guestmeetings/{id}`, `guestagendaitems/{id}` | Gast-API, ohne Anmeldung |
+| ratsinfo | `POST auth` | Login; Login/Passwort stehen nur redigiert in der Kassette |
+| ratsinfo | `meetings/{id}`, `agendaitems/{id}`, `committees` | authentifiziert |
+| ratsinfo | `fulltextsearch` | Suchterme stehen im Query und werden mit aufgezeichnet |
+| ratsinfo | `agendaitems/documents/{docId}` | Binär-Download, bytetreu |
+
+Nicht erfasst wird, was kein Client abfragt — der Recorder ist passiv. Für vollständige Abdeckung
+eine Aufzeichnungs-Session mit allen Flows fahren und die Suchterme variieren: komki `search`/
+`show` (mehrere Terme, auch nicht-öffentliche Treffer), ratsinfo-Login (Credentials wie üblich
+aus `RIS_EMAIL`/`RIS_PASSWORD`), Sitzungsliste, TOP-Details, Volltextsuche mit mehreren Termen,
+Anlagen-Downloads, Gremienliste. Danach liegen alle Antwortformate als Kassetten vor.
+
 Für committbare Testdaten gilt weiterhin: echte Inhalte verwerfen und Kassetten mit synthetischen
 Inhalten im echten Format erzeugen. Ein tragfähiger, deterministischer Anonymisierungs-Ansatz dafür
 steht noch aus; die Aufzeichnungen sind seine Grundlage.
