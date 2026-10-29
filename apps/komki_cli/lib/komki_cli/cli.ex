@@ -21,7 +21,7 @@ defmodule KomkiCli.CLI do
       komki go
       komki run "PROMPT" [--mode text|json] [--scratch PATH] [--timeout SEKUNDEN] [--capture-denials]
       komki session [FILE ...] [--continue] [--detach] [--decided-by ID]
-      komki session-chain [--continue]   # intern: Pane-Einstieg der Session
+      komki session-chain --base P [--continue]  # intern: Pane-Einstieg der Session
       komki label import FILE [--db PATH]
       komki label quarantine OBJ@VER [--content-ref PATH] [--origin TEXT]
                        --decided-by ID --basis TEXT [--db PATH]
@@ -68,6 +68,12 @@ defmodule KomkiCli.CLI do
   @doc false
   @spec main([binary()]) :: no_return()
   def main(argv) do
+    # Ticket #246: Rollen laufen mit `LANG=C` (Proc.escript_cmd/6); die VM
+    # schriebe stdout/stderr dann als latin1, und aus „lässt“ wuerde im Log
+    # das Byte 0xE4. komki schreibt immer UTF-8, unabhaengig von der Locale.
+    _ = :io.setopts(:standard_io, encoding: :unicode)
+    _ = :io.setopts(:standard_error, encoding: :unicode)
+
     # Multicall (Ticket #179): `komki komki-mediator ...` usw. startet die
     # Rolle; deren Einstieg blockiert und beendet die VM selbst.
     case KomkiCli.Roles.dispatch(argv) do
@@ -383,6 +389,13 @@ defmodule KomkiCli.CLI do
       session_chain: [
         name: "session-chain",
         description: "intern: pi-Kette als Port-Kind (Pane-Einstieg von 'session')",
+        options: [
+          base: [
+            value_name: "PATH",
+            long: "base",
+            help: "Basis der Instanz; 'session' schreibt sie ins Pane-Kommando (Ticket #251)"
+          ]
+        ],
         flags: [
           continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"]
         ]

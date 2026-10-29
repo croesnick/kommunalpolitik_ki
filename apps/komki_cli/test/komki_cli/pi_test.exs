@@ -180,11 +180,12 @@ defmodule KomkiCli.PiTest do
       assert Enum.at(argv, idx + 1) == "mcp__komki__*"
     end
 
-    test "pane_command: Escript-Pfad + session-chain, sh-gequotet" do
-      assert Pi.pane_command("/tmp/komki", false) == "'/tmp/komki' 'session-chain'"
+    test "pane_command: Escript-Pfad + session-chain mit Basis, sh-gequotet (Ticket #251)" do
+      assert Pi.pane_command("/tmp/komki", "/tmp/k le", false) ==
+               "'/tmp/komki' 'session-chain' '--base' '/tmp/k le'"
 
-      assert Pi.pane_command("/tmp/komki", true) ==
-               "'/tmp/komki' 'session-chain' '--continue'"
+      assert Pi.pane_command("/tmp/komki", "/tmp/k", true) ==
+               "'/tmp/komki' 'session-chain' '--base' '/tmp/k' '--continue'"
     end
 
     # Burrito-Session-Fix (Pilot 2026-10-11): unter der Binary ist das

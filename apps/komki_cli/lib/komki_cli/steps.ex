@@ -1471,15 +1471,49 @@ defmodule KomkiCli.Steps do
   """
   @spec session_chain(%{String.t() => String.t()}) :: result()
   def session_chain(opts) do
-    case Config.load(Config.config_path(Config.default_base())) do
-      {:error, reason} ->
-        {:error, "config: " <> reason, 2}
-
-      {:ok, cfg} ->
-        do_session_chain(cfg, Map.has_key?(opts, "continue"))
+    with {:ok, base} <- chain_base(opts, System.get_env("KOMKI_HOME")),
+         {:ok, cfg} <- load_chain_cfg(base) do
+      do_session_chain(cfg, Map.has_key?(opts, "continue"))
     end
   rescue
     e -> {:error, "session-chain fehlgeschlagen: " <> exception_reason(e), 2}
+  end
+
+  @doc """
+  Basis des Pane-Laufs (Ticket #251): kommt ausdrücklich als `--base` aus
+  dem Pane-Kommando, nie aus der Umgebung des tmux-Servers. Zeigt
+  `KOMKI_HOME` im Pane auf eine andere Basis, teilen sich zwei Instanzen
+  einen tmux-Server; dann bricht der Lauf ab, statt mit dem falschen
+  Vermittler zu sprechen. Public als Testnaht.
+  """
+  @spec chain_base(%{String.t() => String.t()}, String.t() | nil) ::
+          {:ok, String.t()} | {:error, String.t(), 2}
+  def chain_base(opts, env_home) do
+    case Map.get(opts, "base") do
+      nil ->
+        {:error,
+         "session-chain ohne --base: Pane-Kommando unvollständig, 'komki session' neu starten", 2}
+
+      base ->
+        base = Config.canonical(base)
+
+        if is_nil(env_home) or Config.canonical(env_home) == base,
+          do: {:ok, base},
+          else:
+            {:error,
+             "Basis des Panes weicht ab: KOMKI_HOME=" <>
+               Config.canonical(env_home) <>
+               ", die Session gehört zu " <>
+               base <>
+               ". Zwei Instanzen teilen sich einen tmux-Server; die Session startet nicht.", 2}
+    end
+  end
+
+  defp load_chain_cfg(base) do
+    case Config.load(Config.config_path(base)) do
+      {:ok, cfg} -> {:ok, cfg}
+      {:error, reason} -> {:error, "config: " <> reason, 2}
+    end
   end
 
   defp do_session_chain(cfg, continue?) do
@@ -1951,7 +1985,7 @@ defmodule KomkiCli.Steps do
     case continue_precondition(cfg, continue?) do
       :ok ->
         prepare_session_assets(cfg)
-        pane = Pi.pane_command(KomkiCli.Runtime.self_path(), continue?)
+        pane = Pi.pane_command(KomkiCli.Runtime.self_path(), cfg.base_dir, continue?)
 
         if detach?,
           do: create_detached(tmux, cfg, pane),

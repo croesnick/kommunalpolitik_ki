@@ -106,6 +106,8 @@ defmodule KomkiCli.ChannelTest do
       long = "/tmp/" <> String.duplicate("x", 90)
       assert {:error, reason} = Channel.check_socket_path(%{cfg | base_dir: long})
       assert reason =~ "103"
+      assert reason =~ "kürzere Basis"
+      assert reason =~ "KOMKI_HOME="
     end
   end
 
