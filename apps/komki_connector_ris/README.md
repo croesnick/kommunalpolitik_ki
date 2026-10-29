@@ -149,8 +149,25 @@ Abdeckung eine Aufzeichnungs-Session mit allen Flows fahren und die Suchterme va
 üblich aus `RIS_EMAIL`/`RIS_PASSWORD`), Sitzungsliste, TOP-Details, Volltextsuche mit mehreren
 Termen, Anlagen-Downloads, Gremienliste.
 
+### Skelett-Extraktor: Format ohne Inhalte
+
+`priv/ris_skeleton.exs` (Ticket #232) gewinnt aus Kassetten eine rein strukturelle
+Formatspezifikation: rekursive Schlüsselmengen, Typen, Formen (ISO-Datum, ID-Muster, Base64-HTML)
+und Array-Kardinalitäten, ohne jegliche Inhalte.
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_skeleton.exs --cassette <dir> \
+  [--out <datei>] [--compare <dir2>]
+```
+
+Der Bericht ist committbar und der Vertrag zwischen echtem RIS und Mock. `--compare` meldet
+strukturelle Abweichungen zwischen zwei Kassettenverzeichnissen (Exit-Code 1 bei Drift). Optionale
+Schlüssel und überlappende Array-Längen gelten nicht als Drift, weil sie mit den Aufnahmen
+schwanken. Damit lässt sich prüfen, ob der Mock oder ein späterer Generator formatgetreu ist.
+
 Committbare Testdaten entstehen nie aus den Kassetten selbst, sondern aus synthetischen Inhalten im
-echten Format. Format-Extraktion und Generator dafür sind Ticket #232.
+echten Format. Der Skelett-Bericht ist die Vorlage dieses Generators; ein Verifier (N-Gramm-Abgleich
+gegen die Aufzeichnungen) ist als Freigabetor vor jedem Committen von Kassetten geplant.
 
 ## Grenzen
 
