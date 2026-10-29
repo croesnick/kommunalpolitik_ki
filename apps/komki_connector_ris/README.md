@@ -74,7 +74,45 @@ Seine Daten enthalten öffentliche und nicht-öffentliche TOPs. „Bahnhofstraß
 geschützten Sitzungsteil. Damit lässt sich prüfen, dass die Trefferzahl nichts verrät. TOP `1001-3`
 trägt eine Prompt-Injection im öffentlichen Text für Red-Team-Tests. Anders als die echte Gast-API
 liefert der Mock auch nicht-öffentliche TOPs samt Text aus, damit der Filter des Connectors geprüft
-wird. Modus `error500` antwortet immer mit HTTP 500, `slow` antwortet erst nach 3 s.
+wird. Modus `error500` antwortet immer mit HTTP 500, `slow` antwortet erst nach 3 s, `replay` spielt
+Aufzeichnungen des Recorders zurück (siehe unten).
+
+## Aufzeichnung und Replay echter Antwortformate
+
+Die Daten des Mocks sind handgespiegelt. Um die Antwortformate gegen das echte RIS zu verifizieren
+und komki ohne echtes RIS testen zu können, gibt es einen Aufzeichnungs-Proxy
+(`priv/ris_recorder.exs`): rein deterministischer Code, kein LLM sieht die Aufzeichnungen.
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_recorder.exs --port 4020 \
+  [--upstream https://risapi1.komuna.net/web/] [--out <verzeichnis>]
+```
+
+Der Proxy reicht Anfragen 1:1 an das echte RIS weiter und schreibt jeden Austausch als Kassette
+(JSON, Body base64). `authorization`-/`cookie`-Kopfzeilen, `set-cookie` sowie
+`login`/`password`/`token`-Felder in JSON-Bodies werden beim Schreiben redigiert (`"<redacted>"`);
+Client und Upstream erhalten alles unredigiert. Die Kassetten enthalten trotzdem echte Daten und
+bleiben deshalb lokal (`priv/cassettes/` liegt in der `.gitignore`).
+
+Gegen den Recorder aufzeichnen:
+
+- komki: `"ris_mock_port": 4020` in komkis `config.json` — Loopback gilt als Mock, der
+  Egress-Proxy bleibt aus.
+- `ratsinfo`: `RIS_BASE_URL=http://127.0.0.1:4020/` (ohne `/web/`; der Proxy ergänzt den Präfix
+  upstream-seitig).
+
+Zurückspielen — komki läuft gegen die Aufzeichnung statt gegen das echte RIS:
+
+```bash
+elixir apps/komki_connector_ris/priv/mock_ris.exs --port 4010 --mode replay --cassette <verzeichnis>
+```
+
+Replay matcht `(Methode, Pfad, Query)`; bei abweichendem Query (z. B. anderem Zeitfenster) greift
+die erste Aufnahme für `(Methode, Pfad)`. Nicht aufgezeichnete Pfade antworten mit 404.
+
+Für committbare Testdaten gilt weiterhin: echte Inhalte verwerfen und Kassetten mit synthetischen
+Inhalten im echten Format erzeugen. Ein tragfähiger, deterministischer Anonymisierungs-Ansatz dafür
+steht noch aus; die Aufzeichnungen sind seine Grundlage.
 
 ## Grenzen
 

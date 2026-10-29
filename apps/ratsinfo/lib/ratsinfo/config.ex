@@ -11,8 +11,12 @@ defmodule Ratsinfo.Config do
   @customname "vgbuchloe"
   @unique_id "ris.komuna.net/vgbuchloe"
 
-  @doc "Base URL der RIS-API"
-  def base_url, do: @base_url
+  @doc """
+  Base URL der RIS-API. Überschreibbar über die Umgebungsvariable `RIS_BASE_URL`,
+  z. B. für den Aufzeichnungs-Proxy `apps/komki_connector_ris/priv/ris_recorder.exs`
+  oder den Replay-Modus des Mocks (jeweils ohne `/web/`-Präfix).
+  """
+  def base_url, do: System.get_env("RIS_BASE_URL") || @base_url
 
   @doc "Erforderliche Custom-Header für alle API-Requests"
   def headers do
