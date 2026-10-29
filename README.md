@@ -1,6 +1,6 @@
 # Kommunalpolitik KI
 
-KI-Werkzeuge für die ehrenamtliche Ratsarbeit: recherchieren mit Quellen, ohne Vertrauliches aus der Hand zu geben. Entstanden in und für die Ratsarbeit der Verwaltungsgemeinschaft Buchloe im Allgäu, offen unter MIT-Lizenz.
+KI-Werkzeuge für die ehrenamtliche Ratsarbeit: recherchieren mit Quellen, ohne Vertrauliches aus der Hand zu geben. Gebaut von Carsten Rösnick-Neugebauer, Stadtrat in Buchloe im Allgäu, für die eigene Ratsarbeit, offen unter MIT-Lizenz.
 
 **Zum Lesen und Ausprobieren:** [croesnick.github.io/kommunalpolitik_ki](https://croesnick.github.io/kommunalpolitik_ki/). Den Einstieg ohne Technik bietet die Seite [Worum es geht](https://croesnick.github.io/kommunalpolitik_ki/komki/worum-es-geht/).
 
