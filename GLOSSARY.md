@@ -857,6 +857,44 @@ Sie liegen nie im Repo; committbar ist nur der Skelett-Bericht.
 
 ---
 
+### Bau aus dem Checkout
+
+**Definition:** Der heute gültige Weg zu komki: Repo klonen, `make komki`
+baut das Escript im Clone und legt einen Link nach `~/.local/bin`, danach
+`komki setup`. Wer schon Homebrew nutzt, kann mit `make komki-tap` dasselbe
+lokal als Homebrew-Paket installieren (Tap nur auf diesem Rechner).
+
+**Abgrenzung:** Kein Release. Es gibt keinen veröffentlichten Tap und keine
+heruntergeladene Datei.
+
+**Wo:** [`docs/release.md`](docs/release.md) § „Lokaler Bau aus dem Checkout“.
+
+---
+
+### Wegwerf-Instanz
+
+**Definition:** Eine zweite komki-Instanz mit eigenem `KOMKI_HOME` und
+eigenem Port neben der Hauptinstanz, für echte Läufe, die die Hauptinstanz
+nicht berühren sollen. Der Pfad muss kurz sein, weil Unix-Sockets höchstens
+103 Byte lang sein dürfen (etwa `/private/tmp/komki-test`).
+
+---
+
+### Release
+
+**Definition:** Ein veröffentlichter GitHub-Release eines Tools, getaggt
+`<tool>-v<semver>` (z. B. `komki-v0.1.0`). Für komki ist der Ablauf in
+[`docs/release.md`](docs/release.md) beschrieben, aber noch nicht in Kraft:
+Bis auf Weiteres gilt der Bau aus dem Checkout.
+
+**Begriffe im Release-Ablauf:** *Payload-Staleness* (eine neu gebaute
+Burrito-Einzeldatei derselben Version nutzt den schon entpackten alten
+Inhalt weiter), *Smoke-Matrix* (feste Prüfschritte gegen die Datei, die
+veröffentlicht werden soll), *Publish-GO* (das eine GO, das Tag und
+Veröffentlichung abdeckt).
+
+---
+
 ## Sprachregeln und Festlegungen
 
 Beschlossen in der Sprach-Session am 2026-10-14; Belege und
