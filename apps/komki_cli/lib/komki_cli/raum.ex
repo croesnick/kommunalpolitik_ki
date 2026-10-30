@@ -24,17 +24,19 @@ defmodule KomkiCli.Raum do
       eine Datei `<base>/run/runs/<pid>` (`track_run/2`).
 
   Dieselbe Gefahr hat `komki session --continue`: pi setzt die letzte
-  Unterhaltung samt Kontext fort. Deshalb hält komki beim Start jeder
-  Session fest, unter welchem B_W sie lief (`<base>/run/session-room.json`,
+  Unterhaltung samt Kontext fort. Deshalb bekommt jede Session ein eigenes
+  Verzeichnis unter `pi-home/sessions` (`open_session/2`), und komki hält
+  fest, unter welchem B_W sie lief (`<base>/run/sessions/<name>.json`,
   außerhalb von pi-home, das pi beschreiben darf). Fortsetzen geht nur in
   einem Raum, der mindestens so streng ist.
 
-  Die Markierung gilt nur für die Session-Datei, die pi fortsetzen würde
-  (die neueste nach Änderungszeit). pi legt eine neue Datei erst mit der
-  ersten Nachricht an: Endet eine neue Session ohne Unterhaltung, bleibt
-  die vorige Datei die neueste, und ihr Raum ist unbekannt. Deshalb hält
-  die Markierung fest, welche Datei beim Start die neueste war, und ob
-  fortgesetzt wurde. Passt das nicht zur neuesten Datei: nicht fortsetzen.
+  Innerhalb von pi gäbe es weitere Wege zu einer anderen Session:
+  `/resume` und `/import` (Ticket #295). Das Profil der Session gibt unter
+  `pi-home/sessions` nur ihr eigenes Verzeichnis frei
+  (`KomkiCli.Profile`), die Extension in pi bricht den Wechsel dorthin
+  zusätzlich mit einem Hinweis ab. `/new`, `/fork` und `/clone` legen ihre
+  Dateien im selben Verzeichnis an, also im Raum dieser Session; zu ihnen
+  darf `/resume` wechseln.
 
   Den Wechsel belegt das Journal: Der Vermittler hält bei jedem Start das
   B_W fest, mit dem er entscheidet (`tool: "workspace"`).
@@ -154,44 +156,75 @@ defmodule KomkiCli.Raum do
 
   defp runs_dir(cfg), do: Path.join(Channel.run_dir(cfg), "runs")
 
-  @doc "Pfad der Raum-Markierung der letzten Session."
-  @spec marker_path(Config.t()) :: Path.t()
-  def marker_path(%Config{} = cfg), do: Path.join(Channel.run_dir(cfg), "session-room.json")
+  @doc "Pfad der Raum-Markierung einer Session (Name ihres Verzeichnisses)."
+  @spec marker_path(Config.t(), String.t()) :: Path.t()
+  def marker_path(%Config{} = cfg, name),
+    do: Path.join([Channel.run_dir(cfg), "sessions", name <> ".json"])
 
   @doc """
-  Hält das B_W des Raums fest, in dem eine Session startet oder
-  fortgesetzt wird. Rufen nur `komki session` und ein verschärfender
-  Wechsel; pi kann die Datei nicht schreiben.
+  Öffnet das Verzeichnis für `komki session` und hält den Raum fest. Neu:
+  ein frisches Verzeichnis. `--continue`: das jüngste mit einer
+  Unterhaltung, wenn der Raum mindestens so streng ist wie der, in dem sie
+  lief. Fehlt die Markierung, ist das unbekannt: dann nein.
+
+  Läuft nur, wenn keine Session läuft. Leere Verzeichnisse (Session ohne
+  Unterhaltung) räumt der Aufruf vorher weg.
   """
-  @spec mark_session(Config.t()) :: :ok | {:error, String.t(), pos_integer()}
-  def mark_session(%Config{} = cfg, continue? \\ false) do
-    with {:ok, room} <- read_room(cfg) do
-      write_marker(cfg, %{
-        "workspace_bindings" => Enum.sort(room["workspace_bindings"]),
-        "newest" => newest_session(cfg),
-        "continued" => continue?
-      })
+  @spec open_session(Config.t(), boolean()) ::
+          {:ok, Path.t()} | {:error, String.t(), pos_integer()}
+  def open_session(%Config{} = cfg, continue?) do
+    prune_sessions(cfg)
+
+    with {:ok, room} <- read_room(cfg),
+         current = room["workspace_bindings"],
+         {:ok, name} <- pick_session(cfg, current, continue?) do
+      dir = Path.join(Pi.sessions_root(cfg), name)
+      File.mkdir_p!(dir)
+      write_json(marker_path(cfg, name), %{"workspace_bindings" => Enum.sort(current)})
+      write_json(current_path(cfg), %{"session" => name})
+      {:ok, dir}
     end
   end
 
   @doc """
-  Darf die letzte Session im aktuellen Raum fortgesetzt werden? Nur, wenn
-  der Raum mindestens so streng ist wie der, in dem sie lief. Fehlt die
-  Markierung (Session von vor #268) oder gehört sie zu einer anderen
-  Session-Datei als der neuesten, ist das unbekannt: dann nein.
+  Verzeichnis der zuletzt geöffneten Session, für den Start von pi im
+  Pane. Prüft den Raum noch einmal: Wurde seit `open_session/2` gelockert,
+  startet die Session nicht.
   """
-  @spec continue_allowed(Config.t()) :: :ok | {:error, String.t(), pos_integer()}
-  def continue_allowed(%Config{} = cfg) do
-    with {:ok, room} <- read_room(cfg) do
-      with {:ok, marker} <- read_marker(cfg),
-           true <- describes?(marker, newest_session(cfg)) do
-        continue_into(room["workspace_bindings"], marker["workspace_bindings"])
-      else
-        _ ->
-          {:error,
-           "Für die letzte Session ist nicht festgehalten, in welchem Raum sie lief. " <>
-             "Starte eine neue Session ohne --continue.", 2}
-      end
+  @spec session_dir(Config.t()) :: {:ok, Path.t()} | {:error, String.t(), pos_integer()}
+  def session_dir(%Config{} = cfg) do
+    with {:ok, name} <- current_session(cfg),
+         {:ok, previous} <- read_marker(cfg, name),
+         {:ok, room} <- read_room(cfg),
+         :ok <- continue_into(room["workspace_bindings"], previous) do
+      {:ok, Path.join(Pi.sessions_root(cfg), name)}
+    else
+      :missing -> {:error, "kein Session-Verzeichnis geöffnet: 'komki session' neu starten", 2}
+      error -> error
+    end
+  end
+
+  defp pick_session(_cfg, _current, false), do: {:ok, new_session_name()}
+
+  defp pick_session(cfg, current, true) do
+    case last_conversation(cfg) do
+      nil ->
+        {:error,
+         "keine frühere Session in " <> Pi.sessions_root(cfg) <> "; ohne --continue starten", 2}
+
+      name ->
+        with {:ok, previous} <- read_marker(cfg, name),
+             :ok <- continue_into(current, previous) do
+          {:ok, name}
+        else
+          :missing ->
+            {:error,
+             "Für die letzte Session ist nicht festgehalten, in welchem Raum sie lief. " <>
+               "Starte eine neue Session ohne --continue.", 2}
+
+          error ->
+            error
+        end
     end
   end
 
@@ -308,19 +341,19 @@ defmodule KomkiCli.Raum do
     end
   end
 
-  defp write_room(cfg, room, bindings) do
-    path = StartContract.default_path(cfg.base_dir)
-    tmp = path <> ".tmp"
-    File.write!(tmp, KomkiPolicy.JSON.canonical(Map.put(room, "workspace_bindings", bindings)))
-    File.rename!(tmp, path)
-  end
+  defp write_room(cfg, room, bindings),
+    do:
+      write_json(
+        StartContract.default_path(cfg.base_dir),
+        Map.put(room, "workspace_bindings", bindings)
+      )
 
   # Eine laufende Session arbeitet nach einem verschärfenden Wechsel im
   # strengeren Raum weiter; ihre Markierung zieht mit.
   defp mark_if_running(cfg, bindings, deps) do
     with true <- deps.session_running?.(cfg),
-         {:ok, marker} <- read_marker(cfg) do
-      write_marker(cfg, Map.put(marker, "workspace_bindings", Enum.sort(bindings)))
+         {:ok, name} <- current_session(cfg) do
+      write_json(marker_path(cfg, name), %{"workspace_bindings" => Enum.sort(bindings)})
     else
       _ -> :ok
     end
@@ -350,47 +383,66 @@ defmodule KomkiCli.Raum do
       else: ""
   end
 
-  # Die Markierung beschreibt die neueste Session-Datei, wenn genau diese
-  # fortgesetzt wurde oder wenn seit dem Start einer neuen Session eine
-  # neue Datei entstanden ist.
-  defp describes?(%{"continued" => true, "newest" => newest}, newest) when is_binary(newest),
-    do: true
+  # Verzeichnisnamen: UTC-Zeit des Starts auf die Mikrosekunde, sortierbar.
+  # Andere Namen unter pi-home/sessions (etwa Dateien von vor #295) zählen
+  # nicht als Session.
+  @session_name ~r/\A\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{6}Z\z/
 
-  defp describes?(%{"continued" => false} = marker, newest) when is_binary(newest),
-    do: marker["newest"] != newest
+  defp new_session_name,
+    do: Calendar.strftime(DateTime.utc_now(:microsecond), "%Y-%m-%dT%H-%M-%S-%fZ")
 
-  defp describes?(_marker, _newest), do: false
-
-  # Wie pi bei --continue: die zuletzt geänderte Session-Datei.
-  defp newest_session(cfg) do
-    dir = Pi.session_dir(cfg)
-
-    case File.ls(dir) do
-      {:ok, files} ->
-        files
-        |> Enum.filter(&String.ends_with?(&1, ".jsonl"))
-        |> Enum.max_by(&{File.stat!(Path.join(dir, &1), time: :posix).mtime, &1}, &>=/2, fn ->
-          nil
-        end)
-
-      {:error, _} ->
-        nil
+  defp session_names(cfg) do
+    case File.ls(Pi.sessions_root(cfg)) do
+      {:ok, names} -> names |> Enum.filter(&Regex.match?(@session_name, &1)) |> Enum.sort()
+      {:error, _} -> []
     end
   end
 
-  defp write_marker(cfg, marker) do
-    path = marker_path(cfg)
+  # pi legt eine Session-Datei erst mit der ersten Nachricht an.
+  defp last_conversation(cfg) do
+    cfg
+    |> session_names()
+    |> Enum.reverse()
+    |> Enum.find(fn name ->
+      case File.ls(Path.join(Pi.sessions_root(cfg), name)) do
+        {:ok, files} -> Enum.any?(files, &String.ends_with?(&1, ".jsonl"))
+        {:error, _} -> false
+      end
+    end)
+  end
+
+  defp prune_sessions(cfg) do
+    for name <- session_names(cfg),
+        File.rmdir(Path.join(Pi.sessions_root(cfg), name)) == :ok,
+        do: File.rm(marker_path(cfg, name))
+
+    :ok
+  end
+
+  defp current_path(cfg), do: Path.join(Channel.run_dir(cfg), "session-current.json")
+
+  defp current_session(cfg) do
+    with {:ok, raw} <- File.read(current_path(cfg)),
+         {:ok, %{"session" => name}} when is_binary(name) <- decode_object(raw),
+         true <- Regex.match?(@session_name, name) do
+      {:ok, name}
+    else
+      _ -> :missing
+    end
+  end
+
+  defp write_json(path, term) do
     File.mkdir_p!(Path.dirname(path))
     tmp = path <> ".tmp"
-    File.write!(tmp, KomkiPolicy.JSON.canonical(marker))
+    File.write!(tmp, KomkiPolicy.JSON.canonical(term))
     File.rename!(tmp, path)
   end
 
-  defp read_marker(cfg) do
-    with {:ok, raw} <- File.read(marker_path(cfg)),
-         {:ok, %{"workspace_bindings" => bindings} = marker} when is_list(bindings) <-
+  defp read_marker(cfg, name) do
+    with {:ok, raw} <- File.read(marker_path(cfg, name)),
+         {:ok, %{"workspace_bindings" => bindings}} when is_list(bindings) <-
            decode_object(raw) do
-      {:ok, marker}
+      {:ok, bindings}
     else
       _ -> :missing
     end

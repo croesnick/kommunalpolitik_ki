@@ -1519,21 +1519,22 @@ defmodule KomkiCli.Steps do
     end
   end
 
+  # Das Session-Verzeichnis hat `komki session` geöffnet und im Raum
+  # geprüft (KomkiCli.Raum.open_session/2), bevor es das Pane startete.
   defp do_session_chain(cfg, continue?) do
-    case prepare_channel(cfg) do
-      {:ok, channel_env} -> start_session_chain(cfg, continue?, channel_env)
-      {:error, reason, code} -> {:error, reason, code}
+    with {:ok, session_dir} <- KomkiCli.Raum.session_dir(cfg),
+         {:ok, channel_env} <- prepare_channel(cfg) do
+      start_session_chain(cfg, session_dir, continue?, channel_env)
     end
   end
 
-  defp start_session_chain(cfg, continue?, channel_env) do
-    File.mkdir_p!(Pi.session_dir(cfg))
-
+  defp start_session_chain(cfg, session_dir, continue?, channel_env) do
     arbeit = Path.join(cfg.base_dir, "arbeit")
     File.mkdir_p!(arbeit)
-    Profile.write!(Pi.session_profile_path(cfg), Profile.generate(cfg, arbeit))
+    Profile.write!(Pi.session_profile_path(cfg), Profile.generate(cfg, arbeit, session_dir))
 
-    [program | args] = Pi.argv_session(cfg, continue?, KomkiCli.Runtime.burrito?())
+    [program | args] =
+      Pi.argv_session(cfg, session_dir, continue?, KomkiCli.Runtime.burrito?())
 
     # Port-Env in Charlist-Form: die open_port-Spec fuer :env verlangt sie
     # (Dialyzer-Fund: Binär-Tupel lassen den Aufruf als fehlgeschlagen typisieren).
@@ -1998,9 +1999,8 @@ defmodule KomkiCli.Steps do
     continue? = Map.has_key?(opts, "continue")
     detach? = Map.has_key?(opts, "detach")
 
-    with :ok <- continue_precondition(cfg, continue?),
-         :ok <- KomkiCli.Raum.mark_session(cfg, continue?) do
-      prepare_session_assets(cfg)
+    with {:ok, session_dir} <- KomkiCli.Raum.open_session(cfg, continue?) do
+      prepare_session_assets(cfg, session_dir)
       pane = Pi.pane_command(KomkiCli.Runtime.self_path(), cfg.base_dir, continue?)
 
       if detach?,
@@ -2009,13 +2009,11 @@ defmodule KomkiCli.Steps do
     end
   end
 
-  defp prepare_session_assets(cfg) do
-    File.mkdir_p!(Pi.session_dir(cfg))
-
+  defp prepare_session_assets(cfg, session_dir) do
     # Schreibbereich interaktiver Arbeit (persistenter Workspace im KomkiCli)
     arbeit = Path.join(cfg.base_dir, "arbeit")
     File.mkdir_p!(arbeit)
-    Profile.write!(Pi.session_profile_path(cfg), Profile.generate(cfg, arbeit))
+    Profile.write!(Pi.session_profile_path(cfg), Profile.generate(cfg, arbeit, session_dir))
   end
 
   # Detached: kein Terminalbedarf, System.cmd genuegt (stderr gefangen).
@@ -2051,27 +2049,6 @@ defmodule KomkiCli.Steps do
         {:error, "tmux new-session fehlgeschlagen (exit " <> to_string(code) <> ")", 4}
     end
   end
-
-  # pi --continue ohne fruehere Session wuerde in der TUI fehlschlagen;
-  # deshalb explizit und mit klarem Text verweigern.
-  defp continue_precondition(cfg, true) do
-    case File.ls(Pi.session_dir(cfg)) do
-      {:ok, []} ->
-        {:error,
-         "keine frühere Session in " <> Pi.session_dir(cfg) <> "; ohne --continue starten", 2}
-
-      # Fortsetzen nur in einem Raum, der mindestens so streng ist wie der
-      # der letzten Session: pi bringt ihren Kontext mit (Ticket #268).
-      {:ok, _sessions} ->
-        KomkiCli.Raum.continue_allowed(cfg)
-
-      {:error, _posix} ->
-        {:error,
-         "keine frühere Session in " <> Pi.session_dir(cfg) <> "; ohne --continue starten", 2}
-    end
-  end
-
-  defp continue_precondition(_cfg, false), do: :ok
 
   defp session_started_message(cfg, true = _detach) do
     "tmux-session '" <>

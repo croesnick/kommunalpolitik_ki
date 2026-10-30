@@ -15,6 +15,8 @@ defmodule KomkiCli.Profile do
        `komki-relay.js` liegt im pi-Home und ist ueber dessen Leseregel
        abgedeckt.
     * pi-Home — isoliertes HOME (lesend/schreibend, inkl. Komponenten-Kette)
+      ohne die Session-Verläufe `pi-home/sessions` (Ticket #295): Offen ist
+      nur das Verzeichnis der eigenen Session, beim Einmal-Lauf keines
     * Scratch-Verzeichnis — die Write-Scope dieses Laufs (lesend/schreibend)
 
   Garantien (vom Profil-Test erzwungen):
@@ -29,7 +31,7 @@ defmodule KomkiCli.Profile do
       Profil).
   """
 
-  alias KomkiCli.{Channel, Config, Llama}
+  alias KomkiCli.{Channel, Config, Llama, Pi}
   alias Seatbelt.{MachODeps, Preset, SBPL}
   require Config
 
@@ -42,10 +44,18 @@ defmodule KomkiCli.Profile do
     Path.join(Path.dirname(cfg.profile_path) <> ".d", "check-scratch")
   end
 
-  @doc "Profil-Text generieren. Feste Eingaben -> byte-identischer Output."
-  @spec generate(Config.t(), String.t()) :: String.t()
-  def generate(%Config{} = cfg, scratch)
-      when is_binary(scratch) and Config.tools_ready(cfg) do
+  @doc """
+  Profil-Text generieren. Feste Eingaben -> byte-identischer Output.
+  `session_dir` ist das Verzeichnis der interaktiven Session, das einzige
+  unter `pi-home/sessions`, das pi lesen und schreiben darf; `nil` beim
+  Einmal-Lauf.
+  """
+  @spec generate(Config.t(), String.t(), String.t() | nil) :: String.t()
+  def generate(cfg, scratch, session_dir \\ nil)
+
+  def generate(%Config{} = cfg, scratch, session_dir)
+      when is_binary(scratch) and (is_binary(session_dir) or is_nil(session_dir)) and
+             Config.tools_ready(cfg) do
     scratch = Config.canonical(scratch)
 
     # Host-unabhaengig: <home> und asdf-Root aus der gepinnten node-Kette
@@ -61,14 +71,14 @@ defmodule KomkiCli.Profile do
     asdf_bin = System.find_executable("asdf")
 
     asdf_root_dir
-    |> rules_for(cfg, scratch, user_home, asdf_bin)
+    |> rules_for(cfg, {scratch, session_dir}, user_home, asdf_bin)
     |> Enum.join("\n")
     |> Kernel.<>("\n")
   end
 
   # Unvollstaendige config (Werkzeugpfade fehlen): klar scheitern statt
   # kryptisch in Regel-Konkatenationen zu crashen.
-  def generate(%Config{}, _scratch) do
+  def generate(%Config{}, _scratch, _session_dir) do
     raise_incomplete_tools!("Profil")
   end
 
@@ -392,7 +402,7 @@ defmodule KomkiCli.Profile do
 
   ## ---------------------------------------------------------------- Regelaufbau
 
-  defp rules_for(asdf_root_dir, cfg, scratch, user_home, asdf_bin) do
+  defp rules_for(asdf_root_dir, cfg, {scratch, session_dir}, user_home, asdf_bin) do
     node = cfg.node_bin
     # node installiert im asdf-Schema <asdf-root>/installs/nodejs/<v>/bin/node:
     # bin_dir = .../bin, install_root = .../<v>.
@@ -433,6 +443,7 @@ defmodule KomkiCli.Profile do
       Preset.tui() ++
       tty_redirect_rules() ++
       scope_rules(cfg, scratch) ++
+      session_rules(cfg, session_dir) ++
       [port_rule, mediator_socket_rule]
   end
 
@@ -713,6 +724,29 @@ defmodule KomkiCli.Profile do
       "(allow file-read-metadata (literal \"/private/var/select\"))",
       "(allow file-read* (literal \"/private/var/select/sh\"))"
     ]
+  end
+
+  # Ticket #295: Die Verläufe aller Sessions liegen unter pi-home, in einem
+  # Verzeichnis je Session. pi dürfte sie sonst alle lesen: /resume und
+  # /import holten den Kontext einer Session aus einem strengeren Raum in
+  # diesen. Offen bleibt nur das Verzeichnis der eigenen Session, dessen Raum
+  # komki beim Start geprüft hat (KomkiCli.Raum.open_session/2). Die Regeln
+  # stehen hinter der pi-Home-Freigabe: Bei Seatbelt gilt die letzte
+  # passende Regel.
+  defp session_rules(cfg, session_dir) do
+    root = SBPL.quote!(Pi.sessions_root(cfg))
+
+    [
+      "; Session-Verläufe: nur die eigene Session (Ticket #295)",
+      "(deny file-read* (subpath " <> root <> "))",
+      "(deny file-write* (subpath " <> root <> "))"
+    ] ++
+      if session_dir,
+        do: [
+          "(allow file-read* (subpath " <> SBPL.quote!(session_dir) <> "))",
+          "(allow file-write* (subpath " <> SBPL.quote!(session_dir) <> "))"
+        ],
+        else: []
   end
 
   ## ---------------------------------------------------------------- Helfer

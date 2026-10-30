@@ -4,10 +4,11 @@ defmodule KomkiCli.Pi do
 
     * **Einmal-Lauf** (`run/4`): headless `--print`, stdin aus `/dev/null`,
       ephemeral (keine Session-Datei).
-    * **Interaktive Session** (`argv_session/2`, aufgerufen vom internen
+    * **Interaktive Session** (`argv_session/3`, aufgerufen vom internen
       `session-chain`): pi als Port-Kind des Pane-BEAM mit `:nouse_stdio` —
-      die tmux-Pty ist das Terminal. Persistente Session-Dateien unter
-      `pi-home/sessions`, fortsetzbar via pi `--continue`.
+      die tmux-Pty ist das Terminal. Persistente Session-Dateien in einem
+      eigenen Verzeichnis je komki-Session unter `pi-home/sessions`
+      (`KomkiCli.Raum.open_session/2`), fortsetzbar via pi `--continue`.
 
   Environment (identisch fuer beide Modi — die validierte Lauf-Konvention):
 
@@ -149,9 +150,12 @@ defmodule KomkiCli.Pi do
   # Interaktive Session (tmux-Pty als stdin)
   # ===========================================================================
 
-  @doc "pi-Session-Verzeichnis (persistente Session-Dateien unter pi-home)."
-  @spec session_dir(Config.t()) :: String.t()
-  def session_dir(%Config{} = cfg), do: Path.join(cfg.pi_home, "sessions")
+  @doc """
+  Wurzel der Session-Verzeichnisse unter pi-home. Jede komki-Session hat
+  darin ein eigenes (Ticket #295), das Profil gibt nur dieses frei.
+  """
+  @spec sessions_root(Config.t()) :: String.t()
+  def sessions_root(%Config{} = cfg), do: Path.join(cfg.pi_home, "sessions")
 
   @doc """
   Profil-Pfad der interaktiven Session (eine tmux-Session gleichzeitig,
@@ -168,8 +172,8 @@ defmodule KomkiCli.Pi do
   @redirect_stdout_sh ~s(exec "$0" "$@" > /dev/fd/0)
 
   @doc """
-  argv der interaktiven Session: sandbox-exec-Direktkette ohne `--print`
-  und ohne stdin-Redirect (die tmux-Pty ist stdin — ein `/dev/null`-Redirect
+  argv der interaktiven Session in `session_dir`: sandbox-exec-Direktkette
+  ohne `--print` und ohne stdin-Redirect (die tmux-Pty ist stdin — ein `/dev/null`-Redirect
   wuerde die TUI-Eingabe kappen). Fuer Doctor/Tests sichtbar.
 
   `tty_redirect` (Burrito-Fix, Pilot 2026-10-11): Mit `true` laeuft die
@@ -179,14 +183,15 @@ defmodule KomkiCli.Pi do
   (dort ist stdout ohnehin die Pane-PTY); das passende Profil erlaubt das
   Oeffnen von /dev/fd/0 kontextfrei.
   """
-  @spec argv_session(Config.t(), boolean(), boolean()) :: [String.t()]
+  @spec argv_session(Config.t(), String.t(), boolean(), boolean()) :: [String.t()]
 
   # Header fuehrt den Default (Multi-Clause-Konvention): Escript-Pfad ruft
-  # argv_session/2 ohne Redirect-Angabe, session_chain gibt den Kontext mit.
-  def argv_session(cfg, continue?, tty_redirect \\ false)
+  # argv_session/3 ohne Redirect-Angabe, session_chain gibt den Kontext mit.
+  def argv_session(cfg, session_dir, continue?, tty_redirect \\ false)
 
-  def argv_session(%Config{} = cfg, continue?, tty_redirect)
-      when is_boolean(continue?) and is_boolean(tty_redirect) and Config.tools_ready(cfg) do
+  def argv_session(%Config{} = cfg, session_dir, continue?, tty_redirect)
+      when is_binary(session_dir) and is_boolean(continue?) and is_boolean(tty_redirect) and
+             Config.tools_ready(cfg) do
     prefix = [cfg.sandbox_exec, "-f", session_profile_path(cfg), "--"]
 
     chain =
@@ -196,10 +201,10 @@ defmodule KomkiCli.Pi do
         [cfg.node_bin, cfg.cli_js]
       end
 
-    prefix ++ chain ++ session_flags(cfg, continue?)
+    prefix ++ chain ++ session_flags(cfg, session_dir, continue?)
   end
 
-  def argv_session(%Config{}, _continue?, _tty_redirect),
+  def argv_session(%Config{}, _session_dir, _continue?, _tty_redirect),
     do: raise(ArgumentError, message: @incomplete_tools_msg)
 
   @doc "Lauf-Umgebung als Key-Value-Paare (deterministisch sortiert)."
@@ -255,7 +260,7 @@ defmodule KomkiCli.Pi do
   # (#166) nennt der Prompt, damit pi beides ohne Nachfrage nutzt.
   @komki_system_prompt "Antworte knapp und präzise, per Default auf Deutsch und durchgehend in der Du-Form. Du bist Assistent für kommunalpolitische Arbeit in einem lokalen Arbeitsraum. Welche Dokumente im Arbeitsraum bereitliegen, erfährst du mit list_documents; lesen kannst du sie mit admit_document. Ist ein Aufruf gesperrt, gilt der hinweis in der Antwort: Such keinen Umweg über andere Werkzeuge, sondern sag der nutzenden Person, was gesperrt ist. Belege jede sachliche Aussage mit ihrer Quelle: aus der Websuche mit der vollständigen URL des Treffers (https://…, nicht nur die Domain), aus dem RIS mit Gremium, Sitzungsdatum und TOP-Nummer, aus dem Vault mit dem Pfad der Notiz. Das gilt auch für Notizen: Die legst du mit vault_write_test im Vault an, mit den Quellen bei jeder Aussage. Hast du für eine Aussage keine Quelle, lass sie weg oder kennzeichne sie als unbelegt. Markiere Unsicherheit offen."
 
-  defp session_flags(cfg, continue?) do
+  defp session_flags(cfg, session_dir, continue?) do
     base =
       [
         "--offline"
@@ -272,7 +277,7 @@ defmodule KomkiCli.Pi do
           # Headless-Laeufe (pi_flags) behalten --no-approve: dort gibt es keinen
           # Projekt-Kontext.
           "--session-dir",
-          session_dir(cfg)
+          session_dir
         ] ++
         tool_flags() ++
         [

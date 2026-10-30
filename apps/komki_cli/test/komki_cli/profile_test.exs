@@ -187,6 +187,38 @@ defmodule KomkiCli.ProfileTest do
     end
   end
 
+  describe "Session-Verläufe (Ticket #295)" do
+    # Bei Seatbelt gilt die letzte passende Regel: Die Sperre muss hinter der
+    # pi-Home-Freigabe stehen, die Freigabe der eigenen Session dahinter.
+    defp index!(text, line) do
+      {idx, _} = :binary.match(text, line)
+      idx
+    end
+
+    test "Einmal-Lauf: alle Sessions zu", %{cfg: cfg, text: text} do
+      root = KomkiCli.Pi.sessions_root(cfg)
+      deny = ~s|(deny file-read* (subpath "#{root}"))|
+
+      assert index!(text, ~s|(allow file-read* (subpath "#{cfg.pi_home}"))|) < index!(text, deny)
+      assert String.contains?(text, ~s|(deny file-write* (subpath "#{root}"))|)
+      refute String.contains?(text, ~s|(allow file-read* (subpath "#{root}/|)
+    end
+
+    test "Session: nur ihr eigenes Verzeichnis offen", %{cfg: cfg, scratch: scratch} do
+      root = KomkiCli.Pi.sessions_root(cfg)
+      own = Path.join(root, "2026-10-30T12-00-00-000000Z")
+      text = Profile.generate(cfg, scratch, own)
+
+      assert index!(text, ~s|(deny file-read* (subpath "#{root}"))|) <
+               index!(text, ~s|(allow file-read* (subpath "#{own}"))|)
+
+      assert String.contains?(text, ~s|(allow file-write* (subpath "#{own}"))|)
+
+      # Keine andere Freigabe unter den Sessions.
+      assert [_] = Regex.scan(~r|\(allow file-read\* \(subpath "#{Regex.escape(root)}/|, text)
+    end
+  end
+
   describe "Determinismus" do
     test "feste cfg -> byte-identisch", %{cfg: cfg, scratch: scratch} do
       assert Profile.generate(cfg, scratch) == Profile.generate(cfg, scratch)
