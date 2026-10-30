@@ -571,12 +571,11 @@ ein Abschnitt; am Ende Querverweise, offene Fragen und nächste Schritte.
 
 ### Muss-Kriterien für jeden TOP-Abschnitt
 
-Realmodell-Benchmark vom 30.10.2026 (Ticket #158,
-[Labbook](../../docs/research/2026-10-30-pi-realmodell-smoke-test.md)):
-Modelle fassen TOPs ohne explizite Anforderung unvollständig zusammen —
-der Eigenanteil einer Kostenschätzung fiel in jedem natürlichen Prompt-Lauf
-weg. Mit expliziter Checkliste lieferte dasselbe Modell alle Kriterien in
-jedem Lauf. Deshalb für **jeden** TOP-Abschnitt verbindlich:
+Gemessenes Modellverhalten: Ohne explizite Anforderung fassen Modelle TOPs
+unvollständig zusammen — typischerweise fällt der Eigenanteil einer
+Kostenschätzung weg. Mit expliziter Checkliste liefert dasselbe Modell
+alle Kriterien zuverlässig. Deshalb für **jeden** TOP-Abschnitt
+verbindlich:
 
 | Kriterium | Muss |
 |---|---|
