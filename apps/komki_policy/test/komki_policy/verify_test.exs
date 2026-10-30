@@ -288,4 +288,78 @@ defmodule KomkiPolicy.VerifyTest do
       assert Enum.any?(reasons, &(&1["code"] == "unknown_premise"))
     end
   end
+
+  describe "store (§ 4.7): Prüflabel λ(y), label_preservation" do
+    defp store_case(name) do
+      {fixture(name <> "/snapshot.json"), fixture(name <> "/intent.json")}
+    end
+
+    test "derive(case_store_permit)-Beweis bestätigt verify als valid" do
+      reg = registry()
+      {snapshot, intent} = store_case("case_store_permit")
+      {:ok, decision} = Derive.decide(reg, snapshot, intent)
+
+      assert decision["rule"] == "store"
+      refute Map.has_key?(decision, "assigned_label")
+
+      assert {:ok, %{"result" => "valid", "reasons" => []}} =
+               Verify.check(reg, snapshot, intent, decision["proof"])
+    end
+
+    test "Beweis unter B_W statt λ(y): checked_label_mismatch" do
+      reg = registry()
+      {snapshot, intent} = store_case("case_store_permit")
+      {:ok, %{"proof" => proof}} = Derive.decide(reg, snapshot, intent)
+
+      # λ(y) trägt eine weitere Bindung; der Baum behauptet weiter nur B_W.
+      wider =
+        put_in(snapshot, ["object", "labels"], ["buergerfall-4711@1", "lizenz-namensnennung@1"])
+
+      assert {:ok, %{"result" => "invalid", "reasons" => [%{"code" => "checked_label_mismatch"}]}} =
+               Verify.check(reg, wider, intent, proof)
+    end
+
+    test "λ(y) ohne B_W: label_preservation_false" do
+      reg = registry()
+      {snapshot, intent} = store_case("case_store_permit")
+      {:ok, %{"proof" => proof}} = Derive.decide(reg, snapshot, intent)
+
+      shrunk =
+        put_in(snapshot, ["workspace", "bindings"], [
+          "buergerfall-4711@1",
+          "lizenz-namensnennung@1"
+        ])
+
+      assert {:ok, %{"result" => "invalid", "reasons" => reasons}} =
+               Verify.check(reg, shrunk, intent, proof)
+
+      assert "label_preservation_false" in Enum.map(reasons, & &1["code"])
+    end
+
+    test "label_preservation auf einem emit-Baum ist eine unbekannte Prämisse" do
+      reg = registry()
+      snapshot = fixture("case_emit_permit/snapshot.json")
+      intent = fixture("case_emit_permit/intent.json")
+      proof = fixture("proofs/proof_emit_valid.json")
+
+      extra =
+        Map.update!(proof, "premises", fn premises ->
+          [
+            %{
+              "name" => "label_preservation",
+              "kind" => "computed",
+              "value" => true,
+              "workspace_bindings" => snapshot["workspace"]["bindings"],
+              "checked_label" => snapshot["workspace"]["bindings"]
+            }
+            | premises
+          ]
+        end)
+
+      assert {:ok, %{"result" => "invalid", "reasons" => reasons}} =
+               Verify.check(reg, snapshot, intent, extra)
+
+      assert Enum.any?(reasons, &(&1["code"] == "unknown_premise"))
+    end
+  end
 end

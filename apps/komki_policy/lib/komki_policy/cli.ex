@@ -20,7 +20,7 @@ defmodule KomkiPolicy.CLI do
   | `0` | Erfolg; auch `deny`/`indeterminate` (decide), `valid` (verify) und der erfolgreiche `advance` sind legitime Ergebnisse |
   | `1` | `verify` hat den vorgelegten Beweis verworfen (`invalid`) **oder** `advance` hat den Standübergang abgelehnt (`refused`) |
   | `2` | Eingabefehler: Parse-/Schemaverstoß, Kohärenz, fehlende oder unerwartete Argumente, fehlende Datei, **unbekannter Befehl** — mit strukturiertem Fehlerdatensatz auf stdout |
-  | `3` | `unsupported`: nicht implementierter Regelzweig (und explizit `plan`, Freigabe-`kind: offenlegungsfreigabe`, Nicht-`emit`-Operation) — niemals ein `deny` |
+  | `3` | `unsupported`: nicht implementierter Regelzweig (und explizit `plan`, Freigabe-`kind: offenlegungsfreigabe`, Freigabe für eine Operation außer `emit`/`store`) — niemals ein `deny` |
   | `4` | unerwarteter interner Fehler (Crash-Handler) — erzeugt niemals eine Decision und fällt nie auf `permit` zurück (§ 1) |
 
   Deterministische Wahl für Grenzfälle:

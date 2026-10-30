@@ -1,0 +1,28 @@
+{
+  "blockers": null,
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "decision": "permit",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-case-release-store-permit",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-ausgabe-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "release": {
+    "call_hash": "754215904dbd4ba715d5a60994e0d7e0b09cc1c93d92c6be36d6a4e08480f0a9",
+    "nonce": "go-nonce-4711-store",
+    "release_id": "go-speichern-4711",
+    "stand_ref": "stand-4711@5",
+    "stand_version_after": 6
+  },
+  "remedies": null,
+  "rule": "store",
+  "snapshot_ref": "snap-store-4711-release",
+  "workspace": "ws-fall-4711"
+}

@@ -300,29 +300,27 @@ defmodule KomkiMediator.ConnectorGateTest do
   # Schreibende Operation
   # -----------------------------------------------------------------------
 
-  test "vault_write_test: assigned_label = B_W geht mit, Rueckmeldung wird geprueft", %{env: env} do
-    fake(env, "vault", fn "write_test", _params, context ->
-      {:ok, %{"note_id" => "komki-test/x.md", "labels" => context["assigned_label"]}}
-    end)
+  # Seit #205 braucht jedes Schreiben ein GO (store ohne Regel in Γ); der
+  # Weg mit GO steht in KomkiMediator.GoStoreTest.
+  test "vault_write_test ohne GO: emit erlaubt, store abgelehnt, kein Vollzug", %{env: env} do
+    fake(env, "vault", ok(%{"note_id" => "komki-test/x.md", "labels" => @recherche}))
 
     response = ConnectorGate.call(env, "vault_write_test", %{"title" => "T", "body" => "B"})
 
-    assert_received {:connector_called, "vault", "write_test", _,
-                     %{"assigned_label" => @recherche}, 1}
+    assert response["decision"] == "deny"
+    assert response["rule"] == "store"
+    # Ein Blocker je Bindung in λ(y) = B_W.
+    assert remedy_codes(response) == List.duplicate("missing_operation_rule", length(@recherche))
 
-    assert response["decision"] == "permit"
-    assert response["labels"] == @recherche
+    assert %{"type" => "aktionsfreigabe", "scope" => "call"} =
+             response["remedies"] |> hd() |> Map.fetch!("transitions") |> List.last()
 
-    [emit, _admit] = records(env)
-    assert emit["assigned_label"] == @recherche
-  end
+    refute_received {:connector_called, "vault", _, _, _, _}
 
-  test "vault_write_test: abweichende Labels in der Rueckmeldung -> redacted", %{env: env} do
-    fake(env, "vault", ok(%{"note_id" => "komki-test/x.md", "labels" => ["vault-oeffentlich@1"]}))
-
-    response = ConnectorGate.call(env, "vault_write_test", %{"title" => "T", "body" => "B"})
-    assert response["admitted"] == "redacted"
-    assert response["verify"] == ["label_mismatch"]
+    [store] = records(env)
+    assert store["rule"] == "store"
+    assert store["decision"] == "deny"
+    assert store["outcome"] == "not_admitted"
   end
 
   # -----------------------------------------------------------------------

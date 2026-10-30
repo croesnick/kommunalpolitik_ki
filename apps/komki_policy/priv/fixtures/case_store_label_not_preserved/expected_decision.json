@@ -1,0 +1,41 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "label_not_preserved",
+      "condition": null
+    }
+  ],
+  "checked_label": [],
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "decision": "deny",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-case-store-label-not-preserved",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-ausgabe-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "label_not_preserved",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "lokale-fallverarbeitung",
+            "nutzende-person"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
+  "rule": "store",
+  "snapshot_ref": "snap-store-4711-not-preserved",
+  "workspace": "ws-fall-4711"
+}

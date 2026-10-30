@@ -196,8 +196,11 @@ Jeder Connector-Aufruf besteht aus **zwei Entscheidungen** der Engine und **zwei
 
 ### 6.3 Schreibende Operationen (`vault.write_test`)
 
-`emit` mit `environment = vault-lokal@1`. Bei permit schickt der Vermittler `context.assigned_label =
-decision.assigned_label` (= B_W) mit. Der Connector schreibt genau diese Labels als `komki_labels` in das
+`emit` mit `environment = vault-lokal@1`, danach `store` (komki_policy CONTRACT §4.7, Ticket #205) unter
+λ(y) = `assigned_label` in derselben Umgebung. Γ hat keine `store`-Regel: Jedes Schreiben ist ohne
+Aktionsfreigabe für genau diesen Call ein deny, der Vermittler fragt die nutzende Person wie beim GO für
+gesperrte Aufrufe (#98), ohne Zuhörer bleibt es beim deny. Erst nach store-Permit (oder Freigabe) schickt der
+Vermittler `context.assigned_label = decision.assigned_label` (= B_W, aus der emit-Entscheidung) mit. Der Connector schreibt genau diese Labels als `komki_labels` in das
 Frontmatter (λ(y) = B_W, R.5.5) und gibt `note_id` und `labels` zurück. Gate 2 prüft, dass die
 zurückgemeldeten Labels gleich `assigned_label` sind.
 
@@ -262,6 +265,6 @@ Zwei Referenzräume für Tests:
 
 ## 10. Nicht in v1 (bewusst offen)
 
-GO-Flow für schreibende Operationen (#98; `write_test` schreibt nur in den Testordner), Page-Fetch-Connector,
+Schreiben in bestehende Notizen (#274; `write_test` schreibt nur in den Testordner), Page-Fetch-Connector,
 AZ und Nextcloud, Peer-PID-Prüfung (nicht nötig unter der Host-Annahme; der Peer-uid-Check aus §3
 unterscheidet Prozesse derselben uid nicht), Vereinheitlichung von `admit_document` mit `workspace_bindings`.

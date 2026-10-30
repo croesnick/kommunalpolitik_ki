@@ -16,6 +16,7 @@ defmodule KomkiCli.GoStepsTest do
       "schema" => "komki-go-request/1",
       "call_hash" => String.duplicate("a", 64),
       "decision_id" => "pdr-1",
+      "operation" => "emit",
       "tool" => "web_search",
       "params" => %{"query" => "Radweg Buchloe", "count" => 5},
       "blockers" => ["recipient_not_allowed"],
@@ -95,5 +96,13 @@ defmodule KomkiCli.GoStepsTest do
 
   test "keine Anfragen" do
     assert {"keine offenen GO-Anfragen\n", 0} = GoSteps.run("/nonexistent", ui(true))
+  end
+
+  test "store (#205): die Vorschau sagt, dass gespeichert wird", %{request: request} do
+    store = Map.merge(request, %{"operation" => "store", "tool" => "vault_write_test"})
+
+    assert GoSteps.describe(store) =~ "Aktion:    speichern — jedes Schreiben braucht dein GO"
+    refute GoSteps.describe(request) =~ "Aktion:"
+    assert Go.release_for(store, 1)["operation"] == "store"
   end
 end

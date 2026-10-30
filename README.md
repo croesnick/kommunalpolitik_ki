@@ -111,7 +111,7 @@ Ohne laufenden `obsidian` CLI legen die Vault-Skills ihre Notizen unter `artifac
 
 - Nur macOS mit Apple Silicon. komki wird aus dem Checkout gebaut (`make komki`, wer Homebrew nutzt auch als lokales Paket mit `make komki-tap`). Einen veröffentlichten Release oder Tap gibt es noch nicht ([docs/release.md](docs/release.md)).
 - Das RIS liefert ohne Zugangsdaten nur Titel, keine Texte der Tagesordnungspunkte ([#148](https://github.com/croesnick/kommunalpolitik_ki/issues/148)).
-- Schreiben in den Vault geht nur in den Ordner `komki-test/`, eine Bestätigung vor jedem Schreiben fehlt noch ([#205](https://github.com/croesnick/kommunalpolitik_ki/issues/205)).
+- Schreiben in den Vault geht nur in den Ordner `komki-test/`, jedes Mal erst nach deinem GO in der Session; bestehende Notizen ändert komki nicht ([#274](https://github.com/croesnick/kommunalpolitik_ki/issues/274)).
 - Schutz vor einem manipulierten Agenten, nicht vor Schadsoftware, die schon auf dem Rechner läuft. Ein unabhängiges Audit gibt es nicht.
 
 **Werkzeugkasten**
