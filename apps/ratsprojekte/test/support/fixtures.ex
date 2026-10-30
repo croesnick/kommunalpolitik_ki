@@ -8,6 +8,10 @@ defmodule Ratsprojekte.Fixtures do
     * `nordumgehung()` — verworfen, verworfen_am 2025-03-15
     * `sportplatz()` — idee, blockiert (kein erfüllter Strang)
     * `bibliothek()` — abgeschlossen, abgeschlossen_am 2025-02-01, blockiert
+    * `freibad(attrs \\ %{})` — idee, Strang A erfüllt, Projekt-Quelle mit
+      URL+Abrufdatum; die Antragsreife-Hard-Gate-Felder
+      (`beschlussvorschlag`, `adressat`) sind bewusst ungesetzt — Tests
+      können sie per `attrs` vorbelegen
   """
 
   alias Ratsprojekte.Repo
@@ -78,6 +82,43 @@ defmodule Ratsprojekte.Fixtures do
     })
 
     schritt(strang_b, %{text: "Haushaltsantrag vorbereiten"})
+
+    projekt
+  end
+
+  def freibad(attrs \\ %{}) do
+    defaults = %{
+      titel: "Freibad: Kartenzahlung einführen",
+      beschreibung: "Bargeldlose Zahlung an allen Freibad-Kassen.",
+      status: :idee,
+      prioritaet: :mittel,
+      slug: "freibad-kartenzahlung-test"
+    }
+
+    {:ok, projekt} = Repo.insert(struct(Projekt, Map.merge(defaults, Map.new(attrs))))
+
+    strang_a =
+      strang(projekt, %{
+        label: "A",
+        titel: "Kartenzahlung über den Bäderbetrieb beschaffen",
+        beschreibung: "Terminalmiete und Kartengebühren über den Bäderhaushalt.",
+        rechtliche_grundlage: "Art. 61 BayGO",
+        bedingung: "Haushaltsmittel müssen eingeplant sein",
+        bedingung_erfuellt: true
+      })
+
+    vorbedingung(strang_a, %{
+      text: "Haushaltsmittel müssen eingeplant sein",
+      erfuellt: true,
+      rechtliche_grundlage: "Art. 61 BayGO"
+    })
+
+    quelle(projekt, %{
+      typ: :sitzung,
+      titel: "Finanz- und Werksausschuss: Haushaltsansatz Bäderbetrieb",
+      url: "https://example.org/sitzung/2026-07-01",
+      abrufdatum: ~D[2026-07-01]
+    })
 
     projekt
   end
@@ -270,14 +311,24 @@ defmodule Ratsprojekte.Fixtures do
     :ok
   end
 
-  defp quelle(strang, attrs) do
+  defp quelle(%Realisierungsstrang{} = strang, attrs) do
+    insert_quelle(Map.put(Map.new(attrs), :realisierungsstrang_id, strang.id))
+  end
+
+  defp quelle(%Projekt{} = projekt, attrs) do
+    insert_quelle(Map.put(Map.new(attrs), :projekt_id, projekt.id))
+  end
+
+  defp insert_quelle(attrs) do
     {:ok, _} =
       Repo.insert(%Quelle{
-        realisierungsstrang_id: strang.id,
+        projekt_id: attrs[:projekt_id],
+        realisierungsstrang_id: attrs[:realisierungsstrang_id],
         typ: attrs[:typ],
         titel: attrs[:titel],
         url: attrs[:url],
-        paragraf: attrs[:paragraf]
+        paragraf: attrs[:paragraf],
+        abrufdatum: attrs[:abrufdatum]
       })
 
     :ok

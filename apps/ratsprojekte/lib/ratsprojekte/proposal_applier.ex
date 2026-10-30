@@ -104,6 +104,12 @@ defmodule Ratsprojekte.ProposalApplier do
         {"prioritaet", v}, acc when is_binary(v) ->
           Map.put(acc, :prioritaet, String.to_existing_atom(v))
 
+        {"beschlussvorschlag", v}, acc when is_binary(v) ->
+          Map.put(acc, :beschlussvorschlag, v)
+
+        {"adressat", v}, acc when is_binary(v) ->
+          Map.put(acc, :adressat, v)
+
         _, acc ->
           acc
       end)

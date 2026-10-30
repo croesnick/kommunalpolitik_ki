@@ -1,7 +1,7 @@
 defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdate do
   @moduledoc """
   Schlage eine Aktualisierung eines bestehenden Projekts vor (titel,
-  beschreibung, prioritaet).
+  beschreibung, prioritaet, beschlussvorschlag, adressat).
 
   **GO-Prinzip**: Dieses Tool schreibt NUR in die Staging-Tabelle
   `pending_proposals` — nicht in `projekte`. Der Vorschlag muss vom
@@ -41,6 +41,14 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdate do
       description: "Neue Priorität: 'hoch', 'mittel' oder 'niedrig' (optional)"
     )
 
+    field(:beschlussvorschlag, :string,
+      description: "Konkreter Beschlussvorschlag (> 20 Zeichen, Hard Gate)"
+    )
+
+    field(:adressat, :string,
+      description: "Adressat des Antrags (Stadtrat, Bürgermeister, Vergabeausschuss)"
+    )
+
     field(:begruendung, :string,
       required: true,
       description:
@@ -66,7 +74,9 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdate do
         %{
           "titel" => params[:titel],
           "beschreibung" => params[:beschreibung],
-          "prioritaet" => params[:prioritaet]
+          "prioritaet" => params[:prioritaet],
+          "beschlussvorschlag" => params[:beschlussvorschlag],
+          "adressat" => params[:adressat]
         }
         # Nur Felder aufnehmen, die die KI tatsächlich setzen will — keine
         # nil-Werte im Payload, sonst würde apply_projekt_update/3 Felder

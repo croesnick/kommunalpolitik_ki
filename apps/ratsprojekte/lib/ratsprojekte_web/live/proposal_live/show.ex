@@ -237,6 +237,18 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
                 value={payload_field(@proposal.payload, "prioritaet")}
               />
             <% end %>
+            <%= if payload_field(@proposal.payload, "beschlussvorschlag") != "" do %>
+              <.payload_row
+                label="Beschlussvorschlag"
+                value={payload_field(@proposal.payload, "beschlussvorschlag")}
+              />
+            <% end %>
+            <%= if payload_field(@proposal.payload, "adressat") != "" do %>
+              <.payload_row
+                label="Adressat"
+                value={payload_field(@proposal.payload, "adressat")}
+              />
+            <% end %>
           <% :update_strang -> %>
             <.payload_row label="Strang" value={payload_field(@proposal.payload, "label")} />
             <%= if payload_field(@proposal.payload, "titel") != "" do %>
