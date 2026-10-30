@@ -110,47 +110,39 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
    `komki run` stellt pi einen Auftrag und gibt die Antwort aus. Du schreibst ganz normal, welche Quelle passt, entscheidet pi selbst. Läuft komki gerade nicht, startet `run` es vorher.
 
    ```sh
-   komki run "Ich bereite mich auf das Thema Radverkehr in Buchloe vor. Was steht dazu im RIS, was in meinen Vault-Notizen, und welche Förderprogramme für Radwege gibt es in Bayern? Lege mir eine kurze Notiz 'Vorbereitung Radverkehr' mit Quellen an."
+   komki run "Ich bereite mich auf das Thema Radverkehr in Buchloe vor. Was steht dazu im RIS, was in meinen Vault-Notizen, und welche Förderprogramme für Radwege gibt es in Bayern?"
    ```
 
-   ```text frame="terminal" title="Das siehst du (nach gut einer Minute)"
-   scratch: ~/.local/share/komki/runs/2026-10-25T10-24-23Z
-   Ich habe die Informationen für dich zusammengetragen und eine Notiz erstellt.
+   ```text frame="terminal" title="Das siehst du (nach knapp zwei Minuten)"
+   scratch: ~/.local/share/komki/runs/2026-10-30T10-29-34Z
+   Für deine Vorbereitung zum Thema Radverkehr in Buchloe habe ich die Informationen aus dem RIS, deinen Vault-Notizen und dem Internet zusammengetragen:
 
-   ### Zusammenfassung der Recherche:
+   ### 1. Informationen aus dem RIS (Ratsinformationssystem)
+   Im RIS finden sich zwei relevante Sitzungspunkte des Mobilitätsausschusses:
+   *   **13.10.2026:** Beratung und Beschlussfassung zur verkehrsrechtlichen Anordnung der **Zeppelinstraße als „unechte Fahrradstraße“**.
+   *   **30.06.2026:** Besprechung der **Ergebnisse des Arbeitskreises Radverkehrskonzept** inklusive der Umsetzungsmöglichkeiten.
 
-   1.  **RIS (Ratsinformationssystem):**
-       *   Es gibt einen relevanten Eintrag aus der **1. Sitzung des Mobilitätsausschusses Buchloe (30.06.2026)** zum Thema *"Ergebnisse des Arbeitskreises Radverkehrskonzept mit Umsetzung - Beratung und Beschlussfassung"*. Details zum Textinhalt sind über die aktuelle Schnittstelle nicht direkt einsehbar, aber der Termin ist als zentraler Beschlusspunkt markiert.
+   ### 2. Informationen aus deinen Vault-Notizen
+   Deine Notizen geben detaillierte Einblicke in die Planung und den aktuellen Stand:
+   *   **Radverkehrskonzept Buchloe:** Das Hauptziel ist ein durchgehender Radweg vom **Bahnhof zum Schulzentrum**. Als kritischer Engpass wurde die **Bahnhofstraße** identifiziert (wegen der Parkstreifen). Es werden drei Varianten diskutiert:
+       1. Einbahnregelung für Kfz bei gleichzeitigem Radweg in beide Richtungen.
+       2. Wegfall des Parkstreifens auf der Nordseite.
+       3. Umleitung über die Gartenstraße.
+       *   *Nächster Schritt:* Beantragung einer Verkehrszählung für das Frühjahr.
+   *   **Bauausschuss (17.09.2026):** Die Entscheidung über den Abschnitt Bahnhofstraße wurde im Bauausschuss **vertagt**.
 
-   2.  **Vault-Notizen:**
-       *   In deiner Notiz `Projekte/Verkehr/Radverkehrskonzept.md` ist das Hauptziel die Schaffung eines **durchgehenden Radwegs vom Bahnhof zum Schulzentrum**.
-       *   Die **Bahnhofstraße** wird als kritischer Engpass identifiziert (Parkstreifen).
-       *   Es werden drei Varianten diskutiert: Einbahnregelung für PKW, Wegfall des Parkstreifens auf der Nordseite oder eine Umleitung über die Gartenstraße.
-       *   **Nächster Schritt:** Antrag auf eine Verkehrszählung im Frühjahr.
-
-   3.  **Förderprogramme (Bayern/Bund):**
-       *   **Sonderprogramm „Stadt und Land“ (Bund):** Finanzhilfen sind bis Ende 2030 verfügbar.
-       *   **BayGVFG:** Ermöglicht bis zu **80 % Förderung** für Radwegeprojekte.
-       *   **Bayerische Landesförderung:** Seit dem 1. März gibt es verstärkte Möglichkeiten zur Förderung von **selbstständigen Radwegen** (unabhängig von Straßen).
-       *   **Radoffensive Bayern:** Allgemeine Unterstützung für den Ausbau des Radnetzes.
-
-   Die neue Notiz **'Vorbereitung Radverkehr'** wurde im Testordner angelegt:
-   `komki-test/2026-10-25-vorbereitung-radverkehr.md`
+   ### 3. Förderprogramme für Radwege in Bayern
+   Laut dem Bayerischen Staatsministerium für Wohnen, Bau und Verkehr gibt es verschiedene Möglichkeiten für Kommunen:
+   *   **Radoffensive Klimaland Bayern:** Ein zentrales Programm zur Verbesserung der kommunalen Radverkehrsinfrastruktur.
+   *   **Sonderprogramm „Stadt und Land“:** Bundesweite Finanzhilfen, die auch in Bayern genutzt werden können.
+   *   **BayGVFG** (Bayerisches Gemeindeverkehrsfinanzierungsgesetz) und **BayFAG** (Bayerisches Finanzausgleichsgesetz).
+   *   **Städtebauförderung:** Ergänzende Mittel im Rahmen der Stadtentwicklung.
+   *   **Besonderheit:** Seit März 2023 gibt es verstärkte Förderung auch für **selbständige Radwege** (die nicht parallel zur Straße verlaufen).
    ```
 
-   Der RIS-Treffer ist echt, er stammt aus dem öffentlichen Ratsinformationssystem. Die Vault-Notiz ist erfunden. Die Förderprogramme kommen aus der Websuche. Prüfe sie, bevor du sie verwendest: Das Modell fasst Suchtreffer zusammen und kann sich dabei irren.
+   Die RIS-Treffer sind echt, sie stammen aus dem öffentlichen Ratsinformationssystem. Die Vault-Notizen sind erfunden. Die Förderprogramme kommen aus der Websuche. Prüfe sie, bevor du sie verwendest: Das Modell fasst Suchtreffer zusammen und kann sich dabei irren.
 
-   Die neue Notiz liegt im Vault unter `komki-test/`, in keinem anderen Ordner darf komki schreiben. Oben trägt sie die Labels aller Quellen, aus denen sie entstanden ist:
-
-   ```text frame="terminal" title="~/.local/share/komki/vault/komki-test/2026-10-25-vorbereitung-radverkehr.md (Anfang)"
-   ---
-   komki_labels: [ris-oeffentlich@1, vault-oeffentlich@1, web-oeffentlich@1]
-   title: "Vorbereitung Radverkehr"
-   created: 2026-10-25T10:25:16Z
-   ---
-   ```
-
-   Liest komki die Notiz später wieder, weiß es dadurch, woher ihr Inhalt stammt, und behandelt sie entsprechend.
+   `komki run` liest und sucht, schreibt aber nichts. Eine Notiz legt komki nur an, wenn du es in einer Session freigibst (nächster Schritt).
 
 5. ### Interaktiv arbeiten
 
@@ -167,6 +159,40 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
    - „Was sagt das Web zu Förderprogrammen für Bürgerhäuser in Bayern?“
 
    Abkoppeln, ohne zu beenden: `Ctrl+B`, dann `d`. Wieder dazu: `komki session --continue`.
+
+   **Notizen anlegen, mit deinem GO.** Bittest du pi um eine Notiz, fragt komki vorher dich. Jedes Schreiben ist gesperrt, bis du es für genau diesen Aufruf freigibst. Im Testlauf lautete die Bitte: „Lege mir im Vault eine kurze Notiz 'Radverkehr kurz' an: zwei Stichpunkte aus der Notiz Projekte/Verkehr/Radverkehrskonzept.md, mit Quelle.“ Dann öffnete komki dieses Fenster:
+
+   ```text frame="terminal" title="Das komki-Fenster in der Session"
+   Gesperrter Aufruf (Beleg pdr-7a9b40bb974d06da5f853f0cc165f327)
+     Werkzeug:  vault_write_test
+     Aktion:    speichern — jedes Schreiben braucht dein GO
+     Parameter:
+       body: "- Ziel ist ein durchgehender Radweg vom Bahnhof zum Schulzentrum.\n- Die Bahnhofstraße stellt einen Engpass dar.\n\nQuelle: Projekte/Verkehr/Radverkehrskonzept.md (Vault)"
+       title: "Radverkehr kurz"
+     Gesperrt:  missing_operation_rule
+     Ein GO gilt nur für genau diesen Aufruf, einmal, fünf Minuten lang.
+   GO für genau diesen Aufruf? [j/N]
+   ```
+
+   Du siehst Titel und Text, bevor etwas geschrieben wird. Mit `j` legt komki die Notiz an, Enter oder `n` heißt Nein. Danach meldet pi:
+
+   ```text frame="terminal" title="In pi"
+   Testnotiz anlegen  »Radverkehr kurz«
+   ✓ zugelassen · öffentlich
+   Angelegt  komki-test/2026-10-30-radverkehr-kurz.md
+   ```
+
+   Die neue Notiz liegt im Vault unter `komki-test/`, in keinem anderen Ordner darf komki schreiben. Oben trägt sie die Labels des Raums, in dem sie entstanden ist:
+
+   ```text frame="terminal" title="~/.local/share/komki/vault/komki-test/2026-10-30-radverkehr-kurz.md (Anfang)"
+   ---
+   komki_labels: [doc-oeffentlich@2, ris-oeffentlich@1, vault-oeffentlich@1, web-oeffentlich@1]
+   title: "Radverkehr kurz"
+   created: 2026-10-30T10:22:54Z
+   ---
+   ```
+
+   Liest komki die Notiz später wieder, weiß es dadurch, woher ihr Inhalt stammen kann, und behandelt sie entsprechend.
 
 6. ### Eigenen Vault anschließen
 
