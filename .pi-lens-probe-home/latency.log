@@ -1,4 +1,0 @@
-{"type":"phase","filePath":"<pi-lens>","phase":"extension_loaded","durationMs":723,"metadata":{"loadedFrom":"dist"},"ts":"2026-10-30T14:20:43.677Z","pid":96600,"turnId":"turn:0"}
-{"type":"phase","filePath":"<pi-lens>","phase":"host_boot","durationMs":705,"metadata":{"loadedFrom":"dist","evaluationOrdinal":1},"ts":"2026-10-30T14:20:43.677Z","pid":96600,"turnId":"turn:0"}
-{"type":"phase","filePath":"<pi-lens>","phase":"extension_eval","durationMs":18,"metadata":{"loadedFrom":"dist"},"ts":"2026-10-30T14:20:43.677Z","pid":96600,"turnId":"turn:0"}
-{"type":"phase","phase":"ast_grep_rules_resolved","filePath":"/Users/crn/.pi/agent/npm/node_modules/pi-lens/rules","durationMs":0,"metadata":{"status":"healthy","entryCount":298},"ts":"2026-10-30T14:20:43.679Z","pid":96600,"turnId":"turn:0"}
