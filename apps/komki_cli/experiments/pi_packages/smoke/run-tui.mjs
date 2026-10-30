@@ -16,7 +16,6 @@
  * Ohne --root entsteht ein eigener Lauf unter $KOMKI_PI_EXPERIMENTS_DIR/runs.
  */
 import {
-  existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -25,7 +24,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 
-import { PACKAGES, PI_CLI, packageDir, runRoot, timestamp } from "../lib/config.mjs";
+import { NODE_BIN, PACKAGES, PI_CLI, packageDir, runRoot, timestamp } from "../lib/config.mjs";
 import { contentText, parseSessionFile } from "../lib/session.mjs";
 import { startForwardProvider } from "../lib/provider.mjs";
 import {
@@ -69,10 +68,6 @@ function parseArgs(argv) {
   return args;
 }
 
-function stamp(date = new Date()) {
-  return date.toISOString().replace(/[:.]/g, "-");
-}
-
 function shQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
@@ -100,21 +95,24 @@ function findNewestJsonl(root) {
 }
 
 function readRequests(logPath) {
+  const requests = [];
+  let requestParseErrors = 0;
   try {
-    return readFileSync(logPath, "utf8")
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => {
+    for (const line of readFileSync(logPath, "utf8").split("\n")) {
+      if (!line.trim()) continue;
+      try {
         const record = JSON.parse(line);
         let parsed = null;
         try {
           parsed = JSON.parse(record.body);
         } catch {}
-        return { ...record, parsed };
-      });
-  } catch {
-    return [];
-  }
+        requests.push({ ...record, parsed });
+      } catch {
+        requestParseErrors += 1;
+      }
+    }
+  } catch {}
+  return { requests, requestParseErrors };
 }
 
 function requirement(id, text, status, observed, gating = true) {
@@ -154,53 +152,60 @@ async function main() {
     logPath: requestsLog,
   });
 
-  writeFileSync(
-    path.join(agentDir, "models.json"),
-    JSON.stringify(
-      {
-        providers: {
-          "pi-local": {
-            api: "openai-completions",
-            apiKey: llama.apiKey,
-            baseUrl: forwarder.baseUrl,
-            models: [
-              {
-                id: "local-model",
-                name: "local-model",
-                contextWindow: 131072,
-                // Produktiv-Default von pi, wenn models.json kein maxTokens
-                // setzt (provider-composer.js) — gleiche Basis wie run-smoke.
-                maxTokens: 16384,
-                reasoning: false,
-              },
-            ],
+  // Schreibfehler nach dem Proxy-Start dürfen den Server nicht leaken.
+  try {
+    writeFileSync(
+      path.join(agentDir, "models.json"),
+      JSON.stringify(
+        {
+          providers: {
+            "pi-local": {
+              api: "openai-completions",
+              apiKey: llama.apiKey,
+              baseUrl: forwarder.baseUrl,
+              models: [
+                {
+                  id: "local-model",
+                  name: "local-model",
+                  contextWindow: 131072,
+                  // Produktiv-Default von pi, wenn models.json kein maxTokens
+                  // setzt (provider-composer.js) — gleiche Basis wie run-smoke.
+                  maxTokens: 16384,
+                  reasoning: false,
+                },
+              ],
+            },
           },
         },
-      },
-      null,
-      2,
-    ),
-  );
-  writeFileSync(path.join(agentDir, "settings.json"), "{}\n");
-  writeFileSync(path.join(agentDir, "trust.json"), "{}\n");
+        null,
+        2,
+      ),
+    );
+    writeFileSync(path.join(agentDir, "settings.json"), "{}\n");
+    writeFileSync(path.join(agentDir, "trust.json"), "{}\n");
 
-  writeFileSync(
-    wrapperPath,
-    [
-      "#!/bin/sh",
-      `export HOME=${shQuote(agentRoot)}`,
-      `export PI_CODING_AGENT_DIR=${shQuote(agentDir)}`,
-      "export PI_OFFLINE=1",
-      "export PATH='/usr/bin:/bin'",
-      "export LANG=C",
-      "export LC_ALL=C",
-      `cd ${shQuote(workDir)}`,
-      `exec ${shQuote(process.execPath)} ${shQuote(PI_CLI)} --offline --no-extensions --no-skills --no-context-files --no-prompt-templates --no-themes --no-approve --session-dir ${shQuote(sessionDir)} --provider pi-local --model local-model --tools read,ask_user_question -e ${shQuote(EXTENSION)}`,
-      "",
-    ].join("\n"),
-    { mode: 0o755 },
-  );
+    writeFileSync(
+      wrapperPath,
+      [
+        "#!/bin/sh",
+        `export HOME=${shQuote(agentRoot)}`,
+        `export PI_CODING_AGENT_DIR=${shQuote(agentDir)}`,
+        "export PI_OFFLINE=1",
+        "export PATH='/usr/bin:/bin'",
+        "export LANG=C",
+        "export LC_ALL=C",
+        `cd ${shQuote(workDir)}`,
+        `exec ${shQuote(NODE_BIN)} ${shQuote(PI_CLI)} --offline --no-extensions --no-skills --no-context-files --no-prompt-templates --no-themes --no-approve --session-dir ${shQuote(sessionDir)} --provider pi-local --model local-model --tools read,ask_user_question -e ${shQuote(EXTENSION)}`,
+        "",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+  } catch (error) {
+    await forwarder.close();
+    throw error;
+  }
 
+  const tuiStartedAt = Date.now();
   const requirements = [];
   const captures = {};
   let blocker = null;
@@ -208,6 +213,7 @@ async function main() {
   let answeredOk = false;
   let exitedAfterCtrlD = false;
   let dialogWaitMs = null;
+  let answerWaitMs = null;
   let sessionFile = null;
   let session = null;
 
@@ -271,6 +277,7 @@ async function main() {
       if (dialogVisible) {
         // Dokumentierte Taste: Ziffer wählt die nummerierte Zeile; 1 = erste Option.
         sendKey(SOCKET, SESSION, "1");
+        const answerStartedAt = Date.now();
 
         const answerDeadline = Date.now() + ANSWER_TIMEOUT_MS;
         while (Date.now() < answerDeadline) {
@@ -300,13 +307,14 @@ async function main() {
           }
           await new Promise((resolve) => setTimeout(resolve, 500));
         }
+        answerWaitMs = Date.now() - answerStartedAt;
         captures.afterAnswer = trimCapture(capturePane(SOCKET, SESSION));
         requirements.push(
           requirement(
             "answer-recorded",
             "Taste 1 wählt die erste Option; Antwort und Modell-Fortsetzung landen in der Session",
             answeredOk ? "pass" : "fail",
-            { answerWaitMs: ANSWER_TIMEOUT_MS, pane: captures.afterAnswer },
+            { answerWaitMs, pane: captures.afterAnswer },
           ),
         );
 
@@ -328,7 +336,7 @@ async function main() {
   }
 
   // ---------------------------------------------------------------- Auswertung
-  const requests = readRequests(requestsLog);
+  const { requests, requestParseErrors } = readRequests(requestsLog);
   sessionFile = sessionFile ?? findNewestJsonl(sessionDir);
   session = sessionFile ? await parseSessionFile(sessionFile) : null;
   const toolCalls = validateToolCalls(requests);
@@ -359,10 +367,16 @@ async function main() {
   const answerInSession = Boolean(
     firstOptionLabel && askResult?.text && askResult.text.includes(firstOptionLabel),
   );
+  // Die Antwort muss das Modell über die Tool-Result-Nachricht erreichen —
+  // nicht über das Tool-Call-Echo, das pi ohnehin in jeden Folge-Request spiegelt.
   const answerInModelContext = Boolean(
     firstOptionLabel &&
       requests.some((request) =>
-        JSON.stringify(request.parsed?.messages ?? "").includes(firstOptionLabel),
+        (request.parsed?.messages ?? []).some(
+          (message) =>
+            message.role === "tool" &&
+            JSON.stringify(message.content ?? "").includes(firstOptionLabel),
+        ),
       ),
   );
 
@@ -401,7 +415,10 @@ async function main() {
     hypothesis:
       "Gemma 4 26B erkennt den klärungsbedürftigen Prüfumfang selbst, ruft ask_user_question mit einer deutschen Frage und Optionen auf; die Auswahl per Taste 1 erreicht das Modell.",
     measurements: {
+      durationMs: Date.now() - tuiStartedAt,
       dialogWaitMs,
+      answerWaitMs,
+      requestParseErrors,
       proxyRequests: requests.map((request) => ({
         url: request.url,
         status: request.status,

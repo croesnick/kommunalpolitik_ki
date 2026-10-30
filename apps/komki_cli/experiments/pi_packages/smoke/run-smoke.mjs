@@ -19,7 +19,7 @@
  * Tool-Call-Fehler, Reparaturbedarf, Token und Speicher. Ergebnisse landen
  * unter <root>/results/*.json, <root>/results.json und <root>/SMOKE.md.
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { PACKAGES, runRoot, packageDir, timestamp } from "../lib/config.mjs";
@@ -80,7 +80,8 @@ function smokeVerdict(requirements) {
 function detectLanguage(text) {
   if (!text) return null;
   const german = (text.match(/\b(der|die|das|und|nicht|für|wird|Sätze|Quelle|gelesen|Zusammenfassung)\b/gi) ?? []).length;
-  const english = (text.match(/\b(the|and|for|with|was|read|summary|file|sources?|sentences?)\b/gi) ?? []).length;
+  // "was" ist auch Deutsch — nicht als englischen Marker zählen.
+  const english = (text.match(/\b(the|and|for|with|read|summary|file|sources?|sentences?)\b/gi) ?? []).length;
   if (german === 0 && english === 0) return "unbekannt";
   return german >= english ? "de" : "en";
 }
@@ -88,7 +89,13 @@ function detectLanguage(text) {
 function parseArgs(argv) {
   const args = { only: null, root: null };
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === "--only") args.only = new Set((argv[i + 1] ?? "").split(",").filter(Boolean));
+    if (argv[i] === "--only") {
+      const list = (argv[i + 1] ?? "").split(",").filter(Boolean).map((x) => x.trim());
+      if (list.length === 0) {
+        throw new Error("--only braucht eine Aufgabenliste, z. B. --only 1,2,3,4,6");
+      }
+      args.only = new Set(list);
+    }
     if (argv[i] === "--root") args.root = argv[i + 1];
   }
   return args;
@@ -121,14 +128,10 @@ function measurementsOf(executed) {
     timedOut: run.timedOut,
     exitCode: run.code,
     stderrTail: (run.stderr ?? "").slice(-1500),
-    eventCounts: Object.fromEntries(
-      Object.entries(
-        (run.events ?? []).reduce((acc, event) => {
-          acc[event.type] = (acc[event.type] ?? 0) + 1;
-          return acc;
-        }, {}),
-      ).map(([type, count]) => [type, count]),
-    ),
+    eventCounts: (run.events ?? []).reduce((acc, event) => {
+      acc[event.type] = (acc[event.type] ?? 0) + 1;
+      return acc;
+    }, {}),
     proxyRequests: run.requests.map((request) => ({
       url: request.url,
       status: request.status,
@@ -154,6 +157,12 @@ function measurementsOf(executed) {
       isError: result.isError,
       text: result.text.slice(0, 300),
     })),
+    // Der Harness läuft gegen den geteilten Live-Server: Andere Clients können
+    // Timing-Zeilen ins Logfenster schreiben. Counts abgleichen macht die
+    // Pollution sichtbar statt still.
+    serverRequestCountMismatch:
+      serverRequests.length !== run.requests.filter((r) => (r.url ?? "").includes("/chat/completions")).length,
+    requestParseErrors: run.requestParseErrors ?? 0,
     answerText: answerText(run.session),
     sessionFile: run.sessionFile,
   };
@@ -229,6 +238,9 @@ async function task1Top(llama, provider) {
 async function task2Quellen(llama, provider) {
   const runDir = path.join(ROOT, "task-2-quellen");
   const workDir = path.join(runDir, "work");
+  // Output-Datei vorher entfernen: Ein Re-Lauf in denselben Root darf nie die
+  // Datei eines Vorlaufs als frisches Ergebnis lesen.
+  await rm(path.join(workDir, "quellen.json"), { force: true });
   await writeTextFile(path.join(workDir, "lagebericht-bahnhofstr.md"), LAGEBERICHT);
 
   const executed = await executeRun(llama, provider, {
@@ -306,6 +318,7 @@ async function task2Quellen(llama, provider) {
 async function task3Redigieren(llama, provider) {
   const runDir = path.join(ROOT, "task-3-redigieren");
   const workDir = path.join(runDir, "work");
+  await rm(path.join(workDir, "neue-fassung.md"), { force: true });
   await writeTextFile(path.join(workDir, "entwurf-beschlussvorlage.md"), ENTWURF_BESCHLUSSVORLAGE);
 
   const executed = await executeRun(llama, provider, {
@@ -432,7 +445,17 @@ async function task4Todo(llama, provider) {
     (entry) => entry.customType === "rpiv-todo-state",
   );
   const answerB = mB.answerText ?? "";
-  const listResultB = [...mB.sessionToolResults].reverse().find((result) => result.toolName === "todo");
+  // Vollständiger Session-Text statt der 300-Zeichen-Kopie, gepinnt auf den
+  // list-Aufruf — ein update/get-Result darf nicht als Liste gelten.
+  const bSession = executedB.run.session;
+  const listCallB =
+    (bSession?.toolCalls ?? []).find(
+      (call) => call.name === "todo" && call.arguments?.action === "list",
+    ) ?? null;
+  const listResultB = listCallB
+    ? (bSession?.toolResults ?? []).find((result) => result.toolCallId === listCallB.id) ??
+      null
+    : null;
   const completedInB = listResultB ? (listResultB.text.match(/completed/g) ?? []).length : 0;
 
   const requirements = [
@@ -524,19 +547,20 @@ async function task6Compaction(llama, provider) {
   const summary = summaryRequests(executedA.run.requests);
   const summaryUsage = summary[0]?.response?.usage ?? null;
   const summaryText = summary[0]?.response?.text ?? null;
-  // Semantische Prüfung, sprachneutral: pis Summary-Prompt ist englisch und
-  // sprachneutral; Gemma fasst die deutsche Sitzung auf Englisch zusammen
-  // (Beobachtung fürs Labbook). Inhalt zählt, nicht die Sprache.
+  // Semantische Prüfung, sprachneutral und paraphrasenfest: pis Summary-Prompt
+  // ist englisch und sprachneutral; Gemma fasst die deutsche Sitzung auf
+  // Englisch zusammen (Beobachtung fürs Labbook). Inhalt zählt, nicht die
+  // Wortwahl — „knappe Sätze" ist genauso bestanden wie „kurze Sätze".
+  const stilRe =
+    /(kurz|knapp|prägnant)\w*[^\n]{0,30}(satz|sätze|formulier|antwort|fasse)|short sentences|concise/i;
+  const quellRe = /quell|beleg|cit(?:e|ing|ation)s?\b|sources?\b/i;
   const preferenceInSummary = Boolean(
-    summaryText &&
-      /kurze Sätze|short sentences/i.test(summaryText) &&
-      /Quelle|cit(?:e|ing) (?:the )?source|source citations|sources for/i.test(summaryText),
+    summaryText && stilRe.test(summaryText) && quellRe.test(summaryText),
   );
 
   const answerB = mB.answerText ?? "";
-  const recallOk =
-    /kurz\w* Sätze|short sentences/i.test(answerB) &&
-    /Quell\w*|sources|citing/i.test(answerB);
+  const recallOk = stilRe.test(answerB) && quellRe.test(answerB);
+  const summaryRequestsInContinue = summaryRequests(executedB.run.requests).length;
 
   const answerA = mA.answerText ?? "";
 
@@ -579,7 +603,7 @@ async function task6Compaction(llama, provider) {
       "praefrenz-nach-resume",
       "Nach --continue erinnert sich das Modell an die Präferenz (semantisch)",
       recallOk ? "pass" : "fail",
-      { answerB, summaryRequestsInContinue: summaryRequests(executedB.run.requests).length },
+      { answerB, summaryRequestsInContinue },
     ),
   ];
 
@@ -598,7 +622,7 @@ async function task6Compaction(llama, provider) {
         text: summaryText,
         language: detectLanguage(summaryText),
       },
-      summaryRequestsInContinue: summaryRequests(executedB.run.requests).length,
+      summaryRequestsInContinue,
     },
     requirements,
     verdict: smokeVerdict(requirements),
@@ -667,9 +691,25 @@ async function main() {
     );
   }
 
+  // Gesamtübersicht aus allem, was im Root liegt — auch Aufgabe 5 vom
+  // separaten run-tui.mjs und Nachläufe einzelner Aufgaben mit --only.
+  // Ein Teillauf überschreibt so nie still die Übersicht aller Aufgaben.
+  const merged = new Map();
+  try {
+    for (const file of await readdir(outDir)) {
+      if (!file.endsWith(".json")) continue;
+      try {
+        const parsed = JSON.parse(await readFile(path.join(outDir, file), "utf8"));
+        if (parsed?.id) merged.set(parsed.id, parsed);
+      } catch {}
+    }
+  } catch {}
+  const allResults = [...merged.values()];
+
   const summary = {
     at: new Date().toISOString(),
     root: ROOT,
+    node: process.version,
     llama: {
       port: llama.port,
       pid: llama.pid,
@@ -678,7 +718,7 @@ async function main() {
       ctx: llama.ctx,
       rssMiB: llamaRssMiB(llama.pid),
     },
-    results: results.map((result) => ({
+    results: allResults.map((result) => ({
       id: result.id,
       title: result.title,
       verdict: result.verdict,
@@ -690,13 +730,14 @@ async function main() {
   const lines = ["# Realmodell-Smoke-Test — Ergebnisentwurf", ""];
   lines.push(`- Lauf: ${summary.at}`);
   lines.push(`- Root: ${ROOT}`);
+  lines.push(`- Node: ${process.version}`);
   lines.push(
     `- llama-server: port ${llama.port}, pid ${llama.pid}, auth=${llama.authRequired}, RSS ${summary.llama.rssMiB} MiB`,
   );
   lines.push("");
   lines.push("| Aufgabe | Verdikt | Dauer | Requests | Tokens (Prompt/Completion) | Tool-Calls (Fehler) |");
   lines.push("|---|---|---|---|---|---|");
-  for (const result of results) {
+  for (const result of allResults) {
     const verdict = result.verdict ?? "harness-error";
     const all = Object.values(result.measurements ?? {}).filter(
       (x) => x && typeof x === "object" && x.durationMs !== undefined,

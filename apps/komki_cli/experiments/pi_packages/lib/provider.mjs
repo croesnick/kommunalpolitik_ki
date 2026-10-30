@@ -18,6 +18,12 @@ import path from "node:path";
  * `{ text, toolCalls, finishReason, usage, sse }`. The Authorization header
  * is never logged. The record shape extends the mock provider's request log
  * ({ at, method, url, body }) so shared consumers keep working.
+ *
+ * Bodies are accumulated as Buffers and decoded once at the end — chunk
+ * boundaries must never split multi-byte UTF-8 (German fixtures). Every
+ * completion path (upstream error, mid-stream abort, client abort) logs a
+ * record, so diagnostic runs keep their measurements. Pending log appends
+ * are awaited by close().
  */
 
 const HOP_BY_HOP = new Set([
@@ -32,6 +38,8 @@ const HOP_BY_HOP = new Set([
   "host",
   "content-length",
 ]);
+
+const pendingAppends = new Set();
 
 function parseDataLines(buffer) {
   const events = [];
@@ -125,16 +133,47 @@ export async function startForwardProvider({ upstreamBaseUrl, logPath } = {}) {
 
   const server = http.createServer((req, res) => {
     const started = Date.now();
-    let requestBody = "";
+    const requestChunks = [];
+    let upstreamReq = null;
+    let upstreamResponded = false;
+    let logged = false;
+
+    const abortLog = () => {
+      if (logged || upstreamResponded) return;
+      logged = true;
+      appendLog(
+        logPath,
+        req,
+        started,
+        null,
+        Buffer.concat(requestChunks).toString("utf8"),
+        {
+          text: null,
+          toolCalls: [],
+          finishReason: null,
+          usage: null,
+          clientAborted: true,
+        },
+      );
+    };
+
     req.on("data", (chunk) => {
-      requestBody += chunk;
+      requestChunks.push(chunk);
     });
+    req.on("aborted", () => {
+      upstreamReq?.destroy();
+      abortLog();
+    });
+
     req.on("end", () => {
+      const bodyBuffer = Buffer.concat(requestChunks);
+      const requestBody = bodyBuffer.toString("utf8");
+
       const headers = { ...req.headers };
       for (const name of HOP_BY_HOP) delete headers[name];
       headers.host = `${upstream.hostname}:${upstream.port}`;
 
-      const upstreamReq = http.request(
+      upstreamReq = http.request(
         {
           hostname: upstream.hostname,
           port: Number(upstream.port),
@@ -143,24 +182,48 @@ export async function startForwardProvider({ upstreamBaseUrl, logPath } = {}) {
           headers,
         },
         (upstreamRes) => {
+          upstreamResponded = true;
           const status = upstreamRes.statusCode;
           const isSse = /text\/event-stream/i.test(
             upstreamRes.headers["content-type"] ?? "",
           );
-          let payloadBuffer = "";
+          const responseChunks = [];
+
+          // Jeder Abschlusspfad loggt genau einmal: normales Ende,
+          // Upstream-Fehler mitten im Stream, Abbruch auf einer Seite.
+          const finishLog = (extra) => {
+            if (logged) return;
+            logged = true;
+            const payload = Buffer.concat(responseChunks).toString("utf8");
+            const response = isSse
+              ? reconstructSse(parseDataLines(payload))
+              : reconstructJson(payload);
+            appendLog(logPath, req, started, status, requestBody, extra
+              ? { ...response, ...extra }
+              : response);
+          };
 
           res.writeHead(status, upstreamRes.headers);
 
           upstreamRes.on("data", (chunk) => {
-            payloadBuffer += chunk;
+            responseChunks.push(chunk);
             res.write(chunk);
           });
           upstreamRes.on("end", () => {
             res.end();
-            const response = isSse
-              ? reconstructSse(parseDataLines(payloadBuffer))
-              : reconstructJson(payloadBuffer);
-            appendLog(logPath, req, started, status, requestBody, response);
+            finishLog();
+          });
+          upstreamRes.on("aborted", () => {
+            finishLog({ upstreamAborted: true });
+            try {
+              res.end();
+            } catch {}
+          });
+          upstreamRes.on("error", (error) => {
+            finishLog({ upstreamError: String(error?.message ?? error) });
+            try {
+              res.end();
+            } catch {}
           });
         },
       );
@@ -177,14 +240,13 @@ export async function startForwardProvider({ upstreamBaseUrl, logPath } = {}) {
         });
       });
 
-      req.on("aborted", () => {
-        upstreamReq.destroy();
-      });
       res.on("close", () => {
-        upstreamReq.destroy();
+        // Normalfall: close kommt nach res.end() und finishLog war schon da.
+        // Abbruchfall: Teil-Rekord statt Datenverlust.
+        upstreamReq?.destroy();
       });
 
-      upstreamReq.end(requestBody);
+      upstreamReq.end(bodyBuffer);
     });
   });
 
@@ -196,11 +258,13 @@ export async function startForwardProvider({ upstreamBaseUrl, logPath } = {}) {
   return {
     baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
     port: server.address().port,
-    close: () =>
-      new Promise((resolve) => {
+    close: async () => {
+      await Promise.allSettled([...pendingAppends]);
+      await new Promise((resolve) => {
         server.close(() => resolve());
         server.closeAllConnections?.();
-      }),
+      });
+    },
   };
 }
 
@@ -214,5 +278,7 @@ function appendLog(logPath, req, started, status, body, response) {
     body,
     response,
   };
-  appendFile(logPath, `${JSON.stringify(record)}\n`).catch(() => {});
+  const append = appendFile(logPath, `${JSON.stringify(record)}\n`).catch(() => {});
+  pendingAppends.add(append);
+  append.finally(() => pendingAppends.delete(append));
 }

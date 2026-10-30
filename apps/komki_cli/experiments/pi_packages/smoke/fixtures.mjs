@@ -158,21 +158,60 @@ Der Ausschuss soll den Vorentwurf für die weitere Vertiefung freigeben.
 `;
 
 /**
- * Fakt-Helfer für Aufgabe 3: extrahiert Zahlen, Paragrafen und
- * Hausnummern-Bereiche aus einem Text, normalisiert Tausenderpunkte.
- * Jede im Original enthaltene Zahl muss auch in der Redigierten Fassung
- * stehen (Faktentreue-Check).
+ * Fakt-Helfer für Aufgabe 3 und den TOP-Benchmark: extrahiert Zahlen,
+ * Paragrafen und Daten aus einem Text. Zahlen werden normalisiert
+ * (Tausenderpunkte weg, Komma zu Punkt); Daten werden als eigene Einheit
+ * tokenisiert (date:t.m.y), sodass „03.02.2027" und „3. Februar 2027"
+ * denselben Fakt ergeben — eine prosaische Datumsumschreibung ist keine
+ * Faktänderung. Jede im Original enthaltene Zahl muss auch in der
+ * überarbeiteten Fassung stehen (Faktentreue-Check).
  */
+
+const MONATE = [
+  "januar",
+  "februar",
+  "märz",
+  "april",
+  "mai",
+  "juni",
+  "juli",
+  "august",
+  "september",
+  "oktober",
+  "november",
+  "dezember",
+];
+const MONAT_RE = MONATE.join("|");
+const DATE_RE = new RegExp(`\\b(\\d{1,2})\\.(\\d{1,2})\\.(\\d{4})\\b`, "g");
+const LONG_DATE_RE = new RegExp(
+  `\\b(\\d{1,2})\\.?\\s*(${MONAT_RE})\\s+(\\d{4})\\b`,
+  "gi",
+);
+
+function dateToken(day, month, year) {
+  return `date:${Number(day)}.${Number(month)}.${year}`;
+}
+
 export function factTokens(text) {
   const facts = new Set();
   const normalized = text.replace(/ /g, " ");
-  // Zahlen mit optionalen Tausenderpunkten, Nachkommastellen, Einheiten wie "m"
-  for (const match of normalized.matchAll(/\d[\d .,]*\d|\d/g)) {
+
+  // Daten zuerst als eigene Einheiten; ausmaskieren, damit die Zahlpassage
+  // keine Datumsbestandteile (03022027) als eigene Zahlen erfindet.
+  for (const match of normalized.matchAll(DATE_RE)) {
+    facts.add(dateToken(match[1], match[2], match[3]));
+  }
+  for (const match of normalized.matchAll(LONG_DATE_RE)) {
+    facts.add(dateToken(match[1], MONATE.indexOf(match[2].toLowerCase()) + 1, match[3]));
+  }
+  const masked = normalized.replace(DATE_RE, " ").replace(LONG_DATE_RE, " ");
+
+  // Zahlen mit optionalen Tausenderpunkten, Nachkommastellen
+  for (const match of masked.matchAll(/\d[\d .,]*\d|\d/g)) {
     const token = match[0]
       .replace(/\./g, "")
       .replace(/,/g, ".")
-      .replace(/ /g, "")
-      .replace(/\.$/, "");
+      .replace(/ /g, "");
     if (token.length > 0) facts.add(token);
   }
   for (const match of normalized.matchAll(/§\s*\d+(?:\s+Abs\.\s*\d+)?/g)) {

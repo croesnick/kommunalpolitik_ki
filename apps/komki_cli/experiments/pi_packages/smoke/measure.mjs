@@ -32,6 +32,7 @@ export function llamaGet(port, urlPath, timeoutMs = 3000) {
       (res) => {
         res.resume();
         res.on("end", () => resolve({ code: String(res.statusCode) }));
+        res.on("error", (error) => resolve({ error: String(error.message ?? error) }));
       },
     );
     req.on("timeout", () => {
@@ -55,7 +56,12 @@ export async function resolveLlama() {
       `keine komki-Instanz gefunden (${configPath}) — komki init ausführen`,
     );
   }
-  const config = JSON.parse(configRaw);
+  let config;
+  try {
+    config = JSON.parse(configRaw);
+  } catch (error) {
+    throw new Error(`config.json unlesbar (${configPath}): ${error.message}`);
+  }
   const port = config.port;
   const apiKey = await readTrimmed(path.join(base, "tmp", "llama.key"));
   if (!port || !apiKey) {
@@ -178,10 +184,15 @@ export function validateToolCalls(requests) {
   );
   if (chatRequests.length === 0) return [];
 
+  // Schemata über alle Chat-Requests mergen (last wins): Ein unparsebarer
+  // erster Datensatz darf die Map nicht leeren und damit jeden Call des
+  // Laufs als unknown-tool fehlklassifizieren.
   const schemas = new Map();
-  for (const tool of chatRequests[0].parsed?.tools ?? []) {
-    const fn = tool.function ?? tool;
-    if (fn?.name) schemas.set(fn.name, fn.parameters ?? null);
+  for (const request of chatRequests) {
+    for (const tool of request.parsed?.tools ?? []) {
+      const fn = tool.function ?? tool;
+      if (fn?.name) schemas.set(fn.name, fn.parameters ?? null);
+    }
   }
 
   const calls = [];
@@ -220,6 +231,16 @@ export function validateToolCalls(requests) {
           maxCompletionTokens: limit,
           truncatedByOutputLimit: completion !== null && limit !== null && completion >= limit,
         };
+        calls.push(entry);
+        continue;
+      }
+
+      // Valides JSON, aber kein Objekt (null, 42, "x", [...]) ist ein
+      // Malformed-Call — klassifizieren statt zu werfen oder als ok zu werten.
+      if (typeof args !== "object" || args === null || Array.isArray(args)) {
+        entry.valid = false;
+        entry.class = "wrong-type";
+        entry.details = { got: Array.isArray(args) ? "array" : typeof args, expected: "object" };
         calls.push(entry);
         continue;
       }
