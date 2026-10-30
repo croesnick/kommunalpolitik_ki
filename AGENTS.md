@@ -18,11 +18,13 @@ gh project item-add 1 --owner croesnick --url <issue-url>
 
 Bot-Issues wie die Renovate Dependency Dashboard landen nicht auf dem Board.
 
-**Status führen:** Ein angefangenes Ticket auf `In Progress` setzen, nach Merge oder Close auf `Done`:
+**Status führen:** Ein angefangenes Ticket von Hand auf `In Progress` setzen. `Done` setzt der Board-Workflow, sobald das Ticket geschlossen ist:
 
 ```bash
 gh project item-edit 1 --owner croesnick --url <issue-url> --field Status --value "In Progress"
 ```
+
+**Ticket schließen:** Der PR-Text enthält `Closes #<n>`, dann schließt der Merge das Ticket. `(Ticket #<n>)` im Titel oder in Commits reicht dafür nicht. Erledigt ein PR ein Ticket bewusst nur teilweise, steht dort `Refs #<n>` mit einem Satz, warum.
 
 **Ticket-Disziplin:** Neue Erkenntnisse oder angepasste Anforderungen während der Arbeit werden entweder ins bestehende Ticket eingetragen oder als sinnvolles Folgeticket angelegt — nichts wird still am Ticket vorbei eingebaut.
 
