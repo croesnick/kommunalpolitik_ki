@@ -1,0 +1,65 @@
+---
+title: Mit einem Agenten einrichten
+description: Claude Code, OpenCode oder pi richten komki ein und übergeben dir genau die Schritte, die eine Person entscheiden muss.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Du kannst komki auch von deinem Coding-Agenten einrichten lassen, etwa Claude Code, OpenCode oder pi. Er arbeitet die Seite [In Betrieb nehmen](/kommunalpolitik_ki/komki/in-betrieb-nehmen/) ab, so weit er kommt. An einigen Stellen muss aber eine Person entscheiden: ein großer Download, ein Schlüssel, Touch ID. Dort hält er an und sagt dir, was zu tun ist. Diese Seite ist für dich und für ihn.
+
+## Der Auftrag zum Kopieren
+
+```text
+Richte komki auf diesem Mac ein. Die Anleitung steht unter
+https://croesnick.github.io/kommunalpolitik_ki/komki/in-betrieb-nehmen/
+und die Regeln für dich unter
+https://croesnick.github.io/kommunalpolitik_ki/komki/mit-agent-einrichten/
+Nimm den Test-Vault (komki setup --demo). Wo eine Person entscheiden muss,
+halte an und sag mir genau, was ich tun soll. Beende mit dem Erfolgsnachweis.
+```
+
+Als Markdown liest der Agent beide Seiten direkt aus dem Repo: [in-betrieb-nehmen.mdx](https://raw.githubusercontent.com/croesnick/kommunalpolitik_ki/main/docs/site/src/content/docs/komki/in-betrieb-nehmen.mdx) und [mit-agent-einrichten.mdx](https://raw.githubusercontent.com/croesnick/kommunalpolitik_ki/main/docs/site/src/content/docs/komki/mit-agent-einrichten.mdx).
+
+## Wo der Agent an dich übergibt
+
+| Stelle | Warum eine Person | Was du tust |
+|---|---|---|
+| Xcode Command Line Tools (`xcode-select --install`) | macOS zeigt ein Fenster, das nur du bestätigen kannst | Im Fenster auf „Installieren“ klicken |
+| Modell laden (17 GB, Lizenz Apache-2.0) | Großer Download, du stimmst der Lizenz zu | Im Terminal `komki setup --demo` und die Frage mit `j` beantworten, oder dem Agenten den Pfad zu einer vorhandenen Datei geben (`--gguf-from PFAD`) |
+| Brave-Schlüssel für die Websuche | Ein Geheimnis gehört nicht in den Chat mit dem Agenten | Im Terminal `komki secret set brave`, oder überspringen: RIS und Vault laufen auch ohne |
+| Touch ID bei jedem Start | Nur du öffnest das Siegel des Schlüssels | Freigeben, wenn macOS mit „komki startet den Connector web“ fragt |
+| Veränderte Programme nach einem Neubau übernehmen | Nur wer selbst gebaut hat, weiß, dass die neue Prüfsumme stimmt | Im Terminal `komki setup` und die Frage mit `j` beantworten |
+
+Diese Fragen beantwortet komki ohne Terminal nie mit Ja. Auch eine hineingepipte Antwort wie `yes j | komki setup` zählt nicht. So sieht der Agent das in einem echten Lauf, wenn sich komki nach einem Neubau verändert hat:
+
+```text frame="terminal" title="Das sieht der Agent"
+Programm    komki hat sich verändert: ~/projects/kommunalpolitik_ki/apps/komki_cli/komki
+            übernehmen? Nur wenn du es selbst aktualisiert hast [j/N] nein (kein Terminal: das beantwortet nur eine Person; den Befehl in einem Terminal wiederholen)
+            nicht übernommen; komki startet erst nach Prüfung
+brave       ok (Schlüsselbund-Eintrag 'brave-search-api', versiegelt mit der Secure Enclave)
+Start       llama, Egress, Connectoren und Vermittler (beim ersten Mal bis zu einer Minute)
+Start verweigert: nicht grün: pin komki — 'komki doctor' nennt die Gründe
+```
+
+## Regeln für den Agenten
+
+- **Antworten nie pipen.** komki wertet jede Frage ohne Terminal als Nein. Gib den Schritt an die Person ab und nenne ihr den Befehl.
+- **Lange Befehle im Hintergrund laufen lassen.** `asdf install erlang` baut Erlang aus den Quellen, der Modell-Download hat 17 GB. Beides dauert länger als übliche Zeitgrenzen für einen Befehl.
+- **Kein neues Terminal nötig nach `pnpm setup`.** In derselben Shell weiter mit `export PNPM_HOME="$HOME/Library/pnpm"` und `export PATH="$PNPM_HOME:$PATH"`.
+- **`komki session` nicht starten.** Die Session ist interaktiv und gehört der Person. Prüfen kannst du mit `komki run`, `komki status` und `komki journal verify`.
+- **Bei `komki run` stdout und stderr zusammen durch eine Pipe leiten** (`2>&1 | cat`). Hängt die Ausgabe an keinem Terminal, bricht pi sonst ab ([#135](https://github.com/croesnick/kommunalpolitik_ki/issues/135)).
+- **Nichts entfernen.** Den Abschnitt „komki ganz entfernen“ auf der Anleitungsseite nur auf ausdrücklichen Wunsch der Person ausführen.
+
+## Der Erfolgsnachweis
+
+Die Einrichtung ist fertig, wenn alle drei Prüfungen stimmen:
+
+1. `komki setup --demo` endet mit `Prüfung     doctor ok`.
+2. `komki run "Was steht im RIS zum Radverkehrskonzept?" 2>&1 | cat` liefert eine Antwort mit Quellen.
+3. `komki journal verify` meldet `Journal ok: … Einträge, lückenlos verkettet und unverändert`.
+
+Danach übergibt der Agent an dich: `komki session` startest du selbst.
+
+<Aside type="note">
+Ein vollständiger Lauf, in dem ein frischer Agent nur diesen Auftrag bekommt, steht noch aus ([#262](https://github.com/croesnick/kommunalpolitik_ki/issues/262)). Was hier über das Verhalten von komki steht, ist geprüft. Wie gut ein bestimmter Agent den Regeln folgt, nicht.
+</Aside>

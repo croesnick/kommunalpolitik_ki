@@ -26,7 +26,7 @@ Dieses Repo hat deshalb zwei Teile: **komki**, einen lokalen KI-Arbeitsraum, der
 
 Angebunden sind heute das öffentliche Ratsinformationssystem, die Websuche (Brave), der eigene Obsidian-Vault und Dokumente, die man in eine Sitzung mitbringt.
 
-**Stand:** Prototyp, im Alltag erprobt. komki braucht einen Mac mit Apple Silicon und rund 32 GB Arbeitsspeicher und wird aus dem Repo gebaut. Die Anleitung steht unter [In Betrieb nehmen](https://croesnick.github.io/kommunalpolitik_ki/komki/in-betrieb-nehmen/). Wie die Grenze hält, kann man [selbst ausprobieren](https://croesnick.github.io/kommunalpolitik_ki/komki/sicherheitsgrenze/). Die Sicherheitsprüfungen stehen im [Labbook](docs/research/2026-10-23-labbook-komki-connectoren.md), das Konzept in [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+**Stand:** Prototyp, im Alltag erprobt. komki braucht einen Mac mit Apple Silicon und genug Arbeitsspeicher für ein 17-GB-Modell (erprobt mit 64 GB) und wird aus dem Repo gebaut. Die Anleitung steht unter [In Betrieb nehmen](https://croesnick.github.io/kommunalpolitik_ki/komki/in-betrieb-nehmen/). Wie die Grenze hält, kann man [selbst ausprobieren](https://croesnick.github.io/kommunalpolitik_ki/komki/sicherheitsgrenze/). Die Sicherheitsprüfungen stehen im [Labbook](docs/research/2026-10-23-labbook-komki-connectoren.md), das Konzept in [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 ```sh
 # Werkzeuge wie in der Anleitung installiert, dann:
