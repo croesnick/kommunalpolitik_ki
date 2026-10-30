@@ -34,7 +34,7 @@ import { runRoot, timestamp } from "../lib/config.mjs";
 import { writeTextFile } from "../lib/fixtures.mjs";
 import { runPi } from "../lib/runner.mjs";
 import { answerText, resolveLlama, usageTotals, validateToolCalls } from "./measure.mjs";
-import { TOP_3_ANHOERUNG, factTokens } from "./fixtures.mjs";
+import { TOP_3_ANHOERUNG, classifyNumbers } from "./fixtures.mjs";
 
 const PROMPT_A =
   "Lies die Datei top-3-anhoerung.md im aktuellen Verzeichnis und fasse TOP 3 für die Sitzungsvorbereitung in höchstens fünf Sätzen zusammen. Nenne Gremium, Sitzungsdatum, Kostenschätzung und Beschlussvorschlag.";
@@ -70,33 +70,6 @@ function parseArgs(argv) {
     if (argv[i] === "--runs") args.runs = Math.max(1, Number(argv[i + 1]) || 3);
   }
   return args;
-}
-
-/**
- * K8: Zahlen der Antwort, die weder in der Quelle stehen noch als
- * Summe/Differenz zweier Quellenzahlen ableitbar sind. Rückgabe:
- * { erfunden: [], abgeleitet: [] } (normalisierte Tokens).
- */
-function classifyNumbers(sourceText, answerText) {
-  const source = [...factTokens(sourceText)].map(Number).filter(Number.isFinite);
-  const derivedSet = new Set();
-  for (let i = 0; i < source.length; i += 1) {
-    for (let j = 0; j < source.length; j += 1) {
-      if (i === j) continue;
-      derivedSet.add(source[i] - source[j]);
-      derivedSet.add(source[i] + source[j]);
-    }
-  }
-  const erfunden = [];
-  const abgeleitet = [];
-  for (const token of factTokens(answerText)) {
-    const value = Number(token);
-    if (!Number.isFinite(value)) continue;
-    if (source.includes(value)) continue;
-    if (derivedSet.has(value)) abgeleitet.push(token);
-    else erfunden.push(token);
-  }
-  return { erfunden: [...new Set(erfunden)], abgeleitet: [...new Set(abgeleitet)] };
 }
 
 function checkAnswer(answer) {
