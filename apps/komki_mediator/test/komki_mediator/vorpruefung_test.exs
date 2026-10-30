@@ -58,12 +58,20 @@ defmodule KomkiMediator.VorpruefungTest do
     assert [%{"decision" => "error", "rule" => "emit"}] = pdrs(env)
   end
 
-  test "falscher Typ query: 42: decision error, ein PDR", %{env: env} do
+  test "falscher Typ (query: 42, count: viele): decision error mit PDR", %{env: env} do
     assert {:reply, reply, _frame} = call("web_search", %{"query" => 42})
 
     assert %{"decision" => "error", "detail" => detail} = body(reply)
     assert detail =~ "query: erwartet string"
-    assert [%{"decision" => "error"}] = pdrs(env)
+
+    # Dasselbe fuer ein Integer-Feld: falscher Typ endet auch hier vor dem Gate.
+    assert {:reply, reply_count, _frame} =
+             call("web_search", %{"query" => "Radweg", "count" => "viele"})
+
+    assert %{"decision" => "error", "detail" => count_detail} = body(reply_count)
+    assert count_detail =~ "count: erwartet integer"
+
+    assert [%{"decision" => "error"}, %{"decision" => "error"}] = pdrs(env)
   end
 
   test "Pflichtfeld fehlt, auch ganz ohne Argumente: decision error, ein PDR", %{env: env} do
@@ -142,6 +150,17 @@ defmodule KomkiMediator.VorpruefungTest do
 
   test "unbekannter Tool-Name: anubis antwortet Tool not found, ohne PDR", %{env: env} do
     assert {:error, %Anubis.MCP.Error{}, _frame} = call("gibt_es_nicht", %{"query" => "x"})
+    assert [] = pdrs(env)
+  end
+
+  # Regressionssicherung der Klauselkopf-Haertung: params, die kein Objekt
+  # mit `name` sind, faellt die Vorpruefung nicht an (kein PDR, kein
+  # Abfangen) - anubis scheitert daran wie vor Ticket #165.
+  test "unparsable params (Liste): kein Abfangen durch die Vorpruefung, kein PDR", %{env: env} do
+    assert_raise FunctionClauseError, fn ->
+      Server.handle_request(%{"method" => "tools/call", "params" => ["x"]}, Frame.new())
+    end
+
     assert [] = pdrs(env)
   end
 

@@ -38,16 +38,18 @@ defmodule KomkiMediator.Server do
   # unbekannter Felder und falscher Typen, welche die anubis-Schicht
   # sonst ohne PDR ablehnt bzw. still verwirft. Bestandene Aufrufe
   # laufen unveraendert weiter; die anubis-Validierung bleibt fuer sie
-  # als zweite Schicht wirksam. `Handlers.handle/3` ist der Rumpf des
-  # injizierten Defaults (`super` steht vor dem before_compile nicht
-  # bereit); alle Methoden ausser `tools/call` erreicht der Default
-  # direkt.
+  # als zweite Schicht wirksam. Der Klauselkopf verlangt `params` als
+  # Objekt mit `name`: Alles Unparsbare (etwa `params` als Liste) faellt
+  # unveraendert an den injizierten Default zurueck, und `get_in/2` im
+  # Rumpf kann auf einer Map nicht raisen. `Handlers.handle/3` ist der
+  # Rumpf des injizierten Defaults (`super` steht vor dem before_compile
+  # nicht bereit); alle Methoden ausser `tools/call` erreicht der
+  # Default direkt.
   @impl Anubis.Server
-  def handle_request(%{"method" => "tools/call"} = request, frame) do
-    tool = get_in(request, ["params", "name"])
+  def handle_request(%{"method" => "tools/call", "params" => %{"name" => name}} = request, frame) do
     arguments = get_in(request, ["params", "arguments"])
 
-    case Vorpruefung.check(tool, arguments, Env.for_call(frame)) do
+    case Vorpruefung.check(name, arguments, Env.for_call(frame)) do
       :ok ->
         Handlers.handle(request, __MODULE__, frame)
 
