@@ -1,12 +1,17 @@
 defmodule KomkiConnectorDocuments.TestPDF do
   @moduledoc """
   Baut die Test-PDFs des Connectors selbst (Ticket #290): kein Binär-Fixture
-  im Repo — die Bytes entstehen im Test. Drei Formen:
+  im Repo — die Bytes entstehen im Test. Fünf Formen:
 
-    * `multi_page/1` — zwei Seiten mit Text; auf Seite 2 zwei
-      Highlight-Annotationen mit Kommentar, eine einzeilig, eine mehrzeilig.
+    * `multi_page/1` — zwei Seiten mit Text; auf Seite 2 drei
+      Highlight-Annotationen mit Kommentar: eine einzeilig, eine
+      mehrzeilig, eine versteckt (/F 6) — versteckte Markierungen
+      gehoeren nicht in den Agentenkontext.
     * `no_text/1` — eine Seite ohne Textebene (gefülltes Rechteck statt
       Text, wie ein Scan ohne OCR).
+    * `lone_cr/1` — eine Seite mit einzelnem \\r im Text: pdfium reicht
+      rohe Steuerzeichen durch, der Connector normalisiert zu \\n.
+    * `big/1` — extrahierbarer Text über 1 MiB, für die Frame-Grenze.
     * `invalid/1` — eine Datei mit PDF-Endung, aber kaputten Bytes.
 
   Die PDF-Syntax ist handgeschrieben und absichtlich minimal: Catalog,
@@ -19,8 +24,10 @@ defmodule KomkiConnectorDocuments.TestPDF do
   @doc """
   Zweiseitiges PDF. Seite 1: zwei Zeilen. Seite 2: drei Zeilen mit
   Highlights — Zeile 1 ganz markiert (Kommentar „Wichtige Stelle“), die
-  Zeilen 2 und 3 zusammen markiert (Kommentar „Mehrzeilige Markierung“).
-  Alle Koordinaten sind PDF-Punkte, Ursprung unten links.
+  Zeilen 2 und 3 zusammen markiert (Kommentar „Mehrzeilige Markierung“);
+  die dritte Annotation (Kommentar „Versteckte Markierung“) trägt das
+  Hidden-Flag (/F 6) und darf nicht erscheinen. Alle Koordinaten sind
+  PDF-Punkte, Ursprung unten links.
   """
   @spec multi_page(Path.t()) :: :ok
   def multi_page(path) do
@@ -43,10 +50,11 @@ defmodule KomkiConnectorDocuments.TestPDF do
       page(parent: "2 0 R", contents: "4 0 R"),
       {:stream, page1},
       "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-      page(parent: "2 0 R", contents: "7 0 R", annots: "[8 0 R 9 0 R]"),
+      page(parent: "2 0 R", contents: "7 0 R", annots: "[8 0 R 9 0 R 10 0 R]"),
       {:stream, page2},
-      annot({60, 688, 200, 714}, "Wichtige Stelle"),
-      annot({60, 592, 400, 666}, "Mehrzeilige Markierung")
+      annot({60, 688, 200, 714}, "Wichtige Stelle", 4),
+      annot({60, 592, 400, 666}, "Mehrzeilige Markierung", 4),
+      annot({60, 542, 300, 570}, "Versteckte Markierung", 6)
     ]
 
     File.write!(path, assemble(objects))
@@ -71,6 +79,23 @@ defmodule KomkiConnectorDocuments.TestPDF do
     File.write!(path, assemble(objects))
   end
 
+  @doc "Eine Seite mit einzelnem \\r im Text (kein \\r\\n-Paar)."
+  @spec lone_cr(Path.t()) :: :ok
+  def lone_cr(path) do
+    stream =
+      "BT\n/F1 12 Tf\n1 0 0 1 72 700 Tm\n(Zeile mit Wagenruecklauf) Tj\n1 0 0 1 72 650 Tm\n(Dritte Zeile) Tj\nET\n"
+
+    objects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      page(parent: "2 0 R", contents: "4 0 R"),
+      {:stream, stream},
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    ]
+
+    File.write!(path, assemble(objects))
+  end
+
   @doc "Datei mit PDF-Endung und kaputten Bytes."
   @spec invalid(Path.t()) :: :ok
   def invalid(path), do: File.write!(path, "kein PDF, nur Bytes mit Endung\n")
@@ -78,13 +103,18 @@ defmodule KomkiConnectorDocuments.TestPDF do
   @doc """
   Einseitiges PDF mit ueber 1 MiB extrahierbarem Text — fuer die
   Frame-Grenze des Protokolls. pdfium kuerzt einzelne ueberlange Zeilen,
-  der Text kommt deshalb aus vielen kurzen Zeilen.
+  der Text kommt deshalb aus vielen kurzen Zeilen; jede liegt auf
+  eigener Baseline, damit pdfium sie nicht zu einer ueberlangen Zeile
+  verschmilzt.
   """
   @spec big(Path.t()) :: :ok
   def big(path) do
     lines =
       Enum.map(1..40_000//1, fn number ->
-        "1 0 0 1 72 700 Tm\n(Zeile #{number} des grossen Testdokuments.) Tj\n"
+        # 3 000 verteilte Baseline-Slots (0,2 Pt Abstand): gut 13 kurze
+        # Zeilen je Slot, nirgends eine verschmelzbare Riesenzeile.
+        y = 700 - rem(number, 3000) * 0.2
+        "1 0 0 1 72 #{y} Tm\n(Zeile #{number} des grossen Testdokuments.) Tj\n"
       end)
 
     stream = "BT\n/F1 12 Tf\n" <> Enum.join(lines) <> "ET\n"
@@ -125,10 +155,12 @@ defmodule KomkiConnectorDocuments.TestPDF do
       "/Resources #{resources} /Contents #{contents}#{annots} >>"
   end
 
-  # /F 4 = Print-Flag; /C [1 1 0] = typische Highlight-Farbe gelb.
-  defp annot({left, bottom, right, top}, contents) do
+  # /F: 4 = Print-Flag (sichtbar), 6 = Hidden+Print — versteckte
+  # Markierungen bleiben dem Viewer verborgen und dem Connector auch.
+  # /C [1 1 0] = typische Highlight-Farbe gelb.
+  defp annot({left, bottom, right, top}, contents, flags) do
     "<< /Type /Annot /Subtype /Highlight /Rect [#{left} #{bottom} #{right} #{top}] " <>
-      "/Contents (#{contents}) /C [1 1 0] /F 4 >>"
+      "/Contents (#{contents}) /C [1 1 0] /F #{flags} >>"
   end
 
   defp assemble(objects) do

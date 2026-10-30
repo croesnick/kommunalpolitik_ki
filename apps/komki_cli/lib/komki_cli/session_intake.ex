@@ -21,9 +21,12 @@ defmodule KomkiCli.SessionIntake do
   Bytes landen als `<base>/mediator/documents/<objekt>.md` — PDF-Quellen
   als `<objekt>.pdf` (#290, der Dokument-Connector liest sie mit
   Seitenankern und Highlights) —, das Objekt mit Typ `document`, Version
-  und λ(x) in `room.json`. pi liest sie danach nur ueber `admit_document`
-  und den Dokument-Connector; der Vermittler entscheidet jede Aufnahme
-  erneut. Quarantaene-Bytes bleiben am Quellort.
+  und λ(x) in `room.json`. Eine Objekt-ID liegt in genau einer Form im
+  Raum: Der Connector liest .md zuerst, eine zweite Form derselben ID
+  bliebe ungelesen und widerspraeche der eingetragenen Version. pi liest
+  sie danach nur ueber `admit_document` und den Dokument-Connector; der
+  Vermittler entscheidet jede Aufnahme erneut. Quarantaene-Bytes bleiben
+  am Quellort.
   """
 
   alias KomkiCli.{Config, LabelStore, StartContract}
@@ -707,7 +710,8 @@ defmodule KomkiCli.SessionIntake do
   defp unusable(entry) do
     cond do
       pdf?(entry.source) and not pdf_header?(entry.source) ->
-        "kein PDF trotz Endung (kein %-Header), als Raumdokument nicht lesbar: " <> entry.source
+        "kein PDF trotz Endung (%PDF- steht nicht am Dateianfang), als Raumdokument nicht lesbar: " <>
+          entry.source
 
       not pdf?(entry.source) and not String.valid?(File.read!(entry.source)) ->
         "kein UTF-8-Text, als Raumdokument nicht lesbar: " <> entry.source
@@ -721,30 +725,71 @@ defmodule KomkiCli.SessionIntake do
   # Objekt-ID danach (.md gewinnt vor .pdf).
   defp pdf?(path), do: path |> Path.extname() |> String.downcase() == ".pdf"
 
-  # %-Header in den ersten Kilo-Byte (ex_pdfium verzeiht Bytes davor).
-  # Eine leere Datei liefert :eof aus IO.binread/2 — kein Binary, kein PDF.
+  # %PDF- am Dateianfang (ISO 32000). Bewusst strenger als ex_pdfium, das
+  # Bytes vor dem Header verzeiht: Die Aufnahme weist alles schon hier
+  # zurueck, was die Lesung im Connector nur scheitern liesse — eine
+  # Textdatei, die irgendwo %PDF- erwaehnt, waere sonst ein Pseudo-PDF im
+  # Raum (#290). Eine leere Datei liefert :eof aus IO.binread/2.
   defp pdf_header?(path) do
     case File.open(path) do
       {:ok, device} ->
-        head = IO.binread(device, 1024)
+        head = IO.binread(device, 5)
         File.close(device)
-        is_binary(head) and String.contains?(head, "%PDF-")
+        head == "%PDF-"
 
       {:error, _posix} ->
         false
     end
   end
 
-  # APFS ist case-insensitiv: "Brief.txt" und "brief.txt" kollidieren.
+  # APFS ist case-insensitiv: "Brief.txt" und "brief.txt" kollidieren —
+  # und .md wie .pdf derselben Objekt-ID sind zwei Fassungen desselben
+  # Raumdokuments, das im Raum nur einmal liegt: verglichen wird darum
+  # die Objekt-ID ohne Endung, nicht der volle Zielpfad (#290).
   defp unique_destinations(staged) do
-    destinations = Enum.map(staged, &String.downcase(&1.destination))
+    roots =
+      staged
+      |> Enum.map(&(&1.destination |> Path.basename() |> Path.rootname() |> String.downcase()))
+      |> Enum.sort()
 
-    if length(destinations) == length(Enum.uniq(destinations)) do
+    duplicates = roots -- Enum.uniq(roots)
+
+    if duplicates == [] do
       :ok
     else
       {:error,
        "mehrere Dateien zielen auf dasselbe Raumdokument (case-insensitiv); bitte umbenennen: " <>
-         inspect(destinations -- Enum.uniq(destinations))}
+         inspect(duplicates)}
+    end
+  end
+
+  # Eine Objekt-ID liegt im Raum in genau einer Form (.md oder .pdf, #290):
+  # Der Connector liest .md zuerst, eine zweite Form bliebe ungelesen und
+  # widerspraeche der im Raum eingetragenen Version. Gilt in der Planung
+  # wie beim Staging; dieselbe Form mit gleichen Bytes bleibt idempotent
+  # (s. preflight_destination/stage_destination).
+  defp rendition_conflict(destination) do
+    sibling = sibling_rendition(destination)
+
+    if sibling && File.exists?(sibling) do
+      {:error,
+       "Raumdokument " <>
+         Path.rootname(Path.basename(destination)) <>
+         " liegt bereits als " <>
+         Path.extname(sibling) <>
+         " vor (" <>
+         sibling <>
+         "); der Connector liest nur eine Form je Objekt-ID — alte Fassung entfernen oder unter anderer Objekt-ID aufnehmen"}
+    else
+      :ok
+    end
+  end
+
+  defp sibling_rendition(destination) do
+    case Path.extname(destination) do
+      ".pdf" -> String.replace_suffix(destination, ".pdf", ".md")
+      ".md" -> String.replace_suffix(destination, ".md", ".pdf")
+      _other -> nil
     end
   end
 
@@ -763,7 +808,9 @@ defmodule KomkiCli.SessionIntake do
     if source == destination do
       verify_source(source, expected)
     else
-      preflight_destination(destination, expected)
+      with :ok <- rendition_conflict(destination) do
+        preflight_destination(destination, expected)
+      end
     end
   end
 
@@ -836,7 +883,9 @@ defmodule KomkiCli.SessionIntake do
     if source == destination do
       verify_source(source, expected)
     else
-      stage_destination(source, destination, expected)
+      with :ok <- rendition_conflict(destination) do
+        stage_destination(source, destination, expected)
+      end
     end
   end
 
