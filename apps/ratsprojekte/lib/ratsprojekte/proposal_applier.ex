@@ -101,7 +101,10 @@ defmodule Ratsprojekte.ProposalApplier do
           Map.put(acc, :beschreibung, v)
 
         {"prioritaet", v}, acc when is_binary(v) ->
-          Map.put(acc, :prioritaet, String.to_existing_atom(v))
+          # Bewusst den String durchreichen: Ecto.Enum/cast lehnt unbekannte
+          # Werte als Changeset-Fehler ab (graceful über Repo.rollback),
+          # statt hier mit String.to_existing_atom/1 das GO crashen zu lassen.
+          Map.put(acc, :prioritaet, v)
 
         {"beschlussvorschlag", v}, acc when is_binary(v) ->
           Map.put(acc, :beschlussvorschlag, v)

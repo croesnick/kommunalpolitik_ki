@@ -41,6 +41,30 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreifeTest do
       assert {"pass", _} = gate(projekt.slug, :success_metrics_vorhanden)
     end
 
+    test "a pure 'Digitalisierung von X' VP warns instead of blocking the gate" do
+      projekt =
+        freibad(%{value_proposition: "Digitalisierung von Freibad-Kassen und Getränkeautomaten."})
+
+      assert {"warn", detail} = gate(projekt.slug, :value_proposition_vorhanden)
+      assert detail =~ "Digitalisierung von X"
+    end
+
+    test "VP warn yields antragsreif_mit_vorbehalten — no changeset veto on the Stadtrat's GO" do
+      projekt =
+        freibad(
+          Map.merge(@beschlossene_attrs, %{
+            value_proposition: "Digitalisierung von Freibad-Kassen und Getränkeautomaten."
+          })
+        )
+
+      assert Enum.all?(
+               body(projekt.slug)["hard_gates"],
+               &(&1["status"] == "pass" or &1["status"] == "warn")
+             )
+
+      assert body(projekt.slug)["empfehlung"] == "antragsreif_mit_vorbehalten"
+    end
+
     test "alle hard gates pass → empfehlung antragsreif" do
       projekt = freibad(@beschlossene_attrs)
 

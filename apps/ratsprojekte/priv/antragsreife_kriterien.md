@@ -27,7 +27,7 @@ Drei Klassen von Kriterien, scharf getrennt:
 | `beschlussvorschlag_konkret` | Feld `projekt.beschlussvorschlag` gesetzt, nicht leer, länger als 20 Zeichen. |
 | `realisierungsstrang_vorhanden` | Mindestens ein Realisierungsstrang vorhanden. |
 | `vorbedingungen_erfuellt` | Status `pass`, wenn alle Stränge alle Vorbedingungen erfüllt haben; `warn`, wenn Vorbedingungen offen sind. |
-| `value_proposition_vorhanden` | Feld `projekt.value_proposition` gesetzt, nicht leer, länger als 20 Zeichen. Welches konkrete Problem löst das Projekt? Setzbar per Proposal (`propose_projekt`, `propose_projekt_update`). Der Changeset lehnt zusätzlich reine „Digitalisierung von X"-Kurzphrasen ab (maximal fünf Wörter, ohne Nebensatz); die inhaltliche Qualität bewertet weiterhin der AI-Harness über die Soft Gates. |
+| `value_proposition_vorhanden` | Feld `projekt.value_proposition` gesetzt, nicht leer, länger als 20 Zeichen. Welches konkrete Problem löst das Projekt? Setzbar per Proposal (`propose_projekt`, `propose_projekt_update`). Der Changeset prüft nur die Mindestlänge — die inhaltliche Qualität bewertet der AI-Harness über die Soft Gates. Eine reine „Digitalisierung von X"-Kurzphrase (maximal fünf Wörter, ohne Nebensatz) markiert das Gate mit `warn` statt `pass`, blockiert also kein GO des Stadtrats. |
 | `success_metrics_vorhanden` | Feld `projekt.success_metrics` gesetzt, nicht leer, länger als 10 Zeichen. Mindestens eine messbare Größe. Setzbar per Proposal (`propose_projekt`, `propose_projekt_update`). |
 
 Status-Werte: `pass` | `fail` | `warn`.

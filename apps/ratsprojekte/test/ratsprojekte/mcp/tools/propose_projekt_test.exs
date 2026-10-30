@@ -147,10 +147,12 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektTest do
       assert projekt.success_metrics == @sm
     end
 
-    test "GO rejects a pure 'Digitalisierung von X' VP — projekt is not created" do
+    test "GO on a pure 'Digitalisierung von X' VP succeeds — the gate warns, no changeset veto" do
+      alias Ratsprojekte.MCP.Tools.CheckAntragsreife
+
       params = [
         titel: "Freibad Kartenzahlung",
-        slug: "freibad-kartenzahlung-ohne-vp",
+        slug: "freibad-kartenzahlung-rein",
         value_proposition: "Digitalisierung von Freibad-Kassen und Getränkeautomaten.",
         success_metrics: @sm,
         begruendung: "Bargeldloser Betrieb reduziert Ausfallzeiten an den Kassen."
@@ -162,19 +164,35 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektTest do
       body = parse_json_body(response)
       proposal = Repo.get!(PendingProposal, body["id"])
 
-      # GO scheitert an der Changeset-Validierung — Projekt wird nicht angelegt,
-      # Proposal bleibt pending (der Stadtrat korrigiert oder lehnt ab).
+      # Das GO des Stadtrats gilt — die reine Form ist Gate-Warnung (Soft-Gate-
+      # Terrain des AI-Harness), kein Changeset-Veto am GO.
       assert {:reply, go_response, _frame} =
                DecideProposal.execute(
                  [proposal_id: proposal.id, aktion: "accept", kommentar: "GO im Chat"],
                  Frame.new()
                )
 
-      assert go_response.isError
-      assert error_text(go_response) =~ "value_proposition"
+      refute go_response.isError
 
-      refute Repo.exists?(from(p in Projekt, where: p.slug == "freibad-kartenzahlung-ohne-vp"))
-      assert Repo.get!(PendingProposal, proposal.id).status == :pending
+      assert Repo.get!(PendingProposal, proposal.id).status == :approved
+
+      assert {:reply, check_response, _frame} =
+               CheckAntragsreife.execute(
+                 %{slug: "freibad-kartenzahlung-rein", stufe: "stadtrat"},
+                 Frame.new()
+               )
+
+      refute check_response.isError
+
+      [%{"type" => "text", "text" => check_json}] = check_response.content
+
+      vp_gate =
+        Enum.find(
+          Jason.decode!(check_json)["hard_gates"],
+          &(&1["kriterium"] == "value_proposition_vorhanden")
+        )
+
+      assert vp_gate["status"] == "warn"
     end
   end
 

@@ -1,6 +1,7 @@
 defmodule Ratsprojekte.Schemas.Projekt do
   use Ecto.Schema
   import Ecto.Changeset
+  import Ratsprojekte.Present
 
   schema "projekte" do
     field(:titel, :string)
@@ -24,15 +25,11 @@ defmodule Ratsprojekte.Schemas.Projekt do
 
   # Schwellen spiegeln die Hard Gates in check_antragsreife bzw.
   # priv/antragsreife_kriterien.md: VP und SM sind dort erst ab
-  # mehr als 20 bzw. mehr als 10 Zeichen konkret genug.
+  # mehr als 20 bzw. mehr als 10 Zeichen konkret genug. Die inhaltliche
+  # Qualität (kein reines „Digitalisierung von X") prüft das Gate als
+  # :warn — ein Changeset-Veto am GO des Stadtrats wäre der falsche Ort.
   @value_proposition_min_chars 21
   @success_metrics_min_chars 11
-  # Reines „Digitalisierung von X" = kurze Nominalphrase ohne Aussage über
-  # Problem oder Veränderung. Deterministisch trennbar ist nur die Kurzform
-  # (maximal fünf Wörter nach „Digitalisierung", ohne Nebensatz); alles
-  # Längere lässt die Heuristik durch — die inhaltliche Qualität bewertet
-  # der AI-Harness über die Soft Gates.
-  @pure_digitalisierung ~r/^\s*digitalisierung(\s+von)?\s+\S+(?:\s+\S+){0,4}\s*[.!]?\s*$/i
 
   def changeset(projekt, attrs) do
     projekt
@@ -54,31 +51,8 @@ defmodule Ratsprojekte.Schemas.Projekt do
     |> validate_format(:slug, ~r/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
     |> validate_length(:value_proposition, min: @value_proposition_min_chars)
     |> validate_length(:success_metrics, min: @success_metrics_min_chars)
-    |> validate_value_proposition_inhaltlich()
     |> unique_constraint(:slug)
     |> validate_status_dates()
-  end
-
-  # Ein reines „Digitalisierung von X“ nennt kein konkretes Problem und keine
-  # messbare Veränderung — die Querschnitts-Regel im Lifecycle-Dokument
-  # verlangt mehr. Nur prüfen, wenn das Feld gesetzt ist (nil bleibt erlaubt:
-  # Felder werden per Proposal + GO gesetzt, die Antragsreife prüft das Gate).
-  defp validate_value_proposition_inhaltlich(changeset) do
-    case get_field(changeset, :value_proposition) do
-      value when is_binary(value) ->
-        if String.trim(value) =~ @pure_digitalisierung do
-          add_error(
-            changeset,
-            :value_proposition,
-            "darf kein reines „Digitalisierung von X“ sein — es muss das konkrete Problem nennen"
-          )
-        else
-          changeset
-        end
-
-      _ ->
-        changeset
-    end
   end
 
   defp validate_status_dates(changeset) do
@@ -105,9 +79,4 @@ defmodule Ratsprojekte.Schemas.Projekt do
         changeset
     end
   end
-
-  defp present?(nil), do: false
-  defp present?(""), do: false
-  defp present?(value) when is_binary(value), do: String.trim(value) != ""
-  defp present?(_), do: true
 end

@@ -3,8 +3,11 @@ defmodule Ratsprojekte.Schemas.ProjektTest do
   Changeset-Validierung der Antragsreife-Felder (Ticket #37).
 
   Value Proposition und Success Metrics sind optionale Spalten — gesetzt
-  werden sie per Proposal + GO —, aber wenn sie gesetzt sind, müssen sie
-  konkret sein: Mindestlänge und kein reines „Digitalisierung von X“.
+  werden sie per Proposal + GO —, aber wenn sie gesetzt sind, gilt eine
+  Mindestlänge. Die inhaltliche Prüfung (kein reines „Digitalisierung von
+  X“) liegt bewusst NICHT im Changeset: eine Regex dürfe ein GO des
+  Stadtrats nicht vetoen — check_antragsreife markiert die reine Form als
+  :warn am Gate (siehe CheckAntragsreifeTest).
   """
 
   use Ratsprojekte.DataCase, async: false
@@ -25,22 +28,10 @@ defmodule Ratsprojekte.Schemas.ProjektTest do
       assert "should be at least 21 character(s)" in errors_on(changeset).value_proposition
     end
 
-    test "rejects a pure 'Digitalisierung von X' value proposition despite length" do
+    test "accepts a pure 'Digitalisierung von X' phrasing — content quality is gate territory" do
       changeset =
         changeset_with(%{
           value_proposition: "Digitalisierung von Freibad-Kassen und Getränkeautomaten."
-        })
-
-      assert "darf kein reines „Digitalisierung von X“ sein — es muss das konkrete Problem nennen" in errors_on(
-               changeset
-             ).value_proposition
-    end
-
-    test "accepts a value proposition that starts with Digitalisierung but names a concrete change" do
-      changeset =
-        changeset_with(%{
-          value_proposition:
-            "Digitalisierung der Kassen reduziert die Wartezeit pro Gast um 40 Prozent."
         })
 
       assert changeset.valid?

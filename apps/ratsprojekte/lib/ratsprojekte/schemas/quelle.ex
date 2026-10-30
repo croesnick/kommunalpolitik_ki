@@ -1,6 +1,7 @@
 defmodule Ratsprojekte.Schemas.Quelle do
   use Ecto.Schema
   import Ecto.Changeset
+  import Ratsprojekte.Present
 
   @ris_fields [:ris_sitzung_id, :ris_top, :beschluss_nr]
 
@@ -58,9 +59,4 @@ defmodule Ratsprojekte.Schemas.Quelle do
       changeset
     end
   end
-
-  defp present?(nil), do: false
-  defp present?(""), do: false
-  defp present?(value) when is_binary(value), do: String.trim(value) != ""
-  defp present?(_), do: true
 end

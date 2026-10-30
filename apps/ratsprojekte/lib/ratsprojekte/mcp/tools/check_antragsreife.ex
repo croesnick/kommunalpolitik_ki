@@ -37,10 +37,19 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
   alias Ratsprojekte.Repo
   alias Ratsprojekte.Schemas.{Projekt, Realisierungsstrang}
   import Ecto.Query
+  import Ratsprojekte.Present
 
   @beschlussvorschlag_min_length 20
   @value_proposition_min_length 20
   @success_metrics_min_length 10
+
+  # Reines „Digitalisierung von X" = kurze Nominalphrase ohne Aussage über
+  # Problem oder Veränderung. Deterministisch trennbar ist nur die Kurzform
+  # (maximal fünf Wörter nach „Digitalisierung", ohne Nebensatz) — als
+  # :warn am Gate, nicht als Changeset-Veto: die inhaltliche Qualität
+  # bewertet der AI-Harness (Soft Gates), und ein GO des Stadtrats darf
+  # nicht an einer Regex scheitern.
+  @pure_digitalisierung ~r/^\s*digitalisierung(\s+von)?\s+\S+(?:\s+\S+){0,4}\s*[.!]?\s*$/i
 
   schema do
     field(:slug, :string,
@@ -150,68 +159,69 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
     end
   end
 
-  defp gate_beschlussvorschlag_konkret(projekt) do
-    cond do
-      blank?(projekt.beschlussvorschlag) ->
-        gate(:beschlussvorschlag_konkret, :fail, "Feld 'beschlussvorschlag' ist nicht gesetzt")
+  # Gemeinsame Struktur der Feld-Gates: gesetzt, nicht leer, länger als die
+  # Schwellen aus priv/antragsreife_kriterien.md.
+  defp gate_feld_konkret(projekt, kriterium, field, min_length, label) do
+    value = Map.get(projekt, field)
 
-      String.length(projekt.beschlussvorschlag) <= @beschlussvorschlag_min_length ->
-        gate(
-          :beschlussvorschlag_konkret,
-          :fail,
-          "Beschlussvorschlag zu kurz (<= #{@beschlussvorschlag_min_length} Zeichen)"
-        )
+    cond do
+      blank?(value) ->
+        gate(kriterium, :fail, "Feld '#{field}' ist nicht gesetzt")
+
+      String.length(value) <= min_length ->
+        gate(kriterium, :fail, "#{label} zu kurz (<= #{min_length} Zeichen)")
 
       true ->
-        gate(
-          :beschlussvorschlag_konkret,
-          :pass,
-          "Beschlussvorschlag gesetzt (#{String.length(projekt.beschlussvorschlag)} Zeichen)"
-        )
+        gate(kriterium, :pass, "#{label} gesetzt (#{String.length(value)} Zeichen)")
     end
   end
 
+  defp gate_beschlussvorschlag_konkret(projekt) do
+    gate_feld_konkret(
+      projekt,
+      :beschlussvorschlag_konkret,
+      :beschlussvorschlag,
+      @beschlussvorschlag_min_length,
+      "Beschlussvorschlag"
+    )
+  end
+
   defp gate_value_proposition_vorhanden(projekt) do
-    cond do
-      blank?(projekt.value_proposition) ->
-        gate(:value_proposition_vorhanden, :fail, "Feld 'value_proposition' ist nicht gesetzt")
+    base =
+      gate_feld_konkret(
+        projekt,
+        :value_proposition_vorhanden,
+        :value_proposition,
+        @value_proposition_min_length,
+        "Value Proposition"
+      )
 
-      String.length(projekt.value_proposition) <= @value_proposition_min_length ->
-        gate(
-          :value_proposition_vorhanden,
-          :fail,
-          "Value Proposition zu kurz (<= #{@value_proposition_min_length} Zeichen)"
-        )
-
-      true ->
-        gate(
-          :value_proposition_vorhanden,
-          :pass,
-          "Value Proposition gesetzt (#{String.length(projekt.value_proposition)} Zeichen)"
-        )
+    if base.status == :pass and pure_digitalisierung?(projekt.value_proposition) do
+      %{
+        base
+        | status: :warn,
+          detail:
+            base.detail <> " — wirkt wie ein reines „Digitalisierung von X“ (Soft Gate prüfen)"
+      }
+    else
+      base
     end
   end
 
   defp gate_success_metrics_vorhanden(projekt) do
-    cond do
-      blank?(projekt.success_metrics) ->
-        gate(:success_metrics_vorhanden, :fail, "Feld 'success_metrics' ist nicht gesetzt")
-
-      String.length(projekt.success_metrics) <= @success_metrics_min_length ->
-        gate(
-          :success_metrics_vorhanden,
-          :fail,
-          "Success Metrics zu kurz (<= #{@success_metrics_min_length} Zeichen)"
-        )
-
-      true ->
-        gate(
-          :success_metrics_vorhanden,
-          :pass,
-          "Success Metrics gesetzt (#{String.length(projekt.success_metrics)} Zeichen)"
-        )
-    end
+    gate_feld_konkret(
+      projekt,
+      :success_metrics_vorhanden,
+      :success_metrics,
+      @success_metrics_min_length,
+      "Success Metrics"
+    )
   end
+
+  defp pure_digitalisierung?(value) when is_binary(value),
+    do: String.trim(value) =~ @pure_digitalisierung
+
+  defp pure_digitalisierung?(_), do: false
 
   defp gate_realisierungsstrang_vorhanden(projekt) do
     straenge = projekt.realisierungsstraenge
@@ -340,14 +350,4 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
   end
 
   # --- Helpers ---
-
-  defp present?(nil), do: false
-  defp present?(""), do: false
-  defp present?(value) when is_binary(value), do: String.trim(value) != ""
-  defp present?(_), do: true
-
-  defp blank?(nil), do: true
-  defp blank?(""), do: true
-  defp blank?(value) when is_binary(value), do: String.trim(value) == ""
-  defp blank?(_), do: false
 end

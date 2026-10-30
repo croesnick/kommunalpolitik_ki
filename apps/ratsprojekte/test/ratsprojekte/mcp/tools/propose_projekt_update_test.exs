@@ -123,6 +123,41 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdateTest do
       assert response.isError
       assert error_text(response) =~ "nicht gefunden"
     end
+
+    test "rejects an invalid prioritaet at propose time instead of at GO time", %{slug: slug} do
+      assert {:reply, response, _frame} =
+               ProposeProjektUpdate.execute(
+                 [
+                   projekt_slug: slug,
+                   prioritaet: "Hoch",
+                   begruendung: "Falsch geschriebene Priorität muss früh abgelehnt werden."
+                 ],
+                 Frame.new()
+               )
+
+      assert response.isError
+      assert error_text(response) =~ "Ungültige Priorität"
+      assert error_text(response) =~ "hoch, mittel, niedrig"
+
+      # Kein Proposal entstanden.
+      assert Repo.aggregate(PendingProposal, :count) == 0
+    end
+
+    test "rejects an update proposal without any set field (no-op GO)", %{slug: slug} do
+      assert {:reply, response, _frame} =
+               ProposeProjektUpdate.execute(
+                 [
+                   projekt_slug: slug,
+                   begruendung: "Kein einziges Feld gesetzt — der Vorschlag wäre ein No-Op."
+                 ],
+                 Frame.new()
+               )
+
+      assert response.isError
+      assert error_text(response) =~ "Mindestens eines von"
+
+      assert Repo.aggregate(PendingProposal, :count) == 0
+    end
   end
 
   describe "propose + GO for value proposition and success metrics (#37)" do

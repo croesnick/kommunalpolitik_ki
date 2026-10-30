@@ -33,7 +33,7 @@ bündelt. Die Sitzungsmappe ist ein Vault-Tool, nicht Teil von ratsprojekte.
 |---|---|---|
 | Agenda abrufen (Sitzungen + TOPs) | `ratsinfo sessions --remote` + `ratsinfo show <id>` | ✅ |
 | Vorlagen-PDFs lesen | `pdf_ingest ingest(path)` | ✅ |
-| Querverweis: hängt ein TOP an einem Ratsprojekt? | `ratsinfo search` + `ratsprojekte show_projekt` (Quelle mit RIS-Referenz) | ✅ Strukturierte RIS-Referenz an der Quelle (#32); automatischer Cross-Check → #33 |
+| Querverweis: hängt ein TOP an einem Ratsprojekt? | `ratsinfo search` + `ratsprojekte show_projekt` (Quelle mit RIS-Referenz) | ⚠️ Felder, Anzeige und lesende Tools (#32); automatischer Cross-Check → #33; Erfassung der Referenz nur über Seeds/direkte DB (kein UI-/Proposal-Weg) |
 | AZ-Artikel zum Thema finden | `allgaeuer_zeitung_mcp search_articles` | ✅ |
 | Vault-Notizen zum Thema | `vault_suche` | ✅ |
 | Sitzungsmappe im Vault erstellen | `obsidian-cli` (externer Skill) | ✅ |
@@ -141,7 +141,7 @@ RIS-Entwicklungen, die Ratsprojekte betreffen.
 |---|---|---|
 | Beschluss in RIS finden | `ratsinfo search` | ✅ |
 | Projekt-Status checken | `ratsprojekte show_projekt` | ✅ |
-| Beschluss mit Projekt verlinken | Quelle vom Typ `sitzung` mit `ris_sitzung_id` / `ris_top` / `beschluss_nr` | ✅ (#32) |
+| Beschluss mit Projekt verlinken | Quelle vom Typ `sitzung` mit `ris_sitzung_id` / `ris_top` / `beschluss_nr` | ⚠️ Felder + Ausgabe in show_projekt/LiveView (#32); Erfassung nur über Seeds/direkte DB — UI-/Proposal-Weg offen |
 | Frist-Tracking (Beschlussfrist abgelaufen?) | — | ❌ Keine Fristen-Tabelle, keine Alerts (#34) |
 | RIS-Sync → "was ist neu zu meinen Projekten?" | — | ❌ Kein Diff bei Sync (#33) |
 
@@ -208,7 +208,7 @@ Vault-Notiz des jeweiligen Ratsprojekts gespeichert wird.
 |---|---|---|
 | PDF herunterladen | `ratsinfo show <id>` zeigt Dokumente, `ratsinfo open <id>` lädt herunter | ✅ |
 | PDF ingesten (Text + Annotationen) | `pdf_ingest ingest(path)` | ✅ |
-| Mit RIS-Sitzung verlinken | Quelle vom Typ `sitzung` mit `ris_sitzung_id` / `ris_top` / `beschluss_nr` | ✅ (#32) |
+| Mit RIS-Sitzung verlinken | Quelle vom Typ `sitzung` mit `ris_sitzung_id` / `ris_top` / `beschluss_nr` | ⚠️ Felder vorhanden (#32); Erfassung nur über Seeds/direkte DB — UI-/Proposal-Weg offen |
 | Highlights/Annotationen extrahieren | `pdf_ingest extract_annotations` | ✅ |
 
 ### Lücken
