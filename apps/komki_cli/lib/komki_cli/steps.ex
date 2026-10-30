@@ -2000,7 +2000,7 @@ defmodule KomkiCli.Steps do
     detach? = Map.has_key?(opts, "detach")
 
     with :ok <- continue_precondition(cfg, continue?),
-         :ok <- KomkiCli.Raum.mark_session(cfg) do
+         :ok <- KomkiCli.Raum.mark_session(cfg, continue?) do
       prepare_session_assets(cfg)
       pane = Pi.pane_command(KomkiCli.Runtime.self_path(), cfg.base_dir, continue?)
 

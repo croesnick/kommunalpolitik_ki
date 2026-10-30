@@ -40,6 +40,7 @@ defmodule KomkiCli.RaumTest do
   end
 
   test "verschärfen geht auch mit laufender Session und startet den Vermittler neu", %{cfg: cfg} do
+    assert :ok = Raum.mark_session(cfg)
     assert {:raum, text} = Raum.switch(cfg, "vertraulich", deps(session: true, mediator: true))
     assert text =~ "recherche → vertraulich"
     assert bindings(cfg) == Templates.vertraulich_bindings()
@@ -99,23 +100,67 @@ defmodule KomkiCli.RaumTest do
   end
 
   describe "Fortsetzen einer Session" do
+    # pi legt die Session-Datei erst mit der ersten Nachricht an; --continue
+    # nimmt die zuletzt geänderte.
+    defp session_file!(cfg, name, mtime) do
+      dir = KomkiCli.Pi.session_dir(cfg)
+      File.mkdir_p!(dir)
+      path = Path.join(dir, name <> ".jsonl")
+      File.write!(path, "{}\n")
+      File.touch!(path, mtime)
+    end
+
     test "ohne Markierung nein", %{cfg: cfg} do
+      session_file!(cfg, "a", 1_000)
       assert {:error, reason, 2} = Raum.continue_allowed(cfg)
       assert reason =~ "ohne --continue"
     end
 
     test "im gleichen oder strengeren Raum ja, im lockereren nein", %{cfg: cfg} do
       assert :ok = Raum.mark_session(cfg)
+      session_file!(cfg, "a", 1_000)
       assert :ok = Raum.continue_allowed(cfg)
 
       {:raum, _} = Raum.switch(cfg, "vertraulich", deps([]))
       assert :ok = Raum.continue_allowed(cfg)
 
       assert :ok = Raum.mark_session(cfg)
+      session_file!(cfg, "b", 2_000)
       {:raum, _} = Raum.switch(cfg, "recherche", deps([]))
       assert {:error, reason, 2} = Raum.continue_allowed(cfg)
       assert reason =~ "lief im Raum vertraulich"
       assert reason =~ "komki raum vertraulich"
+    end
+
+    test "fortgesetzt: die Markierung gilt weiter für dieselbe Datei", %{cfg: cfg} do
+      assert :ok = Raum.mark_session(cfg)
+      session_file!(cfg, "a", 1_000)
+      assert :ok = Raum.mark_session(cfg, true)
+      session_file!(cfg, "a", 2_000)
+      assert :ok = Raum.continue_allowed(cfg)
+    end
+
+    test "neue Session ohne Unterhaltung: die vorige Datei bleibt, ihr Raum ist unbekannt",
+         %{cfg: cfg} do
+      {:raum, _} = Raum.switch(cfg, "vertraulich", deps([]))
+      assert :ok = Raum.mark_session(cfg)
+      session_file!(cfg, "vertraulich", 1_000)
+
+      {:raum, _} = Raum.switch(cfg, "recherche", deps([]))
+      # Neue Session in recherche, sofort /quit: pi schreibt keine Datei.
+      assert :ok = Raum.mark_session(cfg)
+
+      assert {:error, reason, 2} = Raum.continue_allowed(cfg)
+      assert reason =~ "ohne --continue"
+    end
+
+    test "verschärfen mit laufender Session behält den Bezug zur Datei", %{cfg: cfg} do
+      assert :ok = Raum.mark_session(cfg)
+      session_file!(cfg, "a", 1_000)
+      {:raum, _} = Raum.switch(cfg, "vertraulich", deps(session: true))
+      {:raum, _} = Raum.switch(cfg, "recherche", deps([]))
+      assert {:error, reason, 2} = Raum.continue_allowed(cfg)
+      assert reason =~ "lief im Raum vertraulich"
     end
   end
 
