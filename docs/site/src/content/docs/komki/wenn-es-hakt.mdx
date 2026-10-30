@@ -16,15 +16,15 @@ description: Häufige Meldungen, ihre Ursachen und was hilft. Dazu die ehrlichen
 | `doctor` meldet ein Profil als abweichend | Instanz älter als der Code | `komki setup` schreibt die Profile neu |
 | `komki-mediator nicht aktiv: 'komki up' zuerst` | Vermittler läuft nicht | `komki up` |
 | Ein Connector fehlt in `komki status` | Prozess abgestürzt | `komki up` startet nur das Fehlende neu |
-| Websuche im Raum „vertraulich“ abgelehnt | So gewollt | In den Raum „recherche“ wechseln ([Anleitung](/kommunalpolitik_ki/komki/sicherheitsgrenze/)) |
-| pi sucht nach einer Ablehnung minutenlang weiter | Bekannte Schwäche ([#166](https://github.com/croesnick/kommunalpolitik_ki/issues/166)) | Abbrechen; der Lauf endet spätestens nach 10 Minuten |
+| Websuche im Raum „vertraulich“ abgelehnt | So gewollt | `komki raum recherche` ([Anleitung](/kommunalpolitik_ki/komki/sicherheitsgrenze/)) |
+| pi endet nach einer Ablehnung mit einer Erklärung statt minutenlangem Weitersuchen | Die Sperre trägt einen `hinweis` für pi ([#166](https://github.com/croesnick/kommunalpolitik_ki/issues/166)); im echten Lauf endete der Angriffsfall nach 80 bis 128 s statt nach 10 Minuten | Nichts abbrechen; einzelne erlaubte Nachsuchen sind möglich und gewollt |
 
 Logs liegen unter `~/.local/share/komki/tmp/`: `mediator.log`, `egress.log` und je Connector eine `connector-<name>.log`. Sie enthalten keine Suchbegriffe, keine Notizinhalte und keine Schlüssel, nur Betriebsdaten: welcher Aufruf wann mit welchem Ergebnis lief und welche Adresse der Egress-Proxy verbunden hat. Was entschieden wurde, steht im Journal.
 
 ## Was noch nicht geht
 
 - **Nur auf dem Mac.** komki braucht einen Mac mit Apple Silicon und rund 32 GB Arbeitsspeicher, weil es die Sandbox von macOS nutzt und das Sprachmodell lokal rechnet.
-- **Kein Installer.** komki wird aus dem Repo gebaut und im Terminal eingerichtet. Eine Installation über Homebrew ist geplant.
+- **Kein Installer.** komki wird aus dem Checkout gebaut und im Terminal eingerichtet; optional legst du dir einen lokalen Tap an (`make komki-tap`). Einen veröffentlichten Release gibt es nicht.
 - **Ein Prototyp, kein geprüftes Produkt.** Die Sicherheitsprüfungen sind offen dokumentiert, ein unabhängiges Audit gibt es nicht.
 - **RIS liefert nur Titel.** Ohne Zugangsdaten gibt die Ratsinformations-API keine Texte der Tagesordnungspunkte heraus ([#148](https://github.com/croesnick/kommunalpolitik_ki/issues/148)).
 - **Schreiben ohne Freigabe-Dialog.** Notizen landen nur im Ordner `komki-test/`; eine Bestätigung vor jedem Schreiben fehlt noch ([#205](https://github.com/croesnick/kommunalpolitik_ki/issues/205)). Ein GO gibt es bisher nur für gesperrte Aufrufe ([So funktioniert es](/kommunalpolitik_ki/komki/so-funktioniert-es/)).
