@@ -631,10 +631,16 @@ async function task6Compaction(llama, provider) {
 
 // ---------------------------------------------------------------- Orchestrierung
 
-const args = parseArgs(process.argv.slice(2));
-const ROOT = args.root ?? runRoot(timestamp());
+let args;
+let ROOT;
 
 async function main() {
+  // Argumente innerhalb von main parsen: Ein Wurf (z. B. --only ohne Wert)
+  // läuft dann durch den try/catch am Modulende — klare Meldung, Exit 2 —
+  // statt als unhandled rejection mit Stacktrace zu enden.
+  args = parseArgs(process.argv.slice(2));
+  ROOT = args.root ?? runRoot(timestamp());
+
   const llama = await resolveLlama();
   const provider = {
     upstreamBaseUrl: llama.baseUrl,

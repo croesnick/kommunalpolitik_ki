@@ -231,6 +231,11 @@ export async function startForwardProvider({ upstreamBaseUrl, logPath } = {}) {
       upstreamReq.on("error", (error) => {
         if (!res.headersSent) res.writeHead(502, { "content-type": "text/plain" });
         res.end(`forward error: ${error.message}`);
+        // Nach einem geloggten Response-Ende (finishLog) keinen zweiten
+        // Datensatz anhängen — Midstream-Tod darf einen Request nicht doppelt
+        // loggen, sonst verrutschen die Zählungen.
+        if (logged) return;
+        logged = true;
         appendLog(logPath, req, started, 502, requestBody, {
           text: null,
           toolCalls: [],
