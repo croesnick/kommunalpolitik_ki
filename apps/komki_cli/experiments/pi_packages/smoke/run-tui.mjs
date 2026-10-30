@@ -460,4 +460,9 @@ async function main() {
   process.exitCode = finalVerdict === "pass" ? 0 : finalVerdict === "partial" ? 0 : 1;
 }
 
-await main();
+try {
+  await main();
+} catch (error) {
+  console.error(String(error?.message ?? error));
+  process.exitCode = 2;
+}

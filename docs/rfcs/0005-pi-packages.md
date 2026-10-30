@@ -299,7 +299,7 @@ Das Connector-Gesamtsetup (RIS, Web, Vault) ist nicht Gegenstand dieses RFC. Es 
 ## Offene Fragen
 
 - Bleibt der `rpiv:ask-user:answer`-Eventbus als alternativer Antwortkanal außen vor, oder braucht KomKI ihn für eine spätere Pane-Steuerung?
-- Wie häufig sind die von `pi-tool-repair` reparierten Alias-Fehler im echten 26B-Betrieb? Ohne einen Korpus echter Fehlaufrufe bleibt der Nutzen unklar. Erster Realmodell-Korpus (30.10.2026, #158): null Alias-Fehler bei 24 Tool-Calls; der einzige invalid-Call war Längentruncation, die pi selbst abfängt — siehe [Labbook 2026-10-30](../research/2026-10-30-pi-realmodell-smoke-test.md).
+- Wie häufig sind die von `pi-tool-repair` reparierten Alias-Fehler im echten 26B-Betrieb? Ohne einen Korpus echter Fehlaufrufe bleibt der Nutzen unklar. Erster Realmodell-Korpus (30.10.2026, #158): null Alias-Fehler bei 61 Tool-Calls; der einzige invalid-Call war Längentruncation, die pi selbst abfängt — siehe [Labbook 2026-10-30](../research/2026-10-30-pi-realmodell-smoke-test.md).
 - Wie aufwendig ist ein deutscher Extractor für `pi-vcc` (Präferenzen, Scope-Wechsel), und lohnt er sich gegenüber Pis eingebauter Compaction?
 - Bleibt Node 24.22.1 die gepinnte Harness-Version, und wie wird der Node-Pin bei einem pi-Upgrade mitgeprüft?
 - Kann `pi-quiver` echte RIS-PDFs und Scans im Offline-Tier verlässlich verarbeiten, oder bleibt nur der Mediator-Connector?

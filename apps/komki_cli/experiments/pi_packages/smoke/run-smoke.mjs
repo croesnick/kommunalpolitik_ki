@@ -729,4 +729,9 @@ async function main() {
   process.exitCode = blocking.length > 0 ? 1 : 0;
 }
 
-await main();
+try {
+  await main();
+} catch (error) {
+  console.error(String(error?.message ?? error));
+  process.exitCode = 2;
+}

@@ -29,7 +29,7 @@ Dokumentierter Endlauf (alle Aufgaben im selben Laufverzeichnis):
 
 ## Methode
 
-Jede Aufgabe läuft in einer eigenen isolierten `PI_CODING_AGENT_DIR`-Instanz mit deutschem Prompt und eigener Proxy-Instanz. Aufgabe 5 läuft interaktiv unter tmux (120×40, `send-keys`). Aufgabe 6 erzwingt die Standard-Compaction über ein verkleinertes Fenster — die Parameter-Übertragung vom Mock-Experiment 04 ist selbst ein Befund (siehe Mechanikbefunde). Ein Lauf je Aufgabe; bei temp 1.0 ist das Modell nicht deterministisch. Aufgabe 1 lief in drei Läufen mit konsistentem Qualitätsbefund — Varianz wird benannt, nicht weggemittelt.
+Jede Aufgabe läuft in einer eigenen isolierten `PI_CODING_AGENT_DIR`-Instanz mit deutschem Prompt und eigener Proxy-Instanz. Aufgabe 5 läuft interaktiv unter tmux (120×40, `send-keys`). Aufgabe 6 erzwingt die Standard-Compaction über ein verkleinertes Fenster — die Parameter-Übertragung vom Mock-Experiment 04 ist selbst ein Befund (siehe Mechanikbefunde). Ein Lauf je Aufgabe; bei temp 1.0 ist das Modell nicht deterministisch. Aufgabe 1 lief in vier Läufen (drei während der Harness-Entwicklung, einer danach zur Verifikation) mit konsistentem Qualitätsbefund — Varianz wird benannt, nicht weggemittelt.
 
 Jeden Tool-Call validiert der Harness gegen das JSON-Schema, das pi im ersten Request übermittelt hat (aufgezeichnet vom Proxy). Das ergibt den Fehlerkorpus für die `pi-tool-repair`-Bewertung.
 
@@ -39,7 +39,7 @@ Jeden Tool-Call validiert der Harness gegen das JSON-Schema, das pi im ersten Re
 
 | Aufgabe | Verdikt | Kurzbefund |
 |---|---|---|
-| 1 — RIS-TOP zusammenfassen | **PARTIAL** | `read`-Call sauber; Zusammenfassung nennt 4/5 Faktengruppen. Der Eigenanteil von 80 000 Euro fehlt — in allen drei Läufen. |
+| 1 — RIS-TOP zusammenfassen | **PARTIAL** | `read`-Call sauber; Zusammenfassung nennt 4/5 Faktengruppen. Der Eigenanteil von 80 000 Euro fehlt — in allen vier Läufen. |
 | 2 — Quellen extrahieren | **PASS** | `quellen.json` mit 6 Einträgen; `Quelle`/`Abrufdatum`/`Seite` korrekt, `null`-Behandlung funktioniert. |
 | 3 — Text redigieren | **PASS** | 276 → 92 Wörter, kein einziger Fakt verloren (automatischer Zahlen-/Paragrafen-Abgleich). |
 | 4 — Todo-Workflow | **PASS** | 4 Aufgaben in einem Batch-`create`, 9 `todo`-Calls mit korrekten Zustandsübergängen, 3 Reads, Zustand persistiert, `--continue` listet alles als `completed`. |
@@ -58,9 +58,9 @@ Jeden Tool-Call validiert der Harness gegen das JSON-Schema, das pi im ersten Re
 | 6 | 146,8 s | 5 | 14 600 / 3 242 | 1 (0) | ~36 |
 | Σ | ~471 s headless | 27 | 75 081 / 15 609 | 17 (0) | ~36 |
 
-- **Latenz:** 33–43 Tokens/s Eval über alle Requests (llama-Log-Segmente); der langsamste Einzelrequest war Aufgabe 2 mit ~115 s für ~4 100 Completion-Tokens. Der Prefix-Cache wirkt sichtbar (`cached_tokens`, z. B. 330 von 847 beim Erstrequest).
+- **Latenz:** 31–48 Tokens/s Eval über alle 24 gemessten Requests (llama-Log-Segmente; Aufgabe 5 ohne Log-Segment); der langsamste Einzelrequest war Aufgabe 2 mit 149,5 s für 5 320 Completion-Tokens. Der Prefix-Cache wirkt sichtbar (`cached_tokens`: 842 von 1 468 Prompt-Tokens im Folge-Request von Aufgabe 1; der Erstrequest startet bei 0).
 - **Speicher:** `ps`-RSS des llama-server pendelte über die Aufgaben zwischen 3,8 und 9,3 GiB (Wochen uptimes, macOS purged ungenutzte Seiten). Richtwert mit Vorbehalt: Der Großteil der Gewichte liegt im Metal-/GPU-Speicher und wird in RSS nicht vollständig erfasst. Der Wert war nach dem Endlauf 4,8 GiB.
-- **Fehlerkorpus:** 17 Tool-Calls im Endlauf, alle valide, kein Retry. Über alle Läufe (Endlauf + Vorläufe, 24 Calls): genau ein invalid-Call — siehe nächster Abschnitt.
+- **Fehlerkorpus:** 17 Tool-Calls im Endlauf, alle valide, kein Retry. Über alle Läufe des Tages (Endlauf + Vorläufe + Verifikationslauf, 61 Calls): genau ein invalid-Call — siehe nächster Abschnitt.
 - **Session-Usage:** pi verbucht eigene Input-Zahlen (z. B. Aufgabe 1: 1 152 vs. 2 315 Proxy-Prompt-Tokens); die Proxy-Usage ist die llama-Sicht und maßgeblich.
 
 ## Fehlerbild und Reparaturbedarf
@@ -79,7 +79,7 @@ Jeden Tool-Call validiert der Harness gegen das JSON-Schema, das pi im ersten Re
 
 ### 1 — RIS-TOP zusammenfassen (synthetisch)
 
-`read` mit `{"path":"top-3-anhoerung.md"}` beim ersten Versuch, korrekt. Die Zusammenfassung nennt Gremium, Datum, 240 000 Euro und den Beschlussvorschlag; sie lässt den Eigenanteil von 80 000 Euro weg — in allen drei Läufen (zwei Vorläufe, Endlauf) identisch, im dritten zusätzlich der Vorhabensname. Verdikt PARTIAL: Mechanik einwandfrei, Qualitätslücke konsistent. Für die Ratsarbeit heißt das: Kostensplits in Zusammenfassungen prüfen bzw. im Prompt einfordern.
+`read` mit `{"path":"top-3-anhoerung.md"}` beim ersten Versuch, korrekt. Die Zusammenfassung nennt Gremium, Datum, 240 000 Euro und den Beschlussvorschlag; sie lässt den Eigenanteil von 80 000 Euro weg — in allen vier Läufen identisch, in einem zusätzlich der Vorhabensname. Verdikt PARTIAL: Mechanik einwandfrei, Qualitätslücke konsistent. Für die Ratsarbeit heißt das: Kostensplits in Zusammenfassungen prüfen bzw. im Prompt einfordern.
 
 ### 2 — Quellen extrahieren
 
@@ -105,7 +105,7 @@ Fenster 16 384, `reserveTokens: 8192`, `keepRecentTokens: 512`, 32-KB-Filler (Di
 
 ### `pi-tool-repair`: nicht aufnehmen
 
-Experiment 03 (Mock) hatte gezeigt: repariert wird nur der dokumentierte Alias `file_path` → `path`, kein beliebig geformter Call. Der echte Korpus liefert jetzt die Gegenprobe: 24 Tool-Calls über alle Läufe, **null** Alias-Fehler, null Schema-Verletzungen. Der einzige invalid-Call war Längentruncation — eine Klasse, die `pi-tool-repair` nicht adressiert, die aber pi selbst fail-safe abfängt und die das Modell ohne fremde Hilfe repariert. Kein belegbarer Nutzen, also keine Aufnahme. [#163](https://github.com/croesnick/kommunalpolitik_ki/issues/163) kann mit diesem Korpus weiterarbeiten: Gesucht sind Alias-Fehler aus echten Sitzungen; der Smoke-Test hat sie in dieser Aufgabenklasse nicht erzeugt.
+Experiment 03 (Mock) hatte gezeigt: repariert wird nur der dokumentierte Alias `file_path` → `path`, kein beliebig geformter Call. Der echte Korpus liefert jetzt die Gegenprobe: 61 Tool-Calls über alle Läufe des Tages, **null** Alias-Fehler, null Schema-Verletzungen. Der einzige invalid-Call war Längentruncation — eine Klasse, die `pi-tool-repair` nicht adressiert, die aber pi selbst fail-safe abfängt und die das Modell ohne fremde Hilfe repariert. Kein belegbarer Nutzen, also keine Aufnahme. [#163](https://github.com/croesnick/kommunalpolitik_ki/issues/163) kann mit diesem Korpus weiterarbeiten: Gesucht sind Alias-Fehler aus echten Sitzungen; der Smoke-Test hat sie in dieser Aufgabenklasse nicht erzeugt.
 
 ### `pi-vcc`: nicht für deutsche Sitzungen
 
