@@ -60,7 +60,7 @@ const CONNECTOR_ERRORS: Record<string, string> = {
 	"not-found": "nicht gefunden",
 };
 
-const SOURCES: Record<string, string> = { ris: "RIS", vault: "Vault", web: "Web", admit: "Arbeitsraum" };
+const SOURCES: Record<string, string> = { ris: "RIS", vault: "Vault", web: "Web", admit: "Arbeitsraum", list: "Arbeitsraum" };
 
 const GATES: Record<string, string> = { emit: "Anfrage (Gate 1)", admit: "Aufnahme der Antwort (Gate 2)" };
 
@@ -92,6 +92,8 @@ export function callLine(toolName: string, args: Json, p: Paint): string | undef
 			return `${title("Testnotiz anlegen")}  ${quote(a.title)}`;
 		case "admit_document":
 			return `${title("Raumdokument lesen")}  ${plain(a.document_id)}`;
+		case "list_documents":
+			return title("Raumdokumente auflisten");
 		default:
 			return `${title(`komki: ${tool}`)}  ${p.fg("dim", clean(JSON.stringify(a)))}`;
 	}
@@ -240,6 +242,7 @@ function transition(t: Json): string {
 // ---------------------------------------------------------------- Zugelassen
 
 function admittedRows(tool: string, r: Json, o: ViewOptions, p: Paint): Row[] | undefined {
+	if (tool === "list_documents") return documentList(r, o, p);
 	const hits = Array.isArray(r.results) ? r.results : undefined;
 	const count = hits ? ` · ${hits.length === 0 ? "keine Treffer" : `${hits.length} Treffer`}` : "";
 	// Ohne Treffer gibt der Vermittler keine Labels zurück; dann ist "ohne Label" keine Warnung wert.
@@ -350,6 +353,37 @@ function roomDocument(r: Json, o: ViewOptions, p: Paint): Row[] {
 	];
 }
 
+// Die Raumdokumente, die pi mit admit_document lesen kann: nur Kennung und
+// Label, Inhalte kommen erst mit admit_document. Was der Raum nicht zulässt,
+// nennt der Vermittler gar nicht.
+function documentList(r: Json, o: ViewOptions, p: Paint): Row[] | undefined {
+	const docs = documentsOf(r);
+	if (!docs) return undefined;
+	const count = docs.length === 0 ? "keine Dokumente" : docs.length === 1 ? "1 Dokument" : `${docs.length} Dokumente`;
+	const head = { body: `${p.fg("success", p.bold("✓ zugelassen"))}${p.fg("muted", ` · ${count}`)}` };
+	const body: Row[] =
+		docs.length === 0
+			? [{ body: p.fg("muted", "In diesem Arbeitsraum liegt kein Dokument, das pi lesen kann.") }]
+			: docs.map((d) => ({ lead: "•", leadWidth: 2, body: `${p.bold(d.id)}  ${labelBadge(d.labels, p)}` }));
+	return [head, ...body, ...source("list_documents", r, o, p)];
+}
+
+export interface RoomDocument {
+	id: string;
+	labels: string[];
+}
+
+/** Die Dokumentliste einer list_documents-Antwort; undefined bei anderer Form. */
+export function documentsOf(r: Json): RoomDocument[] | undefined {
+	if (r?.decision !== "permit" || !Array.isArray(r.documents)) return undefined;
+	return r.documents
+		.filter((d: Json) => d && typeof d.document_id === "string")
+		.map((d: Json) => ({
+			id: clean(d.document_id),
+			labels: Array.isArray(d.labels) ? d.labels.map((l: unknown) => clean(String(l))) : [],
+		}));
+}
+
 // Text als eingerückter Auszug mit Balken; Absätze bleiben, Leerzeilen
 // fallen auf eine zusammen. Zugeklappt nur die ersten Zeilen.
 function excerpt(text: string, empty: string, o: ViewOptions, p: Paint): Row[] {
@@ -413,7 +447,7 @@ function komkiTool(toolName: string): string | undefined {
 	return toolName.startsWith(SERVER_PREFIX) ? toolName.slice(SERVER_PREFIX.length) : undefined;
 }
 
-function labelled(key: string, value: string, p: Paint): Row {
+export function labelled(key: string, value: string, p: Paint): Row {
 	return { lead: p.fg("muted", key), leadWidth: 10, body: value };
 }
 
@@ -421,11 +455,11 @@ function hint(o: ViewOptions, p: Paint): string {
 	return p.fg("dim", `${o.expandKey}: Prüfdetails`);
 }
 
-function labelName(label: unknown): string {
+export function labelName(label: unknown): string {
 	return LABELS[String(label)] ?? clean(String(label));
 }
 
-function labelBadge(labels: unknown, p: Paint): string {
+export function labelBadge(labels: unknown, p: Paint): string {
 	const list = Array.isArray(labels) ? labels.map(String) : [];
 	if (list.length === 0) return p.fg("warning", "ohne Label");
 	const names = [...new Set(list.map((l) => (l in LABELS ? p.fg("accent", LABELS[l]) : p.fg("warning", clean(l)))))];

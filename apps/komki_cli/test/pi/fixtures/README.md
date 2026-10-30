@@ -5,6 +5,10 @@ erzeugt mit den Fake-Connectoren aus der Testumgebung des Vermittlers
 (`FakeConnector`, `TestHelpers`): `tool` und `args` sind der Aufruf, `text` ist
 der JSON-Text, den pi als MCP-Ergebnis bekommt.
 
+Ausnahme: `list_documents*.json` stammen aus `KomkiMediator.Gate.list_documents/1`
+mit dem Default-Raum (`list_documents`) und einem Raum, dessen B_W kein
+Dokument zulässt (`list_documents_leer`).
+
 Die Inhalte sind erfunden (Sitzungen, Titel, Notizen, Treffer). Nur die
 Antwortformen sind echt: zugelassen, abgelehnt (Gate 1 und Gate 2),
 zurückgehalten, Connector nicht erreichbar, nicht gefunden, Vorprüfung

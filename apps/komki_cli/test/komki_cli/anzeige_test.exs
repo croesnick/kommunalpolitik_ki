@@ -20,6 +20,7 @@ defmodule KomkiCli.AnzeigeTest do
 
     assert Enum.sort(for {rel, _} <- Anzeige.files(), do: rel) == [
              "komki-anzeige/index.ts",
+             "komki-anzeige/raum.ts",
              "komki-anzeige/view.ts",
              "komki-themes/komki-dunkel.json",
              "komki-themes/komki-hell.json",
@@ -50,11 +51,36 @@ defmodule KomkiCli.AnzeigeTest do
     end
   end
 
-  test "die Extension registriert nur Renderer, keine Handler" do
+  # Die Extension zeigt nur an: keine Handler, die Aufrufe oder Ergebnisse
+  # ändern könnten, keine eigenen Werkzeuge, nichts, was das Modell
+  # erreicht. Beobachtet werden nur der Session-Start und das Ende eines
+  # Aufrufs (Ticket #242); Befehle schreiben Session-Einträge, die pi nicht
+  # ans Modell schickt.
+  test "die Extension zeigt nur an: keine Handler, keine Nachrichten ans Modell" do
     {_, index} = List.keyfind(Anzeige.files(), "komki-anzeige/index.ts", 0)
 
     assert index =~ "registerToolRenderer"
-    refute index =~ ~r/\bpi\.on\(|registerTool\(|registerCommand|sendMessage|executeTool/
+
+    events = Regex.scan(~r/\bpi\.on\("([a-z_]+)"/, index, capture: :all_but_first)
+    assert events |> List.flatten() |> Enum.sort() == ["session_start", "tool_execution_end"]
+
+    refute index =~
+             ~r/registerTool\(|sendMessage|sendUserMessage|executeTool|registerProvider|registerMcpServer/
+
+    for {"komki-anzeige/" <> _, source} <- Anzeige.files() do
+      refute source =~ ~r/writeFile|appendFile|ui\.(confirm|select|input)\(/
+    end
+  end
+
+  test "schreibt das Raumbild neben die Extension, auch ohne Instanzdateien", %{cfg: cfg} do
+    :ok = Anzeige.write!(cfg, %{"schema" => "komki-raum/1", "raum" => "recherche"})
+    assert JSON.decode!(File.read!(Anzeige.raum_path(cfg)))["raum"] == "recherche"
+
+    :ok = Anzeige.write!(cfg)
+    raum = JSON.decode!(File.read!(Anzeige.raum_path(cfg)))
+    assert raum["schema"] == "komki-raum/1"
+    assert raum["raum"] == nil
+    assert raum["labels"] == []
   end
 
   test "Themes heißen wie ihre Datei, je eines für hell und dunkel" do

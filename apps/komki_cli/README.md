@@ -326,7 +326,14 @@ nicht über einen TCP-Port:
   Quelle nicht erreichbar), Label, Treffer, Quelle mit Abrufzeit und Beleg;
   ctrl+o klappt volle URLs und alle Belege auf. Das macht die pi-Extension
   `komki-anzeige` (`priv/pi/komki-anzeige/`). Sie registriert nur Renderer,
-  ändert also weder Entscheidungen noch das, was das Modell sieht. komki
+  ändert also weder Entscheidungen noch das, was das Modell sieht. Dazu
+  zeigt sie Raum, Zweck, Labels, den Weg nach draußen und die Zahl der
+  Raumdokumente in Kopf- und Fußzeile sowie in `/raum`, `/dokumente` und
+  `/hilfe` (Ticket #242). Die Daten kommen aus `raum.json`, das komki vor
+  jedem Start aus `room.json`, Γ und dem Label-Store schreibt
+  (`KomkiCli.Raumbild`), und aus der letzten Antwort von `list_documents`;
+  die Ausgaben der Befehle sind Session-Einträge, die pi nicht ans Modell
+  schickt. komki
   schreibt sie wie das Relay vor jedem pi-Start neu ins pi-Home und lädt sie
   nur in der Session (`-e`); den Übersetzungs-Cache für TypeScript schaltet
   `JITI_FS_CACHE=false` ab, weil er sonst im schreibbaren pi-Home läge.

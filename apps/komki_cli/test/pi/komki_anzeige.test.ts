@@ -255,3 +255,15 @@ test("Raumdokument: Aufrufzeile, Überschrift als Titel, Inhalt, Quelle Arbeitsr
 	assert.match(deny, /Eine Bedingung der Bindung ist nicht erfüllt\./);
 	assert.match(strip(render("admit_document_unknown")), /✗ Prüffehler[\s\S]*unbekanntes Objekt: "doc-phantom"/);
 });
+
+test("Raumdokumente auflisten: Kennung und Label, keine Inhalte", () => {
+	assert.equal(strip(callLine("mcp__komki__list_documents", {}, paint)!), "Raumdokumente auflisten");
+	const out = strip(render("list_documents"));
+	assert.match(out, /✓ zugelassen · 1 Dokument/);
+	assert.match(out, /• doc-oeffentlich +öffentlich/);
+	assert.match(out, /Quelle: Arbeitsraum · Beleg pdr-ac43c5ab…/);
+
+	const leer = strip(render("list_documents_leer"));
+	assert.match(leer, /✓ zugelassen · keine Dokumente/);
+	assert.match(leer, /In diesem Arbeitsraum liegt kein Dokument, das pi lesen kann\./);
+});

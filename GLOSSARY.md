@@ -624,6 +624,24 @@ Raumdokumente kommen über die Dateiaufnahme beim Session-Start
 
 ---
 
+### Raumbild
+
+**Definition:** Die Beschreibung des Raums für die pi-Oberfläche: Name
+(„recherche“, „vertraulich“ oder eigener Raum), Zweck, die Labels in B_W
+mit ihren Bezeichnungen und für jeden Empfänger außerhalb des Rechners, ob
+der Empfängerkreis aller Bindungen ihn einschließt („nach draußen offen“).
+komki schreibt es vor jedem pi-Start als `raum.json` aus `room.json`, Γ und
+dem Label-Store (Ticket #242).
+
+**Abgrenzung:** Reine Anzeige. Was pi darf, entscheidet weiter der
+Vermittler mit der Engine, Aufruf für Aufruf. Ins Modell gelangt das
+Raumbild nicht.
+
+**Wo:** `KomkiCli.Raumbild`; angezeigt von
+`apps/komki_cli/priv/pi/komki-anzeige/raum.ts`.
+
+---
+
 ### Ereignis
 
 **Definition:** Die gesamte beobachtbare Wirkung eines Vorgangs, nicht nur
