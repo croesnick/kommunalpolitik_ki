@@ -254,3 +254,26 @@ def test_osc_links_are_dropped(tmp_path, monkeypatch):
     assert text[0].rstrip() == "Quelle: RIS fertig"
     assert text[1].rstrip() == "Link mit ST"
     assert check(src, out) == (True, [])
+
+
+def test_light_theme_cli(tmp_path):
+    src = tmp_path / "capture.txt"
+    src.write_text(CAPTURE, encoding="utf-8")
+    out = tmp_path / "out.svg"
+
+    def run(*args):
+        return subprocess.run(
+            [sys.executable, *map(str, args)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert run(RENDERER, src, out, "Hell", "hell").returncode == 0
+    svg = out.read_text(encoding="utf-8")
+    assert 'fill="#ffffff"' in svg
+    assert 'fill="#1f2328"' in svg
+    assert "FIDELITY OK" in run(CHECKER, src, out, "hell").stdout
+    # Dasselbe SVG gegen die dunklen Standardfarben geprüft: Abweichung.
+    assert "FIDELITY FAILED" in run(CHECKER, src, out).stdout
+    assert run(RENDERER, src, out, "Hell", "pastell").returncode != 0

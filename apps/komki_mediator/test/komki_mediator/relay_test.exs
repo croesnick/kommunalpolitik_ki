@@ -79,6 +79,44 @@ defmodule KomkiMediator.RelayTest do
     Port.close(relay)
   end
 
+  # Ticket #165: Schemaverstoss ueber das Relay - die Parameter-Vorpruefung
+  # antwortet mit decision error und schreibt den PDR mit der Session, die
+  # der Relay im Header traegt; kein emit, kein Vollzug.
+  test "Bereichsverstoss ueber das Relay: decision error, PDR mit Session", %{
+    socket: socket,
+    token: token,
+    journal_path: journal_path
+  } do
+    relay = start_relay(socket, token)
+    handshake(relay)
+
+    send_line(relay, %{
+      "jsonrpc" => "2.0",
+      "id" => 5,
+      "method" => "tools/call",
+      "params" => %{"name" => "web_search", "arguments" => %{"query" => "Radweg", "count" => 99}}
+    })
+
+    assert %{"id" => 5, "result" => %{"isError" => false, "content" => [content]}} =
+             read_line(relay)
+
+    assert %{"type" => "text", "text" => json} = content
+    assert %{"decision" => "error", "detail" => detail} = JSON.decode!(json)
+    assert detail =~ "ausserhalb 1..10"
+
+    assert [
+             %{
+               "tool" => "web_search",
+               "decision" => "error",
+               "outcome" => "error",
+               "rule" => "emit",
+               "session_id" => @session
+             }
+           ] = TestHelpers.journal_records(journal_path)
+
+    Port.close(relay)
+  end
+
   # Ticket #216: geplanter Neustart mit gleichem Token. Die MCP-Session des
   # alten Vermittlers ist weg; anubis legt zur unbekannten Mcp-Session-Id
   # eine neue an, pi merkt nichts. Bricht diese Annahme (etwa 404 nach

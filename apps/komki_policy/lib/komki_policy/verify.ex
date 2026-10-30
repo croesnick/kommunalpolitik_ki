@@ -32,7 +32,7 @@ defmodule KomkiPolicy.Verify do
   kanonische Ausgaben; kein I/O, kein Zustand, keine Uhr.
   """
 
-  alias KomkiPolicy.{Calculus, Context, Derive, Evaluator, Registry}
+  alias KomkiPolicy.{Calculus, Context, Derive, Evaluator, Registry, Validations}
 
   @proof_fields [
     "schema",
@@ -182,9 +182,9 @@ defmodule KomkiPolicy.Verify do
   defp input_error(code, path, detail), do: {:error, {code, path, detail}}
 
   defp validate_proof_reason(proof) do
-    with {:ok, _} <- require_map(proof, "$"),
+    with {:ok, _} <- Validations.require_map(proof, "$"),
          :ok <- require_proof_schema(proof),
-         :ok <- closed_fields(proof, @proof_fields, "$"),
+         :ok <- Validations.closed_fields(proof, @proof_fields, "$"),
          :ok <- require_present(proof, @required_proof_values, "$"),
          :ok <- require_binary(proof["rule"], "$.rule"),
          :ok <- require_binary(proof["conclusion"], "$.conclusion"),
@@ -209,18 +209,6 @@ defmodule KomkiPolicy.Verify do
 
   defp require_proof_schema(_other),
     do: input_error(:missing_field, "$.schema", "missing field \"schema\"")
-
-  defp closed_fields(map, allowed, path) do
-    unknown = Enum.sort(Enum.reject(Map.keys(map), &(&1 in allowed)))
-
-    case unknown do
-      [] ->
-        :ok
-
-      [first | _] ->
-        input_error(:unknown_field, path <> "." <> first, "field not part of the closed schema")
-    end
-  end
 
   defp require_present(map, keys, root) do
     missing = Enum.reject(keys, &Map.has_key?(map, &1))
@@ -257,8 +245,6 @@ defmodule KomkiPolicy.Verify do
         path,
         "expected an array of strings, got " <> Kernel.inspect(value)
       )
-
-  defp require_map(%{} = map, _path), do: {:ok, map}
 
   defp validate_premises(premises, path) when is_list(premises) do
     premises
@@ -508,15 +494,13 @@ defmodule KomkiPolicy.Verify do
     end
   end
 
+  # "binding_condition" liegt in der Sollmenge beider Regeln und trägt immer
+  # kind "condition" — die frühere zweite cond-Klausel war unreachable.
   defp fits_slot?(premise, allowed_names) do
     name = Map.fetch!(premise, "name")
     kind = Map.fetch!(premise, "kind")
 
-    cond do
-      name in allowed_names and kind == expected_kind(name) -> true
-      name == "binding_condition" and kind == "condition" -> true
-      true -> false
-    end
+    name in allowed_names and kind == expected_kind(name)
   end
 
   defp unexpected_reason(premise) do

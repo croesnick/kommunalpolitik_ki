@@ -52,11 +52,17 @@ mix escript.build   # erzeugt ./komki-policy
 ```
 
 `--release` und `--stand` sind nur paarweise gültig (einzeln → usage,
-Exit 2). `advance` nimmt das `release`-Objekt einer Freigabe-Permit-Decision
+Exit 2). Die Flag-Menge ist je Befehl geschlossen: ein bekanntes Flag am
+falschen Befehl (`decide --proposal`, `verify --stand`, `advance --release`)
+ist ebenso `usage` (Exit 2) und wird nicht still akzeptiert und ignoriert.
+`advance` nimmt das `release`-Objekt einer Freigabe-Permit-Decision
 (§ 4.6) als eigenständige Datei; Erfolg druckt den neuen Stand kanonisch
 (Exit 0), Ablehnung druckt `{"result": "refused", "code": …}` (Exit 1) —
 zwei konkurrierende Ausführungen desselben GOs können nicht beide
-committen (Compare-and-Swap über die Versionsnummer).
+committen (Compare-and-Swap: `stand_ref` adressiert den aktuellen Stand
+und `stand_version_after == version + 1`). Ein Vorschlag außerhalb der
+§ 4.6-Form (Nicht-Kebab-IDs, falsche `stand_ref`-Form, `call_hash` ohne
+Hex64-Form) ist ein Eingabefehler (Exit 2), kein `refused`.
 
 Alle Ausgaben (Ergebnisse wie Fehlerdetails) sind kanonisch
 (`KomkiPolicy.JSON.canonical/1`): byte-stabil, sortierte Schlüssel, genau
@@ -69,7 +75,7 @@ stdout.
 |---|---|
 | `0` | Erfolg. Auch `deny`/`indeterminate` (decide), `valid` (verify) und der erfolgreiche `advance` sind legitime Ergebnisse — der Exit-Code sagt nur „Befehl ausgeführt“, nicht „erlaubt“. |
 | `1` | `verify` hat den Beweis verworfen (`result: invalid`) **oder** `advance` hat den Standübergang abgelehnt (`refused`). |
-| `2` | Eingabefehler: Parse-/Schema-/Kohärenzverstoß, fehlender `output_content_digest` bei `emit` (`emit_digest_missing`), emit-Snapshot mit `quarantine`-Objekt, fehlende Datei, fehlende/unerwartete/unbekannte Argumente, unbekannter Befehl. Immer mit strukturiertem Fehlerdatensatz auf stdout. |
+| `2` | Eingabefehler: Parse-/Schema-/Kohärenzverstoß, fehlender `output_content_digest` bei `emit` (`emit_digest_missing`), emit-Snapshot mit `quarantine`-Objekt, fehlende Datei, fehlende/unerwartete/unbekannte Argumente, bekanntes Flag am falschen Befehl, `advance`-Vorschlag außerhalb der § 4.6-Form, unbekannter Befehl. Immer mit strukturiertem Fehlerdatensatz auf stdout. |
 | `3` | `unsupported`: nicht implementierter Regelzweig (inkl. `plan`), Freigabe-`kind: offenlegungsfreigabe` oder Nicht-`emit`-Operation — **niemals** ein `deny`. |
 | `4` | Unerwarteter interner Fehler. Der Crash-Handler erzeugt **niemals** eine Decision und fällt **nie** auf `permit` zurück (CONTRACT § 1). |
 
@@ -111,6 +117,7 @@ keine Herabstufungsbefugnis: `assigned_label` bleibt B_W.
 | Modul | Aufgabe |
 |---|---|
 | `KomkiPolicy.JSON` | Strenger JSON-Parser (keine doppelten Schlüssel, kein `NaN`) + kanonischer Encoder (§ 6) |
+| `KomkiPolicy.Validations` | Geteilte Schema-Bausteine der Datensatz-Validierer (Objekt-Form, geschlossene Feldmengen, Kebab-/Hex-/Ganzzahl-Prüfungen) |
 | `KomkiPolicy.Registry` | Registry-Compiler (`komki-registry/2`): typgeprüfte B.4-Ausdrücke + registrierte Transformationen (§ 2.1) |
 | `KomkiPolicy.Context` | Snapshot-Validierung, Intent-Kohärenz |
 | `KomkiPolicy.Evaluator` | Dreiwertige Ausdrucksauswertung (kein Default für fehlende Fakten) |

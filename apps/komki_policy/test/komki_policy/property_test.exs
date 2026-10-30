@@ -538,7 +538,7 @@ defmodule KomkiPolicy.PropertyTest do
             ) do
         reg = registry()
         ctx = merits_ctx(kind)
-        [remedy] = Remedies.catalog(reg, ctx, kind, [finding_of(code)])
+        [remedy] = Remedies.catalog(reg, ctx, [finding_of(code)])
         types = Enum.map(remedy["transitions"], &Map.fetch!(&1, "type"))
 
         case {code, types} do
@@ -576,7 +576,7 @@ defmodule KomkiPolicy.PropertyTest do
         ctx = merits_ctx(kind)
 
         [remedy] =
-          Remedies.catalog(reg, ctx, kind, [%{"code" => code, "fact" => fact, "binding" => nil}])
+          Remedies.catalog(reg, ctx, [%{"code" => code, "fact" => fact, "binding" => nil}])
 
         refute Enum.any?(remedy["transitions"], &(&1["type"] == "aktionsfreigabe"))
       end
