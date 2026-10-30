@@ -1,6 +1,7 @@
 defmodule KomkiMediator.GoTest do
-  # Ticket #98: GO fuer eine blockierte Ausgabe. Raum vertraulich, web_search
-  # wird mit recipient_not_allowed abgelehnt; der Katalog bietet ein Call-GO.
+  # Ticket #98: GO fuer eine blockierte Ausgabe. Raum vertraulich, die
+  # Uebergabe von web_search an die Websuche (transfer, #298) wird mit
+  # recipient_not_allowed abgelehnt; der Katalog bietet ein Call-GO.
   # Ein Testprozess spielt die nutzende Person und antwortet ueber dieselben
   # Funktionen wie `komki go`.
   use ExUnit.Case, async: false
@@ -88,9 +89,15 @@ defmodule KomkiMediator.GoTest do
     assert request["tool"] == "web_search"
     assert request["params"] == Map.put(@params, "count", 5)
     assert "recipient_not_allowed" in request["blockers"]
+    assert request["operation"] == "transfer"
 
-    # deny -> GO-Commit -> emit -> admit; der Commit liegt vor dem Vollzug
+    # transfer-deny -> GO-Commit -> emit -> admit; der Commit liegt vor dem
+    # Vollzug und traegt die call_id des Aufrufs
     assert outcomes(env) == ["not_admitted", "released", "emitted", "admitted"]
+
+    [_deny, released, emitted, _admit] = TestHelpers.journal_records(env.journal_path)
+    assert released["rule"] == "transfer"
+    assert released["call_id"] == emitted["decision_id"]
     assert map_size(GoStand.current()["consumed"]) == 1
     assert Go.pending(go_dir) == []
   end

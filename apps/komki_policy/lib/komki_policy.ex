@@ -1,7 +1,7 @@
 defmodule KomkiPolicy do
   @moduledoc """
   Deterministischer Policy-Kern `komki_policy` (Lieferung 2 und 3: Regelzweige
-  `admit`, `emit` und `store`, Remedy-Katalog, Aktionsfreigabe).
+  `admit`, `emit`, `store` und `transfer`, Remedy-Katalog, Aktionsfreigabe).
 
   Der Kern kann aus einer Registry (`komki-registry/2`), einem
   `ContextSnapshot` (`komki-snapshot/1`) und einem `Intent` (`komki-intent/1`)

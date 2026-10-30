@@ -1,7 +1,7 @@
 # komki_policy
 
-Deterministischer Policy-Kern für Komki (Lieferung 2 und 3): Ableitung (`derive`)
-für die Regelzweige `admit`, `emit` und `store`, Remedy-Katalog (§ 2.8),
+Deterministischer Policy-Kern für Komki (Lieferung 2 bis 4): Ableitung (`derive`)
+für die Regelzweige `admit`, `emit`, `store` und `transfer`, Remedy-Katalog (§ 2.8),
 Aktionsfreigabe-Mechanik (`decide_with_release`, `advance`), unabhängiger
 Ableitungsprüfer (`verify`) sowie eine reine Escript-CLI (`komki-policy`) ohne
 Runtime-Abhängigkeiten.
@@ -76,7 +76,7 @@ stdout.
 | `0` | Erfolg. Auch `deny`/`indeterminate` (decide), `valid` (verify) und der erfolgreiche `advance` sind legitime Ergebnisse — der Exit-Code sagt nur „Befehl ausgeführt“, nicht „erlaubt“. |
 | `1` | `verify` hat den Beweis verworfen (`result: invalid`) **oder** `advance` hat den Standübergang abgelehnt (`refused`). |
 | `2` | Eingabefehler: Parse-/Schema-/Kohärenzverstoß, fehlender `output_content_digest` bei `emit` (`emit_digest_missing`), emit-Snapshot mit `quarantine`-Objekt, fehlende Datei, fehlende/unerwartete/unbekannte Argumente, bekanntes Flag am falschen Befehl, `advance`-Vorschlag außerhalb der § 4.6-Form, unbekannter Befehl. Immer mit strukturiertem Fehlerdatensatz auf stdout. |
-| `3` | `unsupported`: nicht implementierter Regelzweig (inkl. `plan`), Freigabe-`kind: offenlegungsfreigabe` oder Freigabe für eine Operation außer `emit`/`store` — **niemals** ein `deny`. |
+| `3` | `unsupported`: nicht implementierter Regelzweig (inkl. `plan`), Freigabe-`kind: offenlegungsfreigabe` oder Freigabe für eine Operation außer `emit`/`store`/`transfer` — **niemals** ein `deny`. |
 | `4` | Unerwarteter interner Fehler. Der Crash-Handler erzeugt **niemals** eine Decision und fällt **nie** auf `permit` zurück (CONTRACT § 1). |
 
 ## Semantik (Lieferung 2)
@@ -99,6 +99,16 @@ jedes Speichern verboten und nur mit einer Aktionsfreigabe für genau diesen
 Call zulässig. Die Operation steckt im Call-Hash: ein GO für `emit` gilt
 nicht für `store`.
 
+### `transfer` übergibt unter dem Ausgabelabel (RFC R.5.6, § 4.8)
+
+Ein erzeugtes Objekt geht an ein Ziel außerhalb des Raums, etwa als Anfrage
+an einen externen Dienst. Die Form ist die von `store`: entschieden unter
+λ(y), B_W ⊆ λ(y) als `label_preservation`, Empfängertest gegen die
+Beobachter des Ziels, dazu die `transfer`-Regeln der Bindungen. `emit` prüft
+damit nur noch das Erzeugen im Raum. `verify` gleicht die Regel des Baums mit
+der Operation des Intents ab (`rule_mismatch`), weil `store`- und
+`transfer`-Bäume dieselbe Form haben.
+
 ### Der Remedy-Katalog berät ohne Autorität (§ 2.8)
 
 `deny`/`indeterminate`-Decisions tragen `remedies` in derselben Ordnung wie
@@ -108,7 +118,7 @@ Payload-Formen): `fakt_nachreichen` (facts), `registrierte_transformation`
 `aktionsfreigabe` (scope `call` mit call_hash / scope `object` für die
 Erstklassifikation). Ordnung normativ: fakt < transformation < neuer Raum <
 aktionsfreigabe. Bei `admit` erscheint kein call-GO (bewusste Lücke, § 9);
-bei `emit` und `store` zusätzlich das call-GO für die fünf weichen Blocker. Für
+bei `emit`, `store` und `transfer` zusätzlich das call-GO für die fünf weichen Blocker. Für
 `indeterminate` nie ein GO — ein GO kann keine Belege herstellen.
 
 ### Aktionsfreigabe trennt Urteil und Vollzug (§ 4.6)
@@ -131,11 +141,11 @@ keine Herabstufungsbefugnis: `assigned_label` bleibt B_W.
 | `KomkiPolicy.Context` | Snapshot-Validierung, Intent-Kohärenz |
 | `KomkiPolicy.Evaluator` | Dreiwertige Ausdrucksauswertung (kein Default für fehlende Fakten) |
 | `KomkiPolicy.Calculus` | Reine Mengenfunktionen (R_Γ, ρ_Γ, Label-Subsets) |
-| `KomkiPolicy.Derive` | Ableitung `admit`/`emit`/`store` in fester Prämissenordnung (§ 4/§ 4.5/§ 4.7), Freigabe-Zweig `decide_with_release/5` (§ 4.6), Beweisbäume |
+| `KomkiPolicy.Derive` | Ableitung `admit`/`emit`/`store`/`transfer` in fester Prämissenordnung (§ 4/§ 4.5/§ 4.7/§ 4.8), Freigabe-Zweig `decide_with_release/5` (§ 4.6), Beweisbäume |
 | `KomkiPolicy.Remedies` | Remedy-Katalog (§ 2.8): reine Ausgabe, beratend ohne Autorität |
 | `KomkiPolicy.Release` | Aktionsfreigabe-Validierung (`komki-release/1`) + verbindliche call-hash-Formel (§ 2.6) |
 | `KomkiPolicy.Stand` | Offenlegungsstand (`komki-stand/1`) + atomarer Standübergang `advance/2` (§ 2.7) |
-| `KomkiPolicy.Verify` | Unabhängiger Prüfer (§ 5): ruft `derive` nie auf, glaubt kein `permit`, regelabhängige Sollmengen admit/emit/store |
+| `KomkiPolicy.Verify` | Unabhängiger Prüfer (§ 5): ruft `derive` nie auf, glaubt kein `permit`, regelabhängige Sollmengen admit/emit/store/transfer |
 | `KomkiPolicy.CLI` | Escript-Eingang; Datei-I/O nur hier im Modul, Rest pur |
 
 Der Kern ist rein: keine Uhr, kein Zufall, kein Netz, kein Dateizugriff

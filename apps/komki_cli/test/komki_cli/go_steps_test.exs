@@ -16,7 +16,8 @@ defmodule KomkiCli.GoStepsTest do
       "schema" => "komki-go-request/1",
       "call_hash" => String.duplicate("a", 64),
       "decision_id" => "pdr-1",
-      "operation" => "emit",
+      # Seit #298 sperrt die Uebergabe an die Websuche, nicht das Erzeugen.
+      "operation" => "transfer",
       "tool" => "web_search",
       "params" => %{"query" => "Radweg Buchloe", "count" => 5},
       "blockers" => ["recipient_not_allowed"],
@@ -92,6 +93,22 @@ defmodule KomkiCli.GoStepsTest do
              "blockers" => []
            }) =~
              "Sichtbar"
+  end
+
+  test "emit-GO (#298): Erzeugen im Raum zeigt niemandem draussen etwas", %{base: base} = ctx do
+    File.write!(
+      Path.join([base, "mediator", "registry.json"]),
+      JSON.encode!(KomkiMediator.Templates.registry())
+    )
+
+    Go.write_atomic(
+      Path.join(ctx.dir, ctx.request["call_hash"] <> ".request.json"),
+      Map.put(ctx.request, "operation", "emit")
+    )
+
+    GoSteps.run(base, ui(false))
+    assert_received {:said, preview}
+    refute preview =~ "Sichtbar"
   end
 
   test "keine Anfragen" do

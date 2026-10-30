@@ -32,11 +32,11 @@ Drei Regeln halten das zusammen:
 
 ## Was bei einer Anfrage passiert
 
-Angenommen, pi möchte im Web nach „Förderung Radwege Bayern“ suchen. Der Vermittler stellt dafür zwei Fragen an das Regelwerk:
+Angenommen, pi möchte im Web nach „Förderung Radwege Bayern“ suchen. Der Vermittler lässt das Regelwerk an zwei Toren entscheiden:
 
 <div class="komki-figure"><Anfrage /></div>
 
-Gate 1 heißt technisch `emit` (eine Ausgabe erzeugen), Gate 2 `admit` (einen Eingang aufnehmen).
+Gate 1 besteht technisch aus zwei Fragen: `emit` (der Raum erzeugt die Anfrage) und `transfer` (die Anfrage geht an den Connector; beim Schreiben heißt das `store`). Gate 2 heißt `admit` (einen Eingang aufnehmen).
 
 - **Gate 1:** Wer würde die Anfrage sehen? Bei der Websuche ist das Brave. Ist Brave ein zulässiger Empfänger für alles, was gerade im Raum liegt? Wenn nein, ist hier Schluss, und es entsteht keine einzige Netzverbindung.
 - **Beleg vor der Wirkung:** Erst wenn der Beleg zu Gate 1 im Journal steht, ruft der Vermittler den Connector.

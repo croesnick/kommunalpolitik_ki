@@ -136,7 +136,12 @@ defmodule KomkiMediator.TemplatesTest do
           "vault-oeffentlich@1"
         ] do
       assert registry["bindings"][binding]["readers"] == registry["observers"]
-      assert registry["bindings"][binding]["operations"] == %{"admit" => true, "emit" => true}
+
+      assert registry["bindings"][binding]["operations"] == %{
+               "admit" => true,
+               "emit" => true,
+               "transfer" => true
+             }
     end
 
     assert registry["bindings"]["vault-vertraulich@1"]["readers"] == [

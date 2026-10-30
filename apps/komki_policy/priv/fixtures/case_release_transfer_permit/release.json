@@ -1,0 +1,15 @@
+{
+  "authority": "lokale-fallverarbeitung",
+  "call_hash": "b0eb07dfc9f2025d16f7b87ce6ff065e4fdbb20227e88f43a735098530e3e153",
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "kind": "aktionsfreigabe",
+  "nonce": "go-nonce-4711-transfer",
+  "object": "obj-ausgabe-a@v1",
+  "operation": "transfer",
+  "release_id": "go-uebergabe-4711",
+  "schema": "komki-release/1",
+  "scope": "bereich-fall-4711",
+  "valid_from": 1000,
+  "valid_until": 1100,
+  "workspace": "ws-fall-4711"
+}

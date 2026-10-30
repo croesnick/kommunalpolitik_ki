@@ -12,7 +12,7 @@ pi (Seatbelt) ──stdio──> komki-relay.js (in pis Sandbox)
                               │  HTTP über Unix-Socket, Bearer-Token
                               ▼
                  komki-mediator (eigenes Seatbelt-Profil, kein Outbound)
-                 Gate 1 (emit) → Connector-Aufruf → Gate 2 (admit) → PDR
+                 Gate 1 (emit → transfer/store) → Connector-Aufruf → Gate 2 (admit) → PDR
                               │  Unix-Socket je Connector, Frame-Protokoll §3
           ┌───────────────────┼────────────────────┐
           ▼                   ▼                    ▼
@@ -124,7 +124,7 @@ Einzige Quelle für Fassung, Operationen, Netz, Dateisystem, Credentials und Imp
 | `egress_hosts` | Host-Allowlist für den Egress-Proxy (`host:port`). Leer heißt: kein Netz, kein Proxy-Port |
 | `fs` | Platzhalter-Pfade (`{vault_dir}`, `{documents_dir}` = `<base>/mediator/documents`) mit Modus `read` oder `write` |
 | `credentials` | Name → Keychain-Service. Der Eintrag enthält nur das Siegel (`ktv1.…`); `komki up` öffnet es mit `komki-tresor` über die Secure Enclave (Touch ID oder Passwort) und schreibt den Klartext nur in die stdin-Zeile. Ein Klartext-Eintrag wird nicht benutzt |
-| `environment` | Umgebung für `emit` (modellierte Empfänger der Anfrage), z. B. `web-suche@1` |
+| `environment` | Umgebung für `transfer` und `store` (modellierte Empfänger der Anfrage), z. B. `web-suche@1` |
 | `import_labels` | erlaubte Labels für Antworten. Bei RIS und Web genau eines. Bei Vault leer: die Notiz trägt ihre Labels im Frontmatter, und der Vermittler lässt jede Bindung aus Γ zu (Ticket #211); der Connector prüft nur die Form einer Bindungs-ID. Geschriebene Notizen tragen λ(y) = B_W (§6.3) |
 
 Parameter-Schemas sind geschlossen: Typ `string` (mit `max` Zeichen und optional `pattern`) oder `integer`
@@ -146,7 +146,7 @@ oder einen Host an.
 Der Vermittler bietet damit `ping`, `list_documents` und diese sieben Tools an. `admit_document` ist ein
 Sonderfall (Ticket #169): Der Vermittler entscheidet es über die Objekt-Labels aus `room.json` gegen das B_W
 des Raums (Regelzweig `admit`, `KomkiMediator.Gate`, R.5.4, #213), bevor er den Connector ruft. Der Connector
-führt nur das Lesen aus; Gate 1 (`emit`) und die Labels aus dem Manifest gelten dafür nicht. `ping` und
+führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Manifest gelten dafür nicht. `ping` und
 `list_documents` (#218) beantwortet der Vermittler selbst, ohne Connector. Das ist Fassung
 `komki-mediator/3`, und der D.9-Pin bricht absichtlich.
 
@@ -168,19 +168,28 @@ führt nur das Lesen aus; Gate 1 (`emit`) und die Labels aus dem Manifest gelten
 
 ## 6. Ablauf im Vermittler (Gate 1, Vollzug, Gate 2)
 
-Jeder Connector-Aufruf besteht aus **zwei Entscheidungen** der Engine und **zwei PDR**.
+Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine und **drei PDR** mit derselben
+`call_id`: Erzeugen (`emit`) und Übergeben (`transfer`) bzw. Speichern (`store`) in Gate 1, Aufnahme
+(`admit`) in Gate 2 (RFC R.5.5, R.5.6; Ticket #298).
 
-### 6.1 Gate 1: `emit` (die Anfrage ist eine Ausgabe, R.4.2/R.4.3)
+### 6.1 Gate 1: `emit`, dann `transfer` oder `store` (die Anfrage ist eine Ausgabe, R.4.2/R.4.3)
 
 1. Schema-Prüfung der Parameter gegen das Manifest. Bei Verstoß: `decision: error`, PDR, kein Vollzug.
-2. `call_bytes = JSON.canonical({"tool", "params"})`, `intent_hash = sha256(call_bytes)`.
-3. Snapshot: `workspace.bindings = room.workspace_bindings` (B_W), `workspace.environment =
-   manifest.environment` (Empfänger der Anfrage), Objekt `out-<digest12>` / Version `v1` / Labels `[]`,
-   Fakten des Raums plus `output_content_digest = intent_hash`.
-4. `Derive.decide(..., intent{operation: "emit"})`. Kein permit: Antwort mit Remedies, PDR, **kein
-   Vollzug**.
-5. permit: **emit-PDR wird geschrieben, bevor der Connector aufgerufen wird** (Vorbeleg vor Wirkung, R.11).
-   Die `decision_id` dieses PDR ist die `call_id` im Frame.
+2. `call_bytes = JSON.canonical({"tool", "params"})`, `intent_hash = sha256(call_bytes)`. Der Vermittler
+   vergibt die `call_id` des Aufrufs.
+3. **Erzeugen** (`emit`, komki_policy CONTRACT §4.5): Snapshot mit `workspace.bindings =
+   room.workspace_bindings` (B_W), `workspace.environment = room.environment` (der Raum erzeugt die
+   Anfrage), Objekt `out-<digest12>` / Version `v1` / Labels `[]`, Fakten des Raums plus
+   `output_content_digest = intent_hash`. Die Engine ordnet λ(y) = B_W zu.
+4. **Übergeben** (`transfer`, §4.8) bei lesenden Operationen, **Speichern** (`store`, §4.7) bei
+   schreibenden: Snapshot mit Objekt-Labels λ(y) = `assigned_label` und `workspace.environment =
+   manifest.environment` (Empfänger der Anfrage). Hier fällt der Empfängertest gegen RIS, Websuche oder
+   Vault.
+5. Kein permit in Schritt 3 oder 4: Antwort mit Remedies, PDR ohne `call_id`, **kein Vollzug**.
+6. permit: erst der **emit-PDR (`outcome: emitted`), dann der transfer- bzw. store-PDR (`outcome:
+   permitted`), beide bevor der Connector aufgerufen wird** (Vorbeleg vor Wirkung, R.11). Die
+   `decision_id` des emit-PDR ist die `call_id` im Frame. Der transfer- bzw. store-PDR, ein GO-Beleg
+   (`outcome: released`) und der admit-PDR tragen sie ebenfalls.
 
 ### 6.2 Gate 2: `admit` (die Antwort ist ein neuer Eingang)
 
@@ -198,8 +207,8 @@ Jeder Connector-Aufruf besteht aus **zwei Entscheidungen** der Engine und **zwei
 
 ### 6.3 Schreibende Operationen (`vault.write_test`)
 
-`emit` mit `environment = vault-lokal@1`, danach `store` (komki_policy CONTRACT §4.7, Ticket #205) unter
-λ(y) = `assigned_label` in derselben Umgebung. Γ hat keine `store`-Regel: Jedes Schreiben ist ohne
+`emit` in der Raumumgebung, danach `store` (komki_policy CONTRACT §4.7, Ticket #205) unter
+λ(y) = `assigned_label` mit `environment = vault-lokal@1`. Γ hat keine `store`-Regel: Jedes Schreiben ist ohne
 Aktionsfreigabe für genau diesen Call ein deny, der Vermittler fragt die nutzende Person wie beim GO für
 gesperrte Aufrufe (#98), ohne Zuhörer bleibt es beim deny. Erst nach store-Permit (oder Freigabe) schickt der
 Vermittler `context.assigned_label = decision.assigned_label` (= B_W, aus der emit-Entscheidung) mit. Der Connector schreibt genau diese Labels als `komki_labels` in das
@@ -219,10 +228,10 @@ Beobachter: `nutzende-person`, `pi-agent`, `ris-betreiber`, `brave-search`.
 
 | Bindung | readers (R_b) | operations |
 |---|---|---|
-| `ris-oeffentlich@1` | alle vier | admit true, emit true |
-| `web-oeffentlich@1` | alle vier | admit true, emit true |
-| `vault-oeffentlich@1` | alle vier | admit true, emit true |
-| `vault-vertraulich@1` | nutzende-person, pi-agent | admit true, emit true |
+| `ris-oeffentlich@1` | alle vier | admit true, emit true, transfer true |
+| `web-oeffentlich@1` | alle vier | admit true, emit true, transfer true |
+| `vault-oeffentlich@1` | alle vier | admit true, emit true, transfer true |
+| `vault-vertraulich@1` | nutzende-person, pi-agent | admit true, emit true, transfer true |
 
 `fact_fields` bekommt zusätzlich `output_content_digest: string`.
 
@@ -234,9 +243,9 @@ Zwei Referenzräume für Tests:
 - **recherche**: B_W = `[ris-oeffentlich@1, vault-oeffentlich@1, web-oeffentlich@1]`. Websuche, RIS und
   öffentliche Vault-Notizen sind erlaubt. Eine vertrauliche Notiz scheitert an `label_inclusion`.
 - **vertraulich**: B_W = `[ris-oeffentlich@1, vault-oeffentlich@1, vault-vertraulich@1, web-oeffentlich@1]`.
-  Vertrauliche Notizen sind lesbar. **Jede Websuche und jede RIS-Anfrage wird abgelehnt**
-  (`recipient_not_allowed`: brave-search bzw. ris-betreiber ∉ R(vault-vertraulich@1)). Das ist die
-  Lethal-Trifecta-Sperre.
+  Vertrauliche Notizen sind lesbar. **Jede Websuche und jede RIS-Anfrage wird bei der Übergabe abgelehnt**
+  (`transfer`, `recipient_not_allowed`: brave-search bzw. ris-betreiber ∉ R(vault-vertraulich@1)). Das ist
+  die Lethal-Trifecta-Sperre.
 
 ## 8. Unix-Socket pi → Vermittler
 

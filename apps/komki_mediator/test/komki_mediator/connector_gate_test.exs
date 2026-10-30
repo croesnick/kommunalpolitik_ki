@@ -52,25 +52,37 @@ defmodule KomkiMediator.ConnectorGateTest do
   defp remedy_codes(response), do: Enum.map(response["remedies"], & &1["code"])
 
   # -----------------------------------------------------------------------
-  # Permit-Fluss: emit-PDR vor dem Vollzug, zwei PDR mit gleicher call_id
+  # Permit-Fluss: emit- und transfer-PDR vor dem Vollzug, drei PDR mit
+  # gleicher call_id (#298)
   # -----------------------------------------------------------------------
 
-  test "recherche ris_search: emit-PDR liegt vor dem Connector-Aufruf, dann admit", %{env: env} do
+  test "recherche ris_search: emit- und transfer-PDR liegen vor dem Connector-Aufruf, dann admit",
+       %{env: env} do
     fake(env, "ris", ok(ris_hits()))
 
     response = ConnectorGate.call(env, "ris_search", %{"text" => "Bahnhof"})
 
-    # Der Fake hat beim Aufruf genau einen Journal-Datensatz gesehen: den
-    # emit-PDR. Default-Parameter sind gesetzt, kein Kontext bei read.
+    # Der Fake hat beim Aufruf genau zwei Journal-Datensaetze gesehen: den
+    # emit- und den transfer-PDR. Default-Parameter sind gesetzt, kein
+    # Kontext bei read.
     assert_received {:connector_called, "ris", "search", %{"text" => "Bahnhof", "limit" => 10},
-                     %{}, 1}
+                     %{}, 2}
 
     assert response["decision"] == "permit"
     assert response["labels"] == ["ris-oeffentlich@1"]
     assert response["results"] == ris_hits()["results"]
     assert response["payload_hash"] =~ "sha256:"
 
-    [emit, admit] = records(env)
+    [emit, transfer, admit] = records(env)
+
+    # Übergabe an das RIS unter λ(y) = B_W, in der Umgebung des Manifests.
+    assert transfer["rule"] == "transfer"
+    assert transfer["outcome"] == "permitted"
+    assert transfer["call_id"] == emit["decision_id"]
+    assert transfer["checked_label"] == @recherche
+    assert transfer["snapshot_id"] =~ "snap-transfer-"
+    assert transfer["intent_hash"] == emit["intent_hash"]
+
     assert emit["rule"] == "emit"
     assert emit["outcome"] == "emitted"
     assert emit["call_id"] == emit["decision_id"]
@@ -86,7 +98,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert admit["payload_hash"] == response["payload_hash"]
     assert response["emit_decision_id"] == emit["decision_id"]
 
-    assert {:ok, %{records: 2}} = Journal.verify(File.read!(env.journal_path))
+    assert {:ok, %{records: 3}} = Journal.verify(File.read!(env.journal_path))
   end
 
   test "call_id im Frame ist die decision_id des emit-PDR", %{env: env} do
@@ -103,7 +115,7 @@ defmodule KomkiMediator.ConnectorGateTest do
 
     # Die Server-Seite antwortet nur, wenn die call_id passt (Client prueft
     # sie); ein permit belegt also die Zuordnung call_id == emit-PDR.
-    [emit, _admit] = records(env)
+    [emit, _transfer, _admit] = records(env)
     assert response["emit_decision_id"] == emit["decision_id"]
   end
 
@@ -115,21 +127,24 @@ defmodule KomkiMediator.ConnectorGateTest do
         {"web_search", "web", %{"query" => "Buergerfall 4711"}},
         {"ris_search", "ris", %{"text" => "Buergerfall"}}
       ] do
-    test "vertraulich #{tool}: deny recipient_not_allowed, Connector nicht gerufen", %{env: env} do
+    # Erzeugen im Raum ist erlaubt; die Übergabe an RIS oder Websuche
+    # scheitert am Empfängerkreis von vault-vertraulich (#298).
+    test "vertraulich #{tool}: transfer deny recipient_not_allowed, Connector nicht gerufen",
+         %{env: env} do
       fake(env, unquote(id), ok(%{}))
       env = TestHelpers.vertraulich(env)
 
       response = ConnectorGate.call(env, unquote(tool), unquote(Macro.escape(params)))
 
       assert response["decision"] == "deny"
-      assert response["rule"] == "emit"
+      assert response["rule"] == "transfer"
       assert "recipient_not_allowed" in remedy_codes(response)
       # Endpunkt fuers Modell (#166)
       assert response["hinweis"] == KomkiMediator.Hinweis.text(:deny)
       refute_received {:connector_called, _, _, _, _, _}
 
       [pdr] = records(env)
-      assert pdr["rule"] == "emit"
+      assert pdr["rule"] == "transfer"
       assert pdr["decision"] == "deny"
       assert pdr["call_id"] == nil
     end
@@ -161,7 +176,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     refute Map.has_key?(response, "content")
     refute inspect(response) =~ "geheimer Inhalt"
 
-    [emit, admit] = records(env)
+    [emit, _transfer, admit] = records(env)
     assert admit["call_id"] == emit["decision_id"]
     assert admit["outcome"] == "not_admitted"
   end
@@ -204,7 +219,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert response["verify"] == ["label_not_in_gamma"]
     refute Map.has_key?(response, "content")
 
-    [_emit, admit] = records(env)
+    [_emit, _transfer, admit] = records(env)
     assert admit["outcome"] == "redacted"
   end
 
@@ -274,14 +289,15 @@ defmodule KomkiMediator.ConnectorGateTest do
   # Connector-Fehler
   # -----------------------------------------------------------------------
 
-  test "Connector down: admitted false mit emit- und admit-PDR", %{env: env} do
+  test "Connector down: admitted false mit transfer-, emit- und admit-PDR", %{env: env} do
     response = ConnectorGate.call(env, "ris_search", %{"text" => "x"})
 
     assert response["decision"] == "permit"
     assert response["admitted"] == false
     assert response["error"]["code"] == "upstream-error"
 
-    [emit, admit] = records(env)
+    [emit, transfer, admit] = records(env)
+    assert transfer["rule"] == "transfer"
     assert emit["rule"] == "emit"
     assert admit["outcome"] == "error"
     assert admit["call_id"] == emit["decision_id"]
@@ -338,7 +354,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     [%{"type" => "text", "text" => json}] = response.content
     body = JSON.decode!(json)
     assert body["decision"] == "permit"
-    assert_received {:connector_called, "ris", "search", %{"limit" => 3}, _, 1}
+    assert_received {:connector_called, "ris", "search", %{"limit" => 3}, _, 2}
   end
 
   test "Default-Raum ist recherche", %{env: env} do

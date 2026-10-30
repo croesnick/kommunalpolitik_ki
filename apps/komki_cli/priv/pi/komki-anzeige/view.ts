@@ -62,7 +62,12 @@ const CONNECTOR_ERRORS: Record<string, string> = {
 
 const SOURCES: Record<string, string> = { ris: "RIS", vault: "Vault", web: "Web", admit: "Arbeitsraum", list: "Arbeitsraum" };
 
-const GATES: Record<string, string> = { emit: "Anfrage (Gate 1)", admit: "Aufnahme der Antwort (Gate 2)" };
+const GATES: Record<string, string> = {
+	emit: "Anfrage erzeugen (Gate 1)",
+	transfer: "Anfrage übergeben (Gate 1)",
+	store: "Speichern (Gate 1)",
+	admit: "Aufnahme der Antwort (Gate 2)",
+};
 
 const COLLAPSED_HITS = 5;
 const COLLAPSED_TEXT_LINES = 4;
@@ -131,9 +136,13 @@ export function resultRows(
 	return rows;
 }
 
+// Gate 1 eines Connector-Aufrufs: erzeugen, übergeben, speichern (#298).
+const OUTGOING = new Set(["emit", "transfer", "store"]);
+
 // Alles, was nicht "zugelassen" ist. undefined: Inhalt wurde zugelassen.
 function outcome(tool: string, r: Json, p: Paint): Row[] | undefined {
-	const gate = r.rule === "emit" ? "Die Anfrage hat komki nicht verlassen." : "Der Inhalt hat das Modell nicht erreicht.";
+	const outgoing = OUTGOING.has(r.rule);
+	const gate = outgoing ? "Die Anfrage hat komki nicht verlassen." : "Der Inhalt hat das Modell nicht erreicht.";
 
 	if (r.decision === "deny" || r.decision === "indeterminate") {
 		const head =
@@ -145,7 +154,7 @@ function outcome(tool: string, r: Json, p: Paint): Row[] | undefined {
 	}
 
 	if (r.decision === "error") {
-		const head = r.rule === "emit" ? "✗ abgewiesen" : "✗ Prüffehler";
+		const head = outgoing ? "✗ abgewiesen" : "✗ Prüffehler";
 		return [
 			{ body: `${p.fg("error", p.bold(head))}  ${p.fg("muted", gate)}` },
 			labelled("Grund", clean(String(r.detail ?? "unbekannt")), p),

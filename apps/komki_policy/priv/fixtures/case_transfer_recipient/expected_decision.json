@@ -1,0 +1,48 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null
+    }
+  ],
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "decision": "deny",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-case-transfer-recipient",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-ausgabe-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "nutzende-person",
+            "webdienst-x"
+          ],
+          "type": "neuer_raum"
+        },
+        {
+          "call_hash": "b0eb07dfc9f2025d16f7b87ce6ff065e4fdbb20227e88f43a735098530e3e153",
+          "scope": "call",
+          "type": "aktionsfreigabe"
+        }
+      ]
+    }
+  ],
+  "rule": "transfer",
+  "snapshot_ref": "snap-transfer-4711-recipient",
+  "workspace": "ws-fall-4711"
+}
