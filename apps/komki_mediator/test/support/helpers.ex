@@ -12,10 +12,18 @@ defmodule KomkiMediator.TestHelpers do
     Path.join(System.tmp_dir!(), prefix <> suffix)
   end
 
-  @doc "Provisioniert einen tmp-Basisraum und liefert das Basisverzeichnis zurueck."
+  @doc """
+  Provisioniert einen tmp-Basisraum und liefert das Basisverzeichnis
+  zurueck; nach dem Test wird das Verzeichnis automatisch entfernt.
+  """
   def provisioned_base do
     base = tmp_base()
     Templates.provision!(base)
+
+    # Ohne Bang: Aufraeumen darf einen gruenen Test nachtraeglich nicht
+    # rot machen (Reste waeren ein Hygiene-Problem, kein Testfehler).
+    ExUnit.Callbacks.on_exit(fn -> File.rm_rf(base) end)
+
     base
   end
 
