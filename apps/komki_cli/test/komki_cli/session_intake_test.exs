@@ -586,16 +586,18 @@ defmodule KomkiCli.SessionIntakeTest do
     assert header =~ "eingangsrechte: brief@v1"
   end
 
-  test "Header ohne Vertrag: Hinweis, Dateiaufnahme braucht die vier Felder", %{base: base} do
+  # Session ohne Dateien ist der Normalfall: kein Hinweis. Die vier
+  # Pflichtfelder nennt erst die Ablehnung einer Dateiaufnahme.
+  test "Header ohne Vertrag: keine Zeilen; die Anleitung steht in setup_remedy", %{base: base} do
     room = write_room!(base, nil)
     {:ok, contract} = StartContract.load(room, nil)
-    header = contract |> StartContract.header() |> Enum.join("\n")
 
-    assert header =~ "kein Startvertrag"
-    assert header =~ "bindings"
-    assert header =~ "auftrag"
-    assert header =~ "verantwortliche_person"
-    assert header =~ "eingangsrechte"
+    assert StartContract.header(contract) == []
+
+    remedy = StartContract.setup_remedy(room, "contract-Block fehlt")
+
+    for field <- ~w(bindings auftrag verantwortliche_person eingangsrechte),
+        do: assert(remedy =~ field)
   end
 
   # ========================================================================

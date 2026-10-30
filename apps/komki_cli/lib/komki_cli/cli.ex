@@ -576,7 +576,7 @@ defmodule KomkiCli.CLI do
   defp run_session(opts) do
     case KomkiCli.Steps.session_plan(opts, &show_start/1) do
       {:session_plan, header, intake} ->
-        IO.write(Enum.join(header, "\n") <> "\n")
+        if header != [], do: IO.write(Enum.join(header, "\n") <> "\n")
         render(KomkiCli.Steps.session_start(intake, opts))
 
       {:session_refused, header, _entries} ->
