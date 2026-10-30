@@ -186,9 +186,10 @@ Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine und **drei
    manifest.environment` (Empfänger der Anfrage). Hier fällt der Empfängertest gegen RIS, Websuche oder
    Vault.
 5. Kein permit in Schritt 3 oder 4: Antwort mit Remedies, PDR ohne `call_id`, **kein Vollzug**.
-6. permit: erst der transfer- bzw. store-PDR (`outcome: permitted`), dann der **emit-PDR (`outcome:
-   emitted`), beide bevor der Connector aufgerufen wird** (Vorbeleg vor Wirkung, R.11). Die
-   `decision_id` des emit-PDR ist die `call_id` im Frame; der transfer- bzw. store-PDR trägt sie ebenfalls.
+6. permit: erst der **emit-PDR (`outcome: emitted`), dann der transfer- bzw. store-PDR (`outcome:
+   permitted`), beide bevor der Connector aufgerufen wird** (Vorbeleg vor Wirkung, R.11). Die
+   `decision_id` des emit-PDR ist die `call_id` im Frame. Der transfer- bzw. store-PDR, ein GO-Beleg
+   (`outcome: released`) und der admit-PDR tragen sie ebenfalls.
 
 ### 6.2 Gate 2: `admit` (die Antwort ist ein neuer Eingang)
 

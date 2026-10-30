@@ -82,6 +82,14 @@ defmodule KomkiPolicy.Derive do
   @unsupported_operations ["start"]
   @unsupported_detail "rule branch not implemented"
 
+  @doc "Regelzweige, die ein erzeugtes Objekt unter λ(y) aus dem Raum geben (§ 4.7, § 4.8)."
+  @spec handover_operations() :: [String.t()]
+  def handover_operations, do: @handover_operations
+
+  @doc "Regelzweige mit Beweisbaum (`verify`, § 5)."
+  @spec proof_rules() :: [String.t()]
+  def proof_rules, do: ["admit" | @output_operations]
+
   @doc "§ 4.3-Prämissennamen in fester Reihenfolge (gemeinsame Sollmenge für derive-Baum und verify)."
   @spec required_premises() :: [String.t()]
   def required_premises, do: @admit_premises
@@ -245,6 +253,7 @@ defmodule KomkiPolicy.Derive do
       ctx
       |> shared_premises(registry, auth.operation)
       |> premise_workspace_valid()
+      |> release_label_preservation(auth.operation)
       |> release_check_call_hash(release, call_hash)
       |> release_check_window(release, stand)
       |> release_check_nonce(release, stand)
@@ -253,6 +262,13 @@ defmodule KomkiPolicy.Derive do
 
     conclude_release(state, ctx, registry, auth, release, stand, call_hash)
   end
+
+  # Ein GO stellt keine entfernte Bindung wieder her (§ 2.8): auch mit
+  # Freigabe gilt B_W ⊆ λ(y) für store und transfer.
+  defp release_label_preservation(state, operation) when operation in @handover_operations,
+    do: premise_label_preservation(state)
+
+  defp release_label_preservation(state, _emit), do: state
 
   # Release-Prüfungen in fester Ordnung (§ 4.6 Schritt 3); jede Verletzung
   # ein Blocker (binding: null, condition: null, § 2.4).

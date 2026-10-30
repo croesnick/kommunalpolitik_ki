@@ -23,7 +23,8 @@ defmodule KomkiPolicy.Remedies do
   (§ 4.6): je Release-Blocker genau ein call-GO-Eintrag mit dem **neu
   berechneten** korrekten call_hash; `workspace_invalid` behält seinen
   `neuer_raum`-Eintrag. `label_not_preserved` (`store`, `transfer`) bekommt nur
-  `neuer_raum`: ein GO stellt keine entfernte Bindung wieder her.
+  `neuer_raum`, auch im Freigabe-Zweig: ein GO stellt keine entfernte
+  Bindung wieder her.
   """
 
   alias KomkiPolicy.Calculus
@@ -184,8 +185,9 @@ defmodule KomkiPolicy.Remedies do
   # Anwendbarkeitstabelle (Freigabe-Zweig, § 4.6)
   # -------------------------------------------------------------------------
 
-  defp release_transitions(ctx, %{"code" => "workspace_invalid"}),
-    do: [newer_space(ctx, [])]
+  defp release_transitions(ctx, %{"code" => code})
+       when code in ["workspace_invalid", "label_not_preserved"],
+       do: [newer_space(ctx, [])]
 
   defp release_transitions(%{call_hash: call_hash}, _finding),
     do: [call_go(call_hash)]

@@ -46,7 +46,7 @@ defmodule KomkiCli.GoSteps do
   end
 
   defp answer(dir, request, ui, environments) do
-    ui.say.(describe(request, recipients(request["tool"], environments)))
+    ui.say.(describe(request, leak_recipients(request, environments)))
     go? = ui.confirm.("GO für genau diesen Aufruf?", false)
 
     case Go.answer(dir, request, go?) do
@@ -121,6 +121,11 @@ defmodule KomkiCli.GoSteps do
   end
 
   def recipients(_tool, _environments), do: []
+
+  # Ein emit-GO gibt nur das Erzeugen im Raum frei; nach draussen geht die
+  # Anfrage erst mit transfer bzw. store (#298), dort steht die Warnung.
+  defp leak_recipients(%{"operation" => "emit"}, _environments), do: []
+  defp leak_recipients(request, environments), do: recipients(request["tool"], environments)
 
   defp environments(base) do
     with {:ok, content} <- File.read(Path.join([base, "mediator", "registry.json"])),

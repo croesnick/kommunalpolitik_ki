@@ -52,18 +52,18 @@ defmodule KomkiMediator.ConnectorGateTest do
   defp remedy_codes(response), do: Enum.map(response["remedies"], & &1["code"])
 
   # -----------------------------------------------------------------------
-  # Permit-Fluss: transfer- und emit-PDR vor dem Vollzug, drei PDR mit
+  # Permit-Fluss: emit- und transfer-PDR vor dem Vollzug, drei PDR mit
   # gleicher call_id (#298)
   # -----------------------------------------------------------------------
 
-  test "recherche ris_search: transfer- und emit-PDR liegen vor dem Connector-Aufruf, dann admit",
+  test "recherche ris_search: emit- und transfer-PDR liegen vor dem Connector-Aufruf, dann admit",
        %{env: env} do
     fake(env, "ris", ok(ris_hits()))
 
     response = ConnectorGate.call(env, "ris_search", %{"text" => "Bahnhof"})
 
     # Der Fake hat beim Aufruf genau zwei Journal-Datensaetze gesehen: den
-    # transfer- und den emit-PDR. Default-Parameter sind gesetzt, kein
+    # emit- und den transfer-PDR. Default-Parameter sind gesetzt, kein
     # Kontext bei read.
     assert_received {:connector_called, "ris", "search", %{"text" => "Bahnhof", "limit" => 10},
                      %{}, 2}
@@ -73,7 +73,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert response["results"] == ris_hits()["results"]
     assert response["payload_hash"] =~ "sha256:"
 
-    [transfer, emit, admit] = records(env)
+    [emit, transfer, admit] = records(env)
 
     # Übergabe an das RIS unter λ(y) = B_W, in der Umgebung des Manifests.
     assert transfer["rule"] == "transfer"
@@ -115,7 +115,7 @@ defmodule KomkiMediator.ConnectorGateTest do
 
     # Die Server-Seite antwortet nur, wenn die call_id passt (Client prueft
     # sie); ein permit belegt also die Zuordnung call_id == emit-PDR.
-    [_transfer, emit, _admit] = records(env)
+    [emit, _transfer, _admit] = records(env)
     assert response["emit_decision_id"] == emit["decision_id"]
   end
 
@@ -176,7 +176,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     refute Map.has_key?(response, "content")
     refute inspect(response) =~ "geheimer Inhalt"
 
-    [_transfer, emit, admit] = records(env)
+    [emit, _transfer, admit] = records(env)
     assert admit["call_id"] == emit["decision_id"]
     assert admit["outcome"] == "not_admitted"
   end
@@ -219,7 +219,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert response["verify"] == ["label_not_in_gamma"]
     refute Map.has_key?(response, "content")
 
-    [_transfer, _emit, admit] = records(env)
+    [_emit, _transfer, admit] = records(env)
     assert admit["outcome"] == "redacted"
   end
 
@@ -296,7 +296,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert response["admitted"] == false
     assert response["error"]["code"] == "upstream-error"
 
-    [transfer, emit, admit] = records(env)
+    [emit, transfer, admit] = records(env)
     assert transfer["rule"] == "transfer"
     assert emit["rule"] == "emit"
     assert admit["outcome"] == "error"

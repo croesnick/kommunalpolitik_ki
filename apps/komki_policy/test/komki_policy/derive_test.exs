@@ -513,6 +513,24 @@ defmodule KomkiPolicy.DeriveTest do
                )
     end
 
+    test "ein GO überbrückt label_not_preserved nicht, auch im Freigabe-Zweig" do
+      dir = Path.join(@fixtures_dir, "case_release_transfer_permit")
+      {:ok, snapshot} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
+      {:ok, intent} = JSON.parse(File.read!(Path.join(dir, "intent.json")))
+      {:ok, release} = JSON.parse(File.read!(Path.join(dir, "release.json")))
+      {:ok, stand} = JSON.parse(File.read!(Path.join(dir, "stand.json")))
+
+      # λ(y) hat die Raumbindung verloren; die Freigabe passt sonst exakt.
+      shrunk = put_in(snapshot, ["object", "labels"], [])
+
+      assert {:ok,
+              %{
+                "decision" => "deny",
+                "blockers" => [%{"code" => "label_not_preserved"} | _],
+                "remedies" => [%{"transitions" => [%{"type" => "neuer_raum"}]} | _]
+              }} = Derive.decide_with_release(registry(), shrunk, intent, release, stand)
+    end
+
     test "unzulässiger Empfänger: call-GO im Katalog mit dem transfer-Hash der Freigabe" do
       dir = Path.join(@fixtures_dir, "case_transfer_recipient")
       {:ok, snapshot} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))

@@ -171,8 +171,8 @@ sequenceDiagram
             M->>J: PDR (rule emit bzw. transfer, Remedies)
             M-->>P: Remedy-Katalog, kein Vollzug
         else permit
-            M->>J: transfer-PDR (outcome permitted, call_id)
             M->>J: emit-PDR (decision_id = call_id)
+            M->>J: transfer-PDR (outcome permitted, call_id)
             M->>C: Frame (call_id, op, params, context)
             C-->>M: result oder error
             Note over M: Ergebnisform §5.2, Labels aus dem Manifest
@@ -408,10 +408,11 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
     Schreiben ein deny mit Aktionsfreigabe fuer den exakten Call; mit
     Zuhoerer fragt der Vermittler (GO-Anfrage mit `operation: store`
     bzw. `transfer`), sonst bleibt es beim deny.
-  * Vorbeleg: bei permit liegt zuerst der transfer- bzw. store-PDR
-    (`outcome: permitted`), dann der emit-PDR (`outcome: emitted`) im
-    Journal, **bevor** der Connector gerufen wird. Die `decision_id` des
-    emit-PDR ist die `call_id` im Frame; alle PDR des Aufrufs tragen sie.
+  * Vorbeleg: bei permit liegt zuerst der emit-PDR (`outcome: emitted`),
+    dann der transfer- bzw. store-PDR (`outcome: permitted`) im Journal,
+    **bevor** der Connector gerufen wird. Die `decision_id` des emit-PDR
+    ist die `call_id` im Frame; die PDR des Aufrufs tragen sie, auch ein
+    GO-Beleg (`outcome: released`), nicht aber Ablehnungen.
     Bei `vault_write_test` geht `context.assigned_label` (= B_W) mit.
   * Gate 2 `admit`: Ergebnisform §5.2 (geschlossen), Labels allein aus dem
     Manifest (RIS/Web fest `import_labels`; Vault: Labels der Notiz,

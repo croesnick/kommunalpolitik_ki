@@ -21,11 +21,11 @@ defmodule KomkiMediator.ConnectorGate do
     Empfaengerpruefung gegen RIS, Websuche oder Vault. Ohne `store`-Regel
     in Γ ist Speichern ein deny mit Aktionsfreigabe fuer den exakten Call.
     Der Permit-PDR (`outcome: permitted`) liegt vor dem Vollzug.
-  * PDR je Aufruf: die `call_id` ist die `decision_id` des emit-PDR
-    (`outcome: emitted`), der unmittelbar vor dem Vollzug geschrieben
-    wird; transfer- bzw. store-Permit und admit tragen dieselbe
-    `call_id`. Ablehnungen in Gate 1 tragen keine `call_id`, weil kein
-    Vollzug folgt.
+  * PDR je Aufruf: unmittelbar vor dem Vollzug der emit-PDR (`outcome:
+    emitted`), dessen `decision_id` die `call_id` ist, dann der transfer-
+    bzw. store-PDR (`outcome: permitted`), danach admit; alle mit
+    derselben `call_id`, ebenso ein GO-Beleg (`outcome: released`).
+    Ablehnungen in Gate 1 tragen keine `call_id`, weil kein Vollzug folgt.
   * Vollzug: `Sidecar.Client.call/6` gegen
     `<connectors_dir>/<id>.sock`. Bei schreibenden Operationen geht
     `context.assigned_label` (= B_W) mit.
@@ -117,7 +117,9 @@ defmodule KomkiMediator.ConnectorGate do
 
     intent = intent(env.room, "emit", "intent-emit-" <> d12, object)
 
-    emitted = fn decision -> after_emit(env, call, decision, snapshot, intent) end
+    emitted = fn decision ->
+      handover(env, call, %{decision: decision, snapshot: snapshot, intent: intent})
+    end
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
@@ -132,9 +134,6 @@ defmodule KomkiMediator.ConnectorGate do
   defp digest_fact(call) do
     %{"value" => call.intent_hash, "source" => "komki-mediator", "source_kind" => "technical"}
   end
-
-  defp after_emit(env, call, decision, snapshot, intent),
-    do: handover(env, call, %{decision: decision, snapshot: snapshot, intent: intent})
 
   # -------------------------------------------------------------------------
   # Gate 1b: transfer an den Connector (§4.8) oder store in seinen
@@ -160,22 +159,27 @@ defmodule KomkiMediator.ConnectorGate do
       })
 
     intent = intent(env.room, rule, "intent-" <> rule <> "-" <> d12, object)
-    handed = fn _decision -> execute(env, call, emit.decision, emit.snapshot, emit.intent) end
+    # Nach einer Freigabe belegt der released-PDR die Entscheidung.
+    released = fn _decision -> execute(env, call, emit, fn -> :ok end) end
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
-        handover_permitted(env, call, decision, snapshot, intent)
-        handed.(decision)
+        execute(env, call, emit, handover_permitted(env, call, decision, snapshot, intent))
 
       other ->
         response = not_permitted(env, call, rule, nil, intent, snapshot, other)
-        maybe_go(env, call, snapshot, intent, response, handed)
+        maybe_go(env, call, snapshot, intent, response, released)
     end
   end
 
   # Vorbeleg vor Wirkung (R.11): die transfer- bzw. store-Entscheidung
-  # liegt im Journal, bevor die Anfrage den Vermittler verlaesst.
+  # liegt im Journal, bevor die Anfrage den Vermittler verlaesst. Liefert
+  # den Schreibschritt, den `execute/4` nach dem emit-PDR ausfuehrt.
   defp handover_permitted(env, call, decision, snapshot, intent) do
+    fn -> append_handover(env, call, decision, snapshot, intent) end
+  end
+
+  defp append_handover(env, call, decision, snapshot, intent) do
     PDR.append(env, %{
       "decision_id" => PDR.new_id(),
       "call_id" => call.call_id,
@@ -261,9 +265,7 @@ defmodule KomkiMediator.ConnectorGate do
       {:ok, _stand} ->
         PDR.append(env, %{
           "decision_id" => PDR.new_id(),
-          # Nach transfer oder store folgt der Vollzug sofort; nach einem
-          # emit-GO steht Gate 1b noch aus.
-          "call_id" => if(intent["operation"] == "emit", do: nil, else: call.call_id),
+          "call_id" => call.call_id,
           "tool" => call.tool,
           "rule" => intent["operation"],
           "decision" => "permit",
@@ -307,7 +309,10 @@ defmodule KomkiMediator.ConnectorGate do
   # Vollzug
   # -------------------------------------------------------------------------
 
-  defp execute(env, call, decision, snapshot, intent) do
+  # `handed` schreibt nach dem emit-PDR den Beleg von Gate 1b, beides vor
+  # dem Vollzug und in der Reihenfolge der Entscheidungen.
+  defp execute(env, call, emit, handed) do
+    %{decision: decision, snapshot: snapshot, intent: intent} = emit
     call_id = call.call_id
 
     context =
@@ -332,6 +337,8 @@ defmodule KomkiMediator.ConnectorGate do
       "checked_label" => decision["checked_label"],
       "assigned_label" => decision["assigned_label"]
     })
+
+    handed.()
 
     case connector_call(env, call, call_id, context) do
       {:ok, result} -> admit(env, call, call_id, decision, result)

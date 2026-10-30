@@ -169,7 +169,7 @@ defmodule KomkiMediator.VorpruefungTest do
   # -----------------------------------------------------------------------
 
   test "gueltiges ris_search: permit, emit, transfer und admit wie im Connector-Gate", %{env: env} do
-    # Kein Connector-Verzeichnis: transfer- und emit-PDR, dann
+    # Kein Connector-Verzeichnis: emit- und transfer-PDR, dann
     # Connector-Fehler (Muster wie der Connector-down-Fall im
     # ConnectorGate-Test).
     assert {:reply, reply, _frame} = call("ris_search", %{"text" => "Radweg"})
@@ -177,8 +177,8 @@ defmodule KomkiMediator.VorpruefungTest do
     assert %{"decision" => "permit", "admitted" => false} = body(reply)
 
     assert [
-             %{"rule" => "transfer", "outcome" => "permitted"},
              %{"rule" => "emit", "outcome" => "emitted"},
+             %{"rule" => "transfer", "outcome" => "permitted"},
              %{"outcome" => "error"}
            ] = pdrs(env)
   end

@@ -57,7 +57,6 @@ defmodule KomkiPolicy.Verify do
     "premises"
   ]
   @premise_kinds ["object_check", "fact", "computed", "condition"]
-  @verifiable_rules ["admit", "emit", "store", "transfer"]
 
   # Name↔Art-Tabelle § 2.5: jeder feste Prämissenname trägt genau eine Art;
   # Art-Tarnung (richtiger Name, falsche Art) ist eine unbekannte Prämisse.
@@ -430,10 +429,11 @@ defmodule KomkiPolicy.Verify do
 
   # store und transfer haben dieselbe Prämissenform: ohne diesen Abgleich
   # ginge ein store-Baum als Beleg für einen transfer-Intent durch.
-  defp rule_reason(rule, _operation) when rule not in @verifiable_rules,
-    do: reason("unsupported_rule", nil, nil)
-
-  defp rule_reason(rule, operation), do: mismatch_if(rule != operation, "rule_mismatch")
+  defp rule_reason(rule, operation) do
+    if rule in Derive.proof_rules(),
+      do: mismatch_if(rule != operation, "rule_mismatch"),
+      else: reason("unsupported_rule", nil, nil)
+  end
 
   defp mismatch_if(true, code), do: reason(code, nil, nil)
   defp mismatch_if(false, _code), do: nil
@@ -658,7 +658,8 @@ defmodule KomkiPolicy.Verify do
 
     for premise <- premises_for(proof, "label_preservation") do
       ok =
-        proof["rule"] in ["store", "transfer"] and Calculus.labels_subset?(bindings, checked) and
+        proof["rule"] in Derive.handover_operations() and
+          Calculus.labels_subset?(bindings, checked) and
           premise["value"] == true and premise["workspace_bindings"] == bindings and
           premise["checked_label"] == checked
 

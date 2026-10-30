@@ -62,7 +62,12 @@ const CONNECTOR_ERRORS: Record<string, string> = {
 
 const SOURCES: Record<string, string> = { ris: "RIS", vault: "Vault", web: "Web", admit: "Arbeitsraum", list: "Arbeitsraum" };
 
-const GATES: Record<string, string> = { emit: "Anfrage (Gate 1)", admit: "Aufnahme der Antwort (Gate 2)" };
+const GATES: Record<string, string> = {
+	emit: "Anfrage erzeugen (Gate 1)",
+	transfer: "Anfrage übergeben (Gate 1)",
+	store: "Speichern (Gate 1)",
+	admit: "Aufnahme der Antwort (Gate 2)",
+};
 
 const COLLAPSED_HITS = 5;
 const COLLAPSED_TEXT_LINES = 4;
