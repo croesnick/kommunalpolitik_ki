@@ -1,5 +1,5 @@
 {
-  "detail": "rule branch not implemented in delivery 2",
+  "detail": "rule branch not implemented",
   "result": "unsupported",
   "rule": "transfer"
 }

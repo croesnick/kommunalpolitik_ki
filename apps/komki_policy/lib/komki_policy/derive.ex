@@ -49,7 +49,7 @@ defmodule KomkiPolicy.Derive do
   ]
 
   @unsupported_operations ["start", "transfer", "store"]
-  @unsupported_detail "rule branch not implemented in delivery 2"
+  @unsupported_detail "rule branch not implemented"
 
   @doc "§ 4.3-Prämissennamen in fester Reihenfolge (gemeinsame Sollmenge für derive-Baum und verify)."
   @spec required_premises() :: [String.t()]

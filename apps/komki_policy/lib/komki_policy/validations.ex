@@ -84,6 +84,8 @@ defmodule KomkiPolicy.Validations do
     end
   end
 
+  # Bewusst lockerer als `Registry.reference_id?/1` (Stand-Referenz mit
+  # Ganzzahl-Version): Objekt-Versionen sind Kebab-Kennungen wie `v1`.
   defp object_ref?(value) when is_binary(value) do
     case String.split(value, "@") do
       [object_id, version] -> Registry.kebab_id?(object_id) and Registry.kebab_id?(version)
