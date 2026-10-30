@@ -83,12 +83,23 @@ Jeden Tool-Call validiert der Harness gegen die JSON-Schemata aus den aufgezeich
 
 `read` mit `{"path":"top-3-anhoerung.md"}` beim ersten Versuch, korrekt — in jedem Lauf. Die Zusammenfassungen unter dem natürlichen Prompt („Nenne Gremium, Sitzungsdatum, Kostenschätzung und Beschlussvorschlag“) nennen Gremium, Datum, 240 000 € und Beschlussvorschlag, lassen aber den **Eigenanteil von 80 000 €** weg — in jedem der sechs Läufe, einmal zusätzlich den Vorhabensnamen. Smoke-Verdikt FAIL: Mechanik einwandfrei, Qualitätslücke konsistent.
 
-Deshalb ein Benchmark gegen explizit definiertes gewünschtes Verhalten, abgeleitet aus der Sitzungsmappe-Vorlage des Skills `sitzungsvorbereitung` (Gremium, Datum, Gegenstand, „was die Vorlage will“, Beschlussvorschlag; Finanzierungs-TOPs sind im Workflow erster Klasse) und der Quellenpflicht (AGENTS.md §6). Muss-Kriterien: K1 Gremium, K2 Datum, K3 Vorhaben, K4 Anliegen, K5 Gesamtkosten, **K6 Finanzierungsstruktur** (der Rat beschließt über den Eigenanteil; der Beschlussvorschlag meldet ihn zur Haushaltsplanung), K7 Beschlussvorschlag, K8 keine erfundenen Zahlen (arithmetisch abgeleitete werden protokolliert, aber toleriert).
+Deshalb ein Benchmark gegen explizit definiertes gewünschtes Verhalten, abgeleitet aus der Sitzungsmappe-Vorlage des Skills `sitzungsvorbereitung` (Gremium, Datum, Gegenstand, „was die Vorlage will“, Beschlussvorschlag; Finanzierungs-TOPs sind im Workflow erster Klasse) und der Quellenpflicht (AGENTS.md §6). Muss-Kriterien: K1 Gremium, K2 Datum, K3 Vorhaben, K4 Anliegen, K5 Gesamtkosten, **K6 Finanzierungsstruktur** (der Eigenanteil von 80 000 € belastet den städtischen Haushalt; der Beschlussvorschlag meldet die Gesamtkosten zur Haushaltsplanung), K7 Beschlussvorschlag, K8 keine erfundenen Zahlen (arithmetisch abgeleitete werden protokolliert, aber toleriert).
 
 - **Variante A (natürlicher Prompt), 3 Läufe:** 0/3 vollständig — K6 fehlt 3/3, alles andere besteht.
 - **Variante B (Prompt fordert Vorhaben und Aufteilung explizit), 3 Läufe:** 3/3 vollständig; als Förderanteil erscheint jeweils 160 000 (= 240 000 − 80 000), korrekt als abgeleitet statt erfunden klassifiziert.
 
-Ergebnis: **kein Modelldefizit, sondern Prompt-Sensitivität.** Das Modell kann jede Muss-Anforderung, wenn der Prompt sie verlangt. Konsequenz für die Ratsarbeit: Die Vollständigkeit von TOP-Zusammenfassungen muss auf der Instruktions-Ebene eingefordert werden — die Kriterienliste gehört in den `sitzungsvorbereitung`-Skill (Umarbeitung läuft in der Parallel-Session zu diesem Ticket), die Produktivintegration (#155) muss sie in Session-Vorlagen bzw. Systemprompt tragen.
+Ergebnis: **kein Modelldefizit, sondern Prompt-Sensitivität.** Das Modell kann jede Muss-Anforderung, wenn der Prompt sie verlangt. Konsequenz für die Ratsarbeit: Die Vollständigkeit von TOP-Zusammenfassungen muss auf der Instruktions-Ebene eingefordert werden — die Kriterienliste gehört in den `sitzungsvorbereitung`-Skill, die Produktivintegration (#155) muss sie in Session-Vorlagen bzw. Systemprompt tragen.
+
+**Skill-Varianten (Nachmessung):** Derselbe natürliche Prompt, dazu der Skill als angehängter System-Prompt (`--append-system-prompt`), je 5 Läufe. K6 hier streng: Die Zahl 80 000 muss fallen, das Wort „Eigenanteil“ allein reicht nicht.
+
+| Skill im Kontext | vollständig | K6 fehlt | Median-Wandzeit | Prompt-Tokens (Lauf 1) |
+|---|---|---|---|---|
+| ohne | 0/5 | 5/5 | 30 s | 2 385 |
+| Stand `main` (834 Zeilen) | 1/5 | 4/5 | 77 s | 24 301 |
+| `main` + Muss-Tabelle (858 Zeilen) | 2/5 | 2/5 | 80 s | 25 041 |
+| kompakte Fassung (193 Zeilen) | 4/5 | 0/5 | 28 s | 7 756 |
+
+Im langen Skill geht die Checkliste unter. Die kompakte Fassung liefert den Eigenanteil in jedem Lauf, bei knapp einem Drittel der Wandzeit. Der eine unvollständige Lauf der kompakten Fassung nennt das Anliegen nur als „Umgestaltung“; das strengere K4 dieser Nachmessung wertet das nicht, das K4 des Benchmarks schon. Der Skill im Repo ist die kompakte Fassung.
 
 ### 2 — Quellen extrahieren
 
