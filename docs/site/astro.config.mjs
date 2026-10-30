@@ -2,12 +2,19 @@
 // Entscheidung und Abwägung: docs/research/2026-10-24-doku-site-und-bildband.md
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightLinksValidator from 'starlight-links-validator';
 
 export default defineConfig({
   site: 'https://croesnick.github.io',
   base: '/kommunalpolitik_ki',
   integrations: [
     starlight({
+      // Interne Links der .mdx-Seiten prüft der Validator beim Build
+      // (Slug, Trailing-Slash, Anker, relative und lokale Links) — er läuft
+      // damit automatisch im Pages-Build jedes PR. Externe Links prüft er
+      // bewusst nicht; ein Netz-Check externer Links gehört laut
+      // lychee.toml in einen eigenen Scheduled-Job statt ins PR-Gate.
+      plugins: [starlightLinksValidator()],
       title: 'komki',
       description: 'Ein lokaler KI-Arbeitsraum für die Ratsarbeit: recherchieren mit Quellen, ohne dass Vertrauliches nach draußen gelangt.',
       defaultLocale: 'root',
