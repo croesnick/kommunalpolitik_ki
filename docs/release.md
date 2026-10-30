@@ -75,7 +75,7 @@ Eine Wegwerf-Instanz läuft neben der Hauptinstanz:
 make komki KOMKI_LINK_DIR=/tmp/komki-bin   # eigener Link statt ~/.local/bin
 KOMKI_HOME=/private/tmp/komki-test /tmp/komki-bin/komki setup --demo --port 50000 \
   --gguf-from ~/.local/share/komki/models/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
-KOMKI_HOME=/private/tmp/komki-test /tmp/komki-bin/komki run "Was steht im Vault zum Radverkehr?" | cat
+KOMKI_HOME=/private/tmp/komki-test /tmp/komki-bin/komki run "Was steht im Vault zum Radverkehr?" 2>&1 | cat
 KOMKI_HOME=/private/tmp/komki-test /tmp/komki-bin/komki down
 ```
 
@@ -90,7 +90,7 @@ KOMKI_HOME=/private/tmp/komki-test /tmp/komki-bin/komki down
 - Der Brave-Schlüssel liegt im Schlüsselbund unter einem festen Namen. Die
   Wegwerf-Instanz benutzt also denselben Schlüssel, und macOS fragt beim
   Start des Web-Connectors nach Touch ID.
-- `komki run` mit stdout in eine Datei stirbt (#135), deshalb `| cat`.
+- `komki run` stirbt, wenn stdout oder stderr an keinem Terminal hängen (#135), deshalb `2>&1 | cat`. `| cat` allein reicht nicht: Am 30.10.2026 brach pi mit Exit 134 ab, solange stderr direkt an der aufrufenden Shell ohne Terminal hing.
 
 Ein zweites macOS-Benutzerkonto ist der ehrlichere Test, weil dort keine
 asdf-, Homebrew- oder pi-Stände des eigenen Kontos mitlaufen. Er ist noch

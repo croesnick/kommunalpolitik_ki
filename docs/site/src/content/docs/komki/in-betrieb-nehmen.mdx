@@ -5,7 +5,7 @@ description: Von den Voraussetzungen bis zur ersten Recherche mit eigenem Vault,
 
 import { Aside, Steps } from '@astrojs/starlight/components';
 
-Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst ausprobieren willst. Rechne mit einer knappen Stunde, das meiste davon Warten: Erlang wird gebaut, das Modell lädt herunter. Alle Ausgaben stammen aus echten Läufen. Pfade sind mit `~` abgekürzt. Prozessnummern, Zeiten und die Antworten des Modells sehen bei dir anders aus. Der Testlauf lief auf Port 49600 neben einer zweiten Instanz, bei dir steht dort der Standard 49524.
+Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst ausprobieren willst. Rechne mit einer knappen Stunde, das meiste davon Warten: Erlang wird gebaut, das Modell lädt herunter. Alle Ausgaben stammen aus echten Läufen. Pfade sind mit `~` abgekürzt. Prozessnummern, Zeiten und die Antworten des Modells sehen bei dir anders aus. Der Testlauf lief auf Port 50600 neben einer zweiten Instanz, bei dir steht dort der Standard 49524.
 
 Soll dein Coding-Agent die Einrichtung übernehmen, gib ihm den Auftrag von [Mit einem Agenten einrichten](/kommunalpolitik_ki/komki/mit-agent-einrichten/). Dort steht auch, an welchen Stellen er an dich übergibt.
 
@@ -71,13 +71,13 @@ Soll dein Coding-Agent die Einrichtung übernehmen, gib ihm den Auftrag von [Mit
    Instanz     angelegt
    brave       ok (Schlüsselbund-Eintrag 'brave-search-api', versiegelt mit der Secure Enclave)
    Start       llama, Egress, Connectoren und Vermittler (beim ersten Mal bis zu einer Minute)
-   llama up: pid 13796 (health 200)
-   egress up: pid 13900
-   connector-documents up: pid 13939
-   connector-ris up: pid 13977
-   connector-vault up: pid 14012
-   connector-web up: pid 14052
-   mediator up: pid 14092 (tools: ping, admit_document, ris_search, ris_show, vault_read, vault_search, vault_write_test, web_search)
+   llama up: pid 77226 (health 200)
+   egress up: pid 77593
+   connector-documents up: pid 77632
+   connector-ris up: pid 77660
+   connector-vault up: pid 77688
+   connector-web up: pid 77731
+   mediator up: pid 77760 (tools: ping, list_documents, admit_document, ris_search, ris_show, vault_read, vault_search, vault_write_test, web_search)
    Prüfung     doctor ok
 
    Fertig. Probier zum Beispiel:
@@ -261,15 +261,15 @@ Soll dein Coding-Agent die Einrichtung übernehmen, gib ihm den Auftrag von [Mit
    ```text frame="terminal" title="Das siehst du"
    base:                ~/.local/share/komki
    gguf:                ~/.local/share/komki/models/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
-   port:                49524
+   port:                50600
    mediator-sock:       ~/.local/share/komki/run/mediator.sock
-   llama:               running (pid 13796)
-   egress:              running (pid 13900)
-   connector-documents: running (pid 13939)
-   connector-ris:       running (pid 13977)
-   connector-vault:     running (pid 14012)
-   connector-web:       running (pid 14052)
-   mediator:            running (pid 14092)
+   llama:               running (pid 77226)
+   egress:              running (pid 77593)
+   connector-documents: running (pid 77632)
+   connector-ris:       running (pid 77660)
+   connector-vault:     running (pid 77688)
+   connector-web:       running (pid 77731)
+   mediator:            running (pid 80173)
    ```
 
    Wenn du fertig bist, stoppt `komki down` alles, was komki gestartet hat, auch llama. Der Arbeitsspeicher des Modells ist danach wieder frei.

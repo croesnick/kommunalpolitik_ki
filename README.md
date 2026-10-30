@@ -14,9 +14,9 @@ Dieses Repo hat deshalb zwei Teile: **komki**, einen lokalen KI-Arbeitsraum, der
 
 ## komki: der lokale KI-Arbeitsraum
 
-![Terminal mit einer komki-Sitzung: eine Frage, Werkzeugaufrufe mit der Entscheidung des Vermittlers, eine Antwort mit Quellen](docs/site/src/assets/session.svg)
+![Terminal mit einer komki-Sitzung: oben Raum und Labels, eine Frage, Werkzeugaufrufe mit der Entscheidung des Vermittlers, eine Antwort mit Quellen](docs/site/src/assets/session.svg)
 
-*Echte Sitzung vom 25.10.2026 mit erfundenen Test-Notizen und dem echten Ratsinformationssystem.*
+*Echte Sitzung vom 30.10.2026 mit erfundenen Test-Notizen und dem echten Ratsinformationssystem.*
 
 - **Das Sprachmodell läuft auf dem eigenen Mac.** Fragen und Notizen gehen an keinen KI-Anbieter.
 - **Der Agent ist eingesperrt.** Er erreicht nur das Sprachmodell und einen Vermittler, kein Internet, keine Dateien, keine Befehle.
