@@ -33,9 +33,10 @@ defmodule KomkiCli.Raum do
   Innerhalb von pi gäbe es weitere Wege zu einer anderen Session:
   `/resume` und `/import` (Ticket #295). Das Profil der Session gibt unter
   `pi-home/sessions` nur ihr eigenes Verzeichnis frei
-  (`KomkiCli.Profile`), die Extension in pi bricht beide Befehle zusätzlich
-  mit einem Hinweis ab. `/new`, `/fork` und `/clone` legen ihre Dateien im
-  selben Verzeichnis an, also im Raum dieser Session.
+  (`KomkiCli.Profile`), die Extension in pi bricht den Wechsel dorthin
+  zusätzlich mit einem Hinweis ab. `/new`, `/fork` und `/clone` legen ihre
+  Dateien im selben Verzeichnis an, also im Raum dieser Session; zu ihnen
+  darf `/resume` wechseln.
 
   Den Wechsel belegt das Journal: Der Vermittler hält bei jedem Start das
   B_W fest, mit dem er entscheidet (`tool: "workspace"`).
@@ -185,12 +186,21 @@ defmodule KomkiCli.Raum do
     end
   end
 
-  @doc "Verzeichnis der zuletzt geöffneten Session, `nil` ohne."
-  @spec session_dir(Config.t()) :: Path.t() | nil
+  @doc """
+  Verzeichnis der zuletzt geöffneten Session, für den Start von pi im
+  Pane. Prüft den Raum noch einmal: Wurde seit `open_session/2` gelockert,
+  startet die Session nicht.
+  """
+  @spec session_dir(Config.t()) :: {:ok, Path.t()} | {:error, String.t(), pos_integer()}
   def session_dir(%Config{} = cfg) do
-    case current_session(cfg) do
-      {:ok, name} -> Path.join(Pi.sessions_root(cfg), name)
-      :missing -> nil
+    with {:ok, name} <- current_session(cfg),
+         {:ok, previous} <- read_marker(cfg, name),
+         {:ok, room} <- read_room(cfg),
+         :ok <- continue_into(room["workspace_bindings"], previous) do
+      {:ok, Path.join(Pi.sessions_root(cfg), name)}
+    else
+      :missing -> {:error, "kein Session-Verzeichnis geöffnet: 'komki session' neu starten", 2}
+      error -> error
     end
   end
 
@@ -331,12 +341,12 @@ defmodule KomkiCli.Raum do
     end
   end
 
-  defp write_room(cfg, room, bindings) do
-    path = StartContract.default_path(cfg.base_dir)
-    tmp = path <> ".tmp"
-    File.write!(tmp, KomkiPolicy.JSON.canonical(Map.put(room, "workspace_bindings", bindings)))
-    File.rename!(tmp, path)
-  end
+  defp write_room(cfg, room, bindings),
+    do:
+      write_json(
+        StartContract.default_path(cfg.base_dir),
+        Map.put(room, "workspace_bindings", bindings)
+      )
 
   # Eine laufende Session arbeitet nach einem verschärfenden Wechsel im
   # strengeren Raum weiter; ihre Markierung zieht mit.
@@ -378,7 +388,8 @@ defmodule KomkiCli.Raum do
   # nicht als Session.
   @session_name ~r/\A\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{6}Z\z/
 
-  defp new_session_name, do: Calendar.strftime(DateTime.utc_now(), "%Y-%m-%dT%H-%M-%S-%fZ")
+  defp new_session_name,
+    do: Calendar.strftime(DateTime.utc_now(:microsecond), "%Y-%m-%dT%H-%M-%S-%fZ")
 
   defp session_names(cfg) do
     case File.ls(Pi.sessions_root(cfg)) do

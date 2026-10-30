@@ -116,7 +116,17 @@ defmodule KomkiCli.RaumTest do
 
       assert a != b
       assert Path.dirname(a) == KomkiCli.Pi.sessions_root(cfg)
-      assert Raum.session_dir(cfg) == b
+      assert Raum.session_dir(cfg) == {:ok, b}
+    end
+
+    test "das Pane startet nicht, wenn seit dem Öffnen gelockert wurde", %{cfg: cfg} do
+      {:raum, _} = Raum.switch(cfg, "vertraulich", deps([]))
+      dir = open!(cfg, false)
+      assert Raum.session_dir(cfg) == {:ok, dir}
+
+      {:raum, _} = Raum.switch(cfg, "recherche", deps([]))
+      assert {:error, reason, 2} = Raum.session_dir(cfg)
+      assert reason =~ "lief im Raum vertraulich"
     end
 
     test "ohne frühere Unterhaltung nein, auch nicht mit Dateien von vor #295", %{cfg: cfg} do

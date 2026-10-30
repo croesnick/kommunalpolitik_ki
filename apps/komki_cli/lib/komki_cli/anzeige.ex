@@ -6,8 +6,9 @@ defmodule KomkiCli.Anzeige do
     * `komki-anzeige/`: Extension, die die Tool-Aufrufe des Vermittlers
       lesbar statt als Roh-JSON zeichnet. Sie registriert Renderer und
       ändert weder Entscheidungen noch den Modellkontext. Dazu bricht sie
-      `/resume` und `/import` mit einem Hinweis ab (Ticket #295); die
-      Grenze dafür zieht das Profil der Session (`KomkiCli.Profile`).
+      `/resume` und `/import` zu einer fremden Session mit einem Hinweis ab
+      (Ticket #295); die Grenze dafür zieht das Profil der Session
+      (`KomkiCli.Profile`).
     * `komki-vorlagen/`: Prompt-Vorlagen für die Ratsarbeit
       (`/sitzungsmappe`, `/zusammenfassen`, `/quellen`). Reiner Text, den
       die nutzende Person selbst abschickt; keine Befugnis.

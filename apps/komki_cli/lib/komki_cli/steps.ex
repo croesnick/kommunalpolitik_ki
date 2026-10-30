@@ -1522,12 +1522,9 @@ defmodule KomkiCli.Steps do
   # Das Session-Verzeichnis hat `komki session` geöffnet und im Raum
   # geprüft (KomkiCli.Raum.open_session/2), bevor es das Pane startete.
   defp do_session_chain(cfg, continue?) do
-    with session_dir when is_binary(session_dir) <- KomkiCli.Raum.session_dir(cfg),
+    with {:ok, session_dir} <- KomkiCli.Raum.session_dir(cfg),
          {:ok, channel_env} <- prepare_channel(cfg) do
       start_session_chain(cfg, session_dir, continue?, channel_env)
-    else
-      nil -> {:error, "kein Session-Verzeichnis geöffnet: 'komki session' neu starten", 2}
-      {:error, reason, code} -> {:error, reason, code}
     end
   end
 

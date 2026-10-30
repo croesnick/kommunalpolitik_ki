@@ -224,10 +224,10 @@ Hinweise zu den einzelnen Schritten:
   `komki run` (festgehalten unter `<base>/run/runs/`). Und
   `komki session --continue` setzt eine Session nur in einem Raum fort, der
   mindestens so streng ist wie der, in dem sie lief (festgehalten je Session
-  unter `<base>/run/sessions/`). In pi selbst sind `/resume` und `/import`
-  gesperrt: Jede Session sieht unter `pi-home/sessions` nur ihr eigenes
-  Verzeichnis (Seatbelt-Profil), und die komki-Extension bricht beide
-  Befehle mit einem Hinweis ab (#295). Eigene Räume und Räume mit Startvertrag
+  unter `<base>/run/sessions/`). In pi selbst holen `/resume` und `/import`
+  keine andere Session herein: Jede Session sieht unter `pi-home/sessions`
+  nur ihr eigenes Verzeichnis (Seatbelt-Profil), und die komki-Extension
+  bricht den Wechsel dorthin mit einem Hinweis ab (#295). Eigene Räume und Räume mit Startvertrag
   stellt `komki raum` nicht um (#214).
 * **Nachvollziehen:** Jede Entscheidung steht im Journal
   `~/.local/share/komki/mediator/journal/pdr.jsonl`; `komki journal verify`

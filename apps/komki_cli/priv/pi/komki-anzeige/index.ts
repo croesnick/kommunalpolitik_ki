@@ -6,9 +6,10 @@
 // Rückgabewert), um die letzte Dokumentliste zu kennen. Ihre Ausgaben sind
 // Session-Einträge, die pi nicht ans Modell schickt. Die Gestaltung steht in
 // view.ts und raum.ts. Eine Ausnahme von der reinen Anzeige: /resume und
-// /import bricht sie ab (Ticket #295, unten).
+// /import zu einer fremden Session bricht sie ab (Ticket #295, unten).
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { keyText } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
@@ -121,9 +122,14 @@ export default function (pi: ExtensionAPI) {
 	// Kontext in diesen Raum, auch eine aus einem strengeren. Fortsetzen geht
 	// nur mit komki session --continue, das den Raum prüft. Das Profil sperrt
 	// fremde Sessions ohnehin; hier gibt es statt eines Lesefehlers einen
-	// Hinweis. /new, /fork und /clone bleiben in dieser Session.
+	// Hinweis. Erlaubt bleibt der Wechsel zu einer vorhandenen Datei im
+	// eigenen Verzeichnis (nach /new, /fork, /clone): derselbe Raum. /import
+	// zielt auf eine Kopie, die es noch nicht gibt, und bleibt damit zu.
 	pi.on("session_before_switch", async (event, ctx) => {
 		if (event.reason !== "resume") return;
+		const target = event.targetSessionFile;
+		const own = resolve(ctx.sessionManager.getSessionDir());
+		if (target && existsSync(target) && dirname(resolve(target)) === own) return;
 		ctx.ui.notify(
 			"In komki geht das nicht: Eine andere Session brächte ihren Kontext in diesen Raum. Beende pi mit /quit und setze die letzte Session mit komki session --continue fort.",
 			"warning",
