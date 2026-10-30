@@ -41,6 +41,7 @@ export default defineConfig({
             { label: 'Worum es geht', slug: 'komki/worum-es-geht' },
             { label: 'So funktioniert komki', slug: 'komki/so-funktioniert-es' },
             { label: 'In Betrieb nehmen', slug: 'komki/in-betrieb-nehmen' },
+            { label: 'Mit einem Agenten einrichten', slug: 'komki/mit-agent-einrichten' },
             { label: 'Die Sicherheitsgrenze sehen', slug: 'komki/sicherheitsgrenze' },
             { label: 'Wenn etwas hakt', slug: 'komki/wenn-es-hakt' },
           ],

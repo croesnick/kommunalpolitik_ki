@@ -155,7 +155,9 @@ Test-Vault, `--demo` ohne Frage), legt die Instanz an, fragt den
 Brave-Key verdeckt ab, falls er im Schlüsselbund fehlt (oder bietet an,
 einen Klartext-Eintrag zu versiegeln), startet alles und
 prüft mit dem Doctor. Ein zweiter Lauf ändert an einer bestehenden Instanz
-nichts. Fehlt das Modell, nennt `setup` Größe, Quelle (feste Revision auf
+nichts. Ja/Nein-Fragen (Download, veränderte Programme übernehmen) gelten nur
+am Terminal: Ohne Terminal ist jede Antwort nein, auch eine hineingepipte
+(`yes j | komki setup`, Ticket #262). Fehlt das Modell, nennt `setup` Größe, Quelle (feste Revision auf
 Hugging Face) und Lizenz und lädt es nach Rückfrage an den Staging-Ort
 (`~/.local/share/komki/models-staging/`). Ein abgebrochener Download setzt
 beim nächsten Aufruf fort; verwendet wird die Datei nur mit passender

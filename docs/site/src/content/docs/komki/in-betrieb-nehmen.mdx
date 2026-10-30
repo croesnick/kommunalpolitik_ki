@@ -7,10 +7,12 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 
 Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst ausprobieren willst. Rechne mit einer knappen Stunde, das meiste davon Warten: Erlang wird gebaut, das Modell lädt herunter. Alle Ausgaben stammen aus echten Läufen. Pfade sind mit `~` abgekürzt. Prozessnummern, Zeiten und die Antworten des Modells sehen bei dir anders aus. Der Testlauf lief auf Port 49600 neben einer zweiten Instanz, bei dir steht dort der Standard 49524.
 
+Soll dein Coding-Agent die Einrichtung übernehmen, gib ihm den Auftrag von [Mit einem Agenten einrichten](/kommunalpolitik_ki/komki/mit-agent-einrichten/). Dort steht auch, an welchen Stellen er an dich übergibt.
+
 ## Was du brauchst
 
 - **Einen Mac mit Apple Silicon.** komki nutzt die Sandbox von macOS, auf Linux oder Windows läuft es nicht.
-- **Arbeitsspeicher für das Modell.** Gemma belegt rund 17 GB. Mit 32 GB läuft es entspannt, mit 16 GB nicht.
+- **Arbeitsspeicher für das Modell.** Die Modelldatei von Gemma hat 17 GB und muss in den Arbeitsspeicher passen, mit 16 GB geht es also nicht. Erprobt ist komki auf einem M1 Max mit 64 GB. 32 GB sollten reichen, geprüft ist das noch nicht.
 - **Rund 20 GB freien Platz.** Fast alles davon ist das Modell. Die Instanz bekommt nur einen APFS-Klon der Datei, also keine zweite Kopie.
 - **Homebrew und asdf** für die Werkzeuge, **pnpm** für pi, die **Xcode Command Line Tools** (`xcode-select --install`) für ein kleines Swift-Programm, das Schlüssel mit der Secure Enclave schützt.
 - **Optional einen Brave-Search-API-Schlüssel** für die Websuche ([brave.com/search/api](https://brave.com/search/api/), Konditionen dort). Ohne ihn funktionieren RIS und Vault, nur die Websuche fehlt.
@@ -278,14 +280,20 @@ Diese Seite ist für dich, wenn du im Terminal zu Hause bist und komki selbst au
    git pull && make komki && komki setup
    ```
 
-   **Ganz entfernen:** komki stoppen, den Schlüssel aus dem Schlüsselbund löschen und die Instanz samt Modell löschen. Das Journal ist gegen Überschreiben geschützt (nur Anhängen erlaubt), deshalb hebt der erste Befehl diesen Schutz vor dem Löschen auf.
-
-   ```sh
-   komki down
-   security delete-generic-password -s brave-search-api
-   chflags -R nouappnd ~/.local/share/komki && rm -rf ~/.local/share/komki
-   ```
-
 </Steps>
+
+## komki ganz entfernen
+
+<Aside type="caution">
+Das gehört nicht zur Einrichtung. Es löscht deine Instanz mit Journal, Modell und Test-Vault endgültig. Ein Agent führt es nur aus, wenn du es ausdrücklich verlangst.
+</Aside>
+
+komki stoppen, den Schlüssel aus dem Schlüsselbund löschen und die Instanz samt Modell löschen. Das Journal ist gegen Überschreiben geschützt (nur Anhängen erlaubt), deshalb hebt der dritte Befehl diesen Schutz vor dem Löschen auf.
+
+```sh
+komki down
+security delete-generic-password -s brave-search-api
+chflags -R nouappnd ~/.local/share/komki && rm -rf ~/.local/share/komki
+```
 
 Hakt etwas, hilft [Wenn etwas hakt](/kommunalpolitik_ki/komki/wenn-es-hakt/). Weiter geht es mit [Die Sicherheitsgrenze sehen](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
