@@ -1184,12 +1184,15 @@ defmodule KomkiCli.Steps do
       prompt = Map.fetch!(opts, "prompt")
       timeout_ms = Map.get(opts, "timeout", @run_timeout_s) * 1000
 
-      run_pi_with_capture(cfg, scratch, mode, prompt,
-        capture?: Map.has_key?(opts, "capture-denials"),
-        pi_fun: fn cfg, scratch, mode, prompt ->
-          Pi.run(cfg, scratch, mode, prompt, timeout_ms, channel_env)
-        end
-      )
+      # Solange der Lauf geht, lockert `komki raum` nicht (Ticket #268).
+      KomkiCli.Raum.track_run(cfg, fn ->
+        run_pi_with_capture(cfg, scratch, mode, prompt,
+          capture?: Map.has_key?(opts, "capture-denials"),
+          pi_fun: fn cfg, scratch, mode, prompt ->
+            Pi.run(cfg, scratch, mode, prompt, timeout_ms, channel_env)
+          end
+        )
+      end)
     else
       {:error, reason, code} -> {:error, reason, code}
     end
@@ -1927,6 +1930,20 @@ defmodule KomkiCli.Steps do
     end
   end
 
+  @doc "`komki raum [NAME]` (Ticket #268): anzeigen oder wechseln, siehe `KomkiCli.Raum`."
+  @spec raum(String.t() | nil) :: {:raum, String.t()} | {:error, String.t(), pos_integer()}
+  def raum(nil), do: KomkiCli.Raum.show(load_cfg!())
+  def raum(name), do: KomkiCli.Raum.switch(load_cfg!(), name)
+
+  @doc "Ob die interaktive Session dieser Instanz läuft (für `komki raum`, Ticket #268)."
+  @spec session_running?(Config.t()) :: boolean()
+  def session_running?(%Config{} = cfg) do
+    case System.find_executable("tmux") do
+      nil -> false
+      tmux -> tmux_session_running?(tmux, cfg)
+    end
+  end
+
   defp tmux_session_running?(tmux, cfg) do
     # stderr gefangen: "no server running"-Meldungen sollen das Terminal
     # des Aufrufers nicht zumuellen (Live-Fund aus dem Session-Smoke).
@@ -1982,17 +1999,14 @@ defmodule KomkiCli.Steps do
     continue? = Map.has_key?(opts, "continue")
     detach? = Map.has_key?(opts, "detach")
 
-    case continue_precondition(cfg, continue?) do
-      :ok ->
-        prepare_session_assets(cfg)
-        pane = Pi.pane_command(KomkiCli.Runtime.self_path(), cfg.base_dir, continue?)
+    with :ok <- continue_precondition(cfg, continue?),
+         :ok <- KomkiCli.Raum.mark_session(cfg, continue?) do
+      prepare_session_assets(cfg)
+      pane = Pi.pane_command(KomkiCli.Runtime.self_path(), cfg.base_dir, continue?)
 
-        if detach?,
-          do: create_detached(tmux, cfg, pane),
-          else: create_with_attach(tmux, cfg, pane)
-
-      {:error, reason, code} ->
-        {:error, reason, code}
+      if detach?,
+        do: create_detached(tmux, cfg, pane),
+        else: create_with_attach(tmux, cfg, pane)
     end
   end
 
@@ -2047,8 +2061,10 @@ defmodule KomkiCli.Steps do
         {:error,
          "keine frühere Session in " <> Pi.session_dir(cfg) <> "; ohne --continue starten", 2}
 
+      # Fortsetzen nur in einem Raum, der mindestens so streng ist wie der
+      # der letzten Session: pi bringt ihren Kontext mit (Ticket #268).
       {:ok, _sessions} ->
-        :ok
+        KomkiCli.Raum.continue_allowed(cfg)
 
       {:error, _posix} ->
         {:error,
