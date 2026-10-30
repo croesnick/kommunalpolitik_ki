@@ -111,6 +111,14 @@ Regeln für Kriterien:
 - **Kriterien sind versioniert** in der Suite. Eine Änderung an einem Kriterium
   setzt die Vergleichsreihe zurück und gehört in denselben Commit wie die neue
   Messung; die `BENCHMARK.md` nennt den Suite-Stand (Git-SHA).
+- **llm-Richter mit echten Antwortlängen smoken:** Gemma denkt vor der Antwort
+  in `reasoning_content`; ein zu kleines Output-Budget schneidet den Lauf im
+  Denken ab und der Richter sieht nur leeren Content (erste Messung #292:
+  59/60 Urteile unbestimmt bei 256 Token Budget — der Smoke mit
+  Ein-Satz-Antworten sah noch grün aus). Der Richter vergibt 2 048 Token und
+  liest das Urteil notfalls aus dem Ende der Denkspur. Ein Richter-Defekt
+  wird über die gespeicherten Antworten neu bewertet (`--nur-richter`), nie
+  durch Wiederholung der Messläufe.
 - **Jeder neue Fehlertyp wird zum Fall**: Das Lesen der Stichproben findet
   Fehler, die kein abgefragtes Kriterium kennt (in #158 war es die erfundene
   RIS-URL). Pflicht je Messrunde: Stichproben lesen und neue Fehler als Fälle

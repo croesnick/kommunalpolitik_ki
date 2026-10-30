@@ -73,6 +73,7 @@ function parseArgs(argv) {
     bericht: null,
     notizen: null,
     trockenlauf: false,
+    nurRichter: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -84,6 +85,7 @@ function parseArgs(argv) {
     else if (a === "--bericht") args.bericht = argv[++i];
     else if (a === "--notizen") args.notizen = argv[++i];
     else if (a === "--trockenlauf") args.trockenlauf = true;
+    else if (a === "--nur-richter") args.nurRichter = true;
     else throw new Error(`unbekannte Option: ${a}`);
   }
   if (!args.skill) throw new Error("--skill <name> ist Pflicht (z. B. --skill sitzungsvorbereitung)");
@@ -383,9 +385,25 @@ async function main() {
     ? starteRichter({ baseUrl: llama.baseUrl, apiKey: llama.apiKey, model: "local-model" })
     : null;
 
-  const laufErgebnisse = [];
+  // Nur-Richter-Modus: Die Messläufe bleiben unverändert (sie stehen in
+  // <root>/ergebnis.json); nur die llm-Bewerter werden über die gespeicherten
+  // Antworten neu bewertet und der Bericht neu geschrieben. Für den Fall,
+  // dass der Richter selbst einen Defekt hatte — die Messläufe sind teuer,
+  // der Richter ist eine eigene Phase nach ihnen.
+  let laufErgebnisse = null;
+  if (args.nurRichter) {
+    const gespeichert = JSON.parse(await readFile(path.join(root, "ergebnis.json"), "utf8"));
+    laufErgebnisse = gespeichert.laufErgebnisse;
+    console.log(
+      `\nNur-Richter-Modus: ${laufErgebnisse.length} gespeicherte Läufe aus ${root} — ` +
+        `keine Messläufe, nur llm-Bewerter und Bericht.`,
+    );
+  } else {
+    laufErgebnisse = [];
+  }
+
   let fortlauf = 0;
-  for (const eintrag of laufplan) {
+  for (const eintrag of args.nurRichter ? [] : laufplan) {
     const { fall, arm, lauf } = eintrag;
     fortlauf += 1;
     const laufDir = path.join(root, "laeufe", `${fall.id}__${arm}__${lauf}`);

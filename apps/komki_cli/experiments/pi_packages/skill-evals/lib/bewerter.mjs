@@ -106,15 +106,36 @@ export async function bewerte(b, kontext) {
  * Aufruf, Antwort nur PASS/FAIL in der ersten Zeile. Der Richter ist gepinnt
  * (dasselbe Modell, Server-Defaults) und geht in die Token-Zählung des
  * Berichts ein.
+ *
+ * Gemma 4 26B-A4B-it denkt vor der Antwort in reasoning_content (englisch);
+ * bei zu kleinem max_tokens wird der Lauf im Denken abgeschnitten und content
+ * bleibt leer. Deshalb: 2 048 Tokens Budget und ein Fallback, der das Ende
+ * der Denkspur nach PASS/FAIL absucht. Die erste Messung (Ticket #292) lief
+ * mit 256 Tokens exakt in diese Falle: 59 von 60 Urteilen unbestimmt.
  */
-export function starteRichter({ baseUrl, apiKey, model, timeoutMs = 60_000 }) {
+export function starteRichter({ baseUrl, apiKey, model, timeoutMs = 120_000 }) {
   const url = new URL(baseUrl);
   const laeufe = [];
+
+  /** PASS/FAIL aus content (zeilenweise) oder aus dem Ende der Denkspur. */
+  function urteilVon(content, reasoning) {
+    const zeilen = (content ?? "").trim().split("\n");
+    for (const zeile of zeilen) {
+      const wort = zeile.trim().toUpperCase();
+      if (wort.startsWith("PASS")) return true;
+      if (wort.startsWith("FAIL")) return false;
+    }
+    const schwanz = (reasoning ?? "").slice(-400).toUpperCase();
+    const treff = [...schwanz.matchAll(/\b(PASS(?:ES)?|FAIL(?:S)?)\b/g)].at(-1);
+    if (!treff) return null;
+    return treff[1].startsWith("PASS");
+  }
+
   const richter = (bedingungen, antwort) =>
     new Promise((resolve) => {
       const body = JSON.stringify({
         model,
-        max_tokens: 256,
+        max_tokens: 2048,
         messages: [
           {
             role: "system",
@@ -148,32 +169,45 @@ export function starteRichter({ baseUrl, apiKey, model, timeoutMs = 60_000 }) {
           res.on("data", (chunk) => chunks.push(chunk));
           res.on("end", () => {
             const text = Buffer.concat(chunks).toString("utf8");
-            let pass = null;
-            let urteilstext = "";
+            let content = "";
+            let reasoning = "";
             let usage = null;
+            let finish = null;
             try {
               const parsed = JSON.parse(text);
-              urteilstext = parsed.choices?.[0]?.message?.content ?? "";
+              content = parsed.choices?.[0]?.message?.content ?? "";
+              reasoning = parsed.choices?.[0]?.message?.reasoning_content ?? "";
               usage = parsed.usage ?? null;
+              finish = parsed.choices?.[0]?.finish_reason ?? null;
             } catch {
-              urteilstext = text.slice(0, 500);
+              content = text.slice(0, 500);
             }
-            const erste = (urteilstext.trim().split("\n")[0] ?? "").trim().toUpperCase();
-            if (erste.startsWith("PASS")) pass = true;
-            else if (erste.startsWith("FAIL")) pass = false;
+            const pass = urteilVon(content, reasoning);
             laeufe.push({ durationMs: Date.now() - started, usage });
-            resolve({ pass: pass === true, unbestimmt: pass === null, text: urteilstext, usage });
+            resolve({
+              pass: pass === true,
+              unbestimmt: pass === null,
+              abgeschnitten: finish === "length",
+              text: content || reasoning,
+              usage,
+            });
           });
         },
       );
       req.setTimeout(timeoutMs, () => {
         req.destroy();
         laeufe.push({ durationMs: Date.now() - started, usage: null });
-        resolve({ pass: false, unbestimmt: true, text: "timeout", usage: null });
+        resolve({ pass: false, unbestimmt: true, abgeschnitten: false, text: "timeout", usage: null });
       });
       req.on("error", (error) => {
         laeufe.push({ durationMs: Date.now() - started, usage: null });
-        resolve({ pass: false, unbestimmt: true, text: String(error?.message ?? error), usage: null });
+        resolve({
+          pass: false,
+          unbestimmt: true,
+          abgeschnitten: false,
+          text: String(error?.message ?? error),
+          usage: null,
+        });
       });
       req.end(body);
     });
