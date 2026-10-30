@@ -16,6 +16,7 @@ import {
   PI_CLI,
 } from "./config.mjs";
 import { startMockProvider } from "./mock-provider.mjs";
+import { startForwardProvider } from "./provider.mjs";
 import { parseSessionFile } from "./session.mjs";
 
 function safeId(id) {
@@ -97,6 +98,10 @@ async function newestSessionFile(dir) {
  *   timeoutMs                    - default 30000
  *   extraArgs                    - appended before prompt
  *   sessionDir                   - override session directory
+ *   provider                     - real provider instead of the mock:
+ *                                 { upstreamBaseUrl, apiKey, name, model, maxTokens }
+ *                                 pi points at a logging forward proxy
+ *                                 (lib/provider.mjs); `responses` is ignored.
  */
 export async function runPi(options = {}) {
   const runRoot = options.runRoot;
@@ -123,24 +128,47 @@ export async function runPi(options = {}) {
 
   const contextWindow = options.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
 
-  const mock = await startMockProvider({
-    script: options.responses ?? [],
-    logPath: requestsPath,
-    contextWindow,
-  });
+  let mock = null;
+  let forwarder = null;
+  let providerName = MOCK_PROVIDER;
+  let modelName = MOCK_MODEL;
+  let providerLabel = "Mock Model";
+  let apiKey = "mock-key";
+  let baseUrl;
+  let maxTokens = 512;
+
+  if (options.provider) {
+    forwarder = await startForwardProvider({
+      upstreamBaseUrl: options.provider.upstreamBaseUrl,
+      logPath: requestsPath,
+    });
+    providerName = options.provider.name ?? "pi-local";
+    modelName = options.provider.model ?? "local-model";
+    providerLabel = modelName;
+    apiKey = options.provider.apiKey;
+    baseUrl = forwarder.baseUrl;
+    maxTokens = options.provider.maxTokens ?? 4096;
+  } else {
+    mock = await startMockProvider({
+      script: options.responses ?? [],
+      logPath: requestsPath,
+      contextWindow,
+    });
+    baseUrl = mock.baseUrl;
+  }
 
   const models = {
     providers: {
-      [MOCK_PROVIDER]: {
+      [providerName]: {
         api: "openai-completions",
-        apiKey: "mock-key",
-        baseUrl: mock.baseUrl,
+        apiKey,
+        baseUrl,
         models: [
           {
-            id: MOCK_MODEL,
-            name: "Mock Model",
+            id: modelName,
+            name: providerLabel,
             contextWindow,
-            maxTokens: 512,
+            maxTokens,
             reasoning: false,
           },
         ],
@@ -180,9 +208,9 @@ export async function runPi(options = {}) {
     "--session-dir",
     sessionDir,
     "--provider",
-    MOCK_PROVIDER,
+    providerName,
     "--model",
-    MOCK_MODEL,
+    modelName,
     "--tools",
     options.tools ?? "read",
   ];
@@ -240,7 +268,8 @@ export async function runPi(options = {}) {
   });
 
   clearTimeout(timer);
-  await mock.close();
+  await mock?.close();
+  await forwarder?.close();
 
   const { events, parseErrors } = parseJsonl(stdout);
   const sessionFile = await newestSessionFile(sessionDir);
