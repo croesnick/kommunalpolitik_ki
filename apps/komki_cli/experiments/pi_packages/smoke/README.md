@@ -5,6 +5,12 @@ Fünf Aufgaben plus Compaction-Experiment gegen den **echten** llama-server
 [2026-10-24](../../../../../docs/research/2026-10-24-pi-package-experiments.md).
 Ergebnisse: [Labbook 2026-10-30](../../../../../docs/research/2026-10-30-pi-realmodell-smoke-test.md).
 
+Der Smoke-Test dokumentierte in Aufgabe 1 eine Qualitätslücke (Eigenanteil
+fehlt in jeder Zusammenfassung unter natürlichem Prompt). Der
+[`run-top-bench.mjs`](#benchmark-aufgabe-1) misst dagegen gegen explizit
+definiertes gewünschtes Verhalten (Muss-Kriterien K1–K8) in zwei
+Prompt-Varianten — natürlich vs. spec-explizit, je drei Läufe.
+
 Der Harness startet llama-server **nicht** selbst. Er erwartet die laufende
 komki-Instanz (`KOMKI_HOME`, default `~/.local/share/komki`), liest Port und
 API-Key aus ihr und verweigert den Lauf mit klarer Meldung, wenn
@@ -46,7 +52,22 @@ node apps/komki_cli/experiments/pi_packages/smoke/run-tui.mjs --root <run-root>
 
 Optionen von `run-smoke.mjs`: `--only 1,2,3,4,6` (Teilmenge) und
 `--root <dir>` (eigenes Laufverzeichnis). Der Standard-Lauf schreibt unter
-`$KOMKI_PI_EXPERIMENTS_DIR/runs/<timestamp>/`.
+`$KOMKI_PI_EXPERIMENTS_DIR/runs/<timestamp>/`. Die Gesamtübersicht
+(`results.json`, `SMOKE.md`) wird aus allen `results/*.json` des Roots
+zusammengesetzt — Teil-Nachläufe mit `--only` überschreiben sie nicht.
+
+## Benchmark: Aufgabe 1
+
+```bash
+# TOP-Benchmark gegen Muss-Kriterien K1–K8 (siehe Labbook): zwei
+# Prompt-Varianten (natürlich / spec-explizit), je drei Läufe
+node apps/komki_cli/experiments/pi_packages/smoke/run-top-bench.mjs --root <run-root> [--runs 3]
+```
+
+Gewünschtes Verhalten ist im Skript definiert und im Labbook begründet
+(Sitzungsmappe-Vorlage, Finanzierungs-TOPs, Quellenpflicht). Verdikt-Maßstab:
+Variante B (explizit) liefert alle Kriterien in jedem Lauf — sonst läge ein
+Modelldefizit statt Prompt-Sensitivität vor.
 
 ## Ergebnisse
 
@@ -62,6 +83,7 @@ Optionen von `run-smoke.mjs`: `--only 1,2,3,4,6` (Teilmenge) und
 - llama-server-Log-Segment je Aufgabe: prompt-/eval-Tokens und Tokens/s je Request
 - RSS des llama-server vor/nach jeder Aufgabe (`ps`, Richtwert — Metal-Speicher wird nicht vollständig erfasst)
 - Tool-Call-Validierung: jedes vom Modell gelieferte Argument gegen das JSON-Schema aus dem aufgezeichneten Request; Fehlerklassen inkl. Truncation-Erkennung (`invalid-json`, `unknown-tool`, `missing-required`, `wrong-type`, `extra-keys`)
+- Benchmark (Aufgabe 1): Muss-Kriterien K1–K8 je Lauf, inkl. Erfindungs-Check — jede Zahl der Antwort muss aus der Quelle stammen oder als Summe/Differenz aus Quellenzahlen ableitbar sein
 - Session-Zustand: Persistenz (`rpiv-todo-state`), `--continue`-Verhalten, Compaction-Entries
 
 ## Grenzen
