@@ -594,7 +594,9 @@ async function main() {
         if (tokens.size > 0) {
           auffaelligkeiten.push(
             `erfundene Zahlen laut \`${b.id}\` (${ARM_LABEL[arm]}): ` +
-              [...tokens.entries()].map(([t, n]) => `${t} (${n} Läufe)`).join(", "),
+              [...tokens.entries()]
+                .map(([t, n]) => `${t} (${n} ${n === 1 ? "Lauf" : "Läufe"})`)
+                .join(", "),
           );
         }
       }

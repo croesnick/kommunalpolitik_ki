@@ -40,11 +40,12 @@ function kriterienTabelle(fall, armLabel) {
   return lines.join("\n");
 }
 
-/** „id x/N“ für jedes Kriterium mit mindestens einem Fehlschlag im Arm. */
+/** „id fehlt n/N“ für jedes Kriterium mit mindestens einem Fehlschlag im Arm. */
 function fehlkriterienText(e) {
   const fehl = [];
   for (const [id, eintrag] of Object.entries(e.jeKriterium)) {
-    if (eintrag.bestanden < e.laeufeGesamt) fehl.push(`${id} ${eintrag.bestanden}/${e.laeufeGesamt}`);
+    const fehlZahl = e.laeufeGesamt - eintrag.bestanden;
+    if (fehlZahl > 0) fehl.push(`${id} fehlt ${fehlZahl}/${e.laeufeGesamt}`);
   }
   return fehl.length > 0 ? fehl.join(" · ") : "keine";
 }
