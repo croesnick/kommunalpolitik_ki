@@ -1,6 +1,6 @@
 # Lane protocol: work and close a wayfinder ticket
 
-Updated: 2026-10-15. This protocol tells a session how to work a wayfinder ticket from claim to close: read the ticket, build the smallest slice that satisfies it, verify, and record the result. It covers two cases: a dispatched lane in a herdr worktree, and a cold session that takes a ticket from the frontier.
+Updated: 2026-10-30. This protocol tells a session how to work a wayfinder ticket from claim to close: read the ticket, build the smallest slice that satisfies it, verify, and record the result. It covers two cases: a dispatched lane in a herdr worktree, and a cold session that takes a ticket from the frontier.
 
 Acceptance criteria used to live in per-dispatch prompts, and a dispatch prompt dies with its session. The criteria now live in the ticket and in this protocol. If a line would have to appear in a dispatch prompt, put it in the ticket body or here.
 
@@ -34,8 +34,8 @@ Run the gates from the tooling table in [AGENTS.md](../../AGENTS.md) before you 
 ## Close the ticket
 
 1. Commit on the lane branch. Reference the ticket number in the commit message.
-2. Post a resolution comment on the ticket with three parts. `Gebaut` states what you built, where, and in which commit. `Bewusst offen` states what you deliberately left out and where the follow-up lives. `Verifiziert` states the gates and the smoke and test commands you ran.
-3. Close the ticket and set its board status to Done. The project commands live in AGENTS.md under Projekt-Verwaltung.
+2. Open the PR with `Closes #<n>` in its body. The merge closes the ticket, and the board workflow moves it to Done. `(Ticket #<n>)` in the title or in commits does not close anything. If the PR deliberately covers only part of the ticket, write `Refs #<n>` and one sentence on what remains. Do not close the ticket by hand.
+3. Post a resolution comment on the ticket with three parts. `Gebaut` states what you built, where, and in which commit. `Bewusst offen` states what you deliberately left out and where the follow-up lives. `Verifiziert` states the gates and the smoke and test commands you ran.
 4. Leave the map alone. The `wayfinder:map` issue is maintained by the orchestrator session that charted it.
 
 ## Escalate instead of reinterpreting

@@ -117,11 +117,28 @@ defmodule KomkiMediator.CLI do
            }}
         )
 
+      :ok = journal_workspace(base, room)
       IO.puts(startup_note(base, socket, gamma))
       Process.sleep(:infinity)
     else
       {:error, reason} -> error_exit(reason)
     end
+  end
+
+  # Jeder Start belegt das B_W, mit dem der Vermittler ab jetzt
+  # entscheidet. So steht auch ein Raumwechsel (`komki raum`, Ticket #268)
+  # im Journal: als Folge zweier Startdatensaetze mit verschiedenem B_W.
+  defp journal_workspace(base, room) do
+    {:ok, raw} = File.read(Path.join(mediator_dir(base), "room.json"))
+
+    KomkiMediator.PDR.append(KomkiMediator.Env.fetch(), %{
+      "decision_id" => KomkiMediator.PDR.new_id(),
+      "tool" => "workspace",
+      "decision" => "loaded",
+      "outcome" => "room_loaded",
+      "checked_label" => room.workspace_bindings,
+      "payload_hash" => KomkiMediator.Hash.sha256_hex(raw)
+    })
   end
 
   defp connectors_dir(%{connectors_dir: dir}), do: dir

@@ -49,7 +49,7 @@ defmodule KomkiPolicy.Derive do
   ]
 
   @unsupported_operations ["start", "transfer", "store"]
-  @unsupported_detail "rule branch not implemented in delivery 1"
+  @unsupported_detail "rule branch not implemented"
 
   @doc "§ 4.3-Prämissennamen in fester Reihenfolge (gemeinsame Sollmenge für derive-Baum und verify)."
   @spec required_premises() :: [String.t()]
@@ -278,7 +278,7 @@ defmodule KomkiPolicy.Derive do
        })}
     else
       remedy_ctx = release_remedies_context(state, registry, call_hash)
-      findings = Remedies.catalog(registry, remedy_ctx, :release, state.blockers)
+      findings = Remedies.catalog(registry, remedy_ctx, state.blockers)
 
       {:ok,
        release_decision(ctx, auth, state.checked, %{
@@ -540,7 +540,7 @@ defmodule KomkiPolicy.Derive do
     object_labels = if rule_kind == "admit", do: ctx.object["labels"], else: []
 
     %{
-      rule: admit_or_emit(rule_kind),
+      rule: string_to_kind(rule_kind),
       object_labels: object_labels,
       checked: ctx.checked,
       rho: ctx.rho,
@@ -548,9 +548,6 @@ defmodule KomkiPolicy.Derive do
       call_hash: if(rule_kind == "emit", do: emit_call_hash(ctx), else: nil)
     }
   end
-
-  defp admit_or_emit("admit"), do: :admit
-  defp admit_or_emit("emit"), do: :emit
 
   defp emit_call_hash(ctx) do
     Release.call_hash(
@@ -576,12 +573,7 @@ defmodule KomkiPolicy.Derive do
     cond do
       state.blockers != [] ->
         payload =
-          Remedies.catalog(
-            registry,
-            remedies_context(state, rule_kind),
-            string_to_kind(rule_kind),
-            state.blockers
-          )
+          Remedies.catalog(registry, remedies_context(state, rule_kind), state.blockers)
 
         decision =
           Map.merge(base_decision(ctx, auth, state.checked), %{
@@ -596,12 +588,7 @@ defmodule KomkiPolicy.Derive do
 
       state.evidence != [] ->
         payload =
-          Remedies.catalog(
-            registry,
-            remedies_context(state, rule_kind),
-            string_to_kind(rule_kind),
-            state.evidence
-          )
+          Remedies.catalog(registry, remedies_context(state, rule_kind), state.evidence)
 
         decision =
           Map.merge(base_decision(ctx, auth, state.checked), %{

@@ -54,13 +54,11 @@ defmodule KomkiPolicy.Remedies do
   `transitions`) in derselben Ordnung wie die übergebenen Befunde. Reine
   Funktion von (registry, context, finding-Liste).
   """
-  @spec catalog(
-          Registry.compiled(),
-          context(),
-          rule_kind(),
-          [finding()]
-        ) :: [map()]
-  def catalog(registry, ctx, rule_kind, findings) when rule_kind in [:admit, :emit] do
+  @spec catalog(Registry.compiled(), context(), [finding()]) :: [map()]
+
+  # `rule_kind` trägt der Kontext bereits (`ctx.rule`); der Katalog ist reine
+  # Funktion von (registry, context, finding-Liste).
+  def catalog(registry, %{rule: rule_kind} = ctx, findings) when rule_kind in [:admit, :emit] do
     Enum.map(findings, fn finding ->
       Map.merge(finding, %{
         "transitions" => ordered(regular_transitions(registry, ctx, rule_kind, finding))
@@ -68,7 +66,7 @@ defmodule KomkiPolicy.Remedies do
     end)
   end
 
-  def catalog(_registry, ctx, :release, findings) do
+  def catalog(_registry, %{rule: :release} = ctx, findings) do
     Enum.map(findings, fn finding ->
       Map.merge(finding, %{"transitions" => ordered(release_transitions(ctx, finding))})
     end)
