@@ -414,6 +414,84 @@ defmodule RatsprojekteWeb.ProposalLive.ShowTest do
     end
   end
 
+  describe "projektaktualisierung und projektneuantrag payloads (#22, #37)" do
+    test "renders update_projekt payload with the new antragsreife fields", %{
+      conn: conn,
+      projekt: projekt
+    } do
+      proposal =
+        proposal(projekt, %{
+          typ: :update_projekt,
+          payload: %{
+            "beschlussvorschlag" =>
+              "Der Stadtrat beschließt, an allen Freibad-Kassen Kartenzahlung einzuführen.",
+            "adressat" => "Stadtrat",
+            "value_proposition" =>
+              "Bargeldanteil im Bäderbetrieb sinkt, Wartezeiten werden messbar kürzer.",
+            "success_metrics" => "Bargeldanteil im Bäderbetrieb unter 30 Prozent."
+          }
+        })
+
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
+
+      assert html =~ "Vorgeschlagene Projektaktualisierung"
+      assert has_element?(view, "span", "Beschlussvorschlag")
+      assert has_element?(view, "span", "Adressat")
+      assert has_element?(view, "span", "Value Proposition")
+      assert has_element?(view, "span", "Success Metrics")
+      assert html =~ "an allen Freibad-Kassen Kartenzahlung einzuführen"
+      assert html =~ "Bargeldanteil im Bäderbetrieb unter 30 Prozent."
+    end
+
+    test "renders add_projekt payload with VP and SM", %{conn: conn, projekt: projekt} do
+      proposal =
+        proposal(projekt, %{
+          typ: :add_projekt,
+          projekt_id: nil,
+          payload: %{
+            "titel" => "Freibad Kartenzahlung",
+            "value_proposition" =>
+              "Bargeldanteil im Bäderbetrieb sinkt, Wartezeiten werden messbar kürzer.",
+            "success_metrics" => "Bargeldanteil im Bäderbetrieb unter 30 Prozent."
+          }
+        })
+
+      {:ok, view, html} = live(conn, ~p"/proposals/#{proposal.id}")
+
+      assert html =~ "Vorgeschlagenes Projekt"
+      assert has_element?(view, "span", "Value Proposition")
+      assert has_element?(view, "span", "Success Metrics")
+      assert html =~ "Bargeldanteil im Bäderbetrieb unter 30 Prozent."
+    end
+
+    test "accept of update_projekt writes the fields to the projekt (GO in der LiveView)", %{
+      conn: conn,
+      projekt: projekt
+    } do
+      proposal =
+        proposal(projekt, %{
+          typ: :update_projekt,
+          payload: %{
+            "beschlussvorschlag" =>
+              "Der Stadtrat beschließt, an allen Freibad-Kassen Kartenzahlung einzuführen.",
+            "adressat" => "Stadtrat"
+          }
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}/proposals/#{proposal.id}")
+
+      view
+      |> form("#decision-form", kommentar: "Passt.")
+      |> put_submitter("button[name=aktion][value=accept]")
+      |> render_submit()
+
+      reloaded = Repo.get!(Projekt, projekt.id)
+      assert reloaded.beschlussvorschlag =~ "Kartenzahlung"
+      assert reloaded.adressat == "Stadtrat"
+      assert Repo.get!(PendingProposal, proposal.id).status == :approved
+    end
+  end
+
   defp count_straenge_for(projekt) do
     Repo.aggregate(
       from(rs in Realisierungsstrang, where: rs.projekt_id == ^projekt.id),

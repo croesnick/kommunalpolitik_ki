@@ -253,7 +253,7 @@ Projekte werden über Slugs identifiziert, nicht über DB-IDs. Der Slug ist der 
 
 ### Roadmap
 
-Die Punkte 1 bis 4, 7 und 8 der ursprünglichen Roadmap sind abgeschlossen; der bisher hier stehende Detailstatus ist als veraltetes Duplikat des Boards weggefallen. Offen: Antragsvorlagen als Markdown-Render aus Projektdaten (Issue #15), Ratsinfo-Integration (Quellen verlinken mit Sitzung und TOP) sowie Value Proposition + Success Metrics als harte Gates in `check_antragsreife` (bis dahin policy-level über das Lifecycle-Dokument und die Skills). Status und laufende Arbeit stehen auf dem GitHub-Board (Feld „Status"), der Projektlebenszyklus in [docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md).
+Die Punkte 1 bis 4, 7 und 8 der ursprünglichen Roadmap sind abgeschlossen; der bisher hier stehende Detailstatus ist als veraltetes Duplikat des Boards weggefallen. Offen: Antragsvorlagen als Markdown-Render aus Projektdaten (Issue #15). Die Ratsinfo-Integration (Quellen verlinken mit Sitzung und TOP, #32) und Value Proposition + Success Metrics als harte Gates in `check_antragsreife` (#37) sind gebaut. Status und laufende Arbeit stehen auf dem GitHub-Board (Feld „Status"), der Projektlebenszyklus in [docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md).
 
 ## Tooling-Vorgaben
 

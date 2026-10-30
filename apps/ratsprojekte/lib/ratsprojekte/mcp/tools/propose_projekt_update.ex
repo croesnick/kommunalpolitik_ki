@@ -1,7 +1,8 @@
 defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdate do
   @moduledoc """
   Schlage eine Aktualisierung eines bestehenden Projekts vor (titel,
-  beschreibung, prioritaet).
+  beschreibung, prioritaet, beschlussvorschlag, adressat, value_proposition,
+  success_metrics).
 
   **GO-Prinzip**: Dieses Tool schreibt NUR in die Staging-Tabelle
   `pending_proposals` — nicht in `projekte`. Der Vorschlag muss vom
@@ -27,6 +28,8 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdate do
   alias Ratsprojekte.Schemas.{PendingProposal, Projekt}
   import Ecto.Query
 
+  @prioritaet_werte ["hoch", "mittel", "niedrig"]
+
   schema do
     field(:projekt_slug, :string,
       required: true,
@@ -39,6 +42,26 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdate do
 
     field(:prioritaet, :string,
       description: "Neue Priorität: 'hoch', 'mittel' oder 'niedrig' (optional)"
+    )
+
+    field(:beschlussvorschlag, :string,
+      description: "Konkreter Beschlussvorschlag (> 20 Zeichen, Hard Gate)"
+    )
+
+    field(:adressat, :string,
+      description: "Adressat des Antrags (Stadtrat, Bürgermeister, Vergabeausschuss)"
+    )
+
+    field(:value_proposition, :string,
+      description:
+        "Welches konkrete Problem löst das Projekt, für wen? Kein reines " <>
+          "\"Digitalisierung von X\" (Hard Gate, > 20 Zeichen)"
+    )
+
+    field(:success_metrics, :string,
+      description:
+        "Woran wird der Erfolg gemessen? Mindestens eine messbare Größe " <>
+          "(Hard Gate, > 10 Zeichen)"
     )
 
     field(:begruendung, :string,
@@ -56,24 +79,56 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdate do
   @impl true
   def execute(params, frame) do
     projekt_slug = params[:projekt_slug]
+    prioritaet = params[:prioritaet]
 
     projekt = Repo.one(from(p in Projekt, where: p.slug == ^projekt_slug))
 
-    if projekt == nil do
-      {:reply, Response.error(Response.tool(), "Projekt '#{projekt_slug}' nicht gefunden"), frame}
-    else
-      payload =
-        %{
-          "titel" => params[:titel],
-          "beschreibung" => params[:beschreibung],
-          "prioritaet" => params[:prioritaet]
-        }
-        # Nur Felder aufnehmen, die die KI tatsächlich setzen will — keine
-        # nil-Werte im Payload, sonst würde apply_projekt_update/3 Felder
-        # aktiv leeren.
-        |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-        |> Map.new()
+    cond do
+      projekt == nil ->
+        {:reply, Response.error(Response.tool(), "Projekt '#{projekt_slug}' nicht gefunden"),
+         frame}
 
+      prioritaet != nil and prioritaet not in @prioritaet_werte ->
+        # Früh ablehnen wie propose_status_change: sonst würde das GO am
+        # Ende an der Priorität scheitern, nicht der Vorschlag.
+        {:reply,
+         Response.error(
+           Response.tool(),
+           "Ungültige Priorität '#{prioritaet}'. Erlaubt: #{Enum.join(@prioritaet_werte, ", ")}"
+         ), frame}
+
+      true ->
+        insert_proposal(params, projekt, frame)
+    end
+  end
+
+  defp insert_proposal(params, projekt, frame) do
+    payload =
+      %{
+        "titel" => params[:titel],
+        "beschreibung" => params[:beschreibung],
+        "prioritaet" => params[:prioritaet],
+        "beschlussvorschlag" => params[:beschlussvorschlag],
+        "adressat" => params[:adressat],
+        "value_proposition" => params[:value_proposition],
+        "success_metrics" => params[:success_metrics]
+      }
+      # Nur Felder aufnehmen, die die KI tatsächlich setzen will — keine
+      # nil-Werte im Payload, sonst würde apply_projekt_update/3 Felder
+      # aktiv leeren.
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> Map.new()
+
+    # Plausibilität wie propose_strang_update: ein Vorschlag ohne ein
+    # einziges Update-Feld wäre ein No-Op und verbrennte ein GO.
+    if payload == %{} do
+      {:reply,
+       Response.error(
+         Response.tool(),
+         "Mindestens eines von titel/beschreibung/prioritaet/beschlussvorschlag/adressat/" <>
+           "value_proposition/success_metrics muss gesetzt sein"
+       ), frame}
+    else
       attrs = %{
         typ: :update_projekt,
         payload: payload,
@@ -90,7 +145,7 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdate do
         {:ok, proposal} ->
           body = %{
             id: proposal.id,
-            projekt_slug: projekt_slug,
+            projekt_slug: projekt.slug,
             status: proposal.status,
             review_url: "http://localhost:4000/projekte/#{projekt.slug}/proposals/#{proposal.id}",
             hinweis: "Vorschlag angelegt. Stadtrat muss in der LiveView bestätigen (GO-Prinzip)."
