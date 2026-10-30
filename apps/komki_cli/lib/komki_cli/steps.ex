@@ -1739,9 +1739,8 @@ defmodule KomkiCli.Steps do
 
       {:error, reason} ->
         [
-          "komki session — kein nutzbarer Startvertrag (room.json: " <> room_path <> ")",
-          "hinweis: " <>
-            reason <> " — Session ohne Dateien läuft; Dateiaufnahme braucht den Vertrag."
+          "hinweis: Der Startvertrag in room.json ist nicht lesbar (" <> reason <> ").",
+          "         Die Session läuft trotzdem; Dateien mitbringen geht erst mit gültigem Vertrag."
         ]
     end
   end
