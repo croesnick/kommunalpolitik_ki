@@ -291,7 +291,7 @@ function list(hits: Json[], o: ViewOptions, p: Paint, one: (h: Json) => Row[]): 
 function risHit(h: Json, o: ViewOptions, p: Paint): Row[] {
 	return [
 		{ lead: p.fg("muted", date(h.datum)), leadWidth: 12, body: title(h.titel, p) },
-		{ lead: "", leadWidth: 12, body: p.fg("muted", clean(String(h.sitzung ?? ""))) },
+		{ lead: "", leadWidth: 12, body: p.fg("muted", withTop(h.sitzung, h.nummer)) },
 		...urlRow(h.url, 12, o, p),
 	];
 }
@@ -316,10 +316,17 @@ function vaultHit(h: Json, overall: unknown, p: Paint): Row[] {
 	];
 }
 
+// Sitzung mit der TOP-Nummer aus der Tagesordnung, wie sie im RIS steht.
+function withTop(sitzung: unknown, nummer: unknown): string {
+	const s = clean(String(sitzung ?? ""));
+	const n = clean(String(nummer ?? "")).trim();
+	return n ? `${s} · TOP ${n}` : s;
+}
+
 function risShow(r: Json, o: ViewOptions, p: Paint): Row[] {
 	const rows: Row[] = [
 		{ body: title(r.titel, p) },
-		{ body: p.fg("muted", `${clean(String(r.sitzung ?? ""))} · ${date(r.datum)}`) },
+		{ body: p.fg("muted", `${withTop(r.sitzung, r.nummer)} · ${date(r.datum)}`) },
 		...urlRow(r.url, 0, o, p),
 	];
 	const text = clean(String(r.text ?? "")).trim();

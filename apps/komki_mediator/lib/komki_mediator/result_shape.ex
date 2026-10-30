@@ -8,7 +8,7 @@ defmodule KomkiMediator.ResultShape do
   den Modellkontext dann nicht.
   """
 
-  @ris_hit ~w(datum sitzung titel top_id url)
+  @ris_hit ~w(datum nummer sitzung titel top_id url)
   @web_hit ~w(snippet title url)
   @vault_hit ~w(labels note_id title)
 
@@ -17,7 +17,7 @@ defmodule KomkiMediator.ResultShape do
   def check("ris", "search", result), do: list_result(result, ["abrufdatum"], @ris_hit)
 
   def check("ris", "show", result),
-    do: object(result, ~w(abrufdatum datum sitzung text titel top_id url))
+    do: object(result, ~w(abrufdatum datum nummer sitzung text titel top_id url))
 
   def check("web", "search", result), do: list_result(result, ["abrufdatum"], @web_hit)
   def check("vault", "search", result), do: list_result(result, [], @vault_hit)

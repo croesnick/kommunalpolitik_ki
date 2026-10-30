@@ -8,8 +8,8 @@ defmodule KomkiConnectorRisTest do
   alias KomkiConnectorRis.MockRis
   alias Sidecar.{Client, Server}
 
-  @search_keys ~w(datum sitzung titel top_id url)
-  @show_keys ~w(abrufdatum datum sitzung text titel top_id url)
+  @search_keys ~w(datum nummer sitzung titel top_id url)
+  @show_keys ~w(abrufdatum datum nummer sitzung text titel top_id url)
 
   # Startet Mock (im gegebenen Modus) und Connector auf einem echten
   # Unix-Socket unter /tmp (macOS: Pfad < 104 Byte).
@@ -55,6 +55,7 @@ defmodule KomkiConnectorRisTest do
 
       assert first == %{
                "top_id" => "1001-1",
+               "nummer" => "1",
                "titel" => "Sanierung der Bahnhofstraße",
                "sitzung" => "Sitzung des Stadtrates",
                "datum" => "2026-09-15",
@@ -150,7 +151,7 @@ defmodule KomkiConnectorRisTest do
     end
 
     test "ping meldet die Fassung", %{path: path} do
-      assert {:ok, %{"version" => "komki-ris/1", "ops" => ["search", "show"]}} =
+      assert {:ok, %{"version" => "komki-ris/2", "ops" => ["search", "show"]}} =
                Client.call(path, "c", "ping", %{})
     end
 

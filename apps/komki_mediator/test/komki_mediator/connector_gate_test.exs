@@ -34,6 +34,7 @@ defmodule KomkiMediator.ConnectorGateTest do
       "results" => [
         %{
           "top_id" => "top-1",
+          "nummer" => "3",
           "titel" => "Bahnhofstrasse",
           "sitzung" => "Stadtrat",
           "datum" => "2026-10-01",
