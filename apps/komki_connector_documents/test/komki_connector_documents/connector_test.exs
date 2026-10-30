@@ -4,8 +4,11 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
   alias KomkiConnectorDocuments.TestPDF
   alias Sidecar.{Client, Server}
 
+  # Zufallssuffixe wie im komki-Testsupport (TestHelpers.tmp_base/1):
+  # unique_integer wiederholt sich ueber VM-Neustarts, und Reste
+  # abgestuerzter Laeufe liessen File.ln_s!/:listen sonst scheitern.
   setup do
-    root = Path.join(System.tmp_dir!(), "kcd-#{System.unique_integer([:positive])}")
+    root = tmp("kcd")
     dir = Path.join(root, "documents")
     File.mkdir_p!(dir)
     File.write!(Path.join(dir, "doc-oeffentlich.md"), "# Oeffentliche Notiz\n")
@@ -14,13 +17,12 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
     TestPDF.multi_page(Path.join(dir, "doc-drucksache.pdf"))
     TestPDF.no_text(Path.join(dir, "doc-scan.pdf"))
     TestPDF.invalid(Path.join(dir, "doc-broken.pdf"))
-    TestPDF.big(Path.join(dir, "doc-riesig.pdf"))
     File.write!(Path.join(root, "geheim.md"), "geheim\n")
     File.ln_s!(Path.join(root, "geheim.md"), Path.join(dir, "doc-link.md"))
     File.ln_s!(Path.join(root, "geheim.md"), Path.join(dir, "doc-link-pdf.pdf"))
 
     # Kurzer Socket-Pfad: macOS begrenzt Unix-Socket-Pfade auf 103 Byte.
-    socket = "/tmp/kcd-" <> Integer.to_string(System.unique_integer([:positive])) <> ".sock"
+    socket = tmp("kcd") <> ".sock"
     {:ok, state} = KomkiConnectorDocuments.init(dir)
     {:ok, listener} = Server.listen(socket)
     token = Sidecar.Token.provision!(socket)
@@ -33,7 +35,12 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
       File.rm_rf!(root)
     end)
 
-    %{socket: socket}
+    %{socket: socket, dir: dir}
+  end
+
+  defp tmp(prefix) do
+    suffix = Base.encode16(:crypto.strong_rand_bytes(8), case: :lower)
+    Path.join(System.tmp_dir!(), prefix <> "-" <> suffix)
   end
 
   test "liest ein Raumdokument", %{socket: socket} do
@@ -43,6 +50,7 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
 
   # Ticket #290: PDF-Text je Seite mit Seitenanker, dazu die Highlights
   # mit Kommentar und markiertem Text (eine Zeile, einmal mehrzeilig).
+  # Die versteckte dritte Markierung des Fixtures darf nicht erscheinen.
   test "liest ein mehrseitiges PDF mit Highlights", %{socket: socket} do
     assert {:ok, %{"document_id" => "doc-drucksache", "content" => content}} =
              Client.call(socket, "c1", "read", %{"document_id" => "doc-drucksache"})
@@ -58,6 +66,8 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
 
     assert content =~
              "- Seite 2: „Nachfolgender Satz bleibt unmarkiert. Dritte Zeile im Testdokument.“ — Kommentar: Mehrzeilige Markierung"
+
+    refute content =~ "Versteckte Markierung"
   end
 
   # Ticket #290: Ohne Textebene gibt es einen klaren Fehler statt eines
@@ -72,9 +82,38 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
              Client.call(socket, "c1", "read", %{"document_id" => "doc-broken"})
   end
 
-  test "extrahierter Text ueber 1 MiB: too-large", %{socket: socket} do
+  # pdfium reicht ein einzelnes \r ungefiltert durch; der Connector
+  # normalisiert es zu \n, statt rohe Wagenruecklaeufe zuzulassen.
+  test "einzelnes \\r im Text wird zu \\n normalisiert", %{socket: socket, dir: dir} do
+    TestPDF.lone_cr(Path.join(dir, "doc-cr.pdf"))
+
+    assert {:ok, %{"content" => content}} =
+             Client.call(socket, "c1", "read", %{"document_id" => "doc-cr"})
+
+    assert content =~ "Zeile mit Wagenruecklauf\nDritte Zeile"
+    refute content =~ "\r"
+  end
+
+  test "extrahierter Text ueber 1 MiB: too-large", %{socket: socket, dir: dir} do
+    # Das grosse Fixture baut nur dieser Test (~2,4 MB Schreibarbeit).
+    TestPDF.big(Path.join(dir, "doc-riesig.pdf"))
+
     assert {:error, %{"code" => "too-large"}} =
              Client.call(socket, "c1", "read", %{"document_id" => "doc-riesig"})
+  end
+
+  # Die Dateigrenze greift vor dem Parsen: deutlich ueber 64 MiB, ohne
+  # gueltige PDF-Bytes dahinter — der Connector liest nichts.
+  test "PDF-Datei ueber 64 MiB: too-large ohne Parsen", %{socket: socket, dir: dir} do
+    padding = 64 * 1024 * 1024
+
+    File.write!(
+      Path.join(dir, "doc-riesen-file.pdf"),
+      "%PDF-1.4\n" <> String.duplicate("X", padding)
+    )
+
+    assert {:error, %{"code" => "too-large"}} =
+             Client.call(socket, "c1", "read", %{"document_id" => "doc-riesen-file"})
   end
 
   test "Markdown gewinnt vor dem PDF bei gleichem Namen", %{socket: socket} do

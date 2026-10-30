@@ -30,6 +30,12 @@ defmodule KomkiConnectorDocuments do
 
   @max_bytes 1_048_576
 
+  # Dateigrenze fuer PDFs: ex_pdfium liest die ganze Datei in den Speicher
+  # und parst sie im Connector-Prozess (kein Speicherlimit im Profil);
+  # 64 MiB deckt gescannte Drucksachen ab und grenzt die Last. Der
+  # extrahierte Text bleibt ohnehin auf die Frame-Grenze begrenzt.
+  @max_pdf_file_bytes 64 * 1024 * 1024
+
   @impl true
   def manifest, do: KomkiConnector.Manifest.sidecar!("documents")
 
@@ -85,10 +91,14 @@ defmodule KomkiConnectorDocuments do
       else: {:ok, %{"document_id" => document_id, "content" => File.read!(path)}}
   end
 
-  defp read_pdf(document_id, %{path: path}) do
-    case Pdf.render(path) do
-      {:ok, content} -> {:ok, %{"document_id" => document_id, "content" => content}}
-      {:error, code, detail} -> {:error, code, detail}
+  defp read_pdf(document_id, %{path: path, size: size}) do
+    if size > @max_pdf_file_bytes do
+      {:error, "too-large", "PDF-Datei groesser als 64 MiB"}
+    else
+      case Pdf.render(path) do
+        {:ok, content} -> {:ok, %{"document_id" => document_id, "content" => content}}
+        {:error, code, detail} -> {:error, code, detail}
+      end
     end
   end
 end

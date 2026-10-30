@@ -548,9 +548,16 @@ Raumdokument taugt UTF-8-Text; PDFs (an der Endung und am `%PDF`-Header
 erkannt) liest der Connector über ex_pdfium als Text je Seite mit
 Seitenanker `[Seite N]`, dazu die Highlights mit Kommentar und markiertem
 Text — ein PDF ohne Textebene (Scan) ist ein klarer Fehler, es gibt kein
-OCR (#289). Dateien aus dem pi-Home, dem Vermittler-Verzeichnis oder der
-Registry nimmt komki nicht an. Aufnahme gibt es nur bei einem neuen Start,
-nicht mit `--continue` und nicht in eine laufende Session.
+OCR (#289). Eine Objekt-ID liegt in genau einer Form im Raum: Eine
+Markdown- und eine PDF-Fassung derselben Objekt-ID lehnt die Aufnahme ab,
+denn der Connector liest nur eine Form je Objekt. **PDF-Lesung braucht die
+NIF-Form des Programms** (Einzeldatei per `make komki-burrito` oder
+Release): Im Escript-Betrieb (`make komki`, Homebrew-Paket) antwortet jede
+PDF-Lesung mit einem klaren Fehler, bis #288 die Programmform für
+NIF-Connectoren entscheidet; `doctor` bleibt dabei grün, weil `ping` den
+NIF nicht berührt. Dateien aus dem pi-Home, dem Vermittler-Verzeichnis oder
+der Registry nimmt komki nicht an. Aufnahme gibt es nur bei einem neuen
+Start, nicht mit `--continue` und nicht in eine laufende Session.
 
 ## So sieht eine Session aus
 
