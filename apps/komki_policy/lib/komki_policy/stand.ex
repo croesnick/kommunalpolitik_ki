@@ -65,8 +65,9 @@ defmodule KomkiPolicy.Stand do
   @doc """
   Atomarer Standübergang (§ 2.7): `vorschlag` ist das `release`-Objekt
   einer Permit-Entscheidung des Freigabe-Zweigs (Form § 4.6: `release_id`,
-  `nonce`, `stand_ref`, `stand_version_after`, `call_hash`). Erfolg liefert
-  den nächsten Stand (`version + 1`, `consumed` erweitert); sonst
+  `nonce`, `stand_ref`, `stand_version_after`, `call_hash`). Ein Vorschlag
+  außerhalb der § 4.6-Form ist ein Eingabefehler (`{:error, …}`); Erfolg
+  liefert den nächsten Stand (`version + 1`, `consumed` erweitert); sonst
   `{:refused, %{code: …}}`.
   """
   @spec advance(%{String.t() => term()}, term()) ::
