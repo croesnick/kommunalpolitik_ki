@@ -77,7 +77,8 @@
       ],
       "operations": {
         "admit": true,
-        "emit": true
+        "emit": true,
+        "store": true
       },
       "relaxation_authorities": []
     },

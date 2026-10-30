@@ -1,0 +1,98 @@
+{
+  "blockers": null,
+  "checked_label": [
+    "lizenz-namensnennung@1"
+  ],
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "decision": "permit",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-case-store-permit",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-ausgabe-a",
+    "version": "v1"
+  },
+  "proof": {
+    "checked_label": [
+      "lizenz-namensnennung@1"
+    ],
+    "conclusion": "permit",
+    "intent_ref": "intent-case-store-permit",
+    "premises": [
+      {
+        "fact": "workspace_contract_valid",
+        "kind": "fact",
+        "name": "workspace_contract_valid",
+        "source": "workspace.valid",
+        "value": true
+      },
+      {
+        "fact": "has_operation_right",
+        "kind": "fact",
+        "name": "has_operation_right",
+        "source": "rechte-verwaltung",
+        "source_kind": "administered",
+        "value": true
+      },
+      {
+        "fact": "audit_path_ready",
+        "kind": "fact",
+        "name": "audit_path_ready",
+        "source": "journal-verwaltung",
+        "source_kind": "technical",
+        "value": true
+      },
+      {
+        "fact": "environment_observers_complete",
+        "kind": "fact",
+        "name": "environment_observers_complete",
+        "source": "umgebungs-verwaltung",
+        "source_kind": "assumption",
+        "value": true
+      },
+      {
+        "checked_label": [
+          "lizenz-namensnennung@1"
+        ],
+        "kind": "computed",
+        "name": "label_preservation",
+        "value": true,
+        "workspace_bindings": [
+          "lizenz-namensnennung@1"
+        ]
+      },
+      {
+        "actual_recipients": [
+          "lokale-fallverarbeitung",
+          "nutzende-person"
+        ],
+        "allowed_recipients": [
+          "eigene-rz-analyse",
+          "lokale-fallverarbeitung",
+          "nutzende-person",
+          "webdienst-x"
+        ],
+        "kind": "computed",
+        "name": "recipient_inclusion",
+        "value": true
+      },
+      {
+        "binding": "lizenz-namensnennung@1",
+        "expression": true,
+        "fact_refs": [],
+        "kind": "condition",
+        "name": "binding_condition",
+        "value": true
+      }
+    ],
+    "registry_ref": "reg-fall-4711-test",
+    "rule": "store",
+    "schema": "komki-proof/1",
+    "snapshot_ref": "snap-store-4711-permit"
+  },
+  "registry_ref": "reg-fall-4711-test",
+  "remedies": null,
+  "rule": "store",
+  "snapshot_ref": "snap-store-4711-permit",
+  "workspace": "ws-fall-4711"
+}

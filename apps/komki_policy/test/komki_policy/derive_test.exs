@@ -449,4 +449,41 @@ defmodule KomkiPolicy.DeriveTest do
       assert Derive.required_premises() == oracle_names
     end
   end
+
+  describe "store (§ 4.7)" do
+    test "ein GO für emit passt nicht auf store desselben Objekts (Operation im call_hash)" do
+      dir = Path.join(@fixtures_dir, "case_release_store_permit")
+      {:ok, snapshot} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
+      {:ok, intent} = JSON.parse(File.read!(Path.join(dir, "intent.json")))
+      {:ok, stand} = JSON.parse(File.read!(Path.join(dir, "stand.json")))
+
+      {:ok, emit_go} =
+        JSON.parse(File.read!(Path.join(@fixtures_dir, "case_release_permit/release.json")))
+
+      assert {:ok, %{"decision" => "deny", "blockers" => [%{"code" => "release_call_mismatch"}]}} =
+               Derive.decide_with_release(
+                 registry(),
+                 snapshot,
+                 intent,
+                 Map.put(emit_go, "operation", "store"),
+                 stand
+               )
+    end
+
+    test "ohne store-Regel: deny mit call-GO im Katalog, nach neuer_raum" do
+      dir = Path.join(@fixtures_dir, "case_store_no_rule")
+      {:ok, snapshot} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
+      {:ok, intent} = JSON.parse(File.read!(Path.join(dir, "intent.json")))
+
+      assert {:ok, %{"decision" => "deny", "remedies" => [%{"transitions" => transitions}]}} =
+               Derive.decide(registry(), snapshot, intent)
+
+      assert Enum.map(transitions, & &1["type"]) == ["neuer_raum", "aktionsfreigabe"]
+    end
+
+    test "transfer bleibt unsupported" do
+      assert length(Derive.required_premises("store")) == 7
+      assert %{"result" => "unsupported"} = Derive.unsupported_info("transfer")
+    end
+  end
 end

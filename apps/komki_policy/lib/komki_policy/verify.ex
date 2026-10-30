@@ -10,9 +10,11 @@ defmodule KomkiPolicy.Verify do
   * Sollmenge ist regelabhängig (§ 5 Schritt 3): für `admit` die neun
     festen Prämissen (§ 4.3, `KomkiPolicy.Derive.required_premises/0`),
     für `emit` die sieben festen Prämissen plus `label_assignment`-
-    Slot (§ 4.5); jeweils plus je `binding_condition` für jedes Element
-    von `workspace.bindings` — im `emit`-Fall werden die `emit`-Ausdrücke
-    geprüft.
+    Slot (§ 4.5), für `store` die sieben festen Prämissen mit
+    `label_preservation` (§ 4.7); jeweils plus je `binding_condition` für
+    jedes Element des Prüflabels — `workspace.bindings`, bei `store` λ(y)
+    (`KomkiPolicy.Derive.checked_label/3`); geprüft werden die Ausdrücke
+    der jeweiligen Regel.
   * Mengen: `KomkiPolicy.Calculus` (R_G / rho_G / l-Subset, § 4.3 Punkt 8).
   * Neu-Auswertung der Bedingungen: `KomkiPolicy.Evaluator.evaluate/2`.
   * Expression und `fact_refs` muessen exakt und strukturell dem
@@ -66,6 +68,7 @@ defmodule KomkiPolicy.Verify do
     "environment_observers_complete" => "fact",
     "label_inclusion" => "computed",
     "label_assignment" => "computed",
+    "label_preservation" => "computed",
     "recipient_inclusion" => "computed",
     "binding_condition" => "condition"
   }
@@ -99,6 +102,13 @@ defmodule KomkiPolicy.Verify do
     ],
     {"label_inclusion", "computed"} => ["checked_label", "kind", "name", "object_labels", "value"],
     {"label_assignment", "computed"} => @label_assignment_shape_keys,
+    {"label_preservation", "computed"} => [
+      "checked_label",
+      "kind",
+      "name",
+      "value",
+      "workspace_bindings"
+    ],
     {"recipient_inclusion", "computed"} => [
       "actual_recipients",
       "allowed_recipients",
@@ -410,7 +420,7 @@ defmodule KomkiPolicy.Verify do
       mismatch_if(proof["snapshot_ref"] != ctx.snapshot_id, "snapshot_mismatch"),
       mismatch_if(proof["registry_ref"] != registry.registry_id, "registry_mismatch"),
       mismatch_if(proof["intent_ref"] != auth.intent_id, "intent_mismatch"),
-      mismatch_if(proof["rule"] not in ["admit", "emit"], "unsupported_rule")
+      mismatch_if(proof["rule"] not in ["admit", "emit", "store"], "unsupported_rule")
     ]
 
     Enum.reject(findings, &is_nil/1)
@@ -420,7 +430,7 @@ defmodule KomkiPolicy.Verify do
   defp mismatch_if(false, _code), do: nil
 
   defp label_mismatch_reasons(ctx, proof) do
-    if Enum.sort(proof["checked_label"]) == ctx.workspace["bindings"] do
+    if Enum.sort(proof["checked_label"]) == checked(ctx, proof) do
       []
     else
       [reason("checked_label_mismatch", nil, nil)]
@@ -428,6 +438,10 @@ defmodule KomkiPolicy.Verify do
   end
 
   defp reason(code, binding, fact), do: %{"code" => code, "binding" => binding, "fact" => fact}
+
+  # Das Prüflabel wird aus Snapshot und Regel neu berechnet, nie dem Baum
+  # entnommen.
+  defp checked(ctx, proof), do: Derive.checked_label(proof["rule"], ctx.workspace, ctx.object)
 
   defp invalid_outcome(reasons), do: %{"result" => "invalid", "reasons" => reasons}
 
@@ -443,7 +457,7 @@ defmodule KomkiPolicy.Verify do
     rule = proof["rule"]
     fixed = Derive.required_premises(rule) -- ["binding_condition"]
     allowed_names = MapSet.new(Derive.required_premises(rule))
-    bindings = ctx.workspace["bindings"]
+    bindings = checked(ctx, proof)
     premises = proof["premises"]
     present_names = Enum.uniq(Enum.map(premises, &Map.fetch!(&1, "name")))
 
@@ -521,6 +535,7 @@ defmodule KomkiPolicy.Verify do
         quarantine_reasons(ctx, proof),
         label_inclusion_reasons(ctx, proof),
         label_assignment_reasons(ctx, proof),
+        label_preservation_reasons(ctx, proof),
         recipient_inclusion_reasons(ctx, registry, proof),
         condition_reasons(ctx, registry, proof)
       ])
@@ -626,10 +641,27 @@ defmodule KomkiPolicy.Verify do
       claimed_checked == bindings and premise["value"] == true
   end
 
+  # § 5 Schritt 6 (nur store): B_W ⊆ λ(y) wird neu berechnet; behauptete
+  # Mengen müssen übereinstimmen.
+  defp label_preservation_reasons(ctx, proof) do
+    bindings = ctx.workspace["bindings"]
+    checked = checked(ctx, proof)
+
+    for premise <- premises_for(proof, "label_preservation") do
+      ok =
+        proof["rule"] == "store" and Calculus.labels_subset?(bindings, checked) and
+          premise["value"] == true and premise["workspace_bindings"] == bindings and
+          premise["checked_label"] == checked
+
+      if ok, do: nil, else: reason("label_preservation_false", nil, nil)
+    end
+    |> Enum.reject(&is_nil/1)
+  end
+
   defp recipient_inclusion_reasons(ctx, registry, proof) do
     for %{"kind" => "computed", "name" => "recipient_inclusion"} = premise <- proof["premises"] do
       rho = Calculus.actual_recipients(registry, ctx.workspace["environment"])
-      allowed = Calculus.allowed_recipients(registry, ctx.workspace["bindings"])
+      allowed = Calculus.allowed_recipients(registry, checked(ctx, proof))
 
       ok =
         MapSet.subset?(MapSet.new(rho), MapSet.new(allowed)) and

@@ -1,0 +1,15 @@
+{
+  "authority": "lokale-fallverarbeitung",
+  "call_hash": "754215904dbd4ba715d5a60994e0d7e0b09cc1c93d92c6be36d6a4e08480f0a9",
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "kind": "aktionsfreigabe",
+  "nonce": "go-nonce-4711-store",
+  "object": "obj-ausgabe-a@v1",
+  "operation": "store",
+  "release_id": "go-speichern-4711",
+  "schema": "komki-release/1",
+  "scope": "bereich-fall-4711",
+  "valid_from": 1000,
+  "valid_until": 1100,
+  "workspace": "ws-fall-4711"
+}
