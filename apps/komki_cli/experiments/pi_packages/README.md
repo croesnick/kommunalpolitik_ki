@@ -2,6 +2,8 @@
 
 Deterministische Offline-Experimente für die pi.dev-Packages, die in [RFC 0005](../../../../docs/rfcs/0005-pi-packages.md) bewertet werden. Die Ergebnisse stehen im [Labbook](../../../../docs/research/2026-10-24-pi-package-experiments.md).
 
+Die Ergänzung mit dem echten Modell (Gemma 4 26B, Ticket #158) liegt in [`smoke/`](smoke/README.md): fünf Aufgaben plus Compaction-Experiment gegen den llama-server der komki-Instanz, mit einem Logging-Forward-Proxy als Messweg. Ergebnisse: [Labbook 2026-10-30](../../../../docs/research/2026-10-30-pi-realmodell-smoke-test.md).
+
 ## Voraussetzungen
 
 - pi 1.4.0 (`@earendil-works/pi-coding-agent`)
