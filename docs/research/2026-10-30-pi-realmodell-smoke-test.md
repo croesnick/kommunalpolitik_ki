@@ -88,7 +88,7 @@ Deshalb ein Benchmark gegen explizit definiertes gewünschtes Verhalten, abgelei
 - **Variante A (natürlicher Prompt), 3 Läufe:** 0/3 vollständig — K6 fehlt 3/3, alles andere besteht.
 - **Variante B (Prompt fordert Vorhaben und Aufteilung explizit), 3 Läufe:** 3/3 vollständig; als Förderanteil erscheint jeweils 160 000 (= 240 000 − 80 000), korrekt als abgeleitet statt erfunden klassifiziert.
 
-Ergebnis: **kein Modelldefizit, sondern Prompt-Sensitivität.** Das Modell kann jede Muss-Anforderung, wenn der Prompt sie verlangt. Konsequenz für die Ratsarbeit: Die Vollständigkeit von TOP-Zusammenfassungen muss auf der Instruktions-Ebene eingefordert werden — der `sitzungsvorbereitung`-Skill bekommt die Kriterienliste (folgt in diesem PR), die Produktivintegration (#155) muss sie in Session-Vorlagen bzw. Systemprompt tragen.
+Ergebnis: **kein Modelldefizit, sondern Prompt-Sensitivität.** Das Modell kann jede Muss-Anforderung, wenn der Prompt sie verlangt. Konsequenz für die Ratsarbeit: Die Vollständigkeit von TOP-Zusammenfassungen muss auf der Instruktions-Ebene eingefordert werden — die Kriterienliste gehört in den `sitzungsvorbereitung`-Skill (Umarbeitung läuft in der Parallel-Session zu diesem Ticket), die Produktivintegration (#155) muss sie in Session-Vorlagen bzw. Systemprompt tragen.
 
 ### 2 — Quellen extrahieren
 
