@@ -55,14 +55,20 @@ defmodule KomkiCli.AnzeigeTest do
   # ändern könnten, keine eigenen Werkzeuge, nichts, was das Modell
   # erreicht. Beobachtet werden nur der Session-Start und das Ende eines
   # Aufrufs (Ticket #242); Befehle schreiben Session-Einträge, die pi nicht
-  # ans Modell schickt.
+  # ans Modell schickt. Einzige Ausnahme: Sie bricht den Wechsel zu einer
+  # anderen Session ab (Ticket #295), sperren kann sie damit nur.
   test "die Extension zeigt nur an: keine Handler, keine Nachrichten ans Modell" do
     {_, index} = List.keyfind(Anzeige.files(), "komki-anzeige/index.ts", 0)
 
     assert index =~ "registerToolRenderer"
 
     events = Regex.scan(~r/\bpi\.on\("([a-z_]+)"/, index, capture: :all_but_first)
-    assert events |> List.flatten() |> Enum.sort() == ["session_start", "tool_execution_end"]
+
+    assert events |> List.flatten() |> Enum.sort() ==
+             ["session_before_switch", "session_start", "tool_execution_end"]
+
+    assert [_] = Regex.scan(~r/return \{ cancel: true \}/, index)
+    refute index =~ ~r/cancel: false/
 
     refute index =~
              ~r/registerTool\(|sendMessage|sendUserMessage|executeTool|registerProvider|registerMcpServer/

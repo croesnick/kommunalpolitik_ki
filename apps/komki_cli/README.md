@@ -223,8 +223,11 @@ Hinweise zu den einzelnen Schritten:
   jederzeit, in den lockereren nur ohne laufende Session und ohne laufenden
   `komki run` (festgehalten unter `<base>/run/runs/`). Und
   `komki session --continue` setzt eine Session nur in einem Raum fort, der
-  mindestens so streng ist wie der, in dem sie lief (festgehalten in
-  `<base>/run/session-room.json`). Eigene Räume und Räume mit Startvertrag
+  mindestens so streng ist wie der, in dem sie lief (festgehalten je Session
+  unter `<base>/run/sessions/`). In pi selbst sind `/resume` und `/import`
+  gesperrt: Jede Session sieht unter `pi-home/sessions` nur ihr eigenes
+  Verzeichnis (Seatbelt-Profil), und die komki-Extension bricht beide
+  Befehle mit einem Hinweis ab (#295). Eigene Räume und Räume mit Startvertrag
   stellt `komki raum` nicht um (#214).
 * **Nachvollziehen:** Jede Entscheidung steht im Journal
   `~/.local/share/komki/mediator/journal/pdr.jsonl`; `komki journal verify`
@@ -291,8 +294,9 @@ Copy-Modus schreibt weiterhin in die Zwischenablage. Aus einer laufenden
 tmux-Session heraus startet er verschachtelt (Prefix dann zweimal, etwa
 `Ctrl+B Ctrl+B d` zum Abkoppeln). `komki run` filtert Steuersequenzen aus pis
 Ausgabe, bevor sie im Terminal erscheint. Dateien aus der Session landen im Verzeichnis `arbeit`
-innerhalb der Instanz, die Session-Verläufe unter `pi-home/sessions` und
-lassen sich mit `session --continue` fortsetzen. pi startet mit einem
+innerhalb der Instanz, die Session-Verläufe in einem Verzeichnis je Session
+unter `pi-home/sessions`; die letzte lässt sich mit `session --continue`
+fortsetzen, Verläufe von vor #295 nicht mehr. pi startet mit einem
 knappen deutschen System-Prompt (Deutsch als Default, durchgehende
 Du-Form), Thinking-Blöcke sind eingeklappt; liegen `fd`/`ripgrep` vor,
 stehen `find`/`grep` für die Dateisuche bereit. Aus der Session kopieren:

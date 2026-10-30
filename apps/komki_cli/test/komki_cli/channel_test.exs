@@ -90,7 +90,7 @@ defmodule KomkiCli.ChannelTest do
       token = env["KOMKI_MEDIATOR_TOKEN"]
 
       run_argv = Pi.argv_for(cfg, Path.join(cfg.base_dir, "runs/x"), :text, "Hallo")
-      session_argv = Pi.argv_session(cfg, false)
+      session_argv = Pi.argv_session(cfg, Path.join(cfg.pi_home, "sessions/s"), false)
 
       refute Enum.any?(run_argv ++ session_argv, &String.contains?(&1, token))
 

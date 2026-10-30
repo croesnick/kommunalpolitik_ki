@@ -5,6 +5,8 @@ defmodule KomkiCli.PiTest do
 
   alias KomkiCli.{Pi, TestSupport}
 
+  @session_dir "/pi-home/sessions/2026-10-30T12-00-00-000000Z"
+
   setup do
     {:ok, cfg: TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-pi"))}
   end
@@ -71,14 +73,14 @@ defmodule KomkiCli.PiTest do
       assert "--no-context-files" in Pi.argv_for(cfg, "/scratch", :text, "hallo")
 
       for continue? <- [false, true] do
-        assert "--no-context-files" in Pi.argv_session(cfg, continue?)
+        assert "--no-context-files" in Pi.argv_session(cfg, @session_dir, continue?)
       end
     end
   end
 
-  describe "Session (argv_session/2): interaktiv, echte Pty" do
+  describe "Session (argv_session/3): interaktiv, echte Pty" do
     test "kein --print, kein --no-session, kein stdin-Redirect", %{cfg: cfg} do
-      argv = Pi.argv_session(cfg, false)
+      argv = Pi.argv_session(cfg, @session_dir, false)
 
       refute "--print" in argv
       refute "--no-session" in argv
@@ -87,7 +89,7 @@ defmodule KomkiCli.PiTest do
 
     test "MCP-Vertrag (Ticket #102): -e builtin:mcp direkt nach --no-extensions", %{cfg: cfg} do
       for continue? <- [false, true] do
-        argv = Pi.argv_session(cfg, continue?)
+        argv = Pi.argv_session(cfg, @session_dir, continue?)
 
         idx = Enum.find_index(argv, &(&1 == "--no-extensions"))
         assert Enum.slice(argv, idx, 3) == ["--no-extensions", "-e", "builtin:mcp"]
@@ -96,7 +98,7 @@ defmodule KomkiCli.PiTest do
 
     test "genau zwei Extensions: builtin:mcp und die Anzeige aus dem pi-Home", %{cfg: cfg} do
       for continue? <- [false, true] do
-        argv = Pi.argv_session(cfg, continue?)
+        argv = Pi.argv_session(cfg, @session_dir, continue?)
 
         extensions =
           argv
@@ -113,7 +115,7 @@ defmodule KomkiCli.PiTest do
       cfg: cfg
     } do
       for continue? <- [false, true] do
-        argv = Pi.argv_session(cfg, continue?)
+        argv = Pi.argv_session(cfg, @session_dir, continue?)
         value = fn flag -> Enum.at(argv, Enum.find_index(argv, &(&1 == flag)) + 1) end
 
         assert "--no-prompt-templates" in argv
@@ -130,7 +132,7 @@ defmodule KomkiCli.PiTest do
     end
 
     test "Raumbild nur in der Session, aus dem pi-Home (Ticket #242)", %{cfg: cfg} do
-      argv = Pi.argv_session(cfg, false)
+      argv = Pi.argv_session(cfg, @session_dir, false)
       value = Enum.at(argv, Enum.find_index(argv, &(&1 == "--komki-raum")) + 1)
 
       assert value == KomkiCli.Anzeige.raum_path(cfg)
@@ -139,7 +141,7 @@ defmodule KomkiCli.PiTest do
     end
 
     test "Direktkette ohne sh-Hop; session-dir unter pi-home", %{cfg: cfg} do
-      argv = Pi.argv_session(cfg, false)
+      argv = Pi.argv_session(cfg, @session_dir, false)
 
       assert List.starts_with?(
                argv,
@@ -156,20 +158,20 @@ defmodule KomkiCli.PiTest do
       refute "/bin/sh" in argv
 
       idx = Enum.find_index(argv, &(&1 == "--session-dir"))
-      assert Enum.at(argv, idx + 1) == Pi.session_dir(cfg)
+      assert Enum.at(argv, idx + 1) == @session_dir
     end
 
     test "--continue nur auf Wunsch und vor den Basis-Flags", %{cfg: cfg} do
-      argv = Pi.argv_session(cfg, true)
+      argv = Pi.argv_session(cfg, @session_dir, true)
 
       assert Enum.find_index(argv, &(&1 == "--continue")) <
                Enum.find_index(argv, &(&1 == "--provider"))
 
-      refute "--continue" in Pi.argv_session(cfg, false)
+      refute "--continue" in Pi.argv_session(cfg, @session_dir, false)
     end
 
     test "System-Prompt: knapper, deutscher, vor Provider-Angabe", %{cfg: cfg} do
-      argv = Pi.argv_session(cfg, false)
+      argv = Pi.argv_session(cfg, @session_dir, false)
 
       idx = Enum.find_index(argv, &(&1 == "--system-prompt"))
       assert is_integer(idx)
@@ -182,7 +184,7 @@ defmodule KomkiCli.PiTest do
     end
 
     test "Gate 2 (Ticket #104): Built-ins aus, nur die Vermittler-Tools", %{cfg: cfg} do
-      argv = Pi.argv_session(cfg, false)
+      argv = Pi.argv_session(cfg, @session_dir, false)
 
       assert "--no-builtin-tools" in argv
       idx = Enum.find_index(argv, &(&1 == "--tools"))
@@ -202,15 +204,18 @@ defmodule KomkiCli.PiTest do
     # deshalb biegt die Kette stdout auf /dev/fd/0 (Dup des lebenden
     # stdin-PTY) um. Der Escript-Pfad (stdout = Pane-PTY) bleibt exakt
     # wie vorher.
-    test "argv_session/3 ohne Redirect: identisch mit der 2-stelligen Form", %{cfg: cfg} do
-      assert Pi.argv_session(cfg, true) == Pi.argv_session(cfg, true, false)
-      assert Pi.argv_session(cfg, false) == Pi.argv_session(cfg, false, false)
+    test "argv_session/4 ohne Redirect: identisch mit der 3-stelligen Form", %{cfg: cfg} do
+      assert Pi.argv_session(cfg, @session_dir, true) ==
+               Pi.argv_session(cfg, @session_dir, true, false)
 
-      refute "/bin/sh" in Pi.argv_session(cfg, false, false)
+      assert Pi.argv_session(cfg, @session_dir, false) ==
+               Pi.argv_session(cfg, @session_dir, false, false)
+
+      refute "/bin/sh" in Pi.argv_session(cfg, @session_dir, false, false)
     end
 
-    test "argv_session/3 mit tty_redirect: sh-c-Kette leitet stdout auf /dev/fd/0", %{cfg: cfg} do
-      argv = Pi.argv_session(cfg, false, true)
+    test "argv_session/4 mit tty_redirect: sh-c-Kette leitet stdout auf /dev/fd/0", %{cfg: cfg} do
+      argv = Pi.argv_session(cfg, @session_dir, false, true)
 
       assert List.starts_with?(
                argv,
@@ -230,14 +235,14 @@ defmodule KomkiCli.PiTest do
       assert Enum.at(argv, 8) == cfg.cli_js
 
       idx = Enum.find_index(argv, &(&1 == "--session-dir"))
-      assert Enum.at(argv, idx + 1) == Pi.session_dir(cfg)
+      assert Enum.at(argv, idx + 1) == @session_dir
 
       refute Enum.any?(argv, &String.contains?(&1, "/dev/null"))
       refute "--continue" in argv
     end
 
-    test "argv_session/3 mit tty_redirect und --continue: Flag bleibt vor Provider", %{cfg: cfg} do
-      argv = Pi.argv_session(cfg, true, true)
+    test "argv_session/4 mit tty_redirect und --continue: Flag bleibt vor Provider", %{cfg: cfg} do
+      argv = Pi.argv_session(cfg, @session_dir, true, true)
 
       assert Enum.find_index(argv, &(&1 == "--continue")) <
                Enum.find_index(argv, &(&1 == "--provider"))
