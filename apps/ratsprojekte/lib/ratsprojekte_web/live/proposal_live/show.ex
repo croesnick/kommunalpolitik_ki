@@ -213,6 +213,14 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
               label="Beschreibung"
               value={payload_field(@proposal.payload, "beschreibung")}
             />
+            <.payload_row
+              label="Value Proposition"
+              value={payload_field(@proposal.payload, "value_proposition")}
+            />
+            <.payload_row
+              label="Success Metrics"
+              value={payload_field(@proposal.payload, "success_metrics")}
+            />
             <.payload_row label="Priorität" value={payload_field(@proposal.payload, "prioritaet")} />
           <% :change_status -> %>
             <.payload_row label="Neuer Status" value={payload_field(@proposal.payload, "status")} />
@@ -247,6 +255,18 @@ defmodule RatsprojekteWeb.ProposalLive.Show do
               <.payload_row
                 label="Adressat"
                 value={payload_field(@proposal.payload, "adressat")}
+              />
+            <% end %>
+            <%= if payload_field(@proposal.payload, "value_proposition") != "" do %>
+              <.payload_row
+                label="Value Proposition"
+                value={payload_field(@proposal.payload, "value_proposition")}
+              />
+            <% end %>
+            <%= if payload_field(@proposal.payload, "success_metrics") != "" do %>
+              <.payload_row
+                label="Success Metrics"
+                value={payload_field(@proposal.payload, "success_metrics")}
               />
             <% end %>
           <% :update_strang -> %>

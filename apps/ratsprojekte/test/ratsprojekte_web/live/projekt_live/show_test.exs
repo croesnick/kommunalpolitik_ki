@@ -160,6 +160,34 @@ defmodule RatsprojekteWeb.ProjektLive.ShowTest do
     end
   end
 
+  describe "ziel & messung (value proposition / success metrics)" do
+    test "renders VP and SM when set (#37)", %{conn: conn} do
+      projekt =
+        freibad(%{
+          value_proposition:
+            "Bargeldanteil im Bäderbetrieb sinkt, Wartezeiten an den Kassen werden messbar kürzer.",
+          success_metrics:
+            "Bargeldanteil im Bäderbetrieb unter 30 Prozent, Wartezeit pro Gast unter drei Minuten."
+        })
+
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}")
+
+      assert html =~ "Ziel &amp; Messung"
+      assert has_element?(view, "span.payload-row-label", "Value Proposition:")
+      assert has_element?(view, "span.payload-row-label", "Success Metrics:")
+      assert html =~ "Bargeldanteil im Bäderbetrieb unter 30 Prozent"
+    end
+
+    test "renders nothing when both fields are unset", %{conn: conn} do
+      projekt = freibad()
+
+      {:ok, _view, html} = live(conn, ~p"/projekte/#{projekt.slug}")
+
+      refute html =~ "Ziel &amp; Messung"
+      refute html =~ "Value Proposition"
+    end
+  end
+
   # Referenzen werden nicht gehalten — nur, um unused-alias-Warnungen zu vermeiden.
   _ = Projekt
   _ = Repo

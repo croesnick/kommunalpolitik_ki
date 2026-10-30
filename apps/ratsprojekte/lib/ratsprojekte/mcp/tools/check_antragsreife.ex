@@ -39,6 +39,8 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
   import Ecto.Query
 
   @beschlussvorschlag_min_length 20
+  @value_proposition_min_length 20
+  @success_metrics_min_length 10
 
   schema do
     field(:slug, :string,
@@ -103,6 +105,8 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
       gate_quellen_vorhanden(projekt),
       gate_adressat_gesetzt(projekt),
       gate_beschlussvorschlag_konkret(projekt),
+      gate_value_proposition_vorhanden(projekt),
+      gate_success_metrics_vorhanden(projekt),
       gate_realisierungsstrang_vorhanden(projekt),
       gate_vorbedingungen_erfuellt(projekt)
     ]
@@ -163,6 +167,48 @@ defmodule Ratsprojekte.MCP.Tools.CheckAntragsreife do
           :beschlussvorschlag_konkret,
           :pass,
           "Beschlussvorschlag gesetzt (#{String.length(projekt.beschlussvorschlag)} Zeichen)"
+        )
+    end
+  end
+
+  defp gate_value_proposition_vorhanden(projekt) do
+    cond do
+      blank?(projekt.value_proposition) ->
+        gate(:value_proposition_vorhanden, :fail, "Feld 'value_proposition' ist nicht gesetzt")
+
+      String.length(projekt.value_proposition) <= @value_proposition_min_length ->
+        gate(
+          :value_proposition_vorhanden,
+          :fail,
+          "Value Proposition zu kurz (<= #{@value_proposition_min_length} Zeichen)"
+        )
+
+      true ->
+        gate(
+          :value_proposition_vorhanden,
+          :pass,
+          "Value Proposition gesetzt (#{String.length(projekt.value_proposition)} Zeichen)"
+        )
+    end
+  end
+
+  defp gate_success_metrics_vorhanden(projekt) do
+    cond do
+      blank?(projekt.success_metrics) ->
+        gate(:success_metrics_vorhanden, :fail, "Feld 'success_metrics' ist nicht gesetzt")
+
+      String.length(projekt.success_metrics) <= @success_metrics_min_length ->
+        gate(
+          :success_metrics_vorhanden,
+          :fail,
+          "Success Metrics zu kurz (<= #{@success_metrics_min_length} Zeichen)"
+        )
+
+      true ->
+        gate(
+          :success_metrics_vorhanden,
+          :pass,
+          "Success Metrics gesetzt (#{String.length(projekt.success_metrics)} Zeichen)"
         )
     end
   end

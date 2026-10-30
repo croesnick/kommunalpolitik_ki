@@ -125,6 +125,48 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjektUpdateTest do
     end
   end
 
+  describe "propose + GO for value proposition and success metrics (#37)" do
+    @vp "Bargeldanteil im Bäderbetrieb sinkt, Wartezeiten an den Kassen werden messbar kürzer."
+    @sm "Bargeldanteil im Bäderbetrieb unter 30 Prozent, Wartezeit pro Gast unter drei Minuten."
+
+    setup do
+      projekt = freibad()
+      %{slug: projekt.slug, projekt: projekt}
+    end
+
+    test "GO over propose_projekt_update sets both fields", %{slug: slug, projekt: projekt} do
+      assert {:reply, response, _frame} =
+               ProposeProjektUpdate.execute(
+                 [
+                   projekt_slug: slug,
+                   value_proposition: @vp,
+                   success_metrics: @sm,
+                   begruendung: "Messbarkeit und Problembezug für die Antragsreife nachtragen."
+                 ],
+                 Frame.new()
+               )
+
+      refute response.isError
+
+      [%{"type" => "text", "text" => json}] = response.content
+      body = Jason.decode!(json)
+
+      proposal = Repo.get!(PendingProposal, body["id"])
+
+      assert {:reply, go_response, _frame} =
+               DecideProposal.execute(
+                 [proposal_id: proposal.id, aktion: "accept", kommentar: "GO im Chat"],
+                 Frame.new()
+               )
+
+      refute go_response.isError
+
+      reloaded = Repo.get!(Projekt, projekt.id)
+      assert reloaded.value_proposition == @vp
+      assert reloaded.success_metrics == @sm
+    end
+  end
+
   # --- Helpers ---
 
   defp gate_status(slug, kriterium) do

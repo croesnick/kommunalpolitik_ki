@@ -72,6 +72,24 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
         </.link>
       </div>
 
+      <div
+        :if={@projekt.value_proposition || @projekt.success_metrics}
+        class="projekt-kv"
+        style="margin-bottom: var(--space-6);"
+      >
+        <div class="section-label flush">Ziel &amp; Messung</div>
+        <.kv_row
+          :if={@projekt.value_proposition}
+          label="Value Proposition"
+          value={@projekt.value_proposition}
+        />
+        <.kv_row
+          :if={@projekt.success_metrics}
+          label="Success Metrics"
+          value={@projekt.success_metrics}
+        />
+      </div>
+
       <div :for={{strang, i} <- Enum.with_index(@projekt.realisierungsstraenge)} class="strang">
         <.oder_separator :if={i > 0} />
 
@@ -170,6 +188,20 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
   defp oder_separator(assigns) do
     ~H"""
     <div class="oder-separator">— ODER —</div>
+    """
+  end
+
+  attr(:label, :string, required: true)
+  attr(:value, :string, required: true)
+
+  defp kv_row(assigns) do
+    ~H"""
+    <div class="payload-row">
+      <span class="payload-row-label">
+        {@label}:
+      </span>
+      <span class="payload-row-value">{@value}</span>
+    </div>
     """
   end
 end
