@@ -47,6 +47,30 @@ defmodule Ratsprojekte.MCP.Tools.ShowProjektTest do
       assert ohne["beschluss_nr"] == nil
     end
 
+    test "outputs the antragsreife fields of the projekt (#22, #37)" do
+      projekt =
+        freibad(%{
+          beschlussvorschlag:
+            "Der Stadtrat beschließt, an allen Freibad-Kassen Kartenzahlung einzuführen.",
+          adressat: "Stadtrat",
+          value_proposition:
+            "Bargeldanteil im Bäderbetrieb sinkt, Wartezeiten an den Kassen werden messbar kürzer.",
+          success_metrics:
+            "Bargeldanteil im Bäderbetrieb unter 30 Prozent, Wartezeit pro Gast unter drei Minuten."
+        })
+
+      assert {:reply, response, _frame} = ShowProjekt.execute(%{slug: projekt.slug}, Frame.new())
+      refute response.isError
+
+      [%{"type" => "text", "text" => json}] = response.content
+      body = Jason.decode!(json)
+
+      assert body["beschlussvorschlag"] =~ "Kartenzahlung"
+      assert body["adressat"] == "Stadtrat"
+      assert body["value_proposition"] =~ "Bargeldanteil"
+      assert body["success_metrics"] =~ "30 Prozent"
+    end
+
     test "unknown projekt slug returns an error" do
       assert {:reply, response, _frame} =
                ShowProjekt.execute(%{slug: "gibt-es-nicht"}, Frame.new())

@@ -60,6 +60,10 @@ defmodule Ratsprojekte.MCP.Tools.ShowProjekt do
       beschreibung: projekt.beschreibung,
       status: projekt.status,
       prioritaet: projekt.prioritaet,
+      beschlussvorschlag: projekt.beschlussvorschlag,
+      adressat: projekt.adressat,
+      value_proposition: projekt.value_proposition,
+      success_metrics: projekt.success_metrics,
       realisierungsstraenge: Enum.map(projekt.realisierungsstraenge, &format_strang/1),
       projekt_quellen: Enum.map(projekt.quellen, &format_quelle/1)
     }
