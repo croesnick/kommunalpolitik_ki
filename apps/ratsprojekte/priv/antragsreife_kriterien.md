@@ -4,7 +4,7 @@ Dieses Dokument definiert die Kriterien, nach denen das MCP-Tool
 `check_antragsreife` ein Projekt der Stadtratsarbeit bewertet. Es ist
 versionisiert und für den Stadtrat lesbar formuliert.
 
-Stand: 2025-07-14
+Stand: 2026-10-30
 
 ## Überblick
 
@@ -27,8 +27,8 @@ Drei Klassen von Kriterien, scharf getrennt:
 | `beschlussvorschlag_konkret` | Feld `projekt.beschlussvorschlag` gesetzt, nicht leer, länger als 20 Zeichen. |
 | `realisierungsstrang_vorhanden` | Mindestens ein Realisierungsstrang vorhanden. |
 | `vorbedingungen_erfuellt` | Status `pass`, wenn alle Stränge alle Vorbedingungen erfüllt haben; `warn`, wenn Vorbedingungen offen sind. |
-| `value_proposition_vorhanden` | Feld `projekt.value_proposition` gesetzt, nicht leer, länger als 20 Zeichen. Welches konkrete Problem löst das Projekt? (Roadmap: noch nicht code-enforced — die KI prüft dieses Gate vor dem Proposal manuell und trägt die VP in die `begruendung` ein.) |
-| `success_metrics_vorhanden` | Feld `projekt.success_metrics` gesetzt, nicht leer, länger als 10 Zeichen. Mindestens eine messbare Größe. (Roadmap: noch nicht code-enforced — die KI prüft dieses Gate vor dem Proposal manuell und trägt die Metriken in die `begruendung` ein.) |
+| `value_proposition_vorhanden` | Feld `projekt.value_proposition` gesetzt, nicht leer, länger als 20 Zeichen. Welches konkrete Problem löst das Projekt? Kein reines „Digitalisierung von X" — der Changeset lehnt das ab. Setzbar per Proposal (`propose_projekt`, `propose_projekt_update`). |
+| `success_metrics_vorhanden` | Feld `projekt.success_metrics` gesetzt, nicht leer, länger als 10 Zeichen. Mindestens eine messbare Größe. Setzbar per Proposal (`propose_projekt`, `propose_projekt_update`). |
 
 Status-Werte: `pass` | `fail` | `warn`.
 

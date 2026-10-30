@@ -246,8 +246,9 @@ zugehörige Einträge zu einer Sitzung.
 Gremiums), dokumentiert im RIS. Ein Beschluss hat ein Datum, eine
 Beschlussnummer und ist einer Sitzung/einem TOP zugeordnet.
 
-**Lücke:** Ratsprojekte kann aktuell nicht auf eine konkrete
-Beschlussnummer verweisen. Siehe `docs/workflows.md` WF 4.
+**Referenz:** Ratsprojekte verweisen über eine Quelle vom Typ `sitzung`
+auf Sitzung, TOP und Beschluss (`ris_sitzung_id`, `ris_top`,
+`beschluss_nr`).
 
 ---
 
