@@ -80,9 +80,10 @@ Die Anzeige beschreibt den Raum, sie entscheidet nichts. Ob ein Aufruf läuft, e
 
 ## Eigene Dokumente in die Session holen
 
-Eine Vorlage, ein Protokoll, eine Notiz: `komki session vorlage.md` bringt eine Datei als Dokument des Arbeitsraums mit. Vorher prüft komki, ob sie hinein darf. Dafür braucht die Datei ein Label im Label-Store (`komki label`), und der Raum braucht einen Startvertrag in `room.json`: wofür er da ist, welche Labels er verträgt, welche Dateien herein dürfen.
+Eine Vorlage, ein Protokoll, eine Notiz — oder eine Drucksache als PDF: `komki session vorlage.md drucksache.pdf` bringt Dateien als Dokumente des Arbeitsraums mit. Vorher prüft komki, ob sie hinein dürfen. Dafür braucht jede Datei ein Label im Label-Store (`komki label`), und der Raum braucht einen Startvertrag in `room.json`: wofür er da ist, welche Labels er verträgt, welche Dateien herein dürfen.
 
-- Passt alles, liegt die Datei danach als Dokument im Raum, und pi liest sie über den Vermittler, mit Beleg im Journal.
+- Passt alles, liegen die Dateien danach als Dokumente im Raum, und pi liest sie über den Vermittler, mit Beleg im Journal.
+- PDFs liest der Dokument-Connector als Text je Seite mit Seitenanker `[Seite N]` — Zitate lassen sich so auf die Seite belegen —, dazu die Markierungen (Highlights), die du im PDF gesetzt hast, mit Kommentar und markiertem Text. Ein Scan ohne Textebene meldet einen klaren Fehler, es gibt kein OCR.
 - Kennt komki die Datei nicht, kommt sie in Quarantäne, bis du sie einordnest. Die Session startet dann nicht.
 - Passt das Label nicht zum Raum, etwa eine öffentliche Datei in einem Raum mit enger Zweckbindung, lehnt komki ab und sagt, was stattdessen ginge.
 
