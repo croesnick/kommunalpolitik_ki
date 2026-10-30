@@ -2,7 +2,7 @@
 id: skill-gelesen
 typ: tool-call
 tool: read
-parameter: "sitzungsvorbereitung/SKILL\\.md"
+parameter: "sitzungsvorbereitung/SKILL\.md"
 anzahl_min: 1
 ---
 

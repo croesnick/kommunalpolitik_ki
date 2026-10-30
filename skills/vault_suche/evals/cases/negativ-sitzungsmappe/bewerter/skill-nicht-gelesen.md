@@ -2,7 +2,7 @@
 id: skill-nicht-gelesen
 typ: tool-call
 tool: read
-parameter: "vault_suche/SKILL\\.md"
+parameter: "vault_suche/SKILL\.md"
 anzahl_min: 0
 anzahl_max: 0
 ---

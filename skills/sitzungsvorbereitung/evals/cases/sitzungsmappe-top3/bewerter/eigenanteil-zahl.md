@@ -3,8 +3,8 @@ id: eigenanteil-zahl
 typ: enthaelt
 optionen:
   - "80[.,]000"
-  - "\\b80000\\b"
-  - "80\\s?000"
+  - "\b80000\b"
+  - "80\s?000"
   - "80 Tausend"
 ---
 

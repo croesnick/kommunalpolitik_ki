@@ -2,7 +2,7 @@
 id: skill-gelesen
 typ: tool-call
 tool: read
-parameter: "ratsprojekt_delta/SKILL\\.md"
+parameter: "ratsprojekt_delta/SKILL\.md"
 anzahl_min: 1
 ---
 

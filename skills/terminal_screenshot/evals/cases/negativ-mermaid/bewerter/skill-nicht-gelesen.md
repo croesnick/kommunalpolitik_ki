@@ -2,7 +2,7 @@
 id: skill-nicht-gelesen
 typ: tool-call
 tool: read
-parameter: "terminal_screenshot/SKILL\\.md"
+parameter: "terminal_screenshot/SKILL\.md"
 anzahl_min: 0
 anzahl_max: 0
 ---

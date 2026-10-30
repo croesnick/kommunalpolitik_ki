@@ -2,7 +2,7 @@
 id: skill-gelesen
 typ: tool-call
 tool: read
-parameter: "foerdermittel_recherche/SKILL\\.md"
+parameter: "foerdermittel_recherche/SKILL\.md"
 anzahl_min: 1
 ---
 

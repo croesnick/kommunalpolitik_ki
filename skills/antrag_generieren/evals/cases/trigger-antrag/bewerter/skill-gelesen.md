@@ -2,7 +2,7 @@
 id: skill-gelesen
 typ: tool-call
 tool: read
-parameter: "antrag_generieren/SKILL\\.md"
+parameter: "antrag_generieren/SKILL\.md"
 anzahl_min: 1
 ---
 

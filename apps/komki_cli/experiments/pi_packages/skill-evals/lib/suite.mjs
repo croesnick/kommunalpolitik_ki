@@ -25,6 +25,23 @@ export const BEWERTER_TYPEN = [
   "llm",
 ];
 
+/**
+ * Doppel-Backslashes in Regex-Optionen sind in dieser Suite fast immer ein
+ * Versehen: Die Frontmatter ist Mini-YAML und verarbeitet keine
+ * Escape-Sequenzen — "\\b80000\\b" matcht deshalb einen echten Backslash
+ * und wird still niemals treffen. Beim ersten echten Lauf (Ticket #292)
+ * hat genau dieser Fehler fünf Läufe vergiftet, bevor die Stichprobe ihn
+ * fand. Deshalb: laut werden, nicht still grün.
+ */
+function pruefeRegexText(file, text) {
+  if (/\\\\[.bswd]/.test(text)) {
+    throw new Error(
+      `${file}: Doppel-Backslash in Regex ("${text}") — die Frontmatter verarbeitet ` +
+        `keine Escape-Sequenzen. Einfachen Backslash schreiben (z. B. "\\b80000\\b" → "\b80000\b" als Dateiinhalt).`,
+    );
+  }
+}
+
 /** Standard-Unterordnernamen je Skill-Suite. */
 export function suitePfad(repoRoot, skillName) {
   return path.join(repoRoot, "skills", skillName, "evals");
@@ -93,6 +110,7 @@ async function ladeBewerter(fallDir, fallId) {
         throw new Error(`${file}: "optionen" muss eine nicht leere Liste sein`);
       }
       b.optionen = felder.optionen.map(String);
+      for (const option of b.optionen) pruefeRegexText(file, option);
       b.min_treffer = Number(felder.min_treffer ?? 1);
     } else if (typ === "zahlen") {
       b.kennzeichne_abgeleitet = felder.kennzeichne_abgeleitet === true;
@@ -101,6 +119,7 @@ async function ladeBewerter(fallDir, fallId) {
       verlangteFelder(file, felder, "tool", typ);
       b.tool = String(felder.tool);
       b.parameter = felder.parameter === undefined ? ".*" : String(felder.parameter);
+      pruefeRegexText(file, b.parameter);
       b.anzahl_min = felder.anzahl_min === undefined ? 1 : Number(felder.anzahl_min);
       b.anzahl_max =
         felder.anzahl_max === undefined ? Number.POSITIVE_INFINITY : Number(felder.anzahl_max);

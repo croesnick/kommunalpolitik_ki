@@ -2,7 +2,7 @@
 id: skill-gelesen
 typ: tool-call
 tool: read
-parameter: "sprachinventur/SKILL\\.md"
+parameter: "sprachinventur/SKILL\.md"
 anzahl_min: 1
 ---
 

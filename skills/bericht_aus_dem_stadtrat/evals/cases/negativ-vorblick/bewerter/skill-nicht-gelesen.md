@@ -2,7 +2,7 @@
 id: skill-nicht-gelesen
 typ: tool-call
 tool: read
-parameter: "bericht_aus_dem_stadtrat/SKILL\\.md"
+parameter: "bericht_aus_dem_stadtrat/SKILL\.md"
 anzahl_min: 0
 anzahl_max: 0
 ---

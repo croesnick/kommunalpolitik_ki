@@ -2,7 +2,7 @@
 id: skill-gelesen
 typ: tool-call
 tool: read
-parameter: "vault_suche/SKILL\\.md"
+parameter: "vault_suche/SKILL\.md"
 anzahl_min: 1
 ---
 
