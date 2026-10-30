@@ -65,7 +65,7 @@ Regel am Γ-Übergang: Import und Export validieren immer über `KomkiPolicy.Reg
 
 ### 1. Elixir-first
 
-Tools werden in Elixir gebaut. Fehlt eine Bibliothek, bauen wir sie selbst und geben sie als eigenständiges Paket an die Elixir-Community zurück (wie `apps/sidecar`, `apps/seatbelt`). Dass es in einer anderen Sprache eine fertige Bibliothek gibt (etwa `PyMuPDF`, `trafilatura`, `Playwright`), reicht als Grund für eine Abweichung nicht. Abgewichen wird nur aus starken Gründen und **nur nach Rücksprache mit der nutzenden Person**: Die Abwägung kommt als Vorschlag ins Ticket, gebaut wird erst nach dem GO. Für Connectoren regelt das [ADR 0002](docs/adr/0002-connectoren-nur-in-elixir.md). Die bestehenden Python-Tools unter `tools/` bleiben vorerst als Werkzeuge außerhalb von komki.
+Tools werden in Elixir gebaut. Fehlt eine Bibliothek, bauen wir sie selbst und geben sie als eigenständiges Paket an die Elixir-Community zurück (wie `apps/sidecar`, `apps/seatbelt`). Dass es in einer anderen Sprache eine fertige Bibliothek gibt (etwa `PyMuPDF`, `trafilatura`, `Playwright`), reicht als Grund für eine Abweichung nicht. Abgewichen wird nur aus starken Gründen und **nur nach Rücksprache mit der nutzenden Person**: Die Abwägung kommt als Vorschlag ins Ticket, gebaut wird erst nach dem GO. Nativer Code ist ausdrücklich in Ordnung und keine Abweichung, etwa ein NIF in Rust über Rustler oder ein vorkompilierter NIF aus einem Hex-Paket. Am Ende steht aber eine Elixir-Schnittstelle, außer es sprechen gute Gründe dagegen. Für Connectoren regelt das [ADR 0002](docs/adr/0002-connectoren-nur-in-elixir.md). Die bestehenden Python-Tools unter `tools/` bleiben vorerst als Werkzeuge außerhalb von komki.
 
 ### 2. Unix-Prinzip
 
