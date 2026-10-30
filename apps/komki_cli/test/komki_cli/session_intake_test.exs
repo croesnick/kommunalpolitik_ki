@@ -71,6 +71,95 @@ defmodule KomkiCli.SessionIntakeTest do
   end
 
   # ========================================================================
+  # PDF-Aufnahme (Ticket #290)
+  # ========================================================================
+
+  test "PDF-Quelle: permit landet als <objekt>.pdf, Header nennt die document_id", %{
+    base: base,
+    db: db
+  } do
+    file = write_source!(base, "drucksache-4711.pdf", pdf_bytes())
+    register_classified!(db, "drucksache-4711", file, ["ratsarbeit@1"])
+
+    contract =
+      contract_json(["ratsarbeit@1"], ["drucksache-4711@v1"], purpose: "sitzungsvorbereitung")
+
+    room = load_room!(base, contract)
+
+    assert {:ok, intake} = plan(db, base, room, [file])
+
+    [entry] = intake.entries
+    assert entry.status == "permit"
+    assert entry.destination == Path.join([base, "mediator", "documents", "drucksache-4711.pdf"])
+
+    lines = Enum.join(SessionIntake.entry_lines(intake.entries), "\n")
+    assert lines =~ "ziel: " <> entry.destination
+    assert lines =~ "(admit_document drucksache-4711)"
+
+    refute File.exists?(entry.destination)
+    stage!(intake)
+    assert File.read!(entry.destination) == pdf_bytes()
+  end
+
+  # .md und .pdf derselben Objekt-ID sind zwei Fassungen desselben
+  # Raumdokuments: Der Connector liest .md zuerst, eine zweite Form bliebe
+  # ungelesen und widerspraeche der Version im Raum (#290, Code-Review).
+  # Der Store erlaubt beide Fassungen (v1 md, v2 pdf, R.2.1) — die
+  # Aufnahme muss sie verweigern.
+  test "zwei Fassungen einer Objekt-ID (md v1 + pdf v2) -> dieselbe Objekt-ID, Fehler", %{
+    base: base,
+    db: db
+  } do
+    md = write_source!(base, "vorlage.md", "# Erste Fassung\n")
+    pdf = write_source!(base, "vorlage.pdf", pdf_bytes())
+    register_classified!(db, "vorlage", "v1", md, ["ratsarbeit@1"])
+    register_classified!(db, "vorlage", "v2", pdf, ["ratsarbeit@1"])
+
+    contract =
+      contract_json(["ratsarbeit@1"], ["vorlage@v1", "vorlage@v2"],
+        purpose: "sitzungsvorbereitung"
+      )
+
+    room = load_room!(base, contract)
+
+    assert {:error, reason} = plan(db, base, room, [md, pdf])
+    assert reason =~ "dasselbe Raumdokument"
+    refute File.exists?(Path.join([base, "mediator", "documents", "vorlage.md"]))
+    refute File.exists?(Path.join([base, "mediator", "documents", "vorlage.pdf"]))
+  end
+
+  # Cross-Session: Ein frueherer Lauf hat vorlage.md hinterlassen; die
+  # spaetere PDF-Fassung derselben Objekt-ID bliebe ungelesen.
+  test "PDF-Fassung einer vorhandenen Markdown-Fassung -> Fehler", %{base: base, db: db} do
+    documents = Path.join([base, "mediator", "documents"])
+    File.mkdir_p!(documents)
+    File.write!(Path.join(documents, "vorlage-alt.md"), "# Alte Fassung\n")
+
+    file = write_source!(base, "vorlage-alt.pdf", pdf_bytes())
+    register_classified!(db, "vorlage-alt", file, ["ratsarbeit@1"])
+
+    contract =
+      contract_json(["ratsarbeit@1"], ["vorlage-alt@v1"], purpose: "sitzungsvorbereitung")
+
+    room = load_room!(base, contract)
+
+    assert {:error, reason} = plan(db, base, room, [file])
+    assert reason =~ "liegt bereits als .md vor"
+    refute File.exists?(Path.join(documents, "vorlage-alt.pdf"))
+  end
+
+  test "PDF-Endung ohne %-Header -> Fehler, nichts abgelegt", %{base: base, db: db} do
+    file = write_source!(base, "faelschung.pdf", "nur Text mit PDF-Endung")
+    register_classified!(db, "faelschung", file, ["ratsarbeit@1"])
+    contract = contract_json(["ratsarbeit@1"], ["faelschung@v1"], purpose: "sitzungsvorbereitung")
+    room = load_room!(base, contract)
+
+    assert {:error, reason} = plan(db, base, room, [file])
+    assert reason =~ "kein PDF trotz Endung"
+    refute File.exists?(Path.join([base, "mediator", "documents", "faelschung.pdf"]))
+  end
+
+  # ========================================================================
   # D.1-Regression: oeffentliche Datei gegen ALLE Raumbindungen pruefen
   # ========================================================================
 
@@ -706,6 +795,32 @@ defmodule KomkiCli.SessionIntakeTest do
 
   defp seed_term, do: @seed_path |> File.read!() |> JSON.decode!()
 
+  # Minimal-PDF: die Aufnahme prueft nur den %PDF-Header (#290) — aber die
+  # Bytes sind ein echtes, von pdfium oeffnbares PDF (ohne xref; pdfium
+  # repariert), damit der Fixture keine Datei enshrined, die der
+  # Dokument-Connector nur ablehnen koennte (Code-Review zu #290).
+  defp pdf_bytes,
+    do: """
+    %PDF-1.4
+    1 0 obj
+    << /Type /Catalog /Pages 2 0 R >>
+    endobj
+    2 0 obj
+    << /Type /Pages /Kids [3 0 R] /Count 1 >>
+    endobj
+    3 0 obj
+    << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Contents 4 0 R >>
+    endobj
+    4 0 obj
+    << /Length 38 >>
+    stream
+    BT /F1 12 Tf 72 700 Td (Minimal) Tj ET
+    endstream
+    endobj
+    trailer
+    << /Size 5 /Root 1 0 R >>
+    """
+
   defp write_source!(base, name, content) do
     dir = Path.join(base, "quellen")
     File.mkdir_p!(dir)
@@ -714,17 +829,22 @@ defmodule KomkiCli.SessionIntakeTest do
     Config.canonical(path)
   end
 
-  defp register_classified!(db, object_id, path, labels) do
-    register_with_content_ref!(db, object_id, content_sha(path), labels)
+  defp register_classified!(db, object_id, path, labels),
+    do: register_classified!(db, object_id, "v1", path, labels)
+
+  # Objekt-Fassungen koennen Versionen tragen (R.2.1): gleiche Objekt-ID,
+  # andere Version, anderer Inhalt.
+  defp register_classified!(db, object_id, version, path, labels) do
+    register_with_content_ref!(db, object_id, version, content_sha(path), labels)
   end
 
   # Nur fuer die B1-Regression: Altbestand mit Pfad-content_ref (#91).
   defp register_with_path_ref!(db, object_id, path, labels) do
-    register_with_content_ref!(db, object_id, path, labels)
+    register_with_content_ref!(db, object_id, "v1", path, labels)
   end
 
-  defp register_with_content_ref!(db, object_id, content_ref, labels) do
-    {:ok, ref} = ObjectRef.parse(object_id <> "@v1")
+  defp register_with_content_ref!(db, object_id, version, content_ref, labels) do
+    {:ok, ref} = ObjectRef.parse(object_id <> "@" <> version)
 
     {:ok, _} =
       LabelStore.quarantine(db, ref, %{

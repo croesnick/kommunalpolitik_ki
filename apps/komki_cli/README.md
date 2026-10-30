@@ -537,16 +537,27 @@ Je Datei:
    mit demselben Γ wie der Vermittler (Label-Store, #208). Ablehnungen tragen
    den Remedy-Katalog.
 3. Nur wenn **alle** Dateien `permit` sind, legt komki sie als
-   `<base>/mediator/documents/<objekt>.md` ab, trägt jedes Objekt mit Typ
-   `document`, Version und Labels in `room.json` ein und startet den
-   Vermittler neu. Sonst endet der Start mit Exit 3, und nichts wird
-   abgelegt.
+   `<base>/mediator/documents/<objekt>.md` ab — PDF-Quellen als
+   `<objekt>.pdf` (#290) —, trägt jedes Objekt mit Typ `document`, Version
+   und Labels in `room.json` ein und startet den Vermittler neu. Sonst
+   endet der Start mit Exit 3, und nichts wird abgelegt.
 
 pi liest die Dokumente danach nur über `admit_document`; der Vermittler
-entscheidet jede Aufnahme erneut, der Dokument-Connector liest (#169). Nur
-UTF-8-Text taugt als Raumdokument. Dateien aus dem pi-Home, dem Vermittler-
-Verzeichnis oder der Registry nimmt komki nicht an. Aufnahme gibt es nur bei
-einem neuen Start, nicht mit `--continue` und nicht in eine laufende Session.
+entscheidet jede Aufnahme erneut, der Dokument-Connector liest (#169). Als
+Raumdokument taugt UTF-8-Text; PDFs (an der Endung und am `%PDF`-Header
+erkannt) liest der Connector über ex_pdfium als Text je Seite mit
+Seitenanker `[Seite N]`, dazu die Highlights mit Kommentar und markiertem
+Text — ein PDF ohne Textebene (Scan) ist ein klarer Fehler, es gibt kein
+OCR (#289). Eine Objekt-ID liegt in genau einer Form im Raum: Eine
+Markdown- und eine PDF-Fassung derselben Objekt-ID lehnt die Aufnahme ab,
+denn der Connector liest nur eine Form je Objekt. **PDF-Lesung braucht die
+NIF-Form des Programms** (Einzeldatei per `make komki-burrito` oder
+Release): Im Escript-Betrieb (`make komki`, Homebrew-Paket) antwortet jede
+PDF-Lesung mit einem klaren Fehler, bis #288 die Programmform für
+NIF-Connectoren entscheidet; `doctor` bleibt dabei grün, weil `ping` den
+NIF nicht berührt. Dateien aus dem pi-Home, dem Vermittler-Verzeichnis oder
+der Registry nimmt komki nicht an. Aufnahme gibt es nur bei einem neuen
+Start, nicht mit `--continue` und nicht in eine laufende Session.
 
 ## So sieht eine Session aus
 

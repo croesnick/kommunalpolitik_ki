@@ -25,8 +25,11 @@ defmodule KomkiMediator.TemplatesTest do
 
   # Frische Instanz: `komki up` exportiert registry.json vor dem ersten
   # Vermittler-Start (#208). room.json und Dokumente muessen trotzdem kommen.
+  # Zufallssuffix wie TestHelpers.tmp_base/1: unique_integer wiederholt sich
+  # ueber Laeufe, und Reste frueherer Laeufe liessen provision! mit
+  # :already_provisioned scheitern (Flake beim Abschluss-Sweep zu #290).
   test "nur registry.json vorhanden (Export): room.json und Dokumente werden angelegt" do
-    base = Path.join(System.tmp_dir!(), "kmtpl-#{System.unique_integer([:positive])}")
+    base = KomkiMediator.TestHelpers.tmp_base("kmtpl-")
     mediator_dir = Path.join(base, "mediator")
     File.mkdir_p!(mediator_dir)
     File.write!(Path.join(mediator_dir, "registry.json"), "EXPORT")

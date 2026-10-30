@@ -67,7 +67,8 @@ defmodule KomkiConnector.Manifest do
           tool: "admit_document",
           kind: :read,
           description:
-            "Ein Raumdokument anhand seiner document_id zum Agentenkontext zulassen (z. B. \"doc-oeffentlich\").",
+            "Ein Raumdokument anhand seiner document_id zum Agentenkontext zulassen (z. B. \"doc-oeffentlich\"). " <>
+              "PDFs kommen als Text je Seite mit Seitenanker [Seite N], dazu die Highlights der nutzenden Person mit Kommentar und markiertem Text.",
           params: %{
             "document_id" => %{type: :string, max: 64, required: true, pattern: ~r/^[a-z0-9-]+$/}
           }
