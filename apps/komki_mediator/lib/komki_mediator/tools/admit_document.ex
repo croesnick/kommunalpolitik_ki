@@ -24,7 +24,8 @@ defmodule KomkiMediator.Tools.AdmitDocument do
   @impl true
   def description,
     do:
-      "Ein Raumdokument anhand seiner document_id zum Agentenkontext zulassen (z. B. \"doc-oeffentlich\")."
+      "Ein Raumdokument anhand seiner document_id zum Agentenkontext zulassen (z. B. \"doc-oeffentlich\"). " <>
+        "PDFs kommen als Text je Seite mit Seitenanker [Seite N], dazu die Highlights der nutzenden Person mit Kommentar und markiertem Text."
 
   @impl true
   def execute(params, frame) do

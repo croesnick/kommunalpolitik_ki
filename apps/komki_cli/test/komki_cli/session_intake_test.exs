@@ -71,6 +71,48 @@ defmodule KomkiCli.SessionIntakeTest do
   end
 
   # ========================================================================
+  # PDF-Aufnahme (Ticket #290)
+  # ========================================================================
+
+  test "PDF-Quelle: permit landet als <objekt>.pdf, Header nennt die document_id", %{
+    base: base,
+    db: db
+  } do
+    file = write_source!(base, "drucksache-4711.pdf", pdf_bytes())
+    register_classified!(db, "drucksache-4711", file, ["ratsarbeit@1"])
+
+    contract =
+      contract_json(["ratsarbeit@1"], ["drucksache-4711@v1"], purpose: "sitzungsvorbereitung")
+
+    room = load_room!(base, contract)
+
+    assert {:ok, intake} = plan(db, base, room, [file])
+
+    [entry] = intake.entries
+    assert entry.status == "permit"
+    assert entry.destination == Path.join([base, "mediator", "documents", "drucksache-4711.pdf"])
+
+    lines = Enum.join(SessionIntake.entry_lines(intake.entries), "\n")
+    assert lines =~ "ziel: " <> entry.destination
+    assert lines =~ "(admit_document drucksache-4711)"
+
+    refute File.exists?(entry.destination)
+    stage!(intake)
+    assert File.read!(entry.destination) == pdf_bytes()
+  end
+
+  test "PDF-Endung ohne %-Header -> Fehler, nichts abgelegt", %{base: base, db: db} do
+    file = write_source!(base, "faelschung.pdf", "nur Text mit PDF-Endung")
+    register_classified!(db, "faelschung", file, ["ratsarbeit@1"])
+    contract = contract_json(["ratsarbeit@1"], ["faelschung@v1"], purpose: "sitzungsvorbereitung")
+    room = load_room!(base, contract)
+
+    assert {:error, reason} = plan(db, base, room, [file])
+    assert reason =~ "kein PDF trotz Endung"
+    refute File.exists?(Path.join([base, "mediator", "documents", "faelschung.pdf"]))
+  end
+
+  # ========================================================================
   # D.1-Regression: oeffentliche Datei gegen ALLE Raumbindungen pruefen
   # ========================================================================
 
@@ -705,6 +747,12 @@ defmodule KomkiCli.SessionIntakeTest do
   # ========================================================================
 
   defp seed_term, do: @seed_path |> File.read!() |> JSON.decode!()
+
+  # Minimal-PDF: die Aufnahme prueft nur den %-Header (#290); das Lesen
+  # mit Seitenankern und Highlights uebernimmt der Dokument-Connector,
+  # dessen Tests bauen echte PDFs.
+  defp pdf_bytes,
+    do: "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n"
 
   defp write_source!(base, name, content) do
     dir = Path.join(base, "quellen")

@@ -18,10 +18,12 @@ defmodule KomkiCli.SessionIntake do
   (`basis_right_false`).
 
   Nur `permit`-Dateien werden Raumdokumente (Umbau nach #104/#169): Die
-  Bytes landen als `<base>/mediator/documents/<objekt>.md`, das Objekt mit
-  Typ `document`, Version und λ(x) in `room.json`. pi liest sie danach nur
-  ueber `admit_document` und den Dokument-Connector; der Vermittler
-  entscheidet jede Aufnahme erneut. Quarantaene-Bytes bleiben am Quellort.
+  Bytes landen als `<base>/mediator/documents/<objekt>.md` — PDF-Quellen
+  als `<objekt>.pdf` (#290, der Dokument-Connector liest sie mit
+  Seitenankern und Highlights) —, das Objekt mit Typ `document`, Version
+  und λ(x) in `room.json`. pi liest sie danach nur ueber `admit_document`
+  und den Dokument-Connector; der Vermittler entscheidet jede Aufnahme
+  erneut. Quarantaene-Bytes bleiben am Quellort.
   """
 
   alias KomkiCli.{Config, LabelStore, StartContract}
@@ -349,8 +351,9 @@ defmodule KomkiCli.SessionIntake do
   defp destination_lines(%{status: "permit", destination: destination})
        when is_binary(destination),
        do: [
+         # document_id ist der Dateiname ohne Endung — .md wie .pdf (#290).
          "    ziel: " <>
-           destination <> "  (admit_document " <> Path.basename(destination, ".md") <> ")"
+           destination <> "  (admit_document " <> Path.rootname(Path.basename(destination)) <> ")"
        ]
 
   defp destination_lines(%{quarantine_created: true, equivalent_cli: cli}) when is_binary(cli),
@@ -580,7 +583,7 @@ defmodule KomkiCli.SessionIntake do
            remedies: decision["remedies"],
            quarantine_created: info.quarantine_created,
            equivalent_cli: info.equivalent_cli,
-           destination: destination(status, info.object, documents)
+           destination: destination(status, info, documents)
          }}
 
       {:error, err} ->
@@ -634,10 +637,14 @@ defmodule KomkiCli.SessionIntake do
     }
   end
 
-  defp destination("permit", object, documents),
-    do: Path.join(documents, object_id(object) <> ".md")
+  # PDF-Quellen landen mit ihrer Endung (#290); die document_id bleibt die
+  # Objekt-ID ohne Endung.
+  defp destination("permit", info, documents) do
+    suffix = if pdf?(info.path), do: ".pdf", else: ".md"
+    Path.join(documents, object_id(info.object) <> suffix)
+  end
 
-  defp destination(_status, _object, _documents), do: nil
+  defp destination(_status, _info, _documents), do: nil
 
   defp put_object_access(facts, allowed?) when is_map(facts) do
     Map.put(facts, "has_object_access_right", %{
@@ -685,13 +692,46 @@ defmodule KomkiCli.SessionIntake do
     end
   end
 
-  # Ein Raumdokument ist Text: der Dokument-Connector liefert den Inhalt
-  # als JSON-String. Die Objekt-ID taugt schon als document_id, der
-  # Label-Store erzwingt Kebab-Case.
+  # Ein Raumdokument ist Text oder PDF (#290): Markdown liest der
+  # Dokument-Connector als JSON-String, PDFs rendert er als Text je Seite
+  # mit Seitenankern und Highlights. Die Objekt-ID taugt schon als
+  # document_id, der Label-Store erzwingt Kebab-Case.
   defp documentable(staged) do
-    case Enum.find(staged, &(not String.valid?(File.read!(&1.source)))) do
-      nil -> :ok
-      entry -> {:error, "kein UTF-8-Text, als Raumdokument nicht lesbar: " <> entry.source}
+    case Enum.find_value(staged, :ok, fn entry -> unusable(entry) end) do
+      :ok -> :ok
+      reason -> {:error, reason}
+    end
+  end
+
+  # nil = brauchbar, sonst der deutsche Fehlertext.
+  defp unusable(entry) do
+    cond do
+      pdf?(entry.source) and not pdf_header?(entry.source) ->
+        "kein PDF trotz Endung (kein %-Header), als Raumdokument nicht lesbar: " <> entry.source
+
+      not pdf?(entry.source) and not String.valid?(File.read!(entry.source)) ->
+        "kein UTF-8-Text, als Raumdokument nicht lesbar: " <> entry.source
+
+      true ->
+        nil
+    end
+  end
+
+  # PDF am Dateinamen; der Connector entscheidet die Lesart derselben
+  # Objekt-ID danach (.md gewinnt vor .pdf).
+  defp pdf?(path), do: path |> Path.extname() |> String.downcase() == ".pdf"
+
+  # %-Header in den ersten Kilo-Byte (ex_pdfium verzeiht Bytes davor).
+  # Eine leere Datei liefert :eof aus IO.binread/2 — kein Binary, kein PDF.
+  defp pdf_header?(path) do
+    case File.open(path) do
+      {:ok, device} ->
+        head = IO.binread(device, 1024)
+        File.close(device)
+        is_binary(head) and String.contains?(head, "%PDF-")
+
+      {:error, _posix} ->
+        false
     end
   end
 
