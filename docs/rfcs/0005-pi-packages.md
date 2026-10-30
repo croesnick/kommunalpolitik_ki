@@ -7,7 +7,7 @@
 | Gegenstand | Auswahl, Freigabe und Vendoring von pi.dev-Packages für den KomKI-Harness |
 | Umsetzung | Policy validiert; Produktivintegration offen (Tickets #154–#163) |
 | Verwandt | [RFC 0003](0003-vertrauliche-ki-arbeitsraeume.md), [RFC 0001](0001-vertrauliche-ki-arbeitsraeume.md) (ersetzt das nicht mehr eingecheckte RFC 0000) |
-| Labbook | [2026-10-24-pi-package-experiments.md](../research/2026-10-24-pi-package-experiments.md) (in Arbeit) |
+| Labbook | [2026-10-24-pi-package-experiments.md](../research/2026-10-24-pi-package-experiments.md) (Mock-Experimente); [2026-10-30-pi-realmodell-smoke-test.md](../research/2026-10-30-pi-realmodell-smoke-test.md) (Realmodell, Ticket #158) |
 
 Dieses RFC beschreibt, welche pi.dev-Packages der KomKI-Harness aufnehmen darf, unter welchen Bedingungen und mit welcher Validierung. Es ist kein Feature-Katalog: Die meisten Packages sind für Coding-Agenten oder Cloud-Modelle gebaut und für einen lokalen, offline laufenden Ratsarbeitsraum ungeeignet.
 
@@ -280,7 +280,7 @@ Die Policy ist entschieden und experimentell validiert. Die Produktivintegration
 | [#155](https://github.com/croesnick/kommunalpolitik_ki/issues/155) | `rpiv-todo` und `ask_user_question` session-only integrieren | offen, blockiert durch #154 |
 | [#156](https://github.com/croesnick/kommunalpolitik_ki/issues/156) | Seatbelt-Canary als Freigabe-Gate | offen, blockiert durch #154/#155 |
 | [#157](https://github.com/croesnick/kommunalpolitik_ki/issues/157) | Supply-Chain-Härtung (Provenance, Lockfile, SBOM, pi-Pin) | offen, blockiert durch #154 |
-| [#158](https://github.com/croesnick/kommunalpolitik_ki/issues/158) | Realmodell-Smoke-Test mit Gemma 4 26B | offen |
+| [#158](https://github.com/croesnick/kommunalpolitik_ki/issues/158) | Realmodell-Smoke-Test mit Gemma 4 26B | abgeschlossen 2026-10-30 — [Labbook](../research/2026-10-30-pi-realmodell-smoke-test.md); Empfehlung gegen `pi-tool-repair` (null Alias-Fehler im Korpus) und gegen `pi-vcc` für deutsche Sitzungen; die D3-Entscheidungen zu beiden Packages bleiben bis zur Entscheidung über #163/#159 unverändert |
 | [#159](https://github.com/croesnick/kommunalpolitik_ki/issues/159) | `pi-vcc`: deutscher Extractor oder Sprachbeschränkung | offen |
 | [#160](https://github.com/croesnick/kommunalpolitik_ki/issues/160) | `pi-quiver`: echte RIS-PDFs, Scans, OCR | offen |
 | [#161](https://github.com/croesnick/kommunalpolitik_ki/issues/161) | `pi-subagents`: read-only Pilot | offen, blockiert durch #154/#156/#157 |
@@ -299,7 +299,7 @@ Das Connector-Gesamtsetup (RIS, Web, Vault) ist nicht Gegenstand dieses RFC. Es 
 ## Offene Fragen
 
 - Bleibt der `rpiv:ask-user:answer`-Eventbus als alternativer Antwortkanal außen vor, oder braucht KomKI ihn für eine spätere Pane-Steuerung?
-- Wie häufig sind die von `pi-tool-repair` reparierten Alias-Fehler im echten 26B-Betrieb? Ohne einen Korpus echter Fehlaufrufe bleibt der Nutzen unklar.
+- Wie häufig sind die von `pi-tool-repair` reparierten Alias-Fehler im echten 26B-Betrieb? Ohne einen Korpus echter Fehlaufrufe bleibt der Nutzen unklar. Erster Realmodell-Korpus (30.10.2026, #158): null Alias-Fehler bei 24 Tool-Calls; der einzige invalid-Call war Längentruncation, die pi selbst abfängt — siehe [Labbook 2026-10-30](../research/2026-10-30-pi-realmodell-smoke-test.md).
 - Wie aufwendig ist ein deutscher Extractor für `pi-vcc` (Präferenzen, Scope-Wechsel), und lohnt er sich gegenüber Pis eingebauter Compaction?
 - Bleibt Node 24.22.1 die gepinnte Harness-Version, und wie wird der Node-Pin bei einem pi-Upgrade mitgeprüft?
 - Kann `pi-quiver` echte RIS-PDFs und Scans im Offline-Tier verlässlich verarbeiten, oder bleibt nur der Mediator-Connector?
