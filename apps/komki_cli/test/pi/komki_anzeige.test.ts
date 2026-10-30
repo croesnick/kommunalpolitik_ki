@@ -68,9 +68,11 @@ test("Treffer im RIS: Datum deutsch, Titel, Quelle und Abruf sichtbar", () => {
 	assert.match(out, /<success><b>✓ zugelassen<\/><\/>/);
 	assert.match(strip(out), /öffentlich · 3 Treffer/);
 	assert.match(strip(out), /30\.06\.2026 +Ergebnisse des Arbeitskreises/);
+	// Die TOP-Nummer aus der Tagesordnung steht bei der Sitzung (nicht die interne top_id).
+	assert.match(strip(out), /1\. Sitzung des Mobilitätsausschusses Buchloe · TOP 4/);
 	assert.doesNotMatch(out, /https:/);
 	// 18:17Z ist 20:17 in Deutschland (MESZ), unabhängig von der TZ des Prozesses.
-	assert.match(strip(out), /Quelle: RIS · abgerufen 24\.10\.2026, 20:17 · Beleg pdr-9dd7c70b…/);
+	assert.match(strip(out), /Quelle: RIS · abgerufen 24\.10\.2026, 20:17 · Beleg pdr-adba23ef…/);
 });
 
 test("Ablehnung: rot, mit Grund, Ausweg und Beleg; Gate benannt", () => {
@@ -122,9 +124,9 @@ test("Zurückhaltung und Fehler sind von Zulassung unterscheidbar", () => {
 test("aufgeklappt: alle Belege, Hash und Prüfschritt", () => {
 	const out = strip(render("ris_search", true));
 	assert.match(out, /Prüfschritt +Aufnahme der Antwort \(Gate 2\)/);
-	assert.match(out, /Beleg +pdr-9dd7c70ba7cd984ef64a570ecd8f24d7/);
-	assert.match(out, /Beleg der Anfrage +pdr-fd9a1894a4e0fbf070dead6287d8d877/);
-	assert.match(out, /Inhalts-Hash +sha256:cf57e3b8/);
+	assert.match(out, /Beleg +pdr-adba23efd9b227456c09452e4d561c9e/);
+	assert.match(out, /Beleg der Anfrage +pdr-40d0fb8b2296abb0ac13065efef5d80a/);
+	assert.match(out, /Inhalts-Hash +sha256:726c7b1f/);
 	assert.match(out, /komki journal verify/);
 	assert.match(strip(render("web_search_deny", true)), /GO bindet an +509f2621/);
 });

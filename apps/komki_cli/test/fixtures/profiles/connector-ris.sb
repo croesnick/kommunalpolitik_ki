@@ -1,4 +1,4 @@
-; Connector-Profil ris (komki-ris/1, Ticket #146).
+; Connector-Profil ris (komki-ris/2, Ticket #146).
 ; Generiert aus KomkiConnector.Manifest und config.json; feste Eingaben -> byte-identischer Text.
 (version 1)
 (deny default)

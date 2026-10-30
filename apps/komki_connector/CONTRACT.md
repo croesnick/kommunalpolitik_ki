@@ -118,7 +118,7 @@ Einzige Quelle für Fassung, Operationen, Netz, Dateisystem, Credentials und Imp
 | Feld | Bedeutung |
 |---|---|
 | `id` | `documents`, `ris`, `web`, `vault` |
-| `fassung` | `komki-documents/1`, `komki-ris/1`, `komki-web/1`, `komki-vault/1` |
+| `fassung` | `komki-documents/1`, `komki-ris/2`, `komki-web/1`, `komki-vault/1` |
 | `binary` | Name des Escripts |
 | `ops` | Operation → Parameter-Schema (geschlossen, siehe unten) und `kind` (`read` oder `write`) |
 | `egress_hosts` | Host-Allowlist für den Egress-Proxy (`host:port`). Leer heißt: kein Netz, kein Proxy-Port |
@@ -153,11 +153,13 @@ führt nur das Lesen aus; Gate 1 (`emit`) und die Labels aus dem Manifest gelten
 ### 5.2 Ergebnisformen (Connector → Vermittler)
 
 - `documents.read`: `{"document_id", "content"}`. Ein fehlendes Dokument ergibt `not-found`.
-- `ris.search`: `{"results": [{"top_id", "titel", "sitzung", "datum", "url"}], "abrufdatum"}`. Nicht-öffentliche
+- `ris.search`: `{"results": [{"top_id", "nummer", "titel", "sitzung", "datum", "url"}], "abrufdatum"}`. Nicht-öffentliche
   TOPs filtert der Connector **vor** Begrenzung und Zählung heraus. Ihre Existenz ist nicht erkennbar,
   auch nicht über die Anzahl.
-- `ris.show`: `{"top_id", "titel", "sitzung", "datum", "text", "url", "abrufdatum"}`. Ein nicht-öffentlicher TOP
+- `ris.show`: `{"top_id", "nummer", "titel", "sitzung", "datum", "text", "url", "abrufdatum"}`. Ein nicht-öffentlicher TOP
   ergibt `not-found`, genau wie ein nicht existierender.
+  `nummer` ist die TOP-Nummer aus der Tagesordnung, wie das RIS sie führt (`numbering`, etwa `4` oder `6.2`), seit
+  `komki-ris/2`; `top_id` ist die interne Kennung der RIS-API (`<Sitzung>-<Punkt>`) und nur für `show` gedacht.
 - `web.search`: `{"results": [{"title", "url", "snippet"}], "abrufdatum"}`
 - `vault.search`: `{"results": [{"note_id", "title", "labels"}]}`. Notizen ohne gültiges `komki_labels` erscheinen
   nicht.

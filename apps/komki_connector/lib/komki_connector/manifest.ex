@@ -84,14 +84,16 @@ defmodule KomkiConnector.Manifest do
   def fetch!("ris") do
     %{
       id: "ris",
-      fassung: "komki-ris/1",
+      fassung: "komki-ris/2",
       binary: "komki-connector-ris",
       ops: %{
         "search" => %{
           tool: "ris_search",
           kind: :read,
           description:
-            "Volltextsuche in oeffentlichen Tagesordnungspunkten des Ratsinformationssystems (RIS).",
+            "Volltextsuche in oeffentlichen Tagesordnungspunkten des Ratsinformationssystems (RIS). " <>
+              "Zitiere einen Treffer mit Sitzung, Datum und TOP-Nummer (Feld nummer); " <>
+              "top_id ist nur die Kennung fuer ris_show.",
           params: %{
             "text" => %{type: :string, max: 200, required: true},
             "limit" => %{type: :integer, min: 1, max: 20, required: false, default: 10}

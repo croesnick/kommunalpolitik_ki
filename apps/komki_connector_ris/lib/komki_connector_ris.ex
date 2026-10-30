@@ -1,6 +1,6 @@
 defmodule KomkiConnectorRis do
   @moduledoc """
-  RIS-Connector `komki-ris/1` (CONTRACT.md §5.1/§5.2): `search` und `show`
+  RIS-Connector `komki-ris/2` (CONTRACT.md §5.1/§5.2): `search` und `show`
   ueber oeffentliche Tagesordnungspunkte (TOPs) der RIS-API.
 
   Der Connector nutzt nur die Gast-Endpunkte der API (`guestmeetings`,
@@ -164,6 +164,7 @@ defmodule KomkiConnectorRis do
   defp hit(acc, top, meeting, cfg) do
     result = %{
       "top_id" => top["id"],
+      "nummer" => Top.string(top["numbering"]),
       "titel" => Top.string(top["name"]),
       "sitzung" => Top.string(meeting["name"]),
       "datum" => Top.date(meeting["meetingdate"]),
@@ -188,6 +189,7 @@ defmodule KomkiConnectorRis do
       {:ok,
        %{
          "top_id" => top_id,
+         "nummer" => Top.string(top["numbering"]),
          "titel" => Top.string(top["name"]),
          "sitzung" => Top.string(meeting["name"]),
          "datum" => Top.date(meeting["meetingdate"]),
