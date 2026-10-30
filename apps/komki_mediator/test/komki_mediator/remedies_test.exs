@@ -47,7 +47,6 @@ defmodule KomkiMediator.RemediesTest do
       Remedies.catalog(
         gamma.compiled,
         catalog_ctx(gamma, room, "doc-vertraulich"),
-        :admit,
         decision["blockers"]
       )
 
@@ -80,7 +79,6 @@ defmodule KomkiMediator.RemediesTest do
       Remedies.catalog(
         gamma.compiled,
         catalog_ctx(gamma, room, "doc-pending-freigabe"),
-        :admit,
         decision["missing_evidence"]
       )
 

@@ -236,7 +236,7 @@ Regeln (R.6.2 — autorisiert wird ein Ereignis, nicht nur ein Text):
 ```
 
 - Versionierter Stand (R.6.3): `version` nicht-negativer Integer, monoton; `as_of` logische Ist-Zeit aus dem vertrauenswürdigen Kontext; `consumed` mappt verbrauchte Noncen auf die verbrauchende `release_id` (Fortschreibung als Mini-Ledger — Prudentias Endorsement ohne Ledger/ohne Widerruf wird ausdrücklich **nicht** übernommen; Einträge entstehen und ändern sich nur über versionierte Standübergänge).
-- **Standübergang (`advance`):** Die Permit-Entscheidung des Aktionsfreigabe-Zweigs trägt ein `release`-Objekt (Form in § 4.6) — das ist der Verbrauchs-Vorschlag. `advance(stand, vorschlag)` ist rein und atomar: Erfolg nur, wenn `vorschlag.stand_ref == "<stand_id>@<version>"` des aktuellen Standes **und** `vorschlag.nonce ∉ consumed`; Ergebnis ist der nächste Stand (`version + 1`, `consumed` um `nonce → release_id` erweitert). Sonst `refused` (`stand_version_conflict` bzw. `nonce_already_consumed`). Zwei konkurrierende Ausführungen desselben GOs können nicht beide erfolgreich committen — der Versionsabgleich ist das Compare-and-Swap; das Führen des aktuellen Standes ist Vollzug außerhalb des Kerns (B.8).
+- **Standübergang (`advance`):** Die Permit-Entscheidung des Aktionsfreigabe-Zweigs trägt ein `release`-Objekt (Form in § 4.6) — das ist der Verbrauchs-Vorschlag. `advance(stand, vorschlag)` ist rein und atomar: Erfolg nur, wenn `vorschlag.stand_ref == "<stand_id>@<version>"` des aktuellen Standes, `vorschlag.stand_version_after == version + 1` (der Vorschlag muss exakt den nächsten Stand adressieren) **und** `vorschlag.nonce ∉ consumed`; Ergebnis ist der nächste Stand (`version + 1`, `consumed` um `nonce → release_id` erweitert). Sonst `refused` (`stand_version_conflict` bzw. `nonce_already_consumed`). Zwei konkurrierende Ausführungen desselben GOs können nicht beide erfolgreich committen — der Versionsabgleich ist das Compare-and-Swap; das Führen des aktuellen Standes ist Vollzug außerhalb des Kerns (B.8).
 
 ### 2.8 Remedy-Katalog (Legal Fortsetzungen statt nacktem `deny`)
 
@@ -483,7 +483,7 @@ Ungültige Eingaben (Eingabefehler, keine Entscheidungen):
 | `invalid/intent_version_mismatch.json` | Kohärenzfehler `intent_snapshot_mismatch` |
 | `invalid/release_unknown_field.json` | Validierungsfehler `unknown_field` (Release-Schema § 2.6) |
 | `invalid/release_bad_window.json` | Validierungsfehler `invalid_window` (`valid_from > valid_until`) |
-| `invalid/emit_digest_missing.json` | `decide` auf `emit` ohne Fakt `output_content_digest` → Eingabefehler `emit_digest_missing` (§ 4.5) |
+| `invalid/emit_digest_missing_intent.json` + `invalid/emit_digest_missing_snapshot.json` | `decide` auf `emit` ohne Fakt `output_content_digest` → Eingabefehler `emit_digest_missing` (§ 4.5) |
 
 Manipulierte Beweise (alle von `verify` zu verwerfen):
 
