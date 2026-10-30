@@ -52,7 +52,7 @@ Ein **Raum** legt fest, welche Arten von Daten in einer Sitzung zusammenkommen d
 | im Web suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO |
 | öffentliche Notizen lesen | <span class="ja">ja</span> | <span class="ja">ja</span> |
 | vertrauliche Notizen lesen | <span class="nein">nein, sie sind unsichtbar</span> | <span class="ja">ja</span> |
-| Notizen in `komki-test/` schreiben | <span class="ja">ja</span> | <span class="ja">ja, mit vertraulichem Label</span> |
+| Notizen in `komki-test/` schreiben | <span class="ja">ja</span>, nach deinem GO | <span class="ja">ja</span>, nach deinem GO, mit vertraulichem Label |
 
 <Aside type="tip" title="Warum das wirkt">
 Im Raum „vertraulich“ fehlt jeder Weg nach draußen, solange du nicht selbst einen einzelnen Aufruf freigibst. Selbst ein Agent, der vollständig von einem Angreifer gesteuert würde, kann vertrauliche Inhalte dort nicht weitergeben. Im Raum „recherche“ ist der Weg nach draußen offen, dafür kommt der Agent gar nicht erst an Vertrauliches. Du wechselst mit `komki raum vertraulich` und `komki raum recherche`. Das kannst du [selbst ausprobieren](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
@@ -90,7 +90,7 @@ Einzelheiten stehen in der [README von komki_cli](https://github.com/croesnick/k
 
 ## Freigabe: dein GO für genau einen Aufruf
 
-Manchmal ist eine gesperrte Anfrage in Ordnung, etwa eine Websuche nach einem Förderprogramm, während eine vertrauliche Notiz offen ist. Dann entscheidest du. Läuft eine Session und hängt dein Terminal daran, öffnet komki bei einer gesperrten Anfrage ein Fenster. Das Bild stammt aus einer echten Session im Raum „vertraulich“:
+Manchmal ist eine gesperrte Anfrage in Ordnung, etwa eine Websuche nach einem Förderprogramm, während eine vertrauliche Notiz offen ist. Dann entscheidest du. Schreiben ist immer gesperrt, bis du es freigibst: Keine Regel erlaubt komki, von sich aus eine Notiz abzulegen. Das Fenster sagt dann „Aktion: speichern“. Läuft eine Session und hängt dein Terminal daran, öffnet komki bei einer gesperrten Anfrage ein Fenster. Das Bild stammt aus einer echten Session im Raum „vertraulich“:
 
 <div class="komki-figure"><GoExistenzLeck /></div>
 

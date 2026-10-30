@@ -14,7 +14,9 @@ Fassung `komki-mediator/3` (Tickets #144, #218): neben `ping`,
 `list_documents` und `admit_document` bietet der Vermittler die sechs
 Connector-Tools `ris_search`, `ris_show`, `web_search`, `vault_search`,
 `vault_read` und `vault_write_test` an. Jeder Connector-Aufruf laeuft als
-emit → Vollzug → admit mit zwei PDR (`apps/komki_connector/CONTRACT.md` §6).
+emit → Vollzug → admit mit zwei PDR (`apps/komki_connector/CONTRACT.md` §6);
+ein schreibender zusaetzlich mit `store` vor dem Vollzug, das ohne GO der
+nutzenden Person abgelehnt wird (Ticket #205).
 
 Gesperrte Aufrufe (`deny`, `indeterminate`, abgelehntes oder ausgebliebenes
 GO) tragen neben dem Remedy-Katalog das Feld `hinweis`: ein fester Satz an
@@ -397,6 +399,11 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
     wird der emit-PDR geschrieben, **bevor** der Connector gerufen wird;
     seine `decision_id` ist die `call_id` im Frame. Bei `vault_write_test`
     geht `context.assigned_label` (= B_W) mit.
+  * `store` (nur schreibend, #205): nach dem emit-Permit, unter λ(y) =
+    `assigned_label` in der Manifest-Umgebung. Γ hat keine `store`-Regel,
+    also deny mit Aktionsfreigabe fuer den exakten Call; mit Zuhoerer fragt
+    der Vermittler (GO-Anfrage mit `operation: store`), sonst bleibt es
+    beim deny. Der store-PDR liegt vor dem emit-PDR des Vollzugs.
   * Gate 2 `admit`: Ergebnisform §5.2 (geschlossen), Labels allein aus dem
     Manifest (RIS/Web fest `import_labels`; Vault: Labels der Notiz,
     nicht leer und ⊆ `import_labels`; `write_test`: Rueckmeldung =

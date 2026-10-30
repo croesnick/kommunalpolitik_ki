@@ -449,7 +449,7 @@ nach Schnellstart frisch aufgesetzten Instanz.
 | §9 RIS: `sessions(range)` | nicht gebaut, nur `search` und `show` | Ohne konkreten Bedarf weggelassen (KISS) |
 | §9 RIS: Abruf über `risapi1.komuna.net` | nur die öffentlichen Gast-Endpunkte; diese liefern keine TOP-Texte | #148 |
 | §9 Web: Query verbatim im PDR | PDR bindet die Anfrage über `intent_hash`/`payload_hash`, nicht im Klartext | Nach R.11.5 gewollt (Journal ohne Payloads); Klartext-Beleg wäre eine eigene Entscheidung |
-| §9 Vault: Schreibvorgänge mit GO | `write_test` nur in `komki-test/`, ohne GO | GO-Flow ist #98 |
+| §9 Vault: Schreibvorgänge mit GO | `write_test` nur in `komki-test/`, jedes Mal mit GO | Erledigt mit #205: Regelzweig `store` in der Engine, ohne `store`-Regel in Γ braucht jedes Schreiben eine Aktionsfreigabe |
 | §9 Vault: Label aus Frontmatter oder Tag | nur Frontmatter `komki_labels` | Tags bewusst nicht, eindeutiger und prüfbarer |
 | §9 pdf_ingest als eigener Prozess (B2) | `admit_document` läuft weiter im Vermittler-BEAM | Übergang laut §6a; #169 |
 | §6a.1: Connector ohne Netz und Credential | Vault-Connector ohne Egress-Port; Zertifikate aus `/etc/ssl/cert.pem`, weil `cacerts_get` den Schlüsselbund öffnet | Nachtrag aus L-108 |

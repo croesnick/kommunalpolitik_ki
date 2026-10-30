@@ -1,7 +1,7 @@
 defmodule KomkiMediator.Go do
   @moduledoc """
   Interaktives GO fuer eine blockierte Ausgabe (Ticket #98, R.6.2,
-  CONTRACT §4.6). Bietet der Remedy-Katalog einer emit-Ablehnung eine
+  CONTRACT §4.6). Bietet der Remedy-Katalog einer emit- oder store-Ablehnung eine
   Aktionsfreigabe fuer den exakten Call an (`aktionsfreigabe`, scope
   `call`), legt der Vermittler eine Anfrage ab und wartet begrenzt auf die
   Antwort der nutzenden Person (`komki go`), sofern jemand zuhoert
@@ -10,8 +10,9 @@ defmodule KomkiMediator.Go do
   Dateien unter `<base>/mediator/go/` (pi kann dort weder lesen noch
   schreiben, also auch kein GO ausstellen):
 
-  * `<call_hash>.request.json` — vom Vermittler: Tool, Parameter (die
-    Vorschau), Blocker, die Bausteine des Call-Hashs, `expires_at`.
+  * `<call_hash>.request.json` — vom Vermittler: Operation (`emit` oder
+    `store`), Tool, Parameter (die Vorschau), Blocker, die Bausteine des
+    Call-Hashs, `expires_at`.
   * `<call_hash>.answer.json` — von `komki go`: eine Aktionsfreigabe
     `komki-release/1` oder `{"go": false}`.
 
@@ -172,7 +173,7 @@ defmodule KomkiMediator.Go do
       "schema" => "komki-release/1",
       "release_id" => "go-" <> nonce,
       "kind" => "aktionsfreigabe",
-      "operation" => "emit",
+      "operation" => request["operation"],
       "object" => request["object"],
       "workspace" => request["workspace"],
       "content_digest" => request["content_digest"],

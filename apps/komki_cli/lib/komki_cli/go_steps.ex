@@ -78,12 +78,19 @@ defmodule KomkiCli.GoSteps do
 
     Gesperrter Aufruf (Beleg #{request["decision_id"]})
       Werkzeug:  #{request["tool"]}
-      Parameter:
+    #{action(request)}  Parameter:
     #{params}
       Gesperrt:  #{Enum.join(request["blockers"], ", ")}
     #{leak(recipients)}  Ein GO gilt nur für genau diesen Aufruf, einmal, fünf Minuten lang.\
     """
   end
+
+  # Speichern braucht immer ein GO (Ticket #205): keine Bindung erlaubt
+  # `store` von sich aus.
+  defp action(%{"operation" => "store"}),
+    do: "  Aktion:    speichern — jedes Schreiben braucht dein GO\n"
+
+  defp action(_request), do: ""
 
   defp leak([]), do: ""
 
