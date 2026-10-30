@@ -97,6 +97,8 @@ wird von Anfang an mitgedacht, nicht nachträglich aufgesetzt.
 
 Jede Aussage, die ein Tool produziert und politisch relevant ist, braucht eine Quelle: URL, Abrufdatum, ggf. Paragraf. Ein Stadtrat ohne Quellen ist unglaubwürdig. Ein Stadtrat mit Quellen ist eine Bastion. Das gilt für den `foerdermittel_recherche`-Skill, `ratsinfo report`, und jeden anderen Output.
 
+**Quellen verifizieren.** Jede Quelle wird vor der Verwendung geprüft: Links auflösen und prüfen, dass die Seite zeigt, wofür sie zitiert wird (ein HTTP-200 allein genügt nicht), Fundstelle (Seite, Paragraf) nachschlagen, Zitate gegen den Wortlaut halten. URL, Kennung und Abrufdatum stammen aus dem tatsächlichen Abruf. Was sich nicht prüfen lässt, wird als „nicht verifiziert" gekennzeichnet.
+
 ### 7. GO-Prinzip: KI berät, Mensch entscheidet
 
 Die KI entscheidet nichts ohne GO. Keine Triage-Änderung, kein Vault-Eintrag, kein Task-Update ohne Bestätigung. Das ist nicht nur eine Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt beim Menschen. Tools sind read-only by design, wo immer möglich.

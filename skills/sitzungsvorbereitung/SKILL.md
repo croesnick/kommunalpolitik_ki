@@ -63,12 +63,37 @@ jeden inhaltlichen TOP:
   Eigenanteil der Stadt, Förder- oder Restanteil — der Eigenanteil
   belastet den städtischen Haushalt.
 - **Beschlussvorschlag** im Wortlaut oder mit allen Komponenten.
+- **Fristen und Termine**, die den Beschluss oder das Vorhaben binden:
+  Förder- und Antragsfristen, Haushaltsjahr, Bau- und Pflanzzeiten,
+  Einwendungs- oder Vergabefristen — mit Datum und was bei Versäumnis
+  droht, soweit die Vorlage es sagt.
 - **Zahlen nur aus der Vorlage.** Selbst berechnete Zahlen (z. B.
   Förderanteil als Differenz) als „abgeleitet" kennzeichnen.
-- **Lücken benennen:** Fehlt eine erwartbare Angabe, „Angabe fehlt in der
-  Vorlage" schreiben und als Frage aufnehmen — nie still weglassen.
+- **Kritisch gelesen:** was die Vorlage nicht sagt (nächster Abschnitt).
 
 Formale TOPs (Protokollgenehmigung, Bekanntgaben) bekommen eine Zeile.
+
+## Kritisch lesen: Was die Vorlage nicht sagt
+
+Nach der Zusammenfassung jeden inhaltlichen TOP gegenlesen:
+
+- **Selbst als offen benannt:** Was vertagt, ausklammert oder „später"
+  regelt die Vorlage — und was kostet das?
+- **Fehlende Zahlen für die Einordnung:** Folgekosten (Unterhalt, Personal,
+  Betrieb), Vorher-nachher-Vergleich, Grundlage und Stand der
+  Kostenschätzung, Förderbedingungen (Quote, Fristen, Zweckbindung,
+  Rückforderung), Kosten für Zusatzaufträge aus dem Beschlussvorschlag.
+- **Fehlende Fristen:** Bis wann muss entschieden, abgerufen, gebaut oder
+  abgerechnet sein? Fehlt ein Zeitplan, obwohl Förderung oder Haushaltsjahr
+  daran hängen, ist das eine Lücke.
+- **Nicht gestellte Fragen:** Alternativen und Nullvariante, Betroffene, die
+  in der Vorlage nicht vorkommen, Zeitplan, Risiken, Zuständigkeit.
+- **Widersprüche:** Zahlen oder Aussagen, die nicht zusammenpassen.
+
+Nur konkrete Lücken dieses TOPs, keine Standardliste; je Lücke ein
+Halbsatz, warum sie für die Entscheidung zählt. Lücken sind Fragen, keine
+Befunde: eine fehlende Zahl nie schätzen oder ergänzen. Jede Lücke wird zu
+einer Frage für die Fraktion.
 
 ## Quellenpflicht
 
@@ -80,6 +105,11 @@ Jede politisch relevante Aussage trägt eine Quelle (AGENTS.md §6):
 - **Vault:** Titel und Pfad, gekennzeichnet als „persönliche Notiz" — keine
   amtliche Quelle; unbelegte Behauptungen darin als solche markieren.
 - Ohne Quelle: „nicht belegt" — nicht verschweigen.
+- **Quellen verifizieren** (AGENTS.md §6): Links auflösen, Fundstelle
+  nachschlagen; URL, Sitzungs-ID, Drucksachen-Nummer und Abrufdatum aus dem
+  Werkzeug-Ergebnis übernehmen — die Vorlage unten zeigt nur das Format.
+  Was sich nicht prüfen lässt: „nicht verifiziert". Nicht ausgeführte
+  Schritte (AZ, Vault, Ratsprojekte): „nicht gesucht".
 
 ## Querschnittsanalyse (nur große Sitzungen)
 
@@ -124,9 +154,18 @@ Ziel: `1 - Projects/Stadtrat Buchloe/Sitzungsmappen/<YYYY-MM-DD> <Sitzungsname>.
    Externe Titel (AZ, RIS, Vault) in YAML **immer in Single-Quotes**,
    `'` darin als `''` — deutsche Anführungszeichen brechen sonst
    Double-Quotes.
-3. **GO einholen:** Zielpfad und Gliederung zeigen; bei existierender Datei
+3. **Quellen verifizieren:** jeden Link der Temp-Datei abrufen und prüfen,
+   dass die Seite zeigt, wofür er zitiert wird (Sitzungsdatum, TOP- oder
+   Artikeltitel):
+   ```bash
+   curl -sL "<url>" | grep -c "<erwarteter Titel oder Datum>"
+   ```
+   HTTP 200 genügt nicht: Das RIS beantwortet auch erfundene Adressen mit
+   200 und einer leeren Seite. Ohne Treffer → Link entfernen, „nicht
+   verifiziert" eintragen.
+4. **GO einholen:** Zielpfad und Gliederung zeigen; bei existierender Datei
    ausdrücklich auf das Überschreiben hinweisen. Ohne GO kein Write.
-4. Nach GO übernehmen:
+5. Nach GO übernehmen:
    ```bash
    obsidian vault="<v>" eval code="app.vault.adapter.mkdir('<ordner>').then(() => app.vault.adapter.write('<zielpfad>', require('fs').readFileSync('<temp-datei>', 'utf8')))"
    ```
@@ -136,19 +175,19 @@ Ziel: `1 - Projects/Stadtrat Buchloe/Sitzungsmappen/<YYYY-MM-DD> <Sitzungsname>.
 ```markdown
 ---
 type: sitzungsmappe
-sitzung_id: <RIS-ID>
-sitzung_datum: 2025-07-24
-gremium: Stadtrat
-ort: Buchloe
-ris_url: https://ris.komuna.net/vgbuchloe/Meeting.mvc/...
+sitzung_id: <aus ratsinfo>
+sitzung_datum: <YYYY-MM-DD>
+gremium: <Gremium>
+ort: <Ort>
+ris_url: <aus ratsinfo show, verifiziert>
 quellen:
   - typ: sitzung
-    titel: 'RIS-Sitzung <id> vom 2025-07-24'
-    abrufdatum: 2025-07-15
+    titel: 'RIS-Sitzung <id> vom <YYYY-MM-DD>'
+    abrufdatum: <Tag des Abrufs>
   - typ: presse
     titel: '<artikel-titel>'
-    url: <url>
-    abrufdatum: 2025-07-15
+    url: <aufgelöste URL>
+    abrufdatum: <Tag des Abrufs>
   - typ: vault
     titel: '<notiz-titel>'
     pfad: '<vault-pfad>'
@@ -165,14 +204,18 @@ quellen:
 - **Vorhaben / Anliegen:** <Name; was die Vorlage will, Maßnahmen>
 - **Kosten / Finanzierung:** <gesamt, Eigenanteil, Förderanteil — oder „Angabe fehlt in der Vorlage">
 - **Beschlussvorschlag:** <Wortlaut oder alle Komponenten>
+- **Fristen:** <Datum — Bedeutung; oder „kein Zeitplan in der Vorlage">
 - **Dokumente:** <Drucksache / PDF — oder „keine Vorlage gefunden">
 
 **AZ:** „<Titel>" — <url>, abgerufen <datum>. <Kern in 1–2 Sätzen>
 **Vault:** [[<notiz>]] (persönliche Notiz) — <Kern>
 **Ratsprojekt:** möglicher Bezug zu `#ratsprojekt/<slug>`
 
+**Was die Vorlage nicht sagt**
+- <Lücke> — <warum sie für die Entscheidung zählt>
+
 **Fragen für die Fraktion**
-- [ ] <Frage, auch aus Lücken der Vorlage>
+- [ ] <Frage, je Lücke mindestens eine>
 
 ## Querverweise
 <Ratsprojekte, AZ-Artikel, Vault-Notizen, RIS-Sitzung — je mit Quelle>

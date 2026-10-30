@@ -101,6 +101,26 @@ Ergebnis: **kein Modelldefizit, sondern Prompt-Sensitivität.** Das Modell kann 
 
 Im langen Skill geht die Checkliste unter. Die kompakte Fassung liefert den Eigenanteil in jedem Lauf, bei knapp einem Drittel der Wandzeit. Der eine unvollständige Lauf der kompakten Fassung nennt das Anliegen nur als „Umgestaltung“; das strengere K4 dieser Nachmessung wertet das nicht, das K4 des Benchmarks schon. Der Skill im Repo ist die kompakte Fassung.
 
+**Kritisches Lesen, Fristen, Quellen (Nachmessung 2):** Prompt „bereite TOP 3 als Abschnitt für meine Sitzungsmappe auf“, je 5 Läufe pro Arm, Bewertung per Regex. Gezählt ist, in wie vielen Läufen die Antwort die jeweilige Lücke bzw. Frist benennt. Bei der Quellenzeile ist gezählt, wie oft das Modell einen RIS-Link oder ein Abrufdatum erfindet; die Fixture enthält weder das eine noch das andere.
+
+| Kriterium | ohne Skill | kompakt | + kritisch lesen | + Fristen | + Quellen verifizieren | + Platzhalter in der Vorlage |
+|---|---|---|---|---|---|---|
+| Barrierefreiheit offen | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+| Beleuchtungskosten unklar | 0/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+| Folgekosten fehlen | 0/5 | 0/5 | 5/5 | 4/5 | 3/5 | 5/5 |
+| Winterperiode als Termin | – | – | 1/5 | 5/5 | 5/5 | 4/5 |
+| fehlender Zeitplan als Lücke | – | – | 1/5 | 3/5 | 2/5 | 4/5 |
+| Eigenanteil genannt | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+| erfundener RIS-Link | – | – | – | 4/5 | 2/5 | 2/5 |
+
+Die Spalten bauen aufeinander auf; „–“ heißt, der Arm wurde für dieses Kriterium nicht gemessen. Messläufe: `kompakt`/`kritisch` und `kritisch`/`Fristen` je im direkten Vergleich, danach `Fristen`/`Quellen verifizieren` und `Platzhalter` allein.
+
+- Unter diesem Prompt nennt das Modell den Eigenanteil auch ohne Skill; die Lücke aus Aufgabe 1 hing am Fünf-Sätze-Prompt.
+- „Kritisch lesen“ wirkt: Folgekosten 0/5 → 5/5, dazu ein eigener Block mit konkreten Lücken, je mit Grund und abgeleiteter Frage.
+- Fristen als Muss-Angabe holen die Winterperiode zuverlässig in den Abschnitt (1/5 → 5/5).
+- Stellplatzbilanz (vorher/nachher) und Förderbedingungen (Quote, Zweckbindung) bringt das Modell in keiner Fassung von sich aus. Das Kriterium für Förderfristen ist zu eng (es erkennt „Frist für den Abruf der Landesförderung“ nicht) und hier nicht ausgewiesen.
+- Der erfundene Link ist in allen Läufen derselbe: `ris.komuna.net/vgbuchloe/Meeting.mvc/Show?meeting=2026-11-12`, mit Abrufdatum 21.10.2026. Er stand nach der Platzhalter-Änderung nicht mehr im Prompt; das Modell kennt das Muster offenbar aus dem Training. Instruktion senkt die Quote (4/5 → 2/5), verhindert sie nicht. Deshalb verlangt der Skill vor dem GO einen Prüfschritt: jeden Link abrufen und den Inhalt prüfen. Ein HTTP-Status reicht nicht — das RIS beantwortet die erfundene Adresse mit 200 und einer leeren Seite; die Inhaltsprüfung (Sitzungsdatum auf der Seite) findet 0 Treffer. Dieser Prüfschritt selbst ist im Benchmark nicht gemessen, weil der Testlauf nur das `read`-Tool hat und nichts schreibt.
+
 ### 2 — Quellen extrahieren
 
 Sechs Quellen als JSON-Array in `quellen.json`: URL-Angaben, Gutachten mit Auftragsnummer, Amtsblatt; `Abrufdatum` nur wo im Text, `Seite` nur wo angegeben, sonst `null` — die bedingten Felder sauber behandelt.
