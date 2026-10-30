@@ -18,6 +18,15 @@
  * fünf Aufgaben laufen (oder welcher Fehler auftritt), plus Latenz,
  * Tool-Call-Fehler, Reparaturbedarf, Token und Speicher. Ergebnisse landen
  * unter <root>/results/*.json, <root>/results.json und <root>/SMOKE.md.
+ *
+ * Modell als Parameter (Ticket #285): Ohne --gguf läuft der Harness wie in
+ * #158 gegen die komki-Instanz. Mit --gguf <pfad> --port <n> startet er
+ * einen eigenen Staging-llama-server (staging-server.mjs, ohne Seatbelt,
+ * gleiche Flags wie die Instanz) und stoppt ihn am Ende wieder:
+ *   --sampling '{"temp":1.0,"top-p":0.95,"top-k":64}'  llama-server-Flags
+ *   --seed <n>              RNG-Seed des Servers (dokumentiert je Lauf)
+ *   --ctx <n>               Serverkontext (Default 131072 wie die Instanz)
+ *   --timeout-factor <f>    streckt alle Aufgaben-Timeouts (Default 1)
  */
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -26,8 +35,11 @@ import { PACKAGES, runRoot, packageDir, timestamp } from "../lib/config.mjs";
 import { fillerBytes, writeTextFile } from "../lib/fixtures.mjs";
 import { requirement } from "../lib/experiment.mjs";
 import { runPi } from "../lib/runner.mjs";
+import { llamaVersion, startStagingServer } from "./staging-server.mjs";
 import {
   answerText,
+  llamaFootprintMiB,
+  llamaTokenCount,
   llamaLogOffset,
   llamaLogSegment,
   llamaRssMiB,
@@ -87,8 +99,23 @@ function detectLanguage(text) {
 }
 
 function parseArgs(argv) {
-  const args = { only: null, root: null };
+  const args = {
+    only: null,
+    root: null,
+    gguf: null,
+    port: null,
+    sampling: {},
+    seed: null,
+    ctx: 131072,
+    timeoutFactor: 1,
+  };
   for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === "--gguf") args.gguf = argv[i + 1];
+    if (argv[i] === "--port") args.port = Number(argv[i + 1]);
+    if (argv[i] === "--sampling") args.sampling = JSON.parse(argv[i + 1]);
+    if (argv[i] === "--seed") args.seed = Number(argv[i + 1]);
+    if (argv[i] === "--ctx") args.ctx = Number(argv[i + 1]);
+    if (argv[i] === "--timeout-factor") args.timeoutFactor = Number(argv[i + 1]);
     if (argv[i] === "--only") {
       const list = (argv[i + 1] ?? "").split(",").filter(Boolean).map((x) => x.trim());
       if (list.length === 0) {
@@ -98,7 +125,16 @@ function parseArgs(argv) {
     }
     if (argv[i] === "--root") args.root = argv[i + 1];
   }
+  if (args.gguf && !Number.isInteger(args.port)) {
+    throw new Error("--gguf braucht --port <n> für den Staging-Server");
+  }
+  if (!(args.timeoutFactor > 0)) throw new Error("--timeout-factor muss > 0 sein");
   return args;
+}
+
+/** Aufgaben-Timeout, gestreckt um --timeout-factor (gleich für alle Arme). */
+function timeout(ms) {
+  return Math.round(ms * args.timeoutFactor);
 }
 
 function selectTask(only, key) {
@@ -111,17 +147,22 @@ async function executeRun(llama, provider, options) {
   const rssBefore = llamaRssMiB(llama.pid);
   const run = await runPi(options);
   const logEnd = await llamaLogOffset(llama);
+  // Thinking-Token exakt über den Tokenizer des laufenden Servers zählen;
+  // completion_tokens enthält sie bereits, das hier ist der Anteil davon.
+  const reasoning = run.requests.map((request) => request.response?.reasoning ?? "").join("");
   return {
     run,
     serverRequests: await llamaLogSegment(llama, logStart, logEnd),
     rssBeforeMiB: rssBefore,
     rssAfterMiB: llamaRssMiB(llama.pid),
+    footprintAfterMiB: llamaFootprintMiB(llama.pid),
+    reasoningTokens: reasoning ? await llamaTokenCount(llama, reasoning) : 0,
   };
 }
 
 /** Messwerte einer pi-Invocation (Proxy-Log, Session, llama-Log). */
 function measurementsOf(executed) {
-  const { run, serverRequests, rssBeforeMiB, rssAfterMiB } = executed;
+  const { run, serverRequests, rssBeforeMiB, rssAfterMiB, footprintAfterMiB, reasoningTokens } = executed;
   const toolCalls = validateToolCalls(run.requests);
   return {
     durationMs: run.durationMs,
@@ -138,11 +179,16 @@ function measurementsOf(executed) {
       durationMs: request.durationMs,
       finishReason: request.response?.finishReason ?? null,
       usage: request.response?.usage ?? null,
+      firstTokenMs: request.response?.firstTokenMs ?? null,
+      firstAnswerMs: request.response?.firstAnswerMs ?? null,
+      reasoningChars: request.response?.reasoning?.length ?? 0,
     })),
+    reasoningTokens,
     usageProxy: usageTotals(run.requests),
     usageSession: sessionUsageTotals(run.session),
     serverRequests,
     rssLlamaMiB: { before: rssBeforeMiB, after: rssAfterMiB },
+    footprintLlamaMiB: footprintAfterMiB,
     toolCalls,
     toolCallErrorCount: toolCalls.filter((call) => !call.valid).length,
     lengthClampedRequests: run.requests
@@ -181,7 +227,7 @@ async function task1Top(llama, provider) {
     runDir,
     provider,
     contextWindow: 131072,
-    timeoutMs: 300_000,
+    timeoutMs: timeout(300_000),
     tools: "read",
     prompt:
       "Lies die Datei top-3-anhoerung.md im aktuellen Verzeichnis und fasse TOP 3 für die Sitzungsvorbereitung in höchstens fünf Sätzen zusammen. Nenne Gremium, Sitzungsdatum, Kostenschätzung und Beschlussvorschlag.",
@@ -249,7 +295,7 @@ async function task2Quellen(llama, provider) {
     runDir,
     provider,
     contextWindow: 131072,
-    timeoutMs: 300_000,
+    timeoutMs: timeout(300_000),
     tools: "read,write",
     prompt:
       'Lies die Datei lagebericht-bahnhofstr.md im aktuellen Verzeichnis. Extrahiere alle Quellenangaben des Textes und schreibe sie als JSON-Array in die Datei quellen.json. Jedes Objekt erhält die Felder "Quelle" (Fundstelle, URL oder Bezeichnung), "Abrufdatum" (Datum aus dem Text, sonst null) und "Seite" (Seitenangabe aus dem Text, sonst null). Antworte am Ende nur mit einem Satz.',
@@ -327,7 +373,7 @@ async function task3Redigieren(llama, provider) {
     runDir,
     provider,
     contextWindow: 131072,
-    timeoutMs: 300_000,
+    timeoutMs: timeout(300_000),
     tools: "read,write",
     prompt:
       "Lies die Datei entwurf-beschlussvorlage.md im aktuellen Verzeichnis. Redigiere den Text in eine neue Datei neue-fassung.md: deutlich kürzer, klare Sätze, aktive Form. Alle Fakten bleiben unverändert erhalten — Daten, Zahlen, Paragrafen, Fristen, Beträge, Hausnummern. Nichts hinzuerfinden. Antworte am Ende nur mit einem Satz.",
@@ -404,7 +450,7 @@ async function task4Todo(llama, provider) {
     runDir,
     provider,
     contextWindow: 131072,
-    timeoutMs: 600_000,
+    timeoutMs: timeout(600_000),
     tools: "read,todo",
     extensions: [TODO_EXTENSION],
   };
@@ -522,7 +568,7 @@ async function task6Compaction(llama, provider) {
     // Winziges Fenster erzwingt die Compaction (Dimensionierung siehe TINY).
     contextWindow: 16384,
     settings: TINY,
-    timeoutMs: 600_000,
+    timeoutMs: timeout(600_000),
     tools: "read",
   };
 
@@ -641,7 +687,24 @@ async function main() {
   args = parseArgs(process.argv.slice(2));
   ROOT = args.root ?? runRoot(timestamp());
 
-  const llama = await resolveLlama();
+  const llama = args.gguf
+    ? await startStagingServer({
+        gguf: args.gguf,
+        port: args.port,
+        sampling: args.sampling,
+        seed: args.seed,
+        ctx: args.ctx,
+        dir: path.join(ROOT, "server"),
+      })
+    : await resolveLlama();
+  try {
+    await runTasks(llama);
+  } finally {
+    await llama.stop?.();
+  }
+}
+
+async function runTasks(llama) {
   const provider = {
     upstreamBaseUrl: llama.baseUrl,
     apiKey: llama.apiKey,
@@ -655,6 +718,9 @@ async function main() {
 
   console.log(`llama-server: port ${llama.port}, pid ${llama.pid}, auth=${llama.authRequired}`);
   console.log(`gguf: ${llama.gguf}`);
+  if (llama.staging) {
+    console.log(`staging:    geladen in ${llama.staging.loadMs} ms, seed ${llama.staging.seed}`);
+  }
   console.log(`run root:   ${ROOT}`);
 
   const tasks = [
@@ -723,7 +789,10 @@ async function main() {
       gguf: llama.gguf,
       ctx: llama.ctx,
       rssMiB: llamaRssMiB(llama.pid),
+      version: llamaVersion(),
+      staging: llama.staging ?? null,
     },
+    timeoutFactor: args.timeoutFactor,
     results: allResults.map((result) => ({
       id: result.id,
       title: result.title,

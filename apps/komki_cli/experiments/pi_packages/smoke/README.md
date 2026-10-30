@@ -69,6 +69,48 @@ Gewünschtes Verhalten ist im Skript definiert und im Labbook begründet
 Variante B (explizit) liefert alle Kriterien in jedem Lauf — sonst läge ein
 Modelldefizit statt Prompt-Sensitivität vor.
 
+## Modell als Parameter und Modell-A/B (Ticket #285)
+
+Ohne `--gguf` läuft `run-smoke.mjs` unverändert gegen die komki-Instanz. Mit
+`--gguf` startet der Harness einen eigenen Staging-llama-server
+([`staging-server.mjs`](staging-server.mjs)): gleiche Flags wie der
+Produktivstart, aber ohne Seatbelt-Profil, auf eigenem Port, mit eigenem Key
+und Log unter `<root>/server/`. Er beendet ihn am Ende wieder.
+
+```bash
+node apps/komki_cli/experiments/pi_packages/smoke/run-smoke.mjs \
+  --gguf ~/.local/share/komki/models-staging/<datei>.gguf --port 49611 \
+  --sampling '{"temp":1.0,"top-p":0.95,"top-k":64}' --seed 285001 \
+  [--ctx 131072] [--timeout-factor 6] [--only 1,2,3,4,6] [--root <dir>]
+```
+
+Der A/B selbst besteht aus drei Skripten:
+
+```bash
+# 1. Kandidaten stagen: feste Revision, SHA-256 vor und nach dem Download
+node smoke/stage-gguf.mjs --repo <hf-repo> --revision <commit> --file <gguf> --sha256 <hex>
+
+# 2. Lade-Check, dann Warm-up + n Messläufe je Arm, interleaved (A B C …)
+node smoke/run-ab.mjs --root <ab-root> --preflight
+node smoke/run-ab.mjs --root <ab-root> [--runs 3] [--timeout-factor 6]
+
+# 3. Verblinden, manuell bewerten (blind/grades.json), entblinden
+node smoke/grade-ab.mjs blind  --root <ab-root>
+node smoke/grade-ab.mjs report --root <ab-root>
+```
+
+Arme, Revisionen, Prüfsummen und Sampling stehen in [`ab-arms.mjs`](ab-arms.mjs),
+die vorab registrierten Checklisten in [`grade-ab.mjs`](grade-ab.mjs) und
+[`criteria.mjs`](criteria.mjs). `run-ab.mjs` ist fortsetzbar: Läufe mit
+`results.json` werden übersprungen. Protokoll und Ergebnisse:
+[Labbook 2026-10-31](../../../../../docs/research/2026-10-31-modell-ab.md).
+
+Zusätzlich misst der Proxy seit #285 je Request die Zeit bis zum ersten
+Delta (`firstTokenMs`, Thinking eingeschlossen) und bis zur ersten sichtbaren
+Antwort (`firstAnswerMs`) und hält den Thinking-Text (`reasoning`) fest. Der
+Harness zählt die Thinking-Token mit dem Tokenizer des laufenden Servers
+(`/tokenize`) und misst den `phys_footprint` des llama-server.
+
 ## Ergebnisse
 
 - `<root>/results/<task>.json` — je Aufgabe Requirements, Messwerte, Captures
