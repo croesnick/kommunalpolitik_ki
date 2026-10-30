@@ -1,9 +1,9 @@
 defmodule KomkiPolicy.Derive do
   @moduledoc """
-  Regelkern `derive` — Regelzweige `admit` (§ 4), `emit` (§ 4.5) und
-  `store` (§ 4.7), Freigabe-Zweig `decide_with_release/5` (§ 4.6),
-  Remedy-Katalog via `KomkiPolicy.Remedies` (§ 2.8) (CONTRACT.md
-  Lieferung 2 und 3).
+  Regelkern `derive` — Regelzweige `admit` (§ 4), `emit` (§ 4.5),
+  `store` (§ 4.7) und `transfer` (§ 4.8), Freigabe-Zweig
+  `decide_with_release/5` (§ 4.6), Remedy-Katalog via
+  `KomkiPolicy.Remedies` (§ 2.8) (CONTRACT.md Lieferung 2 bis 4).
 
   `decide/3` validiert Snapshot und Intent als geschlossene Schemas,
   prüft die Referenzkohärenz und leitet in fester Prämissenordnung.
@@ -24,6 +24,11 @@ defmodule KomkiPolicy.Derive do
   und `store`-Regeln stammen aus den Bindungen des Objekts. B_W ⊆ λ(y)
   ist eine eigene Prämisse (`label_preservation`), denn ein Speichern
   entfernt keine Bindung. Digest- und Klassifikationspflicht wie `emit`.
+
+  `transfer` (RFC 0003 R.5.6) übergibt ein erzeugtes Objekt y an ein
+  Ziel (die Umgebung des Snapshots, etwa einen externen Dienst). Form
+  wie `store`: Prüflabel λ(y), `label_preservation`, Empfängerkreis des
+  Ziels, `transfer`-Regeln der Bindungen von λ(y).
 
   Urteil und Vollzug getrennt (B.8): der Kern verbraucht keine
   Freigabe — `decide_with_release/5` plant den Verbrauch als
@@ -56,7 +61,9 @@ defmodule KomkiPolicy.Derive do
     "binding_condition"
   ]
 
-  @store_premises [
+  # store (§ 4.7) und transfer (§ 4.8): ein erzeugtes Objekt verlässt den
+  # Raum unter λ(y).
+  @handover_premises [
     "workspace_contract_valid",
     "has_operation_right",
     "audit_path_ready",
@@ -66,30 +73,34 @@ defmodule KomkiPolicy.Derive do
     "binding_condition"
   ]
 
+  @handover_operations ["transfer", "store"]
+
   # Regelzweige mit Ausgabeobjekt: Digest-Pflicht, call-GO im Katalog,
   # Freigabe-Zweig.
-  @output_operations ["emit", "store"]
+  @output_operations ["emit" | @handover_operations]
 
-  @unsupported_operations ["start", "transfer"]
+  @unsupported_operations ["start"]
   @unsupported_detail "rule branch not implemented"
 
   @doc "§ 4.3-Prämissennamen in fester Reihenfolge (gemeinsame Sollmenge für derive-Baum und verify)."
   @spec required_premises() :: [String.t()]
   def required_premises, do: @admit_premises
 
-  @doc "Regelabhängige Sollmengen (§ 4.3 `admit`, § 4.5 `emit`, § 4.7 `store`)."
+  @doc "Regelabhängige Sollmengen (§ 4.3 `admit`, § 4.5 `emit`, § 4.7 `store`, § 4.8 `transfer`)."
   @spec required_premises(String.t()) :: [String.t()]
   def required_premises("admit"), do: @admit_premises
   def required_premises("emit"), do: @emit_premises
-  def required_premises("store"), do: @store_premises
+  def required_premises(rule) when rule in @handover_operations, do: @handover_premises
 
   @doc """
   Prüflabel einer Entscheidung: B_W für `admit` und `emit`, λ(y) (die
-  Objekt-Labels, sortiert) für `store` (§ 4.7). Gemeinsam für derive und
-  verify.
+  Objekt-Labels, sortiert) für `store` und `transfer` (§ 4.7, § 4.8).
+  Gemeinsam für derive und verify.
   """
   @spec checked_label(String.t(), map(), map()) :: [String.t()]
-  def checked_label("store", _workspace, object), do: Enum.sort(Enum.uniq(object["labels"]))
+  def checked_label(rule, _workspace, object) when rule in @handover_operations,
+    do: Enum.sort(Enum.uniq(object["labels"]))
+
   def checked_label(_rule, workspace, _object), do: workspace["bindings"]
 
   @type decision() :: %{required(String.t()) => term()}
@@ -104,7 +115,7 @@ defmodule KomkiPolicy.Derive do
   # =========================================================================
 
   @doc """
-  Leitet für den Regelzweig `admit`, `emit` oder `store` und meldet `unsupported`
+  Leitet für den Regelzweig `admit`, `emit`, `store` oder `transfer` und meldet `unsupported`
   bzw. einen strukturierten Eingabefehler.
   """
   @spec decide(Registry.compiled(), term(), term()) ::
@@ -117,7 +128,7 @@ defmodule KomkiPolicy.Derive do
 
   @doc """
   Ausgabeshape für nicht unterstützte Regelzweige (alle außer `admit`,
-  `emit`, `store` und dem Freigabe-Zweig).
+  `emit`, `store`, `transfer` und dem Freigabe-Zweig).
   """
   def unsupported_info(operation) do
     %{"result" => "unsupported", "rule" => operation, "detail" => @unsupported_detail}
@@ -127,7 +138,7 @@ defmodule KomkiPolicy.Derive do
   Aktionsfreigabe-Zweig (§ 4.6, B.5 Schritt 6): eigener Regelzweig mit
   vorgelegter Aktionsfreigabe und Offenlegungsstand — nie ein stiller
   Fallback der normalen Entscheidung. Nur `kind: aktionsfreigabe` mit
-  Operation `emit` oder `store` ist entscheidbar; `offenlegungsfreigabe`
+  Operation `emit`, `store` oder `transfer` ist entscheidbar; `offenlegungsfreigabe`
   und andere Operationen ergeben `unsupported` (Exit 3).
   """
   @spec decide_with_release(Registry.compiled(), term(), term(), term(), term()) ::
@@ -177,11 +188,11 @@ defmodule KomkiPolicy.Derive do
     case auth.operation do
       "admit" -> run_admit(ctx, registry, auth)
       "emit" -> run_emit(ctx, registry, auth)
-      "store" -> run_store(ctx, registry, auth)
+      handover -> run_handover(ctx, registry, auth, handover)
     end
   end
 
-  defp ensure_supported(operation) when operation in ["admit", "emit", "store"], do: :ok
+  defp ensure_supported(operation) when operation in ["admit" | @output_operations], do: :ok
 
   defp ensure_supported(operation) when operation in @unsupported_operations do
     {:unsupported, unsupported_info(operation)}
@@ -202,7 +213,7 @@ defmodule KomkiPolicy.Derive do
          {:ok, stand} <- Stand.validate(stand_term),
          :ok <- require_supportable(auth, release) do
       # § 4.6-Reihenfolge: erst die Freigabe-Entscheidung (kind/operation),
-      # dann die Digest-Pflicht (emit, store) — ein nicht-unterstützter Zweig ist
+      # dann die Digest-Pflicht (emit, store, transfer) — ein nicht-unterstützter Zweig ist
       # unsupported (Exit 3), auch wenn der Snapshot bereits den Digest
       # vermissen lassen würde.
       case require_emit_input(ctx) do
@@ -325,10 +336,10 @@ defmodule KomkiPolicy.Derive do
     end
   end
 
-  # Nur `emit` ordnet ein Label zu; `store` erhält λ(y) und trägt kein
-  # `assigned_label`.
+  # Nur `emit` ordnet ein Label zu; `store` und `transfer` erhalten λ(y)
+  # und tragen kein `assigned_label`.
   defp release_label_fields("emit", label), do: %{"assigned_label" => label}
-  defp release_label_fields("store", _label), do: %{}
+  defp release_label_fields(_handover, _label), do: %{}
 
   defp release_decision(ctx, auth, checked, label, fields) do
     ctx
@@ -349,7 +360,7 @@ defmodule KomkiPolicy.Derive do
   end
 
   # =========================================================================
-  # Eingabepflichten für emit und store (§ 4.5, § 4.7): Digest-Pflicht,
+  # Eingabepflichten für emit, store und transfer (§ 4.5, § 4.7, § 4.8): Digest-Pflicht,
   # Klassifikationszustand
   # =========================================================================
 
@@ -425,23 +436,24 @@ defmodule KomkiPolicy.Derive do
   end
 
   # =========================================================================
-  # store-Kern (§ 4.7): Prämissen in fester Ordnung, entschieden unter λ(y)
+  # store- und transfer-Kern (§ 4.7, § 4.8): Prämissen in fester Ordnung,
+  # entschieden unter λ(y)
   # =========================================================================
 
-  defp run_store(ctx, registry, auth) do
+  defp run_handover(ctx, registry, auth, rule) do
     with :ok <- require_emit_input(ctx) do
       state =
         ctx
-        |> shared_premises(registry, "store")
+        |> shared_premises(registry, rule)
         |> premise_workspace_valid()
         |> premise_basis_fact("has_operation_right")
         |> premise_basis_fact("audit_path_ready")
         |> premise_env_flag()
         |> premise_label_preservation()
         |> premise_recipient_inclusion()
-        |> premise_binding_conditions(registry, "store")
+        |> premise_binding_conditions(registry, rule)
 
-      conclude(state, ctx, registry, auth, "store")
+      conclude(state, ctx, registry, auth, rule)
     end
   end
 
@@ -523,7 +535,8 @@ defmodule KomkiPolicy.Derive do
     end
   end
 
-  # store P5: B_W ⊆ λ(y) — Speichern entfernt keine Bindung (R.5.6).
+  # store/transfer P5: B_W ⊆ λ(y) — Speichern und Übergeben entfernen keine
+  # Bindung (R.5.6).
   defp premise_label_preservation(ctx) do
     if Calculus.labels_subset?(ctx.workspace["bindings"], ctx.checked) do
       ctx
@@ -622,7 +635,7 @@ defmodule KomkiPolicy.Derive do
   end
 
   # Die Operation geht in den Hash ein: ein GO für `emit` passt nie auf
-  # `store` desselben Objekts und umgekehrt.
+  # `store` oder `transfer` desselben Objekts und umgekehrt.
   defp output_call_hash(ctx, operation) do
     Release.call_hash(
       digest_value(ctx),
@@ -694,6 +707,7 @@ defmodule KomkiPolicy.Derive do
   defp string_to_kind("admit"), do: :admit
   defp string_to_kind("emit"), do: :emit
   defp string_to_kind("store"), do: :store
+  defp string_to_kind("transfer"), do: :transfer
 
   defp emit_rule_fields("emit", state, :permit) do
     %{"assigned_label" => state.checked, "content_digest" => digest_value(state)}
@@ -703,8 +717,8 @@ defmodule KomkiPolicy.Derive do
     %{"assigned_label" => nil, "content_digest" => digest_value(state)}
   end
 
-  defp emit_rule_fields("store", state, _value), do: %{"content_digest" => digest_value(state)}
   defp emit_rule_fields("admit", _state, _value), do: %{}
+  defp emit_rule_fields(_handover, state, _value), do: %{"content_digest" => digest_value(state)}
 
   defp base_decision(ctx, auth, checked) do
     %{
@@ -720,8 +734,8 @@ defmodule KomkiPolicy.Derive do
   end
 
   # =========================================================================
-  # Beweisbaum (§ 2.5): § 4.3 (admit), § 4.5 (emit), § 4.7 (store) feste
-  # Prämissenordnung
+  # Beweisbaum (§ 2.5): § 4.3 (admit), § 4.5 (emit), § 4.7/§ 4.8 (store,
+  # transfer) feste Prämissenordnung
   # =========================================================================
 
   defp build_proof(state, registry, auth, rule_kind) do
@@ -751,7 +765,7 @@ defmodule KomkiPolicy.Derive do
             label_assignment_premise(state)
           ]
 
-        "store" ->
+        handover ->
           [
             workspace_premise(),
             basis_fact_premise(state.facts, "has_operation_right"),
@@ -759,7 +773,7 @@ defmodule KomkiPolicy.Derive do
             basis_fact_premise(state.facts, "environment_observers_complete"),
             label_preservation_premise(state),
             recipient_premise(state),
-            binding_condition_premises(state, registry, "store")
+            binding_condition_premises(state, registry, handover)
           ]
       end
 

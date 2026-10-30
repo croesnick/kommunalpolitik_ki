@@ -15,24 +15,24 @@ defmodule KomkiPolicy.Remedies do
   keine Fortsetzung wird ausgeführt; er erzeugt keine Autorität
   (CONTRACT § 2.8, RFC 0003 R.6).
 
-  Anwendbarkeit (deny, § 2.8): admit-Grundtabelle ohne call-GO; `emit`
-  und `store` zusätzlich `aktionsfreigabe` scope `call` für die fünf weichen Blocker
+  Anwendbarkeit (deny, § 2.8): admit-Grundtabelle ohne call-GO; `emit`,
+  `store` und `transfer` zusätzlich `aktionsfreigabe` scope `call` für die fünf weichen Blocker
   (`workspace_invalid` bleibt unüberbrückbar — ein GO belebt keinen
   ungültigen Vertrag). Für `indeterminate` nur `fakt_nachreichen` +
   `neuer_raum` — ein GO kann keine Belege herstellen. Freigabe-Zweig
   (§ 4.6): je Release-Blocker genau ein call-GO-Eintrag mit dem **neu
   berechneten** korrekten call_hash; `workspace_invalid` behält seinen
-  `neuer_raum`-Eintrag. `label_not_preserved` (nur `store`) bekommt nur
+  `neuer_raum`-Eintrag. `label_not_preserved` (`store`, `transfer`) bekommt nur
   `neuer_raum`: ein GO stellt keine entfernte Bindung wieder her.
   """
 
   alias KomkiPolicy.Calculus
   alias KomkiPolicy.Registry
 
-  @type rule_kind() :: :admit | :emit | :store | :release
+  @type rule_kind() :: :admit | :emit | :store | :transfer | :release
 
   # Regelzweige mit Ausgabeobjekt: call-GO im Katalog.
-  @output_kinds [:emit, :store]
+  @output_kinds [:emit, :store, :transfer]
 
   @transition_order [
     "fakt_nachreichen",
@@ -63,7 +63,7 @@ defmodule KomkiPolicy.Remedies do
   # `rule_kind` trägt der Kontext bereits (`ctx.rule`); der Katalog ist reine
   # Funktion von (registry, context, finding-Liste).
   def catalog(registry, %{rule: rule_kind} = ctx, findings)
-      when rule_kind in [:admit, :emit, :store] do
+      when rule_kind in [:admit | @output_kinds] do
     Enum.map(findings, fn finding ->
       Map.merge(finding, %{
         "transitions" => ordered(regular_transitions(registry, ctx, rule_kind, finding))
@@ -127,7 +127,7 @@ defmodule KomkiPolicy.Remedies do
   defp regular_transitions(_registry, ctx, _kind, %{"code" => "object_quarantine"}),
     do: [object_go(ctx.object_ref)]
 
-  # workspace_invalid: kein GO-Eintrag, auch nicht bei emit/store;
+  # workspace_invalid: kein GO-Eintrag, auch nicht bei emit/store/transfer;
   # label_not_preserved ebenso.
   defp regular_transitions(_registry, ctx, _kind, %{"code" => code})
        when code in ["workspace_invalid", "label_not_preserved"],
@@ -198,7 +198,7 @@ defmodule KomkiPolicy.Remedies do
   defp facts_payload(_), do: []
 
   # § 2.8 Payload-Regeln: `neuer_raum.required_bindings` = λ(x) bei admit,
-  # `[]` bei emit und store (und im Freigabe-Zweig).
+  # `[]` bei emit, store und transfer (und im Freigabe-Zweig).
   defp required_bindings_for(%{rule: :admit, object_labels: object_labels}),
     do: Enum.sort(object_labels)
 

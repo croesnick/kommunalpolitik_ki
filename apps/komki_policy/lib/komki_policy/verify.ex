@@ -10,9 +10,10 @@ defmodule KomkiPolicy.Verify do
   * Sollmenge ist regelabhängig (§ 5 Schritt 3): für `admit` die neun
     festen Prämissen (§ 4.3, `KomkiPolicy.Derive.required_premises/0`),
     für `emit` die sieben festen Prämissen plus `label_assignment`-
-    Slot (§ 4.5), für `store` die sieben festen Prämissen mit
-    `label_preservation` (§ 4.7); jeweils plus je `binding_condition` für
-    jedes Element des Prüflabels — `workspace.bindings`, bei `store` λ(y)
+    Slot (§ 4.5), für `store` und `transfer` die sieben festen Prämissen
+    mit `label_preservation` (§ 4.7, § 4.8); jeweils plus je
+    `binding_condition` für jedes Element des Prüflabels —
+    `workspace.bindings`, bei `store` und `transfer` λ(y)
     (`KomkiPolicy.Derive.checked_label/3`); geprüft werden die Ausdrücke
     der jeweiligen Regel.
   * Mengen: `KomkiPolicy.Calculus` (R_G / rho_G / l-Subset, § 4.3 Punkt 8).
@@ -56,6 +57,7 @@ defmodule KomkiPolicy.Verify do
     "premises"
   ]
   @premise_kinds ["object_check", "fact", "computed", "condition"]
+  @verifiable_rules ["admit", "emit", "store", "transfer"]
 
   # Name↔Art-Tabelle § 2.5: jeder feste Prämissenname trägt genau eine Art;
   # Art-Tarnung (richtiger Name, falsche Art) ist eine unbekannte Prämisse.
@@ -420,11 +422,18 @@ defmodule KomkiPolicy.Verify do
       mismatch_if(proof["snapshot_ref"] != ctx.snapshot_id, "snapshot_mismatch"),
       mismatch_if(proof["registry_ref"] != registry.registry_id, "registry_mismatch"),
       mismatch_if(proof["intent_ref"] != auth.intent_id, "intent_mismatch"),
-      mismatch_if(proof["rule"] not in ["admit", "emit", "store"], "unsupported_rule")
+      rule_reason(proof["rule"], auth.operation)
     ]
 
     Enum.reject(findings, &is_nil/1)
   end
+
+  # store und transfer haben dieselbe Prämissenform: ohne diesen Abgleich
+  # ginge ein store-Baum als Beleg für einen transfer-Intent durch.
+  defp rule_reason(rule, _operation) when rule not in @verifiable_rules,
+    do: reason("unsupported_rule", nil, nil)
+
+  defp rule_reason(rule, operation), do: mismatch_if(rule != operation, "rule_mismatch")
 
   defp mismatch_if(true, code), do: reason(code, nil, nil)
   defp mismatch_if(false, _code), do: nil
@@ -641,7 +650,7 @@ defmodule KomkiPolicy.Verify do
       claimed_checked == bindings and premise["value"] == true
   end
 
-  # § 5 Schritt 6 (nur store): B_W ⊆ λ(y) wird neu berechnet; behauptete
+  # § 5 Schritt 6 (nur store, transfer): B_W ⊆ λ(y) wird neu berechnet; behauptete
   # Mengen müssen übereinstimmen.
   defp label_preservation_reasons(ctx, proof) do
     bindings = ctx.workspace["bindings"]
@@ -649,7 +658,7 @@ defmodule KomkiPolicy.Verify do
 
     for premise <- premises_for(proof, "label_preservation") do
       ok =
-        proof["rule"] == "store" and Calculus.labels_subset?(bindings, checked) and
+        proof["rule"] in ["store", "transfer"] and Calculus.labels_subset?(bindings, checked) and
           premise["value"] == true and premise["workspace_bindings"] == bindings and
           premise["checked_label"] == checked
 

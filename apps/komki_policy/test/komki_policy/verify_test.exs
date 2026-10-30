@@ -289,7 +289,7 @@ defmodule KomkiPolicy.VerifyTest do
     end
   end
 
-  describe "store (§ 4.7): Prüflabel λ(y), label_preservation" do
+  describe "store und transfer (§ 4.7, § 4.8): Prüflabel λ(y), label_preservation" do
     defp store_case(name) do
       {fixture(name <> "/snapshot.json"), fixture(name <> "/intent.json")}
     end
@@ -334,6 +334,27 @@ defmodule KomkiPolicy.VerifyTest do
                Verify.check(reg, shrunk, intent, proof)
 
       assert "label_preservation_false" in Enum.map(reasons, & &1["code"])
+    end
+
+    test "derive(case_transfer_permit)-Beweis bestätigt verify als valid" do
+      reg = registry()
+      {snapshot, intent} = store_case("case_transfer_permit")
+      {:ok, decision} = Derive.decide(reg, snapshot, intent)
+
+      assert decision["rule"] == "transfer"
+      refute Map.has_key?(decision, "assigned_label")
+
+      assert {:ok, %{"result" => "valid", "reasons" => []}} =
+               Verify.check(reg, snapshot, intent, decision["proof"])
+    end
+
+    test "ein store-Baum belegt keinen transfer-Intent: rule_mismatch" do
+      reg = registry()
+      {snapshot, intent} = store_case("case_transfer_permit")
+      {:ok, %{"proof" => proof}} = Derive.decide(reg, snapshot, intent)
+
+      assert {:ok, %{"result" => "invalid", "reasons" => [%{"code" => "rule_mismatch"}]}} =
+               Verify.check(reg, snapshot, intent, Map.put(proof, "rule", "store"))
     end
 
     test "label_preservation auf einem emit-Baum ist eine unbekannte Prämisse" do

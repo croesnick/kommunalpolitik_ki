@@ -64,6 +64,22 @@
               ]
             }
           ]
+        },
+        "transfer": {
+          "all": [
+            {
+              "eq": [
+                "purpose",
+                "antwort-fall-4711"
+              ]
+            },
+            {
+              "eq": [
+                "input_in_approved_case_scope",
+                true
+              ]
+            }
+          ]
         }
       },
       "relaxation_authorities": []
@@ -78,7 +94,8 @@
       "operations": {
         "admit": true,
         "emit": true,
-        "store": true
+        "store": true,
+        "transfer": true
       },
       "relaxation_authorities": []
     },
