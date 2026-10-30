@@ -128,7 +128,7 @@ test("aufgeklappt: alle Belege, Hash und Prüfschritt", () => {
 	assert.match(out, /Beleg der Anfrage +pdr-40d0fb8b2296abb0ac13065efef5d80a/);
 	assert.match(out, /Inhalts-Hash +sha256:726c7b1f/);
 	assert.match(out, /komki journal verify/);
-	assert.match(strip(render("web_search_deny", true)), /GO bindet an +509f2621/);
+	assert.match(strip(render("web_search_deny", true)), /GO bindet an +e57e85f4/);
 });
 
 test("Notiz: zugeklappt gekürzt, aufgeklappt vollständig, Überschrift nicht doppelt", () => {

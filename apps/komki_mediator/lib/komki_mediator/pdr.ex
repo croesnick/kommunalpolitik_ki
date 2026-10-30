@@ -7,10 +7,11 @@ defmodule KomkiMediator.PDR do
   Jeder Datensatz traegt dieselben Schluessel; nicht belegte Felder sind
   `null`. Neu gegenueber `komki-pdr/2`:
 
-    * `rule` — der entschiedene Regelzweig (`"admit"` oder `"emit"`).
+    * `rule` — der entschiedene Regelzweig (`"admit"`, `"emit"`,
+      `"transfer"` oder `"store"`).
     * `call_id` — bei Connector-Aufrufen die `decision_id` des emit-PDR;
-      emit- und admit-PDR eines Aufrufs tragen dieselbe `call_id`
-      (Connector-Vertrag §6).
+      transfer- bzw. store-Permit, emit- und admit-PDR eines Aufrufs tragen
+      dieselbe `call_id` (Connector-Vertrag §6).
     * `session_id` — Zuordnung zur pi-Sitzung (aus der Umgebung, darf
       `null` sein; der Socket-Zugang fuellt sie, Connector-Vertrag §8).
     * `assigned_label` — bei emit-Permits die zugeordnete Ausgabe-Menge

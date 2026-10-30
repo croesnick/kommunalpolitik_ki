@@ -14,9 +14,10 @@ Fassung `komki-mediator/3` (Tickets #144, #218): neben `ping`,
 `list_documents` und `admit_document` bietet der Vermittler die sechs
 Connector-Tools `ris_search`, `ris_show`, `web_search`, `vault_search`,
 `vault_read` und `vault_write_test` an. Jeder Connector-Aufruf laeuft als
-emit → Vollzug → admit mit zwei PDR (`apps/komki_connector/CONTRACT.md` §6);
-ein schreibender zusaetzlich mit `store` vor dem Vollzug, das ohne GO der
-nutzenden Person abgelehnt wird (Ticket #205).
+emit → transfer → Vollzug → admit mit drei PDR
+(`apps/komki_connector/CONTRACT.md` §6, Ticket #298); ein schreibender
+mit `store` statt `transfer`, das ohne GO der nutzenden Person abgelehnt
+wird (Ticket #205).
 
 Gesperrte Aufrufe (`deny`, `indeterminate`, abgelehntes oder ausgebliebenes
 GO) tragen neben dem Remedy-Katalog das Feld `hinweis`: ein fester Satz an
@@ -69,7 +70,7 @@ als Bild:
   Drittens die Connectoren (Dokumente, RIS, Web, Vault): je ein eigener Prozess mit
   Unix-Socket `<connectors_dir>/<id>.sock` (Default `<base>/run/connectors`,
   einstellbar mit `--connectors-dir`). Der Vermittler ruft sie nur nach
-  einem emit-Permit und nur ueber das Frame-Protokoll
+  einem transfer- bzw. store-Permit und nur ueber das Frame-Protokoll
   (`Sidecar.Client`, eine Verbindung je Aufruf).
 * Wem gibt er Daten zurueck? Zwei Senken. pi erhaelt die MCP-Antwort:
   permit-Inhalt, Remedy-Katalog (bei deny) oder Zurueckhaltung
@@ -109,7 +110,7 @@ flowchart TB
     PI -- "Inferenz" --> LL
     MED -- "Gate 1 · Gate 2" --> KOMKI_POLICY
     MED -- "PDR je Aufruf" --> JOURNAL
-    MED -- "Frame nach emit-Permit" --> CONN
+    MED -- "Frame nach transfer-/store-Permit" --> CONN
     MED -. "Antwort + decision_id" .-> RELAY
 ```
 
@@ -146,7 +147,7 @@ sequenceDiagram
     end
 ```
 
-### Ein Connector-Aufruf (emit → Vollzug → admit)
+### Ein Connector-Aufruf (emit → transfer → Vollzug → admit)
 
 ```mermaid
 sequenceDiagram
@@ -163,11 +164,14 @@ sequenceDiagram
         M->>J: PDR (rule emit, decision error)
         M-->>P: decision error, kein Vollzug
     else Vorpruefung bestanden
-        M->>K: Derive.decide emit (B_W, Manifest-Umgebung, out-digest12)
-        alt deny / indeterminate
-            M->>J: PDR (rule emit, Remedies)
+        M->>K: Derive.decide emit (B_W, room.environment, out-digest12)
+        K-->>M: assigned_label = B_W
+        M->>K: Derive.decide transfer (λ(y), Manifest-Umgebung)
+        alt deny / indeterminate (emit oder transfer)
+            M->>J: PDR (rule emit bzw. transfer, Remedies)
             M-->>P: Remedy-Katalog, kein Vollzug
         else permit
+            M->>J: transfer-PDR (outcome permitted, call_id)
             M->>J: emit-PDR (decision_id = call_id)
             M->>C: Frame (call_id, op, params, context)
             C-->>M: result oder error
@@ -181,7 +185,8 @@ sequenceDiagram
 
 ### GO fuer einen gesperrten Aufruf (Ticket #98)
 
-Bietet der Remedy-Katalog einer emit-Ablehnung eine Aktionsfreigabe fuer
+Bietet der Remedy-Katalog einer Ablehnung in Gate 1 (emit, transfer oder
+store) eine Aktionsfreigabe fuer
 den exakten Call an (`aktionsfreigabe`, scope `call`) und hoert jemand zu,
 legt der Vermittler `<base>/mediator/go/<call_hash>.request.json` ab und
 wartet bis zu 120 s. Zuhoeren heisst: Der Herzschlag
@@ -393,17 +398,21 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
 * **Connector-Tools** (`KomkiMediator.ConnectorGate`, CONTRACT §6):
   * Vorpruefung: Parameter gegen das Manifest, `workspace_bindings` (B_W)
     muss im Raum stehen. Sonst `decision: error` mit PDR, kein Vollzug.
-  * Gate 1 `emit`: Snapshot mit B_W, Umgebung aus dem Manifest
-    (`ris-abruf@1`, `web-suche@1`, `vault-lokal@1`), Objekt
-    `out-<digest12>`, Fakt `output_content_digest = intent_hash`. Bei permit
-    wird der emit-PDR geschrieben, **bevor** der Connector gerufen wird;
-    seine `decision_id` ist die `call_id` im Frame. Bei `vault_write_test`
-    geht `context.assigned_label` (= B_W) mit.
-  * `store` (nur schreibend, #205): nach dem emit-Permit, unter λ(y) =
-    `assigned_label` in der Manifest-Umgebung. Γ hat keine `store`-Regel,
-    also deny mit Aktionsfreigabe fuer den exakten Call; mit Zuhoerer fragt
-    der Vermittler (GO-Anfrage mit `operation: store`), sonst bleibt es
-    beim deny. Der store-PDR liegt vor dem emit-PDR des Vollzugs.
+  * Gate 1a `emit`: der Raum erzeugt die Anfrage. Snapshot mit B_W in
+    der Raumumgebung (`room.environment`), Objekt `out-<digest12>`, Fakt
+    `output_content_digest = intent_hash`; die Engine ordnet λ(y) = B_W zu.
+  * Gate 1b `transfer` (lesend, #298) bzw. `store` (schreibend, #205):
+    nach dem emit-Permit, unter λ(y) = `assigned_label` in der
+    Manifest-Umgebung (`ris-abruf@1`, `web-suche@1`, `vault-lokal@1`). Hier
+    faellt der Empfaengertest. Γ hat keine `store`-Regel, also ist jedes
+    Schreiben ein deny mit Aktionsfreigabe fuer den exakten Call; mit
+    Zuhoerer fragt der Vermittler (GO-Anfrage mit `operation: store`
+    bzw. `transfer`), sonst bleibt es beim deny.
+  * Vorbeleg: bei permit liegt zuerst der transfer- bzw. store-PDR
+    (`outcome: permitted`), dann der emit-PDR (`outcome: emitted`) im
+    Journal, **bevor** der Connector gerufen wird. Die `decision_id` des
+    emit-PDR ist die `call_id` im Frame; alle PDR des Aufrufs tragen sie.
+    Bei `vault_write_test` geht `context.assigned_label` (= B_W) mit.
   * Gate 2 `admit`: Ergebnisform §5.2 (geschlossen), Labels allein aus dem
     Manifest (RIS/Web fest `import_labels`; Vault: Labels der Notiz,
     nicht leer und ⊆ `import_labels`; `write_test`: Rueckmeldung =
@@ -412,8 +421,9 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   * Connector nicht erreichbar oder Fehlercode: `admitted: false` mit PDR.
 * **Raeume**: Default ist **recherche** (B_W = `ris-oeffentlich@1`,
   `vault-oeffentlich@1`, `web-oeffentlich@1`). Im Raum **vertraulich**
-  (zusaetzlich `vault-vertraulich@1`) scheitert jede RIS- und Websuche an
-  `recipient_not_allowed`, vertrauliche Notizen sind lesbar. Ein Raum ohne
+  (zusaetzlich `vault-vertraulich@1`) scheitert jede RIS- und Websuche bei
+  der Uebergabe (`transfer`) an `recipient_not_allowed`, vertrauliche
+  Notizen sind lesbar. Ein Raum ohne
   `workspace_bindings` bietet keine Connector-Operationen an.
 * **PDR**: jeder Ablauf haengt einen Auditdatensatz an das Journal, der
   `intent_hash`, `payload_hash` und Γ-Stand-Hash des Aufrufs bindet
@@ -421,8 +431,9 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   Auditkette dunkelt nie still ab) und bettet die `decision_id` in die
   Antwort ein. `payload_hash` ist der SHA-256 der kanonischen Antwortbasis
   (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/3`: zusaetzlich
-  `rule` (`admit`/`emit`), `call_id` (bei Connector-Aufrufen die
-  `decision_id` des emit-PDR, in beiden PDR gleich), `session_id` (aus der
+  `rule` (`admit`/`emit`/`transfer`/`store`), `call_id` (bei
+  Connector-Aufrufen die `decision_id` des emit-PDR, in allen PDR des
+  Aufrufs gleich), `session_id` (aus der
   Umgebung, sonst `null`) und `assigned_label` (emit-Permit).
 
 ## Komponenten
@@ -431,7 +442,7 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
 |---|---|
 | `KomkiMediator.Fassung` | festgedrehte Tool-Auflage (R.4.3) |
 | `KomkiMediator.Gate` | Gate 1 + Gate 2 + PDR (ping, admit_document) |
-| `KomkiMediator.ConnectorGate` | emit → Vollzug → admit fuer die Connector-Tools |
+| `KomkiMediator.ConnectorGate` | emit → transfer/store → Vollzug → admit fuer die Connector-Tools |
 | `KomkiMediator.Go` | GO-Anfragen und -Antworten unter `mediator/go` (Ticket #98) |
 | `KomkiMediator.GoStand` | Offenlegungsstand der GO-Noncen, commit vor Wirkung |
 | `KomkiMediator.ResultShape` | Ergebnisformen der Connectoren (§5.2) |

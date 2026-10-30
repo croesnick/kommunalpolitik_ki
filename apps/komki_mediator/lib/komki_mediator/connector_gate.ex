@@ -1,24 +1,31 @@
 defmodule KomkiMediator.ConnectorGate do
   @moduledoc """
-  Ein Connector-Aufruf als emit → Vollzug → admit (Connector-Vertrag §6):
-  zwei Entscheidungen der Engine, zwei PDR.
+  Ein Connector-Aufruf als emit → transfer oder store → Vollzug → admit
+  (Connector-Vertrag §6): drei Entscheidungen der Engine, drei PDR mit
+  derselben `call_id`.
 
   * Vorpruefung: Parameter gegen das Manifest-Schema
     (`Sidecar.Params.check/3`) und B_W des Raums
     (`workspace_bindings`). Verstoss oder fehlendes B_W: `decision: error`,
     PDR, kein Vollzug (fail-closed).
-  * Gate 1 (`emit`): die Anfrage ist eine Ausgabe an die Empfaenger der
-    Manifest-Umgebung. Objekt `out-<digest12>`, Fakt
+  * Gate 1a (`emit`, CONTRACT §4.5): der Raum erzeugt die Anfrage y. Die
+    Umgebung ist die des Raums (`room.environment`), die Engine ordnet
+    λ(y) = B_W zu. Objekt `out-<digest12>`, Fakt
     `output_content_digest = intent_hash`. Kein Permit: Remedies, PDR,
-    kein Vollzug. Permit: der emit-PDR wird geschrieben, **bevor** der
-    Connector gerufen wird; seine `decision_id` ist die `call_id`.
-  * Speichern (`store`, CONTRACT §4.7, Ticket #205): Eine schreibende
-    Operation (`kind: :write`) legt das erzeugte Objekt in den Speicher
-    des Connectors. Nach dem emit-Permit entscheidet die Engine `store`
-    unter λ(y) = `assigned_label` in der Manifest-Umgebung. Ohne
-    `store`-Regel in Γ ist das ein deny mit Aktionsfreigabe fuer den
-    exakten Call: der Vermittler fragt wie beim emit-GO, ohne Zuhoerer
-    bleibt es beim deny. Der store-Permit-PDR liegt vor dem Vollzug.
+    kein Vollzug.
+  * Gate 1b: y verlaesst den Raum, entschieden unter λ(y) =
+    `assigned_label` in der Manifest-Umgebung. Lesende Operationen
+    uebergeben die Anfrage an den Connector (`transfer`, CONTRACT §4.8,
+    Ticket #298), schreibende (`kind: :write`) legen y in seinen Speicher
+    (`store`, CONTRACT §4.7, Ticket #205). Hier faellt die
+    Empfaengerpruefung gegen RIS, Websuche oder Vault. Ohne `store`-Regel
+    in Γ ist Speichern ein deny mit Aktionsfreigabe fuer den exakten Call.
+    Der Permit-PDR (`outcome: permitted`) liegt vor dem Vollzug.
+  * PDR je Aufruf: die `call_id` ist die `decision_id` des emit-PDR
+    (`outcome: emitted`), der unmittelbar vor dem Vollzug geschrieben
+    wird; transfer- bzw. store-Permit und admit tragen dieselbe
+    `call_id`. Ablehnungen in Gate 1 tragen keine `call_id`, weil kein
+    Vollzug folgt.
   * Vollzug: `Sidecar.Client.call/6` gegen
     `<connectors_dir>/<id>.sock`. Bei schreibenden Operationen geht
     `context.assigned_label` (= B_W) mit.
@@ -31,7 +38,7 @@ defmodule KomkiMediator.ConnectorGate do
   Die Selbstauskunft des Connectors wird nie ueber das Manifest hinaus
   geglaubt. Connector-Fehler ergeben `admitted: false` mit PDR.
 
-  GO (Ticket #98): Bietet der Katalog einer emit-Ablehnung eine
+  GO (Ticket #98): Bietet der Katalog einer Ablehnung in Gate 1 eine
   Aktionsfreigabe fuer den exakten Call an und ist `env.go` gesetzt, fragt
   der Vermittler die nutzende Person, sofern eine Session zuhoert
   (`KomkiMediator.Go`). Eine vorgelegte
@@ -62,7 +69,8 @@ defmodule KomkiMediator.ConnectorGate do
         op: op,
         kind: spec.kind,
         params: checked,
-        intent_hash: intent_hash(tool, checked)
+        intent_hash: intent_hash(tool, checked),
+        call_id: PDR.new_id()
       }
 
       emit(env, call)
@@ -92,7 +100,7 @@ defmodule KomkiMediator.ConnectorGate do
     do: Hash.sha256_hex(JSON.canonical(%{"tool" => tool, "params" => params}))
 
   # -------------------------------------------------------------------------
-  # Gate 1: emit
+  # Gate 1a: emit im Raum
   # -------------------------------------------------------------------------
 
   defp emit(env, call) do
@@ -102,7 +110,7 @@ defmodule KomkiMediator.ConnectorGate do
     snapshot =
       Room.connector_snapshot(env.room, env.gamma, %{
         snapshot_id: "snap-emit-" <> d12,
-        environment: call.manifest.environment,
+        environment: env.room.environment,
         object: object,
         facts: Map.put(env.room.facts, "output_content_digest", digest_fact(call))
       })
@@ -125,18 +133,16 @@ defmodule KomkiMediator.ConnectorGate do
     %{"value" => call.intent_hash, "source" => "komki-mediator", "source_kind" => "technical"}
   end
 
-  # Lesend: Vollzug. Schreibend: erst die store-Entscheidung.
-  defp after_emit(env, %{kind: :write} = call, decision, snapshot, intent),
-    do: store(env, call, %{decision: decision, snapshot: snapshot, intent: intent})
-
   defp after_emit(env, call, decision, snapshot, intent),
-    do: execute(env, call, decision, snapshot, intent)
+    do: handover(env, call, %{decision: decision, snapshot: snapshot, intent: intent})
 
   # -------------------------------------------------------------------------
-  # store: das erzeugte Objekt in den Speicher des Connectors (§4.7)
+  # Gate 1b: transfer an den Connector (§4.8) oder store in seinen
+  # Speicher (§4.7), beide unter λ(y) in der Manifest-Umgebung
   # -------------------------------------------------------------------------
 
-  defp store(env, call, emit) do
+  defp handover(env, call, emit) do
+    rule = if call.kind == :write, do: "store", else: "transfer"
     d12 = Hash.digest12(call.intent_hash)
 
     object = %Object{
@@ -147,33 +153,34 @@ defmodule KomkiMediator.ConnectorGate do
 
     snapshot =
       Room.connector_snapshot(env.room, env.gamma, %{
-        snapshot_id: "snap-store-" <> d12,
+        snapshot_id: "snap-" <> rule <> "-" <> d12,
         environment: call.manifest.environment,
         object: object,
         facts: Map.put(env.room.facts, "output_content_digest", digest_fact(call))
       })
 
-    intent = intent(env.room, "store", "intent-store-" <> d12, object)
-    stored = fn _decision -> execute(env, call, emit.decision, emit.snapshot, emit.intent) end
+    intent = intent(env.room, rule, "intent-" <> rule <> "-" <> d12, object)
+    handed = fn _decision -> execute(env, call, emit.decision, emit.snapshot, emit.intent) end
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
-        store_permitted(env, call, decision, snapshot, intent)
-        stored.(decision)
+        handover_permitted(env, call, decision, snapshot, intent)
+        handed.(decision)
 
       other ->
-        response = not_permitted(env, call, "store", nil, intent, snapshot, other)
-        maybe_go(env, call, snapshot, intent, response, stored)
+        response = not_permitted(env, call, rule, nil, intent, snapshot, other)
+        maybe_go(env, call, snapshot, intent, response, handed)
     end
   end
 
-  # Vorbeleg vor Wirkung (R.11): die store-Entscheidung liegt im Journal,
-  # bevor der Connector schreibt.
-  defp store_permitted(env, call, decision, snapshot, intent) do
+  # Vorbeleg vor Wirkung (R.11): die transfer- bzw. store-Entscheidung
+  # liegt im Journal, bevor die Anfrage den Vermittler verlaesst.
+  defp handover_permitted(env, call, decision, snapshot, intent) do
     PDR.append(env, %{
       "decision_id" => PDR.new_id(),
+      "call_id" => call.call_id,
       "tool" => call.tool,
-      "rule" => "store",
+      "rule" => intent["operation"],
       "decision" => "permit",
       "outcome" => "permitted",
       "intent_hash" => call.intent_hash,
@@ -185,11 +192,13 @@ defmodule KomkiMediator.ConnectorGate do
   end
 
   # -------------------------------------------------------------------------
-  # GO: Aktionsfreigabe fuer den exakten Call (Ticket #98, fuer store #205)
+  # GO: Aktionsfreigabe fuer den exakten Call (Ticket #98, fuer store #205,
+  # fuer transfer #298)
   # -------------------------------------------------------------------------
 
   # `then` setzt nach einem Permit des Freigabe-Zweigs fort: nach emit wie
-  # nach einem normalen emit-Permit, nach store mit dem Vollzug.
+  # nach einem normalen emit-Permit, nach transfer oder store mit dem
+  # Vollzug.
   defp maybe_go(%{go: %{} = go} = env, call, snapshot, intent, response, then) do
     case {Go.offered(response["remedies"]), Go.listening?(go.dir)} do
       {call_hash, true} when is_binary(call_hash) ->
@@ -210,7 +219,7 @@ defmodule KomkiMediator.ConnectorGate do
       "operation" => intent["operation"],
       "tool" => call.tool,
       "params" => call.params,
-      # Fuer die Vorschau je Code einmal (store: ein Blocker je Bindung).
+      # Fuer die Vorschau je Code einmal (store, transfer: ein Blocker je Bindung).
       "blockers" => response["remedies"] |> Enum.map(& &1["code"]) |> Enum.uniq(),
       "object" => intent["object"],
       "workspace" => intent["workspace"],
@@ -252,6 +261,9 @@ defmodule KomkiMediator.ConnectorGate do
       {:ok, _stand} ->
         PDR.append(env, %{
           "decision_id" => PDR.new_id(),
+          # Nach transfer oder store folgt der Vollzug sofort; nach einem
+          # emit-GO steht Gate 1b noch aus.
+          "call_id" => if(intent["operation"] == "emit", do: nil, else: call.call_id),
           "tool" => call.tool,
           "rule" => intent["operation"],
           "decision" => "permit",
@@ -296,7 +308,7 @@ defmodule KomkiMediator.ConnectorGate do
   # -------------------------------------------------------------------------
 
   defp execute(env, call, decision, snapshot, intent) do
-    call_id = PDR.new_id()
+    call_id = call.call_id
 
     context =
       if call.kind == :write, do: %{"assigned_label" => decision["assigned_label"]}, else: %{}

@@ -131,9 +131,13 @@ export function resultRows(
 	return rows;
 }
 
+// Gate 1 eines Connector-Aufrufs: erzeugen, übergeben, speichern (#298).
+const OUTGOING = new Set(["emit", "transfer", "store"]);
+
 // Alles, was nicht "zugelassen" ist. undefined: Inhalt wurde zugelassen.
 function outcome(tool: string, r: Json, p: Paint): Row[] | undefined {
-	const gate = r.rule === "emit" ? "Die Anfrage hat komki nicht verlassen." : "Der Inhalt hat das Modell nicht erreicht.";
+	const outgoing = OUTGOING.has(r.rule);
+	const gate = outgoing ? "Die Anfrage hat komki nicht verlassen." : "Der Inhalt hat das Modell nicht erreicht.";
 
 	if (r.decision === "deny" || r.decision === "indeterminate") {
 		const head =
@@ -145,7 +149,7 @@ function outcome(tool: string, r: Json, p: Paint): Row[] | undefined {
 	}
 
 	if (r.decision === "error") {
-		const head = r.rule === "emit" ? "✗ abgewiesen" : "✗ Prüffehler";
+		const head = outgoing ? "✗ abgewiesen" : "✗ Prüffehler";
 		return [
 			{ body: `${p.fg("error", p.bold(head))}  ${p.fg("muted", gate)}` },
 			labelled("Grund", clean(String(r.detail ?? "unbekannt")), p),

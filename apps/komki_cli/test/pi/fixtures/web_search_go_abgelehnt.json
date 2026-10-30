@@ -2,6 +2,6 @@
   "args": {
     "query": "Foerderung Radweg"
   },
-  "text": "{\"decision\":\"deny\",\"decision_id\":\"pdr-89dc8536f571fcf4f07177f6b09dfe36\",\"go\":\"abgelehnt\",\"registry_id\":\"reg-komki-arbeitsraum\",\"relaxation_authorities\":[],\"remedies\":[{\"binding\":null,\"code\":\"recipient_not_allowed\",\"condition\":null,\"transitions\":[{\"required_bindings\":[],\"required_recipients\":[\"brave-search\",\"nutzende-person\",\"pi-agent\"],\"type\":\"neuer_raum\"},{\"call_hash\":\"8122cb478cc79c991262c0f050bbfda59856c48c7b622ef0d0dee460dbdd402b\",\"scope\":\"call\",\"type\":\"aktionsfreigabe\"}]}],\"rule\":\"emit\"}",
+  "text": "{\"decision\":\"deny\",\"decision_id\":\"pdr-4fafc477574af0772bfb523f1380d02d\",\"go\":\"abgelehnt\",\"hinweis\":\"Die nutzende Person hat diesen Aufruf abgelehnt. Frag nicht erneut, auch nicht mit anderen Worten oder über ein anderes Werkzeug. Arbeite ohne dieses Ergebnis weiter oder beende deine Antwort.\",\"registry_id\":\"reg-komki-arbeitsraum\",\"relaxation_authorities\":[],\"remedies\":[{\"binding\":null,\"code\":\"recipient_not_allowed\",\"condition\":null,\"transitions\":[{\"required_bindings\":[],\"required_recipients\":[\"brave-search\",\"nutzende-person\",\"pi-agent\"],\"type\":\"neuer_raum\"},{\"call_hash\":\"740d6365c76b35b7e0fd183ed799c56e7974e7e9b805de80d243f550da1e098e\",\"scope\":\"call\",\"type\":\"aktionsfreigabe\"}]}],\"rule\":\"transfer\"}",
   "tool": "web_search"
 }

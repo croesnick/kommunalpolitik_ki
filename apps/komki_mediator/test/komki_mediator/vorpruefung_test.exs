@@ -168,14 +168,19 @@ defmodule KomkiMediator.VorpruefungTest do
   # Bestandene Aufrufe: der Fluss bleibt unveraendert
   # -----------------------------------------------------------------------
 
-  test "gueltiges ris_search: permit, emit und admit wie im Connector-Gate", %{env: env} do
-    # Kein Connector-Verzeichnis: emit-PDR, dann Connector-Fehler (Muster
-    # wie der Connector-down-Fall im ConnectorGate-Test).
+  test "gueltiges ris_search: permit, emit, transfer und admit wie im Connector-Gate", %{env: env} do
+    # Kein Connector-Verzeichnis: transfer- und emit-PDR, dann
+    # Connector-Fehler (Muster wie der Connector-down-Fall im
+    # ConnectorGate-Test).
     assert {:reply, reply, _frame} = call("ris_search", %{"text" => "Radweg"})
 
     assert %{"decision" => "permit", "admitted" => false} = body(reply)
 
-    assert [%{"rule" => "emit", "outcome" => "emitted"}, %{"outcome" => "error"}] = pdrs(env)
+    assert [
+             %{"rule" => "transfer", "outcome" => "permitted"},
+             %{"rule" => "emit", "outcome" => "emitted"},
+             %{"outcome" => "error"}
+           ] = pdrs(env)
   end
 
   test "gueltiges ping ohne Argumente: permit, zwei PDR", %{env: env} do

@@ -9,7 +9,7 @@ defmodule KomkiMediator.Server do
   (Gate 1: Policy-Entscheid vor dem Vollzug, Gate 2: Beweispruefung vor der
   Antwort), und jeder Ablauf geht mit einem PDR ins Journal. Die sechs
   Connector-Tools laufen ueber `KomkiMediator.ConnectorGate` (emit →
-  Vollzug → admit, zwei PDR).
+  transfer bzw. store → Vollzug → admit, drei PDR).
 
   Jedem `tools/call` stellt `handle_request/2` die Parameter-Vorpruefung
   `KomkiMediator.Vorpruefung` voran (Ticket #165): Schemaverstoesse und

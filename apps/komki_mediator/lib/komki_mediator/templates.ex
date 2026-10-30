@@ -31,7 +31,7 @@ defmodule KomkiMediator.Templates do
   # (#106 und #107 fuer die Registry, beide mit demselben Raum; #134 nur
   # fuer den Raum; 8dc75f9 vor #213 fuer beide).
   @current %{
-    "registry.json" => "038a1756f2be26e6a13b844e802d15afbb6b9d65fc5b05a19ffb168066ffcc62",
+    "registry.json" => "9d06e591083615071f4386298ddb1e62e9d6f2fc20388a21741fc9bab07d55e0",
     "room.json" => "8bb7a156134d43ebd4cc0027fc66ec27c26e00ae696d0d65f83b8ad8c9d57469"
   }
   @outdated %{
@@ -41,7 +41,9 @@ defmodule KomkiMediator.Templates do
       # bis #208: Lockerungsbefugnis von doc-pending-freigabe in Engine-Form
       "38e86ed685b8887ddac4eb1976873b105fb1f272ce6c8ff67ac806370c8ecdf7",
       # 8dc75f9: vor #213 (ohne doc-oeffentlich@2)
-      "2c7391d3c63e5e06a1910372cb8632026f35f288f750cd3d87b2195db575d835"
+      "2c7391d3c63e5e06a1910372cb8632026f35f288f750cd3d87b2195db575d835",
+      # vor #298: Bindungen ohne transfer-Regel
+      "038a1756f2be26e6a13b844e802d15afbb6b9d65fc5b05a19ffb168066ffcc62"
     ],
     "room.json" => [
       "127831a737e7f5565d8def234c260ca270056b8954b346725f03ef638ef0b51f",
@@ -104,7 +106,11 @@ defmodule KomkiMediator.Templates do
           # unveraenderlich (R.2.1), darum eine neue Fassung, offen wie die
           # oeffentlichen Connector-Bindungen.
           "doc-oeffentlich@2" =>
-            binding("Öffentliches Raumdokument", @observers, %{"admit" => true, "emit" => true}),
+            binding("Öffentliches Raumdokument", @observers, %{
+              "admit" => true,
+              "emit" => true,
+              "transfer" => true
+            }),
           "doc-vertraulich@1" =>
             binding("Vertrauliches Raumdokument", ["nutzende-person", "pi-agent"], %{
               "admit" => %{"eq" => ["purpose", "vertraulich"]}
@@ -160,12 +166,15 @@ defmodule KomkiMediator.Templates do
     }
   end
 
-  # Connector-Bindungen (Connector-Vertrag §7): admit und emit ohne
-  # Bedingung. Die Trennung leistet der Empfaengerkreis: vault-vertraulich
+  # Connector-Bindungen (Connector-Vertrag §7): admit, emit und transfer
+  # ohne Bedingung. Die Trennung leistet der Empfaengerkreis: vault-vertraulich
   # liest nur nutzende-person und pi-agent, damit faellt in einem Raum mit
-  # dieser Bindung jede Anfrage an RIS oder Websuche an recipient_inclusion.
+  # dieser Bindung jede Anfrage an RIS oder Websuche an recipient_inclusion
+  # der Uebergabe (transfer, #298). Die @1-Fassungen tragen transfer erst
+  # seit #298; ein aelterer Label-Store bricht daran ab (R.2.1) und wird
+  # neu angelegt.
   defp connector_bindings do
-    open = %{"admit" => true, "emit" => true}
+    open = %{"admit" => true, "emit" => true, "transfer" => true}
 
     %{
       "ris-oeffentlich@1" => binding("Öffentliche RIS-Inhalte", @observers, open),
