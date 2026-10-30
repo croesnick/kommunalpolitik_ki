@@ -7,6 +7,9 @@ import { Aside } from '@astrojs/starlight/components';
 import Architektur from '../../../assets/architektur.svg';
 import Anfrage from '../../../assets/anfrage.svg';
 import GoAbgelehnt from '../../../assets/go-abgelehnt.svg';
+import GoExistenzLeck from '../../../assets/go-existenz-leck.svg';
+import RaumRecherche from '../../../assets/raum-recherche.svg';
+import RaumVertraulich from '../../../assets/raum-vertraulich-hell.svg';
 
 Ein KI-Agent, der recherchieren darf, ist praktisch. Gefährlich wird er, wenn drei Dinge zusammenkommen: Er kennt private Daten, er liest fremde Inhalte, und er hat einen Weg nach draußen. Simon Willison nennt das die [lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/). Dann reicht ein präparierter Text auf einer Webseite, und der Agent trägt deine Notizen hinaus. komki ist so gebaut, dass diese Kombination nicht entstehen kann.
 
@@ -52,8 +55,28 @@ Ein **Raum** legt fest, welche Arten von Daten in einer Sitzung zusammenkommen d
 | Notizen in `komki-test/` schreiben | <span class="ja">ja</span> | <span class="ja">ja, mit vertraulichem Label</span> |
 
 <Aside type="tip" title="Warum das wirkt">
-Im Raum „vertraulich“ fehlt jeder Weg nach draußen, solange du nicht selbst einen einzelnen Aufruf freigibst. Selbst ein Agent, der vollständig von einem Angreifer gesteuert würde, kann vertrauliche Inhalte dort nicht weitergeben. Im Raum „recherche“ ist der Weg nach draußen offen, dafür kommt der Agent gar nicht erst an Vertrauliches. Das kannst du [selbst ausprobieren](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
+Im Raum „vertraulich“ fehlt jeder Weg nach draußen, solange du nicht selbst einen einzelnen Aufruf freigibst. Selbst ein Agent, der vollständig von einem Angreifer gesteuert würde, kann vertrauliche Inhalte dort nicht weitergeben. Im Raum „recherche“ ist der Weg nach draußen offen, dafür kommt der Agent gar nicht erst an Vertrauliches. Du wechselst mit `komki raum vertraulich` und `komki raum recherche`. Das kannst du [selbst ausprobieren](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
 </Aside>
+
+## Was pi dir zeigt: Raum, Labels, Dokumente
+
+Beim Start zeigt pi oben, in welchem Raum du arbeitest, wofür er da ist, welche Labels darin zusammenkommen und ob Anfragen nach draußen offen sind. Unten steht dasselbe kurz in der Fußzeile, dazu die Zahl der Raumdokumente, sobald pi sie aufgelistet hat. Welche Dokumente bereitliegen, erfährt pi über den Vermittler (`list_documents`): nur Kennung und Label, den Inhalt erst beim Lesen.
+
+<div class="komki-figure"><RaumRecherche /></div>
+
+Drei Befehle zeigen dir mehr, ohne dass etwas davon beim Modell ankommt:
+
+| Befehl | Was du siehst |
+|---|---|
+| `/raum` | Raum, Zweck, jedes Label mit seiner Bezeichnung und wer es sehen darf, der Weg nach draußen |
+| `/dokumente` | die Raumdokumente, die pi zuletzt aufgelistet hat |
+| `/hilfe` | alle Befehle von komki in pi |
+
+Im Raum „vertraulich“ steht oben, dass der Weg nach draußen gesperrt ist. Das Bild zeigt `/raum` dort, im hellen Farbschema:
+
+<div class="komki-figure"><RaumVertraulich /></div>
+
+Die Anzeige beschreibt den Raum, sie entscheidet nichts. Ob ein Aufruf läuft, entscheidet weiter der Vermittler, Aufruf für Aufruf.
 
 ## Eigene Dokumente in die Session holen
 
@@ -67,18 +90,11 @@ Einzelheiten stehen in der [README von komki_cli](https://github.com/croesnick/k
 
 ## Freigabe: dein GO für genau einen Aufruf
 
-Manchmal ist eine gesperrte Anfrage in Ordnung, etwa eine Websuche nach einem Förderprogramm, während eine vertrauliche Notiz offen ist. Dann entscheidest du. Läuft eine Session und hängt dein Terminal daran, öffnet komki bei einer gesperrten Anfrage ein Fenster:
+Manchmal ist eine gesperrte Anfrage in Ordnung, etwa eine Websuche nach einem Förderprogramm, während eine vertrauliche Notiz offen ist. Dann entscheidest du. Läuft eine Session und hängt dein Terminal daran, öffnet komki bei einer gesperrten Anfrage ein Fenster. Das Bild stammt aus einer echten Session im Raum „vertraulich“:
 
-```text
-Gesperrter Aufruf (Beleg pdr-993830d5c6cf5f5dffddfaad3f9948be)
-  Werkzeug:  web_search
-  Parameter:
-    count: 1
-    query: "Förderprogramm Radweg Bayern"
-  Gesperrt:  recipient_not_allowed
-  Ein GO gilt nur für genau diesen Aufruf, einmal, fünf Minuten lang.
-GO für genau diesen Aufruf? [j/N]
-```
+<div class="komki-figure"><GoExistenzLeck /></div>
+
+Geht die Anfrage nach draußen, nennt das Fenster, wer sie zu sehen bekommt, hier Brave für die Websuche. Bedenke: Schon der Aufruf selbst verrät, *dass* und *wann* aus diesem Arbeitsraum gefragt wird, auch wenn der Suchtext harmlos aussieht. Ein GO für eine Suche nach „x“ ist also nicht folgenlos.
 
 Mit `j` läuft genau diese Anfrage, einmal. Fragt pi danach etwas anderes oder dasselbe noch einmal, wird wieder gesperrt. Enter oder `n` heißt Nein. Antwortest du zwei Minuten lang nicht, bleibt es ebenfalls beim Nein. Jede Freigabe und jede Ablehnung steht im Journal.
 

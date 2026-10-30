@@ -18,11 +18,13 @@ gh project item-add 1 --owner croesnick --url <issue-url>
 
 Bot-Issues wie die Renovate Dependency Dashboard landen nicht auf dem Board.
 
-**Status führen:** Ein angefangenes Ticket auf `In Progress` setzen, nach Merge oder Close auf `Done`:
+**Status führen:** Ein angefangenes Ticket von Hand auf `In Progress` setzen. `Done` setzt der Board-Workflow, sobald das Ticket geschlossen ist:
 
 ```bash
 gh project item-edit 1 --owner croesnick --url <issue-url> --field Status --value "In Progress"
 ```
+
+**Ticket schließen:** Der PR-Text enthält `Closes #<n>`, dann schließt der Merge das Ticket. `(Ticket #<n>)` im Titel oder in Commits reicht dafür nicht. Erledigt ein PR ein Ticket bewusst nur teilweise, steht dort `Refs #<n>` mit einem Satz, warum.
 
 **Ticket-Disziplin:** Neue Erkenntnisse oder angepasste Anforderungen während der Arbeit werden entweder ins bestehende Ticket eingetragen oder als sinnvolles Folgeticket angelegt — nichts wird still am Ticket vorbei eingebaut.
 
@@ -65,7 +67,7 @@ Regel am Γ-Übergang: Import und Export validieren immer über `KomkiPolicy.Reg
 
 ### 1. Elixir-first
 
-Wenn nichts Prinzipielles dagegen spricht, wird ein Tool in Elixir gebaut. „Prinzipielles dagegen" heißt: das Ökosystem einer anderen Sprache bietet eine Bibliothek, die in Elixir keine Entsprechung hat und nicht sinnvoll als CLI/NIF angebunden werden kann. Beispiele: `trafilatura` (Python, Artikel-Extraktion), `PyMuPDF` (Python, PDF-Annotation-Extraktion), `Playwright` (Node, Headless-Browser). Dogmatismus ist nicht das Ziel — aber der Default ist Elixir.
+Tools werden in Elixir gebaut. Fehlt eine Bibliothek, bauen wir sie selbst und geben sie als eigenständiges Paket an die Elixir-Community zurück (wie `apps/sidecar`, `apps/seatbelt`). Dass es in einer anderen Sprache eine fertige Bibliothek gibt (etwa `PyMuPDF`, `trafilatura`, `Playwright`), reicht als Grund für eine Abweichung nicht. Abgewichen wird nur aus starken Gründen und **nur nach Rücksprache mit der nutzenden Person**: Die Abwägung kommt als Vorschlag ins Ticket, gebaut wird erst nach dem GO. Nativer Code ist ausdrücklich in Ordnung und keine Abweichung, etwa ein NIF in Rust über Rustler oder ein vorkompilierter NIF aus einem Hex-Paket. Am Ende steht aber eine Elixir-Schnittstelle, außer es sprechen gute Gründe dagegen. Für Connectoren regelt das [ADR 0002](docs/adr/0002-connectoren-nur-in-elixir.md). Die bestehenden Python-Tools unter `tools/` bleiben vorerst als Werkzeuge außerhalb von komki.
 
 ### 2. Unix-Prinzip
 
@@ -161,7 +163,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `apps/ratsinfo` | Elixir | RIS-Scraper + CLI + lokale Volltextsuche | CLI (`ratsinfo sync/search/show`) | Funktionsfähig |
 | `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard | LiveView + MCP (`/mcp`) | Funktionsfähig |
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | Funktionsfähig |
-| `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi), ein Programm, das Vermittler, Egress-Proxy und Connectoren als Rollen mitbringt, + lokale Label-Registry mit Export an den Regel-Prüfkern (RFC 0003); Schlüssel liegen nur versiegelt im Schlüsselbund (Secure Enclave, Freigabe per Touch ID über das kleine Swift-Programm `komki-tresor`), gestartete Programme werden per Prüfsumme festgehalten | CLI (`komki setup/init/doctor/up/down/status/go/run/session/secret/journal/label`) | Funktionsfähig |
+| `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi), ein Programm, das Vermittler, Egress-Proxy und Connectoren als Rollen mitbringt, + lokale Label-Registry mit Export an den Regel-Prüfkern (RFC 0003); Schlüssel liegen nur versiegelt im Schlüsselbund (Secure Enclave, Freigabe per Touch ID über das kleine Swift-Programm `komki-tresor`), gestartete Programme werden per Prüfsumme festgehalten | CLI (`komki setup/init/doctor/up/down/status/raum/go/run/session/secret/journal/label`) | Funktionsfähig |
 | `apps/komki_policy` | Elixir | Regel-Prüfkern: rechnet aus, ob eine Absicht nach den Regeln zulässig ist, und verifiziert die Begründung unabhängig nach; rein, führt selbst nichts aus | CLI (`komki-policy validate/decide/verify/advance`) | Funktionsfähig |
 | `apps/seatbelt` | Elixir | Library für macOS-Seatbelt-Sandboxen: deterministische Profil-Generierung, Escript-/BEAM-Grundschicht, Boot-Gate-Sonden und Programm-Pins (Prüfsummen); komki-unabhängig, Code und Doku auf Englisch (Kandidat für eine Veröffentlichung auf hex.pm, Ticket #226) | — (Bibliothek) | Funktionsfähig |
 | `apps/komki_mediator` | Elixir | Vermittler: MCP-Server für pis Tool-Aufrufe — jede Operation wird vor der Ausführung von komki_policy entschieden (Gate 1), jede Antwort vor der Aufnahme in den Kontext geprüft und gelabelt (Gate 2), jede Entscheidung im PDR-Journal festgehalten | MCP (von `komki up` gestartet, Unix-Socket mit Token) | Funktionsfähig |

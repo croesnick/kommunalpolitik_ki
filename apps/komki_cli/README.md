@@ -207,14 +207,23 @@ Hinweise zu den einzelnen Schritten:
   Netz gibt es einen Mock:
   `elixir apps/komki_connector_ris/priv/mock_ris.exs --port 49640` und
   `komki init --force --ris-mock-port 49640`.
-* **Raum wechseln:** Welche Daten in einer Session zusammenkommen dürfen,
-  steht in `~/.local/share/komki/mediator/room.json`, Feld `workspace_bindings`. Default ist
+* **Raum wechseln:** `komki raum` zeigt den Raum, `komki raum vertraulich`
+  bzw. `komki raum recherche` wechselt (Ticket #268). Default ist
   **recherche** (`doc-oeffentlich@2`, `ris-oeffentlich@1`,
   `vault-oeffentlich@1`, `web-oeffentlich@1`): Websuche und RIS erlaubt,
-  vertrauliche Notizen gesperrt. Raumdokumente liest pi nur, wenn ihre
-  Labels hier stehen (`list_documents` zeigt, welche). Für **vertraulich** `vault-vertraulich@1` ergänzen: Dann sind
-  vertrauliche Notizen lesbar und jede Web- und RIS-Suche gesperrt. Nach der
-  Änderung `komki down && komki up`.
+  vertrauliche Notizen gesperrt. **vertraulich** ergänzt
+  `vault-vertraulich@1`: Dann sind vertrauliche Notizen lesbar und jede
+  Web- und RIS-Suche gesperrt. Gespeichert wird das in `workspace_bindings`
+  in `~/.local/share/komki/mediator/room.json`; ein laufender Vermittler
+  startet neu, das Socket-Token bleibt. Raumdokumente liest pi nur, wenn
+  ihre Labels in diesem B_W stehen (`list_documents` zeigt, welche).
+  Zwei Regeln schützen den Kontext von pi: In den strengeren Raum geht es
+  jederzeit, in den lockereren nur ohne laufende Session und ohne laufenden
+  `komki run` (festgehalten unter `<base>/run/runs/`). Und
+  `komki session --continue` setzt eine Session nur in einem Raum fort, der
+  mindestens so streng ist wie der, in dem sie lief (festgehalten in
+  `<base>/run/session-room.json`). Eigene Räume und Räume mit Startvertrag
+  stellt `komki raum` nicht um (#214).
 * **Nachvollziehen:** Jede Entscheidung steht im Journal
   `~/.local/share/komki/mediator/journal/pdr.jsonl`; `komki journal verify`
   prüft die Hash-Kette. Logs liegen unter `~/.local/share/komki/tmp/`.
@@ -241,6 +250,7 @@ Hinweise zu den einzelnen Schritten:
 ./komki session --detach            # im Hintergrund; der Befehl zum Andocken steht in der Ausgabe
 ./komki down                        # alles stoppen (Vermittler, Connectoren, Egress, llama)
 ./komki status                      # Zustand (base, gguf, port, Socket, llama, Egress, Connectoren, Vermittler)
+./komki raum                        # Raum anzeigen; mit recherche|vertraulich wechseln
 ./komki label …                     # SQLite-Registry: Bindungen, Labels, Γ-Export (siehe unten)
 ```
 
@@ -326,7 +336,14 @@ nicht über einen TCP-Port:
   Quelle nicht erreichbar), Label, Treffer, Quelle mit Abrufzeit und Beleg;
   ctrl+o klappt volle URLs und alle Belege auf. Das macht die pi-Extension
   `komki-anzeige` (`priv/pi/komki-anzeige/`). Sie registriert nur Renderer,
-  ändert also weder Entscheidungen noch das, was das Modell sieht. komki
+  ändert also weder Entscheidungen noch das, was das Modell sieht. Dazu
+  zeigt sie Raum, Zweck, Labels, den Weg nach draußen und die Zahl der
+  Raumdokumente in Kopf- und Fußzeile sowie in `/raum`, `/dokumente` und
+  `/hilfe` (Ticket #242). Die Daten kommen aus `raum.json`, das komki vor
+  jedem Start aus `room.json`, Γ und dem Label-Store schreibt
+  (`KomkiCli.Raumbild`), und aus der letzten Antwort von `list_documents`;
+  die Ausgaben der Befehle sind Session-Einträge, die pi nicht ans Modell
+  schickt. komki
   schreibt sie wie das Relay vor jedem pi-Start neu ins pi-Home und lädt sie
   nur in der Session (`-e`); den Übersetzungs-Cache für TypeScript schaltet
   `JITI_FS_CACHE=false` ab, weil er sonst im schreibbaren pi-Home läge.
