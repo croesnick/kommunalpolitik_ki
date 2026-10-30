@@ -15,8 +15,7 @@ defmodule KomkiCli.Raumbild do
   Ins Modell gelangt nichts davon: Die Extension zeichnet es nur.
   """
 
-  alias KomkiCli.{Config, Gamma, LabelStore, StartContract}
-  alias KomkiMediator.Templates
+  alias KomkiCli.{Config, Gamma, LabelStore, Raum, StartContract}
 
   @schema "komki-raum/1"
 
@@ -44,7 +43,7 @@ defmodule KomkiCli.Raumbild do
 
     %{
       "schema" => @schema,
-      "raum" => raum(bw),
+      "raum" => Raum.name(bw),
       "zweck" => purpose(room),
       "labels" =>
         Enum.map(bw, fn id ->
@@ -64,18 +63,6 @@ defmodule KomkiCli.Raumbild do
 
   defp workspace_bindings(%{"workspace_bindings" => bw}) when is_list(bw), do: Enum.sort(bw)
   defp workspace_bindings(_room), do: []
-
-  # Die beiden Referenzräume aus den Vorlagen haben Namen; jeder andere
-  # B_W ist ein eigener Raum ohne Namen.
-  defp raum([]), do: nil
-
-  defp raum(bw) do
-    cond do
-      bw == Enum.sort(Templates.recherche_bindings()) -> "recherche"
-      bw == Enum.sort(Templates.vertraulich_bindings()) -> "vertraulich"
-      true -> nil
-    end
-  end
 
   defp purpose(%{"facts" => %{"purpose" => %{"value" => value}}}) when is_binary(value),
     do: value
