@@ -6,7 +6,7 @@ beschreibung: >
   mermaid_vision_loop (SVG, nicht Terminal-Capture). terminal_screenshot
   darf nicht greifen, obwohl beide Skills Visualisierungen liefern.
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

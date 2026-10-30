@@ -649,6 +649,7 @@ async function main() {
       fixtures: fall.fixtures,
       arme: fall.arme,
       laeufe: laeufeJeFall(fall),
+      timeoutS: fall.timeoutS,
       registrierteSkills: alle?.namen.length ?? 0,
       bewerterListe: fall.bewerter.map((b) => ({
         id: b.id,

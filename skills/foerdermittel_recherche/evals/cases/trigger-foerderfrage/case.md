@@ -5,7 +5,7 @@ beschreibung: >
   Trigger-Fall: Fördermittel für ein kommunales Projekt suchen — Kern-Trigger
   der Description (»Können wir Förderung beantragen?«, »Gibt es Geld für X?«).
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

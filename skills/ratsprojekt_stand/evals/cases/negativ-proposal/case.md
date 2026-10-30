@@ -6,7 +6,7 @@ beschreibung: >
   ratsprojekt_proposal. ratsprojekt_stand ist die Abfrage zum bestehenden
   Stand und darf hier nicht greifen.
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

@@ -6,7 +6,7 @@ beschreibung: >
   Kern-Trigger der Description (»Ich brauche einen Antrag zu …«). Gemessen
   wird, ob das Modell die SKILL.md des Zielskills per read lädt.
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 quelle: "Issue #292: »mindestens ein Trigger-Fall je Skill (die description muss greifen)«"
 ---

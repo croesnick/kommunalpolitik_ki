@@ -6,7 +6,7 @@ beschreibung: >
   der Description (»Wo steht Projekt X?«, »Was steht dem Vorhaben
   entgegen?«).
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

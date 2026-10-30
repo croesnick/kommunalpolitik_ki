@@ -6,7 +6,7 @@ beschreibung: >
   bestehenden Stadtratsprojekts halten — Kern-Trigger der Description
   (»Neue Förderrichtlinie ist raus«, »was bedeutet das für Projekt X?«).
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

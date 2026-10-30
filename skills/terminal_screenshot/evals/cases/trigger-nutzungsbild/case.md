@@ -6,7 +6,7 @@ beschreibung: >
   Kern-Trigger der Description (»Mach einen Terminal-Screenshot für die
   README«, »Zeig, wie eine Session aussieht«).
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

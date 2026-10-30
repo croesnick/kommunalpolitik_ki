@@ -7,7 +7,7 @@ beschreibung: >
   ein neues Projekt ist hier nicht gefragt; ratsprojekt_proposal darf
   nicht greifen.
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

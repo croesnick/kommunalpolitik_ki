@@ -6,7 +6,7 @@ beschreibung: >
   Repo vereinheitlichen — Kern-Trigger der Description (»Ist X etabliert?«,
   »Sprachinventur«).
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

@@ -7,7 +7,7 @@ beschreibung: >
   darf nicht greifen (seine Description nennt als Trigger Kosten- und
   Förderfragen, die dieser Prompt nicht stellt).
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

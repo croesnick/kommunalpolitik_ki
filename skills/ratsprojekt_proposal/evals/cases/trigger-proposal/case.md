@@ -6,7 +6,7 @@ beschreibung: >
   Kern-Trigger der Description (»Ich will das als Projekt anlegen«,
   »Mach daraus ein ratsprojekt«).
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

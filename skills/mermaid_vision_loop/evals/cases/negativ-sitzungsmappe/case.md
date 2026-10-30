@@ -6,7 +6,7 @@ beschreibung: >
   mermaid_vision_loop darf nicht greifen, obwohl der Skill ebenfalls
   »erstellen«-Aufgaben abdeckt.
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

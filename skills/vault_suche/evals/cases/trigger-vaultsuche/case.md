@@ -6,7 +6,7 @@ beschreibung: >
   Description (»Was hab ich im Vault zu Thema X?«, »Hol mal alles aus dem
   Vault zu …«).
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

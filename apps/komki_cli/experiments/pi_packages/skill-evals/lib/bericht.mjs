@@ -122,6 +122,8 @@ export function berichtMarkdown(daten) {
     if (fall.fixtures.length > 0) {
       lines.push(`> Fixtures (synthetisch): ${fall.fixtures.map((f) => `\`${f}\``).join(", ")}`);
     }
+    lines.push(`> Timeout je Lauf: ${fall.timeoutS ?? "–"} s`);
+    if (fall.laeufe !== undefined) lines.push(`> Läufe je Arm: ${fall.laeufe}`);
     if (fall.typ !== "verhalten") {
       lines.push(
         `> Arm: echte Skill-Auswahl über pis \`--skill\`-Mechanismus — alle ${fall.registrierteSkills} Skills registriert, kein Anhängen an den System-Prompt. Gemessen wird, ob der Skill per \`read\` geladen wird (Trigger) bzw. nicht geladen wird (Negativ).`,

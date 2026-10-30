@@ -7,7 +7,7 @@ beschreibung: >
   Kontext Ratsarbeit ist: Anträge sind in der Sitzungsmappe ausdrücklich
   ausgeschlossen, umgekehrt ist die Mappe kein Antrag.
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 quelle: "Issue #292: »mindestens ein Negativfall je Skill (die description … darf nicht greifen)«"
 ---

@@ -5,7 +5,7 @@ beschreibung: >
   Negativfall: Der Prompt verlangt einen Antrag — reine Antragsarbeit ohne
   Begriffsfrage. sprachinventur darf nicht greifen.
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

@@ -6,7 +6,7 @@ beschreibung: >
   von ratsprojekt_stand. ratsprojekt_delta braucht eine neue Information
   als Anlass; die reine Standfrage darf es nicht laden.
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

@@ -7,7 +7,7 @@ beschreibung: >
   (»Bericht aus dem Stadtrat«, »Ich brauche einen Bericht für den
   Stammtisch«).
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

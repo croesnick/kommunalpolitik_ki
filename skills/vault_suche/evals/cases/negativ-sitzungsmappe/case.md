@@ -7,7 +7,7 @@ beschreibung: >
   vault_suche ist die eigenständige Suchaufgabe und darf bei diesem
   Prompt nicht greifen.
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 

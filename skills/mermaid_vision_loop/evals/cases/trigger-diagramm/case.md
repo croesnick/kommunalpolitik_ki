@@ -6,7 +6,7 @@ beschreibung: >
   geprüft werden — Kern-Trigger der Description (»Mach ein
   Mermaid-Diagramm für …«, »Prüfe die Lesbarkeit«).
 tools: read
-timeout_s: 240
+timeout_s: 120
 laeufe: 5
 ---
 
