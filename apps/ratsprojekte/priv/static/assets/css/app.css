@@ -643,6 +643,25 @@ body {
   margin-left: var(--space-1);
 }
 
+/* Strukturierte RIS-Referenz an Sitzungs-Quellen (#32) */
+.source-ris {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  background: var(--color-border-light);
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-sm);
+  margin-left: var(--space-1);
+}
+
+.source-ris a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.source-ris a:hover {
+  text-decoration: underline;
+}
+
 /* Projekt-Quellen */
 .projekt-quellen {
   margin-top: var(--space-6);

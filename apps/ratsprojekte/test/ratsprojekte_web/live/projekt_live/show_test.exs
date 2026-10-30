@@ -188,6 +188,56 @@ defmodule RatsprojekteWeb.ProjektLive.ShowTest do
     end
   end
 
+  describe "ris referenz an sitzungs-quellen (#32)" do
+    test "renders the reference as link into the ris when url is set", %{conn: conn} do
+      projekt = freibad()
+
+      quelle(projekt, %{
+        typ: :sitzung,
+        titel: "Stadtratssitzung 05.11.2026",
+        url: "https://example.org/ris/sitzung/4711",
+        ris_sitzung_id: "4711",
+        ris_top: "7",
+        beschluss_nr: "2026/034"
+      })
+
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}")
+
+      assert has_element?(
+               view,
+               ".source-ris a[href='https://example.org/ris/sitzung/4711']",
+               "🏛 RIS: Sitzung 4711 · TOP 7 · Beschluss 2026/034"
+             )
+
+      assert html =~ "Beschluss 2026/034"
+    end
+
+    test "renders the reference as plain text when url is unset", %{conn: conn} do
+      projekt = freibad()
+
+      quelle(projekt, %{
+        typ: :sitzung,
+        titel: "Stadtratssitzung 05.11.2026",
+        ris_sitzung_id: "4711",
+        ris_top: "7"
+      })
+
+      {:ok, view, html} = live(conn, ~p"/projekte/#{projekt.slug}")
+
+      assert has_element?(view, ".source-ris", "🏛 RIS: Sitzung 4711 · TOP 7")
+      refute has_element?(view, ".source-ris a")
+      assert html =~ "Sitzung 4711"
+    end
+
+    test "renders no ris badge for quellen without reference", %{conn: conn} do
+      projekt = marktplatz()
+
+      {:ok, view, _html} = live(conn, ~p"/projekte/#{projekt.slug}")
+
+      refute has_element?(view, ".source-ris")
+    end
+  end
+
   # Referenzen werden nicht gehalten — nur, um unused-alias-Warnungen zu vermeiden.
   _ = Projekt
   _ = Repo

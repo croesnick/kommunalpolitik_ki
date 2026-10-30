@@ -138,21 +138,13 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
 
         <div :if={strang.quellen != []} class="sources">
           <div class="section-label flush spaced">Quellen</div>
-          <div :for={q <- strang.quellen} class="source-item">
-            📄 <a :if={q.url} href={q.url} target="_blank">{q.titel}</a>
-            <span :if={!q.url}>{q.titel}</span>
-            <span :if={q.paragraf} class="source-paragraf">{q.paragraf}</span>
-          </div>
+          <.quelle_item :for={q <- strang.quellen} quelle={q} />
         </div>
       </div>
 
       <div :if={@projekt.quellen != []} class="projekt-quellen">
         <div class="section-label flush spaced">Projekt-Quellen</div>
-        <div :for={q <- @projekt.quellen} class="source-item">
-          📄 <a :if={q.url} href={q.url} target="_blank">{q.titel}</a>
-          <span :if={!q.url}>{q.titel}</span>
-          <span :if={q.paragraf} class="source-paragraf">{q.paragraf}</span>
-        </div>
+        <.quelle_item :for={q <- @projekt.quellen} quelle={q} />
       </div>
     </div>
     """
@@ -203,5 +195,38 @@ defmodule RatsprojekteWeb.ProjektLive.Show do
       <span class="payload-row-value">{@value}</span>
     </div>
     """
+  end
+
+  attr(:quelle, :map, required: true)
+
+  defp quelle_item(assigns) do
+    ~H"""
+    <div class="source-item">
+      📄 <a :if={@quelle.url} href={@quelle.url} target="_blank">{@quelle.titel}</a>
+      <span :if={!@quelle.url}>{@quelle.titel}</span>
+      <span :if={@quelle.paragraf} class="source-paragraf">{@quelle.paragraf}</span>
+      <span :if={ris_referenz(@quelle)} class="source-ris">
+        <a :if={@quelle.url} href={@quelle.url} target="_blank">{ris_referenz(@quelle)}</a>
+        <span :if={!@quelle.url}>{ris_referenz(@quelle)}</span>
+      </span>
+    </div>
+    """
+  end
+
+  # Strukturierte RIS-Referenz (#32): „welcher Beschluss gehört zu Projekt X?"
+  # Der Link läuft über die URL der Quelle — ratsprojekte kennt nur die IDs
+  # (Unix-Prinzip), keine URL-Schemata des RIS.
+  defp ris_referenz(quelle) do
+    teile =
+      Enum.reject(
+        [
+          if(quelle.ris_sitzung_id, do: "Sitzung #{quelle.ris_sitzung_id}"),
+          if(quelle.ris_top, do: "TOP #{quelle.ris_top}"),
+          if(quelle.beschluss_nr, do: "Beschluss #{quelle.beschluss_nr}")
+        ],
+        &is_nil/1
+      )
+
+    if teile == [], do: nil, else: "🏛 RIS: " <> Enum.join(teile, " · ")
   end
 end

@@ -311,11 +311,16 @@ defmodule Ratsprojekte.Fixtures do
     :ok
   end
 
-  defp quelle(%Realisierungsstrang{} = strang, attrs) do
+  @doc """
+  Legt eine Quelle an — am Projekt oder am Realisierungsstrang. Sitzungs-Quellen
+  können die strukturierte RIS-Referenz tragen (Ticket #32):
+  `ris_sitzung_id`, `ris_top`, `beschluss_nr`.
+  """
+  def quelle(%Realisierungsstrang{} = strang, attrs) do
     insert_quelle(Map.put(Map.new(attrs), :realisierungsstrang_id, strang.id))
   end
 
-  defp quelle(%Projekt{} = projekt, attrs) do
+  def quelle(%Projekt{} = projekt, attrs) do
     insert_quelle(Map.put(Map.new(attrs), :projekt_id, projekt.id))
   end
 
@@ -328,7 +333,10 @@ defmodule Ratsprojekte.Fixtures do
         titel: attrs[:titel],
         url: attrs[:url],
         paragraf: attrs[:paragraf],
-        abrufdatum: attrs[:abrufdatum]
+        abrufdatum: attrs[:abrufdatum],
+        ris_sitzung_id: attrs[:ris_sitzung_id],
+        ris_top: attrs[:ris_top],
+        beschluss_nr: attrs[:beschluss_nr]
       })
 
     :ok
