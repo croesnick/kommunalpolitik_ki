@@ -105,6 +105,11 @@ oder ExVCR.
   niemand vorhergesehen hat (die Struktur bleibt); sonst die Felder `token`/`access_token`/`jwt`.
   Client und Upstream erhalten alles ungeschwärzt, nur die Datei ist geschwärzt.
 
+Geschwärzt heißt nicht verschlüsselt: Was nicht geschwärzt wurde, bleibt in der Kassette Klartext.
+`priv/ris_kassetten.exs` versiegelt deshalb das Verzeichnis nach der Session als Ganzes
+(AES-256-GCM, Schlüssel per Touch ID aus der Secure Enclave; Abschnitt „Kassetten verschlüsseln“
+unten). Ohne diese Freigabe bleibt jedem Prozess — auch jedem Agenten — nur der Chiffretext.
+
 Gegen den Recorder aufzeichnen:
 
 - komki: `"ris_mock_port": 4020` in komkis `config.json`. Loopback gilt als Mock, der
@@ -170,6 +175,48 @@ schwanken. Damit lässt sich prüfen, ob der Mock oder ein späterer Generator f
 Committbare Testdaten entstehen nie aus den Kassetten selbst, sondern aus synthetischen Inhalten im
 echten Format. Der Skelett-Bericht ist die Vorlage dieses Generators; ein Verifier (N-Gramm-Abgleich
 gegen die Aufzeichnungen) ist als Freigabetor vor jedem Committen von Kassetten geplant.
+
+### Kassetten verschlüsseln (Touch ID)
+
+`priv/ris_kassetten.exs` versiegelt ein Kassettenverzeichnis mit AES-256-GCM, damit kein Prozess —
+auch kein Agent — die Kassetten ohne die Person am Mac lesen kann. Der Schlüssel liegt nur als
+Siegel von `komki-tresor` im macOS-Schlüsselbund (Eintrag `ris-kassetten`), gebunden an die Secure
+Enclave dieses Macs; jede Ver- und Entschlüsselung löst genau eine Freigabe per Touch ID (oder
+Passwort des Macs) aus.
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_kassetten.exs init                 # einmalig
+elixir apps/komki_connector_ris/priv/ris_kassetten.exs seal <verzeichnis>
+elixir apps/komki_connector_ris/priv/ris_kassetten.exs unseal <verzeichnis>
+elixir apps/komki_connector_ris/priv/ris_kassetten.exs status <verzeichnis>
+```
+
+Ablauf einer Session: aufzeichnen, Leak-Prüfung und Skelett-Bericht wie gehabt, danach `seal` —
+dann liegen nur noch `<name>.json.enc` (Magic `rkt1`, je Datei eigene Nonce). `seal` löscht den
+Klartext erst nach bestandener Gegenprobe von der Platte. Meldungen nennen nie Schlüssel, Siegel
+oder Inhalte, nur Namen und Zähler.
+
+- Replay und Skelett-Extraktor lesen `*.json`: vorher `unseal`, danach `seal`.
+- Abbrüche lassen einen sichtbaren Mischzustand: `status` zeigt ihn, ein erneutes
+  `seal`/`unseal` vollendet. Beide überschreiben nie und lehnen Verzeichnisse in Git-Repos ab,
+  wie der Recorder.
+- Exit-Codes: 0 ok (auch „nichts zu tun“), 1 fachliche Ablehnung oder Umwelt, 2 Aufruf falsch,
+  3 kein `komki-tresor`/keine Secure Enclave, 4 Freigabe verweigert oder abgebrochen,
+  5 Siegel oder Datei ungültig.
+
+Grenzen, bewusst:
+
+- **Klartext-Fenster.** Bis zum ersten `seal` und während `unseal` liegt Klartext auf der Platte.
+  Optionale Härtung ohne eigenen Code: Recorder mit `--out` auf eine RAM-Disk schreiben
+  (`dev=$(hdiutil attach -nomount ram://524288)`, dann
+  `diskutil eraseVolume APFS Kassetten "$dev"`, Aufzeichnung nach `/Volumes/Kassetten`, am Ende
+  `seal` und `diskutil eject`). RAM-Disk-Inhalte sind bei einem Crash weg, Größe also klein halten.
+- **Kein Key-Escrow, kein Restore.** Das Siegel öffnet nur die Secure Enclave dieses Macs. Ist der
+  Schlüsselbund-Eintrag weg (gelöscht, Mac-Neuaufsetzung, anderer Mac), sind verschlüsselte
+  Kassetten unwiederbringlich. Entfernen nur bewusst:
+  `security delete-generic-password -s ris-kassetten` — `init` verweigert Überschreiben.
+- `komki-tresor` muss im PATH liegen (im komki-Paket enthalten; aus dem Checkout gebaut:
+  `--tresor apps/komki_cli/priv/komki-tresor`).
 
 ## Grenzen
 

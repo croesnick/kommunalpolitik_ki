@@ -380,6 +380,12 @@ aus den Xcode Command Line Tools; das Homebrew-Paket bringt das fertige
 Programm mit. Ohne Secure Enclave (Intel-Mac ohne T2) gibt es keine
 versiegelten Geheimnisse, die Websuche bleibt dann aus.
 
+Dieselbe Binary versiegelt auch den Schlüssel der RIS-Kassetten:
+`apps/komki_connector_ris/priv/ris_kassetten.exs` ruft `komki-tresor` über den
+PATH auf (Override mit `--tresor <pfad>`, aus dem Checkout gebaut liegt es in
+`apps/komki_cli/priv/`). `init` und jedes `seal`/`unseal` brauchen Touch ID auf
+diesem Mac; Details im Connector-README, Abschnitt „Kassetten verschlüsseln“.
+
 **Programm-Pins:** `komki setup` hält die SHA-256 der gestarteten Programme
 fest (komki, escript, node, llama-server, komki-tresor, das pi-Paket);
 `komki up` startet nur mit denselben Bytes. Ein Update von llama.cpp, node
