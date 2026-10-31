@@ -48,6 +48,10 @@ Fünf kanonische Triage-Rollen als Labels: `needs-triage`, `needs-info`, `ready-
 
 `ai:s-tier`, `ai:a-tier` und `ai:b-tier` sagen, was ein Ticket verlangt: Grenze und Urteil, Feature mit Vertrag oder Handwerk. Daraus folgt, welche Modellklasse es bekommt. Berührt eine A- oder B-Aufgabe einen geschützten Pfad, hört die Session auf und eskaliert. Kriterien, geschützte Pfade, Zielbild-Vorlage und die aktuelle Zuordnung der Modelle: [docs/agents/ai-tiers.md](docs/agents/ai-tiers.md).
 
+### Skill-Evals
+
+Jeder Skill hat eine Eval-Suite (`skills/<name>/evals/`) und eine committete `BENCHMARK.md`, gemessen gegen das Zielmodell Gemma 4 26B im llama-server der komki-Instanz — nicht gegen Claude. Ein Skill-PR ohne aktualisierte `BENCHMARK.md` gilt nicht als fertig (reine Kosmetik ausgenommen, dann mit Vermerk). Konvention: Fallformat, Bewertertypen, Arme, Pflichtfelder: [docs/agents/skill-evals.md](docs/agents/skill-evals.md). Runner: `apps/komki_cli/experiments/pi_packages/skill-evals/`.
+
 ### Domain docs
 
 Single-context: `GLOSSARY.md` am Repo-Root (kanonische Nomenklatur aller Domänen — ersetzt die frühere `docs/nomenklatur.md`), ADRs unter `docs/adr/`. Siehe `docs/agents/domain.md`.
