@@ -12,6 +12,9 @@
  *                         [--only 1,2,3,4,6] [--timeout-factor 6]
  *   node smoke/run-ab.mjs --root <dir> --preflight   # nur Lade-Check
  *
+ * Nachmessung einer knappen Kennzahl (Entscheidungsregel 4 im Labbook):
+ * --first-round 4 --runs 5 --only 2 fährt nur die Runden 4–5 ohne Warm-up.
+ *
  * Fortsetzbar: Ein Lauf mit results.json im Laufverzeichnis gilt als
  * erledigt und wird beim erneuten Aufruf übersprungen. Provenance
  * (Hardware, Versionen, SHA-256 von Binary und GGUFs, Git-Stand) und der
@@ -39,6 +42,7 @@ function parseArgs(argv) {
     arms: ["A", "B", "C"],
     only: "1,2,3,4,6",
     timeoutFactor: 6,
+    firstRound: 0,
     preflight: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -47,6 +51,7 @@ function parseArgs(argv) {
     if (argv[i] === "--arms") args.arms = argv[i + 1].split(",");
     if (argv[i] === "--only") args.only = argv[i + 1];
     if (argv[i] === "--timeout-factor") args.timeoutFactor = Number(argv[i + 1]);
+    if (argv[i] === "--first-round") args.firstRound = Number(argv[i + 1]);
     if (argv[i] === "--preflight") args.preflight = true;
   }
   for (const arm of args.arms) if (!ARMS[arm]) throw new Error(`unbekannter Arm ${arm}`);
@@ -115,7 +120,7 @@ async function provenance(args) {
 
 function scheduleOf(args) {
   const entries = [];
-  for (let round = 0; round <= args.runs; round += 1) {
+  for (let round = args.firstRound; round <= args.runs; round += 1) {
     for (const arm of args.arms) {
       entries.push({
         seq: entries.length + 1,

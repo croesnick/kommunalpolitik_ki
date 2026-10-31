@@ -23,6 +23,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { parseSessionFile } from "../lib/session.mjs";
 import { checkAnswer } from "./criteria.mjs";
 import { ENTWURF_BESCHLUSSVORLAGE, factTokens, missingFacts } from "./fixtures.mjs";
 
@@ -107,7 +108,7 @@ function autoTask1(answer) {
   return { items, details: { erfundeneZahlen: zahlen.erfunden, abgeleiteteZahlen: zahlen.abgeleitet } };
 }
 
-function autoTask2(raw) {
+export function autoTask2(raw) {
   let entries = null;
   try {
     const parsed = JSON.parse(raw ?? "");
@@ -248,7 +249,23 @@ function measuresOf(result) {
   return [m.a, m.b].filter(Boolean);
 }
 
-function runMetrics(results, summary) {
+/**
+ * Distinkte Tool-Results mit isError einer Aufgabe. Die Session nach
+ * --continue (Aufgaben 4, 6) enthält die Results des ersten Laufs noch
+ * einmal, daher die Vereinigung über toolCallId. Ein schema-invalider Call
+ * erscheint bei pi ebenfalls als isError-Result und zählt so genau einmal.
+ */
+async function errorResults(measures) {
+  const byId = new Map();
+  for (const m of measures) {
+    if (!m.sessionFile) continue;
+    const session = await parseSessionFile(m.sessionFile).catch(() => null);
+    for (const result of session?.toolResults ?? []) byId.set(result.toolCallId, result);
+  }
+  return [...byId.values()].filter((r) => r.isError);
+}
+
+async function runMetrics(results, summary) {
   const tasks = {};
   const all = [];
   for (const result of results) {
@@ -269,7 +286,8 @@ function runMetrics(results, summary) {
   const requests = all.flatMap((m) => m.proxyRequests ?? []);
   const server = all.flatMap((m) => m.serverRequests ?? []);
   const toolCalls = all.flatMap((m) => m.toolCalls ?? []);
-  const toolResults = all.flatMap((m) => m.sessionToolResults ?? []);
+  const toolErrors = [];
+  for (const result of results) toolErrors.push(...(await errorResults(measuresOf(result))));
   const finishReasons = {};
   for (const request of requests) {
     const reason = request.finishReason ?? "none";
@@ -295,7 +313,7 @@ function runMetrics(results, summary) {
     toolCalls: toolCalls.length,
     toolCallsInvalid: toolCalls.filter((c) => !c.valid).length,
     toolCallClasses: toolCalls.reduce((acc, c) => ({ ...acc, [c.class]: (acc[c.class] ?? 0) + 1 }), {}),
-    toolResultsError: toolResults.filter((r) => r.isError).length,
+    toolResultsError: toolErrors.length,
     lengthClamped: all.reduce((s, m) => s + (m.lengthClampedRequests?.length ?? 0), 0),
     finishReasons,
     footprintMaxMiB: Math.max(0, ...all.map((m) => m.footprintLlamaMiB ?? 0)) || null,
@@ -344,7 +362,7 @@ async function report(root) {
     for (const r of summary.results) {
       results.push(JSON.parse(await readFile(path.join(dir, "results", `${r.id}.json`), "utf8")));
     }
-    perRun.push({ ...entry, metrics: runMetrics(results, summary) });
+    perRun.push({ ...entry, metrics: await runMetrics(results, summary) });
   }
 
   const quality = {};
@@ -361,7 +379,7 @@ async function report(root) {
     const pick = (fn) => spread(armRuns.map((r) => fn(r.metrics)));
     const q = Object.values(quality).filter((x) => x.arm === arm);
     const calls = armRuns.reduce((s, r) => s + r.metrics.toolCalls, 0);
-    const repairs = armRuns.reduce((s, r) => s + r.metrics.toolCallsInvalid + r.metrics.toolResultsError, 0);
+    const repairs = armRuns.reduce((s, r) => s + r.metrics.toolResultsError, 0);
     byArm[arm] = {
       runs: armRuns.map((r) => ({ dir: r.dir, seed: r.seed, round: r.round })),
       loadMs: pick((m) => m.loadMs),
@@ -399,7 +417,7 @@ async function report(root) {
       quality: Object.fromEntries(
         [1, 2, 3].map((task) => {
           const items = q.filter((x) => x.task === task);
-          return [task, { ...spread(items.map((x) => x.points)), max: items[0]?.max ?? null }];
+          return [task, { ...spread(items.map((x) => x.points)), maxPoints: items[0]?.max ?? null }];
         }),
       ),
       factViolationsTask3: q.filter((x) => x.task === 3).map((x) => x.factViolations),
@@ -444,7 +462,7 @@ function renderMarkdown({ arms, byArm, gates, perRun, quality }) {
   row("davon Thinking-Token", (a) => fmtSpread(a.reasoningTokens));
   row("footprint max", (a) => fmtSpread(a.footprintMaxMiB, 0, " MiB"));
   row("längengeklemmte Requests", (a) => fmtSpread(a.lengthClamped));
-  row("Tool-Calls / Reparaturen", (a) => `${a.toolCalls} / ${a.repairs} (${fmt((a.repairRate ?? 0) * 100, 1)} %)`);
+  row("Tool-Calls / invalide / Reparaturen", (a) => `${a.toolCalls} / ${a.toolCallClasses ? Object.entries(a.toolCallClasses).filter(([k]) => k !== "ok" && k !== "extra-keys").reduce((x, [, v]) => x + v, 0) : 0} / ${a.repairs} (${fmt((a.repairRate ?? 0) * 100, 1)} %)`);
   row("finishReasons", (a) => Object.entries(a.finishReasons).map(([k, v]) => `${k} ${v}`).join(", "));
   lines.push("");
   lines.push(`| Aufgabe: Wandzeit | ${arms.join(" | ")} |`);
@@ -458,7 +476,7 @@ function renderMarkdown({ arms, byArm, gates, perRun, quality }) {
   lines.push("");
   lines.push(`| Qualität (Punkte, Median, Spanne) | ${arms.join(" | ")} |`);
   lines.push(`|---|${arms.map(() => "---").join("|")}|`);
-  for (const task of [1, 2, 3]) row(`Aufgabe ${task}`, (a) => `${fmtSpread(a.quality[task])} / ${a.quality[task].max}`);
+  for (const task of [1, 2, 3]) row(`Aufgabe ${task}`, (a) => `${fmtSpread(a.quality[task])} / ${a.quality[task].maxPoints}`);
   row("Faktenänderungen Aufgabe 3 je Lauf", (a) => a.factViolationsTask3.map((v) => v.length).join(" / "));
   lines.push("");
   lines.push(`| Gate | ${arms.join(" | ")} |`);
