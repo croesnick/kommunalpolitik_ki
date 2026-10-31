@@ -105,6 +105,22 @@ die vorab registrierten Checklisten in [`grade-ab.mjs`](grade-ab.mjs) und
 `results.json` werden übersprungen. Protokoll und Ergebnisse:
 [Labbook 2026-10-31](../../../../../docs/research/2026-10-31-modell-ab.md).
 
+Das Build-A/B (#320) variiert statt des GGUFs die Binärdatei: Die Arme
+`V7`/`V8` in `ab-arms.mjs` tragen die Produktivkonfiguration nach #319
+(Thinking aus per `--reasoning off`, MTP-Drafter) je auf llama-server 0.7.0
+(Homebrew-Pin) und 0.8.0 (side-by-side aus dem Release-Bundle b11960). Ein
+Arm mit `bin` überschreibt `KOMKI_LLAMA_SERVER`; `run-ab.mjs` reicht ihn als
+`--bin` an `run-smoke.mjs` weiter und notiert Version und SHA-256 der
+Binärdatei je Arm im Provenance-Protokoll.
+
+```bash
+node smoke/run-ab.mjs --root <ab-root> --arms V7,V8 --preflight
+node smoke/run-ab.mjs --root <ab-root> --arms V7,V8 --runs 3 \
+  --timeout-factor 6 --seed-base 320000
+node smoke/grade-ab.mjs blind --root <ab-root>   # dann blind/grades.json ausfüllen
+node smoke/grade-ab.mjs report --root <ab-root> --reference V7
+```
+
 Zusätzlich misst der Proxy seit #285 je Request die Zeit bis zum ersten
 Delta (`firstTokenMs`, Thinking eingeschlossen) und bis zur ersten sichtbaren
 Antwort (`firstAnswerMs`) und hält den Thinking-Text (`reasoning`) fest. Der

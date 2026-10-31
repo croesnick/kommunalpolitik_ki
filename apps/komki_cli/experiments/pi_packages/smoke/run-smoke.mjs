@@ -28,6 +28,8 @@
  *   --ctx <n>               server context (default 131072, as the instance)
  *   --timeout-factor <f>    stretches all task timeouts (default 1)
  *   --server-args '<json>'  extra llama-server arguments as a JSON array
+ *   --bin <path>            llama-server binary of the staging server
+ *                           (default KOMKI_LLAMA_SERVER, Ticket #320)
  */
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -110,6 +112,7 @@ function parseArgs(argv) {
     ctx: 131072,
     timeoutFactor: 1,
     serverArgs: [],
+    bin: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--gguf") args.gguf = argv[i + 1];
@@ -118,6 +121,7 @@ function parseArgs(argv) {
     if (argv[i] === "--seed") args.seed = Number(argv[i + 1]);
     if (argv[i] === "--ctx") args.ctx = Number(argv[i + 1]);
     if (argv[i] === "--server-args") args.serverArgs = JSON.parse(argv[i + 1]);
+    if (argv[i] === "--bin") args.bin = argv[i + 1];
     if (argv[i] === "--timeout-factor") args.timeoutFactor = Number(argv[i + 1]);
     if (argv[i] === "--only") {
       const list = (argv[i + 1] ?? "").split(",").filter(Boolean).map((x) => x.trim());
@@ -130,6 +134,9 @@ function parseArgs(argv) {
   }
   if (args.gguf && !Number.isInteger(args.port)) {
     throw new Error("--gguf braucht --port <n> für den Staging-Server");
+  }
+  if (args.bin && !args.gguf) {
+    throw new Error("--bin braucht --gguf (gilt nur für den Staging-Server)");
   }
   if (!(args.timeoutFactor > 0)) throw new Error("--timeout-factor muss > 0 sein");
   return args;
@@ -698,6 +705,7 @@ async function main() {
         seed: args.seed,
         ctx: args.ctx,
         extraArgs: args.serverArgs,
+        bin: args.bin,
         dir: path.join(ROOT, "server"),
       })
     : await resolveLlama();
@@ -793,7 +801,7 @@ async function runTasks(llama) {
       gguf: llama.gguf,
       ctx: llama.ctx,
       rssMiB: llamaRssMiB(llama.pid),
-      version: llamaVersion(),
+      version: llamaVersion(llama.staging?.bin),
       staging: llama.staging ?? null,
     },
     timeoutFactor: args.timeoutFactor,
