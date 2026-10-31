@@ -230,8 +230,8 @@ defmodule KomkiMediator.ConnectorGate do
 
     case Go.await(go, request) do
       {:release, release} -> released(env, call, {snapshot, intent, then}, release)
-      :refused -> go_not_given(env, call, intent, response, "go_refused")
-      :timeout -> go_not_given(env, call, intent, response, "go_timeout")
+      :refused -> go_not_given(env, call, {snapshot, intent}, response, "go_refused")
+      :timeout -> go_not_given(env, call, {snapshot, intent}, response, "go_timeout")
     end
   end
 
@@ -298,7 +298,7 @@ defmodule KomkiMediator.ConnectorGate do
 
   # No or no answer: the deny stands and the catalog stays visible; the
   # PDR records that the person was asked.
-  defp go_not_given(env, call, intent, response, outcome) do
+  defp go_not_given(env, call, {snapshot, intent}, response, outcome) do
     hinweis = if outcome == "go_refused", do: :go_refused, else: :go_timeout
     response = Map.put(response, "hinweis", Hinweis.text(hinweis))
 
@@ -312,7 +312,8 @@ defmodule KomkiMediator.ConnectorGate do
       "admitted" => false,
       "intent_hash" => call.intent_hash,
       "payload_hash" => PDR.payload_hash(response),
-      "intent_id" => intent["intent_id"]
+      "intent_id" => intent["intent_id"],
+      "snapshot_id" => snapshot["snapshot_id"]
     })
 
     Map.put(response, "go", if(outcome == "go_refused", do: "abgelehnt", else: "keine Antwort"))
@@ -515,6 +516,12 @@ defmodule KomkiMediator.ConnectorGate do
   defp not_permitted(env, call, rule, executed, intent, snapshot, outcome) do
     decision_id = PDR.new_id()
 
+    checked_label =
+      case outcome do
+        {:ok, decision} -> decision["checked_label"]
+        _ -> nil
+      end
+
     {pdr_decision, response} =
       case outcome do
         {:ok, %{"decision" => kind, "remedies" => remedies}} ->
@@ -555,6 +562,7 @@ defmodule KomkiMediator.ConnectorGate do
       "payload_hash" => PDR.payload_hash(response),
       "intent_id" => intent["intent_id"],
       "snapshot_id" => snapshot["snapshot_id"],
+      "checked_label" => checked_label,
       "remedies" => response["remedies"]
     })
 

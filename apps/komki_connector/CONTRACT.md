@@ -177,7 +177,7 @@ Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine. Im einfac
 
 1. Schema-Prüfung der Parameter gegen das Manifest. Bei Verstoß: `decision: error`, PDR, kein Vollzug.
 2. `call_bytes = JSON.canonical({"tool", "params"})`, `intent_hash = sha256(call_bytes)`. Der Vermittler
-   vergibt die `call_id` des Aufrufs.
+   vergibt die `call_id` des Aufrufs (Schritt 7).
 3. **Erzeugen** (`emit`, komki_policy CONTRACT §4.5): Snapshot mit `workspace.bindings =
    room.workspace_bindings` (B_W), `workspace.environment = room.environment` (der Raum erzeugt die
    Anfrage), Objekt `out-<digest12>` / Version `v1` / Labels `[]`, Fakten des Raums plus
@@ -187,14 +187,14 @@ Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine. Im einfac
    manifest.environment` (Empfänger der Anfrage). Hier fällt der Empfängertest gegen RIS, Websuche oder
    Vault.
 5. Kein permit in Schritt 3 oder 4: Antwort mit Remedies, PDR mit der `call_id` des Aufrufs, **kein
-   Vollzug**. Die Antwort nennt keinen emit-PDR (`emit_decision_id`), weil es keinen gibt.
+   Vollzug**, außer die nutzende Person gibt ein GO (Schritt 6). Die Antwort nennt keinen emit-PDR (`emit_decision_id`), weil es keinen gibt.
 6. permit: erst der **emit-PDR (`outcome: emitted`), dann der transfer- bzw. store-PDR (`outcome:
    permitted`), beide bevor der Connector aufgerufen wird** (Vorbeleg vor Wirkung, R.11). Die
    `decision_id` des emit-PDR ist die `call_id` im Frame. Nach einem GO steht der GO-Beleg
    (`outcome: released`) direkt nach dem Verbrauch der Nonce im Journal, also vor dem emit-PDR; bei
    `transfer` und `store` vertritt er den `permitted`-PDR (commit vor Wirkung, komki_policy CONTRACT
    §4.6).
-7. Die `call_id` vergibt der Vermittler nach der Vorprüfung (Schema, B_W). Jeder PDR des Aufrufs trägt
+7. Die `call_id` entsteht nach der Vorprüfung (Schema, B_W). Jeder PDR des Aufrufs trägt
    sie: Ablehnungen, GO-Belege (`released`, `go_refused`, `go_timeout`, ein gescheiterter Commit),
    emit-, transfer- bzw. store- und admit-PDR. Nur eine Ablehnung in der Vorprüfung hat keine, weil es
    noch keinen Aufruf gibt. Kommt es zum Vollzug, ist die `call_id` die `decision_id` des emit-PDR; ein

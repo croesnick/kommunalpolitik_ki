@@ -140,6 +140,12 @@ defmodule KomkiMediator.GoTest do
     assert "recipient_not_allowed" in Enum.map(response["remedies"], & &1["code"])
     refute_received :web_called
     assert outcomes(env) == ["not_admitted", "go_refused"]
+
+    # Both records belong to the same call and snapshot (CONTRACT §6.1 step 7).
+    [deny, refused] = TestHelpers.journal_records(env.journal_path)
+    assert is_binary(refused["call_id"])
+    assert refused["call_id"] == deny["call_id"]
+    assert refused["snapshot_id"] == deny["snapshot_id"]
   end
 
   test "keine Antwort bis zum Ablauf: deny, kein stiller Fallback", %{env: env} do

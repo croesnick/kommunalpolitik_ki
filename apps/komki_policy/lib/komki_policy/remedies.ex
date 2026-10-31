@@ -33,7 +33,7 @@ defmodule KomkiPolicy.Remedies do
 
   @type rule_kind() :: :admit | :emit | :store | :transfer | :release
 
-  # Regelzweige mit Ausgabeobjekt: call-GO im Katalog.
+  # Rule branches with an output object: call GO in the catalog.
   @output_kinds [:emit, :store, :transfer]
 
   @unbridgeable ["workspace_invalid", "label_not_preserved"]
@@ -64,8 +64,8 @@ defmodule KomkiPolicy.Remedies do
   """
   @spec catalog(Registry.compiled(), context(), [finding()]) :: [map()]
 
-  # `rule_kind` trägt der Kontext bereits (`ctx.rule`); der Katalog ist reine
-  # Funktion von (registry, context, finding-Liste).
+  # The context already carries `rule_kind` (`ctx.rule`); the catalog is a
+  # pure function of (registry, context, findings).
   def catalog(registry, %{rule: rule_kind} = ctx, findings)
       when rule_kind in [:admit | @output_kinds] do
     findings
@@ -108,7 +108,7 @@ defmodule KomkiPolicy.Remedies do
   end
 
   # -------------------------------------------------------------------------
-  # Übergangs-Bausteine (geschlossene Payload-Formen § 2.8)
+  # Transition building blocks (closed payload shapes, § 2.8)
   # -------------------------------------------------------------------------
 
   defp fakt(fact_names), do: %{"type" => "fakt_nachreichen", "facts" => fact_names}
@@ -133,12 +133,11 @@ defmodule KomkiPolicy.Remedies do
   defp object_go(object_ref),
     do: %{"type" => "aktionsfreigabe", "scope" => "object", "object" => object_ref}
 
-  # Ordnung: normative Reihenfolge, stabil innerhalb jedes Typs (die
-  # Bausteine erscheinen in ihrer Konstruktionsordnung, Transformationen
-  # aufsteigend nach Kennung). § 2.8 Payload-Regeln: ein
-  # `fakt_nachreichen` ohne benennbares Feld (facts: [] — z. B.
-  # `binding_condition_false` bei `condition: null`, Literal-Regel)
-  # entfällt; es gibt nichts autoritativ nachzureichen.
+  # Order: the normative order, stable within each type (blocks appear in
+  # construction order, transformations ascending by id). § 2.8 payload
+  # rules: a `fakt_nachreichen` without a nameable field (facts: [] — e.g.
+  # `binding_condition_false` with `condition: null`, a literal rule) is
+  # dropped; there is nothing to supply with authority.
   defp ordered(transitions) do
     @transition_order
     |> Enum.flat_map(fn type ->
@@ -151,14 +150,14 @@ defmodule KomkiPolicy.Remedies do
   defp vacant_fakt?(_transition), do: false
 
   # -------------------------------------------------------------------------
-  # Anwendbarkeitstabelle (deny, § 2.8)
+  # Applicability table (deny, § 2.8)
   # -------------------------------------------------------------------------
 
   defp regular_transitions(_registry, ctx, _kind, %{"code" => "object_quarantine"}),
     do: [object_go(ctx.object_ref)]
 
-  # workspace_invalid: kein GO-Eintrag, auch nicht bei emit/store/transfer;
-  # label_not_preserved ebenso.
+  # workspace_invalid and label_not_preserved: no GO entry, not even for
+  # emit/store/transfer.
   defp regular_transitions(_registry, ctx, _kind, %{"code" => code})
        when code in @unbridgeable,
        do: [newer_space(ctx, required_bindings_for(ctx))]
@@ -191,8 +190,8 @@ defmodule KomkiPolicy.Remedies do
   end
 
   # -------------------------------------------------------------------------
-  # Anwendbarkeitstabelle (indeterminate, § 2.8): fakt nachreichen +
-  # neuer_raum — NIE aktionsfreigabe (ein GO kann keine Belege herstellen).
+  # Applicability table (indeterminate, § 2.8): fakt_nachreichen +
+  # neuer_raum — NEVER aktionsfreigabe (a GO cannot produce evidence).
   # -------------------------------------------------------------------------
 
   defp regular_transitions(
@@ -211,7 +210,7 @@ defmodule KomkiPolicy.Remedies do
   defp regular_transitions(_registry, _ctx, _kind, _finding), do: []
 
   # -------------------------------------------------------------------------
-  # Anwendbarkeitstabelle (Freigabe-Zweig, § 4.6)
+  # Applicability table (release branch, § 4.6)
   # -------------------------------------------------------------------------
 
   defp release_transitions(ctx, %{"code" => code})
@@ -222,14 +221,14 @@ defmodule KomkiPolicy.Remedies do
     do: [call_go(call_hash)]
 
   # -------------------------------------------------------------------------
-  # Payload-Helfer
+  # Payload helpers
   # -------------------------------------------------------------------------
 
   defp facts_payload(fact) when is_binary(fact), do: [fact]
   defp facts_payload(_), do: []
 
-  # § 2.8 Payload-Regeln: `neuer_raum.required_bindings` = λ(x) bei admit,
-  # `[]` bei emit, store und transfer (und im Freigabe-Zweig).
+  # § 2.8 payload rules: `neuer_raum.required_bindings` = λ(x) for admit,
+  # `[]` for emit, store and transfer (and in the release branch).
   defp required_bindings_for(%{rule: :admit, object_labels: object_labels}),
     do: Enum.sort(object_labels)
 

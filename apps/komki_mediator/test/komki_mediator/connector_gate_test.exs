@@ -149,6 +149,8 @@ defmodule KomkiMediator.ConnectorGateTest do
       assert pdr["decision"] == "deny"
       assert is_binary(pdr["call_id"])
       refute Map.has_key?(response, "emit_decision_id")
+      # The label the handover was denied under: λ(y) = B_W of the room.
+      assert pdr["checked_label"] == env.room.workspace_bindings
     end
   end
 
@@ -273,6 +275,8 @@ defmodule KomkiMediator.ConnectorGateTest do
     pdrs = records(env)
     assert length(pdrs) == 3
     assert Enum.all?(pdrs, &(&1["decision"] == "error" and &1["rule"] == "emit"))
+    # A pre-check rejection happens before there is a call: no call_id.
+    assert Enum.all?(pdrs, &is_nil(&1["call_id"]))
   end
 
   test "Raum ohne workspace_bindings: Connector-Tools fail-closed", %{env: env} do

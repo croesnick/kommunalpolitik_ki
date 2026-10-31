@@ -203,8 +203,10 @@ Offenlegungsstand `komki-stand/1` (`KomkiMediator.GoStand`,
 `mediator/go/stand.json`). Bei permit gilt commit vor Wirkung:
 `Stand.advance` verbraucht die Nonce, danach folgt das PDR mit `outcome:
 released` (`payload_hash` bindet den Verbrauchs-Vorschlag), danach der
-normale Vollzug. Nach einem GO fuer `transfer` oder `store` vertritt der
-released-PDR den `permitted`-PDR; er steht deshalb vor dem emit-PDR. Ein Nein ergibt `go_refused`, keine Antwort `go_timeout`,
+normale Vollzug. Der released-PDR steht also vor dem emit-PDR, weil er
+direkt nach dem Verbrauch der Nonce geschrieben wird. Nach einem GO fuer
+`transfer` oder `store` vertritt er zugleich den `permitted`-PDR. Ein Nein
+ergibt `go_refused`, keine Antwort `go_timeout`,
 jeweils mit PDR. Die Antwort bleibt das deny samt Katalog, ergaenzt um
 `"go"`. Eine ungueltige Freigabe (falscher Call, abgelaufen, Nonce
 verbraucht) ist ein neues deny des Freigabe-Zweigs.
