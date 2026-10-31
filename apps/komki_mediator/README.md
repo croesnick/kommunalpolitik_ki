@@ -169,15 +169,15 @@ sequenceDiagram
         alt emit deny / indeterminate (ohne GO)
             M->>J: PDR (rule emit, Remedies, call_id)
             M-->>P: Remedy-Katalog, kein Vollzug
-        else emit permit (oder GO: released)
-            M->>J: emit-PDR (outcome permitted, assigned_label = B_W, call_id)
+        else emit permit (nach GO: deny-PDR, dann released)
+            M->>J: emit-PDR (outcome permitted bzw. released, assigned_label = B_W, call_id)
             M->>K: Derive.decide transfer (λ(y), Manifest-Umgebung)
             alt transfer deny / indeterminate (ohne GO)
                 M->>J: PDR (rule transfer, Remedies, call_id)
                 M-->>P: Remedy-Katalog, kein Vollzug
-            else transfer permit (oder GO: released)
-                M->>J: transfer-PDR (outcome permitted, call_id)
-                M->>J: Vorbeleg (rule emit, outcome emitted, decision null, Verweis auf transfer)
+            else transfer permit (nach GO: deny-PDR, dann released)
+                M->>J: transfer-PDR (outcome permitted bzw. released, call_id)
+                M->>J: Vorbeleg (rule emit, outcome emitted, decision null, authorized_by)
                 M->>C: Frame (call_id, op, params, context)
                 C-->>M: result oder error
                 Note over M: Ergebnisform §5.2, Labels aus dem Manifest
@@ -392,9 +392,10 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   in fester Ordnung — der Vermittler bildet keine eigene Remedy-Abbildung,
   Single-Sourcing #115). Die Relaxationsbefugnisse der benannten Bindungen
   (Γ-L1, R.2.2) schluesselt der Vermittler aus dem rohen Registry-Term auf.
-* **Vorbeleg**: nach einem `permit` schreibt der Vermittler zuerst ein PDR
-  mit `outcome: executing` (beim Connector-Weg: der Vorbeleg mit `rule:
-  emit`, `outcome: emitted`). Erst wenn es gesynct im Journal steht, laeuft der Vollzug;
+* **Vorbeleg**: nach einem `permit` schreibt der Vermittler ein PDR mit
+  `outcome: executing` (beim Connector-Weg: nach den Entscheidungs-PDR der
+  Vorbeleg mit `rule: emit`, `outcome: emitted` und `authorized_by`).
+  Erst wenn es gesynct im Journal steht, laeuft der Vollzug;
   scheitert das Schreiben, stoppt die Vermittlung.
 * **Gate 2**: nur nach einem `permit` vollzieht der Connector. Danach
   laufen zwei unabhaengige Pruefungen: der Beweis durch
@@ -443,7 +444,8 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   Antwort ein. `payload_hash` ist der SHA-256 der kanonischen Antwortbasis
   (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/4` (seit #298:
   jede Entscheidung als eigener PDR, Vorbeleg mit `decision: null` und
-  Verweis auf die transfer- bzw. store-Entscheidung); seit `komki-pdr/3`
+  `authorized_by`, den `decision_id`s der emit- und der transfer- bzw.
+  store-Entscheidung); seit `komki-pdr/3`
   zusaetzlich
   `rule` (`admit`/`emit`/`transfer`/`store`), `call_id` (bei
   Connector-Aufrufen die Kennung des Aufrufs, in allen seinen PDR gleich;

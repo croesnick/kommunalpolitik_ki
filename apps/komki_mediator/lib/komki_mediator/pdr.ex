@@ -9,9 +9,11 @@ defmodule KomkiMediator.PDR do
   New in `komki-pdr/4` (ticket #298): every engine decision of a connector
   call is journaled when it is made (`outcome: permitted` for a permit).
   The record before effect (rule `emit`, `outcome: emitted`) is no
-  decision any more: `decision` is `null`, and `intent_id`/`snapshot_id`
-  name the transfer or store decision that let the request leave the
-  room. In `komki-pdr/3` that record was the emit decision itself.
+  decision any more: `decision` is `null`, and the new field
+  `authorized_by` lists the decision_ids of the emit and the transfer or
+  store decision it relies on (each `permitted` or `released`). In
+  `komki-pdr/3` that record was the emit decision itself; `authorized_by`
+  is `null` on all other records.
 
   New in `komki-pdr/3` compared to `komki-pdr/2`:
 
@@ -76,6 +78,7 @@ defmodule KomkiMediator.PDR do
       "snapshot_id" => nil,
       "checked_label" => nil,
       "assigned_label" => nil,
+      "authorized_by" => nil,
       "remedies" => nil,
       "abrufdatum" => DateTime.to_iso8601(DateTime.utc_now()),
       "fassung_id" => Fassung.fassung_id()

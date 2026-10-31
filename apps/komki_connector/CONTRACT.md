@@ -195,9 +195,9 @@ dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bz
    Antwort nennt keinen Vorbeleg (`emit_decision_id`), weil es keinen gibt. Nur wenn beide Schritte erlaubt
    sind (per Permit oder GO): der **Vorbeleg vor Wirkung** (`rule: emit`, `outcome: emitted`, `decision:
    null`, R.11), bevor der Connector aufgerufen wird. Er ist keine Entscheidung, die stehen schon im
-   Journal. Seine `decision_id` ist die `call_id` im Frame, `intent_id` und `snapshot_id` nennen die
-   transfer- bzw. store-Entscheidung, auf die er sich stützt (Empfängerprüfung), sein `payload_hash`
-   bindet die ausgehende Anfrage. Das Antwortfeld `emit_decision_id` (Name aus Kompatibilität) verweist
+   Journal. Seine `decision_id` ist die `call_id` im Frame, `authorized_by` nennt die `decision_id`s der
+   beiden Entscheidungen, auf die er sich stützt (emit und transfer bzw. store samt Empfängerprüfung,
+   jeweils `permitted` oder `released`), sein `payload_hash` bindet die ausgehende Anfrage. Das Antwortfeld `emit_decision_id` (Name aus Kompatibilität) verweist
    auf ihn. PDR-Schema `komki-pdr/4`.
 7. Die `call_id` entsteht nach der Vorprüfung (Schema, B_W). Jeder PDR des Aufrufs trägt sie:
    Entscheidungen, Ablehnungen, GO-Belege (`released`, `go_refused`, `go_timeout`, ein gescheiterter

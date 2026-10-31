@@ -293,6 +293,9 @@ defmodule KomkiMediator.GoTest do
            ]
 
     [call_id] = records |> Enum.map(& &1["call_id"]) |> Enum.uniq()
-    assert Enum.at(records, 4)["decision_id"] == call_id
+    [_, emit_go, _, transfer_go, emitted, _] = records
+    assert emitted["decision_id"] == call_id
+    # The record before effect relies on both GO records.
+    assert emitted["authorized_by"] == [emit_go["decision_id"], transfer_go["decision_id"]]
   end
 end

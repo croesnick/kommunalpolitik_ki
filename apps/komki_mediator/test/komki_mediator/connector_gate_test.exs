@@ -96,11 +96,11 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert emit["checked_label"] == @recherche
     assert emit["session_id"] == "sess-test"
     assert emit["schema"] == "komki-pdr/4"
-    # The record before effect decides nothing and names the handover
-    # decision it relies on (R.11).
+    # The record before effect decides nothing and names the two decisions
+    # it relies on (R.11).
     assert emit["decision"] == nil
-    assert emit["snapshot_id"] == transfer["snapshot_id"]
-    assert emit["intent_id"] == transfer["intent_id"]
+    assert emit["authorized_by"] == [decided["decision_id"], transfer["decision_id"]]
+    assert transfer["authorized_by"] == nil
 
     assert admit["rule"] == "admit"
     assert admit["outcome"] == "admitted"
