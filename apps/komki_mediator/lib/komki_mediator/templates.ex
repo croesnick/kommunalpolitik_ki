@@ -42,7 +42,7 @@ defmodule KomkiMediator.Templates do
       "38e86ed685b8887ddac4eb1976873b105fb1f272ce6c8ff67ac806370c8ecdf7",
       # 8dc75f9: vor #213 (ohne doc-oeffentlich@2)
       "2c7391d3c63e5e06a1910372cb8632026f35f288f750cd3d87b2195db575d835",
-      # vor #298: Bindungen ohne transfer-Regel
+      # before #298: bindings without a transfer rule
       "038a1756f2be26e6a13b844e802d15afbb6b9d65fc5b05a19ffb168066ffcc62"
     ],
     "room.json" => [
@@ -166,13 +166,13 @@ defmodule KomkiMediator.Templates do
     }
   end
 
-  # Connector-Bindungen (Connector-Vertrag §7): admit, emit und transfer
-  # ohne Bedingung. Die Trennung leistet der Empfaengerkreis: vault-vertraulich
-  # liest nur nutzende-person und pi-agent, damit faellt in einem Raum mit
-  # dieser Bindung jede Anfrage an RIS oder Websuche an recipient_inclusion
-  # der Uebergabe (transfer, #298). Die @1-Fassungen tragen transfer erst
-  # seit #298; ein aelterer Label-Store bricht daran ab (R.2.1) und wird
-  # neu angelegt.
+  # Connector bindings (connector contract §7): admit, emit and transfer
+  # without conditions. The recipient set does the separation:
+  # vault-vertraulich is read only by nutzende-person and pi-agent, so in a
+  # room with this binding every request to RIS or web search fails
+  # recipient_inclusion at the handover (transfer, #298). The @1 versions
+  # carry transfer only since #298; an older label store rejects them
+  # (R.2.1) and has to be set aside.
   defp connector_bindings do
     open = %{"admit" => true, "emit" => true, "transfer" => true}
 

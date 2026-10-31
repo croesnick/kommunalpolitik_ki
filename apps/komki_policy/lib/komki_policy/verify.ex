@@ -1,38 +1,37 @@
 defmodule KomkiPolicy.Verify do
   @moduledoc """
-  Unabhaengiger Ableitungspruefer `verify` (CONTRACT.md § 5).
+  Independent derivation checker `verify` (CONTRACT.md § 5).
 
-  Prueft einen vorgelegten Beweisbaum `komki-proof/1` gegen genau die
-  mitgefuehrte Registry, den Snapshot und den Intent. Er ruft `derive`
-  NIEMALS auf und glaubt kein `permit` — die Prueflabel-, Praemissen-,
-  Fakt-, Mengen- und Bedingungspraemissen werden neu berechnet:
+  Checks a presented proof tree `komki-proof/1` against exactly the
+  registry, snapshot and intent passed along. It NEVER calls `derive` and
+  trusts no `permit` — checked label, premises, facts, sets and conditions
+  are recomputed:
 
-  * Sollmenge ist regelabhängig (§ 5 Schritt 3): für `admit` die neun
-    festen Prämissen (§ 4.3, `KomkiPolicy.Derive.required_premises/0`),
-    für `emit` die sieben festen Prämissen plus `label_assignment`-
-    Slot (§ 4.5), für `store` und `transfer` die sieben festen Prämissen
-    mit `label_preservation` (§ 4.7, § 4.8); jeweils plus je
-    `binding_condition` für jedes Element des Prüflabels —
-    `workspace.bindings`, bei `store` und `transfer` λ(y)
-    (`KomkiPolicy.Derive.checked_label/3`); geprüft werden die Ausdrücke
-    der jeweiligen Regel.
-  * Mengen: `KomkiPolicy.Calculus` (R_G / rho_G / l-Subset, § 4.3 Punkt 8).
-  * Neu-Auswertung der Bedingungen: `KomkiPolicy.Evaluator.evaluate/2`.
-  * Expression und `fact_refs` muessen exakt und strukturell dem
-    Registry-AST entsprechen (`KomkiPolicy.Registry.expression_fact_refs/1`);
-    dem Baum wird nicht getraut. Hat die Bindung keinen Eintrag für die
-    Regel, feuert `expression_mismatch`, bevor Neuauswertung oder
-    `fact_refs`-Vergleich greifen (kein Crash, § 5 Schritt 8).
+  * The required set depends on the rule (§ 5 step 3): for `admit` the
+    nine fixed premises (§ 4.3, `KomkiPolicy.Derive.required_premises/0`),
+    for `emit` the seven fixed premises including the `label_assignment`
+    slot (§ 4.5), for `store` and `transfer` the seven fixed premises with
+    `label_preservation` (§ 4.7, § 4.8); each plus one `binding_condition`
+    per element of the checked label — `workspace.bindings`, for `store`
+    and `transfer` λ(y) (`KomkiPolicy.Derive.checked_label/3`); the
+    expressions of the respective rule are checked. The tree's rule must
+    equal the intent's operation (`rule_mismatch`).
+  * Sets: `KomkiPolicy.Calculus` (R_G / rho_G / label subset, § 4.3 item 8).
+  * Re-evaluation of conditions: `KomkiPolicy.Evaluator.evaluate/2`.
+  * Expression and `fact_refs` must match the registry AST exactly and
+    structurally (`KomkiPolicy.Registry.expression_fact_refs/1`); the tree
+    is not trusted. If the binding has no entry for the rule,
+    `expression_mismatch` fires before re-evaluation or the `fact_refs`
+    comparison (no crash, § 5 step 8).
 
-  Pruefschritte laufen in fester Ordnung § 5; Befund-Reihenfolge ist die
-  Pruefordnung. Struktur-Befunde aus Schritt 1–3 beenden die Pruefung
-  sofort (genau dieser Befund, spaetere Schritte laufen nicht mehr).
-  Befunde aus den praedikatsbezogenen Schritten 4–8 ziehen zusaetzlich
-  `conclusion_mismatch` nach sich. Strukturfehler in den Eingabedaten
-  sind Eingabefehler (`{:error, …}`), kein `invalid`-Urteil.
+  Checks run in the fixed order of § 5; findings come in check order.
+  Structural findings from steps 1–3 end the check at once (exactly that
+  finding, later steps do not run). Findings from the predicate steps 4–8
+  additionally add `conclusion_mismatch`. Structure errors in the input
+  data are input errors (`{:error, …}`), not an `invalid` verdict.
 
-  Deterministisch und rein: gleiche Eingaben -> byte-identische
-  kanonische Ausgaben; kein I/O, kein Zustand, keine Uhr.
+  Deterministic and pure: equal inputs -> byte-identical canonical
+  outputs; no I/O, no state, no clock.
   """
 
   alias KomkiPolicy.{Calculus, Context, Derive, Evaluator, Registry, Validations}
@@ -427,8 +426,8 @@ defmodule KomkiPolicy.Verify do
     Enum.reject(findings, &is_nil/1)
   end
 
-  # store und transfer haben dieselbe Prämissenform: ohne diesen Abgleich
-  # ginge ein store-Baum als Beleg für einen transfer-Intent durch.
+  # store and transfer share one premise shape: without this check a store
+  # tree would pass as proof for a transfer intent.
   defp rule_reason(rule, operation) do
     if rule in Derive.proof_rules(),
       do: mismatch_if(rule != operation, "rule_mismatch"),

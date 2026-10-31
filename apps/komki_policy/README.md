@@ -118,8 +118,10 @@ Payload-Formen): `fakt_nachreichen` (facts), `registrierte_transformation`
 `aktionsfreigabe` (scope `call` mit call_hash / scope `object` für die
 Erstklassifikation). Ordnung normativ: fakt < transformation < neuer Raum <
 aktionsfreigabe. Bei `admit` erscheint kein call-GO (bewusste Lücke, § 9);
-bei `emit`, `store` und `transfer` zusätzlich das call-GO für die fünf weichen Blocker. Für
-`indeterminate` nie ein GO — ein GO kann keine Belege herstellen.
+bei `emit`, `store` und `transfer` zusätzlich das call-GO für die fünf weichen Blocker,
+außer die Entscheidung enthält einen unüberbrückbaren Blocker (`workspace_invalid`,
+`label_not_preserved`). Für `indeterminate` nie ein GO — ein GO kann keine
+Belege herstellen.
 
 ### Aktionsfreigabe trennt Urteil und Vollzug (§ 4.6)
 

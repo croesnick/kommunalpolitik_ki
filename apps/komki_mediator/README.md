@@ -203,7 +203,10 @@ Offenlegungsstand `komki-stand/1` (`KomkiMediator.GoStand`,
 `mediator/go/stand.json`). Bei permit gilt commit vor Wirkung:
 `Stand.advance` verbraucht die Nonce, danach folgt das PDR mit `outcome:
 released` (`payload_hash` bindet den Verbrauchs-Vorschlag), danach der
-normale Vollzug. Ein Nein ergibt `go_refused`, keine Antwort `go_timeout`,
+normale Vollzug. Der released-PDR steht also vor dem emit-PDR, weil er
+direkt nach dem Verbrauch der Nonce geschrieben wird. Nach einem GO fuer
+`transfer` oder `store` vertritt er zugleich den `permitted`-PDR. Ein Nein
+ergibt `go_refused`, keine Antwort `go_timeout`,
 jeweils mit PDR. Die Antwort bleibt das deny samt Katalog, ergaenzt um
 `"go"`. Eine ungueltige Freigabe (falscher Call, abgelaufen, Nonce
 verbraucht) ist ein neues deny des Freigabe-Zweigs.
@@ -411,8 +414,9 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   * Vorbeleg: bei permit liegt zuerst der emit-PDR (`outcome: emitted`),
     dann der transfer- bzw. store-PDR (`outcome: permitted`) im Journal,
     **bevor** der Connector gerufen wird. Die `decision_id` des emit-PDR
-    ist die `call_id` im Frame; die PDR des Aufrufs tragen sie, auch ein
-    GO-Beleg (`outcome: released`), nicht aber Ablehnungen.
+    ist die `call_id` im Frame. Jeder PDR des Aufrufs traegt sie, auch
+    Ablehnungen und GO-Belege; nur die Vorpruefung kennt noch keinen
+    Aufruf. Ein in Gate 1 abgelehnter Aufruf hat keinen emit-PDR.
     Bei `vault_write_test` geht `context.assigned_label` (= B_W) mit.
   * Gate 2 `admit`: Ergebnisform §5.2 (geschlossen), Labels allein aus dem
     Manifest (RIS/Web fest `import_labels`; Vault: Labels der Notiz,
@@ -433,8 +437,9 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   Antwort ein. `payload_hash` ist der SHA-256 der kanonischen Antwortbasis
   (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/3`: zusaetzlich
   `rule` (`admit`/`emit`/`transfer`/`store`), `call_id` (bei
-  Connector-Aufrufen die `decision_id` des emit-PDR, in allen PDR des
-  Aufrufs gleich), `session_id` (aus der
+  Connector-Aufrufen die Kennung des Aufrufs, in allen seinen PDR gleich;
+  kommt es zum Vollzug, ist sie die `decision_id` des emit-PDR),
+  `session_id` (aus der
   Umgebung, sonst `null`) und `assigned_label` (emit-Permit).
 
 ## Komponenten

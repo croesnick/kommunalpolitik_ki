@@ -1,51 +1,52 @@
 defmodule KomkiMediator.ConnectorGate do
   @moduledoc """
-  Ein Connector-Aufruf als emit → transfer oder store → Vollzug → admit
-  (Connector-Vertrag §6): drei Entscheidungen der Engine, drei PDR mit
-  derselben `call_id`.
+  A connector call as emit → transfer or store → execution → admit
+  (connector contract §6): three engine decisions. In the plain permit
+  case that is three PDRs; denials and GO records add more. All PDRs of
+  a call share one `call_id`.
 
-  * Vorpruefung: Parameter gegen das Manifest-Schema
-    (`Sidecar.Params.check/3`) und B_W des Raums
-    (`workspace_bindings`). Verstoss oder fehlendes B_W: `decision: error`,
-    PDR, kein Vollzug (fail-closed).
-  * Gate 1a (`emit`, CONTRACT §4.5): der Raum erzeugt die Anfrage y. Die
-    Umgebung ist die des Raums (`room.environment`), die Engine ordnet
-    λ(y) = B_W zu. Objekt `out-<digest12>`, Fakt
-    `output_content_digest = intent_hash`. Kein Permit: Remedies, PDR,
-    kein Vollzug.
-  * Gate 1b: y verlaesst den Raum, entschieden unter λ(y) =
-    `assigned_label` in der Manifest-Umgebung. Lesende Operationen
-    uebergeben die Anfrage an den Connector (`transfer`, CONTRACT §4.8,
-    Ticket #298), schreibende (`kind: :write`) legen y in seinen Speicher
-    (`store`, CONTRACT §4.7, Ticket #205). Hier faellt die
-    Empfaengerpruefung gegen RIS, Websuche oder Vault. Ohne `store`-Regel
-    in Γ ist Speichern ein deny mit Aktionsfreigabe fuer den exakten Call.
-    Der Permit-PDR (`outcome: permitted`) liegt vor dem Vollzug.
-  * PDR je Aufruf: unmittelbar vor dem Vollzug der emit-PDR (`outcome:
-    emitted`), dessen `decision_id` die `call_id` ist, dann der transfer-
-    bzw. store-PDR (`outcome: permitted`), danach admit; alle mit
-    derselben `call_id`, ebenso ein GO-Beleg (`outcome: released`).
-    Ablehnungen in Gate 1 tragen keine `call_id`, weil kein Vollzug folgt.
-  * Vollzug: `Sidecar.Client.call/6` gegen
-    `<connectors_dir>/<id>.sock`. Bei schreibenden Operationen geht
-    `context.assigned_label` (= B_W) mit.
-  * Gate 2 (`admit`): Ergebnisform (§5.2), Labels allein aus dem Manifest
-    (Vault: Labels der Notiz ⊆ Bindungen aus Γ, #211; `write_test`:
-    zurueckgemeldete Labels = `assigned_label`), Objekt `in-<digest12>` in
-    `room.environment`, `Derive.decide` und `Verify.check`. Danach der
-    admit-PDR mit derselben `call_id`.
+  * Pre-check: parameters against the manifest schema
+    (`Sidecar.Params.check/3`) and the room's B_W (`workspace_bindings`).
+    A violation or a missing B_W yields `decision: error`, a PDR and no
+    execution (fail-closed). There is no call yet, so this PDR carries no
+    `call_id`.
+  * Gate 1a (`emit`, CONTRACT §4.5): the room produces the request y. The
+    environment is the room's (`room.environment`); the engine assigns
+    λ(y) = B_W. Object `out-<digest12>`, fact
+    `output_content_digest = intent_hash`. No permit: remedies, PDR, no
+    execution.
+  * Gate 1b: y leaves the room, decided under λ(y) = `assigned_label` in
+    the manifest environment. Read operations hand the request to the
+    connector (`transfer`, CONTRACT §4.8, ticket #298); write operations
+    (`kind: :write`) put y into its store (`store`, CONTRACT §4.7, ticket
+    #205). This is where the recipient check against RIS, web search or
+    vault happens. Without a `store` rule in Γ, writing is a deny with an
+    action release for the exact call.
+  * PDRs per call: every PDR after the pre-check carries the call's
+    `call_id`, denials and GO records included. Right before execution
+    the journal gets the emit PDR (`outcome: emitted`, its `decision_id`
+    is the `call_id` sent in the frame), then the Gate 1b PDR (`outcome:
+    permitted`). The admit PDR follows the execution.
+  * Execution: `Sidecar.Client.call/6` against
+    `<connectors_dir>/<id>.sock`. Write operations send
+    `context.assigned_label` (= B_W).
+  * Gate 2 (`admit`): result shape (§5.2), labels from the manifest only
+    (vault: note labels ⊆ bindings in Γ, #211; `write_test`: returned
+    labels = `assigned_label`), object `in-<digest12>` in
+    `room.environment`, `Derive.decide` and `Verify.check`.
 
-  Die Selbstauskunft des Connectors wird nie ueber das Manifest hinaus
-  geglaubt. Connector-Fehler ergeben `admitted: false` mit PDR.
+  The connector's self-report is never trusted beyond the manifest.
+  Connector errors yield `admitted: false` with a PDR.
 
-  GO (Ticket #98): Bietet der Katalog einer Ablehnung in Gate 1 eine
-  Aktionsfreigabe fuer den exakten Call an und ist `env.go` gesetzt, fragt
-  der Vermittler die nutzende Person, sofern eine Session zuhoert
-  (`KomkiMediator.Go`). Eine vorgelegte
-  Freigabe entscheidet der Freigabe-Zweig der Engine; nach einem Permit
-  committet `KomkiMediator.GoStand` die Nonce und ein PDR
-  (`outcome: released`) belegt das GO, beides vor dem Vollzug. Nein,
-  keine Antwort oder eine ungueltige Freigabe lassen es beim deny.
+  GO (ticket #98): if the catalog of a Gate 1 denial offers an action
+  release for the exact call and `env.go` is set, the mediator asks the
+  person, provided a session is listening (`KomkiMediator.Go`). The
+  engine's release branch decides a presented release; on permit
+  `KomkiMediator.GoStand` commits the nonce and a PDR (`outcome:
+  released`) records the GO right away, both before any effect. After a
+  transfer or store GO that PDR stands for the Gate 1b decision, so no
+  `permitted` PDR follows. No, no answer or an invalid release leave the
+  deny in place.
   """
 
   alias KomkiConnector.{Manifest, Text}
@@ -54,7 +55,7 @@ defmodule KomkiMediator.ConnectorGate do
   alias KomkiPolicy.{Derive, JSON, Verify}
   alias Sidecar.{Client, Params}
 
-  @doc "Vermittelt einen Aufruf des Connector-Tools `tool` (z. B. `\"ris_search\"`)."
+  @doc "Mediates a call of the connector tool `tool` (e.g. `\"ris_search\"`)."
   @spec call(Gate.env(), String.t(), map()) :: map()
   def call(env, tool, params) do
     {:ok, manifest, op} = Manifest.by_tool(tool)
@@ -80,10 +81,10 @@ defmodule KomkiMediator.ConnectorGate do
   end
 
   # -------------------------------------------------------------------------
-  # Vorpruefung
+  # Pre-check
   # -------------------------------------------------------------------------
 
-  # Die deutschen Parameter-Fehler erreichen das Modell (Gate-2-Texte).
+  # The German parameter errors reach the model (Gate 2 texts).
   defp check_params(spec, rendered) do
     case Params.check(spec.params, rendered, Text) do
       {:ok, checked} -> {:ok, checked}
@@ -100,7 +101,7 @@ defmodule KomkiMediator.ConnectorGate do
     do: Hash.sha256_hex(JSON.canonical(%{"tool" => tool, "params" => params}))
 
   # -------------------------------------------------------------------------
-  # Gate 1a: emit im Raum
+  # Gate 1a: emit inside the room
   # -------------------------------------------------------------------------
 
   defp emit(env, call) do
@@ -136,8 +137,8 @@ defmodule KomkiMediator.ConnectorGate do
   end
 
   # -------------------------------------------------------------------------
-  # Gate 1b: transfer an den Connector (§4.8) oder store in seinen
-  # Speicher (§4.7), beide unter λ(y) in der Manifest-Umgebung
+  # Gate 1b: transfer to the connector (§4.8) or store into its store
+  # (§4.7), both under λ(y) in the manifest environment
   # -------------------------------------------------------------------------
 
   defp handover(env, call, emit) do
@@ -159,12 +160,12 @@ defmodule KomkiMediator.ConnectorGate do
       })
 
     intent = intent(env.room, rule, "intent-" <> rule <> "-" <> d12, object)
-    # Nach einer Freigabe belegt der released-PDR die Entscheidung.
-    released = fn _decision -> execute(env, call, emit, fn -> :ok end) end
+    # After a GO the released PDR already records the Gate 1b decision.
+    released = fn _decision -> execute(env, call, emit, nil) end
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
-        execute(env, call, emit, handover_permitted(env, call, decision, snapshot, intent))
+        execute(env, call, emit, handover_pdr(call, decision, snapshot, intent))
 
       other ->
         response = not_permitted(env, call, rule, nil, intent, snapshot, other)
@@ -172,15 +173,9 @@ defmodule KomkiMediator.ConnectorGate do
     end
   end
 
-  # Vorbeleg vor Wirkung (R.11): die transfer- bzw. store-Entscheidung
-  # liegt im Journal, bevor die Anfrage den Vermittler verlaesst. Liefert
-  # den Schreibschritt, den `execute/4` nach dem emit-PDR ausfuehrt.
-  defp handover_permitted(env, call, decision, snapshot, intent) do
-    fn -> append_handover(env, call, decision, snapshot, intent) end
-  end
-
-  defp append_handover(env, call, decision, snapshot, intent) do
-    PDR.append(env, %{
+  # The Gate 1b PDR; `execute/4` writes it right after the emit PDR.
+  defp handover_pdr(call, decision, snapshot, intent) do
+    %{
       "decision_id" => PDR.new_id(),
       "call_id" => call.call_id,
       "tool" => call.tool,
@@ -192,17 +187,16 @@ defmodule KomkiMediator.ConnectorGate do
       "intent_id" => intent["intent_id"],
       "snapshot_id" => snapshot["snapshot_id"],
       "checked_label" => decision["checked_label"]
-    })
+    }
   end
 
   # -------------------------------------------------------------------------
-  # GO: Aktionsfreigabe fuer den exakten Call (Ticket #98, fuer store #205,
-  # fuer transfer #298)
+  # GO: action release for the exact call (ticket #98, store #205,
+  # transfer #298)
   # -------------------------------------------------------------------------
 
-  # `then` setzt nach einem Permit des Freigabe-Zweigs fort: nach emit wie
-  # nach einem normalen emit-Permit, nach transfer oder store mit dem
-  # Vollzug.
+  # `then` continues after a permit of the release branch: after emit like a
+  # normal emit permit, after transfer or store with the execution.
   defp maybe_go(%{go: %{} = go} = env, call, snapshot, intent, response, then) do
     case {Go.offered(response["remedies"]), Go.listening?(go.dir)} do
       {call_hash, true} when is_binary(call_hash) ->
@@ -223,12 +217,12 @@ defmodule KomkiMediator.ConnectorGate do
       "operation" => intent["operation"],
       "tool" => call.tool,
       "params" => call.params,
-      # Fuer die Vorschau je Code einmal (store, transfer: ein Blocker je Bindung).
+      # One entry per code for the preview (store, transfer: one blocker per binding).
       "blockers" => response["remedies"] |> Enum.map(& &1["code"]) |> Enum.uniq(),
       "object" => intent["object"],
       "workspace" => intent["workspace"],
-      # Das Release-Schema verlangt reines Hex; die Engine rechnet den
-      # Call-Hash ohnehin selbst aus dem Fakt nach.
+      # The release schema wants plain hex; the engine recomputes the call
+      # hash from the fact anyway.
       "content_digest" => String.replace_prefix(call.intent_hash, "sha256:", ""),
       "scope" => GoStand.current()["scope"],
       "authority" => Go.authority()
@@ -236,8 +230,8 @@ defmodule KomkiMediator.ConnectorGate do
 
     case Go.await(go, request) do
       {:release, release} -> released(env, call, {snapshot, intent, then}, release)
-      :refused -> go_not_given(env, call, intent, response, "go_refused")
-      :timeout -> go_not_given(env, call, intent, response, "go_timeout")
+      :refused -> go_not_given(env, call, {snapshot, intent}, response, "go_refused")
+      :timeout -> go_not_given(env, call, {snapshot, intent}, response, "go_timeout")
     end
   end
 
@@ -257,9 +251,9 @@ defmodule KomkiMediator.ConnectorGate do
     end
   end
 
-  # Commit vor Wirkung (CONTRACT §4.6, B.8): erst die Nonce verbrauchen,
-  # dann der PDR, dann der Vollzug. Faellt ein Schritt aus, folgt keiner
-  # der spaeteren.
+  # Commit before effect (CONTRACT §4.6, B.8): consume the nonce first,
+  # then the PDR, then the execution. If a step fails, none of the later
+  # ones follows.
   defp commit_release(env, call, {snapshot, intent, then}, decision, proposal) do
     case GoStand.advance(proposal) do
       {:ok, _stand} ->
@@ -274,24 +268,43 @@ defmodule KomkiMediator.ConnectorGate do
           "payload_hash" => PDR.payload_hash(proposal),
           "intent_id" => intent["intent_id"],
           "snapshot_id" => snapshot["snapshot_id"],
+          "checked_label" => decision["checked_label"],
           "assigned_label" => decision["assigned_label"]
         })
 
         then.(decision)
 
       {_refused_or_error, reason} ->
-        refused(env, call.tool, call.intent_hash, "GO nicht committet: " <> inspect(reason))
+        go_not_committed(env, call, intent, snapshot, reason)
     end
   end
 
-  # Nein oder keine Antwort: es bleibt beim deny, der Katalog bleibt
-  # sichtbar; das PDR haelt fest, dass gefragt wurde.
-  defp go_not_given(env, call, intent, response, outcome) do
+  # The nonce could not be consumed (e.g. a second terminal was faster):
+  # no effect, and the PDR stays linked to the call.
+  defp go_not_committed(env, call, intent, snapshot, reason) do
+    error_out(
+      env,
+      call.tool,
+      call.intent_hash,
+      intent["operation"],
+      "GO nicht committet: " <> inspect(reason),
+      %{
+        "call_id" => call.call_id,
+        "intent_id" => intent["intent_id"],
+        "snapshot_id" => snapshot["snapshot_id"]
+      }
+    )
+  end
+
+  # No or no answer: the deny stands and the catalog stays visible; the
+  # PDR records that the person was asked.
+  defp go_not_given(env, call, {snapshot, intent}, response, outcome) do
     hinweis = if outcome == "go_refused", do: :go_refused, else: :go_timeout
     response = Map.put(response, "hinweis", Hinweis.text(hinweis))
 
     PDR.append(env, %{
       "decision_id" => PDR.new_id(),
+      "call_id" => call.call_id,
       "tool" => call.tool,
       "rule" => intent["operation"],
       "decision" => "deny",
@@ -299,28 +312,30 @@ defmodule KomkiMediator.ConnectorGate do
       "admitted" => false,
       "intent_hash" => call.intent_hash,
       "payload_hash" => PDR.payload_hash(response),
-      "intent_id" => intent["intent_id"]
+      "intent_id" => intent["intent_id"],
+      "snapshot_id" => snapshot["snapshot_id"]
     })
 
     Map.put(response, "go", if(outcome == "go_refused", do: "abgelehnt", else: "keine Antwort"))
   end
 
   # -------------------------------------------------------------------------
-  # Vollzug
+  # Execution
   # -------------------------------------------------------------------------
 
-  # `handed` schreibt nach dem emit-PDR den Beleg von Gate 1b, beides vor
-  # dem Vollzug und in der Reihenfolge der Entscheidungen.
-  defp execute(env, call, emit, handed) do
+  # `handover_pdr` is the permitted Gate 1b PDR, or nil after a GO (the
+  # released PDR is already in the journal). It follows the emit PDR, both
+  # before the execution.
+  defp execute(env, call, emit, handover_pdr) do
     %{decision: decision, snapshot: snapshot, intent: intent} = emit
     call_id = call.call_id
 
     context =
       if call.kind == :write, do: %{"assigned_label" => decision["assigned_label"]}, else: %{}
 
-    # Vorbeleg vor Wirkung (R.11): der emit-PDR liegt im Journal, bevor
-    # die Anfrage den Vermittler verlaesst. payload_hash bindet die
-    # ausgehende Anfrage (Operation, Parameter, Kontext).
+    # Record before effect (R.11): the emit PDR is in the journal before
+    # the request leaves the mediator. payload_hash binds the outgoing
+    # request (operation, parameters, context).
     PDR.append(env, %{
       "decision_id" => call_id,
       "call_id" => call_id,
@@ -338,7 +353,7 @@ defmodule KomkiMediator.ConnectorGate do
       "assigned_label" => decision["assigned_label"]
     })
 
-    handed.()
+    if handover_pdr, do: PDR.append(env, handover_pdr)
 
     case connector_call(env, call, call_id, context) do
       {:ok, result} -> admit(env, call, call_id, decision, result)
@@ -346,8 +361,8 @@ defmodule KomkiMediator.ConnectorGate do
     end
   end
 
-  # Ohne konfiguriertes Connector-Verzeichnis ist kein Connector
-  # erreichbar; der Aufruf faellt als Connector-Fehler aus.
+  # Without a configured connector directory no connector is reachable;
+  # the call fails as a connector error.
   defp connector_call(env, call, call_id, context) do
     case Map.get(env, :connectors_dir) do
       dir when is_binary(dir) ->
@@ -393,11 +408,11 @@ defmodule KomkiMediator.ConnectorGate do
     end
   end
 
-  # Suchtreffer ausserhalb von B_W fallen VOR Gate 2 still heraus
-  # (Labbook L-109): sonst waere "deny" gegenueber "permit, 0 Treffer" ein
-  # Existenz-Orakel fuer vertrauliche Inhalte. Die Antwort sieht dann aus
-  # wie eine Suche ohne diese Treffer; ihre Anzahl verraet nichts.
-  # Einzelzugriffe (`read`) bleiben eine Entscheidung mit Remedies.
+  # Search hits outside B_W are dropped silently BEFORE Gate 2 (labbook
+  # L-109): otherwise "deny" versus "permit, 0 hits" would be an existence
+  # oracle for confidential content. The answer then looks like a search
+  # without those hits; their number reveals nothing. Single reads
+  # (`read`) stay a decision with remedies.
   defp visible(%{manifest: %{id: "vault"}, op: "search"}, %Room{workspace_bindings: b_w}, result) do
     Map.update!(result, "results", fn hits ->
       Enum.filter(hits, fn hit -> Enum.all?(hit["labels"], &(&1 in b_w)) end)
@@ -413,7 +428,7 @@ defmodule KomkiMediator.ConnectorGate do
     end
   end
 
-  # Labels aus dem Manifest (RIS, Web) oder aus Γ (Vault, #211): §6.2.2, §6.3.
+  # Labels from the manifest (RIS, web) or from Γ (vault, #211): §6.2.2, §6.3.
   defp labels(_env, %{kind: :write}, emit_decision, result) do
     assigned = emit_decision["assigned_label"]
 
@@ -422,9 +437,9 @@ defmodule KomkiMediator.ConnectorGate do
       else: {:redact, "zurueckgemeldete Labels weichen von assigned_label ab", ["label_mismatch"]}
   end
 
-  # Vault-Notizen tragen ihre Labels selbst (Frontmatter). Seit Γ aus dem
-  # Label-Store kommt (#208), gilt jede Bindung aus Γ; ein Label ausserhalb
-  # haelt die Antwort zurueck (Ticket #211).
+  # Vault notes carry their own labels (front matter). Since Γ comes from
+  # the label store (#208), any binding in Γ is accepted; a label outside
+  # it withholds the answer (ticket #211).
   defp labels(env, %{manifest: %{id: "vault"}, op: op}, _emit_decision, result) do
     notes =
       if op == "search", do: Enum.map(result["results"], & &1["labels"]), else: [result["labels"]]
@@ -439,7 +454,7 @@ defmodule KomkiMediator.ConnectorGate do
   defp labels(_env, %{manifest: manifest}, _emit_decision, _result),
     do: {:ok, Enum.sort(manifest.import_labels)}
 
-  # Eine Notiz traegt mindestens ein Label, und alle sind Bindungen aus Γ.
+  # A note carries at least one label, and all of them are bindings in Γ.
   defp note_labels_ok?(labels, bindings),
     do: labels != [] and Enum.all?(labels, &(&1 in bindings))
 
@@ -459,7 +474,7 @@ defmodule KomkiMediator.ConnectorGate do
   end
 
   # -------------------------------------------------------------------------
-  # Ausgaenge (jeweils mit PDR)
+  # Outcomes (each with a PDR)
   # -------------------------------------------------------------------------
 
   defp admitted(env, call, call_id, result, labels, decision, snapshot, intent) do
@@ -494,10 +509,18 @@ defmodule KomkiMediator.ConnectorGate do
     Map.put(base, "payload_hash", payload_hash)
   end
 
-  # deny/indeterminate (Remedies) oder Entscheidungsfehler, in Gate 1
-  # (call_id nil, kein Vollzug) oder Gate 2 (Inhalt bleibt zurueck).
-  defp not_permitted(env, call, rule, call_id, intent, snapshot, outcome) do
+  # deny/indeterminate (remedies) or a decision error, in Gate 1 (no
+  # execution, `executed` is nil) or Gate 2 (content withheld, `executed`
+  # is the call_id of the emit PDR). The PDR always carries the call_id;
+  # the answer names an emit PDR only if there is one.
+  defp not_permitted(env, call, rule, executed, intent, snapshot, outcome) do
     decision_id = PDR.new_id()
+
+    checked_label =
+      case outcome do
+        {:ok, decision} -> decision["checked_label"]
+        _ -> nil
+      end
 
     {pdr_decision, response} =
       case outcome do
@@ -524,11 +547,11 @@ defmodule KomkiMediator.ConnectorGate do
         "decision_id" => decision_id,
         "registry_id" => env.gamma.registry_id
       })
-      |> put_emit_id(call_id)
+      |> put_emit_id(executed)
 
     PDR.append(env, %{
       "decision_id" => decision_id,
-      "call_id" => call_id,
+      "call_id" => call.call_id,
       "tool" => call.tool,
       "rule" => rule,
       "decision" => pdr_decision,
@@ -539,6 +562,7 @@ defmodule KomkiMediator.ConnectorGate do
       "payload_hash" => PDR.payload_hash(response),
       "intent_id" => intent["intent_id"],
       "snapshot_id" => snapshot["snapshot_id"],
+      "checked_label" => checked_label,
       "remedies" => response["remedies"]
     })
 
@@ -602,34 +626,42 @@ defmodule KomkiMediator.ConnectorGate do
     response
   end
 
-  # Vorpruefung gescheitert (Schema, fehlendes B_W): keine Entscheidung
-  # der Engine, kein Vollzug.
-  defp refused(env, tool, intent_hash, detail) do
+  # Pre-check failed (schema, missing B_W): no call yet, no engine
+  # decision, no execution.
+  defp refused(env, tool, intent_hash, detail),
+    do: error_out(env, tool, intent_hash, "emit", detail, %{})
+
+  # An error without an engine decision: error answer plus PDR. `link`
+  # adds the call's identifiers once there is a call.
+  defp error_out(env, tool, intent_hash, rule, detail, link) do
     decision_id = PDR.new_id()
 
     response = %{
       "decision" => "error",
-      "rule" => "emit",
+      "rule" => rule,
       "decision_id" => decision_id,
       "detail" => detail
     }
 
-    PDR.append(env, %{
-      "decision_id" => decision_id,
-      "tool" => tool,
-      "rule" => "emit",
-      "decision" => "error",
-      "outcome" => "error",
-      "admitted" => false,
-      "intent_hash" => intent_hash,
-      "payload_hash" => PDR.payload_hash(response)
-    })
+    PDR.append(
+      env,
+      Map.merge(link, %{
+        "decision_id" => decision_id,
+        "tool" => tool,
+        "rule" => rule,
+        "decision" => "error",
+        "outcome" => "error",
+        "admitted" => false,
+        "intent_hash" => intent_hash,
+        "payload_hash" => PDR.payload_hash(response)
+      })
+    )
 
     response
   end
 
   # -------------------------------------------------------------------------
-  # Bausteine
+  # Building blocks
   # -------------------------------------------------------------------------
 
   defp put_emit_id(response, nil), do: response

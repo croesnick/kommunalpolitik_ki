@@ -1,9 +1,9 @@
 defmodule KomkiMediator.GoTest do
-  # Ticket #98: GO fuer eine blockierte Ausgabe. Raum vertraulich, die
-  # Uebergabe von web_search an die Websuche (transfer, #298) wird mit
-  # recipient_not_allowed abgelehnt; der Katalog bietet ein Call-GO.
-  # Ein Testprozess spielt die nutzende Person und antwortet ueber dieselben
-  # Funktionen wie `komki go`.
+  # Ticket #98: GO for a blocked output. Room vertraulich: handing
+  # web_search to the web search (transfer, #298) is denied with
+  # recipient_not_allowed; the catalog offers a call GO.
+  # A test process plays the person and answers through the same functions
+  # as `komki go`.
   use ExUnit.Case, async: false
 
   alias KomkiMediator.{ConnectorGate, FakeConnector, Go, GoStand, TestHelpers}
@@ -91,13 +91,15 @@ defmodule KomkiMediator.GoTest do
     assert "recipient_not_allowed" in request["blockers"]
     assert request["operation"] == "transfer"
 
-    # transfer-deny -> GO-Commit -> emit -> admit; der Commit liegt vor dem
-    # Vollzug und traegt die call_id des Aufrufs
+    # Transfer deny, then the GO commit (released) right after the nonce,
+    # then the emit record, all before execution; every record carries the
+    # call's call_id.
     assert outcomes(env) == ["not_admitted", "released", "emitted", "admitted"]
 
-    [_deny, released, emitted, _admit] = TestHelpers.journal_records(env.journal_path)
+    [deny, released, emitted, admit] = TestHelpers.journal_records(env.journal_path)
     assert released["rule"] == "transfer"
-    assert released["call_id"] == emitted["decision_id"]
+    assert released["checked_label"] == emitted["assigned_label"]
+    assert Enum.all?([deny, released, admit], &(&1["call_id"] == emitted["decision_id"]))
     assert map_size(GoStand.current()["consumed"]) == 1
     assert Go.pending(go_dir) == []
   end
@@ -138,6 +140,12 @@ defmodule KomkiMediator.GoTest do
     assert "recipient_not_allowed" in Enum.map(response["remedies"], & &1["code"])
     refute_received :web_called
     assert outcomes(env) == ["not_admitted", "go_refused"]
+
+    # Both records belong to the same call and snapshot (CONTRACT §6.1 step 7).
+    [deny, refused] = TestHelpers.journal_records(env.journal_path)
+    assert is_binary(refused["call_id"])
+    assert refused["call_id"] == deny["call_id"]
+    assert refused["snapshot_id"] == deny["snapshot_id"]
   end
 
   test "keine Antwort bis zum Ablauf: deny, kein stiller Fallback", %{env: env} do
@@ -189,8 +197,17 @@ defmodule KomkiMediator.GoTest do
 
     assert response["decision"] == "error"
     assert response["detail"] =~ "GO nicht committet"
+    assert response["rule"] == "transfer"
     refute_received :web_called
     assert map_size(GoStand.current()["consumed"]) == 0
+
+    # The failed commit stays linked to its call (#298 review).
+    [deny, failed] = TestHelpers.journal_records(env.journal_path)
+    assert failed["rule"] == "transfer"
+    assert failed["outcome"] == "error"
+    assert failed["call_id"] == deny["call_id"]
+    assert failed["snapshot_id"] == deny["snapshot_id"]
+    assert is_binary(failed["call_id"])
   end
 
   test "HITL load: ein GO je geblockter Operation", %{env: env, go_dir: go_dir} do

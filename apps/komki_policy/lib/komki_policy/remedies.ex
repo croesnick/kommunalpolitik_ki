@@ -1,30 +1,31 @@
 defmodule KomkiPolicy.Remedies do
   @moduledoc """
-  Remedy-Katalog (CONTRACT.md § 2.8, APPA Theorem 5).
+  Remedy catalog (CONTRACT.md § 2.8, APPA theorem 5).
 
-  Zu jedem Blocker und jedem fehlenden Beleg ein begrenzter,
-  aufzählbarer Katalog legaler Fortsetzungen aus **genau vier
-  Übergangstypen** (Enum-Werte nach Ticketvorgabe deutsch):
+  For every blocker and every missing piece of evidence a bounded,
+  enumerable catalog of legal continuations made of **exactly four
+  transition types** (enum values in German, as specified by the ticket):
   `fakt_nachreichen`, `registrierte_transformation`, `neuer_raum`,
   `aktionsfreigabe`.
 
-  Normative Ordnung: `fakt_nachreichen` < `registrierte_transformation` <
-  `neuer_raum` < `aktionsfreigabe` — nicht-verletzende Fortsetzungen VOR
-  GO-Einträgen; ein GO steht nie an erster Stelle (kein "compensatory
-  leakage"). Der Katalog ist reine Ausgabe: keine Eingabe akzeptiert ihn,
-  keine Fortsetzung wird ausgeführt; er erzeugt keine Autorität
-  (CONTRACT § 2.8, RFC 0003 R.6).
+  Normative order: `fakt_nachreichen` < `registrierte_transformation` <
+  `neuer_raum` < `aktionsfreigabe` — non-violating continuations BEFORE GO
+  entries; a GO never comes first (no "compensatory leakage"). The
+  catalog is output only: no input accepts it, no continuation is
+  executed, and it creates no authority (CONTRACT § 2.8, RFC 0003 R.6).
 
-  Anwendbarkeit (deny, § 2.8): admit-Grundtabelle ohne call-GO; `emit`,
-  `store` und `transfer` zusätzlich `aktionsfreigabe` scope `call` für die fünf weichen Blocker
-  (`workspace_invalid` bleibt unüberbrückbar — ein GO belebt keinen
-  ungültigen Vertrag). Für `indeterminate` nur `fakt_nachreichen` +
-  `neuer_raum` — ein GO kann keine Belege herstellen. Freigabe-Zweig
-  (§ 4.6): je Release-Blocker genau ein call-GO-Eintrag mit dem **neu
-  berechneten** korrekten call_hash; `workspace_invalid` behält seinen
-  `neuer_raum`-Eintrag. `label_not_preserved` (`store`, `transfer`) bekommt nur
-  `neuer_raum`, auch im Freigabe-Zweig: ein GO stellt keine entfernte
-  Bindung wieder her.
+  Applicability (deny, § 2.8): the admit base table without a call GO;
+  `emit`, `store` and `transfer` additionally get `aktionsfreigabe` scope
+  `call` for the five soft blockers. `workspace_invalid` and
+  `label_not_preserved` (`store`, `transfer`) are unbridgeable and get
+  `neuer_raum` only — a GO neither revives an invalid contract nor
+  restores a dropped binding. If one of them is among the findings, no
+  finding of that decision offers a call GO, since the release branch
+  would deny it again. For `indeterminate` only `fakt_nachreichen` +
+  `neuer_raum` — a GO cannot produce evidence. Release branch (§ 4.6):
+  exactly one call-GO entry per release blocker with the **recomputed**
+  correct call_hash; the unbridgeable blockers keep their `neuer_raum`
+  entry.
   """
 
   alias KomkiPolicy.Calculus
@@ -32,8 +33,10 @@ defmodule KomkiPolicy.Remedies do
 
   @type rule_kind() :: :admit | :emit | :store | :transfer | :release
 
-  # Regelzweige mit Ausgabeobjekt: call-GO im Katalog.
+  # Rule branches with an output object: call GO in the catalog.
   @output_kinds [:emit, :store, :transfer]
+
+  @unbridgeable ["workspace_invalid", "label_not_preserved"]
 
   @transition_order [
     "fakt_nachreichen",
@@ -54,32 +57,58 @@ defmodule KomkiPolicy.Remedies do
   @type finding() :: %{required(String.t()) => String.t() | nil}
 
   @doc """
-  Baut die `remedies`-Liste (deny-Form: `code`/`binding`/`condition`/
-  `transitions`; indeterminate-Form: `code`/`fact`/`binding`/
-  `transitions`) in derselben Ordnung wie die übergebenen Befunde. Reine
-  Funktion von (registry, context, finding-Liste).
+  Builds the `remedies` list (deny shape: `code`/`binding`/`condition`/
+  `transitions`; indeterminate shape: `code`/`fact`/`binding`/
+  `transitions`) in the order of the given findings. A pure function of
+  (registry, context, findings).
   """
   @spec catalog(Registry.compiled(), context(), [finding()]) :: [map()]
 
-  # `rule_kind` trägt der Kontext bereits (`ctx.rule`); der Katalog ist reine
-  # Funktion von (registry, context, finding-Liste).
+  # The context already carries `rule_kind` (`ctx.rule`); the catalog is a
+  # pure function of (registry, context, findings).
   def catalog(registry, %{rule: rule_kind} = ctx, findings)
       when rule_kind in [:admit | @output_kinds] do
-    Enum.map(findings, fn finding ->
+    findings
+    |> Enum.map(fn finding ->
       Map.merge(finding, %{
         "transitions" => ordered(regular_transitions(registry, ctx, rule_kind, finding))
       })
     end)
+    |> withhold_call_go(ctx)
   end
 
   def catalog(_registry, %{rule: :release} = ctx, findings) do
-    Enum.map(findings, fn finding ->
+    findings
+    |> Enum.map(fn finding ->
       Map.merge(finding, %{"transitions" => ordered(release_transitions(ctx, finding))})
     end)
+    |> withhold_call_go(ctx)
+  end
+
+  # A GO never bridges the unbridgeable blockers; the release branch denies
+  # them again. So no finding of such a decision may offer a call GO: the
+  # person would be asked for a GO that cannot take effect (#298 review).
+  # A finding left without transitions gets `neuer_raum`, so every
+  # catalog entry stays non-empty.
+  defp withhold_call_go(entries, ctx) do
+    if Enum.any?(entries, &(&1["code"] in @unbridgeable)) do
+      Enum.map(entries, fn entry ->
+        Map.update!(entry, "transitions", &drop_call_go(&1, ctx))
+      end)
+    else
+      entries
+    end
+  end
+
+  defp drop_call_go(transitions, ctx) do
+    case Enum.reject(transitions, &(&1["type"] == "aktionsfreigabe" and &1["scope"] == "call")) do
+      [] -> [newer_space(ctx, required_bindings_for(ctx))]
+      kept -> kept
+    end
   end
 
   # -------------------------------------------------------------------------
-  # Übergangs-Bausteine (geschlossene Payload-Formen § 2.8)
+  # Transition building blocks (closed payload shapes, § 2.8)
   # -------------------------------------------------------------------------
 
   defp fakt(fact_names), do: %{"type" => "fakt_nachreichen", "facts" => fact_names}
@@ -104,12 +133,11 @@ defmodule KomkiPolicy.Remedies do
   defp object_go(object_ref),
     do: %{"type" => "aktionsfreigabe", "scope" => "object", "object" => object_ref}
 
-  # Ordnung: normative Reihenfolge, stabil innerhalb jedes Typs (die
-  # Bausteine erscheinen in ihrer Konstruktionsordnung, Transformationen
-  # aufsteigend nach Kennung). § 2.8 Payload-Regeln: ein
-  # `fakt_nachreichen` ohne benennbares Feld (facts: [] — z. B.
-  # `binding_condition_false` bei `condition: null`, Literal-Regel)
-  # entfällt; es gibt nichts autoritativ nachzureichen.
+  # Order: the normative order, stable within each type (blocks appear in
+  # construction order, transformations ascending by id). § 2.8 payload
+  # rules: a `fakt_nachreichen` without a nameable field (facts: [] — e.g.
+  # `binding_condition_false` with `condition: null`, a literal rule) is
+  # dropped; there is nothing to supply with authority.
   defp ordered(transitions) do
     @transition_order
     |> Enum.flat_map(fn type ->
@@ -122,16 +150,16 @@ defmodule KomkiPolicy.Remedies do
   defp vacant_fakt?(_transition), do: false
 
   # -------------------------------------------------------------------------
-  # Anwendbarkeitstabelle (deny, § 2.8)
+  # Applicability table (deny, § 2.8)
   # -------------------------------------------------------------------------
 
   defp regular_transitions(_registry, ctx, _kind, %{"code" => "object_quarantine"}),
     do: [object_go(ctx.object_ref)]
 
-  # workspace_invalid: kein GO-Eintrag, auch nicht bei emit/store/transfer;
-  # label_not_preserved ebenso.
+  # workspace_invalid and label_not_preserved: no GO entry, not even for
+  # emit/store/transfer.
   defp regular_transitions(_registry, ctx, _kind, %{"code" => code})
-       when code in ["workspace_invalid", "label_not_preserved"],
+       when code in @unbridgeable,
        do: [newer_space(ctx, required_bindings_for(ctx))]
 
   defp regular_transitions(_registry, ctx, kind, %{
@@ -162,8 +190,8 @@ defmodule KomkiPolicy.Remedies do
   end
 
   # -------------------------------------------------------------------------
-  # Anwendbarkeitstabelle (indeterminate, § 2.8): fakt nachreichen +
-  # neuer_raum — NIE aktionsfreigabe (ein GO kann keine Belege herstellen).
+  # Applicability table (indeterminate, § 2.8): fakt_nachreichen +
+  # neuer_raum — NEVER aktionsfreigabe (a GO cannot produce evidence).
   # -------------------------------------------------------------------------
 
   defp regular_transitions(
@@ -182,25 +210,25 @@ defmodule KomkiPolicy.Remedies do
   defp regular_transitions(_registry, _ctx, _kind, _finding), do: []
 
   # -------------------------------------------------------------------------
-  # Anwendbarkeitstabelle (Freigabe-Zweig, § 4.6)
+  # Applicability table (release branch, § 4.6)
   # -------------------------------------------------------------------------
 
   defp release_transitions(ctx, %{"code" => code})
-       when code in ["workspace_invalid", "label_not_preserved"],
+       when code in @unbridgeable,
        do: [newer_space(ctx, [])]
 
   defp release_transitions(%{call_hash: call_hash}, _finding),
     do: [call_go(call_hash)]
 
   # -------------------------------------------------------------------------
-  # Payload-Helfer
+  # Payload helpers
   # -------------------------------------------------------------------------
 
   defp facts_payload(fact) when is_binary(fact), do: [fact]
   defp facts_payload(_), do: []
 
-  # § 2.8 Payload-Regeln: `neuer_raum.required_bindings` = λ(x) bei admit,
-  # `[]` bei emit, store und transfer (und im Freigabe-Zweig).
+  # § 2.8 payload rules: `neuer_raum.required_bindings` = λ(x) for admit,
+  # `[]` for emit, store and transfer (and in the release branch).
   defp required_bindings_for(%{rule: :admit, object_labels: object_labels}),
     do: Enum.sort(object_labels)
 
