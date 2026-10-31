@@ -168,8 +168,9 @@ führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Man
 
 ## 6. Ablauf im Vermittler (Gate 1, Vollzug, Gate 2)
 
-Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine und **drei PDR** mit derselben
-`call_id`: Erzeugen (`emit`) und Übergeben (`transfer`) bzw. Speichern (`store`) in Gate 1, Aufnahme
+Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine. Im einfachen Permit-Fall sind das
+**drei PDR**; Ablehnungen und GO-Belege kommen hinzu. Alle PDR eines Aufrufs tragen dieselbe `call_id`
+(Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bzw. Speichern (`store`) in Gate 1, Aufnahme
 (`admit`) in Gate 2 (RFC R.5.5, R.5.6; Ticket #298).
 
 ### 6.1 Gate 1: `emit`, dann `transfer` oder `store` (die Anfrage ist eine Ausgabe, R.4.2/R.4.3)

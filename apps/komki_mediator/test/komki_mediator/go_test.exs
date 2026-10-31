@@ -200,6 +200,7 @@ defmodule KomkiMediator.GoTest do
     assert failed["rule"] == "transfer"
     assert failed["outcome"] == "error"
     assert failed["call_id"] == deny["call_id"]
+    assert failed["snapshot_id"] == deny["snapshot_id"]
     assert is_binary(failed["call_id"])
   end
 

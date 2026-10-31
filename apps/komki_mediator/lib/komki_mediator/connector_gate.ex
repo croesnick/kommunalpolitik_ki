@@ -1,8 +1,9 @@
 defmodule KomkiMediator.ConnectorGate do
   @moduledoc """
   A connector call as emit → transfer or store → execution → admit
-  (connector contract §6): three engine decisions, three PDRs sharing one
-  `call_id`.
+  (connector contract §6): three engine decisions. In the plain permit
+  case that is three PDRs; denials and GO records add more. All PDRs of
+  a call share one `call_id`.
 
   * Pre-check: parameters against the manifest schema
     (`Sidecar.Params.check/3`) and the room's B_W (`workspace_bindings`).
@@ -274,36 +275,25 @@ defmodule KomkiMediator.ConnectorGate do
         then.(decision)
 
       {_refused_or_error, reason} ->
-        go_not_committed(env, call, intent, reason)
+        go_not_committed(env, call, intent, snapshot, reason)
     end
   end
 
   # The nonce could not be consumed (e.g. a second terminal was faster):
-  # no effect, and the PDR keeps the call's call_id and rule.
-  defp go_not_committed(env, call, intent, reason) do
-    decision_id = PDR.new_id()
-
-    response = %{
-      "decision" => "error",
-      "rule" => intent["operation"],
-      "decision_id" => decision_id,
-      "detail" => "GO nicht committet: " <> inspect(reason)
-    }
-
-    PDR.append(env, %{
-      "decision_id" => decision_id,
-      "call_id" => call.call_id,
-      "tool" => call.tool,
-      "rule" => intent["operation"],
-      "decision" => "error",
-      "outcome" => "error",
-      "admitted" => false,
-      "intent_hash" => call.intent_hash,
-      "payload_hash" => PDR.payload_hash(response),
-      "intent_id" => intent["intent_id"]
-    })
-
-    response
+  # no effect, and the PDR stays linked to the call.
+  defp go_not_committed(env, call, intent, snapshot, reason) do
+    error_out(
+      env,
+      call.tool,
+      call.intent_hash,
+      intent["operation"],
+      "GO nicht committet: " <> inspect(reason),
+      %{
+        "call_id" => call.call_id,
+        "intent_id" => intent["intent_id"],
+        "snapshot_id" => snapshot["snapshot_id"]
+      }
+    )
   end
 
   # No or no answer: the deny stands and the catalog stays visible; the
@@ -630,26 +620,34 @@ defmodule KomkiMediator.ConnectorGate do
 
   # Pre-check failed (schema, missing B_W): no call yet, no engine
   # decision, no execution.
-  defp refused(env, tool, intent_hash, detail) do
+  defp refused(env, tool, intent_hash, detail),
+    do: error_out(env, tool, intent_hash, "emit", detail, %{})
+
+  # An error without an engine decision: error answer plus PDR. `link`
+  # adds the call's identifiers once there is a call.
+  defp error_out(env, tool, intent_hash, rule, detail, link) do
     decision_id = PDR.new_id()
 
     response = %{
       "decision" => "error",
-      "rule" => "emit",
+      "rule" => rule,
       "decision_id" => decision_id,
       "detail" => detail
     }
 
-    PDR.append(env, %{
-      "decision_id" => decision_id,
-      "tool" => tool,
-      "rule" => "emit",
-      "decision" => "error",
-      "outcome" => "error",
-      "admitted" => false,
-      "intent_hash" => intent_hash,
-      "payload_hash" => PDR.payload_hash(response)
-    })
+    PDR.append(
+      env,
+      Map.merge(link, %{
+        "decision_id" => decision_id,
+        "tool" => tool,
+        "rule" => rule,
+        "decision" => "error",
+        "outcome" => "error",
+        "admitted" => false,
+        "intent_hash" => intent_hash,
+        "payload_hash" => PDR.payload_hash(response)
+      })
+    )
 
     response
   end

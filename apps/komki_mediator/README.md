@@ -435,8 +435,9 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   Antwort ein. `payload_hash` ist der SHA-256 der kanonischen Antwortbasis
   (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/3`: zusaetzlich
   `rule` (`admit`/`emit`/`transfer`/`store`), `call_id` (bei
-  Connector-Aufrufen die `decision_id` des emit-PDR, in allen PDR des
-  Aufrufs gleich), `session_id` (aus der
+  Connector-Aufrufen die Kennung des Aufrufs, in allen seinen PDR gleich;
+  kommt es zum Vollzug, ist sie die `decision_id` des emit-PDR),
+  `session_id` (aus der
   Umgebung, sonst `null`) und `assigned_label` (emit-Permit).
 
 ## Komponenten

@@ -68,28 +68,43 @@ defmodule KomkiPolicy.Remedies do
   # Funktion von (registry, context, finding-Liste).
   def catalog(registry, %{rule: rule_kind} = ctx, findings)
       when rule_kind in [:admit | @output_kinds] do
-    ctx = withhold_call_go(ctx, findings)
-
-    Enum.map(findings, fn finding ->
+    findings
+    |> Enum.map(fn finding ->
       Map.merge(finding, %{
         "transitions" => ordered(regular_transitions(registry, ctx, rule_kind, finding))
       })
     end)
+    |> withhold_call_go(ctx)
   end
 
   def catalog(_registry, %{rule: :release} = ctx, findings) do
-    Enum.map(findings, fn finding ->
+    findings
+    |> Enum.map(fn finding ->
       Map.merge(finding, %{"transitions" => ordered(release_transitions(ctx, finding))})
     end)
+    |> withhold_call_go(ctx)
   end
 
-  # A GO never bridges these blockers; the release branch denies them again.
-  # So no other finding of the same decision may offer a call GO either:
-  # the person would be asked for a GO that cannot take effect (#298 review).
-  defp withhold_call_go(ctx, findings) do
-    if Enum.any?(findings, &(&1["code"] in @unbridgeable)),
-      do: %{ctx | call_hash: nil},
-      else: ctx
+  # A GO never bridges the unbridgeable blockers; the release branch denies
+  # them again. So no finding of such a decision may offer a call GO: the
+  # person would be asked for a GO that cannot take effect (#298 review).
+  # A finding left without transitions gets `neuer_raum`, so every
+  # catalog entry stays non-empty.
+  defp withhold_call_go(entries, ctx) do
+    if Enum.any?(entries, &(&1["code"] in @unbridgeable)) do
+      Enum.map(entries, fn entry ->
+        Map.update!(entry, "transitions", &drop_call_go(&1, ctx))
+      end)
+    else
+      entries
+    end
+  end
+
+  defp drop_call_go(transitions, ctx) do
+    case Enum.reject(transitions, &(&1["type"] == "aktionsfreigabe" and &1["scope"] == "call")) do
+      [] -> [newer_space(ctx, required_bindings_for(ctx))]
+      kept -> kept
+    end
   end
 
   # -------------------------------------------------------------------------

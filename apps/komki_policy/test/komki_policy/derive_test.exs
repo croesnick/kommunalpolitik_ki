@@ -554,6 +554,25 @@ defmodule KomkiPolicy.DeriveTest do
       refute "aktionsfreigabe" in types
     end
 
+    test "Freigabe-Zweig: neben label_not_preserved nur neuer_raum, auch für Release-Blocker" do
+      dir = Path.join(@fixtures_dir, "case_release_transfer_permit")
+      {:ok, snapshot} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
+      {:ok, intent} = JSON.parse(File.read!(Path.join(dir, "intent.json")))
+      {:ok, release} = JSON.parse(File.read!(Path.join(dir, "release.json")))
+      {:ok, stand} = JSON.parse(File.read!(Path.join(dir, "stand.json")))
+
+      # λ(y) lost the room binding and the release has expired as well.
+      shrunk = put_in(snapshot, ["object", "labels"], [])
+      expired = Map.put(stand, "as_of", release["valid_until"] + 1)
+
+      assert {:ok, %{"decision" => "deny", "remedies" => remedies}} =
+               Derive.decide_with_release(registry(), shrunk, intent, release, expired)
+
+      assert Enum.map(remedies, & &1["code"]) == ["label_not_preserved", "release_expired"]
+
+      for r <- remedies, do: assert([%{"type" => "neuer_raum"}] = r["transitions"])
+    end
+
     test "unzulässiger Empfänger: call-GO im Katalog mit dem transfer-Hash der Freigabe" do
       dir = Path.join(@fixtures_dir, "case_transfer_recipient")
       {:ok, snapshot} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
