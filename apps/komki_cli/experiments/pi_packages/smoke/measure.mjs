@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -14,6 +16,17 @@ import { readFile, stat } from "node:fs/promises";
 
 export function komkiBaseDir() {
   return process.env.KOMKI_HOME ?? path.join(os.homedir(), ".local", "share", "komki");
+}
+
+/** SHA-256 of a file (pins of GGUF and binary). */
+export function sha256File(file) {
+  return new Promise((resolve, reject) => {
+    const hash = createHash("sha256");
+    createReadStream(file)
+      .on("data", (chunk) => hash.update(chunk))
+      .on("end", () => resolve(hash.digest("hex")))
+      .on("error", reject);
+  });
 }
 
 async function readTrimmed(file) {
@@ -92,6 +105,44 @@ export async function resolveLlama() {
   };
 }
 
+/**
+ * Counts the tokens of a text via /tokenize of the running server (its own
+ * tokenizer, so exact per arm). null if the server does not answer.
+ */
+export function llamaTokenCount(llama, text, timeoutMs = 30_000) {
+  const body = JSON.stringify({ content: text, add_special: false });
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        hostname: "127.0.0.1",
+        port: llama.port,
+        path: "/tokenize",
+        method: "POST",
+        timeout: timeoutMs,
+        headers: {
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(body),
+          authorization: `Bearer ${llama.apiKey}`,
+        },
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")).tokens?.length ?? null);
+          } catch {
+            resolve(null);
+          }
+        });
+      },
+    );
+    req.on("timeout", () => req.destroy());
+    req.on("error", () => resolve(null));
+    req.end(body);
+  });
+}
+
 /** Resident Set Size des llama-server in MiB (oder null). */
 export function llamaRssMiB(pid) {
   if (!pid) return null;
@@ -101,6 +152,25 @@ export function llamaRssMiB(pid) {
     }).trim();
     const rssKiB = Number(out);
     return Number.isFinite(rssKiB) ? Math.round(rssKiB / 1024) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * phys_footprint of the llama-server in MiB via /usr/bin/footprint (or
+ * null). Unlike RSS it counts compressed and swapped-out pages and the
+ * malloc buffers in which llama.cpp keeps weights and KV cache under Metal.
+ */
+export function llamaFootprintMiB(pid) {
+  if (!pid) return null;
+  try {
+    const out = execFileSync("/usr/bin/footprint", ["-j", "/dev/stdout", String(pid)], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const bytes = JSON.parse(out.slice(out.indexOf("{"))).processes?.[0]?.footprint;
+    return Number.isFinite(bytes) ? Math.round(bytes / 1024 / 1024) : null;
   } catch {
     return null;
   }

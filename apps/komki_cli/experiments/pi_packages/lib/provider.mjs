@@ -1,6 +1,7 @@
 import http from "node:http";
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 
 /**
  * Logging forward proxy in front of the real llama-server.
@@ -15,7 +16,10 @@ import path from "node:path";
  *   { at, method, url, status, durationMs, body, response }
  *
  * `response` is reconstructed for both streaming and non-streaming replies:
- * `{ text, toolCalls, finishReason, usage, sse }`. The Authorization header
+ * `{ text, reasoning, toolCalls, finishReason, usage, sse }`. Streaming
+ * replies also carry timings relative to the request start (Ticket #285):
+ * `firstByteMs`, `firstTokenMs` (first delta of any kind, thinking
+ * included) and `firstAnswerMs` (first content or tool-call delta). The Authorization header
  * is never logged. The record shape extends the mock provider's request log
  * ({ at, method, url, body }) so shared consumers keep working.
  *
@@ -80,18 +84,21 @@ function rebuildCalls(events) {
 
 function reconstructSse(events) {
   let text = "";
+  let reasoning = "";
   let finishReason = null;
   let usage = null;
   for (const event of events) {
     for (const choice of event.choices ?? []) {
       const delta = choice.delta ?? {};
       if (typeof delta.content === "string") text += delta.content;
+      if (typeof delta.reasoning_content === "string") reasoning += delta.reasoning_content;
       if (choice.finish_reason) finishReason = choice.finish_reason;
     }
     if (event.usage && (event.choices?.length ?? 0) === 0) usage = event.usage;
   }
   return {
     text,
+    reasoning,
     toolCalls: rebuildCalls(events),
     finishReason,
     usage,
@@ -122,6 +129,37 @@ function reconstructJson(body) {
       parseError: true,
     };
   }
+}
+
+/**
+ * Timestamps of the first deltas of an SSE stream (Ticket #285). Parses the
+ * chunks incrementally, for timing only; StringDecoder keeps multi-byte
+ * UTF-8 sequences intact across chunk boundaries. The reconstruction still
+ * works on the complete buffer.
+ */
+function sseTimer(started) {
+  const decoder = new StringDecoder("utf8");
+  let pending = "";
+  const timings = { firstByteMs: null, firstTokenMs: null, firstAnswerMs: null };
+  return {
+    timings,
+    push(chunk) {
+      const now = Date.now() - started;
+      timings.firstByteMs ??= now;
+      if (timings.firstAnswerMs !== null) return;
+      pending += decoder.write(chunk);
+      const lines = pending.split("\n");
+      pending = lines.pop();
+      for (const event of parseDataLines(lines.join("\n"))) {
+        for (const choice of event.choices ?? []) {
+          const delta = choice.delta ?? {};
+          const answer = Boolean(delta.content) || (delta.tool_calls?.length ?? 0) > 0;
+          if (answer || delta.reasoning_content) timings.firstTokenMs ??= now;
+          if (answer) timings.firstAnswerMs ??= now;
+        }
+      }
+    },
+  };
 }
 
 export async function startForwardProvider({ upstreamBaseUrl, logPath } = {}) {
@@ -188,6 +226,7 @@ export async function startForwardProvider({ upstreamBaseUrl, logPath } = {}) {
             upstreamRes.headers["content-type"] ?? "",
           );
           const responseChunks = [];
+          const timer = sseTimer(started);
 
           // Jeder Abschlusspfad loggt genau einmal: normales Ende,
           // Upstream-Fehler mitten im Stream, Abbruch auf einer Seite.
@@ -196,7 +235,7 @@ export async function startForwardProvider({ upstreamBaseUrl, logPath } = {}) {
             logged = true;
             const payload = Buffer.concat(responseChunks).toString("utf8");
             const response = isSse
-              ? reconstructSse(parseDataLines(payload))
+              ? { ...reconstructSse(parseDataLines(payload)), ...timer.timings }
               : reconstructJson(payload);
             appendLog(logPath, req, started, status, requestBody, extra
               ? { ...response, ...extra }
@@ -207,6 +246,7 @@ export async function startForwardProvider({ upstreamBaseUrl, logPath } = {}) {
 
           upstreamRes.on("data", (chunk) => {
             responseChunks.push(chunk);
+            if (isSse) timer.push(chunk);
             res.write(chunk);
           });
           upstreamRes.on("end", () => {

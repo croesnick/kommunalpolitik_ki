@@ -62,7 +62,15 @@ jeden inhaltlichen TOP:
 - **Kosten und Finanzierung**, wenn der TOP Geld berührt: Gesamtkosten,
   Eigenanteil der Stadt, Förder- oder Restanteil — der Eigenanteil
   belastet den städtischen Haushalt.
-- **Beschlussvorschlag** im Wortlaut oder mit allen Komponenten.
+- **Beschlussvorschlag** im Wortlaut oder mit allen Komponenten. Verben
+  und Rollen nicht verschärfen: „zur Haushaltsplanung melden“ ist nicht
+  „in den Haushalt aufnehmen“, „der Ausschuss empfiehlt dem Rat“ ist nicht
+  „der Ausschuss beschließt“ (gemessen: 3 von 6 Läufen verschärft,
+  Labbook 2026-10-31).
+- **Gewissheit wie in der Vorlage:** „kann“, „soll“, „voraussichtlich“
+  bleiben stehen. Was die Vorlage als möglich nennt, wird nicht als sicher
+  dargestellt (gemessen: 9 von 9 Fassungen machten aus „kann gedeckt
+  werden“ ein „wird gedeckt“).
 - **Fristen und Termine**, die den Beschluss oder das Vorhaben binden:
   Förder- und Antragsfristen, Haushaltsjahr, Bau- und Pflanzzeiten,
   Einwendungs- oder Vergabefristen — mit Datum und was bei Versäumnis

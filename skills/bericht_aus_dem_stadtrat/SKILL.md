@@ -454,6 +454,11 @@ Skill kennzeichnet die Quellentypen konsistent (siehe §6 `AGENTS.md` und
   ausführen.
 - **Ohne bestätigte Quelle:** als "nicht belegt" kennzeichnen, nicht
   verschweigen.
+- **Beschlüsse und Vorlagen nicht verschärfen:** Verben, Rollen und
+  Gewissheit wie im RIS. „Empfiehlt dem Rat“ ist kein Beschluss, „zur
+  Haushaltsplanung melden“ ist keine Aufnahme in den Haushalt, „kann
+  gefördert werden“ ist keine Zusage. Das lokale Modell verschärft so
+  etwas häufig (Labbook `docs/research/2026-10-31-modell-ab.md`).
 
 ## Komposition mit anderen Skills
 
