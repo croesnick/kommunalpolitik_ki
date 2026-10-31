@@ -136,7 +136,7 @@ export function resultRows(
 	return rows;
 }
 
-// Gate 1 eines Connector-Aufrufs: erzeugen, übergeben, speichern (#298).
+// Gate 1 of a connector call: produce, hand over, store (#298).
 const OUTGOING = new Set(["emit", "transfer", "store"]);
 
 // Alles, was nicht "zugelassen" ist. undefined: Inhalt wurde zugelassen.

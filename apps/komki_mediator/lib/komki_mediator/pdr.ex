@@ -1,29 +1,30 @@
 defmodule KomkiMediator.PDR do
   @moduledoc """
-  PDR-Auditdatensaetze (Schema `"komki-pdr/3"`): eine gemeinsame Form fuer
-  `KomkiMediator.Gate` (ping, admit_document) und
-  `KomkiMediator.ConnectorGate` (Connector-Tools).
+  PDR audit records (schema `"komki-pdr/3"`): one shared shape for
+  `KomkiMediator.Gate` (ping, admit_document) and
+  `KomkiMediator.ConnectorGate` (connector tools).
 
-  Jeder Datensatz traegt dieselben Schluessel; nicht belegte Felder sind
-  `null`. Neu gegenueber `komki-pdr/2`:
+  Every record carries the same keys; unused fields are `null`. New
+  compared to `komki-pdr/2`:
 
-    * `rule` — der entschiedene Regelzweig (`"admit"`, `"emit"`,
-      `"transfer"` oder `"store"`).
-    * `call_id` — bei Connector-Aufrufen die `decision_id` des emit-PDR;
-      transfer- bzw. store-Permit, emit- und admit-PDR eines Aufrufs tragen
-      dieselbe `call_id` (Connector-Vertrag §6).
-    * `session_id` — Zuordnung zur pi-Sitzung (aus der Umgebung, darf
-      `null` sein; der Socket-Zugang fuellt sie, Connector-Vertrag §8).
-    * `assigned_label` — bei emit-Permits die zugeordnete Ausgabe-Menge
+    * `rule` — the decided rule branch (`"admit"`, `"emit"`, `"transfer"`
+      or `"store"`).
+    * `call_id` — for connector calls, the id of the call; it equals the
+      `decision_id` of the emit PDR. Every PDR of the call carries it,
+      denials and GO records included (connector contract §6); only a
+      rejection in the pre-check has none.
+    * `session_id` — the pi session (from the environment, may be `null`;
+      the socket access fills it, connector contract §8).
+    * `assigned_label` — for emit permits, the assigned output set
       λ(y) = B_W.
 
-  Neben den Entscheidungen schreibt der Vermittler bei jedem Start einen
-  Datensatz mit `tool: "workspace"`, `decision: "loaded"`: `checked_label` ist
-  das B_W, mit dem er ab jetzt entscheidet, `payload_hash` der SHA-256 von
-  `room.json`. Ein Raumwechsel (Ticket #268) zeigt sich als zwei solche
-  Datensaetze mit verschiedenem B_W.
+  Besides the decisions, the mediator writes a record with
+  `tool: "workspace"`, `decision: "loaded"` on every start: `checked_label`
+  is the B_W it decides with from now on, `payload_hash` the SHA-256 of
+  `room.json`. A room switch (ticket #268) shows up as two such records
+  with different B_W.
 
-  `seq` und `prev_hash` setzt allein der Journal-Writer (Ticket #139).
+  Only the journal writer sets `seq` and `prev_hash` (ticket #139).
   """
 
   alias KomkiMediator.{Fassung, Hash, Journal}

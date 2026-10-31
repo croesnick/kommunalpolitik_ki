@@ -1,7 +1,7 @@
 defmodule KomkiMediator.GoTest do
-  # Ticket #98: GO fuer eine blockierte Ausgabe. Raum vertraulich, die
-  # Uebergabe von web_search an die Websuche (transfer, #298) wird mit
-  # recipient_not_allowed abgelehnt; der Katalog bietet ein Call-GO.
+  # Ticket #98: GO for a blocked output. Room vertraulich: handing
+  # web_search to the web search (transfer, #298) is denied with
+  # recipient_not_allowed; the catalog offers a call GO.
   # Ein Testprozess spielt die nutzende Person und antwortet ueber dieselben
   # Funktionen wie `komki go`.
   use ExUnit.Case, async: false
@@ -91,13 +91,14 @@ defmodule KomkiMediator.GoTest do
     assert "recipient_not_allowed" in request["blockers"]
     assert request["operation"] == "transfer"
 
-    # transfer-deny -> GO-Commit -> emit -> admit; der Commit liegt vor dem
-    # Vollzug und traegt die call_id des Aufrufs
-    assert outcomes(env) == ["not_admitted", "released", "emitted", "admitted"]
+    # Transfer deny, then emit and the released transfer in decision order,
+    # both before execution; every record carries the call's call_id.
+    assert outcomes(env) == ["not_admitted", "emitted", "released", "admitted"]
 
-    [_deny, released, emitted, _admit] = TestHelpers.journal_records(env.journal_path)
+    [deny, emitted, released, admit] = TestHelpers.journal_records(env.journal_path)
     assert released["rule"] == "transfer"
-    assert released["call_id"] == emitted["decision_id"]
+    assert released["checked_label"] == emitted["assigned_label"]
+    assert Enum.all?([deny, released, admit], &(&1["call_id"] == emitted["decision_id"]))
     assert map_size(GoStand.current()["consumed"]) == 1
     assert Go.pending(go_dir) == []
   end

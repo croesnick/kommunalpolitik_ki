@@ -1,8 +1,8 @@
 defmodule KomkiMediator.Tools.WebSearch do
   @moduledoc """
-  MCP-Tool `web_search`: Websuche (Connector web, Operation search).
-  Schema und Beschreibung aus dem Manifest, Ablauf emit → Vollzug → admit
-  (`KomkiMediator.ConnectorGate`).
+  MCP tool `web_search`: web search (connector web, operation search).
+  Schema and description come from the manifest; the call runs as
+  emit → transfer → execution → admit (`KomkiMediator.ConnectorGate`).
   """
 
   use KomkiMediator.Tools.Connector, tool: "web_search"

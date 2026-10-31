@@ -25,10 +25,10 @@ defmodule KomkiPolicy.Derive do
   ist eine eigene Prämisse (`label_preservation`), denn ein Speichern
   entfernt keine Bindung. Digest- und Klassifikationspflicht wie `emit`.
 
-  `transfer` (RFC 0003 R.5.6) übergibt ein erzeugtes Objekt y an ein
-  Ziel (die Umgebung des Snapshots, etwa einen externen Dienst). Form
-  wie `store`: Prüflabel λ(y), `label_preservation`, Empfängerkreis des
-  Ziels, `transfer`-Regeln der Bindungen von λ(y).
+  `transfer` (RFC 0003 R.5.6) hands a produced object y to a target (the
+  snapshot's environment, e.g. an external service). Same shape as
+  `store`: checked label λ(y), `label_preservation`, the target's
+  recipients, and the `transfer` rules of the bindings in λ(y).
 
   Urteil und Vollzug getrennt (B.8): der Kern verbraucht keine
   Freigabe — `decide_with_release/5` plant den Verbrauch als
@@ -61,8 +61,8 @@ defmodule KomkiPolicy.Derive do
     "binding_condition"
   ]
 
-  # store (§ 4.7) und transfer (§ 4.8): ein erzeugtes Objekt verlässt den
-  # Raum unter λ(y).
+  # store (§ 4.7) and transfer (§ 4.8): a produced object leaves the room
+  # under λ(y).
   @handover_premises [
     "workspace_contract_valid",
     "has_operation_right",
@@ -82,11 +82,11 @@ defmodule KomkiPolicy.Derive do
   @unsupported_operations ["start"]
   @unsupported_detail "rule branch not implemented"
 
-  @doc "Regelzweige, die ein erzeugtes Objekt unter λ(y) aus dem Raum geben (§ 4.7, § 4.8)."
+  @doc "Rule branches that let a produced object leave the room under λ(y) (§ 4.7, § 4.8)."
   @spec handover_operations() :: [String.t()]
   def handover_operations, do: @handover_operations
 
-  @doc "Regelzweige mit Beweisbaum (`verify`, § 5)."
+  @doc "Rule branches with a proof tree (`verify`, § 5)."
   @spec proof_rules() :: [String.t()]
   def proof_rules, do: ["admit" | @output_operations]
 
@@ -263,8 +263,8 @@ defmodule KomkiPolicy.Derive do
     conclude_release(state, ctx, registry, auth, release, stand, call_hash)
   end
 
-  # Ein GO stellt keine entfernte Bindung wieder her (§ 2.8): auch mit
-  # Freigabe gilt B_W ⊆ λ(y) für store und transfer.
+  # A GO never restores a dropped binding (§ 2.8): B_W ⊆ λ(y) holds for
+  # store and transfer even with a release.
   defp release_label_preservation(state, operation) when operation in @handover_operations,
     do: premise_label_preservation(state)
 
@@ -352,8 +352,8 @@ defmodule KomkiPolicy.Derive do
     end
   end
 
-  # Nur `emit` ordnet ein Label zu; `store` und `transfer` erhalten λ(y)
-  # und tragen kein `assigned_label`.
+  # Only `emit` assigns a label; `store` and `transfer` keep λ(y) and carry
+  # no `assigned_label`.
   defp release_label_fields("emit", label), do: %{"assigned_label" => label}
   defp release_label_fields(_handover, _label), do: %{}
 
@@ -452,8 +452,8 @@ defmodule KomkiPolicy.Derive do
   end
 
   # =========================================================================
-  # store- und transfer-Kern (§ 4.7, § 4.8): Prämissen in fester Ordnung,
-  # entschieden unter λ(y)
+  # store and transfer core (§ 4.7, § 4.8): premises in fixed order,
+  # decided under λ(y)
   # =========================================================================
 
   defp run_handover(ctx, registry, auth, rule) do
@@ -551,8 +551,8 @@ defmodule KomkiPolicy.Derive do
     end
   end
 
-  # store/transfer P5: B_W ⊆ λ(y) — Speichern und Übergeben entfernen keine
-  # Bindung (R.5.6).
+  # store/transfer P5: B_W ⊆ λ(y) — storing and handing over drop no
+  # binding (R.5.6).
   defp premise_label_preservation(ctx) do
     if Calculus.labels_subset?(ctx.workspace["bindings"], ctx.checked) do
       ctx

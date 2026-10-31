@@ -52,8 +52,8 @@ defmodule KomkiMediator.ConnectorGateTest do
   defp remedy_codes(response), do: Enum.map(response["remedies"], & &1["code"])
 
   # -----------------------------------------------------------------------
-  # Permit-Fluss: emit- und transfer-PDR vor dem Vollzug, drei PDR mit
-  # gleicher call_id (#298)
+  # Permit flow: emit and transfer PDRs before execution, three PDRs with
+  # one call_id (#298)
   # -----------------------------------------------------------------------
 
   test "recherche ris_search: emit- und transfer-PDR liegen vor dem Connector-Aufruf, dann admit",
@@ -62,9 +62,8 @@ defmodule KomkiMediator.ConnectorGateTest do
 
     response = ConnectorGate.call(env, "ris_search", %{"text" => "Bahnhof"})
 
-    # Der Fake hat beim Aufruf genau zwei Journal-Datensaetze gesehen: den
-    # emit- und den transfer-PDR. Default-Parameter sind gesetzt, kein
-    # Kontext bei read.
+    # When called, the fake saw exactly two journal records: the emit and
+    # the transfer PDR. Default parameters are set, no context for a read.
     assert_received {:connector_called, "ris", "search", %{"text" => "Bahnhof", "limit" => 10},
                      %{}, 2}
 
@@ -75,7 +74,7 @@ defmodule KomkiMediator.ConnectorGateTest do
 
     [emit, transfer, admit] = records(env)
 
-    # Übergabe an das RIS unter λ(y) = B_W, in der Umgebung des Manifests.
+    # Handover to the RIS under λ(y) = B_W, in the manifest environment.
     assert transfer["rule"] == "transfer"
     assert transfer["outcome"] == "permitted"
     assert transfer["call_id"] == emit["decision_id"]
@@ -127,8 +126,8 @@ defmodule KomkiMediator.ConnectorGateTest do
         {"web_search", "web", %{"query" => "Buergerfall 4711"}},
         {"ris_search", "ris", %{"text" => "Buergerfall"}}
       ] do
-    # Erzeugen im Raum ist erlaubt; die Übergabe an RIS oder Websuche
-    # scheitert am Empfängerkreis von vault-vertraulich (#298).
+    # Producing inside the room is allowed; the handover to RIS or web
+    # search fails on the recipient set of vault-vertraulich (#298).
     test "vertraulich #{tool}: transfer deny recipient_not_allowed, Connector nicht gerufen",
          %{env: env} do
       fake(env, unquote(id), ok(%{}))
@@ -143,10 +142,13 @@ defmodule KomkiMediator.ConnectorGateTest do
       assert response["hinweis"] == KomkiMediator.Hinweis.text(:deny)
       refute_received {:connector_called, _, _, _, _, _}
 
+      # The denial carries the call's call_id; the answer names no emit PDR,
+      # because nothing was executed.
       [pdr] = records(env)
       assert pdr["rule"] == "transfer"
       assert pdr["decision"] == "deny"
-      assert pdr["call_id"] == nil
+      assert is_binary(pdr["call_id"])
+      refute Map.has_key?(response, "emit_decision_id")
     end
   end
 

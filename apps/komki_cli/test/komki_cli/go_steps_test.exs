@@ -16,7 +16,7 @@ defmodule KomkiCli.GoStepsTest do
       "schema" => "komki-go-request/1",
       "call_hash" => String.duplicate("a", 64),
       "decision_id" => "pdr-1",
-      # Seit #298 sperrt die Uebergabe an die Websuche, nicht das Erzeugen.
+      # Since #298 the handover to web search is what gets blocked, not emit.
       "operation" => "transfer",
       "tool" => "web_search",
       "params" => %{"query" => "Radweg Buchloe", "count" => 5},
@@ -95,7 +95,9 @@ defmodule KomkiCli.GoStepsTest do
              "Sichtbar"
   end
 
-  test "emit-GO (#298): Erzeugen im Raum zeigt niemandem draussen etwas", %{base: base} = ctx do
+  # An emit GO can be followed by a transfer that Γ permits without asking:
+  # the warning has to come with the emit GO already (#298 review).
+  test "emit-GO (#298): Vorschau warnt ebenfalls vor dem Existenz-Leck", %{base: base} = ctx do
     File.write!(
       Path.join([base, "mediator", "registry.json"]),
       JSON.encode!(KomkiMediator.Templates.registry())
@@ -108,7 +110,7 @@ defmodule KomkiCli.GoStepsTest do
 
     GoSteps.run(base, ui(false))
     assert_received {:said, preview}
-    refute preview =~ "Sichtbar"
+    assert preview =~ "Sichtbar für: Brave (Websuche)"
   end
 
   test "keine Anfragen" do

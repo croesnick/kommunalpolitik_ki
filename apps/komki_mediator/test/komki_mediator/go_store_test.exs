@@ -89,8 +89,8 @@ defmodule KomkiMediator.GoStoreTest do
     # store-deny -> GO-Commit -> emit-Vorbeleg -> Vollzug -> admit
     assert journal(env) == [
              {"store", "not_admitted"},
-             {"store", "released"},
              {"emit", "emitted"},
+             {"store", "released"},
              {"admit", "admitted"}
            ]
 

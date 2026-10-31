@@ -185,11 +185,15 @@ Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine und **drei
    schreibenden: Snapshot mit Objekt-Labels λ(y) = `assigned_label` und `workspace.environment =
    manifest.environment` (Empfänger der Anfrage). Hier fällt der Empfängertest gegen RIS, Websuche oder
    Vault.
-5. Kein permit in Schritt 3 oder 4: Antwort mit Remedies, PDR ohne `call_id`, **kein Vollzug**.
+5. Kein permit in Schritt 3 oder 4: Antwort mit Remedies, PDR mit der `call_id` des Aufrufs, **kein
+   Vollzug**. Die Antwort nennt keinen emit-PDR (`emit_decision_id`), weil es keinen gibt.
 6. permit: erst der **emit-PDR (`outcome: emitted`), dann der transfer- bzw. store-PDR (`outcome:
-   permitted`), beide bevor der Connector aufgerufen wird** (Vorbeleg vor Wirkung, R.11). Die
-   `decision_id` des emit-PDR ist die `call_id` im Frame. Der transfer- bzw. store-PDR, ein GO-Beleg
-   (`outcome: released`) und der admit-PDR tragen sie ebenfalls.
+   permitted`, nach einem GO `released`), beide bevor der Connector aufgerufen wird** (Vorbeleg vor
+   Wirkung, R.11). Die `decision_id` des emit-PDR ist die `call_id` im Frame.
+7. Die `call_id` vergibt der Vermittler nach der Schema-Prüfung. Jeder PDR des Aufrufs trägt sie:
+   Ablehnungen, GO-Belege (`released`, `go_refused`, `go_timeout`), emit-, transfer- bzw. store- und
+   admit-PDR. Nur die Ablehnung in der Schema-Prüfung (Schritt 1) hat keine, weil es noch keinen
+   Aufruf gibt. Das Journal folgt der Reihenfolge der Entscheidungen.
 
 ### 6.2 Gate 2: `admit` (die Antwort ist ein neuer Eingang)
 

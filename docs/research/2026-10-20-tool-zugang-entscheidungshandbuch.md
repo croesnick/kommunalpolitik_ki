@@ -434,8 +434,8 @@ nach Schnellstart frisch aufgesetzten Instanz.
 | Credentials über stdin, nie env/argv (§6a.1, Regel 2) | S-11: Key in 0 Prozessen und 0 Dateien |
 | Egress-Proxy nötig, weil Seatbelt nicht nach Host filtert (§5 V3, §6a B5) | `komki-egress`, Allowlist je Port, Schutz vor Rebinding und Metadaten (S-08) |
 | Semantische Fassungen, keine URL- oder Pfad-Parameter (§1, Regel 1) | geschlossene Schemas; Pfad-Escapes abgewiesen (S-06) |
-| Anfrage = gebundene Ausgabe (Gate 1), Antwort = gelabelter Eingang (Gate 2) | emit → Vollzug → admit, zwei PDR, emit-PDR vor der Wirkung (L-105) |
-| Lethal-Trifecta-Sperre (§9) | ergibt sich aus der Empfängerprüfung von `emit`; im Raum vertraulich keine Verbindung (S-09, S-10) |
+| Anfrage = gebundene Ausgabe (Gate 1), Antwort = gelabelter Eingang (Gate 2) | emit → Vollzug → admit, zwei PDR, emit-PDR vor der Wirkung (L-105). Seit #298: emit → transfer (schreibend: store) → Vollzug → admit, drei PDR mit einer `call_id`, emit- und transfer-PDR vor der Wirkung |
+| Lethal-Trifecta-Sperre (§9) | ergibt sich aus der Empfängerprüfung von `emit`, seit #298 von `transfer`; im Raum vertraulich keine Verbindung (S-09, S-10) |
 | Kanal: Unix-Socket, Token, Session-ID, Relay (§7.2) | umgesetzt (#143); kein TCP-Listener (S-01, S-02) |
 | Host-Annahme statt G3-Schutz (§7.2) | gilt; keine eigene uid, keine Peer-PID-Prüfung |
 | Kein `fetch(url)` in der Web-Fassung (§9) | `komki-web/1` hat nur `search` |

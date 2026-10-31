@@ -35,6 +35,8 @@ defmodule KomkiPolicy.Remedies do
   # Regelzweige mit Ausgabeobjekt: call-GO im Katalog.
   @output_kinds [:emit, :store, :transfer]
 
+  @unbridgeable ["workspace_invalid", "label_not_preserved"]
+
   @transition_order [
     "fakt_nachreichen",
     "registrierte_transformation",
@@ -65,6 +67,8 @@ defmodule KomkiPolicy.Remedies do
   # Funktion von (registry, context, finding-Liste).
   def catalog(registry, %{rule: rule_kind} = ctx, findings)
       when rule_kind in [:admit | @output_kinds] do
+    ctx = withhold_call_go(ctx, findings)
+
     Enum.map(findings, fn finding ->
       Map.merge(finding, %{
         "transitions" => ordered(regular_transitions(registry, ctx, rule_kind, finding))
@@ -76,6 +80,15 @@ defmodule KomkiPolicy.Remedies do
     Enum.map(findings, fn finding ->
       Map.merge(finding, %{"transitions" => ordered(release_transitions(ctx, finding))})
     end)
+  end
+
+  # A GO never bridges these blockers; the release branch denies them again.
+  # So no other finding of the same decision may offer a call GO either:
+  # the person would be asked for a GO that cannot take effect (#298 review).
+  defp withhold_call_go(ctx, findings) do
+    if Enum.any?(findings, &(&1["code"] in @unbridgeable)),
+      do: %{ctx | call_hash: nil},
+      else: ctx
   end
 
   # -------------------------------------------------------------------------

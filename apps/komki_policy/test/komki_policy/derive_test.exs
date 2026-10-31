@@ -520,7 +520,7 @@ defmodule KomkiPolicy.DeriveTest do
       {:ok, release} = JSON.parse(File.read!(Path.join(dir, "release.json")))
       {:ok, stand} = JSON.parse(File.read!(Path.join(dir, "stand.json")))
 
-      # λ(y) hat die Raumbindung verloren; die Freigabe passt sonst exakt.
+      # λ(y) lost the room binding; otherwise the release matches exactly.
       shrunk = put_in(snapshot, ["object", "labels"], [])
 
       assert {:ok,
@@ -529,6 +529,29 @@ defmodule KomkiPolicy.DeriveTest do
                 "blockers" => [%{"code" => "label_not_preserved"} | _],
                 "remedies" => [%{"transitions" => [%{"type" => "neuer_raum"}]} | _]
               }} = Derive.decide_with_release(registry(), shrunk, intent, release, stand)
+    end
+
+    # A call GO next to label_not_preserved could never take effect, so the
+    # catalog offers none for any finding of that decision.
+    test "neben label_not_preserved bietet kein Befund ein call-GO an" do
+      dir = Path.join(@fixtures_dir, "case_transfer_permit")
+      {:ok, snapshot} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
+      {:ok, intent} = JSON.parse(File.read!(Path.join(dir, "intent.json")))
+
+      # λ(y) lost the room binding and carries one without a transfer rule.
+      lost = put_in(snapshot, ["object", "labels"], ["nur-start-test@1"])
+
+      assert {:ok, %{"decision" => "deny", "remedies" => remedies}} =
+               Derive.decide(registry(), lost, intent)
+
+      assert Enum.map(remedies, & &1["code"]) == [
+               "label_not_preserved",
+               "recipient_not_allowed",
+               "missing_operation_rule"
+             ]
+
+      types = for r <- remedies, t <- r["transitions"], do: t["type"]
+      refute "aktionsfreigabe" in types
     end
 
     test "unzulässiger Empfänger: call-GO im Katalog mit dem transfer-Hash der Freigabe" do

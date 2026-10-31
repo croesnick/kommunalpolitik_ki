@@ -427,8 +427,8 @@ defmodule KomkiPolicy.Verify do
     Enum.reject(findings, &is_nil/1)
   end
 
-  # store und transfer haben dieselbe Prämissenform: ohne diesen Abgleich
-  # ginge ein store-Baum als Beleg für einen transfer-Intent durch.
+  # store and transfer share one premise shape: without this check a store
+  # tree would pass as proof for a transfer intent.
   defp rule_reason(rule, operation) do
     if rule in Derive.proof_rules(),
       do: mismatch_if(rule != operation, "rule_mismatch"),
