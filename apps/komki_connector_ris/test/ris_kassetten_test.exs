@@ -12,10 +12,13 @@ defmodule KomkiConnectorRis.RisKassettenTest do
   @kanarie "GEHEIM-MARKER-42"
 
   defp tmp_area!(name) do
+    # Zeitstempel UND unique_integer: letzteres wiederholt sich ueber
+    # VM-Neustarts, ein abgestuerzter Lauf koennte sonst alte Zaehlerdateien
+    # erben und Funde verfaelschen.
     dir =
       Path.join([
         System.tmp_dir!(),
-        "ris-kassetten-#{name}-#{System.unique_integer([:positive])}"
+        "ris-kassetten-#{name}-#{System.system_time(:millisecond)}-#{System.unique_integer([:positive])}"
       ])
 
     File.mkdir_p!(dir)
@@ -74,6 +77,14 @@ defmodule KomkiConnectorRis.RisKassettenTest do
     script
   end
 
+  # Standard-Vorstufe der seal/unseal-Tests: Fakes installieren, init
+  # durchziehen (eine Freigabe im Fake), opts liefern.
+  defp initialisiert!(dir) do
+    opts = [tresor: tresor!(dir), security: security!(dir)]
+    assert {0, _} = RisKassetten.run(["init"], opts)
+    opts
+  end
+
   defp kassette!(dir, name, content) do
     file = Path.join(dir, name)
     File.write!(file, content)
@@ -124,13 +135,17 @@ defmodule KomkiConnectorRis.RisKassettenTest do
       dir = tmp_area!("init-rundweg")
 
       tresor =
-        script!(dir, "komki-tresor", """
-        case "$1" in
-          check) exit 0 ;;
-          seal) read -r v; echo "ktv1.$v" ;;
-          open) read -r v; echo "voellig-was-anderes" ;;
-        esac
-        """)
+        script!(
+          dir,
+          "komki-tresor",
+          """
+          case "$1" in
+            check) exit 0 ;;
+            seal) read -r v; echo "ktv1.$v" ;;
+            open) read -r v; echo "voellig-was-anderes" ;;
+          esac
+          """
+        )
 
       {5, meldungen} = RisKassetten.run(["init"], tresor: tresor, security: security!(dir))
 
@@ -146,16 +161,31 @@ defmodule KomkiConnectorRis.RisKassettenTest do
       assert Enum.any?(texts(meldungen), &(&1 =~ "komki-tresor nicht gefunden"))
     end
 
+    test "Tresor vorhanden, aber nicht ausfuehrbar: Exit 3" do
+      dir = tmp_area!("init-tresor-stumm")
+      tresor = Path.join(dir, "komki-tresor")
+      File.write!(tresor, "kein skript")
+      File.chmod!(tresor, 0o644)
+
+      {3, meldungen} = RisKassetten.run(["init"], tresor: tresor, security: security!(dir))
+
+      assert Enum.any?(texts(meldungen), &(&1 =~ "nicht ausfuehrbar"))
+    end
+
     test "ohne Secure Enclave: Exit 3" do
       dir = tmp_area!("init-ohne-enclave")
 
       tresor =
-        script!(dir, "komki-tresor", """
-        case "$1" in
-          check) exit 3 ;;
-          *) exit 0 ;;
-        esac
-        """)
+        script!(
+          dir,
+          "komki-tresor",
+          """
+          case "$1" in
+            check) exit 3 ;;
+            *) exit 0 ;;
+          esac
+          """
+        )
 
       {3, meldungen} = RisKassetten.run(["init"], tresor: tresor, security: security!(dir))
 
@@ -166,12 +196,16 @@ defmodule KomkiConnectorRis.RisKassettenTest do
       dir = tmp_area!("init-bad-seal")
 
       tresor =
-        script!(dir, "komki-tresor", """
-        case "$1" in
-          check) exit 0 ;;
-          *) read -r v; echo "kein-siegel" ;;
-        esac
-        """)
+        script!(
+          dir,
+          "komki-tresor",
+          """
+          case "$1" in
+            check) exit 0 ;;
+            *) read -r v; echo "kein-siegel" ;;
+          esac
+          """
+        )
 
       {5, meldungen} = RisKassetten.run(["init"], tresor: tresor, security: security!(dir))
 
@@ -182,8 +216,7 @@ defmodule KomkiConnectorRis.RisKassettenTest do
   describe "seal/unseal" do
     test "Rundweg bytetreu: .enc mit Magic und 0600, Klartext geloescht und 0600" do
       dir = tmp_area!("rundweg")
-      opts = [tresor: tresor!(dir), security: security!(dir)]
-      assert {0, _} = RisKassetten.run(["init"], opts)
+      opts = initialisiert!(dir)
 
       kassetten = %{
         "0001-get-guestmeetings.json" => "{\"request\":\"#{@kanarie}\"}",
@@ -194,7 +227,19 @@ defmodule KomkiConnectorRis.RisKassettenTest do
       # Eine Kassette bewusst weiter offen: unseal muss 0600 wiederherstellen.
       File.chmod!(Path.join(dir, "0002-post-auth.json"), 0o644)
 
-      assert {0, _} = RisKassetten.run(["seal", dir], opts)
+      {0, seal_meldungen} = RisKassetten.run(["seal", dir], opts)
+
+      # Meldungen in Verarbeitungsreihenfolge: Zusammenfassung vorne, dann
+      # Dateien aufsteigend.
+      assert [
+               summary,
+               erste,
+               zweite
+             ] = for({:out, text} <- seal_meldungen, do: text)
+
+      assert summary =~ "2 Kassette(n) versiegelt"
+      assert erste == "versiegelt: 0001-get-guestmeetings.json"
+      assert zweite == "versiegelt: 0002-post-auth.json"
 
       Enum.each(kassetten, fn {name, _content} ->
         enc = Path.join(dir, name <> ".enc")
@@ -215,6 +260,20 @@ defmodule KomkiConnectorRis.RisKassettenTest do
         assert mode(json) == 0o600
         refute File.exists?(Path.join(dir, name <> ".enc"))
       end)
+    end
+
+    test "leere Kassetten runden ebenfalls bytetreu" do
+      dir = tmp_area!("leer-datei")
+      opts = initialisiert!(dir)
+      json = kassette!(dir, "0001-get-x.json", "")
+
+      assert {0, _} = RisKassetten.run(["seal", dir], opts)
+      enc = Path.join(dir, "0001-get-x.json.enc")
+      assert byte_size(File.read!(enc)) == 4 + 12 + 16
+      refute File.exists?(json)
+
+      assert {0, _} = RisKassetten.run(["unseal", dir], opts)
+      assert File.read!(json) == ""
     end
 
     test "Meldungen nennen nie Klartext oder Siegel" do
@@ -248,8 +307,7 @@ defmodule KomkiConnectorRis.RisKassettenTest do
 
     test "unseal verweigert bei existierender Klartextdatei" do
       dir = tmp_area!("kollision-unseal")
-      opts = [tresor: tresor!(dir), security: security!(dir)]
-      assert {0, _} = RisKassetten.run(["init"], opts)
+      opts = initialisiert!(dir)
       kassette!(dir, "0001-get-x.json", "{}")
       assert {0, _} = RisKassetten.run(["seal", dir], opts)
       File.write!(Path.join(dir, "0001-get-x.json"), "{}")
@@ -261,8 +319,8 @@ defmodule KomkiConnectorRis.RisKassettenTest do
 
     test "Korruption: Exit 5 mit Dateiname; .enc bleibt liegen" do
       dir = tmp_area!("korruption")
-      opts = [tresor: tresor!(dir), security: security!(dir)]
-      assert {0, _} = RisKassetten.run(["init"], opts)
+      opts = initialisiert!(dir)
+
       # Lang genug, dass Position 30 im Chiffretext liegt und das letzte Byte im Tag.
       kassette!(dir, "0001-get-x.json", ~s({"k":"v","padding":"0123456789abcdef"}))
       assert {0, _} = RisKassetten.run(["seal", dir], opts)
@@ -290,10 +348,25 @@ defmodule KomkiConnectorRis.RisKassettenTest do
       assert Enum.any?(texts(meldungen), &(&1 =~ "zu kurz"))
     end
 
+    test "Restdatei (.json.new) blockiert unseal mit klarem Namen" do
+      dir = tmp_area!("restdatei")
+      opts = initialisiert!(dir)
+      kassette!(dir, "0001-get-x.json", "{}")
+      assert {0, _} = RisKassetten.run(["seal", dir], opts)
+      # Simuliert den Crash-Rest eines abgebrochenen unseal.
+      File.write!(Path.join(dir, "0001-get-x.json.new"), "alt")
+
+      {1, meldungen} = RisKassetten.run(["unseal", dir], opts)
+
+      assert Enum.any?(texts(meldungen), &(&1 =~ "Restdatei 0001-get-x.json.new blockiert"))
+      assert File.exists?(Path.join(dir, "0001-get-x.json.enc"))
+      # Die Restdatei wurde nicht ueberschrieben.
+      assert File.read!(Path.join(dir, "0001-get-x.json.new")) == "alt"
+    end
+
     test "Mischzustand: seal versiegelt nur offene Kassetten und laesst .enc in Ruhe" do
       dir = tmp_area!("gemischt")
-      opts = [tresor: tresor!(dir), security: security!(dir)]
-      assert {0, _} = RisKassetten.run(["init"], opts)
+      opts = initialisiert!(dir)
       kassette!(dir, "0001-get-a.json", ~s({"a":"#{@kanarie}"}))
       kassette!(dir, "0002-get-b.json", ~s({"b":2}))
       File.write!(Path.join(dir, "0003-get-c.json.enc"), "rkt1-fremd-fuer-unseal")
@@ -307,10 +380,27 @@ defmodule KomkiConnectorRis.RisKassettenTest do
       assert Enum.any?(texts(meldungen), &(&1 =~ "0 Klartext-Kassette(n), 3 versiegelt"))
     end
 
+    test "nicht-Kassetten bleiben sichtbar: Warnung beim seal, Zaehler bei status" do
+      dir = tmp_area!("sonstige")
+      opts = initialisiert!(dir)
+      kassette!(dir, "0001-get-x.json", "{}")
+      File.write!(Path.join(dir, "notiz.txt"), "x")
+
+      {0, meldungen} = RisKassetten.run(["seal", dir], opts)
+
+      assert Enum.any?(texts(meldungen), &(&1 =~ "notiz.txt" and &1 =~ "bleiben Klartext"))
+
+      {0, status_meldungen} = RisKassetten.run(["status", dir], opts)
+
+      assert Enum.any?(
+               texts(status_meldungen),
+               &(&1 =~ "0 Klartext-Kassette(n), 1 versiegelt" and &1 =~ "sonstige")
+             )
+    end
+
     test "leeres Verzeichnis ist ein Idempotentes nichts-zu-tun (Exit 0)" do
       dir = tmp_area!("leer")
-      opts = [tresor: tresor!(dir), security: security!(dir)]
-      assert {0, _} = RisKassetten.run(["init"], opts)
+      opts = initialisiert!(dir)
 
       {0, seal_meldungen} = RisKassetten.run(["seal", dir], opts)
       assert Enum.any?(texts(seal_meldungen), &(&1 =~ "nichts zu tun"))
@@ -354,6 +444,42 @@ defmodule KomkiConnectorRis.RisKassettenTest do
 
       assert RisKassetten.check_dir(System.tmp_dir!()) == :ok
       assert calls(dir, "tresor-calls", "open") == 0
+    end
+
+    test "Symlink in ein Repo umgeht die Pruefung nicht" do
+      area = tmp_area!("symlink")
+      opts = [tresor: tresor!(area), security: security!(area)]
+
+      repo = Path.join(area, "repo")
+      File.mkdir_p!(Path.join(repo, ".git"))
+      File.mkdir_p!(Path.join(repo, "kassetten"))
+      File.write!(Path.join([repo, "kassetten", "0001-get-x.json"]), "{}")
+
+      live = Path.join(area, "live")
+      File.ln_s!(Path.join(repo, "kassetten"), live)
+
+      assert {:error, {:dir_in_repo, _}} = RisKassetten.check_dir(live)
+
+      {1, meldungen} = RisKassetten.run(["seal", live], opts)
+      assert Enum.any?(texts(meldungen), &(&1 =~ "Git-Repo"))
+      refute File.exists?(Path.join([repo, "kassetten", "0001-get-x.json.enc"]))
+    end
+
+    test "unlesbares Verzeichnis: klare Meldung statt Crash, auch bei status" do
+      area = tmp_area!("unlesbar")
+      dir = Path.join(area, "kassetten")
+      File.mkdir_p!(dir)
+      on_exit(fn -> if File.exists?(dir), do: File.chmod!(dir, 0o755) end)
+
+      File.chmod!(dir, 0o000)
+
+      {1, meldungen} = RisKassetten.run(["status", dir], [])
+      assert Enum.any?(texts(meldungen), &(&1 =~ "nicht lesbar"))
+
+      {1, meldungen} = RisKassetten.run(["seal", dir], [])
+      assert Enum.any?(texts(meldungen), &(&1 =~ "nicht lesbar"))
+
+      File.chmod!(dir, 0o755)
     end
 
     test "ohne Tresor: Exit 3 auch beim seal" do
@@ -404,6 +530,13 @@ defmodule KomkiConnectorRis.RisKassettenTest do
       assert {:error, :no_enclave} = RisKassetten.tresor_check(script!(dir, "tresor-3", "exit 3"))
     end
 
+    test "check haengt nicht: Timeout beendet das Programm" do
+      dir = tmp_area!("check-timeout")
+      cmd = script!(dir, "komki-tresor", "exec sleep 30")
+
+      assert {:error, :timeout} = RisKassetten.tresor_check(cmd, check_timeout: 300)
+    end
+
     test "Klartext und Siegel gehen nie ueber argv" do
       dir = tmp_area!("argv")
 
@@ -437,7 +570,15 @@ defmodule KomkiConnectorRis.RisKassettenTest do
 
   describe "Aufruf" do
     test "falsche Aufrufe: Exit 2 mit Usage" do
-      for argv <- [[], ["nix"], ["seal"], ["seal", "a", "b"], ["init", "verzeichnis"]] do
+      for argv <- [
+            [],
+            ["nix"],
+            ["seal"],
+            ["seal", "a", "b"],
+            ["init", "verzeichnis"],
+            # --tresor ohne Wert waere sonst der Pfad
+            ["seal", "--tresor"]
+          ] do
         {2, meldungen} = RisKassetten.run(argv, [])
         assert Enum.any?(texts(meldungen), &(&1 =~ "Aufruf:"))
       end
@@ -457,10 +598,11 @@ defmodule KomkiConnectorRis.RisKassettenTest do
     pos = if at < 0, do: byte_size(blob) + at, else: at
     byte = :binary.at(blob, pos)
 
-    File.write!(
-      file,
+    changed =
       binary_part(blob, 0, pos) <>
-        <<:erlang.bxor(byte, 0xFF)>> <> binary_part(blob, pos + 1, byte_size(blob) - pos - 1)
-    )
+        <<Bitwise.bxor(byte, 0xFF)>> <>
+        binary_part(blob, pos + 1, byte_size(blob) - pos - 1)
+
+    File.write!(file, changed)
   end
 end

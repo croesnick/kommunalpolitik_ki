@@ -384,23 +384,15 @@ defmodule KomkiConnectorRis.RisRecorder do
 
   @doc """
   `:ok`, wenn `out` ausserhalb jedes Git-Repos liegt (auch Worktrees, deren
-  `.git` eine Datei ist), sonst `{:error, {:out_in_repo, repo}}`.
+  `.git` eine Datei ist, und Symlinks hinein — RisHttp.repo_free?/1), sonst
+  `{:error, {:out_in_repo, repo}}`.
   """
   @spec check_out(Path.t()) :: :ok | {:error, {:out_in_repo, Path.t()}}
   def check_out(out) do
-    out
-    |> Path.expand()
-    |> ancestors()
-    |> Enum.find(&File.exists?(Path.join(&1, ".git")))
-    |> case do
-      nil -> :ok
-      repo -> {:error, {:out_in_repo, repo}}
+    case RisHttp.repo_free?(out) do
+      :ok -> :ok
+      {:error, {:in_repo, repo}} -> {:error, {:out_in_repo, repo}}
     end
-  end
-
-  defp ancestors(path) do
-    parent = Path.dirname(path)
-    if parent == path, do: [path], else: [path | ancestors(parent)]
   end
 
   # Nur fuer den Eigentuemer: die Kassetten tragen nicht-oeffentliche Inhalte.
