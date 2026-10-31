@@ -27,8 +27,8 @@ Komponenten mit denselben Pins:
 * **MTP-Drafter** (Ticket #318): `mtp-gemma-4-26B-A4B-it-Q8_0.gguf` aus
   derselben Repo-Revision, ebenfalls per SHA-256 verifiziert. llama-server
   nutzt ihn für speculative decoding (`--spec-type draft-mtp`) und startet
-  ohne Thinking (`--chat-template-kwargs '{"enable_thinking":false}'`):
-  gleiche Qualität bei rund 70 % kürzerer Gesamtdauer (Labbook #285, F4).
+  ohne Thinking (`--reasoning off`): gleiche Qualität bei rund 70 %
+  kürzerer Gesamtdauer (Labbook #285, F4).
 * **Server:** `llama-server` auf Loopback, Port 49524, mit festen Flags
   (`--jinja`, `--offline`, ohne Web-UI, ohne Slots; Sampling nach der
   offiziellen Gemma-4-Empfehlung: temp 1.0, top-p 0.95, top-k 64).
