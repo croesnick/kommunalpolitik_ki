@@ -86,7 +86,11 @@ Bewerterdefinitionen sind Teil der Suite — der Runner kennt die Typen, aber
 keine Kriterien (Lehre aus #158: das Wort „Eigenanteil“ ohne Zahl genügte und
 machte ein lasches Kriterium unabsichtlich grün). Deterministische Bewerter
 kommen zuerst; ein LLM als Richter nur für kurze Ausgaben mit konkreten
-PASS/FAIL-Bedingungen.
+PASS/FAIL-Bedingungen. Der Fachbegriff für diese Bewertungsmethode ist
+**LLM-as-a-Judge** (etabliertes Englisch, seit Zheng et al. 2023, „Judging
+LLM-as-a-Judge with MT-Bench and Chatbot Arena“; eine etablierte deutsche
+Übersetzung gibt es nicht) — in dieser Konvention heißt das bewertende Modell
+kurz „der Richter“.
 
 | Typ | Frontmatter | Bestanden, wenn |
 |---|---|---|
@@ -116,9 +120,10 @@ Regeln für Kriterien:
   Denken ab und der Richter sieht nur leeren Content (erste Messung #292:
   59/60 Urteile unbestimmt bei 256 Token Budget — der Smoke mit
   Ein-Satz-Antworten sah noch grün aus). Der Richter vergibt 2 048 Token und
-  liest das Urteil notfalls aus dem Ende der Denkspur. Ein Richter-Defekt
-  wird über die gespeicherten Antworten neu bewertet (`--nur-richter`), nie
-  durch Wiederholung der Messläufe.
+  liest das Urteil notfalls aus dem Ende der Denkspur. Ein Fehler im
+  LLM-as-a-Judge (judge bug — das Problem sitzt im Bewerter, nicht im
+  Gemessenen) wird über die gespeicherten Antworten neu bewertet
+  (`--nur-richter`), nie durch Wiederholung der Messläufe.
 - **Jeder neue Fehlertyp wird zum Fall**: Das Lesen der Stichproben findet
   Fehler, die kein abgefragtes Kriterium kennt (in #158 war es die erfundene
   RIS-URL). Pflicht je Messrunde: Stichproben lesen und neue Fehler als Fälle

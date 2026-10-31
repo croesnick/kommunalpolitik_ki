@@ -255,8 +255,9 @@ oben.
 llm-Kriterien als „unbestimmt" und damit FAIL — Gemma 4 26B-A4B-it denkt vor
 der Antwort in `reasoning_content` (englisch), und das ursprüngliche
 Output-Budget von 256 Token schnitt jeden Lauf mitten im Denken ab
-(`finish_reason: length`, leerer `content`). Das war ein Richter-Defekt, kein
-Befund über die Antworten: Die Messläufe selbst blieben unberührt; die
+(`finish_reason: length`, leerer `content`). Das war ein Fehler im
+LLM-as-a-Judge (judge bug), kein Befund über die Antworten: Die Messläufe
+selbst blieben unberührt; die
 Richter-Phase wurde nach dem Fix (2 048 Token Budget, Urteil auch aus dem
 Ende der Denkspur lesbar) über dieselben gespeicherten Antworten wiederholt.
 Die llm-Zahlen in den Tabellen stammen aus dem zweiten Durchlauf. Lehre für
