@@ -1,6 +1,7 @@
 # Labbook: llama-server-A/B — 0.7.0-Pin gegen 0.8.0
 
-- **Status:** laufend, 2026-10-31 (Ticket #320). Nutzer-GO 31.10.2026: Lane starten, ohne auf den Merge von PR #319 zu warten — der Merge war um 16:07 Uhr durch; die Lane lief auf `origin/main` (`d191752`), also auf dem Stand nach #319 (`--reasoning off`).
+- **Status:** abgeschlossen, 2026-10-31 (Ticket #320). Nutzer-GO 31.10.2026: Lane starten, ohne auf den Merge von PR #319 zu warten — der Merge war um 16:07 Uhr durch; die Lane lief auf `origin/main` (`d191752`), also auf dem Stand nach #319 (`--reasoning off`).
+- **Empfehlung:** 0.7.0-Pin behalten. 0.8.0 besteht alle registrierten Gates, bringt aber keinen messbaren Gewinn und dekodiert rund 6 % langsamer. Herleitung im Abschnitt [Empfehlung](#empfehlung).
 - **Vorgänger:** [Labbook: Modell-A/B](2026-10-31-modell-ab.md) (#285: Protokoll, Gates, Checklisten, F4-Referenz), [Labbook: Realmodell-Smoke-Test](2026-10-30-pi-realmodell-smoke-test.md) (#158: Harness-Basis)
 - **Harness:** `apps/komki_cli/experiments/pi_packages/smoke/` (`run-ab.mjs`, `grade-ab.mjs`), erweitert um eine Binär-Auswahl je Arm (`--bin`, Arme `V7`/`V8`)
 
@@ -64,6 +65,100 @@ Wie #285: `grade-ab.mjs blind` kopiert die Outputs der Aufgaben 1, 2 und 3 aller
 2. Tempo und Speicher werden als Kosten/Nutzen berichtet; sie entscheiden nicht allein.
 3. Scheitert V8 an einem Gate, bleibt es beim Pin; der Befund steht in diesem Labbook und im Ticket.
 4. Das Upgrade selbst (brew, Re-Pin, Profil-Regeneration, Doku-Pflege) läuft nur nach ausdrücklichem GO der nutzenden Person.
+
+## Ablauf
+
+| Schritt | Zeit (31.10.2026, MEZ) | Verzeichnis unter `$TMPDIR/komki-pi-experiments/ab-320/` |
+|---|---|---|
+| 0.8.0-Bundle geladen, Tarball-SHA-256 gegen die GitHub-Digest geprüft, entpackt | 19:08 | `downloads/b11960/` |
+| Pre-Registration committet | 19:14 | Commit `c7e8b1c`, Arbeitsbaum sauber — der Hauptlauf lief auf genau diesem Stand |
+| Preflight-Check V7, V8 | 19:15 | `main/preflight/V7|V8/` (V7 4,3 s, V8 8,9 s) |
+| Hauptlauf: Warm-up + 3 Runden × 2 Arme, verzahnt | 19:16–19:29 | `main/` (`schedule.json`, `provenance.json`, `REPORT.md`) |
+| Blindbewertung, Entblindung | 19:31–19:34 | `main/blind/`, `main/blind-key.json` |
+
+Abweichungen vom Protokoll: keine. Die Rohdaten (Request-Mitschnitte, Sessions, Server-Logs, Blindkopien) liegen nur in diesen Verzeichnissen und sind nicht Teil des Repos.
+
+## Umgebung und Provenance
+
+| Feld | Wert |
+|---|---|
+| Hardware | MacBookPro18,4, Apple M1 Max, 64 GB, Netzbetrieb, in keinem Lauf eine Thermik- oder Leistungswarnung (`pmset -g therm`) |
+| macOS | 27.2 (26B5101f) |
+| Node, pi | 24.22.1 (asdf), pi 1.4.0 |
+| Git-Stand | `c7e8b1c` (Pre-Registration), sauber |
+| V7-Binärdatei | `/opt/homebrew/Cellar/llama.cpp/0.7.0/bin/llama-server` — 0.7.0 (build 11669, `620d2225c`), identisch mit dem Pin der Live-Instanz |
+| V8-Binärdatei | `downloads/b11960/llama-b11960/llama-server` — 0.8.0-dev (build 11960, `8642541b2`), SHA-256 `3d81b799…4635be`, aus dem geprüften Release-Asset entpackt |
+| GGUF, Drafter | Pin `gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf` (`ef728c8e…`), Drafter `mtp-gemma-4-26B-A4B-it-Q8_0.gguf` (`6326fb9f…`) — vor jedem Lauf geprüft |
+| Störgrößen | Live-Instanz (Port 49524) und eine #318-Wegwerf-Instanz (Port 49621) liefen idle mit; Swap ~29 GB belegt, weitgehend stabil. Das Interleaving verteilt Resteffekte gleich auf beide Arme. |
+
+## Ergebnisübersicht
+
+V8 besteht alle registrierten Gates gegen V7 — aber ohne jeden messbaren Gewinn.
+
+### Gates
+
+| Gate | V7 (Referenz) | V8 (0.8.0) |
+|---|---|---|
+| H1 0 Faktenänderungen (A3, jeder Lauf) | 0 / 0 / 0 | 0 / 0 / 0 → bestanden |
+| H2 Reparaturrate ≤ Referenz | 0 von 49 (0 %) | 0 von 48 (0 %) → bestanden |
+| Q Median ≥ Referenz in ≥ 2 von 3 Textaufgaben | Referenz | Aufgaben 1–3, überall Gleichstand → bestanden |
+| Regel 1 kein zusätzlicher `fail`/Timeout | 0 | 0 → bestanden |
+
+### Qualität (blind, Median und Spanne)
+
+| Aufgabe | V7 | V8 |
+|---|---|---|
+| 1 — TOP-Zusammenfassung (von 11) | 10 (10–10) | 10 (10–10) |
+| 2 — Quellen (von 20) | 20 (20–20) | 20 (20–20) |
+| 3 — Redigieren (von 16) | 15 (15–15) | 15 (15–15) |
+
+Alle 18 bewerteten Outputs liegen auf denselben Punktzahlen. Einziges Verfehlten ist überall S4 („kann gedeckt werden" wird zu „wird gedeckt/finanziert") — derselbe Befund wie in #285 (dort Befund 7), ohne Unterschied zwischen den Builds.
+
+### Leistung (Median und Spanne über 3 Messläufe, Aufgaben 1–4 und 6)
+
+| Messgröße | V7 (0.7.0) | V8 (0.8.0) |
+|---|---|---|
+| Ladezeit | 3,5 s (3,5–3,5) | 2,5 s (2,5–2,5) |
+| Gesamtdauer | 89 s (88–97) | 91 s (91–96) |
+| Decode | 59,6 t/s (59,2–59,8) | 56,1 t/s (56,0–56,4) |
+| Prefill | 405 t/s (399–408) | 400 t/s (397–402) |
+| TTFT = erste sichtbare Antwort (ohne Thinking) | 825 ms (737–876) | 877 ms (860–882) |
+| Thinking-Token | 0 | 0 |
+| draft acceptance (gepoolt) | 0,710 (4 428 von 6 240) | 0,708 (4 347 von 6 140) |
+| `phys_footprint` max | 14,5 GiB (12,9–16,4) | 13,5 GiB (13,0–17,3) |
+| Tool-Calls / invalide / Reparaturen | 49 / 0 / 0 | 48 / 0 / 0 |
+| repetition loops / längengeklemmte Requests | 0 / 0 | 0 / 0 |
+
+Prüfergebnisse je Aufgabe: in beiden Armen und allen Läufen identisch — Aufgabe 1 `partial` in allen sechs Läufen (Eigenanteil fehlt, bekannter Befund aus #158/#285), Aufgaben 2, 3, 4 und 6 überall `pass`.
+
+### Sonde: gleicher Seed
+
+| Artefakt | Runden mit Bytengleichheit V7 = V8 |
+|---|---|
+| `quellen.json` (Aufgabe 2) | 3 von 3 |
+| TOP-Antwort (Aufgabe 1) | 1 von 3 (Runde 2; Runden 1 und 3 mit Formulierungsunterschieden) |
+| `neue-fassung.md` (Aufgabe 3) | 0 von 3 (Formulierungsunterschiede, alle Fakten identisch) |
+
+Wie in F4-Beobachtung 2 garantiert gleicher Seed keine Bytengleichheit — GPU-Rechenreihenfolgen brechen sie auch bei unveränderter Verteilung. Dass vier von neun Artefakt-Paaren trotzdem bytengleich sind und die übrigen nur in Kleinigkeiten abweichen, ist ein Hinweis, dass die 0.8.0-Numerik für dieses Setup nahe an 0.7.0 liegt. Mehr kann eine n=3-Sonde nicht zeigen.
+
+## Befunde
+
+1. **0.8.0 ist voll kompatibel zur Produktivkonfiguration.** Der Build akzeptiert die exakte Flagliste (inklusive `--no-webui`, `--reasoning off`, `--spec-type draft-mtp --spec-draft-n-max 4 --model-draft`); Preflight und alle acht Läufe liefen ohne Einschränkung. Die `--no-webui`-Zeile steht in beiden Logs identisch (Info, kein Fehler); der Wechsel auf `--no-ui` bleibt ein eigener, zu vermessender Schritt (PR #319, „bewusst offen").
+2. **Verhalten ununterscheidbar.** Thinking bleibt aus (0 Token überall), die draft acceptance liegt mit 0,708 quasi auf 0,710 (Referenzband 0,62–0,70 aus #318/#285), Qualität und Prüfergebnisse sind identisch.
+3. **Kein Tempo-Gewinn — ein kleiner Decode-Nachteil.** V8 dekodiert stabilerweise in allen Runden langsamer (56,0–56,4 gegen 59,2–59,8 t/s; Median −5,9 %), die Gesamtdauer gleicht das fast aus (91 gegen 89 s), der Prefill ist gleich. Einziger messbarer Vorteil: die Ladezeit (2,5 gegen 3,5 s — Vokabular-Laden, llama/30679). Für den Agentenalltag mit langen Sitzungen wiegt der Decode mehr als der Start.
+4. **Speicher ohne belastbaren Unterschied.** V8s footprint-max tendiert niedriger (13,5 gegen 14,5 GiB), die Spannen überlappen bei n = 3.
+
+## Empfehlung
+
+Formal besteht V8 alle registrierten Gates — die Regel ließe ein Upgrade zu. Inhaltlich gibt es aber keinen Grund: gleiche Qualität, gleiches Verhalten, gleiche Annahmequote, und im Decode rund 6 % langsamer. **Empfehlung: den 0.7.0-Pin behalten, 0.8.0 nicht übernehmen.** Die Changelog-Kandidaten (Metal-/MoE-Fixes, `no_alloc`-Arbeit) schlagen sich in dieser Konfiguration nicht in messbaren Vorteilen nieder. Die kurz nach dem Release gelandeten Builds b12007 (RoPE-Konstanten auf die GPU — könnte den 128K-Prefill bringen) und b12008 (Gemma-tied-Embedding-Puffer) sind nicht Teil von 0.8.0 und bleiben Kandidaten für die nächste Messung, ebenso ein mögliches 0.8.x mit Decode-Korrekturen. Das Setup dafür steht: Arme V7/V8, `--bin` je Arm und `--reference V7` sind im Harness.
+
+Die Entscheidung trifft die nutzende Person. Dieses Ticket pinnt nichts um; die Live-Instanz läuft unverändert auf 0.7.0.
+
+## Grenzen
+
+- n = 3 bei temp 1,0: Der Decode-Unterschied ist über alle Runden stabil und ohne Spannenüberlappung, aber klein; die Qualitätsgleichstände lösen keine Differenzen auf.
+- Die Blindbewertung lag bei derselben Session, die die Arme ergänzt hat; sie arbeitete nur an den verblindeten Kopien vor dem Lesen des Schlüssels. Da alle Bewertungen auf Inhalt fielen und einheitlich ausfielen, ist die Verblindung hier unkritisch — perfekt war sie ohnehin nie (#285, Grenzen).
+- Gemessen wurde das Nightly-Artefakt b11960 des Release-Commits; ein Homebrew-Build desselben Commits kann andere Compiler-Flags tragen (der AppleClang-Buildstring unterscheidet sich schon). Die Empfehlung gilt für diesen Build; ein Build, den Homebrew später einschenkt, wäre beim GO noch einmal zu vermessen.
 
 ## Reproduktion
 
