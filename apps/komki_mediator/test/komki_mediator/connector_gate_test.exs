@@ -108,7 +108,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert {:ok, %{records: 4}} = Journal.verify(File.read!(env.journal_path))
   end
 
-  test "call_id im Frame ist die decision_id des emit-PDR", %{env: env} do
+  test "call_id im Frame ist die decision_id des Vorbelegs (emitted)", %{env: env} do
     test = self()
 
     fake(env, "web", fn _op, _params, _context ->
@@ -120,10 +120,12 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert_received :web_called
     assert response["labels"] == ["web-oeffentlich@1"]
 
-    # Die Server-Seite antwortet nur, wenn die call_id passt (Client prueft
-    # sie); ein permit belegt also die Zuordnung call_id == emit-PDR.
-    [_decided, _transfer, emit, _admit] = records(env)
-    assert response["emit_decision_id"] == emit["decision_id"]
+    # The server side answers only if the call_id matches (the client checks
+    # it); a permit therefore proves call_id == record before effect.
+    [_decided, _transfer, emitted, _admit] = records(env)
+    assert emitted["outcome"] == "emitted"
+    assert emitted["decision"] == nil
+    assert response["emit_decision_id"] == emitted["decision_id"]
   end
 
   # -----------------------------------------------------------------------

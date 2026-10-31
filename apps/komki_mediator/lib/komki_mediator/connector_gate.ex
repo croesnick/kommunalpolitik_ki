@@ -26,7 +26,8 @@ defmodule KomkiMediator.ConnectorGate do
     `permitted`, a denial, or `released` after a GO — so the journal holds
     the complete derivation even when nothing is executed. Right before
     execution follows the record before effect (rule `emit`, `outcome:
-    emitted`; its `decision_id` is the `call_id` sent in the frame and its
+    emitted`, `decision: null` because it decides nothing; its
+    `decision_id` is the `call_id` sent in the frame and its
     `payload_hash` binds the outgoing request). The admit PDR follows the
     execution. Every PDR after the pre-check carries the call's `call_id`.
   * Execution: `Sidecar.Client.call/6` against
@@ -340,13 +341,14 @@ defmodule KomkiMediator.ConnectorGate do
 
     # Record before effect (R.11): it is in the journal before the request
     # leaves the mediator. payload_hash binds the outgoing request
-    # (operation, parameters, context).
+    # (operation, parameters, context). It is no decision — those are
+    # journaled already — so `decision` stays null.
     PDR.append(env, %{
       "decision_id" => call_id,
       "call_id" => call_id,
       "tool" => call.tool,
       "rule" => "emit",
-      "decision" => "permit",
+      "decision" => nil,
       "outcome" => "emitted",
       "admitted" => nil,
       "intent_hash" => call.intent_hash,

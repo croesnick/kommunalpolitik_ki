@@ -14,7 +14,8 @@ Fassung `komki-mediator/3` (Tickets #144, #218): neben `ping`,
 `list_documents` und `admit_document` bietet der Vermittler die sechs
 Connector-Tools `ris_search`, `ris_show`, `web_search`, `vault_search`,
 `vault_read` und `vault_write_test` an. Jeder Connector-Aufruf laeuft als
-emit → transfer → Vollzug → admit mit drei PDR
+emit → transfer → Vollzug → admit; jede Entscheidung steht sofort im
+Journal, dazu der Vorbeleg vor dem Vollzug, im Permit-Fall also vier PDR
 (`apps/komki_connector/CONTRACT.md` §6, Ticket #298); ein schreibender
 mit `store` statt `transfer`, das ohne GO der nutzenden Person abgelehnt
 wird (Ticket #205).
@@ -165,15 +166,19 @@ sequenceDiagram
         M-->>P: decision error, kein Vollzug
     else Vorpruefung bestanden
         M->>K: Derive.decide emit (B_W, room.environment, out-digest12)
-        K-->>M: assigned_label = B_W
-        M->>J: emit-PDR (outcome permitted, assigned_label, call_id)
-        M->>K: Derive.decide transfer (λ(y), Manifest-Umgebung)
-        alt deny / indeterminate (emit oder transfer)
-            M->>J: PDR (rule emit bzw. transfer, Remedies, call_id)
+        alt emit deny / indeterminate
+            M->>J: PDR (rule emit, Remedies, call_id)
             M-->>P: Remedy-Katalog, kein Vollzug
-        else permit
+        else emit permit (assigned_label = B_W)
+            M->>J: emit-PDR (outcome permitted, assigned_label, call_id)
+            M->>K: Derive.decide transfer (λ(y), Manifest-Umgebung)
+        end
+        alt transfer deny / indeterminate
+            M->>J: PDR (rule transfer, Remedies, call_id)
+            M-->>P: Remedy-Katalog, kein Vollzug
+        else transfer permit
             M->>J: transfer-PDR (outcome permitted, call_id)
-            M->>J: Vorbeleg (rule emit, outcome emitted, decision_id = call_id)
+            M->>J: Vorbeleg (rule emit, outcome emitted, decision null, decision_id = call_id)
             M->>C: Frame (call_id, op, params, context)
             C-->>M: result oder error
             Note over M: Ergebnisform §5.2, Labels aus dem Manifest

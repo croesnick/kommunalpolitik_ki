@@ -191,10 +191,12 @@ dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bz
    ein GO-Beleg mit `outcome: released` direkt nach dem Verbrauch der Nonce (commit vor Wirkung,
    komki_policy CONTRACT §4.6). Der GO-Beleg ist die Entscheidung des Freigabe-Zweigs; für dasselbe Gate
    folgt kein `permitted`. So steht auch bei einem abgelehnten Aufruf jede Prüfung im Journal.
-6. Ohne Permit (oder GO) in Schritt 3 und 4: Antwort mit Remedies, **kein Vollzug**. Die Antwort nennt
-   keinen Vorbeleg (`emit_decision_id`), weil es keinen gibt. Mit Permit in beiden Schritten: der
-   **Vorbeleg vor Wirkung** (`rule: emit`, `outcome: emitted`, R.11), bevor der Connector aufgerufen wird.
-   Seine `decision_id` ist die `call_id` im Frame, sein `payload_hash` bindet die ausgehende Anfrage.
+6. Lehnt Schritt 3 **oder** Schritt 4 ab und kommt kein GO: Antwort mit Remedies, **kein Vollzug**. Die
+   Antwort nennt keinen Vorbeleg (`emit_decision_id`), weil es keinen gibt. Nur wenn beide Schritte erlaubt
+   sind (per Permit oder GO): der **Vorbeleg vor Wirkung** (`rule: emit`, `outcome: emitted`, `decision:
+   null`, R.11), bevor der Connector aufgerufen wird. Er ist keine Entscheidung, die stehen schon im
+   Journal. Seine `decision_id` ist die `call_id` im Frame, sein `payload_hash` bindet die ausgehende
+   Anfrage. Das Antwortfeld `emit_decision_id` (Name aus Kompatibilität) verweist auf ihn.
 7. Die `call_id` entsteht nach der Vorprüfung (Schema, B_W). Jeder PDR des Aufrufs trägt sie:
    Entscheidungen, Ablehnungen, GO-Belege (`released`, `go_refused`, `go_timeout`, ein gescheiterter
    Commit), Vorbeleg und admit-PDR. Nur eine Ablehnung in der Vorprüfung hat keine, weil es noch keinen
