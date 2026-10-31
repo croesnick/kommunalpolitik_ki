@@ -26,7 +26,9 @@ defmodule KomkiMediator.TemplatesTest do
   # Frische Instanz: `komki up` exportiert registry.json vor dem ersten
   # Vermittler-Start (#208). room.json und Dokumente muessen trotzdem kommen.
   test "nur registry.json vorhanden (Export): room.json und Dokumente werden angelegt" do
-    base = Path.join(System.tmp_dir!(), "kmtpl-#{System.unique_integer([:positive])}")
+    base = KomkiMediator.TestHelpers.tmp_base("kmtpl-")
+    on_exit(fn -> File.rm_rf(base) end)
+
     mediator_dir = Path.join(base, "mediator")
     File.mkdir_p!(mediator_dir)
     File.write!(Path.join(mediator_dir, "registry.json"), "EXPORT")
