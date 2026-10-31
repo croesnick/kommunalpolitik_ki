@@ -7,23 +7,23 @@ import path from "node:path";
 import { llamaGet } from "./measure.mjs";
 
 /**
- * Staging-llama-server für den Modell-A/B (Ticket #285).
+ * Staging llama-server for the model A/B (Ticket #285).
  *
- * Gleiche Flags wie der Produktivstart in KomkiCli.Llama (`--jinja
- * --offline --no-webui --no-slots -c <ctx> --alias local-model`, API-Key
- * per Datei), aber ohne Seatbelt-Profil, auf eigenem Port, mit eigenem
- * Key und Log unter dem Laufverzeichnis — nie über die komki-Instanz.
- * Variabel sind nur das GGUF und dessen Sampling-Flags, dazu der Seed.
+ * Same flags as the production start in KomkiCli.Llama (`--jinja
+ * --offline --no-webui --no-slots -c <ctx> --alias local-model`, API key
+ * from a file), but without a Seatbelt profile, on its own port, with its
+ * own key and log under the run directory — never via the komki instance.
+ * Only the GGUF, its sampling flags and the seed vary.
  *
- * Liefert dieselbe Form wie resolveLlama() (port, pid, apiKey, baseUrl,
- * gguf, ctx, logPath), damit run-smoke.mjs beide Wege gleich misst, plus
- * loadMs (Spawn bis /health 200) und stop().
+ * Returns the same shape as resolveLlama() (port, pid, apiKey, baseUrl,
+ * gguf, ctx, logPath), so run-smoke.mjs measures both paths alike, plus
+ * loadMs (spawn until /health 200) and stop().
  */
 
 export const DEFAULT_LLAMA_SERVER = "/opt/homebrew/bin/llama-server";
 const HEALTH_TIMEOUT_MS = 15 * 60_000;
 
-/** Sampling-Objekt → llama-server-Flags. Schlüssel = Flag ohne "--". */
+/** Sampling object → llama-server flags. Key = flag without "--". */
 export function samplingFlags(sampling = {}) {
   return Object.entries(sampling).flatMap(([flag, value]) => [`--${flag}`, String(value)]);
 }
@@ -112,9 +112,9 @@ export async function startStagingServer({
   };
 }
 
-/** `llama-server --version` (Build-Nummer und Commit) für die Provenance. */
+/** `llama-server --version` (build number and commit) for the provenance record. */
 export function llamaVersion(bin = process.env.KOMKI_LLAMA_SERVER ?? DEFAULT_LLAMA_SERVER) {
-  // llama-server schreibt die Version je nach Build nach stdout oder stderr
+  // depending on the build, llama-server prints the version to stdout or stderr
   const out = spawnSync(bin, ["--version"], { encoding: "utf8" });
   return `${out.stdout ?? ""}${out.stderr ?? ""}`.trim() || null;
 }

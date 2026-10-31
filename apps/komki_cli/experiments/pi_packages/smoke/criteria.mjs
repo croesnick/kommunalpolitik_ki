@@ -1,12 +1,12 @@
 /**
- * Muss-Kriterien K1–K8 für TOP-Zusammenfassungen (Aufgabe 1), geteilt von
- * run-top-bench.mjs (#158) und der blinden A/B-Bewertung grade-ab.mjs
- * (#285). Herleitung der Kriterien: Kopfkommentar von run-top-bench.mjs.
+ * Must-have criteria K1–K8 for agenda item summaries (task 1), shared by
+ * run-top-bench.mjs (#158) and the blind A/B grading in grade-ab.mjs
+ * (#285). Where the criteria come from: header comment of run-top-bench.mjs.
  */
 import { TOP_3_ANHOERUNG, factTokens } from "./fixtures.mjs";
 
-// Muss-Kriterien als Alternativgruppen (mindestens eine Option muss im
-// Antworttext vorkommen). K7 zählt Komponenten.
+// Must-have criteria as groups of alternatives (at least one option must
+// occur in the answer text). K7 counts components.
 export const KRITERIEN = [
   { id: "K1", label: "Gremium", options: ["Ausschuss"] },
   { id: "K2", label: "Sitzungsdatum", options: ["12.11.2026", "12. November 2026", "12. November"] },
@@ -27,9 +27,9 @@ export const KRITERIEN = [
 export const K7_KOMPONENTEN = ["Zustimmung", "Haushaltsplanung", "Ergänzungsantrag"];
 
 /**
- * K8: Zahlen der Antwort, die weder in der Quelle stehen noch als
- * Summe/Differenz zweier Quellenzahlen ableitbar sind. Rückgabe:
- * { erfunden: [], abgeleitet: [] } (normalisierte Tokens).
+ * K8: numbers in the answer that neither occur in the source nor follow as
+ * the sum or difference of two source numbers. Returns
+ * { erfunden: [], abgeleitet: [] } (invented, derived; normalized tokens).
  */
 export function classifyNumbers(sourceText, answerText) {
   const source = [...factTokens(sourceText)].map(Number).filter(Number.isFinite);

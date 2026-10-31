@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * Staging eines Kandidaten-GGUF mit Pin-Disziplin (Ticket #285), nach dem
- * Muster von KomkiCli.Model.download/1:
+ * Stages a candidate GGUF with pin discipline (Ticket #285), following
+ * KomkiCli.Model.download/1:
  *
- *   1. feste Revision statt main; die vom Server gemeldete Prüfsumme
- *      (X-Linked-ETag = SHA-256 der LFS-Datei) muss vor dem Download zum Pin
- *      passen,
- *   2. Download als <datei>.part mit /usr/bin/curl -C - (fortsetzbar),
- *   3. SHA-256 der fertigen Datei gegen den Pin; erst dann Umbenennung auf
- *      den endgültigen Namen. Eine abweichende Datei bleibt als .part liegen
- *      und wird nicht verwendet.
+ *   1. a fixed revision instead of main; the checksum the server reports
+ *      (X-Linked-ETag = SHA-256 of the LFS file) must match the pin before
+ *      the download starts,
+ *   2. download to <file>.part with /usr/bin/curl -C - (resumable),
+ *   3. SHA-256 of the finished file against the pin; only then is it renamed
+ *      to its final name. A mismatching file stays behind as .part and is
+ *      never used.
  *
- * Ablage: <KOMKI_HOME>/models-staging (nie models/ der Instanz).
+ * Target: <KOMKI_HOME>/models-staging (never the instance's models/).
  *
  *   node smoke/stage-gguf.mjs --repo unsloth/gemma-4-26B-A4B-it-qat-GGUF \
  *     --revision <commit> --file <name.gguf> --sha256 <hex>

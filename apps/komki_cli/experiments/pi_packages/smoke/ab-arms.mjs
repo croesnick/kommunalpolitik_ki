@@ -1,13 +1,14 @@
 /**
- * Die drei Arme des Modell-A/B (Ticket #285). Einzige Variable je Arm: das
- * GGUF samt der Sampling-Empfehlung seines Herstellers. Revision und
- * SHA-256 sind beim Staging (stage-gguf.mjs) gegen den Server geprüft und
- * werden vor jedem A/B-Lauf gegen die Datei geprüft.
+ * The three arms of the model A/B (Ticket #285). The only variable per arm
+ * is the GGUF together with its vendor's sampling recommendation. Revision
+ * and SHA-256 are checked against the server while staging
+ * (stage-gguf.mjs) and against the file before every A/B run.
  *
- * A/B tragen exakt die Sampling-Flags des Produktivstarts (KomkiCli.Llama,
- * Gemma-4-Modellkarte); min-p bleibt dort wie in Produktion auf dem
- * llama-server-Default 0.05. C trägt die Thinking-Mode-Empfehlung der
- * Qwen3.8-27B-Modellkarte (inkl. min_p 0, presence/repetition neutral).
+ * A and B carry exactly the sampling flags of the production start
+ * (KomkiCli.Llama, Gemma 4 model card); as in production, min-p stays at
+ * the llama-server default of 0.05. C carries the thinking-mode
+ * recommendation of the Qwen3.8-27B model card (min_p 0, presence and
+ * repetition penalties neutral).
  */
 
 const GEMMA_SAMPLING = { temp: 1.0, "top-p": 0.95, "top-k": 64 };
@@ -49,7 +50,7 @@ export const ARMS = {
   },
 };
 
-/** Seed je Runde: Runde 0 ist das Warm-up, 1..n die Messläufe; alle Arme einer Runde teilen den Seed. */
+/** Seed per round: round 0 is the warm-up, 1..n are measured runs; all arms of a round share the seed. */
 export function seedFor(round) {
   return 285_000 + round;
 }

@@ -1,22 +1,22 @@
 #!/usr/bin/env node
 /**
- * Blinde Bewertung und Auswertung des Modell-A/B (Ticket #285).
+ * Blind grading and evaluation of the model A/B (Ticket #285).
  *
  *   node smoke/grade-ab.mjs blind  --root <ab-root>
- *     Kopiert die Outputs der Aufgaben 1–3 aller Messläufe unter neutralen
- *     Zufalls-IDs nach <root>/blind/task-N/<id>.txt (je Aufgabe gemischt),
- *     rechnet die automatischen Checklisten-Punkte (auto.json, ohne
- *     Armkennung) und legt die Vorlage für die manuelle Bewertung an
- *     (grades.json). Der Schlüssel liegt getrennt in <root>/blind-key.json
- *     und wird erst von `report` gelesen.
+ *     Copies the outputs of tasks 1–3 of all measured runs under neutral
+ *     random IDs to <root>/blind/task-N/<id>.txt (shuffled per task),
+ *     computes the automatic checklist points (auto.json, without arm
+ *     labels) and writes the template for manual grading (grades.json).
+ *     The key is kept separately in <root>/blind-key.json and is read only
+ *     by `report`.
  *
  *   node smoke/grade-ab.mjs report --root <ab-root>
- *     Entblindet, verbindet Auto- und manuelle Punkte, rechnet Mediane und
- *     Spannen je Arm, prüft die vorab registrierten Gates und schreibt
- *     <root>/report.json und <root>/REPORT.md.
+ *     Unblinds, joins automatic and manual points, computes medians and
+ *     ranges per arm, checks the pre-registered gates and writes
+ *     <root>/report.json and <root>/REPORT.md.
  *
- * Die Checklisten unten sind vorab registriert (Labbook #285, Abschnitt
- * „Pre-Registration“): Änderungen nach den Messläufen sind nicht zulässig.
+ * The checklists below are pre-registered (labbook #285, section
+ * "Pre-Registration"): they must not change after the measured runs.
  */
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -27,9 +27,9 @@ import { parseSessionFile } from "../lib/session.mjs";
 import { checkAnswer } from "./criteria.mjs";
 import { ENTWURF_BESCHLUSSVORLAGE, factTokens, missingFacts } from "./fixtures.mjs";
 
-// ---------------------------------------------------------------- Checklisten
+// ---------------------------------------------------------------- checklists
 
-/** Manuelle Punkte je Aufgabe (blind bewertet, je 1 Punkt; true/false). */
+/** Manual items per task (graded blind, 1 point each; true/false). */
 export const MANUAL = {
   1: [
     { id: "M1", text: "Höchstens fünf Sätze (Vorgabe des Prompts)." },
@@ -79,7 +79,7 @@ function pages(value) {
 const quelleText = (entry) => `${entry?.Quelle ?? ""}`;
 const isVep = (entry) => /Verkehrsentwicklungsplan|VEP/i.test(quelleText(entry));
 
-/** Soll-Quellen des Lageberichts (Aufgabe 2) mit erlaubten Feldwerten. */
+/** Expected sources of the status report (task 2) with accepted field values. */
 export const QUELLEN_SOLL = [
   { id: "VEP S. 14", match: (e) => /2026-V-118/.test(quelleText(e)) || (isVep(e) && pages(e.Seite).includes(14)), abruf: ["2.10.2026"], seite: [14] },
   { id: "VEP S. 22", match: (e) => isVep(e) && pages(e.Seite).includes(22), abruf: [null, "2.10.2026"], seite: [22] },
@@ -95,7 +95,7 @@ function seiteOk(expected, value) {
   const got = pages(value);
   if (expected.length === 0) return got.length === 0;
   if (expected.length === 2 && expected[0] === 7) {
-    // Spanne S. 7–9: Grenzen enthalten, nichts außerhalb
+    // page range 7–9: both bounds present, nothing outside
     return got.includes(7) && got.includes(9) && got.every((p) => p >= 7 && p <= 9);
   }
   return got.length === expected.length && expected.every((p) => got.includes(p));
@@ -154,8 +154,8 @@ function autoTask3(edited) {
   const original = factTokens(ENTWURF_BESCHLUSSVORLAGE);
   const added = [...factTokens(edited)].filter((token) => !original.has(token));
   return {
-    // Die Vorprüfung fließt nicht in den Score (F0–F10 decken die Fakten
-    // ab); sie zeigt der blinden Bewertung fehlende und neue Zahlen.
+    // The pre-check does not count towards the score (F0–F10 cover the
+    // facts); it shows the blind grader missing and new numbers.
     items: { S1: editedWords <= Math.round(originalWords * 0.8) },
     vorpruefung: { missingFacts: missing, hinzugekommeneZahlen: added, originalWords, editedWords },
   };
@@ -241,7 +241,7 @@ function spread(values) {
   return { median: median(list), min: Math.min(...list), max: Math.max(...list), n: list.length, values: list };
 }
 
-/** Alle Einzelmessungen einer Aufgabe (Aufgaben 4 und 6 haben a und b). */
+/** All single measurements of a task (tasks 4 and 6 have a and b). */
 function measuresOf(result) {
   const m = result?.measurements;
   if (!m) return [];
@@ -250,10 +250,10 @@ function measuresOf(result) {
 }
 
 /**
- * Distinkte Tool-Results mit isError einer Aufgabe. Die Session nach
- * --continue (Aufgaben 4, 6) enthält die Results des ersten Laufs noch
- * einmal, daher die Vereinigung über toolCallId. Ein schema-invalider Call
- * erscheint bei pi ebenfalls als isError-Result und zählt so genau einmal.
+ * Distinct tool results with isError of a task. The session after
+ * --continue (tasks 4, 6) repeats the results of the first run, hence the
+ * union over toolCallId. pi turns a schema-invalid call into an isError
+ * result as well, so it counts exactly once.
  */
 async function errorResults(measures) {
   const byId = new Map();
@@ -424,7 +424,7 @@ async function report(root) {
     };
   }
 
-  // Gates (vorab registriert): Referenz ist Arm A (Pin)
+  // gates (pre-registered): arm A (the pin) is the reference
   const gates = {};
   for (const arm of arms) {
     const a = byArm[arm];

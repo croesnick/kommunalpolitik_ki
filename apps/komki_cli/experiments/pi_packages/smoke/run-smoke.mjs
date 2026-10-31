@@ -19,14 +19,14 @@
  * Tool-Call-Fehler, Reparaturbedarf, Token und Speicher. Ergebnisse landen
  * unter <root>/results/*.json, <root>/results.json und <root>/SMOKE.md.
  *
- * Modell als Parameter (Ticket #285): Ohne --gguf läuft der Harness wie in
- * #158 gegen die komki-Instanz. Mit --gguf <pfad> --port <n> startet er
- * einen eigenen Staging-llama-server (staging-server.mjs, ohne Seatbelt,
- * gleiche Flags wie die Instanz) und stoppt ihn am Ende wieder:
- *   --sampling '{"temp":1.0,"top-p":0.95,"top-k":64}'  llama-server-Flags
- *   --seed <n>              RNG-Seed des Servers (dokumentiert je Lauf)
- *   --ctx <n>               Serverkontext (Default 131072 wie die Instanz)
- *   --timeout-factor <f>    streckt alle Aufgaben-Timeouts (Default 1)
+ * Model as a parameter (Ticket #285): without --gguf the harness runs
+ * against the komki instance as in #158. With --gguf <path> --port <n> it
+ * starts its own staging llama-server (staging-server.mjs, no Seatbelt,
+ * same flags as the instance) and stops it at the end:
+ *   --sampling '{"temp":1.0,"top-p":0.95,"top-k":64}'  llama-server flags
+ *   --seed <n>              server RNG seed (recorded per run)
+ *   --ctx <n>               server context (default 131072, as the instance)
+ *   --timeout-factor <f>    stretches all task timeouts (default 1)
  */
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -132,7 +132,7 @@ function parseArgs(argv) {
   return args;
 }
 
-/** Aufgaben-Timeout, gestreckt um --timeout-factor (gleich für alle Arme). */
+/** Task timeout stretched by --timeout-factor (the same for all arms). */
 function timeout(ms) {
   return Math.round(ms * args.timeoutFactor);
 }
@@ -147,8 +147,8 @@ async function executeRun(llama, provider, options) {
   const rssBefore = llamaRssMiB(llama.pid);
   const run = await runPi(options);
   const logEnd = await llamaLogOffset(llama);
-  // Thinking-Token exakt über den Tokenizer des laufenden Servers zählen;
-  // completion_tokens enthält sie bereits, das hier ist der Anteil davon.
+  // Count thinking tokens exactly with the running server's tokenizer;
+  // completion_tokens already includes them, this is their share.
   const reasoning = run.requests.map((request) => request.response?.reasoning ?? "").join("");
   return {
     run,

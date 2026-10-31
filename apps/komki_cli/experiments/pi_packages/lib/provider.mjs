@@ -132,9 +132,10 @@ function reconstructJson(body) {
 }
 
 /**
- * Zeitstempel der ersten Deltas eines SSE-Streams (Ticket #285). Parst die
- * Chunks inkrementell (StringDecoder: keine zerrissenen UTF-8-Zeichen) nur
- * für die Zeitmessung; die Rekonstruktion bleibt beim Gesamtpuffer.
+ * Timestamps of the first deltas of an SSE stream (Ticket #285). Parses the
+ * chunks incrementally, for timing only; StringDecoder keeps multi-byte
+ * UTF-8 sequences intact across chunk boundaries. The reconstruction still
+ * works on the complete buffer.
  */
 function sseTimer(started) {
   const decoder = new StringDecoder("utf8");

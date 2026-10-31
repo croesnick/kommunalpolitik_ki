@@ -1,25 +1,24 @@
 #!/usr/bin/env node
 /**
- * Modell-A/B über den Smoke-Harness (Ticket #285).
+ * Model A/B on top of the smoke harness (Ticket #285).
  *
- * Fährt run-smoke.mjs je Arm mit eigenem Staging-llama-server (--gguf),
- * interleaved: Runde 0 = Warm-up (ungemessen), Runden 1..n = Messläufe,
- * je Runde A B C. Alle Arme einer Runde teilen den Seed (ab-arms.mjs).
- * Jeder Lauf startet seinen Server frisch und stoppt ihn danach — gleiche
- * Ausgangslage, Ladezeit als Messwert.
+ * Runs run-smoke.mjs per arm against its own staging llama-server (--gguf),
+ * interleaved: round 0 = warm-up (not measured), rounds 1..n = measured
+ * runs, each round A B C. All arms of a round share the seed (ab-arms.mjs).
+ * Every run starts its server fresh and stops it afterwards — same starting
+ * point for every run, with load time as a measurement.
  *
  *   node smoke/run-ab.mjs --root <dir> [--runs 3] [--arms A,B,C]
  *                         [--only 1,2,3,4,6] [--timeout-factor 6]
- *   node smoke/run-ab.mjs --root <dir> --preflight   # nur Lade-Check
+ *   node smoke/run-ab.mjs --root <dir> --preflight   # load check only
  *
- * Nachmessung einer knappen Kennzahl (Entscheidungsregel 4 im Labbook):
- * --first-round 4 --runs 5 --only 2 fährt nur die Runden 4–5 ohne Warm-up.
+ * Re-measuring a close metric (decision rule 4 in the labbook):
+ * --first-round 4 --runs 5 --only 2 runs rounds 4–5 only, without warm-up.
  *
- * Fortsetzbar: Ein Lauf mit results.json im Laufverzeichnis gilt als
- * erledigt und wird beim erneuten Aufruf übersprungen. Provenance
- * (Hardware, Versionen, SHA-256 von Binary und GGUFs, Git-Stand) und der
- * Ablauf mit Systemzustand je Lauf landen in <root>/provenance.json und
- * <root>/schedule.json.
+ * Resumable: a run whose directory holds results.json counts as done and
+ * is skipped on the next invocation. Provenance (hardware, versions,
+ * SHA-256 of binary and GGUFs, git state) and the schedule with the system
+ * state per run go to <root>/provenance.json and <root>/schedule.json.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { createWriteStream, existsSync, realpathSync } from "node:fs";
@@ -70,7 +69,7 @@ function ggufPath(arm) {
   return path.join(komkiBaseDir(), "models-staging", ARMS[arm].file);
 }
 
-/** Systemzustand vor/nach einem Lauf: Swap, Last, Thermik, Stromquelle. */
+/** System state before/after a run: swap, load, thermals, power source. */
 function systemState() {
   return {
     at: new Date().toISOString(),

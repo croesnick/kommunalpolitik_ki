@@ -152,6 +152,8 @@ Die Doku-Site unter [`docs/site/`](docs/site/) (veröffentlicht über GitHub Pag
 
 Etablierte englische Fachbegriffe werden immer und konsistent auf Englisch verwendet — nicht eingedeutscht und nicht durch neugeprägte deutsche Komposita ersetzt (z. B. remedy plan, field provenance, taint tracking, paired execution). Deutsch wird nur verwendet, wenn (a) noch kein etablierter englischer Begriff existiert oder (b) ein etablierter deutscher Begriff vorhanden ist (z. B. Nichtinterferenz, Sitzungsmappe). Neue Begriffe — welcher Sprache auch immer — werden bei ihrer ersten Verwendung definiert.
 
+**Code-Kommentare:** In Code mit englischen Bezeichnern sind Kommentare und Docstrings englisch. Deutsch bleiben Inhalte, die Daten oder Oberfläche sind: Prompts, Fixtures, Meldungen an Nutzende.
+
 ## Lizenz-Bewusstsein
 
 Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder kommerziell von Artifex). Für ein persönliches/Open-Source-Projekt ist AGPL in Ordnung; bei proprietärer Nutzung Alternative evaluieren (`pdfplumber` MIT, `pdf.js` Apache-2.0). Pro Tool in der Tool-Doku dokumentieren.

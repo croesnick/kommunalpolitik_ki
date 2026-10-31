@@ -18,7 +18,7 @@ export function komkiBaseDir() {
   return process.env.KOMKI_HOME ?? path.join(os.homedir(), ".local", "share", "komki");
 }
 
-/** SHA-256 einer Datei (Pins von GGUF und Binary). */
+/** SHA-256 of a file (pins of GGUF and binary). */
 export function sha256File(file) {
   return new Promise((resolve, reject) => {
     const hash = createHash("sha256");
@@ -106,8 +106,8 @@ export async function resolveLlama() {
 }
 
 /**
- * Zählt Token eines Textes über /tokenize des laufenden Servers (dessen
- * eigener Tokenizer, also armgenau). null, wenn der Server nicht antwortet.
+ * Counts the tokens of a text via /tokenize of the running server (its own
+ * tokenizer, so exact per arm). null if the server does not answer.
  */
 export function llamaTokenCount(llama, text, timeoutMs = 30_000) {
   const body = JSON.stringify({ content: text, add_special: false });
@@ -158,9 +158,9 @@ export function llamaRssMiB(pid) {
 }
 
 /**
- * phys_footprint des llama-server in MiB über /usr/bin/footprint (oder
- * null). Anders als RSS zählt er komprimierte und ausgelagerte Seiten und
- * die Malloc-Puffer, in denen llama.cpp unter Metal Gewichte und KV hält.
+ * phys_footprint of the llama-server in MiB via /usr/bin/footprint (or
+ * null). Unlike RSS it counts compressed and swapped-out pages and the
+ * malloc buffers in which llama.cpp keeps weights and KV cache under Metal.
  */
 export function llamaFootprintMiB(pid) {
   if (!pid) return null;
