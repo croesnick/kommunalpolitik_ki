@@ -15,6 +15,7 @@ description: Häufige Meldungen, ihre Ursachen und was hilft. Dazu die ehrlichen
 | `Basis abgelehnt: Socket-Pfad zu lang: 154 Byte, macOS erlaubt höchstens 103 (…)` | Der Ordner in `KOMKI_HOME` ist zu tief verschachtelt; die Verbindungsdateien von komki dürfen unter macOS höchstens 103 Byte lang sein | Einen kürzeren Ordner wählen, etwa `KOMKI_HOME=/private/tmp/komki-test`, dann `komki setup` erneut |
 | `Basis des Panes weicht ab: KOMKI_HOME=…, die Session gehört zu …` | Eine zweite Instanz nutzt denselben tmux-Server mit einer anderen Basis | `komki session` aus einer Shell starten, deren `KOMKI_HOME` zur gewünschten Instanz passt; ein von Hand gestarteter tmux-Server mit diesem Namen muss vorher beendet werden |
 | `doctor` meldet ein Profil als abweichend | Instanz älter als der Code | `komki setup` schreibt die Profile neu |
+| `doctor` meldet `drafter sha256` oder `Start verweigert: … drafter presence`, und `up` startet nicht | Der MTP-Drafter fehlt: Instanz von vor [#318](https://github.com/croesnick/kommunalpolitik_ki/issues/318), oder der Download ist nie gelaufen | `komki setup` lädt die 0,5-GB-Datei nach Rückfrage nach; liegt sie schon bereit (etwa `--drafter-from PFAD`), entfällt die Frage |
 | `komki-mediator nicht aktiv: 'komki up' zuerst` | Vermittler läuft nicht | `komki up` |
 | Ein Connector fehlt in `komki status` | Prozess abgestürzt | `komki up` startet nur das Fehlende neu |
 | `komki run` legt keine Notiz an, pi meldet die Sperre | So gewollt: Jedes Schreiben braucht dein GO, und bei `komki run` fragt komki nicht | Notizen in einer Session anlegen lassen und das GO im komki-Fenster geben ([Freigabe](/kommunalpolitik_ki/komki/so-funktioniert-es/#freigabe-dein-go-für-genau-einen-aufruf)) |
@@ -25,7 +26,7 @@ Logs liegen unter `~/.local/share/komki/tmp/`: `mediator.log`, `egress.log` und 
 
 ## Was noch nicht geht
 
-- **Nur auf dem Mac.** komki braucht einen Mac mit Apple Silicon und genug Arbeitsspeicher für ein 17-GB-Modell (erprobt mit 64 GB), weil es die Sandbox von macOS nutzt und das Sprachmodell lokal rechnet.
+- **Nur auf dem Mac.** komki braucht einen Mac mit Apple Silicon und genug Arbeitsspeicher für ein 17-GB-Modell plus 0,5-GB-Drafter (erprobt mit 64 GB), weil es die Sandbox von macOS nutzt und das Sprachmodell lokal rechnet.
 - **Kein Installer.** komki wird aus dem Checkout gebaut und im Terminal eingerichtet; optional legst du dir einen lokalen Tap an (`make komki-tap`). Einen veröffentlichten Release gibt es nicht.
 - **Ein Prototyp, kein geprüftes Produkt.** Die Sicherheitsprüfungen sind offen dokumentiert, ein unabhängiges Audit gibt es nicht.
 - **RIS liefert nur Titel.** Ohne Zugangsdaten gibt die Ratsinformations-API keine Texte der Tagesordnungspunkte heraus ([#148](https://github.com/croesnick/kommunalpolitik_ki/issues/148)).

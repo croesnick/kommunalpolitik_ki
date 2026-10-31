@@ -109,6 +109,12 @@ defmodule KomkiCli.Profile do
   network-outbound (llama laeuft --offline); Memory-Fitter bricht mit Warnung
   ab und laesst die Parameter wie angefordert.
 
+  MTP-Drafter (Ticket #318): seit dem Produktivstart laedt llama-server eine
+  zweite gepinnte Datei (`--model-draft`). Das Profil erlaubt ihr Lesen als
+  genau dieses Literal — dieselbe Regelklasse wie das Modell, nichts darueber
+  hinaus (kein models-Subpath). Der echte Lauf unter der Grenze steht im
+  Ticket #318 (draft acceptance im llama-Log).
+
   Nachweis-Konsolidierung: `docs/research/2026-10-14-llama-server-confinement.md`.
   """
   @spec generate_llama(Config.t()) :: String.t()
@@ -148,7 +154,7 @@ defmodule KomkiCli.Profile do
         llama_exec_read_rules(cfg.llama_server_bin) ++
         llama_dylib_rules(dylib_dirs) ++
         llama_dev_rules() ++
-        llama_model_rules(cfg.gguf_path) ++
+        llama_model_rules(cfg) ++
         llama_log_rules(log_path) ++
         llama_key_rules(Llama.key_path(cfg)) ++
         llama_network_rules(cfg.port) ++
@@ -213,10 +219,12 @@ defmodule KomkiCli.Profile do
     ]
   end
 
-  defp llama_model_rules(gguf_path) do
+  defp llama_model_rules(%Config{} = cfg) do
     [
-      "; Modell (mmap)",
-      "(allow file-read* (literal " <> SBPL.quote!(gguf_path) <> "))"
+      "; Modell + MTP-Drafter (mmap; Drafter Ticket #318: --model-draft,",
+      "; genau diese Datei — kein models-Subpath)",
+      "(allow file-read* (literal " <> SBPL.quote!(cfg.gguf_path) <> "))",
+      "(allow file-read* (literal " <> SBPL.quote!(cfg.drafter_path) <> "))"
     ]
   end
 
@@ -381,6 +389,7 @@ defmodule KomkiCli.Profile do
       "/opt",
       cfg.base_dir,
       cfg.gguf_path,
+      cfg.drafter_path,
       log_path,
       cfg.llama_server_bin
     ] ++ dylib_dirs ++ [user_home]

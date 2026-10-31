@@ -12,8 +12,8 @@ Soll dein Coding-Agent die Einrichtung übernehmen, gib ihm den Auftrag von [Mit
 ## Was du brauchst
 
 - **Einen Mac mit Apple Silicon.** komki nutzt die Sandbox von macOS, auf Linux oder Windows läuft es nicht.
-- **Arbeitsspeicher für das Modell.** Die Modelldatei von Gemma hat 17 GB und muss in den Arbeitsspeicher passen, mit 16 GB geht es also nicht. Erprobt ist komki auf einem M1 Max mit 64 GB. 32 GB sollten reichen, geprüft ist das noch nicht.
-- **Rund 20 GB freien Platz.** Fast alles davon ist das Modell. Die Instanz bekommt nur einen APFS-Klon der Datei, also keine zweite Kopie.
+- **Arbeitsspeicher für das Modell.** Die Modelldatei von Gemma hat 17 GB, dazu kommt ein halbes GB für den MTP-Drafter, einen kleinen Beschleuniger, der Antworten schneller macht. Mit 16 GB geht es also nicht. Erprobt ist komki auf einem M1 Max mit 64 GB. 32 GB sollten reichen, geprüft ist das noch nicht.
+- **Rund 20 GB freien Platz.** Fast alles davon ist das Modell (17 GB) plus MTP-Drafter (0,5 GB). Die Instanz bekommt von beiden nur einen APFS-Klon, also keine zweite Kopie.
 - **Homebrew und asdf** für die Werkzeuge, **pnpm** für pi, die **Xcode Command Line Tools** (`xcode-select --install`) für ein kleines Swift-Programm, das Schlüssel mit der Secure Enclave schützt.
 - **Optional einen Brave-Search-API-Schlüssel** für die Websuche ([brave.com/search/api](https://brave.com/search/api/), Konditionen dort). Ohne ihn funktionieren RIS und Vault, nur die Websuche fehlt.
 
@@ -101,7 +101,15 @@ Soll dein Coding-Agent die Einrichtung übernehmen, gib ihm den Auftrag von [Mit
    Lizenz      Apache-2.0 (https://ai.google.dev/gemma/docs/gemma_4_license)
    ```
 
-   Die Revision ist fest, du bekommst also genau die geprüfte Datei. Bricht der Download ab, macht der nächste Aufruf an derselben Stelle weiter. Verwendet wird die Datei nur, wenn ihre Prüfsumme exakt stimmt. Hast du das Modell schon, gibst du es mit `--gguf-from PFAD` an.
+   Danach fragt `setup` dasselbe für den MTP-Drafter, eine 0,5-GB-Datei aus derselben Quelle. Der Drafter schlägt während des Antwortens mehrere Token auf einmal vor, und das sichtbare Nachdenken ist abgestellt: gleiche Antworten, aber in der Messung rund 70 % schneller ([Labbook zum Modellvergleich](https://github.com/croesnick/kommunalpolitik_ki/blob/main/docs/research/2026-10-31-modell-ab.md)). Auch hier gilt:
+
+   ```text frame="terminal" title="Das siehst du"
+   Drafter     mtp-gemma-4-26B-A4B-it-Q8_0.gguf (0,5 GB)
+   Quelle      huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF (Revision c099eb48)
+   Lizenz      Apache-2.0 (https://ai.google.dev/gemma/docs/gemma_4_license)
+   ```
+
+   Die Revision ist fest, du bekommst also genau die geprüfte Datei. Bricht der Download ab, macht der nächste Aufruf an derselben Stelle weiter. Verwendet wird die Datei nur, wenn ihre Prüfsumme exakt stimmt. Hast du das Modell oder den Drafter schon, gibst du sie mit `--gguf-from PFAD` beziehungsweise `--drafter-from PFAD` an.
 
    **Fehlt der Brave-Schlüssel**, fragt `setup` ihn verdeckt ab: Die Eingabe erscheint nicht auf dem Bildschirm. komki versiegelt sie mit der Secure Enclave und legt nur das Siegel im Schlüsselbund ab. Du kannst die Frage mit Enter überspringen und ihn später mit `komki secret set brave` nachtragen. Liegt dort noch ein Schlüssel im Klartext aus einer älteren Version, bietet `setup` an, ihn zu versiegeln.
 
@@ -274,7 +282,7 @@ Soll dein Coding-Agent die Einrichtung übernehmen, gib ihm den Auftrag von [Mit
 
    Wenn du fertig bist, stoppt `komki down` alles, was komki gestartet hat, auch llama. Der Arbeitsspeicher des Modells ist danach wieder frei.
 
-   **Aktualisieren:** neuen Stand holen, neu bauen, `setup` erneut aufrufen. Deine Instanz bleibt dabei erhalten, mit Vault, Journal und Schlüssel. `setup` trägt nur die neuen Programmpfade und Sandbox-Profile ein und sagt, was es aufgefrischt hat. Außerdem hält komki für jedes Programm, das es startet, eine Prüfsumme fest und startet nur, wenn sie noch stimmt. Nach einem Neubau fragt `setup` deshalb, ob es das veränderte komki übernehmen soll. Bestätige mit `j`, wenn du selbst gebaut hast.
+   **Aktualisieren:** neuen Stand holen, neu bauen, `setup` erneut aufrufen. Deine Instanz bleibt dabei erhalten, mit Vault, Journal und Schlüssel. `setup` trägt nur die neuen Programmpfade und Sandbox-Profile ein und sagt, was es aufgefrischt hat. Außerdem hält komki für jedes Programm, das es startet, eine Prüfsumme fest und startet nur, wenn sie noch stimmt. Nach einem Neubau fragt `setup` deshalb, ob es das veränderte komki übernehmen soll. Bestätige mit `j`, wenn du selbst gebaut hast. Instanzen von vor dem MTP-Drafter ([#318](https://github.com/croesnick/kommunalpolitik_ki/issues/318)) fragt `setup` einmalig nach dem Nachladen des 0,5-GB-Drafters, wenn er fehlt. Läuft llama gerade, rechnet es erst nach `komki down && komki up` mit dem Drafter.
 
    ```sh
    git pull && make komki && komki setup

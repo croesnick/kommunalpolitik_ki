@@ -9,10 +9,10 @@ defmodule KomkiCli.CLI do
   Befehle (Vertrag):
 
       komki version
-      komki setup [--demo] [--vault-dir PATH] [--gguf-from PATH] [--port N]
+      komki setup [--demo] [--vault-dir PATH] [--gguf-from PATH] [--drafter-from PATH] [--port N]
       komki secret set NAME | komki secret list
       komki journal verify
-      komki init  [--gguf-from PATH] [--port N] [--ctx N]
+      komki init  [--gguf-from PATH] [--drafter-from PATH] [--port N] [--ctx N]
                   [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--force]
       komki doctor
       komki up    [--ctx N]
@@ -193,6 +193,11 @@ defmodule KomkiCli.CLI do
             long: "gguf-from",
             help: "vorhandene Modelldatei (GGUF) verwenden"
           ],
+          drafter_from: [
+            value_name: "PATH",
+            long: "drafter-from",
+            help: "vorhandene MTP-Drafter-Datei verwenden (Ticket #318)"
+          ],
           port: [
             value_name: "N",
             long: "port",
@@ -246,6 +251,11 @@ defmodule KomkiCli.CLI do
             long: "gguf-from",
             help:
               "GGUF-Quelle (Kopie; default: das Staging-Artefakt unter ~/.local/share/komki/models-staging/)"
+          ],
+          drafter_from: [
+            value_name: "PATH",
+            long: "drafter-from",
+            help: "MTP-Drafter-Quelle (Kopie; default: das Staging-Artefakt; Ticket #318)"
           ],
           port: [
             value_name: "N",

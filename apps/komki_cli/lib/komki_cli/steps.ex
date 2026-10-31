@@ -12,7 +12,8 @@ defmodule KomkiCli.Steps do
   Resultatformen:
 
     * `{:inited, cfg, gguf_lines}` — init ok; `gguf_lines` sind Datenzeilen
-      (Pfad + SHA), die CLI rendert sie.
+      (Pfad + SHA je gepinntem Artefakt: Modell und MTP-Drafter, Ticket
+      #318), die CLI rendert sie.
     * `{:checks, [%{name, ok, reason}], summary_state}` — Doctor-Ergebnis;
       `summary_state` ∈ `:ok | :fail | :boot_gate_fail`.
     * `{:up, %{llama: pid, connectors: [{name, up_state}], mediator: mediator_state}}`
@@ -145,18 +146,19 @@ defmodule KomkiCli.Steps do
 
   defp create_instance(cfg, opts) do
     with :ok <- create_dirs(cfg),
-         {:ok, gguf_lines} <- place_gguf(cfg, opts) do
+         {:ok, gguf_lines} <- place_gguf(cfg, opts),
+         {:ok, drafter_lines} <- place_drafter(cfg, opts) do
       write_pi_home(cfg)
       Profile.write!(cfg.profile_path, Profile.generate(cfg, Profile.check_scratch(cfg)))
       # Ticket #100: llama-server-Profil neben dem pi-Profil schreiben
       Profile.write!(Llama.llama_profile_path(cfg), Profile.generate_llama(cfg))
       write_sandbox_profiles(cfg)
       Config.save(%{cfg | pins: Pins.compute(cfg)})
-      {:inited, cfg, gguf_lines}
+      {:inited, cfg, gguf_lines ++ drafter_lines}
     else
-      # place_gguf liefert {:error, reason, 2}; create_dirs wirft bei Misserfolg
-      # (MatchError faellt in den init-Rescue). Ein Catch-All hier waere
-      # unerreichbar (Dialyzer) und verdeckte das.
+      # place_gguf/place_drafter liefern {:error, reason, 2}; create_dirs
+      # wirft bei Misserfolg (MatchError faellt in den init-Rescue). Ein
+      # Catch-All hier waere unerreichbar (Dialyzer) und verdeckte das.
       {:error, _reason, _code} = error -> error
     end
   end
@@ -414,6 +416,65 @@ defmodule KomkiCli.Steps do
     end
   end
 
+  # ------------------------------------------------------- MTP-Drafter (#318)
+
+  @doc """
+  Legt den gepinnten MTP-Drafter in der Instanz ab (Ticket #318): Quelle ist
+  `--drafter-from` oder das Staging-Artefakt, SHA-Gate wie beim Modell
+  (Mismatch bricht ab, die Kopie wird entfernt — kein brauchbarer Verweis).
+  Public als Testnaht und fuer `komki setup` bei bestehenden Instanzen, denen
+  der Drafter noch fehlt.
+  """
+  @spec place_drafter(Config.t(), %{String.t() => String.t()}) ::
+          {:ok, [String.t()]} | {:error, String.t(), 2}
+  def place_drafter(%Config{} = cfg, opts) do
+    source = Map.get(opts, "drafter-from") || Config.default_probe_drafter()
+
+    cond do
+      is_nil(source) ->
+        {:error,
+         "keine Drafter-Quelle: 'komki setup' lädt den MTP-Drafter, oder --drafter-from PATH angeben " <>
+           "(erwartet unter " <> Config.staging_drafter_path() <> ")", 2}
+
+      not File.exists?(source) ->
+        {:error, "--drafter-from Pfad nicht gefunden: " <> source, 2}
+
+      true ->
+        copy_and_verify_drafter(cfg, source)
+    end
+  end
+
+  defp copy_and_verify_drafter(cfg, source) do
+    dest = cfg.drafter_path
+    File.mkdir_p!(Path.dirname(dest))
+    how = clone_or_copy(source, dest)
+
+    case sha256(dest) do
+      {:ok, actual} ->
+        if actual == cfg.drafter_sha256 do
+          {:ok,
+           [
+             "drafter:      " <> dest,
+             "drafter-sha256: " <> actual <> " (pinned, verified)",
+             "drafter-ablage: " <> how
+           ]}
+        else
+          File.rm(dest)
+
+          {:error,
+           "Drafter SHA256 mismatch: pinned " <>
+             cfg.drafter_sha256 <>
+             ", got " <>
+             actual <>
+             "; kopie entfernt — nicht verwendet", 2}
+        end
+
+      {:error, reason} ->
+        File.rm(dest)
+        {:error, reason, 2}
+    end
+  end
+
   @doc """
   Schreibt die pi-Konfiguration ins pi-home (models/auth/settings/trust;
   bei asdf-gemanagtem node zusaetzlich .tool-versions). Reine
@@ -568,6 +629,7 @@ defmodule KomkiCli.Steps do
       # Programm-Pins: auch im Kurz-Doctor, `up` startet nur mit gleichen Bytes.
       Pins.checks(cfg),
       gguf_checks(cfg, scope),
+      drafter_checks(cfg, scope),
       boot_gate(cfg),
       llama_boot_gate(cfg),
       [port_check(cfg), llama_auth_check(cfg)],
@@ -767,6 +829,52 @@ defmodule KomkiCli.Steps do
       {:error, reason} ->
         [%{name: "gguf sha256", ok: false, reason: reason}]
     end
+  end
+
+  # MTP-Drafter (Ticket #318): dieselbe Kaskade wie das Modell — Vorhandensein
+  # im Start-Gate (`up` startet llama mit --model-draft), Pruefsumme im vollen
+  # Doctor. Fehlt die Datei (Instanz von vor dem Produktivstart), nennt der
+  # Reason den Nachladeweg. Public als Testnaht (wie journal_check/1).
+  @doc "Doctor-Checks des MTP-Drafters (Ticket #318): Präsenz und Prüfsumme."
+  @spec drafter_checks(Config.t(), :full | :profile_boot) :: [check()]
+  def drafter_checks(%Config{} = cfg, :full) do
+    if File.exists?(cfg.drafter_path) do
+      case sha256(cfg.drafter_path) do
+        {:ok, actual} ->
+          [
+            %{
+              name: "drafter sha256",
+              ok: actual == cfg.drafter_sha256,
+              reason:
+                if(actual == cfg.drafter_sha256,
+                  do: actual,
+                  else: "recorded " <> cfg.drafter_sha256 <> ", actual " <> actual
+                )
+            }
+          ]
+
+        {:error, reason} ->
+          [%{name: "drafter sha256", ok: false, reason: reason}]
+      end
+    else
+      [drafter_missing("drafter sha256", cfg)]
+    end
+  end
+
+  def drafter_checks(%Config{} = cfg, :profile_boot) do
+    if File.exists?(cfg.drafter_path) do
+      [%{name: "drafter presence", ok: true, reason: cfg.drafter_path}]
+    else
+      [drafter_missing("drafter presence", cfg)]
+    end
+  end
+
+  defp drafter_missing(name, cfg) do
+    %{
+      name: name,
+      ok: false,
+      reason: "missing: " <> cfg.drafter_path <> " — 'komki setup' lädt den MTP-Drafter nach"
+    }
   end
 
   # Ticket #136: ein laufender llama ohne API-Key ist fuer jede Website im

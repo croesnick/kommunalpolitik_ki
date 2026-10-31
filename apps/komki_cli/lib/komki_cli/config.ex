@@ -11,6 +11,11 @@ defmodule KomkiCli.Config do
   der Vermittler lauscht auf `<base>/run/mediator.sock` (`KomkiCli.Channel`);
   ein `mediator_port` in aelteren config.json wird ignoriert.
 
+  Dazu der MTP-Drafter (Ticket #318): `drafter_path`/`drafter_sha256`
+  — wie das Modell gepinnt, aeltere config.json laden mit Defaults (Pfad
+  aus `base_dir` abgeleitet, SHA aus dem Code-Pin; die Migration ist damit
+  rein lesend, `komki setup` laedt die fehlende Datei nach).
+
   Connectoren und Egress (Ticket #146, CONTRACT.md §2/§4/§9), alle optional
   (aeltere config.json laden mit Defaults):
 
@@ -47,6 +52,10 @@ defmodule KomkiCli.Config do
   ]
   defstruct @enforce_keys ++
               [
+                # MTP-Drafter (Ticket #318): gepinnt wie das Modell; immer
+                # gesetzt (defaults/from_map tragen die Pins nach).
+                :drafter_path,
+                :drafter_sha256,
                 :profile_path,
                 :fd_bin,
                 :rg_bin,
@@ -76,6 +85,8 @@ defmodule KomkiCli.Config do
           ctx: pos_integer(),
           gguf_path: String.t(),
           gguf_sha256: String.t(),
+          drafter_path: String.t(),
+          drafter_sha256: String.t(),
           pi_home: String.t(),
           node_bin: String.t() | nil,
           cli_js: String.t() | nil,
@@ -111,6 +122,13 @@ defmodule KomkiCli.Config do
   @expected_gguf_sha256 "ef728c8e0c337fd1067b947af006e38a9ef2419e56feced4fd29b4bf0636e30c"
   @model_filename "gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf"
 
+  # MTP-Drafter (Ticket #318, Nutzerentscheidung nach Labbook #285, F4):
+  # speculative decoding neben dem Pin — dieselbe Quelle/Revision, Datei aus
+  # dem MTP-Unterordner des Repos. 461 766 816 Byte, SHA-256 verifiziert
+  # gegen den Download (Staging-Protokoll im Labbook).
+  @expected_drafter_sha256 "6326fb9f5e487aa8dcdd313a091e3c67724cb2a666ec3b7d2895b5b26d93ed1b"
+  @drafter_filename "mtp-gemma-4-26B-A4B-it-Q8_0.gguf"
+
   @default_sandbox_exec "/usr/bin/sandbox-exec"
   @default_port 49_524
   # Nutzer-Präferenz «große Kontexte» bei 64 GB RAM: 128K ist der Default;
@@ -133,10 +151,26 @@ defmodule KomkiCli.Config do
   @spec model_filename :: String.t()
   def model_filename, do: @model_filename
 
+  @doc """
+  Erwarteter SHA-256 des MTP-Drafters (Ticket #318). Gepinnt wie das Modell.
+  """
+  @spec expected_drafter_sha256 :: String.t()
+  def expected_drafter_sha256, do: @expected_drafter_sha256
+
+  @doc "Dateiname des gepinnten MTP-Drafters (Ticket #318)."
+  @spec drafter_filename :: String.t()
+  def drafter_filename, do: @drafter_filename
+
   @doc "Default-GGUF-Quelle: das bereitgestellte Staging-Artefakt (falls vorhanden)."
   @spec default_probe_gguf() :: String.t() | nil
   def default_probe_gguf do
     if File.exists?(staging_gguf_path()), do: staging_gguf_path(), else: nil
+  end
+
+  @doc "Default-Drafter-Quelle (Ticket #318): das Staging-Artefakt, falls vorhanden."
+  @spec default_probe_drafter() :: String.t() | nil
+  def default_probe_drafter do
+    if File.exists?(staging_drafter_path()), do: staging_drafter_path(), else: nil
   end
 
   ## ------------------------------------------------------- Werkzeug-Entdeckung
@@ -368,6 +402,22 @@ defmodule KomkiCli.Config do
         @model_filename
       ])
 
+  @doc """
+  Staging-Ort des MTP-Drafters (Ticket #318): dasselbe Verzeichnis wie das
+  Modell, unter dem Dateinamen ohne den `MTP/`-Repo-Pfad.
+  """
+  @spec staging_drafter_path() :: String.t()
+  def staging_drafter_path,
+    do:
+      Path.join([
+        canonical(System.user_home!()),
+        ".local",
+        "share",
+        "komki",
+        "models-staging",
+        @drafter_filename
+      ])
+
   @doc "Basisverzeichnis: KOMKI_HOME oder ~/.local/share/komki."
   @spec default_base() :: String.t()
   def default_base do
@@ -434,6 +484,8 @@ defmodule KomkiCli.Config do
       ctx: opts[:ctx] || @default_ctx,
       gguf_path: Path.join([base, "models", @model_filename]),
       gguf_sha256: @expected_gguf_sha256,
+      drafter_path: Path.join([base, "models", @drafter_filename]),
+      drafter_sha256: @expected_drafter_sha256,
       pi_home: Path.join(base, "pi-home"),
       node_bin: node_bin,
       cli_js: resolve_cli_js(node_bin),
@@ -529,8 +581,13 @@ defmodule KomkiCli.Config do
   ]
 
   # Optionale Felder: fehlen sie in aelteren config.json, wird nil gelesen —
-  # kein Breaking-Change fuer bestehende Instanzen.
+  # kein Breaking-Change fuer bestehende Instanzen. Ausnahme drafter_path/
+  # drafter_sha256 (Ticket #318): Sie bekommen Laden-Defaults (Pfad aus
+  # base_dir, SHA aus dem Code-Pin) — aeltere Instanzen sehen so denselben
+  # Pfad wie frische, und der Doctor meldet nur die fehlende Datei.
   @optional_keys [
+    :drafter_path,
+    :drafter_sha256,
     :fd_bin,
     :rg_bin,
     :mediator_bin,
@@ -572,6 +629,12 @@ defmodule KomkiCli.Config do
       ctx: require_pos(:ctx, map["ctx"]),
       gguf_path: map["gguf_path"],
       gguf_sha256: map["gguf_sha256"],
+      # Ticket #318: Laden-Defaults — aeltere config.json ohne die Felder
+      # bekommen Pfad und Pin nachgetragen (Config-Migration, rein lesend).
+      drafter_path:
+        Map.get(map, "drafter_path") ||
+          Path.join([map["base_dir"], "models", @drafter_filename]),
+      drafter_sha256: Map.get(map, "drafter_sha256") || @expected_drafter_sha256,
       pi_home: map["pi_home"],
       node_bin: map["node_bin"],
       cli_js: map["cli_js"],

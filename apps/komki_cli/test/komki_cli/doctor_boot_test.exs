@@ -5,7 +5,8 @@ defmodule KomkiCli.DoctorBootTest do
   (`a`) sandbox-exec vorhanden ist — GitHub-Actions-Linux-Runner haben kein
   `/usr/bin/sandbox-exec` und zählen dann null Tests — und (`b`) das
   verifizierte GGUF-Artefakt der Sandbox-Forschung am erwarteten Pfad
-  liegt; ohne beides findet dieser Modul keine Tests statt.
+  liegt (seit Ticket #318 auch der MTP-Drafter); ohne beides findet dieser
+  Modul keine Tests statt.
   """
 
   use ExUnit.Case, async: false
@@ -14,7 +15,8 @@ defmodule KomkiCli.DoctorBootTest do
 
   @sandbox_exec System.find_executable("sandbox-exec")
 
-  if @sandbox_exec != nil and Config.default_probe_gguf() != nil do
+  if @sandbox_exec != nil and Config.default_probe_gguf() != nil and
+       Config.default_probe_drafter() != nil do
     # Aliase innerhalb der Bedingung: Im Ruhezustand (kein sandbox-exec wie
     # auf CI-Linux, oder kein Staging-GGUF) kompiliert der Block nicht und
     # warnt nicht ueber unbenutzte Aliase.
@@ -60,6 +62,10 @@ defmodule KomkiCli.DoctorBootTest do
     test "init ok, gepinntes SHA verifiziert", %{init_out: init_out} do
       assert init_out =~ "init ok"
       assert init_out =~ "gguf-sha256:  " <> Config.expected_gguf_sha256()
+
+      # Ticket #318: der MTP-Drafter liegt mit eigenem SHA in der Instanz.
+      assert init_out =~ "drafter-sha256: " <> Config.expected_drafter_sha256()
+      assert init_out =~ "drafter:      "
     end
 
     test "doctor: alle Checks grün inklusive Boot-Gate" do
@@ -74,6 +80,12 @@ defmodule KomkiCli.DoctorBootTest do
       assert out_doctor =~ "boot /usr/bin/true"
       assert out_doctor =~ "boot /bin/sh"
       assert out_doctor =~ "llama profile"
+
+      # Ticket #318: der volle Doctor prüft die Drafter-Prüfsumme (die
+      # Präsenz-Form "drafter presence" gehört zum Start-Gate von `up`
+      # und ist in steps_test abgedeckt).
+      assert out_doctor =~ "drafter sha256"
+
       # bestehende pi-Probes + der neue llama-server-Boot-Probe unter seinem Profil
       assert out_doctor =~ "boot " <> cfg.llama_server_bin
       refute out_doctor =~ "FAIL"

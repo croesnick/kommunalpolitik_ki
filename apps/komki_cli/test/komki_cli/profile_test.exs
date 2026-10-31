@@ -296,6 +296,19 @@ defmodule KomkiCli.ProfileTest do
       assert String.contains?(text, "(allow file-write* (literal \"" <> log <> "\"))")
     end
 
+    # Ticket #318: der MTP-Drafter ist die zweite gepinnte Datei des
+    # Inferenz-Prozesses — genau dieses Literal, kein models-Subpath und
+    # keine breitere Freigabe (Write bleibt dem Log vorbehalten).
+    test "MTP-Drafter: genau diese Datei lesbar, nichts darüber hinaus", %{text: text, cfg: cfg} do
+      assert String.contains?(
+               text,
+               "(allow file-read* (literal \"" <> cfg.drafter_path <> "\"))"
+             )
+
+      refute String.contains?(text, ~s|(subpath "#{Path.dirname(cfg.drafter_path)}")|)
+      refute String.contains?(text, ~s|(allow file-write* (literal "#{cfg.drafter_path}"))|)
+    end
+
     test "Write-Scope-Disziplin: file-write nur Log + dtracehelper", %{text: text, cfg: cfg} do
       log = Path.join([cfg.base_dir, "tmp", "llama-server.log"])
 
