@@ -17,6 +17,9 @@ defmodule KomkiConnectorRis.MixProject do
         ignore_warnings: "dialyzer.ignore-warnings",
         plt_add_apps: [:inets, :ssl, :public_key]
       ],
+      # test/support/ traegt Hilfsskripte, keine Testdateien (z. B. den
+      # Fake-tresor, den ris_kassetten_test per Shell-Wrapper startet).
+      test_ignore_filters: [&String.starts_with?(&1, "test/support/")],
       deps: deps()
     ]
   end
