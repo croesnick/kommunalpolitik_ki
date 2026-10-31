@@ -10,14 +10,15 @@ defmodule KomkiMediator.PDR do
     * `rule` — the decided rule branch (`"admit"`, `"emit"`, `"transfer"`
       or `"store"`).
     * `call_id` — for connector calls, the id of the call, assigned after
-      the pre-check. Every PDR of the call carries it, denials and GO
-      records included (connector contract §6); a pre-check rejection has
-      none. If the call reaches execution, the emit PDR's `decision_id`
-      equals it; a call denied in Gate 1 has no emit PDR.
+      the pre-check. Every PDR of the call carries it: each engine decision
+      (journaled when it is made), denials, GO records and the record
+      before effect (connector contract §6); a pre-check rejection has
+      none. If the call reaches execution, the record before effect (rule
+      `emit`, `outcome: emitted`) has it as its `decision_id`.
     * `session_id` — the pi session (from the environment, may be `null`;
       the socket access fills it, connector contract §8).
-    * `assigned_label` — for emit permits, the assigned output set
-      λ(y) = B_W.
+    * `assigned_label` — for emit permits and the record before effect,
+      the assigned output set λ(y) = B_W.
 
   Besides the decisions, the mediator writes a record with
   `tool: "workspace"`, `decision: "loaded"` on every start: `checked_label`

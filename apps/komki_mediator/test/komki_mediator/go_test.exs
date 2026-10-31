@@ -60,6 +60,21 @@ defmodule KomkiMediator.GoTest do
     end)
   end
 
+  # The answered request can still be pending for a moment; wait for the
+  # request of the given operation.
+  defp wait_for_operation(_go_dir, _operation, 0), do: flunk("keine GO-Anfrage")
+
+  defp wait_for_operation(go_dir, operation, tries) do
+    case Enum.find(Go.pending(go_dir), &(&1["operation"] == operation)) do
+      nil ->
+        Process.sleep(20)
+        wait_for_operation(go_dir, operation, tries - 1)
+
+      request ->
+        request
+    end
+  end
+
   defp wait_for_request(_go_dir, 0), do: flunk("keine GO-Anfrage")
 
   defp wait_for_request(go_dir, tries) do
@@ -91,15 +106,21 @@ defmodule KomkiMediator.GoTest do
     assert "recipient_not_allowed" in request["blockers"]
     assert request["operation"] == "transfer"
 
-    # Transfer deny, then the GO commit (released) right after the nonce,
-    # then the emit record, all before execution; every record carries the
-    # call's call_id.
-    assert outcomes(env) == ["not_admitted", "released", "emitted", "admitted"]
+    # Emit decision, transfer deny, the GO commit (released) right after the
+    # nonce, then the record before effect, all before execution; every
+    # record carries the call's call_id.
+    assert outcomes(env) == ["permitted", "not_admitted", "released", "emitted", "admitted"]
 
-    [deny, released, emitted, admit] = TestHelpers.journal_records(env.journal_path)
+    [decided, deny, released, emitted, admit] = TestHelpers.journal_records(env.journal_path)
+    assert decided["rule"] == "emit"
     assert released["rule"] == "transfer"
     assert released["checked_label"] == emitted["assigned_label"]
-    assert Enum.all?([deny, released, admit], &(&1["call_id"] == emitted["decision_id"]))
+
+    assert Enum.all?(
+             [decided, deny, released, admit],
+             &(&1["call_id"] == emitted["decision_id"])
+           )
+
     assert map_size(GoStand.current()["consumed"]) == 1
     assert Go.pending(go_dir) == []
   end
@@ -139,10 +160,12 @@ defmodule KomkiMediator.GoTest do
     assert response["hinweis"] == KomkiMediator.Hinweis.text(:go_refused)
     assert "recipient_not_allowed" in Enum.map(response["remedies"], & &1["code"])
     refute_received :web_called
-    assert outcomes(env) == ["not_admitted", "go_refused"]
+    assert outcomes(env) == ["permitted", "not_admitted", "go_refused"]
 
-    # Both records belong to the same call and snapshot (CONTRACT §6.1 step 7).
-    [deny, refused] = TestHelpers.journal_records(env.journal_path)
+    # All records belong to the same call; deny and refusal to the same
+    # snapshot (CONTRACT §6.1 step 7).
+    [decided, deny, refused] = TestHelpers.journal_records(env.journal_path)
+    assert decided["call_id"] == deny["call_id"]
     assert is_binary(refused["call_id"])
     assert refused["call_id"] == deny["call_id"]
     assert refused["snapshot_id"] == deny["snapshot_id"]
@@ -157,7 +180,7 @@ defmodule KomkiMediator.GoTest do
     assert response["go"] == "keine Antwort"
     assert response["hinweis"] == KomkiMediator.Hinweis.text(:go_timeout)
     refute_received :web_called
-    assert outcomes(env) == ["not_admitted", "go_timeout"]
+    assert outcomes(env) == ["permitted", "not_admitted", "go_timeout"]
     assert Go.pending(env.go.dir) == []
   end
 
@@ -202,7 +225,7 @@ defmodule KomkiMediator.GoTest do
     assert map_size(GoStand.current()["consumed"]) == 0
 
     # The failed commit stays linked to its call (#298 review).
-    [deny, failed] = TestHelpers.journal_records(env.journal_path)
+    [_decided, deny, failed] = TestHelpers.journal_records(env.journal_path)
     assert failed["rule"] == "transfer"
     assert failed["outcome"] == "error"
     assert failed["call_id"] == deny["call_id"]
@@ -241,5 +264,45 @@ defmodule KomkiMediator.GoTest do
     assert response["decision"] == "deny"
     refute Map.has_key?(response, "go")
     assert Go.pending(env.go.dir) == []
+  end
+
+  # A binding without emit and transfer rules (doc-vertraulich@1) blocks
+  # both gates: two GO prompts for one call, each a decision of its own
+  # (decision 2026-10-31: leave as is). The journal shows every step.
+  test "emit-GO und transfer-GO: jede Entscheidung im Journal, eine call_id", %{
+    env: env,
+    go_dir: go_dir
+  } do
+    env = put_in(env.room.workspace_bindings, ["doc-vertraulich@1", "web-oeffentlich@1"])
+    test = self()
+
+    spawn_link(fn ->
+      for operation <- ["emit", "transfer"] do
+        request = wait_for_operation(go_dir, operation, 100)
+        send(test, {:request, operation})
+        Go.answer(go_dir, request, true)
+      end
+    end)
+
+    ConnectorGate.call(env, "web_search", @params)
+
+    assert_received {:request, "emit"}
+    assert_received {:request, "transfer"}
+    assert_received :web_called
+
+    records = TestHelpers.journal_records(env.journal_path)
+
+    steps = Enum.map(records, &{&1["rule"], &1["outcome"]})
+
+    assert Enum.take(steps, 5) == [
+             {"emit", "not_admitted"},
+             {"emit", "released"},
+             {"transfer", "not_admitted"},
+             {"transfer", "released"},
+             {"emit", "emitted"}
+           ]
+
+    [call_id] = records |> Enum.map(& &1["call_id"]) |> Enum.uniq()
+    assert Enum.at(records, 4)["decision_id"] == call_id
   end
 end

@@ -166,13 +166,14 @@ sequenceDiagram
     else Vorpruefung bestanden
         M->>K: Derive.decide emit (B_W, room.environment, out-digest12)
         K-->>M: assigned_label = B_W
+        M->>J: emit-PDR (outcome permitted, assigned_label, call_id)
         M->>K: Derive.decide transfer (λ(y), Manifest-Umgebung)
         alt deny / indeterminate (emit oder transfer)
-            M->>J: PDR (rule emit bzw. transfer, Remedies)
+            M->>J: PDR (rule emit bzw. transfer, Remedies, call_id)
             M-->>P: Remedy-Katalog, kein Vollzug
         else permit
-            M->>J: emit-PDR (decision_id = call_id)
             M->>J: transfer-PDR (outcome permitted, call_id)
+            M->>J: Vorbeleg (rule emit, outcome emitted, decision_id = call_id)
             M->>C: Frame (call_id, op, params, context)
             C-->>M: result oder error
             Note over M: Ergebnisform §5.2, Labels aus dem Manifest
@@ -203,9 +204,8 @@ Offenlegungsstand `komki-stand/1` (`KomkiMediator.GoStand`,
 `mediator/go/stand.json`). Bei permit gilt commit vor Wirkung:
 `Stand.advance` verbraucht die Nonce, danach folgt das PDR mit `outcome:
 released` (`payload_hash` bindet den Verbrauchs-Vorschlag), danach der
-normale Vollzug. Der released-PDR steht also vor dem emit-PDR, weil er
-direkt nach dem Verbrauch der Nonce geschrieben wird. Nach einem GO fuer
-`transfer` oder `store` vertritt er zugleich den `permitted`-PDR. Ein Nein
+normale Vollzug. Der released-PDR ist die Entscheidung des
+Freigabe-Zweigs; fuer dasselbe Gate folgt kein `permitted`-PDR. Ein Nein
 ergibt `go_refused`, keine Antwort `go_timeout`,
 jeweils mit PDR. Die Antwort bleibt das deny samt Katalog, ergaenzt um
 `"go"`. Eine ungueltige Freigabe (falscher Call, abgelaufen, Nonce
@@ -388,8 +388,8 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   Single-Sourcing #115). Die Relaxationsbefugnisse der benannten Bindungen
   (Γ-L1, R.2.2) schluesselt der Vermittler aus dem rohen Registry-Term auf.
 * **Vorbeleg**: nach einem `permit` schreibt der Vermittler zuerst ein PDR
-  mit `outcome: executing` (beim Connector-Weg: der emit-PDR mit `outcome:
-  emitted`). Erst wenn es gesynct im Journal steht, laeuft der Vollzug;
+  mit `outcome: executing` (beim Connector-Weg: der Vorbeleg mit `rule:
+  emit`, `outcome: emitted`). Erst wenn es gesynct im Journal steht, laeuft der Vollzug;
   scheitert das Schreiben, stoppt die Vermittlung.
 * **Gate 2**: nur nach einem `permit` vollzieht der Connector. Danach
   laufen zwei unabhaengige Pruefungen: der Beweis durch
@@ -411,12 +411,13 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
     Schreiben ein deny mit Aktionsfreigabe fuer den exakten Call; mit
     Zuhoerer fragt der Vermittler (GO-Anfrage mit `operation: store`
     bzw. `transfer`), sonst bleibt es beim deny.
-  * Vorbeleg: bei permit liegt zuerst der emit-PDR (`outcome: emitted`),
-    dann der transfer- bzw. store-PDR (`outcome: permitted`) im Journal,
-    **bevor** der Connector gerufen wird. Die `decision_id` des emit-PDR
-    ist die `call_id` im Frame. Jeder PDR des Aufrufs traegt sie, auch
-    Ablehnungen und GO-Belege; nur die Vorpruefung kennt noch keinen
-    Aufruf. Ein in Gate 1 abgelehnter Aufruf hat keinen emit-PDR.
+  * Journal: jede Entscheidung kommt sofort ins Journal (`permitted`,
+    Ablehnung oder `released`), auch wenn danach nichts vollzogen wird.
+    Bei permit folgt der Vorbeleg (`rule: emit`, `outcome: emitted`),
+    **bevor** der Connector gerufen wird; seine `decision_id` ist die
+    `call_id` im Frame. Jeder PDR des Aufrufs traegt sie, auch Ablehnungen
+    und GO-Belege; nur die Vorpruefung kennt noch keinen Aufruf (Vertrag
+    §6.1, Schritte 5 bis 7).
     Bei `vault_write_test` geht `context.assigned_label` (= B_W) mit.
   * Gate 2 `admit`: Ergebnisform §5.2 (geschlossen), Labels allein aus dem
     Manifest (RIS/Web fest `import_labels`; Vault: Labels der Notiz,
@@ -438,9 +439,9 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/3`: zusaetzlich
   `rule` (`admit`/`emit`/`transfer`/`store`), `call_id` (bei
   Connector-Aufrufen die Kennung des Aufrufs, in allen seinen PDR gleich;
-  kommt es zum Vollzug, ist sie die `decision_id` des emit-PDR),
-  `session_id` (aus der
-  Umgebung, sonst `null`) und `assigned_label` (emit-Permit).
+  kommt es zum Vollzug, ist sie die `decision_id` des Vorbelegs),
+  `session_id` (aus der Umgebung, sonst `null`) und `assigned_label`
+  (emit-Permit und Vorbeleg).
 
 ## Komponenten
 

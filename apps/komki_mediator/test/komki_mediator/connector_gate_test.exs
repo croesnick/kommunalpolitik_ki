@@ -52,27 +52,35 @@ defmodule KomkiMediator.ConnectorGateTest do
   defp remedy_codes(response), do: Enum.map(response["remedies"], & &1["code"])
 
   # -----------------------------------------------------------------------
-  # Permit flow: emit and transfer PDRs before execution, three PDRs with
-  # one call_id (#298)
+  # Permit flow: every decision journaled when made, then the record before
+  # effect, then admit; one call_id (#298)
   # -----------------------------------------------------------------------
 
-  test "recherche ris_search: emit- und transfer-PDR liegen vor dem Connector-Aufruf, dann admit",
+  test "recherche ris_search: Entscheidungen und Vorbeleg liegen vor dem Connector-Aufruf, dann admit",
        %{env: env} do
     fake(env, "ris", ok(ris_hits()))
 
     response = ConnectorGate.call(env, "ris_search", %{"text" => "Bahnhof"})
 
-    # When called, the fake saw exactly two journal records: the emit and
-    # the transfer PDR. Default parameters are set, no context for a read.
+    # When called, the fake saw exactly three journal records: the emit and
+    # transfer decisions and the record before effect. Default parameters
+    # are set, no context for a read.
     assert_received {:connector_called, "ris", "search", %{"text" => "Bahnhof", "limit" => 10},
-                     %{}, 2}
+                     %{}, 3}
 
     assert response["decision"] == "permit"
     assert response["labels"] == ["ris-oeffentlich@1"]
     assert response["results"] == ris_hits()["results"]
     assert response["payload_hash"] =~ "sha256:"
 
-    [emit, transfer, admit] = records(env)
+    [decided, transfer, emit, admit] = records(env)
+
+    # The emit decision itself, with the assigned λ(y) = B_W.
+    assert decided["rule"] == "emit"
+    assert decided["outcome"] == "permitted"
+    assert decided["assigned_label"] == @recherche
+    assert decided["snapshot_id"] =~ "snap-emit-"
+    assert decided["call_id"] == emit["decision_id"]
 
     # Handover to the RIS under λ(y) = B_W, in the manifest environment.
     assert transfer["rule"] == "transfer"
@@ -97,7 +105,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert admit["payload_hash"] == response["payload_hash"]
     assert response["emit_decision_id"] == emit["decision_id"]
 
-    assert {:ok, %{records: 3}} = Journal.verify(File.read!(env.journal_path))
+    assert {:ok, %{records: 4}} = Journal.verify(File.read!(env.journal_path))
   end
 
   test "call_id im Frame ist die decision_id des emit-PDR", %{env: env} do
@@ -114,7 +122,7 @@ defmodule KomkiMediator.ConnectorGateTest do
 
     # Die Server-Seite antwortet nur, wenn die call_id passt (Client prueft
     # sie); ein permit belegt also die Zuordnung call_id == emit-PDR.
-    [emit, _transfer, _admit] = records(env)
+    [_decided, _transfer, emit, _admit] = records(env)
     assert response["emit_decision_id"] == emit["decision_id"]
   end
 
@@ -142,9 +150,14 @@ defmodule KomkiMediator.ConnectorGateTest do
       assert response["hinweis"] == KomkiMediator.Hinweis.text(:deny)
       refute_received {:connector_called, _, _, _, _, _}
 
-      # The denial carries the call's call_id; the answer names no emit PDR,
-      # because nothing was executed.
-      [pdr] = records(env)
+      # The emit decision is journaled although nothing runs; the denial
+      # carries the same call_id, and the answer names no record before
+      # effect, because nothing was executed.
+      [decided, pdr] = records(env)
+      assert decided["rule"] == "emit"
+      assert decided["outcome"] == "permitted"
+      assert decided["assigned_label"] == env.room.workspace_bindings
+      assert decided["call_id"] == pdr["call_id"]
       assert pdr["rule"] == "transfer"
       assert pdr["decision"] == "deny"
       assert is_binary(pdr["call_id"])
@@ -180,7 +193,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     refute Map.has_key?(response, "content")
     refute inspect(response) =~ "geheimer Inhalt"
 
-    [emit, _transfer, admit] = records(env)
+    [_decided, _transfer, emit, admit] = records(env)
     assert admit["call_id"] == emit["decision_id"]
     assert admit["outcome"] == "not_admitted"
   end
@@ -223,7 +236,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert response["verify"] == ["label_not_in_gamma"]
     refute Map.has_key?(response, "content")
 
-    [_emit, _transfer, admit] = records(env)
+    [_decided, _transfer, _emit, admit] = records(env)
     assert admit["outcome"] == "redacted"
   end
 
@@ -295,14 +308,17 @@ defmodule KomkiMediator.ConnectorGateTest do
   # Connector-Fehler
   # -----------------------------------------------------------------------
 
-  test "Connector down: admitted false mit transfer-, emit- und admit-PDR", %{env: env} do
+  test "Connector down: admitted false mit allen Entscheidungen, Vorbeleg und admit-PDR", %{
+    env: env
+  } do
     response = ConnectorGate.call(env, "ris_search", %{"text" => "x"})
 
     assert response["decision"] == "permit"
     assert response["admitted"] == false
     assert response["error"]["code"] == "upstream-error"
 
-    [emit, transfer, admit] = records(env)
+    [decided, transfer, emit, admit] = records(env)
+    assert decided["outcome"] == "permitted"
     assert transfer["rule"] == "transfer"
     assert emit["rule"] == "emit"
     assert admit["outcome"] == "error"
@@ -340,7 +356,8 @@ defmodule KomkiMediator.ConnectorGateTest do
 
     refute_received {:connector_called, "vault", _, _, _, _}
 
-    [store] = records(env)
+    [decided, store] = records(env)
+    assert {decided["rule"], decided["outcome"]} == {"emit", "permitted"}
     assert store["rule"] == "store"
     assert store["decision"] == "deny"
     assert store["outcome"] == "not_admitted"
@@ -360,7 +377,7 @@ defmodule KomkiMediator.ConnectorGateTest do
     [%{"type" => "text", "text" => json}] = response.content
     body = JSON.decode!(json)
     assert body["decision"] == "permit"
-    assert_received {:connector_called, "ris", "search", %{"limit" => 3}, _, 2}
+    assert_received {:connector_called, "ris", "search", %{"limit" => 3}, _, 3}
   end
 
   test "Default-Raum ist recherche", %{env: env} do

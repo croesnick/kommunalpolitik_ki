@@ -1,9 +1,9 @@
 defmodule KomkiMediator.ConnectorGate do
   @moduledoc """
   A connector call as emit → transfer or store → execution → admit
-  (connector contract §6): three engine decisions. In the plain permit
-  case that is three PDRs; denials and GO records add more. All PDRs of
-  a call share one `call_id`.
+  (connector contract §6): three engine decisions, each recorded in the
+  journal when it is made, plus a record before the effect. All PDRs of a
+  call share one `call_id`.
 
   * Pre-check: parameters against the manifest schema
     (`Sidecar.Params.check/3`) and the room's B_W (`workspace_bindings`).
@@ -22,11 +22,13 @@ defmodule KomkiMediator.ConnectorGate do
     #205). This is where the recipient check against RIS, web search or
     vault happens. Without a `store` rule in Γ, writing is a deny with an
     action release for the exact call.
-  * PDRs per call: every PDR after the pre-check carries the call's
-    `call_id`, denials and GO records included. Right before execution
-    the journal gets the emit PDR (`outcome: emitted`, its `decision_id`
-    is the `call_id` sent in the frame), then the Gate 1b PDR (`outcome:
-    permitted`). The admit PDR follows the execution.
+  * PDRs per call: every engine decision is journaled when it is made —
+    `permitted`, a denial, or `released` after a GO — so the journal holds
+    the complete derivation even when nothing is executed. Right before
+    execution follows the record before effect (rule `emit`, `outcome:
+    emitted`; its `decision_id` is the `call_id` sent in the frame and its
+    `payload_hash` binds the outgoing request). The admit PDR follows the
+    execution. Every PDR after the pre-check carries the call's `call_id`.
   * Execution: `Sidecar.Client.call/6` against
     `<connectors_dir>/<id>.sock`. Write operations send
     `context.assigned_label` (= B_W).
@@ -43,10 +45,10 @@ defmodule KomkiMediator.ConnectorGate do
   person, provided a session is listening (`KomkiMediator.Go`). The
   engine's release branch decides a presented release; on permit
   `KomkiMediator.GoStand` commits the nonce and a PDR (`outcome:
-  released`) records the GO right away, both before any effect. After a
-  transfer or store GO that PDR stands for the Gate 1b decision, so no
-  `permitted` PDR follows. No, no answer or an invalid release leave the
-  deny in place.
+  released`) records the GO right away, both before any effect. That PDR
+  is the decision of the release branch, so no `permitted` PDR follows
+  for the same gate. No, no answer or an invalid release leave the deny in
+  place.
   """
 
   alias KomkiConnector.{Manifest, Text}
@@ -124,6 +126,7 @@ defmodule KomkiMediator.ConnectorGate do
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
+        permitted(env, call, decision, snapshot, intent)
         emitted.(decision)
 
       other ->
@@ -161,21 +164,23 @@ defmodule KomkiMediator.ConnectorGate do
 
     intent = intent(env.room, rule, "intent-" <> rule <> "-" <> d12, object)
     # After a GO the released PDR already records the Gate 1b decision.
-    released = fn _decision -> execute(env, call, emit, nil) end
+    executed = fn _decision -> execute(env, call, emit) end
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
-        execute(env, call, emit, handover_pdr(call, decision, snapshot, intent))
+        permitted(env, call, decision, snapshot, intent)
+        execute(env, call, emit)
 
       other ->
         response = not_permitted(env, call, rule, nil, intent, snapshot, other)
-        maybe_go(env, call, snapshot, intent, response, released)
+        maybe_go(env, call, snapshot, intent, response, executed)
     end
   end
 
-  # The Gate 1b PDR; `execute/4` writes it right after the emit PDR.
-  defp handover_pdr(call, decision, snapshot, intent) do
-    %{
+  # A permit of the normal branch, journaled when it is made (emit, transfer
+  # or store). For emit it carries the assigned λ(y).
+  defp permitted(env, call, decision, snapshot, intent) do
+    PDR.append(env, %{
       "decision_id" => PDR.new_id(),
       "call_id" => call.call_id,
       "tool" => call.tool,
@@ -186,8 +191,9 @@ defmodule KomkiMediator.ConnectorGate do
       "payload_hash" => PDR.payload_hash(decision),
       "intent_id" => intent["intent_id"],
       "snapshot_id" => snapshot["snapshot_id"],
-      "checked_label" => decision["checked_label"]
-    }
+      "checked_label" => decision["checked_label"],
+      "assigned_label" => decision["assigned_label"]
+    })
   end
 
   # -------------------------------------------------------------------------
@@ -323,19 +329,18 @@ defmodule KomkiMediator.ConnectorGate do
   # Execution
   # -------------------------------------------------------------------------
 
-  # `handover_pdr` is the permitted Gate 1b PDR, or nil after a GO (the
-  # released PDR is already in the journal). It follows the emit PDR, both
-  # before the execution.
-  defp execute(env, call, emit, handover_pdr) do
+  # All decisions are in the journal by now; this adds the record before
+  # effect and runs the connector.
+  defp execute(env, call, emit) do
     %{decision: decision, snapshot: snapshot, intent: intent} = emit
     call_id = call.call_id
 
     context =
       if call.kind == :write, do: %{"assigned_label" => decision["assigned_label"]}, else: %{}
 
-    # Record before effect (R.11): the emit PDR is in the journal before
-    # the request leaves the mediator. payload_hash binds the outgoing
-    # request (operation, parameters, context).
+    # Record before effect (R.11): it is in the journal before the request
+    # leaves the mediator. payload_hash binds the outgoing request
+    # (operation, parameters, context).
     PDR.append(env, %{
       "decision_id" => call_id,
       "call_id" => call_id,
@@ -352,8 +357,6 @@ defmodule KomkiMediator.ConnectorGate do
       "checked_label" => decision["checked_label"],
       "assigned_label" => decision["assigned_label"]
     })
-
-    if handover_pdr, do: PDR.append(env, handover_pdr)
 
     case connector_call(env, call, call_id, context) do
       {:ok, result} -> admit(env, call, call_id, decision, result)
@@ -511,8 +514,9 @@ defmodule KomkiMediator.ConnectorGate do
 
   # deny/indeterminate (remedies) or a decision error, in Gate 1 (no
   # execution, `executed` is nil) or Gate 2 (content withheld, `executed`
-  # is the call_id of the emit PDR). The PDR always carries the call_id;
-  # the answer names an emit PDR only if there is one.
+  # is the call_id, i.e. the decision_id of the record before effect). The
+  # PDR always carries the call_id; the answer names a record before effect
+  # only if there is one.
   defp not_permitted(env, call, rule, executed, intent, snapshot, outcome) do
     decision_id = PDR.new_id()
 
