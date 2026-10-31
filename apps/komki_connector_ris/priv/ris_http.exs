@@ -103,6 +103,53 @@ defmodule KomkiConnectorRis.RisHttp do
   def method_label(method) when is_binary(method), do: method
 
   @doc """
+  `:ok`, wenn `path` ausserhalb jedes Git-Repos liegt (auch Worktrees, deren
+  `.git` eine Datei ist), sonst `{:error, {:in_repo, repo}}`. Vorhandene
+  Pfade werden per realpath aufgeloest — ein Symlink, der in ein Repo
+  fuehrt, umgeht die Pruefung sonst. Noch nicht existierende Enden (der
+  Recorder legt sein --out erst nach der Pruefung an) bleiben lexikalisch:
+  aufgeloest wird der laengste existierende Vorfahre.
+  """
+  @spec repo_free?(Path.t()) :: :ok | {:error, {:in_repo, Path.t()}}
+  def repo_free?(path) do
+    path
+    |> Path.expand()
+    |> resolved()
+    |> ancestors()
+    |> Enum.find(&File.exists?(Path.join(&1, ".git")))
+    |> case do
+      nil -> :ok
+      repo -> {:error, {:in_repo, repo}}
+    end
+  end
+
+  # Symlinks aufloesen, soweit sie existieren (realpath gibt es in OTP 29
+  # nicht mehr): erst der Pfad selbst, dann die Vorfahren. Schutz gegen
+  # Zyklen (a -> b -> a): nach 64 Hops wird lexikalisch weitergearbeitet —
+  # schlimmstenfalls greift dann die alte, rein lexikalische Pruefung.
+  defp resolved(path), do: resolved_loop(Path.expand(path), 0)
+
+  defp resolved_loop(path, hops) when hops >= 64, do: path
+
+  defp resolved_loop(path, hops) do
+    case File.read_link(path) do
+      {:ok, target} ->
+        resolved_loop(Path.expand(target, Path.dirname(path)), hops + 1)
+
+      {:error, _reason} ->
+        case Path.dirname(path) do
+          ^path -> path
+          parent -> Path.join(resolved_loop(parent, hops + 1), Path.basename(path))
+        end
+    end
+  end
+
+  defp ancestors(path) do
+    parent = Path.dirname(path)
+    if parent == path, do: [path], else: [path | ancestors(parent)]
+  end
+
+  @doc """
   CLI-Einsprung der priv-Skripte: `runner` laeuft nur, wenn Argumente da sind
   und kein Testlauf vorliegt (`mix test` laedt die Skripte per
   Code.require_file — ohne Argumente oder im Test nichts tun). Alles andere

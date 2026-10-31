@@ -106,7 +106,7 @@ oder ExVCR.
   Client und Upstream erhalten alles ungeschwärzt, nur die Datei ist geschwärzt.
 
 Geschwärzt heißt nicht verschlüsselt: Was nicht geschwärzt wurde, bleibt in der Kassette Klartext.
-`priv/ris_kassetten.exs` versiegelt deshalb das Verzeichnis nach der Session als Ganzes
+`priv/ris_kassetten.exs` versiegelt deshalb nach der Session alle `*.json` des Verzeichnisses
 (AES-256-GCM, Schlüssel per Touch ID aus der Secure Enclave; Abschnitt „Kassetten verschlüsseln“
 unten). Ohne diese Freigabe bleibt jedem Prozess — auch jedem Agenten — nur der Chiffretext.
 
@@ -193,24 +193,29 @@ elixir apps/komki_connector_ris/priv/ris_kassetten.exs status <verzeichnis>
 
 Ablauf einer Session: aufzeichnen, Leak-Prüfung und Skelett-Bericht wie gehabt, danach `seal` —
 dann liegen nur noch `<name>.json.enc` (Magic `rkt1`, je Datei eigene Nonce). `seal` löscht den
-Klartext erst nach bestandener Gegenprobe von der Platte. Meldungen nennen nie Schlüssel, Siegel
-oder Inhalte, nur Namen und Zähler.
+Klartext erst nach bestandener Gegenprobe von der Platte. Dateien, die keine `*.json` sind,
+bleiben unberührt und werden gemeldet — sie sind keine Kassetten. Meldungen nennen nie Schlüssel,
+Siegel oder Inhalte, nur Namen und Zähler.
 
 - Replay und Skelett-Extraktor lesen `*.json`: vorher `unseal`, danach `seal`.
 - Abbrüche lassen einen sichtbaren Mischzustand: `status` zeigt ihn, ein erneutes
-  `seal`/`unseal` vollendet. Beide überschreiben nie und lehnen Verzeichnisse in Git-Repos ab,
-  wie der Recorder.
+  `seal`/`unseal` vollendet. Nicht löschbare Dateien werden übersprungen und gemeldet; eine
+  Restdatei `<name>.json.new` aus einem Crash blockiert mit klarer Meldung. Beide überschreiben
+  nie und lehnen Verzeichnisse in Git-Repos ab, wie der Recorder.
 - Exit-Codes: 0 ok (auch „nichts zu tun“), 1 fachliche Ablehnung oder Umwelt, 2 Aufruf falsch,
-  3 kein `komki-tresor`/keine Secure Enclave, 4 Freigabe verweigert oder abgebrochen,
-  5 Siegel oder Datei ungültig.
+  3 kein oder nicht ausführbares `komki-tresor`/keine Secure Enclave, 4 Freigabe verweigert
+  oder abgebrochen, 5 Siegel oder Datei ungültig.
 
 Grenzen, bewusst:
 
 - **Klartext-Fenster.** Bis zum ersten `seal` und während `unseal` liegt Klartext auf der Platte.
   Optionale Härtung ohne eigenen Code: Recorder mit `--out` auf eine RAM-Disk schreiben
-  (`dev=$(hdiutil attach -nomount ram://524288)`, dann
-  `diskutil eraseVolume APFS Kassetten "$dev"`, Aufzeichnung nach `/Volumes/Kassetten`, am Ende
-  `seal` und `diskutil eject`). RAM-Disk-Inhalte sind bei einem Crash weg, Größe also klein halten.
+  (`dev=$(hdiutil attach -nomount ram://524288)`, dann `diskutil eraseVolume APFS Kassetten
+  "$dev"`, Aufzeichnung nach `/Volumes/Kassetten`). Am Ende `seal` auf der RAM-Disk ausführen
+  und das Verzeichnis **vor** dem `diskutil eject` auf die Platte verschieben:
+  `mv /Volumes/Kassetten ~/.local/share/kommunalpolitik_ki/ris-cassettes/<zeitstempel>` —
+  der eject verwirft alles, was noch auf der RAM-Disk liegt. RAM-Disk-Inhalte sind auch bei
+  einem Crash weg, Größe also klein halten.
 - **Kein Key-Escrow, kein Restore.** Das Siegel öffnet nur die Secure Enclave dieses Macs. Ist der
   Schlüsselbund-Eintrag weg (gelöscht, Mac-Neuaufsetzung, anderer Mac), sind verschlüsselte
   Kassetten unwiederbringlich. Entfernen nur bewusst:
