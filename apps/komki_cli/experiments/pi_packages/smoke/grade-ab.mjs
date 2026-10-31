@@ -452,7 +452,7 @@ function renderMarkdown({ arms, byArm, gates, perRun, quality }) {
   lines.push(`| Messgröße (Median, Spanne über n Messläufe) | ${arms.join(" | ")} |`);
   lines.push(`|---|${arms.map(() => "---").join("|")}|`);
   row("Ladezeit", (a) => fmtSpread({ ...a.loadMs, median: a.loadMs.median / 1000, min: a.loadMs.min / 1000, max: a.loadMs.max / 1000 }, 1, " s"));
-  row("Wandzeit gesamt", (a) => fmtSpread({ ...a.wallMsTotal, median: a.wallMsTotal.median / 1000, min: a.wallMsTotal.min / 1000, max: a.wallMsTotal.max / 1000 }, 0, " s"));
+  row("Gesamtdauer", (a) => fmtSpread({ ...a.wallMsTotal, median: a.wallMsTotal.median / 1000, min: a.wallMsTotal.min / 1000, max: a.wallMsTotal.max / 1000 }, 0, " s"));
   row("Decode t/s", (a) => fmtSpread(a.decodeTps, 1));
   row("Prefill t/s", (a) => fmtSpread(a.prefillTps, 0));
   row("TTFT (Median je Request)", (a) => fmtSpread(a.ttftMedianMs, 0, " ms"));
@@ -465,7 +465,7 @@ function renderMarkdown({ arms, byArm, gates, perRun, quality }) {
   row("Tool-Calls / invalide / Reparaturen", (a) => `${a.toolCalls} / ${a.toolCallClasses ? Object.entries(a.toolCallClasses).filter(([k]) => k !== "ok" && k !== "extra-keys").reduce((x, [, v]) => x + v, 0) : 0} / ${a.repairs} (${fmt((a.repairRate ?? 0) * 100, 1)} %)`);
   row("finishReasons", (a) => Object.entries(a.finishReasons).map(([k, v]) => `${k} ${v}`).join(", "));
   lines.push("");
-  lines.push(`| Aufgabe: Wandzeit | ${arms.join(" | ")} |`);
+  lines.push(`| Aufgabe: Gesamtdauer · Prüfergebnisse | ${arms.join(" | ")} |`);
   lines.push(`|---|${arms.map(() => "---").join("|")}|`);
   for (const task of Object.keys(byArm[arms[0]].taskWallMs)) {
     row(task, (a) => {
@@ -491,7 +491,7 @@ function renderMarkdown({ arms, byArm, gates, perRun, quality }) {
   lines.push("");
   lines.push("## Läufe");
   lines.push("");
-  lines.push("| Lauf | Arm | Runde | Seed | Ladezeit | Wandzeit | Decode t/s |");
+  lines.push("| Lauf | Arm | Runde | Seed | Ladezeit | Gesamtdauer | Decode t/s |");
   lines.push("|---|---|---|---|---|---|---|");
   for (const run of perRun) {
     lines.push(`| ${run.dir} | ${run.arm} | ${run.round} | ${run.seed} | ${fmt(run.metrics.loadMs / 1000, 1)} s | ${fmt(run.metrics.wallMsTotal / 1000)} s | ${fmt(run.metrics.decodeTps, 1)} |`);

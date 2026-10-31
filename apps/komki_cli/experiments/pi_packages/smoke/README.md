@@ -90,7 +90,7 @@ Der A/B selbst besteht aus drei Skripten:
 # 1. Kandidaten stagen: feste Revision, SHA-256 vor und nach dem Download
 node smoke/stage-gguf.mjs --repo <hf-repo> --revision <commit> --file <gguf> --sha256 <hex>
 
-# 2. Lade-Check, dann Warm-up + n Messläufe je Arm, interleaved (A B C …)
+# 2. Preflight-Check, dann Warm-up + n Messläufe je Arm, interleaved (A B C …)
 node smoke/run-ab.mjs --root <ab-root> --preflight
 node smoke/run-ab.mjs --root <ab-root> [--runs 3] [--timeout-factor 6]
 
