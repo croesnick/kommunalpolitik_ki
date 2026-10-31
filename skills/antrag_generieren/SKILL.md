@@ -103,6 +103,7 @@ Bevor der Entwurf der nutzenden Person vorgelegt wird, muss jeder Punkt erfüllt
 - [ ] **Strukturierte Auftragsliste** — konkrete Einzelpunkte, nicht „prüft mal alles“.
 - [ ] **Wirkungsorientierte Begründung** — nicht „weil wir das wollen“, sondern „weil es X bewirkt“ (Wohnraum zurückgewinnen, Investitionshemmnis abbauen, etc.).
 - [ ] **Quellen und Material** — Links, PDFs, externe Quellen. Quellenpflicht ist Standard.
+- [ ] **Gewissheit und Verben wie in der Quelle** — was eine Vorlage als möglich nennt („kann gedeckt werden“, „voraussichtlich“), steht im Antrag nicht als sicher; „melden“ wird nicht zu „aufnehmen“, „empfehlen“ nicht zu „beschließen“. Das lokale Modell verschärft beides häufig (Labbook `docs/research/2026-10-31-modell-ab.md`, Befunde 7 und 8).
 - [ ] **Signatur-Block** — formal korrekt, mit Namen + Fraktionszugehörigkeit (oder Platzhalter für Musterantrag).
 - [ ] **Adressat klar** — Verwaltungsauftrag vs. Ratsbeschluss vs. Resolution unterscheidbar.
 
