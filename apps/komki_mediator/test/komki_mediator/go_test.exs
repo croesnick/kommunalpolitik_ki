@@ -60,17 +60,31 @@ defmodule KomkiMediator.GoTest do
     end)
   end
 
-  defp wait_for_request(_go_dir, 0), do: flunk("keine GO-Anfrage")
+  # `operation` narrows the wait: an answered request can still be pending
+  # for a moment while the next one is already there.
+  defp wait_for_request(go_dir, tries, operation \\ nil)
 
-  defp wait_for_request(go_dir, tries) do
+  defp wait_for_request(_go_dir, 0, _operation), do: flunk("keine GO-Anfrage")
+
+  # Without `operation` exactly one request may be pending: a second one
+  # would be a duplicate GO request for the same gate.
+  defp wait_for_request(go_dir, tries, nil) do
     case Go.pending(go_dir) do
-      [request] ->
-        request
-
-      [] ->
-        Process.sleep(20)
-        wait_for_request(go_dir, tries - 1)
+      [request] -> request
+      [] -> retry(go_dir, tries, nil)
     end
+  end
+
+  defp wait_for_request(go_dir, tries, operation) do
+    case Enum.find(Go.pending(go_dir), &(&1["operation"] == operation)) do
+      nil -> retry(go_dir, tries, operation)
+      request -> request
+    end
+  end
+
+  defp retry(go_dir, tries, operation) do
+    Process.sleep(20)
+    wait_for_request(go_dir, tries - 1, operation)
   end
 
   defp outcomes(env), do: Enum.map(TestHelpers.journal_records(env.journal_path), & &1["outcome"])
@@ -91,15 +105,21 @@ defmodule KomkiMediator.GoTest do
     assert "recipient_not_allowed" in request["blockers"]
     assert request["operation"] == "transfer"
 
-    # Transfer deny, then the GO commit (released) right after the nonce,
-    # then the emit record, all before execution; every record carries the
-    # call's call_id.
-    assert outcomes(env) == ["not_admitted", "released", "emitted", "admitted"]
+    # Emit decision, transfer deny, the GO commit (released) right after the
+    # nonce, then the record before effect, all before execution; every
+    # record carries the call's call_id.
+    assert outcomes(env) == ["permitted", "not_admitted", "released", "emitted", "admitted"]
 
-    [deny, released, emitted, admit] = TestHelpers.journal_records(env.journal_path)
+    [decided, deny, released, emitted, admit] = TestHelpers.journal_records(env.journal_path)
+    assert decided["rule"] == "emit"
     assert released["rule"] == "transfer"
     assert released["checked_label"] == emitted["assigned_label"]
-    assert Enum.all?([deny, released, admit], &(&1["call_id"] == emitted["decision_id"]))
+
+    assert Enum.all?(
+             [decided, deny, released, admit],
+             &(&1["call_id"] == emitted["decision_id"])
+           )
+
     assert map_size(GoStand.current()["consumed"]) == 1
     assert Go.pending(go_dir) == []
   end
@@ -139,10 +159,12 @@ defmodule KomkiMediator.GoTest do
     assert response["hinweis"] == KomkiMediator.Hinweis.text(:go_refused)
     assert "recipient_not_allowed" in Enum.map(response["remedies"], & &1["code"])
     refute_received :web_called
-    assert outcomes(env) == ["not_admitted", "go_refused"]
+    assert outcomes(env) == ["permitted", "not_admitted", "go_refused"]
 
-    # Both records belong to the same call and snapshot (CONTRACT §6.1 step 7).
-    [deny, refused] = TestHelpers.journal_records(env.journal_path)
+    # All records belong to the same call; deny and refusal to the same
+    # snapshot (CONTRACT §6.1 step 7).
+    [decided, deny, refused] = TestHelpers.journal_records(env.journal_path)
+    assert decided["call_id"] == deny["call_id"]
     assert is_binary(refused["call_id"])
     assert refused["call_id"] == deny["call_id"]
     assert refused["snapshot_id"] == deny["snapshot_id"]
@@ -157,7 +179,7 @@ defmodule KomkiMediator.GoTest do
     assert response["go"] == "keine Antwort"
     assert response["hinweis"] == KomkiMediator.Hinweis.text(:go_timeout)
     refute_received :web_called
-    assert outcomes(env) == ["not_admitted", "go_timeout"]
+    assert outcomes(env) == ["permitted", "not_admitted", "go_timeout"]
     assert Go.pending(env.go.dir) == []
   end
 
@@ -202,7 +224,7 @@ defmodule KomkiMediator.GoTest do
     assert map_size(GoStand.current()["consumed"]) == 0
 
     # The failed commit stays linked to its call (#298 review).
-    [deny, failed] = TestHelpers.journal_records(env.journal_path)
+    [_decided, deny, failed] = TestHelpers.journal_records(env.journal_path)
     assert failed["rule"] == "transfer"
     assert failed["outcome"] == "error"
     assert failed["call_id"] == deny["call_id"]
@@ -241,5 +263,49 @@ defmodule KomkiMediator.GoTest do
     assert response["decision"] == "deny"
     refute Map.has_key?(response, "go")
     assert Go.pending(env.go.dir) == []
+  end
+
+  # A binding without emit and transfer rules (doc-vertraulich@1) blocks
+  # both gates: two GO prompts for one call, each a decision of its own
+  # (decision 2026-10-31: leave as is). The journal shows every step.
+  test "emit-GO und transfer-GO: jede Entscheidung im Journal, eine call_id", %{
+    env: env,
+    go_dir: go_dir
+  } do
+    env = put_in(env.room.workspace_bindings, ["doc-vertraulich@1", "web-oeffentlich@1"])
+    test = self()
+
+    spawn_link(fn ->
+      for operation <- ["emit", "transfer"] do
+        request = wait_for_request(go_dir, 100, operation)
+        send(test, {:request, operation})
+        Go.answer(go_dir, request, true)
+      end
+    end)
+
+    ConnectorGate.call(env, "web_search", @params)
+
+    assert_received {:request, "emit"}
+    assert_received {:request, "transfer"}
+    assert_received :web_called
+
+    records = TestHelpers.journal_records(env.journal_path)
+
+    # Every step of the call, ending with admit (the web result's label is
+    # outside what doc-vertraulich@1 admits for this purpose).
+    assert Enum.map(records, &{&1["rule"], &1["outcome"]}) == [
+             {"emit", "not_admitted"},
+             {"emit", "released"},
+             {"transfer", "not_admitted"},
+             {"transfer", "released"},
+             {"emit", "emitted"},
+             {"admit", "not_admitted"}
+           ]
+
+    [call_id] = records |> Enum.map(& &1["call_id"]) |> Enum.uniq()
+    [_, emit_go, _, transfer_go, emitted, _] = records
+    assert emitted["decision_id"] == call_id
+    # The record before effect relies on both GO records.
+    assert emitted["authorized_by"] == [emit_go["decision_id"], transfer_go["decision_id"]]
   end
 end

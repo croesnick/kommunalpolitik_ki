@@ -65,7 +65,7 @@ macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge.
 - Anfrage:
 
   ```json
-  {"v": 1, "token": "<connector-token>", "call_id": "<pdr-id des emit-PDR>", "op": "<operation>", "params": {...}, "context": {...}}
+  {"v": 1, "token": "<connector-token>", "call_id": "<call_id des Aufrufs = decision_id des Vorbelegs>", "op": "<operation>", "params": {...}, "context": {...}}
   ```
 
   `token` ist Pflicht und muss dem Token des Connectors entsprechen (Vergleich in konstanter Zeit,
@@ -168,9 +168,9 @@ führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Man
 
 ## 6. Ablauf im Vermittler (Gate 1, Vollzug, Gate 2)
 
-Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine. Im einfachen Permit-Fall sind das
-**drei PDR**; Ablehnungen und GO-Belege kommen hinzu. Alle PDR eines Aufrufs tragen dieselbe `call_id`
-(Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bzw. Speichern (`store`) in Gate 1, Aufnahme
+Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine. Jede Entscheidung steht mit einem
+eigenen PDR im Journal, sobald sie fällt, dazu der Vorbeleg vor dem Vollzug. Alle PDR eines Aufrufs tragen
+dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bzw. Speichern (`store`) in Gate 1, Aufnahme
 (`admit`) in Gate 2 (RFC R.5.5, R.5.6; Ticket #298).
 
 ### 6.1 Gate 1: `emit`, dann `transfer` oder `store` (die Anfrage ist eine Ausgabe, R.4.2/R.4.3)
@@ -186,19 +186,27 @@ Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine. Im einfac
    schreibenden: Snapshot mit Objekt-Labels λ(y) = `assigned_label` und `workspace.environment =
    manifest.environment` (Empfänger der Anfrage). Hier fällt der Empfängertest gegen RIS, Websuche oder
    Vault.
-5. Kein permit in Schritt 3 oder 4: Antwort mit Remedies, PDR mit der `call_id` des Aufrufs, **kein
-   Vollzug**, außer die nutzende Person gibt ein GO (Schritt 6). Die Antwort nennt keinen emit-PDR (`emit_decision_id`), weil es keinen gibt.
-6. permit: erst der **emit-PDR (`outcome: emitted`), dann der transfer- bzw. store-PDR (`outcome:
-   permitted`), beide bevor der Connector aufgerufen wird** (Vorbeleg vor Wirkung, R.11). Die
-   `decision_id` des emit-PDR ist die `call_id` im Frame. Nach einem GO steht der GO-Beleg
-   (`outcome: released`) direkt nach dem Verbrauch der Nonce im Journal, also vor dem emit-PDR; bei
-   `transfer` und `store` vertritt er den `permitted`-PDR (commit vor Wirkung, komki_policy CONTRACT
-   §4.6).
-7. Die `call_id` entsteht nach der Vorprüfung (Schema, B_W). Jeder PDR des Aufrufs trägt
-   sie: Ablehnungen, GO-Belege (`released`, `go_refused`, `go_timeout`, ein gescheiterter Commit),
-   emit-, transfer- bzw. store- und admit-PDR. Nur eine Ablehnung in der Vorprüfung hat keine, weil es
-   noch keinen Aufruf gibt. Kommt es zum Vollzug, ist die `call_id` die `decision_id` des emit-PDR; ein
-   in Gate 1 abgelehnter Aufruf hat keinen emit-PDR.
+5. **Jede Entscheidung kommt sofort ins Journal**, in der Reihenfolge, in der sie fällt: ein Permit mit
+   `outcome: permitted` (beim emit-Permit samt `assigned_label` = λ(y)), eine Ablehnung mit Remedies,
+   ein GO-Beleg mit `outcome: released` direkt nach dem Verbrauch der Nonce (commit vor Wirkung,
+   komki_policy CONTRACT §4.6). Der GO-Beleg ist die Entscheidung des Freigabe-Zweigs; für dasselbe Gate
+   folgt kein `permitted`. So steht auch bei einem abgelehnten Aufruf jede Prüfung im Journal.
+6. Lehnt Schritt 3 **oder** Schritt 4 ab und kommt kein GO: Antwort mit Remedies, **kein Vollzug**. Die
+   Antwort nennt keinen Vorbeleg (`emit_decision_id`), weil es keinen gibt. Nur wenn beide Schritte erlaubt
+   sind (per Permit oder GO): der **Vorbeleg vor Wirkung** (`rule: emit`, `outcome: emitted`, `decision:
+   null`, R.11), bevor der Connector aufgerufen wird. Er ist keine Entscheidung, die stehen schon im
+   Journal. Seine `decision_id` ist die `call_id` im Frame, `authorized_by` nennt die `decision_id`s der
+   beiden Entscheidungen, auf die er sich stützt (emit und transfer bzw. store samt Empfängerprüfung,
+   jeweils `permitted` oder `released`), sein `payload_hash` bindet die ausgehende Anfrage. Das Antwortfeld `emit_decision_id` (Name aus Kompatibilität) verweist
+   auf ihn. PDR-Schema `komki-pdr/4`.
+7. Die `call_id` entsteht nach der Vorprüfung (Schema, B_W). Jeder PDR des Aufrufs trägt sie:
+   Entscheidungen, Ablehnungen, GO-Belege (`released`, `go_refused`, `go_timeout`, ein gescheiterter
+   Commit), Vorbeleg und admit-PDR. Nur eine Ablehnung in der Vorprüfung hat keine, weil es noch keinen
+   Aufruf gibt. Einen Vorbeleg mit `decision_id` = `call_id` gibt es nur, wenn es zum Vollzug kommt.
+
+   Journal eines erlaubten Aufrufs: `emit permitted` → `transfer permitted` → `emit emitted` →
+   `admit admitted`. Abgelehnt in Gate 1b: `emit permitted` → `transfer not_admitted`. Mit GO für die
+   Übergabe: `emit permitted` → `transfer not_admitted` → `transfer released` → `emit emitted` → `admit …`.
 
 ### 6.2 Gate 2: `admit` (die Antwort ist ein neuer Eingang)
 
@@ -212,7 +220,7 @@ Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine. Im einfac
 3. Objekt `in-<digest12 der Ergebnis-Bytes>` / `v1` / Labels, `workspace.environment = room.environment`.
 4. `Derive.decide(admit)` und `Verify.check`. permit: Antwort mit `labels`, `decision_id`,
    `emit_decision_id` und `payload_hash`. Sonst Remedies bzw. `redacted`.
-5. admit-PDR mit Verweis auf den emit-PDR (`call_id`).
+5. admit-PDR mit derselben `call_id`.
 
 ### 6.3 Schreibende Operationen (`vault.write_test`)
 

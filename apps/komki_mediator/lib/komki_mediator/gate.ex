@@ -215,7 +215,8 @@ defmodule KomkiMediator.Gate do
     end
   end
 
-  # Vorbeleg vor Wirkung (R.11), wie der emit-PDR im ConnectorGate: Der
+  # Vorbeleg vor Wirkung (R.11), wie der Vorbeleg (`emitted`) im
+  # ConnectorGate; hier faellt er mit dem Permit in einen Datensatz: Der
   # Permit steht im Journal, bevor der Executor laeuft (etwa der
   # Dokument-Connector liest). Scheitert das Schreiben, stoppt der
   # Journal-Writer die Vermittlung und der Executor laeuft nie.

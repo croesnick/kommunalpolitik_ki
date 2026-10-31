@@ -49,7 +49,7 @@ defmodule KomkiMediator.GateTest do
     # Der Eintrag ist selbst byte-kanonisch.
     assert JSON.canonical(pdr) == chunk
 
-    assert pdr["schema"] == "komki-pdr/3"
+    assert pdr["schema"] == "komki-pdr/4"
     assert pdr["decision"] == "permit"
     assert pdr["outcome"] == "admitted"
     assert pdr["admitted"] == true

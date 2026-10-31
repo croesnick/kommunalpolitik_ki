@@ -86,8 +86,10 @@ defmodule KomkiMediator.GoStoreTest do
     assert request["params"] == @params
     assert request["blockers"] == ["missing_operation_rule"]
 
-    # store deny -> GO commit (released) -> emit record -> execution -> admit
+    # emit decision -> store deny -> GO commit (released) -> record before
+    # effect -> execution -> admit
     assert journal(env) == [
+             {"emit", "permitted"},
              {"store", "not_admitted"},
              {"store", "released"},
              {"emit", "emitted"},
@@ -106,7 +108,12 @@ defmodule KomkiMediator.GoStoreTest do
     assert response["decision"] == "deny"
     assert response["go"] == "abgelehnt"
     refute_received {:written, _, _}
-    assert journal(env) == [{"store", "not_admitted"}, {"store", "go_refused"}]
+
+    assert journal(env) == [
+             {"emit", "permitted"},
+             {"store", "not_admitted"},
+             {"store", "go_refused"}
+           ]
   end
 
   test "niemand hoert zu (komki run): abgelehnt, nichts geschrieben, keine Anfrage", %{env: env} do
