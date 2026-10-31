@@ -57,10 +57,10 @@ defmodule KomkiPolicy.Remedies do
   @type finding() :: %{required(String.t()) => String.t() | nil}
 
   @doc """
-  Baut die `remedies`-Liste (deny-Form: `code`/`binding`/`condition`/
-  `transitions`; indeterminate-Form: `code`/`fact`/`binding`/
-  `transitions`) in derselben Ordnung wie die übergebenen Befunde. Reine
-  Funktion von (registry, context, finding-Liste).
+  Builds the `remedies` list (deny shape: `code`/`binding`/`condition`/
+  `transitions`; indeterminate shape: `code`/`fact`/`binding`/
+  `transitions`) in the order of the given findings. A pure function of
+  (registry, context, findings).
   """
   @spec catalog(Registry.compiled(), context(), [finding()]) :: [map()]
 

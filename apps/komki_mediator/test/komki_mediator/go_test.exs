@@ -2,8 +2,8 @@ defmodule KomkiMediator.GoTest do
   # Ticket #98: GO for a blocked output. Room vertraulich: handing
   # web_search to the web search (transfer, #298) is denied with
   # recipient_not_allowed; the catalog offers a call GO.
-  # Ein Testprozess spielt die nutzende Person und antwortet ueber dieselben
-  # Funktionen wie `komki go`.
+  # A test process plays the person and answers through the same functions
+  # as `komki go`.
   use ExUnit.Case, async: false
 
   alias KomkiMediator.{ConnectorGate, FakeConnector, Go, GoStand, TestHelpers}

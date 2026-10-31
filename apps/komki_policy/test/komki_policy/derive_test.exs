@@ -573,6 +573,23 @@ defmodule KomkiPolicy.DeriveTest do
       for r <- remedies, do: assert([%{"type" => "neuer_raum"}] = r["transitions"])
     end
 
+    test "emit: neben workspace_invalid bietet auch ein weicher Blocker kein call-GO an" do
+      dir = Path.join(@fixtures_dir, "case_emit_workspace_invalid")
+      {:ok, snapshot} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
+      {:ok, intent} = JSON.parse(File.read!(Path.join(dir, "intent.json")))
+
+      # Invalid contract plus a soft blocker that alone would offer a call GO.
+      denied = put_in(snapshot, ["facts", "has_operation_right", "value"], false)
+
+      assert {:ok, %{"decision" => "deny", "remedies" => remedies}} =
+               Derive.decide(registry(), denied, intent)
+
+      assert ["workspace_invalid", "basis_right_false" | _] = Enum.map(remedies, & &1["code"])
+
+      types = for r <- remedies, t <- r["transitions"], do: t["type"]
+      refute "aktionsfreigabe" in types
+    end
+
     test "unzulässiger Empfänger: call-GO im Katalog mit dem transfer-Hash der Freigabe" do
       dir = Path.join(@fixtures_dir, "case_transfer_recipient")
       {:ok, snapshot} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
