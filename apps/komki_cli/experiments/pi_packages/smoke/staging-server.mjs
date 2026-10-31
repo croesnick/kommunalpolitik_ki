@@ -13,7 +13,8 @@ import { llamaGet } from "./measure.mjs";
  * --offline --no-webui --no-slots -c <ctx> --alias local-model`, API key
  * from a file), but without a Seatbelt profile, on its own port, with its
  * own key and log under the run directory — never via the komki instance.
- * Only the GGUF, its sampling flags and the seed vary.
+ * Only the GGUF, its sampling flags, the seed and per-arm extra server
+ * arguments (thinking switch, MTP drafter) vary.
  *
  * Returns the same shape as resolveLlama() (port, pid, apiKey, baseUrl,
  * gguf, ctx, logPath), so run-smoke.mjs measures both paths alike, plus
@@ -38,6 +39,7 @@ export async function startStagingServer({
   sampling = {},
   seed = null,
   ctx = 131072,
+  extraArgs = [],
   dir,
   bin = process.env.KOMKI_LLAMA_SERVER ?? DEFAULT_LLAMA_SERVER,
 }) {
@@ -61,6 +63,7 @@ export async function startStagingServer({
     "--no-slots",
     ...samplingFlags(sampling),
     ...(seed === null ? [] : ["--seed", String(seed)]),
+    ...extraArgs,
     "-c", String(ctx),
     "--api-key-file", keyPath,
   ];
@@ -102,7 +105,7 @@ export async function startStagingServer({
     gguf,
     ctx,
     logPath,
-    staging: { bin, args, sampling, seed, loadMs },
+    staging: { bin, args, sampling, seed, extraArgs, loadMs },
     async stop() {
       if (exited) return;
       child.kill("SIGTERM");

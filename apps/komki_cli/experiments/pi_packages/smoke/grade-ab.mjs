@@ -20,7 +20,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { parseSessionFile } from "../lib/session.mjs";
@@ -265,7 +265,47 @@ async function errorResults(measures) {
   return [...byId.values()].filter((r) => r.isError);
 }
 
-async function runMetrics(results, summary) {
+/** A line repeated this often within one model response counts as a loop. */
+export const LOOP_LINE_REPEATS = 8;
+
+function isSummaryRequest(record) {
+  try {
+    const system = JSON.parse(record.body).messages?.find((m) => m.role === "system");
+    const text = typeof system?.content === "string" ? system.content : JSON.stringify(system?.content ?? "");
+    return text.startsWith("You are a context summarization assistant.");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Repetition loops of a run: model responses (compaction summaries
+ * excluded) in which one non-empty line occurs at least LOOP_LINE_REPEATS
+ * times. Reads the proxy logs under <run>/task-N/harness/.
+ */
+async function repetitionLoops(dir) {
+  const loops = [];
+  const taskDirs = (await readdir(dir).catch(() => [])).filter((name) => name.startsWith("task-"));
+  for (const taskDir of taskDirs) {
+    const harness = path.join(dir, taskDir, "harness");
+    for (const invocation of await readdir(harness).catch(() => [])) {
+      const log = await readMaybe(path.join(harness, invocation, "requests.jsonl"));
+      for (const line of (log ?? "").split("\n").filter(Boolean)) {
+        const record = JSON.parse(line);
+        if (isSummaryRequest(record)) continue;
+        const counts = new Map();
+        for (const text of (record.response?.text ?? "").split("\n").map((l) => l.trim()).filter(Boolean)) {
+          counts.set(text, (counts.get(text) ?? 0) + 1);
+        }
+        const [top, repeats] = [...counts].sort((x, y) => y[1] - x[1])[0] ?? [null, 0];
+        if (repeats >= LOOP_LINE_REPEATS) loops.push({ task: taskDir, repeats, line: top.slice(0, 80) });
+      }
+    }
+  }
+  return loops;
+}
+
+async function runMetrics(results, summary, dir) {
   const tasks = {};
   const all = [];
   for (const result of results) {
@@ -316,11 +356,12 @@ async function runMetrics(results, summary) {
     toolResultsError: toolErrors.length,
     lengthClamped: all.reduce((s, m) => s + (m.lengthClampedRequests?.length ?? 0), 0),
     finishReasons,
+    loops: await repetitionLoops(dir),
     footprintMaxMiB: Math.max(0, ...all.map((m) => m.footprintLlamaMiB ?? 0)) || null,
     rssMaxMiB: Math.max(0, ...all.map((m) => m.rssLlamaMiB?.after ?? 0)) || null,
     compaction: task6
       ? {
-          compactions: task6.requirements?.find((x) => x.id === "compaction-ausgeloest")?.evidence?.compactions ?? null,
+          compactions: task6.requirements?.find((x) => x.id === "compaction-ausgeloest")?.observed?.compactions ?? null,
           summaryRequests: task6.measurements?.summary?.count ?? null,
           summaryMs: task6.measurements?.summary?.durationMsTotal ?? null,
           summaryLanguage: task6.measurements?.summary?.language ?? null,
@@ -345,10 +386,12 @@ const fmt = (value, digits = 0) =>
 const fmtSpread = (s, digits = 0, unit = "") =>
   s.n === 0 ? "–" : `${fmt(s.median, digits)}${unit} (${fmt(s.min, digits)}–${fmt(s.max, digits)})`;
 
-async function report(root) {
-  const key = JSON.parse(await readFile(path.join(root, "blind-key.json"), "utf8"));
-  const auto = JSON.parse(await readFile(path.join(root, "blind", "auto.json"), "utf8"));
-  const grades = JSON.parse(await readFile(path.join(root, "blind", "grades.json"), "utf8"));
+async function report(root, { perfOnly = false } = {}) {
+  // --perf-only: studies without text grading (speed, loops) skip blinding
+  const readJson = async (file) => JSON.parse(await readFile(path.join(root, file), "utf8"));
+  const key = perfOnly ? {} : await readJson("blind-key.json");
+  const auto = perfOnly ? {} : await readJson(path.join("blind", "auto.json"));
+  const grades = perfOnly ? {} : await readJson(path.join("blind", "grades.json"));
   const open = Object.entries(grades).filter(([, g]) => Object.entries(g).some(([k, v]) => k !== "notiz" && typeof v !== "boolean"));
   if (open.length > 0) throw new Error(`${open.length} Outputs noch nicht vollständig bewertet (grades.json)`);
 
@@ -362,7 +405,7 @@ async function report(root) {
     for (const r of summary.results) {
       results.push(JSON.parse(await readFile(path.join(dir, "results", `${r.id}.json`), "utf8")));
     }
-    perRun.push({ ...entry, metrics: await runMetrics(results, summary) });
+    perRun.push({ ...entry, metrics: await runMetrics(results, summary, dir) });
   }
 
   const quality = {};
@@ -393,6 +436,7 @@ async function report(root) {
       reasoningTokens: pick((m) => m.reasoningTokens),
       footprintMaxMiB: pick((m) => m.footprintMaxMiB),
       lengthClamped: pick((m) => m.lengthClamped),
+      runsWithLoop: armRuns.filter((r) => r.metrics.loops.length > 0).length,
       taskWallMs: Object.fromEntries(
         Object.keys(armRuns[0]?.metrics.tasks ?? {}).map((t) => [t, pick((m) => m.tasks[t]?.wallMs)]),
       ),
@@ -440,13 +484,13 @@ async function report(root) {
     };
   }
 
-  const out = { root, at: new Date().toISOString(), arms, byArm, gates, perRun, quality };
+  const out = { root, at: new Date().toISOString(), perfOnly, arms, byArm, gates, perRun, quality };
   await writeFile(path.join(root, "report.json"), JSON.stringify(out, null, 2));
   await writeFile(path.join(root, "REPORT.md"), renderMarkdown(out));
   console.log(`Bericht: ${path.join(root, "REPORT.md")}`);
 }
 
-function renderMarkdown({ arms, byArm, gates, perRun, quality }) {
+function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
   const lines = ["# Modell-A/B — Auswertung (generiert von grade-ab.mjs)", ""];
   const row = (label, fn) => lines.push(`| ${label} | ${arms.map((arm) => fn(byArm[arm])).join(" | ")} |`);
   lines.push(`| Messgröße (Median, Spanne über n Messläufe) | ${arms.join(" | ")} |`);
@@ -464,6 +508,7 @@ function renderMarkdown({ arms, byArm, gates, perRun, quality }) {
   row("längengeklemmte Requests", (a) => fmtSpread(a.lengthClamped));
   row("Tool-Calls / invalide / Reparaturen", (a) => `${a.toolCalls} / ${a.toolCallClasses ? Object.entries(a.toolCallClasses).filter(([k]) => k !== "ok" && k !== "extra-keys").reduce((x, [, v]) => x + v, 0) : 0} / ${a.repairs} (${fmt((a.repairRate ?? 0) * 100, 1)} %)`);
   row("finishReasons", (a) => Object.entries(a.finishReasons).map(([k, v]) => `${k} ${v}`).join(", "));
+  row(`Läufe mit Wiederholungsschleife (Zeile ≥ ${LOOP_LINE_REPEATS}×)`, (a) => `${a.runsWithLoop} von ${a.runs.length}`);
   lines.push("");
   lines.push(`| Aufgabe: Gesamtdauer · Prüfergebnisse | ${arms.join(" | ")} |`);
   lines.push(`|---|${arms.map(() => "---").join("|")}|`);
@@ -474,6 +519,7 @@ function renderMarkdown({ arms, byArm, gates, perRun, quality }) {
     });
   }
   lines.push("");
+  if (perfOnly) return renderRuns(lines, perRun);
   lines.push(`| Qualität (Punkte, Median, Spanne) | ${arms.join(" | ")} |`);
   lines.push(`|---|${arms.map(() => "---").join("|")}|`);
   for (const task of [1, 2, 3]) row(`Aufgabe ${task}`, (a) => `${fmtSpread(a.quality[task])} / ${a.quality[task].maxPoints}`);
@@ -489,13 +535,7 @@ function renderMarkdown({ arms, byArm, gates, perRun, quality }) {
     return `${yn(g.Q_qualitaet)} (${g.qualitaetGePin.join(", ") || "keine"})`;
   });
   lines.push("");
-  lines.push("## Läufe");
-  lines.push("");
-  lines.push("| Lauf | Arm | Runde | Seed | Ladezeit | Gesamtdauer | Decode t/s |");
-  lines.push("|---|---|---|---|---|---|---|");
-  for (const run of perRun) {
-    lines.push(`| ${run.dir} | ${run.arm} | ${run.round} | ${run.seed} | ${fmt(run.metrics.loadMs / 1000, 1)} s | ${fmt(run.metrics.wallMsTotal / 1000)} s | ${fmt(run.metrics.decodeTps, 1)} |`);
-  }
+  renderRuns(lines, perRun);
   lines.push("");
   lines.push("## Blindbewertung (entblindet)");
   lines.push("");
@@ -503,6 +543,18 @@ function renderMarkdown({ arms, byArm, gates, perRun, quality }) {
   lines.push("|---|---|---|---|---|---|---|");
   for (const [id, q] of Object.entries(quality).sort((x, y) => x[1].task - y[1].task || x[1].arm.localeCompare(y[1].arm) || x[1].round - y[1].round)) {
     lines.push(`| ${id} | ${q.task} | ${q.arm} | ${q.round} | ${q.points}/${q.max} | ${q.factViolations.join(", ") || "–"} | ${q.notiz.replace(/\|/g, "/")} |`);
+  }
+  return lines.join("\n") + "\n";
+}
+
+function renderRuns(lines, perRun) {
+  lines.push("## Läufe");
+  lines.push("");
+  lines.push("| Lauf | Arm | Runde | Seed | Ladezeit | Gesamtdauer | Decode t/s | Schleifen |");
+  lines.push("|---|---|---|---|---|---|---|---|");
+  for (const run of perRun) {
+    const loops = run.metrics.loops.map((l) => `${l.task} ${l.repeats}×`).join(", ") || "–";
+    lines.push(`| ${run.dir} | ${run.arm} | ${run.round} | ${run.seed} | ${fmt(run.metrics.loadMs / 1000, 1)} s | ${fmt(run.metrics.wallMsTotal / 1000)} s | ${fmt(run.metrics.decodeTps, 1)} | ${loops} |`);
   }
   return lines.join("\n") + "\n";
 }
@@ -515,7 +567,7 @@ async function main() {
   const root = rootIndex >= 0 ? rest[rootIndex + 1] : null;
   if (!root) throw new Error("--root <ab-root> fehlt");
   if (command === "blind") return blind(root);
-  if (command === "report") return report(root);
+  if (command === "report") return report(root, { perfOnly: rest.includes("--perf-only") });
   throw new Error("Befehl: blind | report");
 }
 

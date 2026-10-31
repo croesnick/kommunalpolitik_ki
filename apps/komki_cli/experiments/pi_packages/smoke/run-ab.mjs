@@ -15,6 +15,10 @@
  * Re-measuring a close metric (decision rule 4 in the labbook):
  * --first-round 4 --runs 5 --only 2 runs rounds 4–5 only, without warm-up.
  *
+ * Follow-up studies use their own seed base (--seed-base) so no run repeats
+ * an earlier seed. Arms with `serverArgs` or a `draft` (ab-arms.mjs) pass
+ * them to the staging server.
+ *
  * Resumable: a run whose directory holds results.json counts as done and
  * is skipped on the next invocation. Provenance (hardware, versions,
  * SHA-256 of binary and GGUFs, git state) and the schedule with the system
@@ -42,6 +46,7 @@ function parseArgs(argv) {
     only: "1,2,3,4,6",
     timeoutFactor: 6,
     firstRound: 0,
+    seedBase: 285_000,
     preflight: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -51,6 +56,7 @@ function parseArgs(argv) {
     if (argv[i] === "--only") args.only = argv[i + 1];
     if (argv[i] === "--timeout-factor") args.timeoutFactor = Number(argv[i + 1]);
     if (argv[i] === "--first-round") args.firstRound = Number(argv[i + 1]);
+    if (argv[i] === "--seed-base") args.seedBase = Number(argv[i + 1]);
     if (argv[i] === "--preflight") args.preflight = true;
   }
   for (const arm of args.arms) if (!ARMS[arm]) throw new Error(`unbekannter Arm ${arm}`);
@@ -65,8 +71,18 @@ function sh(cmd, cmdArgs) {
   }
 }
 
+function stagedPath(name) {
+  return path.join(komkiBaseDir(), "models-staging", name);
+}
+
 function ggufPath(arm) {
-  return path.join(komkiBaseDir(), "models-staging", ARMS[arm].file);
+  return stagedPath(path.basename(ARMS[arm].file));
+}
+
+/** Extra llama-server arguments of an arm, the MTP drafter path included. */
+function serverArgsOf(arm) {
+  const { serverArgs = [], draft } = ARMS[arm];
+  return draft ? [...serverArgs, "--model-draft", stagedPath(draft.as)] : serverArgs;
 }
 
 /** System state before/after a run: swap, load, thermals, power source. */
@@ -94,6 +110,15 @@ async function provenance(args) {
       throw new Error(`Arm ${arm}: ${file} fehlt oder SHA-256 ${actual} ≠ Pin — erst stage-gguf.mjs`);
     }
     ggufs[arm] = { ...ARMS[arm], path: file, sha256Verified: actual };
+    const draft = ARMS[arm].draft;
+    if (draft) {
+      const draftFile = stagedPath(draft.as);
+      const draftSha = existsSync(draftFile) ? await sha256File(draftFile) : null;
+      if (draftSha !== draft.sha256) {
+        throw new Error(`Arm ${arm}: Drafter ${draftFile} fehlt oder SHA-256 ${draftSha} ≠ Pin`);
+      }
+      ggufs[arm].draft = { ...draft, path: draftFile, sha256Verified: draftSha };
+    }
   }
   return {
     at: new Date().toISOString(),
@@ -126,7 +151,7 @@ function scheduleOf(args) {
         round,
         arm,
         kind: round === 0 ? "warmup" : "measured",
-        seed: seedFor(round),
+        seed: seedFor(round, args.seedBase),
         dir: path.join("runs", `${String(entries.length + 1).padStart(2, "0")}-r${round}-${arm}`),
       });
     }
@@ -143,6 +168,7 @@ function runSmoke(entry, args, root) {
     "--port", String(arm.port),
     "--sampling", JSON.stringify(arm.sampling),
     "--seed", String(entry.seed),
+    "--server-args", JSON.stringify(serverArgsOf(entry.arm)),
     "--timeout-factor", String(args.timeoutFactor),
     "--only", args.only,
     "--root", runDir,
@@ -169,6 +195,7 @@ async function preflight(args, root) {
         gguf: ggufPath(arm),
         port: ARMS[arm].port,
         sampling: ARMS[arm].sampling,
+        extraArgs: serverArgsOf(arm),
         dir: path.join(root, "preflight", arm),
       });
       results[arm] = { ok: true, loadMs: llama.staging.loadMs };

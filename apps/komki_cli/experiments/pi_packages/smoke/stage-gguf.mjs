@@ -14,7 +14,10 @@
  * Target: <KOMKI_HOME>/models-staging (never the instance's models/).
  *
  *   node smoke/stage-gguf.mjs --repo unsloth/gemma-4-26B-A4B-it-qat-GGUF \
- *     --revision <commit> --file <name.gguf> --sha256 <hex>
+ *     --revision <commit> --file <name.gguf> --sha256 <hex> [--as <name>]
+ *
+ * --as stores the file under a different name, e.g. for the equally named
+ * MTP drafters (MTP/mtp-….gguf) of two repos.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -49,7 +52,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const url = `https://huggingface.co/${args.repo}/resolve/${args.revision}/${args.file}`;
   const dir = path.join(komkiBaseDir(), "models-staging");
-  const target = path.join(dir, args.file);
+  const target = path.join(dir, args.as ?? path.basename(args.file));
   const part = `${target}.part`;
   await mkdir(dir, { recursive: true });
 

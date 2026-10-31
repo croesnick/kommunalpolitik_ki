@@ -27,6 +27,7 @@
  *   --seed <n>              server RNG seed (recorded per run)
  *   --ctx <n>               server context (default 131072, as the instance)
  *   --timeout-factor <f>    stretches all task timeouts (default 1)
+ *   --server-args '<json>'  extra llama-server arguments as a JSON array
  */
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -108,6 +109,7 @@ function parseArgs(argv) {
     seed: null,
     ctx: 131072,
     timeoutFactor: 1,
+    serverArgs: [],
   };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--gguf") args.gguf = argv[i + 1];
@@ -115,6 +117,7 @@ function parseArgs(argv) {
     if (argv[i] === "--sampling") args.sampling = JSON.parse(argv[i + 1]);
     if (argv[i] === "--seed") args.seed = Number(argv[i + 1]);
     if (argv[i] === "--ctx") args.ctx = Number(argv[i + 1]);
+    if (argv[i] === "--server-args") args.serverArgs = JSON.parse(argv[i + 1]);
     if (argv[i] === "--timeout-factor") args.timeoutFactor = Number(argv[i + 1]);
     if (argv[i] === "--only") {
       const list = (argv[i + 1] ?? "").split(",").filter(Boolean).map((x) => x.trim());
@@ -694,6 +697,7 @@ async function main() {
         sampling: args.sampling,
         seed: args.seed,
         ctx: args.ctx,
+        extraArgs: args.serverArgs,
         dir: path.join(ROOT, "server"),
       })
     : await resolveLlama();

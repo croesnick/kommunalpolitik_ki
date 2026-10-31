@@ -50,7 +50,47 @@ export const ARMS = {
   },
 };
 
-/** Seed per round: round 0 is the warm-up, 1..n are measured runs; all arms of a round share the seed. */
-export function seedFor(round) {
-  return 285_000 + round;
+/**
+ * MTP drafters (multi-token prediction) shipped in the A and B repos at the
+ * same revisions; staged under distinct names via stage-gguf.mjs --as.
+ * Speculative decoding verifies every drafted token with the target model,
+ * so it changes speed, not the output distribution.
+ */
+export const DRAFTS = {
+  A: {
+    repo: ARMS.A.repo,
+    revision: ARMS.A.revision,
+    file: "MTP/mtp-gemma-4-26B-A4B-it-Q8_0.gguf",
+    as: "mtp-gemma-4-26B-A4B-it-Q8_0.gguf",
+    sha256: "6326fb9f5e487aa8dcdd313a091e3c67724cb2a666ec3b7d2895b5b26d93ed1b",
+  },
+  B: {
+    repo: ARMS.B.repo,
+    revision: ARMS.B.revision,
+    file: "MTP/mtp-gemma-4-26B-A4B-it-Q8_0.gguf",
+    as: "mtp-gemma-4-26B-A4B-it-qat-Q8_0.gguf",
+    sha256: "75f58e20c32281d1adc086c0569d53f147e8d81a7b8493cf4a73a028415f67af",
+  },
+};
+
+const MTP_ARGS = ["--spec-type", "draft-mtp", "--spec-draft-n-max", "4"];
+
+// Follow-up arms (labbook #285, section "Folgemessungen"): same GGUF and
+// sampling as their base arm, one extra server switch each.
+ARMS.A0 = {
+  ...ARMS.A,
+  label: "Pin without thinking (enable_thinking=false)",
+  serverArgs: ["--chat-template-kwargs", '{"enable_thinking":false}'],
+  port: 49614,
+};
+ARMS.AM = { ...ARMS.A, label: "Pin with MTP drafter", draft: DRAFTS.A, serverArgs: MTP_ARGS, port: 49615 };
+ARMS.BM = { ...ARMS.B, label: "QAT with MTP drafter", draft: DRAFTS.B, serverArgs: MTP_ARGS, port: 49616 };
+
+/**
+ * Seed per round: round 0 is the warm-up, 1..n are measured runs; all arms
+ * of a round share the seed. Each study gets its own base so that no run
+ * repeats the seed of an earlier study.
+ */
+export function seedFor(round, base = 285_000) {
+  return base + round;
 }
