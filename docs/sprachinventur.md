@@ -250,12 +250,12 @@ Die Pre-Registration im Labbook behält „Wandzeit“ und „Verdikt“ wörtli
 
 | Term | Status | Kernbeleg | Konsequenz |
 |---|---|---|---|
-| Pre-Registration | ETABLIERT_DE als **Präregistrierung** | Uni Erfurt, Erfurt Laboratory for Empirical Research: „Die Präregistrierung von Studien ist eines der wichtigsten Instrumente offener Wissenschaft (open science).“ (Seitenkopf schreibt „Prä-Registrierung“) | Ersetzung im Labbook steht zum GO aus |
+| Pre-Registration | ETABLIERT_DE wäre **Präregistrierung**; per GO 2026-10-31 bleibt **Pre-Registration** | Uni Erfurt, Erfurt Laboratory for Empirical Research: „Die Präregistrierung von Studien ist eines der wichtigsten Instrumente offener Wissenschaft (open science).“ (Seitenkopf schreibt „Prä-Registrierung“) | Entscheidung der nutzenden Person: Pre-Registration verwenden; Präregistrierung nicht einführen |
 | Verblindung, verblinden, Entblindung | ETABLIERT_DE | DocCheck Flexikon „Verblindung“: „Die Verblindung ist eine methodische Maßnahme in klinischen Studien, bei der bestimmte Personen die Zuordnung …“; dort auch „gezielte Entblindung“ | behalten |
 | Arm (Studienarm) | OFFEN | kein deutscher Glossareintrag gefunden (IQWiG-, Cochrane-Suche: Negativbefund; DocCheck nutzt „Studiengruppe“); englisch „study arm“ im ATMP-Sweden-Glossar | im Labbook bei Ersteinführung definiert; vor weiterer Verwendung klären |
 | Warm-up | NUR_ENGLISCH, mit Vorbehalt | Benchmark-Literatur nur englisch (Barrett u. a., „Virtual Machine Warmup Blows Hot and Cold“, arXiv 1602.00602; IBM-Doku „warm-up period“); deutsche Suche ohne Fachbeleg | behalten; schwacher Negativbefund |
 | TTFT (time to first token) | NUR_ENGLISCH | NVIDIA-NIM-Benchmark-Doku „Metrics“: TTFT ist „the time from query submission to the first received token“ | behalten, bei Ersteinführung ausschreiben |
-| Wiederholungsschleife | OFFEN (Eigenprägungs-Verdacht) | englisch etabliert: „repetition“ bzw. „neural text degeneration“ (Holtzman u. a., ICLR 2020); für die deutsche Form kein Fachbeleg gesucht | im Labbook bei Ersteinführung mit „repetition loop“ definieren oder ersetzen; GO ausstehend |
+| Wiederholungsschleife → **repetition loop** | NUR_ENGLISCH (per GO 2026-10-31) | englisch etabliert: „repetition“ bzw. „neural text degeneration“ (Holtzman u. a., ICLR 2020) | Labbook umgestellt; die Pre-Registration der Folgemessungen behält „Wiederholungsschleife“ wörtlich, der Ergebnisteil nennt die Zuordnung; Tabellenkopf in `grade-ab.mjs` |
 
 ## Bestätigte Korpus-Befunde (Extraktion Welle 1, per Grep verifiziert)
 

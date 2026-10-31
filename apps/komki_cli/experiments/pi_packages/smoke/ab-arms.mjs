@@ -76,7 +76,7 @@ export const DRAFTS = {
 const MTP_ARGS = ["--spec-type", "draft-mtp", "--spec-draft-n-max", "4"];
 
 // Follow-up arms (labbook #285, section "Folgemessungen"): same GGUF and
-// sampling as their base arm, one extra server switch each.
+// sampling as their base arm plus one extra server switch (A0M: both).
 ARMS.A0 = {
   ...ARMS.A,
   label: "Pin without thinking (enable_thinking=false)",
@@ -85,6 +85,13 @@ ARMS.A0 = {
 };
 ARMS.AM = { ...ARMS.A, label: "Pin with MTP drafter", draft: DRAFTS.A, serverArgs: MTP_ARGS, port: 49615 };
 ARMS.BM = { ...ARMS.B, label: "QAT with MTP drafter", draft: DRAFTS.B, serverArgs: MTP_ARGS, port: 49616 };
+ARMS.A0M = {
+  ...ARMS.A,
+  label: "Pin without thinking, with MTP drafter",
+  draft: DRAFTS.A,
+  serverArgs: [...ARMS.A0.serverArgs, ...MTP_ARGS],
+  port: 49618,
+};
 
 /**
  * Seed per round: round 0 is the warm-up, 1..n are measured runs; all arms

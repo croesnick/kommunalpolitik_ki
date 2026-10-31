@@ -508,7 +508,7 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
   row("längengeklemmte Requests", (a) => fmtSpread(a.lengthClamped));
   row("Tool-Calls / invalide / Reparaturen", (a) => `${a.toolCalls} / ${a.toolCallClasses ? Object.entries(a.toolCallClasses).filter(([k]) => k !== "ok" && k !== "extra-keys").reduce((x, [, v]) => x + v, 0) : 0} / ${a.repairs} (${fmt((a.repairRate ?? 0) * 100, 1)} %)`);
   row("finishReasons", (a) => Object.entries(a.finishReasons).map(([k, v]) => `${k} ${v}`).join(", "));
-  row(`Läufe mit Wiederholungsschleife (Zeile ≥ ${LOOP_LINE_REPEATS}×)`, (a) => `${a.runsWithLoop} von ${a.runs.length}`);
+  row(`Läufe mit repetition loop (Zeile ≥ ${LOOP_LINE_REPEATS}×)`, (a) => `${a.runsWithLoop} von ${a.runs.length}`);
   lines.push("");
   lines.push(`| Aufgabe: Gesamtdauer · Prüfergebnisse | ${arms.join(" | ")} |`);
   lines.push(`|---|${arms.map(() => "---").join("|")}|`);
