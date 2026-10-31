@@ -897,7 +897,10 @@ Skelett-Extraktor gewinnt daraus einen inhaltsfreien Formatbericht
 (Skelett-Bericht).
 
 **Abgrenzung:** Kassetten enthalten echte, auch nicht-öffentliche Inhalte.
-Sie liegen nie im Repo; committbar ist nur der Skelett-Bericht.
+Sie liegen nie im Repo; committbar ist nur der Skelett-Bericht. Aufbewahrt
+werden sie verschlüsselt (`priv/ris_kassetten.exs`, Freigabe per Touch ID) —
+Details im Connector-README, Abschnitt „Kassetten verschlüsseln“; bis zur
+Versiegelung ist eine Kassette Klartext.
 
 **Wo:** [`apps/komki_connector_ris/README.md`](apps/komki_connector_ris/README.md)
 § „Aufzeichnung und Replay echter Antwortformate“.
