@@ -22,11 +22,10 @@ defmodule KomkiMediator.ConnectorGate do
     vault happens. Without a `store` rule in Γ, writing is a deny with an
     action release for the exact call.
   * PDRs per call: every PDR after the pre-check carries the call's
-    `call_id`, denials included. Right before execution the journal gets
-    the emit PDR (`outcome: emitted`, its `decision_id` is the `call_id`
-    sent in the frame), then the Gate 1b PDR (`outcome: permitted`, or
-    `released` after a GO), so the journal follows the order of the
-    decisions. The admit PDR follows the execution.
+    `call_id`, denials and GO records included. Right before execution
+    the journal gets the emit PDR (`outcome: emitted`, its `decision_id`
+    is the `call_id` sent in the frame), then the Gate 1b PDR (`outcome:
+    permitted`). The admit PDR follows the execution.
   * Execution: `Sidecar.Client.call/6` against
     `<connectors_dir>/<id>.sock`. Write operations send
     `context.assigned_label` (= B_W).
@@ -42,11 +41,11 @@ defmodule KomkiMediator.ConnectorGate do
   release for the exact call and `env.go` is set, the mediator asks the
   person, provided a session is listening (`KomkiMediator.Go`). The
   engine's release branch decides a presented release; on permit
-  `KomkiMediator.GoStand` commits the nonce before any effect, and a PDR
-  (`outcome: released`) records the GO. After an emit GO that PDR is
-  written at once; after a transfer or store GO it takes the place of the
-  `permitted` PDR right after the emit PDR. No, no answer or an invalid
-  release leave the deny in place.
+  `KomkiMediator.GoStand` commits the nonce and a PDR (`outcome:
+  released`) records the GO right away, both before any effect. After a
+  transfer or store GO that PDR stands for the Gate 1b decision, so no
+  `permitted` PDR follows. No, no answer or an invalid release leave the
+  deny in place.
   """
 
   alias KomkiConnector.{Manifest, Text}
@@ -55,7 +54,7 @@ defmodule KomkiMediator.ConnectorGate do
   alias KomkiPolicy.{Derive, JSON, Verify}
   alias Sidecar.{Client, Params}
 
-  @doc "Vermittelt einen Aufruf des Connector-Tools `tool` (z. B. `\"ris_search\"`)."
+  @doc "Mediates a call of the connector tool `tool` (e.g. `\"ris_search\"`)."
   @spec call(Gate.env(), String.t(), map()) :: map()
   def call(env, tool, params) do
     {:ok, manifest, op} = Manifest.by_tool(tool)
@@ -122,19 +121,13 @@ defmodule KomkiMediator.ConnectorGate do
       handover(env, call, %{decision: decision, snapshot: snapshot, intent: intent})
     end
 
-    # An emit GO is recorded at once: Gate 1b is still to be decided.
-    released = fn decision, released_pdr ->
-      PDR.append(env, released_pdr)
-      emitted.(decision)
-    end
-
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
         emitted.(decision)
 
       other ->
         response = not_permitted(env, call, "emit", nil, intent, snapshot, other)
-        maybe_go(env, call, snapshot, intent, response, released)
+        maybe_go(env, call, snapshot, intent, response, emitted)
     end
   end
 
@@ -166,8 +159,8 @@ defmodule KomkiMediator.ConnectorGate do
       })
 
     intent = intent(env.room, rule, "intent-" <> rule <> "-" <> d12, object)
-    # After a GO the released PDR records the Gate 1b decision.
-    released = fn _decision, released_pdr -> execute(env, call, emit, released_pdr) end
+    # After a GO the released PDR already records the Gate 1b decision.
+    released = fn _decision -> execute(env, call, emit, nil) end
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
@@ -201,9 +194,8 @@ defmodule KomkiMediator.ConnectorGate do
   # transfer #298)
   # -------------------------------------------------------------------------
 
-  # `then` continues after a permit of the release branch with the decision
-  # and the released PDR: after emit like a normal emit permit, after
-  # transfer or store with the execution.
+  # `then` continues after a permit of the release branch: after emit like a
+  # normal emit permit, after transfer or store with the execution.
   defp maybe_go(%{go: %{} = go} = env, call, snapshot, intent, response, then) do
     case {Go.offered(response["remedies"]), Go.listening?(go.dir)} do
       {call_hash, true} when is_binary(call_hash) ->
@@ -264,7 +256,7 @@ defmodule KomkiMediator.ConnectorGate do
   defp commit_release(env, call, {snapshot, intent, then}, decision, proposal) do
     case GoStand.advance(proposal) do
       {:ok, _stand} ->
-        released_pdr = %{
+        PDR.append(env, %{
           "decision_id" => PDR.new_id(),
           "call_id" => call.call_id,
           "tool" => call.tool,
@@ -277,13 +269,41 @@ defmodule KomkiMediator.ConnectorGate do
           "snapshot_id" => snapshot["snapshot_id"],
           "checked_label" => decision["checked_label"],
           "assigned_label" => decision["assigned_label"]
-        }
+        })
 
-        then.(decision, released_pdr)
+        then.(decision)
 
       {_refused_or_error, reason} ->
-        refused(env, call.tool, call.intent_hash, "GO nicht committet: " <> inspect(reason))
+        go_not_committed(env, call, intent, reason)
     end
+  end
+
+  # The nonce could not be consumed (e.g. a second terminal was faster):
+  # no effect, and the PDR keeps the call's call_id and rule.
+  defp go_not_committed(env, call, intent, reason) do
+    decision_id = PDR.new_id()
+
+    response = %{
+      "decision" => "error",
+      "rule" => intent["operation"],
+      "decision_id" => decision_id,
+      "detail" => "GO nicht committet: " <> inspect(reason)
+    }
+
+    PDR.append(env, %{
+      "decision_id" => decision_id,
+      "call_id" => call.call_id,
+      "tool" => call.tool,
+      "rule" => intent["operation"],
+      "decision" => "error",
+      "outcome" => "error",
+      "admitted" => false,
+      "intent_hash" => call.intent_hash,
+      "payload_hash" => PDR.payload_hash(response),
+      "intent_id" => intent["intent_id"]
+    })
+
+    response
   end
 
   # No or no answer: the deny stands and the catalog stays visible; the
@@ -312,8 +332,9 @@ defmodule KomkiMediator.ConnectorGate do
   # Execution
   # -------------------------------------------------------------------------
 
-  # `handover_pdr` is the Gate 1b PDR (permitted or released). It follows
-  # the emit PDR, both before the execution and in decision order.
+  # `handover_pdr` is the permitted Gate 1b PDR, or nil after a GO (the
+  # released PDR is already in the journal). It follows the emit PDR, both
+  # before the execution.
   defp execute(env, call, emit, handover_pdr) do
     %{decision: decision, snapshot: snapshot, intent: intent} = emit
     call_id = call.call_id
@@ -341,7 +362,7 @@ defmodule KomkiMediator.ConnectorGate do
       "assigned_label" => decision["assigned_label"]
     })
 
-    PDR.append(env, handover_pdr)
+    if handover_pdr, do: PDR.append(env, handover_pdr)
 
     case connector_call(env, call, call_id, context) do
       {:ok, result} -> admit(env, call, call_id, decision, result)
@@ -607,8 +628,8 @@ defmodule KomkiMediator.ConnectorGate do
     response
   end
 
-  # Pre-check failed (schema, missing B_W) or a GO could not be committed:
-  # no engine decision, no execution.
+  # Pre-check failed (schema, missing B_W): no call yet, no engine
+  # decision, no execution.
   defp refused(env, tool, intent_hash, detail) do
     decision_id = PDR.new_id()
 

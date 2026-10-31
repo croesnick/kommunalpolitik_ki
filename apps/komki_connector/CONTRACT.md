@@ -188,12 +188,16 @@ Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine und **drei
 5. Kein permit in Schritt 3 oder 4: Antwort mit Remedies, PDR mit der `call_id` des Aufrufs, **kein
    Vollzug**. Die Antwort nennt keinen emit-PDR (`emit_decision_id`), weil es keinen gibt.
 6. permit: erst der **emit-PDR (`outcome: emitted`), dann der transfer- bzw. store-PDR (`outcome:
-   permitted`, nach einem GO `released`), beide bevor der Connector aufgerufen wird** (Vorbeleg vor
-   Wirkung, R.11). Die `decision_id` des emit-PDR ist die `call_id` im Frame.
-7. Die `call_id` vergibt der Vermittler nach der Schema-Prüfung. Jeder PDR des Aufrufs trägt sie:
-   Ablehnungen, GO-Belege (`released`, `go_refused`, `go_timeout`), emit-, transfer- bzw. store- und
-   admit-PDR. Nur die Ablehnung in der Schema-Prüfung (Schritt 1) hat keine, weil es noch keinen
-   Aufruf gibt. Das Journal folgt der Reihenfolge der Entscheidungen.
+   permitted`), beide bevor der Connector aufgerufen wird** (Vorbeleg vor Wirkung, R.11). Die
+   `decision_id` des emit-PDR ist die `call_id` im Frame. Nach einem GO steht der GO-Beleg
+   (`outcome: released`) direkt nach dem Verbrauch der Nonce im Journal, also vor dem emit-PDR; bei
+   `transfer` und `store` vertritt er den `permitted`-PDR (commit vor Wirkung, komki_policy CONTRACT
+   §4.6).
+7. Die `call_id` vergibt der Vermittler nach der Vorprüfung (Schema, B_W). Jeder PDR des Aufrufs trägt
+   sie: Ablehnungen, GO-Belege (`released`, `go_refused`, `go_timeout`, ein gescheiterter Commit),
+   emit-, transfer- bzw. store- und admit-PDR. Nur eine Ablehnung in der Vorprüfung hat keine, weil es
+   noch keinen Aufruf gibt. Kommt es zum Vollzug, ist die `call_id` die `decision_id` des emit-PDR; ein
+   in Gate 1 abgelehnter Aufruf hat keinen emit-PDR.
 
 ### 6.2 Gate 2: `admit` (die Antwort ist ein neuer Eingang)
 

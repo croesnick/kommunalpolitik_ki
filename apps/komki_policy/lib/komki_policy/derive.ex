@@ -1,38 +1,37 @@
 defmodule KomkiPolicy.Derive do
   @moduledoc """
-  Regelkern `derive` — Regelzweige `admit` (§ 4), `emit` (§ 4.5),
-  `store` (§ 4.7) und `transfer` (§ 4.8), Freigabe-Zweig
-  `decide_with_release/5` (§ 4.6), Remedy-Katalog via
-  `KomkiPolicy.Remedies` (§ 2.8) (CONTRACT.md Lieferung 2 bis 4).
+  Rule core `derive` — rule branches `admit` (§ 4), `emit` (§ 4.5),
+  `store` (§ 4.7) and `transfer` (§ 4.8), release branch
+  `decide_with_release/5` (§ 4.6), remedy catalog via
+  `KomkiPolicy.Remedies` (§ 2.8) (CONTRACT.md deliveries 2 to 4).
 
-  `decide/3` validiert Snapshot und Intent als geschlossene Schemas,
-  prüft die Referenzkohärenz und leitet in fester Prämissenordnung.
-  Nicht implementierte Regelzweige ergeben `{:unsupported, info}` —
-  niemals ein `deny` (die fehlende Prüfung ist keine verbietende
-  Prüfung). Struktur- und Validierungsfehler sind Eingabefehler, keine
-  Decisions.
+  `decide/3` validates snapshot and intent as closed schemas, checks
+  reference coherence and derives in a fixed premise order. Rule
+  branches that are not implemented yield `{:unsupported, info}` — never
+  a `deny` (a missing check is not a prohibiting check). Structure and
+  validation errors are input errors, not decisions.
 
-  `emit` ordnet λ(y) := B_W zu (Vermittler-Zuordnung, R.5.5): keine
-  Eingabe kann `assigned_label` beeinflussen — der Intent trägt keine
-  Labels und der Kern liest `object.labels` für `emit` nicht. Fehlt der
-  technische Fakt `output_content_digest`, ist der Call nicht
-  identifizierbar: Eingabefehler `emit_digest_missing` (Exit 2).
+  `emit` assigns λ(y) := B_W (mediator assignment, R.5.5): no input can
+  influence `assigned_label` — the intent carries no labels and the core
+  does not read `object.labels` for `emit`. Without the technical fact
+  `output_content_digest` the call cannot be identified: input error
+  `emit_digest_missing` (exit 2).
 
-  `store` (RFC 0003 R.5.6) legt ein erzeugtes Objekt y in einen
-  dauerhaften Speicher (die Umgebung des Snapshots). Entschieden wird
-  unter λ(y) = `object.labels`, nicht unter B_W: Prüflabel, Empfängerkreis
-  und `store`-Regeln stammen aus den Bindungen des Objekts. B_W ⊆ λ(y)
-  ist eine eigene Prämisse (`label_preservation`), denn ein Speichern
-  entfernt keine Bindung. Digest- und Klassifikationspflicht wie `emit`.
+  `store` (RFC 0003 R.5.6) puts a produced object y into a durable store
+  (the snapshot's environment). It is decided under λ(y) =
+  `object.labels`, not under B_W: checked label, recipients and `store`
+  rules come from the object's bindings. B_W ⊆ λ(y) is a premise of its
+  own (`label_preservation`), because storing drops no binding. Digest
+  and classification duties as for `emit`.
 
   `transfer` (RFC 0003 R.5.6) hands a produced object y to a target (the
   snapshot's environment, e.g. an external service). Same shape as
   `store`: checked label λ(y), `label_preservation`, the target's
   recipients, and the `transfer` rules of the bindings in λ(y).
 
-  Urteil und Vollzug getrennt (B.8): der Kern verbraucht keine
-  Freigabe — `decide_with_release/5` plant den Verbrauch als
-  deklaratives `release`-Objekt, der atomare Übergang liegt in
+  Judgement and execution are separate (B.8): the core consumes no
+  release — `decide_with_release/5` plans the consumption as a
+  declarative `release` object; the atomic transition lives in
   `KomkiPolicy.Stand.advance/2`.
   """
 

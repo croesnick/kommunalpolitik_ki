@@ -1,30 +1,31 @@
 defmodule KomkiPolicy.Remedies do
   @moduledoc """
-  Remedy-Katalog (CONTRACT.md § 2.8, APPA Theorem 5).
+  Remedy catalog (CONTRACT.md § 2.8, APPA theorem 5).
 
-  Zu jedem Blocker und jedem fehlenden Beleg ein begrenzter,
-  aufzählbarer Katalog legaler Fortsetzungen aus **genau vier
-  Übergangstypen** (Enum-Werte nach Ticketvorgabe deutsch):
+  For every blocker and every missing piece of evidence a bounded,
+  enumerable catalog of legal continuations made of **exactly four
+  transition types** (enum values in German, as specified by the ticket):
   `fakt_nachreichen`, `registrierte_transformation`, `neuer_raum`,
   `aktionsfreigabe`.
 
-  Normative Ordnung: `fakt_nachreichen` < `registrierte_transformation` <
-  `neuer_raum` < `aktionsfreigabe` — nicht-verletzende Fortsetzungen VOR
-  GO-Einträgen; ein GO steht nie an erster Stelle (kein "compensatory
-  leakage"). Der Katalog ist reine Ausgabe: keine Eingabe akzeptiert ihn,
-  keine Fortsetzung wird ausgeführt; er erzeugt keine Autorität
-  (CONTRACT § 2.8, RFC 0003 R.6).
+  Normative order: `fakt_nachreichen` < `registrierte_transformation` <
+  `neuer_raum` < `aktionsfreigabe` — non-violating continuations BEFORE GO
+  entries; a GO never comes first (no "compensatory leakage"). The
+  catalog is output only: no input accepts it, no continuation is
+  executed, and it creates no authority (CONTRACT § 2.8, RFC 0003 R.6).
 
-  Anwendbarkeit (deny, § 2.8): admit-Grundtabelle ohne call-GO; `emit`,
-  `store` und `transfer` zusätzlich `aktionsfreigabe` scope `call` für die fünf weichen Blocker
-  (`workspace_invalid` bleibt unüberbrückbar — ein GO belebt keinen
-  ungültigen Vertrag). Für `indeterminate` nur `fakt_nachreichen` +
-  `neuer_raum` — ein GO kann keine Belege herstellen. Freigabe-Zweig
-  (§ 4.6): je Release-Blocker genau ein call-GO-Eintrag mit dem **neu
-  berechneten** korrekten call_hash; `workspace_invalid` behält seinen
-  `neuer_raum`-Eintrag. `label_not_preserved` (`store`, `transfer`) bekommt nur
-  `neuer_raum`, auch im Freigabe-Zweig: ein GO stellt keine entfernte
-  Bindung wieder her.
+  Applicability (deny, § 2.8): the admit base table without a call GO;
+  `emit`, `store` and `transfer` additionally get `aktionsfreigabe` scope
+  `call` for the five soft blockers. `workspace_invalid` and
+  `label_not_preserved` (`store`, `transfer`) are unbridgeable and get
+  `neuer_raum` only — a GO neither revives an invalid contract nor
+  restores a dropped binding. If one of them is among the findings, no
+  finding of that decision offers a call GO, since the release branch
+  would deny it again. For `indeterminate` only `fakt_nachreichen` +
+  `neuer_raum` — a GO cannot produce evidence. Release branch (§ 4.6):
+  exactly one call-GO entry per release blocker with the **recomputed**
+  correct call_hash; the unbridgeable blockers keep their `neuer_raum`
+  entry.
   """
 
   alias KomkiPolicy.Calculus
@@ -144,7 +145,7 @@ defmodule KomkiPolicy.Remedies do
   # workspace_invalid: kein GO-Eintrag, auch nicht bei emit/store/transfer;
   # label_not_preserved ebenso.
   defp regular_transitions(_registry, ctx, _kind, %{"code" => code})
-       when code in ["workspace_invalid", "label_not_preserved"],
+       when code in @unbridgeable,
        do: [newer_space(ctx, required_bindings_for(ctx))]
 
   defp regular_transitions(_registry, ctx, kind, %{
@@ -199,7 +200,7 @@ defmodule KomkiPolicy.Remedies do
   # -------------------------------------------------------------------------
 
   defp release_transitions(ctx, %{"code" => code})
-       when code in ["workspace_invalid", "label_not_preserved"],
+       when code in @unbridgeable,
        do: [newer_space(ctx, [])]
 
   defp release_transitions(%{call_hash: call_hash}, _finding),

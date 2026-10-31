@@ -91,11 +91,12 @@ defmodule KomkiMediator.GoTest do
     assert "recipient_not_allowed" in request["blockers"]
     assert request["operation"] == "transfer"
 
-    # Transfer deny, then emit and the released transfer in decision order,
-    # both before execution; every record carries the call's call_id.
-    assert outcomes(env) == ["not_admitted", "emitted", "released", "admitted"]
+    # Transfer deny, then the GO commit (released) right after the nonce,
+    # then the emit record, all before execution; every record carries the
+    # call's call_id.
+    assert outcomes(env) == ["not_admitted", "released", "emitted", "admitted"]
 
-    [deny, emitted, released, admit] = TestHelpers.journal_records(env.journal_path)
+    [deny, released, emitted, admit] = TestHelpers.journal_records(env.journal_path)
     assert released["rule"] == "transfer"
     assert released["checked_label"] == emitted["assigned_label"]
     assert Enum.all?([deny, released, admit], &(&1["call_id"] == emitted["decision_id"]))
@@ -190,8 +191,16 @@ defmodule KomkiMediator.GoTest do
 
     assert response["decision"] == "error"
     assert response["detail"] =~ "GO nicht committet"
+    assert response["rule"] == "transfer"
     refute_received :web_called
     assert map_size(GoStand.current()["consumed"]) == 0
+
+    # The failed commit stays linked to its call (#298 review).
+    [deny, failed] = TestHelpers.journal_records(env.journal_path)
+    assert failed["rule"] == "transfer"
+    assert failed["outcome"] == "error"
+    assert failed["call_id"] == deny["call_id"]
+    assert is_binary(failed["call_id"])
   end
 
   test "HITL load: ein GO je geblockter Operation", %{env: env, go_dir: go_dir} do

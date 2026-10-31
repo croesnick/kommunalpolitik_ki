@@ -203,9 +203,8 @@ Offenlegungsstand `komki-stand/1` (`KomkiMediator.GoStand`,
 `mediator/go/stand.json`). Bei permit gilt commit vor Wirkung:
 `Stand.advance` verbraucht die Nonce, danach folgt das PDR mit `outcome:
 released` (`payload_hash` bindet den Verbrauchs-Vorschlag), danach der
-normale Vollzug. Nach einem GO fuer `emit` steht der released-PDR sofort
-im Journal; nach einem GO fuer `transfer` oder `store` nimmt er den Platz
-des `permitted`-PDR hinter dem emit-PDR ein, beide vor dem Vollzug. Ein Nein ergibt `go_refused`, keine Antwort `go_timeout`,
+normale Vollzug. Nach einem GO fuer `transfer` oder `store` vertritt der
+released-PDR den `permitted`-PDR; er steht deshalb vor dem emit-PDR. Ein Nein ergibt `go_refused`, keine Antwort `go_timeout`,
 jeweils mit PDR. Die Antwort bleibt das deny samt Katalog, ergaenzt um
 `"go"`. Eine ungueltige Freigabe (falscher Call, abgelaufen, Nonce
 verbraucht) ist ein neues deny des Freigabe-Zweigs.
@@ -415,7 +414,7 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
     **bevor** der Connector gerufen wird. Die `decision_id` des emit-PDR
     ist die `call_id` im Frame. Jeder PDR des Aufrufs traegt sie, auch
     Ablehnungen und GO-Belege; nur die Vorpruefung kennt noch keinen
-    Aufruf.
+    Aufruf. Ein in Gate 1 abgelehnter Aufruf hat keinen emit-PDR.
     Bei `vault_write_test` geht `context.assigned_label` (= B_W) mit.
   * Gate 2 `admit`: Ergebnisform §5.2 (geschlossen), Labels allein aus dem
     Manifest (RIS/Web fest `import_labels`; Vault: Labels der Notiz,

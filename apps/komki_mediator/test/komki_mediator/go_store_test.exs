@@ -86,11 +86,11 @@ defmodule KomkiMediator.GoStoreTest do
     assert request["params"] == @params
     assert request["blockers"] == ["missing_operation_rule"]
 
-    # store-deny -> GO-Commit -> emit-Vorbeleg -> Vollzug -> admit
+    # store deny -> GO commit (released) -> emit record -> execution -> admit
     assert journal(env) == [
              {"store", "not_admitted"},
-             {"emit", "emitted"},
              {"store", "released"},
+             {"emit", "emitted"},
              {"admit", "admitted"}
            ]
 
