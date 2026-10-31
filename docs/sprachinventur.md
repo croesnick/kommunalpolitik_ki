@@ -2,8 +2,8 @@
 
 | Feld | Wert |
 |---|---|
-| Status | Entwurf; Wellen 1–3 abgeschlossen; Welle 4 (K4-Cross-Check) extrahiert, Sweeps und B2-Entscheidungen per GO 2026-10-16 ausgeführt |
-| Stand | 2026-10-16 |
+| Status | Entwurf; Wellen 1–3 abgeschlossen; Welle 4 (K4-Cross-Check) extrahiert, Sweeps und B2-Entscheidungen per GO 2026-10-16 ausgeführt; Welle 5 (Benchmark-Begriffe, #285) 2026-10-31 |
+| Stand | 2026-10-31 |
 | Zweck | Inventur aller Fachbegriffe und Phrasen des Korpus, Klassifikation mit Quellenbelegen, Entscheidungsgrundlage für konsistente Verwendung |
 | Korpus | Alle 39 Markdown-Dokumente des Repos (AGENTS.md, docs/, skills/, apps/, tools/). Code-Bezeichner (Funktionen, Module, CLI-Flags, MCP-Parameter) sind außen vor. RFC0001 ist historisch: es wird inventiert, Entscheidungen gelten nur für aktive Dokumente. |
 
@@ -229,6 +229,33 @@ Beleganker wie von der Verifikationslane gemeldet (Duden/DWDS-, ISTQB-, Obsidian
 4. Schwache Grenzfälle belassen: Wegwerf-Sessions (terminal_screenshot:115), Vorschlagserzeuger (RFC0002:86), Netz-Auswärts (llama-server-confinement:62), einspeisen (komki_cli README:158).
 5. Adjudiziert behalten: eingefroren (RFC0002, K5-Präzidenz „eingefrorene Konfiguration“), Rollenetiketten (RFC0003:504, bewusste Etikett-Metapher, nicht der Label-Term), Vortraining, Aufnahme (RFC-5.4-Kernbegriff), Beweisbaum (etablierte Logik-Form), Arbeitsabläufe (generisches Deutsch, in RFC0003:736 bewusst von „kanonischen Workflows“ abgesetzt), Dissektion (Lehnwort, bei Ersteinführung definieren).
 6. RFC0000 (lokal, gitignored): Wurzel-Grenzen :422, Sitzung/Sitzungsgedächtnis :67, :91, :369, Lesemaschine :76, :457 — Inventar, historisch, bleibt lokal unkorrigiert.
+
+## Welle 5 — Benchmark-Begriffe aus dem Modell-A/B (Ticket #285, 2026-10-31)
+
+**Anlass:** Das Labbook [2026-10-31-modell-ab.md](research/2026-10-31-modell-ab.md) führt Begriffe der Messmethodik ein. Drei davon hat die nutzende Person am 31.10.2026 per GO ersetzt; die übrigen stehen hier mit Beleg, damit sie bei der nächsten Benchmark-Notiz nicht neu entschieden werden. Korpus der Welle: das Labbook und `apps/komki_cli/experiments/pi_packages/smoke/README.md`. Alle Abrufe am 31.10.2026.
+
+**Per GO ersetzt (2026-10-31):**
+
+| Alt → Neu | Status | Kernbeleg | Umfang |
+|---|---|---|---|
+| Wandzeit → Gesamtdauer | „Wandzeit“ FEHLFORM (Lehnübersetzung von wall-clock time); Gesamtdauer ETABLIERT_DE | DWDS „Wandzeit“: „nicht in unseren gegenwartssprachlichen lexikalischen Quellen vorhanden“, nur computergenerierter Kopf. Positivkontrolle: DWDS „Gesamtdauer“ mit Eintrag und Korpusbeleg („mit einer Gesamtdauer von siebenundvierzig Stunden“, Die Zeit, 03.04.1970). Englisch: wall-clock time, en-Wikipedia „Elapsed real time“ | Labbook ab dem Ergebnisteil, generierter Bericht (`grade-ab.mjs`) |
+| Verdikt → Prüfergebnis (für `pass`/`partial`/`fail` je Aufgabe) | Prüfergebnis ETABLIERT_DE; Verdikt hier Fehlgebrauch | Duden „Verdikt“: bildungssprachlich, „Urteil, Urteilsspruch [der Geschworenen]“, „Verdammungsurteil“. DWDS „Prüfergebnis“ mit Korpusbeleg („Nach Vorliegen der Prüfergebnisse …“, Die Zeit, 08.12.2007) | wie oben |
+| Lade-Check → Preflight-Check | NUR_ENGLISCH | de-Wikipedia „Preflight“: „Ein Preflight (engl. Vor-Flug-Kontrolle) ist im Druckwesen die softwareseitige … Prüfung“ (Lehnwort, im Deutschen etabliert); Duden ohne Lemma | Labbook, Smoke-README |
+
+Die Pre-Registration im Labbook behält „Wandzeit“ und „Verdikt“ wörtlich: Sie belegt den Stand vor der Messung. Der Ergebnisteil nennt die Zuordnung.
+
+**Wortfeld trennen:** In dieser Inventur heißt die Klassifikationsentscheidung über einen Begriff weiterhin „Verdikt“ (Welle-1- bis Welle-4-Verdikte). Das Ergebnis einer automatischen Prüfung in einem Mess-Harness heißt „Prüfergebnis“.
+
+**Weitere Begriffe des Labbooks:**
+
+| Term | Status | Kernbeleg | Konsequenz |
+|---|---|---|---|
+| Pre-Registration | ETABLIERT_DE als **Präregistrierung** | Uni Erfurt, Erfurt Laboratory for Empirical Research: „Die Präregistrierung von Studien ist eines der wichtigsten Instrumente offener Wissenschaft (open science).“ (Seitenkopf schreibt „Prä-Registrierung“) | Ersetzung im Labbook steht zum GO aus |
+| Verblindung, verblinden, Entblindung | ETABLIERT_DE | DocCheck Flexikon „Verblindung“: „Die Verblindung ist eine methodische Maßnahme in klinischen Studien, bei der bestimmte Personen die Zuordnung …“; dort auch „gezielte Entblindung“ | behalten |
+| Arm (Studienarm) | OFFEN | kein deutscher Glossareintrag gefunden (IQWiG-, Cochrane-Suche: Negativbefund; DocCheck nutzt „Studiengruppe“); englisch „study arm“ im ATMP-Sweden-Glossar | im Labbook bei Ersteinführung definiert; vor weiterer Verwendung klären |
+| Warm-up | NUR_ENGLISCH, mit Vorbehalt | Benchmark-Literatur nur englisch (Barrett u. a., „Virtual Machine Warmup Blows Hot and Cold“, arXiv 1602.00602; IBM-Doku „warm-up period“); deutsche Suche ohne Fachbeleg | behalten; schwacher Negativbefund |
+| TTFT (time to first token) | NUR_ENGLISCH | NVIDIA-NIM-Benchmark-Doku „Metrics“: TTFT ist „the time from query submission to the first received token“ | behalten, bei Ersteinführung ausschreiben |
+| Wiederholungsschleife | OFFEN (Eigenprägungs-Verdacht) | englisch etabliert: „repetition“ bzw. „neural text degeneration“ (Holtzman u. a., ICLR 2020); für die deutsche Form kein Fachbeleg gesucht | im Labbook bei Ersteinführung mit „repetition loop“ definieren oder ersetzen; GO ausstehend |
 
 ## Bestätigte Korpus-Befunde (Extraktion Welle 1, per Grep verifiziert)
 
