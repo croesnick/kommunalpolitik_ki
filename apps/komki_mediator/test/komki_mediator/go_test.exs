@@ -66,15 +66,25 @@ defmodule KomkiMediator.GoTest do
 
   defp wait_for_request(_go_dir, 0, _operation), do: flunk("keine GO-Anfrage")
 
-  defp wait_for_request(go_dir, tries, operation) do
-    case Enum.filter(Go.pending(go_dir), &(operation in [nil, &1["operation"]])) do
-      [request | _] ->
-        request
-
-      [] ->
-        Process.sleep(20)
-        wait_for_request(go_dir, tries - 1, operation)
+  # Without `operation` exactly one request may be pending: a second one
+  # would be a duplicate GO request for the same gate.
+  defp wait_for_request(go_dir, tries, nil) do
+    case Go.pending(go_dir) do
+      [request] -> request
+      [] -> retry(go_dir, tries, nil)
     end
+  end
+
+  defp wait_for_request(go_dir, tries, operation) do
+    case Enum.find(Go.pending(go_dir), &(&1["operation"] == operation)) do
+      nil -> retry(go_dir, tries, operation)
+      request -> request
+    end
+  end
+
+  defp retry(go_dir, tries, operation) do
+    Process.sleep(20)
+    wait_for_request(go_dir, tries - 1, operation)
   end
 
   defp outcomes(env), do: Enum.map(TestHelpers.journal_records(env.journal_path), & &1["outcome"])

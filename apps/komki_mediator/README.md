@@ -6,9 +6,10 @@ ausschliesslich durch diesen Vermittler: jeder Aufruf durchlaeuft Gate 1
 (eine Policy-Entscheidung durch komki_policy VOR dem Vollzug), jede Antwort
 durchlaeuft Gate 2 (unabhaengige Beweispruefung und Pruefung des
 realisierten Payloads gegen den Regelstand Γ, BEVOR sie zur MCP-Antwort
-wird). Fuer jeden Aufruf entsteht ein PDR-Auditdatensatz
+wird). Jede Entscheidung eines Aufrufs steht als PDR-Auditdatensatz
 im Journal; ein Permit schreibt zusaetzlich einen Vorbeleg, bevor
-irgendetwas vollzogen wird (Audit vor Wirkung).
+irgendetwas vollzogen wird (Audit vor Wirkung). Ein Connector-Aufruf
+ergibt so mehrere Datensaetze mit derselben `call_id`.
 
 Fassung `komki-mediator/3` (Tickets #144, #218): neben `ping`,
 `list_documents` und `admit_document` bietet der Vermittler die sechs
@@ -77,8 +78,9 @@ als Bild:
   permit-Inhalt, Remedy-Katalog (bei deny) oder Zurueckhaltung
   (`"admitted" => "redacted"`, ohne content) — immer mit eingebetteter
   `decision_id`. Und das PDR-Journal
-  (`<base>/mediator/journal/pdr.jsonl`) erhaelt je Aufruf einen
-  Auditdatensatz, der intent_hash, payload_hash und den Γ-Stand-Hash bindet.
+  (`<base>/mediator/journal/pdr.jsonl`) erhaelt je Entscheidung und je
+  Vorbeleg einen Auditdatensatz, der intent_hash, payload_hash und den
+  Γ-Stand-Hash bindet.
   komki_policy selbst ist kein Netz-Dienst: `Derive.decide` und
   `Verify.check` laufen als Bibliothek im selben BEAM wie der Vermittler.
 
@@ -110,7 +112,7 @@ flowchart TB
     RELAY -- "POST /mcp · Bearer-Token · Unix-Socket" --> MED
     PI -- "Inferenz" --> LL
     MED -- "Gate 1 · Gate 2" --> KOMKI_POLICY
-    MED -- "PDR je Aufruf" --> JOURNAL
+    MED -- "PDR je Entscheidung" --> JOURNAL
     MED -- "Frame nach transfer-/store-Permit" --> CONN
     MED -. "Antwort + decision_id" .-> RELAY
 ```
@@ -321,7 +323,7 @@ mediator/
 ├── registry.json   # Gamma (Export des Label-Store, #208): Bindungen, Umgebungen, Beobachter
 ├── room.json       # Raum: Identitaet, Arbeitsraum, Fakten, Objekte
 ├── documents/      # die drei Beispieldokumente (doc-oeffentlich u. a.)
-└── journal/pdr.jsonl  # PDR-Auditjournal (ein kanonisches, mehrzeiliges JSON-Dokument je Aufruf)
+└── journal/pdr.jsonl  # PDR-Auditjournal (ein kanonisches, mehrzeiliges JSON-Dokument je Datensatz)
 ```
 
 Das Journal ist trotz der Endung kein zeilenweises JSONL: Jeder Datensatz

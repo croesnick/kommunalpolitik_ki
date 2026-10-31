@@ -13,12 +13,17 @@ defmodule KomkiMediator.PDR do
   `authorized_by` lists the decision_ids of the emit and the transfer or
   store decision it relies on (each `permitted` or `released`). In
   `komki-pdr/3` that record was the emit decision itself; `authorized_by`
-  is `null` on all other records.
+  is `null` on all other records. To find decisions, select records with
+  a non-null `decision`; to find records before effect, select `outcome`
+  `emitted` (connector path) or `executing` (`KomkiMediator.Gate`, where
+  the permit and the record before effect are one record, so `decision`
+  is `permit` and `authorized_by` stays `null`).
 
   New in `komki-pdr/3` compared to `komki-pdr/2`:
 
-    * `rule` — the decided rule branch (`"admit"`, `"emit"`, `"transfer"`
-      or `"store"`).
+    * `rule` — the rule branch the record belongs to (`"admit"`, `"emit"`,
+      `"transfer"` or `"store"`); for a record before effect it is the
+      branch whose output leaves the mediator.
     * `call_id` — for connector calls, the id of the call, assigned after
       the pre-check. Every PDR of the call carries it: each engine decision
       (journaled when it is made), denials, GO records and the record
