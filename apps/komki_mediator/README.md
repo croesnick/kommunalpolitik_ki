@@ -166,25 +166,25 @@ sequenceDiagram
         M-->>P: decision error, kein Vollzug
     else Vorpruefung bestanden
         M->>K: Derive.decide emit (B_W, room.environment, out-digest12)
-        alt emit deny / indeterminate
+        alt emit deny / indeterminate (ohne GO)
             M->>J: PDR (rule emit, Remedies, call_id)
             M-->>P: Remedy-Katalog, kein Vollzug
-        else emit permit (assigned_label = B_W)
-            M->>J: emit-PDR (outcome permitted, assigned_label, call_id)
+        else emit permit (oder GO: released)
+            M->>J: emit-PDR (outcome permitted, assigned_label = B_W, call_id)
             M->>K: Derive.decide transfer (λ(y), Manifest-Umgebung)
-        end
-        alt transfer deny / indeterminate
-            M->>J: PDR (rule transfer, Remedies, call_id)
-            M-->>P: Remedy-Katalog, kein Vollzug
-        else transfer permit
-            M->>J: transfer-PDR (outcome permitted, call_id)
-            M->>J: Vorbeleg (rule emit, outcome emitted, decision null, decision_id = call_id)
-            M->>C: Frame (call_id, op, params, context)
-            C-->>M: result oder error
-            Note over M: Ergebnisform §5.2, Labels aus dem Manifest
-            M->>K: Derive.decide admit (in-digest12, room.environment) + Verify.check
-            M->>J: admit-PDR (call_id)
-            M-->>P: Inhalt + labels + decision_id + emit_decision_id
+            alt transfer deny / indeterminate (ohne GO)
+                M->>J: PDR (rule transfer, Remedies, call_id)
+                M-->>P: Remedy-Katalog, kein Vollzug
+            else transfer permit (oder GO: released)
+                M->>J: transfer-PDR (outcome permitted, call_id)
+                M->>J: Vorbeleg (rule emit, outcome emitted, decision null, Verweis auf transfer)
+                M->>C: Frame (call_id, op, params, context)
+                C-->>M: result oder error
+                Note over M: Ergebnisform §5.2, Labels aus dem Manifest
+                M->>K: Derive.decide admit (in-digest12, room.environment) + Verify.check
+                M->>J: admit-PDR (call_id)
+                M-->>P: Inhalt + labels + decision_id + emit_decision_id
+            end
         end
     end
 ```
@@ -441,7 +441,10 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   (separater Writer-Prozess; stirbt er, stirbt die Vermittlung — die
   Auditkette dunkelt nie still ab) und bettet die `decision_id` in die
   Antwort ein. `payload_hash` ist der SHA-256 der kanonischen Antwortbasis
-  (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/3`: zusaetzlich
+  (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/4` (seit #298:
+  jede Entscheidung als eigener PDR, Vorbeleg mit `decision: null` und
+  Verweis auf die transfer- bzw. store-Entscheidung); seit `komki-pdr/3`
+  zusaetzlich
   `rule` (`admit`/`emit`/`transfer`/`store`), `call_id` (bei
   Connector-Aufrufen die Kennung des Aufrufs, in allen seinen PDR gleich;
   kommt es zum Vollzug, ist sie die `decision_id` des Vorbelegs),
@@ -458,7 +461,7 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
 | `KomkiMediator.Go` | GO-Anfragen und -Antworten unter `mediator/go` (Ticket #98) |
 | `KomkiMediator.GoStand` | Offenlegungsstand der GO-Noncen, commit vor Wirkung |
 | `KomkiMediator.ResultShape` | Ergebnisformen der Connectoren (§5.2) |
-| `KomkiMediator.PDR` | Form der PDR-Datensaetze (`komki-pdr/3`) |
+| `KomkiMediator.PDR` | Form der PDR-Datensaetze (`komki-pdr/4`) |
 | `KomkiMediator.Tools.Connector` | Tool-Baustein aus dem Manifest |
 | `KomkiMediator.Gamma` | Registry-Snapshot + Stand-Hash |
 | `KomkiMediator.Room` | Raum-Zustand, Objekt-/Snapshot-Bildung |

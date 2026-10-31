@@ -1,11 +1,19 @@
 defmodule KomkiMediator.PDR do
   @moduledoc """
-  PDR audit records (schema `"komki-pdr/3"`): one shared shape for
+  PDR audit records (schema `"komki-pdr/4"`): one shared shape for
   `KomkiMediator.Gate` (ping, admit_document) and
   `KomkiMediator.ConnectorGate` (connector tools).
 
-  Every record carries the same keys; unused fields are `null`. New
-  compared to `komki-pdr/2`:
+  Every record carries the same keys; unused fields are `null`.
+
+  New in `komki-pdr/4` (ticket #298): every engine decision of a connector
+  call is journaled when it is made (`outcome: permitted` for a permit).
+  The record before effect (rule `emit`, `outcome: emitted`) is no
+  decision any more: `decision` is `null`, and `intent_id`/`snapshot_id`
+  name the transfer or store decision that let the request leave the
+  room. In `komki-pdr/3` that record was the emit decision itself.
+
+  New in `komki-pdr/3` compared to `komki-pdr/2`:
 
     * `rule` — the decided rule branch (`"admit"`, `"emit"`, `"transfer"`
       or `"store"`).
@@ -32,7 +40,7 @@ defmodule KomkiMediator.PDR do
   alias KomkiMediator.{Fassung, Hash, Journal}
   alias KomkiPolicy.JSON
 
-  @schema "komki-pdr/3"
+  @schema "komki-pdr/4"
 
   @doc "Schema-Kennung der Datensaetze."
   @spec schema() :: String.t()

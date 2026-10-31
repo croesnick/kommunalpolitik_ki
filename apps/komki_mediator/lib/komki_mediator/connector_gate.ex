@@ -27,8 +27,9 @@ defmodule KomkiMediator.ConnectorGate do
     the complete derivation even when nothing is executed. Right before
     execution follows the record before effect (rule `emit`, `outcome:
     emitted`, `decision: null` because it decides nothing; its
-    `decision_id` is the `call_id` sent in the frame and its
-    `payload_hash` binds the outgoing request). The admit PDR follows the
+    `decision_id` is the `call_id` sent in the frame, its
+    `intent_id`/`snapshot_id` name the transfer or store decision it relies
+    on, and its `payload_hash` binds the outgoing request). The admit PDR follows the
     execution. Every PDR after the pre-check carries the call's `call_id`.
   * Execution: `Sidecar.Client.call/6` against
     `<connectors_dir>/<id>.sock`. Write operations send
@@ -121,18 +122,18 @@ defmodule KomkiMediator.ConnectorGate do
 
     intent = intent(env.room, "emit", "intent-emit-" <> d12, object)
 
-    emitted = fn decision ->
+    to_handover = fn decision ->
       handover(env, call, %{decision: decision, snapshot: snapshot, intent: intent})
     end
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
         permitted(env, call, decision, snapshot, intent)
-        emitted.(decision)
+        to_handover.(decision)
 
       other ->
         response = not_permitted(env, call, "emit", nil, intent, snapshot, other)
-        maybe_go(env, call, snapshot, intent, response, emitted)
+        maybe_go(env, call, snapshot, intent, response, to_handover)
     end
   end
 
@@ -165,12 +166,13 @@ defmodule KomkiMediator.ConnectorGate do
 
     intent = intent(env.room, rule, "intent-" <> rule <> "-" <> d12, object)
     # After a GO the released PDR already records the Gate 1b decision.
-    executed = fn _decision -> execute(env, call, emit) end
+    gate1b = %{snapshot: snapshot, intent: intent}
+    executed = fn _decision -> execute(env, call, emit, gate1b) end
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
         permitted(env, call, decision, snapshot, intent)
-        execute(env, call, emit)
+        execute(env, call, emit, gate1b)
 
       other ->
         response = not_permitted(env, call, rule, nil, intent, snapshot, other)
@@ -331,9 +333,11 @@ defmodule KomkiMediator.ConnectorGate do
   # -------------------------------------------------------------------------
 
   # All decisions are in the journal by now; this adds the record before
-  # effect and runs the connector.
-  defp execute(env, call, emit) do
-    %{decision: decision, snapshot: snapshot, intent: intent} = emit
+  # effect and runs the connector. The record names the Gate 1b decision
+  # (`gate1b`) that let the request leave the room, i.e. the recipient
+  # check it relies on (R.11); λ(y) comes from the emit decision.
+  defp execute(env, call, emit, gate1b) do
+    %{decision: decision} = emit
     call_id = call.call_id
 
     context =
@@ -354,8 +358,8 @@ defmodule KomkiMediator.ConnectorGate do
       "intent_hash" => call.intent_hash,
       "payload_hash" =>
         PDR.payload_hash(%{"op" => call.op, "params" => call.params, "context" => context}),
-      "intent_id" => intent["intent_id"],
-      "snapshot_id" => snapshot["snapshot_id"],
+      "intent_id" => gate1b.intent["intent_id"],
+      "snapshot_id" => gate1b.snapshot["snapshot_id"],
       "checked_label" => decision["checked_label"],
       "assigned_label" => decision["assigned_label"]
     })

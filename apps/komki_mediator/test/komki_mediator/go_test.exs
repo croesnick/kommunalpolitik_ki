@@ -60,31 +60,20 @@ defmodule KomkiMediator.GoTest do
     end)
   end
 
-  # The answered request can still be pending for a moment; wait for the
-  # request of the given operation.
-  defp wait_for_operation(_go_dir, _operation, 0), do: flunk("keine GO-Anfrage")
+  # `operation` narrows the wait: an answered request can still be pending
+  # for a moment while the next one is already there.
+  defp wait_for_request(go_dir, tries, operation \\ nil)
 
-  defp wait_for_operation(go_dir, operation, tries) do
-    case Enum.find(Go.pending(go_dir), &(&1["operation"] == operation)) do
-      nil ->
-        Process.sleep(20)
-        wait_for_operation(go_dir, operation, tries - 1)
+  defp wait_for_request(_go_dir, 0, _operation), do: flunk("keine GO-Anfrage")
 
-      request ->
-        request
-    end
-  end
-
-  defp wait_for_request(_go_dir, 0), do: flunk("keine GO-Anfrage")
-
-  defp wait_for_request(go_dir, tries) do
-    case Go.pending(go_dir) do
-      [request] ->
+  defp wait_for_request(go_dir, tries, operation) do
+    case Enum.filter(Go.pending(go_dir), &(operation in [nil, &1["operation"]])) do
+      [request | _] ->
         request
 
       [] ->
         Process.sleep(20)
-        wait_for_request(go_dir, tries - 1)
+        wait_for_request(go_dir, tries - 1, operation)
     end
   end
 
@@ -278,7 +267,7 @@ defmodule KomkiMediator.GoTest do
 
     spawn_link(fn ->
       for operation <- ["emit", "transfer"] do
-        request = wait_for_operation(go_dir, operation, 100)
+        request = wait_for_request(go_dir, 100, operation)
         send(test, {:request, operation})
         Go.answer(go_dir, request, true)
       end
@@ -292,14 +281,15 @@ defmodule KomkiMediator.GoTest do
 
     records = TestHelpers.journal_records(env.journal_path)
 
-    steps = Enum.map(records, &{&1["rule"], &1["outcome"]})
-
-    assert Enum.take(steps, 5) == [
+    # Every step of the call, ending with admit (the web result's label is
+    # outside what doc-vertraulich@1 admits for this purpose).
+    assert Enum.map(records, &{&1["rule"], &1["outcome"]}) == [
              {"emit", "not_admitted"},
              {"emit", "released"},
              {"transfer", "not_admitted"},
              {"transfer", "released"},
-             {"emit", "emitted"}
+             {"emit", "emitted"},
+             {"admit", "not_admitted"}
            ]
 
     [call_id] = records |> Enum.map(& &1["call_id"]) |> Enum.uniq()
