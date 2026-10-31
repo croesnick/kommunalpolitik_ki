@@ -25,7 +25,7 @@ Als Markdown liest der Agent beide Seiten direkt aus dem Repo: [in-betrieb-nehme
 | Stelle | Warum eine Person | Was du tust |
 |---|---|---|
 | Xcode Command Line Tools (`xcode-select --install`) | macOS zeigt ein Fenster, das nur du bestätigen kannst | Im Fenster auf „Installieren“ klicken |
-| Modell laden (17 GB, Lizenz Apache-2.0) | Großer Download, du stimmst der Lizenz zu | Im Terminal `komki setup --demo` und die Frage mit `j` beantworten, oder dem Agenten den Pfad zu einer vorhandenen Datei geben (`--gguf-from PFAD`) |
+| Modell laden (17 GB) und MTP-Drafter laden (0,5 GB), Lizenz Apache-2.0 | Großer Download, du stimmst der Lizenz zu | Im Terminal `komki setup --demo` und beide Fragen mit `j` beantworten, oder dem Agenten den Pfad zu vorhandenen Dateien geben (`--gguf-from PFAD`, `--drafter-from PFAD`) |
 | Brave-Schlüssel für die Websuche | Ein Geheimnis gehört nicht in den Chat mit dem Agenten | Im Terminal `komki secret set brave`, oder überspringen: RIS und Vault laufen auch ohne |
 | Touch ID bei jedem Start | Nur du öffnest das Siegel des Schlüssels | Freigeben, wenn macOS mit „komki startet den Connector web“ fragt |
 | Veränderte Programme nach einem Neubau übernehmen | Nur wer selbst gebaut hat, weiß, dass die neue Prüfsumme stimmt | Im Terminal `komki setup` und die Frage mit `j` beantworten |
@@ -44,7 +44,7 @@ Start verweigert: nicht grün: pin komki — 'komki doctor' nennt die Gründe
 ## Regeln für den Agenten
 
 - **Antworten nie pipen.** komki wertet jede Frage ohne Terminal als Nein. Gib den Schritt an die Person ab und nenne ihr den Befehl.
-- **Lange Befehle im Hintergrund laufen lassen.** `asdf install erlang` baut Erlang aus den Quellen, der Modell-Download hat 17 GB. Beides dauert länger als übliche Zeitgrenzen für einen Befehl.
+- **Lange Befehle im Hintergrund laufen lassen.** `asdf install erlang` baut Erlang aus den Quellen, der Modell-Download hat 17 GB (dazu 0,5 GB MTP-Drafter). Beides dauert länger als übliche Zeitgrenzen für einen Befehl.
 - **Kein neues Terminal nötig nach `pnpm setup`.** In derselben Shell weiter mit `export PNPM_HOME="$HOME/Library/pnpm"` und `export PATH="$PNPM_HOME:$PATH"`.
 - **`komki session` nicht starten.** Die Session ist interaktiv und gehört der Person. Prüfen kannst du mit `komki run`, `komki status` und `komki journal verify`.
 - **Bei `komki run` stdout und stderr zusammen durch eine Pipe leiten** (`2>&1 | cat`). Hängt die Ausgabe an keinem Terminal, bricht pi sonst ab ([#135](https://github.com/croesnick/kommunalpolitik_ki/issues/135)).

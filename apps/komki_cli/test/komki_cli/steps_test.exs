@@ -224,6 +224,90 @@ defmodule KomkiCli.StepsTest do
     end
   end
 
+  # Ticket #318: Ablage und Doctor-Checks des MTP-Drafters über die
+  # öffentlichen Nahten Steps.place_drafter/2 und Steps.drafter_checks/2 —
+  # hermetisch mit kleiner Datei und explizitem --drafter-from (das
+  # Staging-Fallback ist host-abhängig und gehört zum echten Lauf).
+  describe "MTP-Drafter (Ticket #318)" do
+    @drafter_inhalt "kleiner test-drafter"
+    @drafter_sha Base.encode16(:crypto.hash(:sha256, "kleiner test-drafter"), case: :lower)
+
+    defp drafter_cfg(prefix, sha \\ nil) do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!(prefix))
+      %{cfg | drafter_sha256: sha || @drafter_sha}
+    end
+
+    defp drafter_source(cfg) do
+      source = Path.join(cfg.base_dir, "quelle-mtp.gguf")
+      File.write!(source, @drafter_inhalt)
+      source
+    end
+
+    test "place_drafter/2: --drafter-from, SHA verifiziert, Zeilen wie beim gguf" do
+      cfg = drafter_cfg("komki-drafter-place")
+      source = drafter_source(cfg)
+
+      assert {:ok, [place, sha_line, ablage]} =
+               Steps.place_drafter(cfg, %{"drafter-from" => source})
+
+      assert place == "drafter:      " <> cfg.drafter_path
+      assert sha_line == "drafter-sha256: " <> @drafter_sha <> " (pinned, verified)"
+      assert ablage =~ ~r/drafter-ablage: (APFS-Klon|Kopie)/
+      assert File.read!(cfg.drafter_path) == @drafter_inhalt
+    end
+
+    test "place_drafter/2: falscher SHA bricht ab, Kopie entfernt" do
+      cfg = drafter_cfg("komki-drafter-falsch", String.duplicate("c", 64))
+      source = drafter_source(cfg)
+
+      assert {:error, reason, 2} = Steps.place_drafter(cfg, %{"drafter-from" => source})
+      assert reason =~ "Drafter SHA256 mismatch"
+      assert reason =~ "kopie entfernt"
+      refute File.exists?(cfg.drafter_path)
+    end
+
+    test "place_drafter/2: nicht vorhandene Quelle ist ein Usage-Fehler" do
+      cfg = drafter_cfg("komki-drafter-quelle")
+
+      assert {:error, reason, 2} =
+               Steps.place_drafter(cfg, %{"drafter-from" => "/gibt-es-nicht/mtp.gguf"})
+
+      assert reason =~ "--drafter-from Pfad nicht gefunden"
+    end
+
+    test "drafter_checks/2: Präsenz im Start-Gate, Prüfsumme im vollen Doctor" do
+      cfg = drafter_cfg("komki-drafter-checks")
+
+      # Fehlende Datei: beide Scopes rot, mit dem Nachladeweg im Reason.
+      for scope <- [:full, :profile_boot] do
+        assert [%{ok: false, reason: reason}] = Steps.drafter_checks(cfg, scope)
+        assert reason =~ "missing: " <> cfg.drafter_path
+        assert reason =~ "'komki setup' lädt den MTP-Drafter nach"
+      end
+
+      File.mkdir_p!(Path.dirname(cfg.drafter_path))
+      File.write!(cfg.drafter_path, @drafter_inhalt)
+
+      assert [%{name: "drafter presence", ok: true, reason: presence_path}] =
+               Steps.drafter_checks(cfg, :profile_boot)
+
+      assert presence_path == cfg.drafter_path
+
+      assert [%{name: "drafter sha256", ok: true, reason: @drafter_sha}] =
+               Steps.drafter_checks(cfg, :full)
+
+      # Andere Bytes: der volle Doctor meldet recorded gegen actual, das
+      # Start-Gate bleibt grün (Praesenz genügt dort, wie beim gguf).
+      verändert = %{cfg | drafter_sha256: String.duplicate("d", 64)}
+
+      assert [%{name: "drafter sha256", ok: false, reason: reason}] =
+               Steps.drafter_checks(verändert, :full)
+
+      assert reason =~ "recorded " <> String.duplicate("d", 64)
+      assert reason =~ "actual " <> @drafter_sha
+    end
+  end
+
   # Ticket #125: Naht um pi-Lauf, Zeitfenster und Denial-Capture. Kein
   # echtes llama/pi/log — pi_fun und capture_fun sind injiziert.
   describe "run_pi_with_capture/5" do

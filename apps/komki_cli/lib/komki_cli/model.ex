@@ -1,7 +1,9 @@
 defmodule KomkiCli.Model do
   @moduledoc """
   Das gepinnte Modell beschaffen (Ticket #178, Entscheidung „Download ja“
-  im Plan `docs/research/2026-10-24-komki-devx-installation.md`, §8).
+  im Plan `docs/research/2026-10-24-komki-devx-installation.md`, §8) und
+  dazu den MTP-Drafter (Ticket #318): dieselbe Disziplin — feste Revision,
+  Pruefsumme vor und nach dem Download — fuer die zweite gepinnte Datei.
 
   Quelle ist eine feste Revision des Hugging-Face-Repos, nicht `main`. Vor
   dem Download vergleicht komki die vom Server gemeldete Pruefsumme
@@ -25,12 +27,24 @@ defmodule KomkiCli.Model do
   # Reserve fuer das Dateisystem ueber die fehlenden Bytes hinaus
   @headroom 1_000_000_000
 
+  # MTP-Drafter (Ticket #318): gleiche Quelle/Revision wie das Modell, Datei
+  # unter dem MTP-Unterordner des Repos; Staging-Name ohne Verzeichnis.
+  @drafter_repo_file "MTP/mtp-gemma-4-26B-A4B-it-Q8_0.gguf"
+  @drafter_size 461_766_816
+
   @doc "Download-URL der gepinnten Revision."
   @spec url() :: String.t()
   def url,
     do:
       "https://huggingface.co/" <>
         @repo <> "/resolve/" <> @revision <> "/" <> Config.model_filename()
+
+  @doc "Download-URL des MTP-Drafters (Ticket #318), dieselbe Revision."
+  @spec drafter_url() :: String.t()
+  def drafter_url,
+    do:
+      "https://huggingface.co/" <>
+        @repo <> "/resolve/" <> @revision <> "/" <> @drafter_repo_file
 
   @doc "Größe der gepinnten Datei in Byte."
   @spec size() :: pos_integer()
@@ -41,6 +55,17 @@ defmodule KomkiCli.Model do
   def summary do
     [
       "Modell      " <> Config.model_filename() <> " (" <> gb(@size) <> ")",
+      "Quelle      huggingface.co/" <>
+        @repo <> " (Revision " <> String.slice(@revision, 0, 8) <> ")",
+      "Lizenz      " <> @license
+    ]
+  end
+
+  @doc "Kurzbeschreibung des MTP-Drafters für die Rückfrage vor dem Download."
+  @spec drafter_summary() :: [String.t()]
+  def drafter_summary do
+    [
+      "Drafter     " <> Config.drafter_filename() <> " (" <> gb(@drafter_size) <> ")",
       "Quelle      huggingface.co/" <>
         @repo <> " (Revision " <> String.slice(@revision, 0, 8) <> ")",
       "Lizenz      " <> @license
@@ -78,6 +103,17 @@ defmodule KomkiCli.Model do
   end
 
   @doc """
+  Pruefsummen-Abgleich fuer den MTP-Drafter (Ticket #318): derselbe Mechanismus
+  wie beim Modell, nur mit Drafter-URL und Drafter-Pin.
+  """
+  @spec drafter_remote_matches?(keyword()) :: :ok | :unknown | {:error, String.t()}
+  def drafter_remote_matches?(opts \\ []) do
+    remote_matches?(
+      Keyword.merge([url: drafter_url(), sha256: Config.expected_drafter_sha256()], opts)
+    )
+  end
+
+  @doc """
   Laedt das Modell nach `dest` (Default: Staging-Pfad). Setzt einen
   vorhandenen Teil-Download fort, prueft Platz und Pruefsumme und legt die
   Datei erst bei passendem SHA-256 unter `dest` ab.
@@ -96,6 +132,26 @@ defmodule KomkiCli.Model do
       File.rename!(part, dest)
       {:ok, dest}
     end
+  end
+
+  @doc """
+  Laedt den MTP-Drafter nach Staging (Ticket #318): dieselbe Kaskade wie
+  `download/1` — Platz pruefen, fortsetzbar laden, SHA-256 verifizieren,
+  erst dann unter dem Staging-Pfad ablegen.
+  """
+  @spec drafter_download(keyword()) :: {:ok, String.t()} | {:error, String.t()}
+  def drafter_download(opts \\ []) do
+    download(
+      Keyword.merge(
+        [
+          dest: Config.staging_drafter_path(),
+          size: @drafter_size,
+          sha256: Config.expected_drafter_sha256(),
+          url: drafter_url()
+        ],
+        opts
+      )
+    )
   end
 
   defp curl, do: Application.get_env(:komki_cli, :curl, @curl)

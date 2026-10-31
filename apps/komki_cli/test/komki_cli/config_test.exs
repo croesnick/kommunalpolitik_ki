@@ -55,6 +55,19 @@ defmodule KomkiCli.ConfigTest do
       assert cfg.profile_path == Path.join([base, "profile", "komki.sb"])
     end
 
+    test "Drafter-Pin (Ticket #318): neben dem Modell, Staging ohne MTP/-Pfad" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-drafter"))
+
+      assert cfg.drafter_path ==
+               Path.join([cfg.base_dir, "models", "mtp-gemma-4-26B-A4B-it-Q8_0.gguf"])
+
+      assert cfg.drafter_sha256 == Config.expected_drafter_sha256()
+      assert cfg.drafter_sha256 =~ ~r/^[0-9a-f]{64}$/
+
+      assert Config.staging_drafter_path() =~
+               ~r/models-staging\/mtp-gemma-4-26B-A4B-it-Q8_0\.gguf$/
+    end
+
     test "Werkzeug-Entdeckung: aufgeloeste Pfade oder nil, nie asdf-Shims" do
       cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg"))
 
@@ -190,6 +203,27 @@ defmodule KomkiCli.ConfigTest do
       assert loaded.ris_base_url == Config.default_ris_base_url()
       assert loaded.vault_dir == nil
       assert loaded.connector_bins == %{}
+    end
+
+    # Ticket #318 (Config-Migration): aeltere Instanzen kennen drafter_path/
+    # drafter_sha256 noch nicht. Laden traegt die Pins nach (Pfad aus base_dir,
+    # SHA aus dem Code-Pin) — doctor meldet dann nur noch die fehlende Datei,
+    # und die naechste Speicherung persistiert die Felder.
+    test "aeltere config.json ohne Drafter-Felder: Laden-Defaults (Ticket #318)" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-old-drafter"))
+
+      old =
+        cfg
+        |> Config.encode()
+        |> JSON.decode!()
+        |> Map.drop(~w(drafter_path drafter_sha256))
+
+      assert {:ok, loaded} = Config.from_map(old)
+      assert loaded.drafter_path == cfg.drafter_path
+      assert loaded.drafter_sha256 == Config.expected_drafter_sha256()
+
+      Config.save(loaded)
+      assert {:ok, ^loaded} = Config.load(Config.config_path(loaded.base_dir))
     end
 
     test "ungültiger Egress-Port ist ein Fehler" do

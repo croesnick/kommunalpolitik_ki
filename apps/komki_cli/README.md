@@ -24,6 +24,11 @@ Komponenten mit denselben Pins:
   gewählt: starke Deutsch-Community-Reports, sauberes Tool-Calling seit den
   Template- und Parser-Fixes von April 2026. Kontext-Standard: 128K
   (Nutzer-Präferenz große Kontexte bei 64 GB RAM).
+* **MTP-Drafter** (Ticket #318): `mtp-gemma-4-26B-A4B-it-Q8_0.gguf` aus
+  derselben Repo-Revision, ebenfalls per SHA-256 verifiziert. llama-server
+  nutzt ihn für speculative decoding (`--spec-type draft-mtp`) und startet
+  ohne Thinking (`--chat-template-kwargs '{"enable_thinking":false}'`):
+  gleiche Qualität bei rund 70 % kürzerer Gesamtdauer (Labbook #285, F4).
 * **Server:** `llama-server` auf Loopback, Port 49524, mit festen Flags
   (`--jinja`, `--offline`, ohne Web-UI, ohne Slots; Sampling nach der
   offiziellen Gemma-4-Empfehlung: temp 1.0, top-p 0.95, top-k 64).
@@ -138,7 +143,7 @@ Von null bis zur ersten Recherche, im Repo-Root:
 
 ```sh
 make komki                     # baut komki (ein Programm, alle Rollen) und legt es nach ~/.local/bin
-komki setup                    # lädt beim ersten Mal das Modell (17 GB), fragt vorher
+komki setup                    # lädt beim ersten Mal das Modell (17 GB) und den MTP-Drafter (0,5 GB), fragt vorher
 komki run "Suche im RIS nach Bahnhofstraße und fasse die Treffer zusammen."
 komki session                  # interaktiv in tmux
 komki journal verify           # Hash-Kette des Journals prüfen
@@ -161,7 +166,10 @@ am Terminal: Ohne Terminal ist jede Antwort nein, auch eine hineingepipte
 Hugging Face) und Lizenz und lädt es nach Rückfrage an den Staging-Ort
 (`~/.local/share/komki/models-staging/`). Ein abgebrochener Download setzt
 beim nächsten Aufruf fort; verwendet wird die Datei nur mit passender
-Prüfsumme. Liegt das Modell schon woanders, `--gguf-from PFAD`. Die Instanz
+Prüfsumme. Liegt das Modell schon woanders, `--gguf-from PFAD`. Dasselbe
+gilt seit Ticket #318 für den MTP-Drafter (0,5 GB, `--drafter-from PFAD`):
+`setup` fragt beide Downloads einzeln, und einer bestehenden Instanz ohne
+Drafter lädt er nach. Die Instanz
 bekommt das Modell als APFS-Klon: kein zusätzlicher Platz, Millisekunden
 statt einer 17-GB-Kopie. `run` und `session` starten fehlende Prozesse
 selbst, `komki up` ist nur noch nötig, wenn man ausdrücklich vorab starten
@@ -246,7 +254,8 @@ Hinweise zu den einzelnen Schritten:
 ./komki journal verify              # Hash-Kette des Journals pruefen
 ./komki init                        # Instanz anlegen (config, Profil, pi-home, GGUF mit SHA-Gate)
 ./komki init --gguf-from PFAD       # GGUF-Quelle explizit angeben
-./komki doctor                      # alle Checks (Werkzeuge, Profil, Programm-Pins, GGUF-SHA, Boot-Gate, Port)
+./komki init --drafter-from PFAD    # MTP-Drafter-Quelle explizit angeben (Ticket #318)
+./komki doctor                      # alle Checks (Werkzeuge, Profil, Programm-Pins, GGUF-SHA, Drafter-SHA, Boot-Gate, Port)
 ./komki up                          # llama-server, Egress, Connectoren, Vermittler starten
 ./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil (startet bei Bedarf alles)
 ./komki run "PROMPT" --capture-denials  # zusaetzlich Sandbox-Denials des Lauffensters ablegen
@@ -374,6 +383,15 @@ byte-identisch. Weil sich die Kommentarzeilen ändern, meldet der Doctor
 nach dem Update Profil-Drift, bis `komki setup` die Profile neu schreibt
 (das geschieht dort automatisch, sobald der Generator anderen Text
 erzeugt; `komki init --force` ist nicht nötig).
+
+**Bestehende Instanzen nach #318** (MTP-Drafter): Die config.json älterer
+Instanzen kennt `drafter_path`/`drafter_sha256` noch nicht — sie laden mit
+den Pins aus dem Code (Pfad `<base>/models/mtp-gemma-4-26B-A4B-it-Q8_0.gguf`).
+`komki doctor` meldet die fehlende Datei mit dem Nachladeweg, und `komki
+setup` lädt sie nach Rückfrage und legt sie in die Instanz; das
+llama-Profil bekommt seine Drafter-Regel beim selben `setup`-Lauf. Ein
+`init --force` ist nicht nötig. Ein bereits laufender llama rechnet erst
+nach dem nächsten Start mit den neuen Schaltern: `komki down && komki up`.
 
 Werkzeuge mit Außenwirkung (RIS, Websuche, Vault) laufen als eigene
 Prozesse, jeder unter einem eigenen, generierten Seatbelt-Profil

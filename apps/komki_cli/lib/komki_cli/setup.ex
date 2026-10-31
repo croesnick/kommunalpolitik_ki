@@ -15,6 +15,8 @@ defmodule KomkiCli.Setup do
 
   alias KomkiCli.{Config, DemoVault, Model, Secrets, Steps, Tresor}
 
+  @drafter_hint "setup angehalten: ohne MTP-Drafter keine Instanz (oder --drafter-from PFAD angeben)"
+
   @type ui :: %{
           say: (String.t() -> any()),
           ask: (String.t(), String.t() -> String.t()),
@@ -106,12 +108,15 @@ defmodule KomkiCli.Setup do
 
   defp instance(base, opts, ui) do
     if File.exists?(Config.config_path(base)) do
-      with :ok <- existing_instance(base, ui) do
+      with :ok <- existing_instance(base, ui),
+           :ok <- existing_drafter(base, opts, ui) do
         switch_vault(base, opts, ui)
       end
     else
-      with {:ok, vault_dir} <- vault(base, opts, ui) do
-        create_instance(base, vault_dir, opts, ui)
+      with {:ok, vault_dir} <- vault(base, opts, ui),
+           :ok <- ensure_model(opts, ui),
+           :ok <- stage_drafter(opts, ui) do
+        init_instance(base, vault_dir, opts, ui)
       end
     end
   end
@@ -194,12 +199,6 @@ defmodule KomkiCli.Setup do
       else: {:ok, Config.canonical(dir)}
   end
 
-  defp create_instance(base, vault_dir, opts, ui) do
-    with :ok <- ensure_model(opts, ui) do
-      init_instance(base, vault_dir, opts, ui)
-    end
-  end
-
   # Modell (Ticket #178): vorhanden am Staging-Ort oder per --gguf-from,
   # sonst nach Rueckfrage laden (Groesse, Quelle, Lizenz vorab).
   defp ensure_model(opts, ui) do
@@ -222,6 +221,58 @@ defmodule KomkiCli.Setup do
     end
   end
 
+  # MTP-Drafter (Ticket #318): dieselbe Rueckfrage wie beim Modell — Quelle,
+  # Groesse und Lizenz vorab, laden nur nach GO. Vorhandenes Staging-Artefakt
+  # oder --drafter-from braucht keine Frage; init legt die Instanz-Kopie an.
+  defp stage_drafter(opts, ui) do
+    if Map.has_key?(opts, "drafter-from") or Config.default_probe_drafter() do
+      :ok
+    else
+      Enum.each(Model.drafter_summary(), ui.say)
+
+      cond do
+        not ui.confirm.("            jetzt herunterladen?", true) ->
+          {:error, @drafter_hint, 2}
+
+        (check = Model.drafter_remote_matches?()) not in [:ok, :unknown] ->
+          {:error, elem(check, 1), 2}
+
+        true ->
+          drafter_download(ui)
+      end
+    end
+  end
+
+  defp drafter_download(ui) do
+    case Model.drafter_download() do
+      {:ok, path} ->
+        ui.say.("Drafter     geladen und geprüft: " <> path)
+        :ok
+
+      {:error, reason} ->
+        {:error, reason, 2}
+    end
+  end
+
+  # Bestehende Instanz (Ticket #318): Init laeuft nicht nochmal, die Datei
+  # fehlt also moeglicherweise noch (Instanz von vor dem Produktivstart).
+  # Nachladen in die Instanz, SHA-Gate inklusive; der doctor am Ende prueft.
+  defp existing_drafter(base, opts, ui) do
+    cfg = Config.load!(Config.config_path(base))
+
+    if File.exists?(cfg.drafter_path) do
+      :ok
+    else
+      with :ok <- stage_drafter(opts, ui),
+           {:ok, _lines} <- Steps.place_drafter(cfg, opts) do
+        ui.say.("Drafter     geladen und geprüft: " <> cfg.drafter_path)
+        :ok
+      else
+        {:error, reason, code} -> {:error, reason, code}
+      end
+    end
+  end
+
   defp download(ui) do
     case Model.download() do
       {:ok, path} ->
@@ -239,6 +290,7 @@ defmodule KomkiCli.Setup do
     init_opts =
       %{"vault-dir" => vault_dir}
       |> put_if("gguf-from", Map.get(opts, "gguf-from"))
+      |> put_if("drafter-from", Map.get(opts, "drafter-from"))
       |> put_if("port", Map.get(opts, "port"))
 
     case Steps.init(init_opts) do

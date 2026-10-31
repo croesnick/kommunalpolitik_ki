@@ -74,10 +74,16 @@ Eine Wegwerf-Instanz läuft neben der Hauptinstanz:
 ```bash
 make komki KOMKI_LINK_DIR=/tmp/komki-bin   # eigener Link statt ~/.local/bin
 KOMKI_HOME=/private/tmp/komki-test /tmp/komki-bin/komki setup --demo --port 50000 \
-  --gguf-from ~/.local/share/komki/models/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf
+  --gguf-from ~/.local/share/komki/models/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf \
+  --drafter-from ~/.local/share/komki/models-staging/mtp-gemma-4-26B-A4B-it-Q8_0.gguf
 KOMKI_HOME=/private/tmp/komki-test /tmp/komki-bin/komki run "Was steht im Vault zum Radverkehr?" 2>&1 | cat
 KOMKI_HOME=/private/tmp/komki-test /tmp/komki-bin/komki down
 ```
+
+Beide `--…-from`-Pfade setzen vorhandene Dateien voraus (Modell in der
+Hauptinstanz, MTP-Drafter im Staging-Ort, Ticket #318). Fehlt der Drafter,
+lädt `setup` ihn nach Rückfrage selbst — ohne Terminal gilt die Antwort als
+Nein, der Lauf endet dann mit Exit 2.
 
 - Der `KOMKI_HOME`-Pfad muss kurz sein: Unix-Sockets dürfen höchstens 103
   Byte lang sein. `setup` prüft das zuerst und nennt Länge und Abhilfe

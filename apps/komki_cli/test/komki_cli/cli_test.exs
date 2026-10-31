@@ -60,6 +60,16 @@ defmodule KomkiCli.CLITest do
       assert out =~ "komki "
     end
 
+    # Ticket #318: --drafter-from ist das Pendant zu --gguf-from (vorhandene
+    # Drafter-Datei statt Download).
+    test "setup/init --help nennen --drafter-from" do
+      {setup_out, 0} = CLI.run(["setup", "--help"])
+      assert setup_out =~ "--drafter-from"
+
+      {init_out, 0} = CLI.run(["init", "--help"])
+      assert init_out =~ "--drafter-from"
+    end
+
     test "run --help nennt --capture-denials" do
       {out, 0} = CLI.run(["run", "--help"])
       assert out =~ "--capture-denials"
