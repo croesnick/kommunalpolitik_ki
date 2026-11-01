@@ -189,13 +189,25 @@ elixir apps/komki_connector_ris/priv/ris_kassetten.exs init                 # ei
 elixir apps/komki_connector_ris/priv/ris_kassetten.exs seal <verzeichnis>
 elixir apps/komki_connector_ris/priv/ris_kassetten.exs unseal <verzeichnis>
 elixir apps/komki_connector_ris/priv/ris_kassetten.exs status <verzeichnis>
+elixir apps/komki_connector_ris/priv/ris_kassetten.exs check [verzeichnis]
 ```
 
-Ablauf einer Session: aufzeichnen, Leak-Prüfung und inferred schema wie gehabt, danach `seal` —
+Ablauf einer Session: aufzeichnen, dann `check` (Leak-Prüfung), inferred schema, danach `seal` —
 dann liegen nur noch `<name>.json.enc` (Magic `rkt1`, je Datei eigene Nonce). `seal` löscht den
 Klartext erst nach bestandener Gegenprobe von der Platte. Dateien, die keine `*.json` sind,
 bleiben unberührt und werden gemeldet — sie sind keine Kassetten. Meldungen nennen nie Schlüssel,
 Siegel oder Inhalte, nur Namen und Zähler.
+
+`check` sucht Geheimnisse in Klartext-Kassetten und braucht keine Freigabe wie `status`: Es
+durchsucht den Rohtext jeder Kassette und die Base64-dekodierten Bodies von Anfrage und Antwort
+nach den Werten aus `RIS_EMAIL`/`RIS_PASSWORD` (`.env`) und der `token`-Datei des
+Konfig-Verzeichnisses — nie von der Kommandozeile. Geprüft werden `*.json` und `*.json.new`
+(Klartext-Rest eines abgestürzten `unseal`); Chiffretext (`*.json.enc`, `*.json.enc.new`) wird
+übersprungen und gemeldet. Ohne Verzeichnis prüft es alle Zeitstempel-Verzeichnisse unter
+`~/.local/share/kommunalpolitik_ki/ris-cassettes/`, ein Sammel-Verzeichnis ohne eigenen
+Klartext seine Unterverzeichnisse. Exit 1 gilt bei Funden, bei unlesbaren Dateien oder
+Verzeichnissen und wenn Klartext da ist, aber kein Geheimnis geladen werden konnte —
+nichts geprüft ist nicht sauber.
 
 - Replay und `priv/ris_skeleton.exs` lesen `*.json`: vorher `unseal`, danach `seal`.
 - Abbrüche lassen einen sichtbaren Mischzustand: `status` zeigt ihn, ein erneutes

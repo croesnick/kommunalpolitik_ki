@@ -517,6 +517,216 @@ defmodule KomkiConnectorRis.RisKassettenTest do
     end
   end
 
+  describe "check" do
+    # check braucht weder tresor noch Schluesselbund: Geheimnisse kommen aus
+    # dem (Fake-)Konfig-Verzeichnis, Kassetten aus dem (Fake-)Zeitstempel-Baum.
+    defp konfig!(dir, env \\ "", token \\ nil) do
+      File.write!(Path.join(dir, ".env"), env)
+      if token, do: File.write!(Path.join(dir, "token"), token)
+      dir
+    end
+
+    defp kassette_mit_body!(dir, name, response_body) do
+      json =
+        ~s({"request":{"method":"POST","path":"/auth","query":null,"headers":[],) <>
+          ~s("body_b64":"#{Base.encode64("login=redacted")}"},) <>
+          ~s("response":{"status":200,"headers":[],"body_b64":"#{Base.encode64(response_body)}"}})
+
+      kassette!(dir, name, json)
+    end
+
+    test "findet Geheimnis im dekodierten Antwort-Body: Exit 1" do
+      area = tmp_area!("check-body")
+      kassetten = tmp_area!("check-body-kassetten")
+      konfig = konfig!(area, "", @kanarie)
+      kassette_mit_body!(kassetten, "0001-post-auth.json", ~s({"token":"#{@kanarie}"}))
+
+      {code, meldungen} =
+        RisKassetten.run(["check", kassetten], config_dir: konfig)
+
+      assert code == 1
+      zeilen = texts(meldungen)
+
+      assert Enum.at(zeilen, 0) ==
+               "ris_kassetten: FUND: token in 0001-post-auth.json (#{Path.basename(kassetten)})"
+
+      assert Enum.at(zeilen, 1) =~ "1 Kassette(n) geprueft, 1 Fund"
+      assert List.last(zeilen) =~ "Gesamt: 1 Kassette(n) geprueft, 1 Funde"
+    end
+
+    test "findet Geheimnis im Rohtext einer Restdatei (.json.new)" do
+      area = tmp_area!("check-rest")
+      kassetten = tmp_area!("check-rest-kassetten")
+      konfig = konfig!(area, "", @kanarie)
+      # Crash-Rest: kein gueltiges JSON, Klartext direkt in der Datei.
+      kassette!(kassetten, "0002-get-x.json.new", "crash-rest mit #{@kanarie} im Klartext")
+
+      {code, meldungen} = RisKassetten.run(["check", kassetten], config_dir: konfig)
+
+      assert code == 1
+      assert Enum.any?(texts(meldungen), &(&1 =~ "FUND: token in 0002-get-x.json.new"))
+    end
+
+    test ".env-Auswertung: Kommentare, Leerzeilen und fremde Schluessel bleiben draussen" do
+      area = tmp_area!("check-env")
+      kassetten = tmp_area!("check-env-kassetten")
+
+      # Beide Werte stehen im Antwort-Body: nur RIS_EMAIL ist ein Geheimnis,
+      # RIS_FOO darf trotz Treffer nie als FUND gemeldet werden.
+      konfig = konfig!(area, "# Kommentar\n\nRIS_FOO=DRIN123\nRIS_EMAIL=#{@kanarie}\n", nil)
+      kassette_mit_body!(kassetten, "0001-get-x.json", ~s({"a":"#{@kanarie}","b":"DRIN123"}))
+
+      {code, meldungen} = RisKassetten.run(["check", kassetten], config_dir: konfig)
+
+      assert code == 1
+      assert Enum.any?(texts(meldungen), &(&1 =~ "FUND: RIS_EMAIL in 0001-get-x.json"))
+      refute Enum.any?(texts(meldungen), &(&1 =~ "FUND: RIS_FOO"))
+    end
+
+    test "sauber: Exit 0, Zaehler stimmen" do
+      area = tmp_area!("check-sauber")
+      kassetten = tmp_area!("check-sauber-kassetten")
+
+      # Der .env-Schluessel steht bewusst nicht als Literal im Test — die
+      # gitleaks-Regel ris-password wuerde sonst jeden Commit-Scan scheitern
+      # lassen, obwohl hier nur Platzhalter-Werte stehen.
+      passwort_zeile = "RIS_" <> "PASSWORD=streg"
+      konfig = konfig!(area, "RIS_EMAIL=wer@web.de\n#{passwort_zeile}\n", "tok")
+      kassette_mit_body!(kassetten, "0001-get-x.json", ~s({"items":[]}))
+      kassette_mit_body!(kassetten, "0002-get-y.json", ~s({"items":[]}))
+
+      {code, meldungen} = RisKassetten.run(["check", kassetten], config_dir: konfig)
+
+      assert code == 0
+      assert Enum.any?(texts(meldungen), &(&1 =~ "2 Kassette(n) geprueft, 0 Fund"))
+      assert List.last(texts(meldungen)) =~ "Gesamt: 2 Kassette(n) geprueft, 0 Funde"
+    end
+
+    test "Meldungen nennen nie Geheimnis-Werte" do
+      area = tmp_area!("check-leak")
+      kassetten = tmp_area!("check-leak-kassetten")
+      konfig = konfig!(area, "RIS_PASSWORD=#{@kanarie}\n", @kanarie)
+      kassette_mit_body!(kassetten, "0001-post-auth.json", ~s({"password":"#{@kanarie}"}))
+
+      {1, meldungen} = RisKassetten.run(["check", kassetten], config_dir: konfig)
+
+      for text <- texts(meldungen) do
+        refute text =~ @kanarie
+      end
+    end
+
+    test "versiegeltes Verzeichnis: uebersprungen, Exit 0" do
+      area = tmp_area!("check-versiegelt")
+      kassetten = tmp_area!("check-versiegelt-dir")
+      konfig = konfig!(area, "", @kanarie)
+      File.write!(Path.join(kassetten, "0001-get-x.json.enc"), "rkt1-chiffre")
+
+      {code, meldungen} = RisKassetten.run(["check", kassetten], config_dir: konfig)
+
+      assert code == 0
+
+      assert Enum.any?(
+               texts(meldungen),
+               &(&1 =~ "kein Klartext (versiegelt oder leer), uebersprungen")
+             )
+    end
+
+    test "ohne Verzeichnis: alle Zeitstempel-Baum-Unterverzeichnisse, Chiffre-Reste zaehlen nicht" do
+      area = tmp_area!("check-basis")
+      basis = tmp_area!("check-basis-baum")
+      konfig = konfig!(area, "", @kanarie)
+
+      sauber = Path.join(basis, "20261101T090000Z")
+      fund = Path.join(basis, "20261101T090500Z")
+      versiegelt = Path.join(basis, "20261101T091000Z")
+      Enum.each([sauber, fund, versiegelt], &File.mkdir_p!/1)
+      kassette_mit_body!(sauber, "0001-get-a.json", ~s({"ok":1}))
+      kassette_mit_body!(fund, "0001-get-b.json", ~s({"token":"#{@kanarie}"}))
+      File.write!(Path.join(fund, "0002-get-c.json.enc.new"), "rkt1-chiffre-rest")
+      File.write!(Path.join(versiegelt, "0001-get-d.json.enc"), "rkt1-chiffre")
+
+      {code, meldungen} = RisKassetten.run(["check"], config_dir: konfig, cassette_base: basis)
+      zeilen = texts(meldungen)
+
+      assert code == 1
+      assert Enum.count(zeilen, &(&1 =~ "FUND:")) == 1
+      assert Enum.any?(zeilen, &(&1 =~ "20261101T090000Z: 1 Kassette(n) geprueft, 0 Fund"))
+      assert Enum.any?(zeilen, &(&1 =~ "20261101T090500Z: 1 Kassette(n) geprueft, 1 Fund"))
+      assert Enum.any?(zeilen, &(&1 =~ "20261101T091000Z: kein Klartext"))
+
+      assert List.last(zeilen) =~
+               "Gesamt: 2 Kassette(n) geprueft, 1 Funde, 1 Verzeichnis(se) uebersprungen"
+    end
+
+    test "Sammel-Verzeichnis ohne eigenen Klartext: laeuft die Unterverzeichnisse" do
+      area = tmp_area!("check-sammel")
+      basis = tmp_area!("check-sammel-baum")
+      konfig = konfig!(area, "", @kanarie)
+      kind = Path.join(basis, "20261101T093000Z")
+      File.mkdir_p!(kind)
+      kassette_mit_body!(kind, "0001-get-a.json", ~s({"token":"#{@kanarie}"}))
+
+      # basis selbst hat keine Kassetten, nur das Unterverzeichnis.
+      {code, meldungen} = RisKassetten.run(["check", basis], config_dir: konfig)
+
+      assert code == 1
+      assert Enum.any?(texts(meldungen), &(&1 =~ "FUND: token in 0001-get-a.json"))
+    end
+
+    test "Klartext vorhanden, aber kein Geheimnis ladbar: Exit 1, nichts geprueft" do
+      area = tmp_area!("check-ohne-geheimnisse")
+      kassetten = tmp_area!("check-ohne-geheimnisse-dir")
+      konfig = konfig!(area, "", nil)
+      kassette_mit_body!(kassetten, "0001-get-x.json", ~s({"egal":1}))
+
+      {code, meldungen} = RisKassetten.run(["check", kassetten], config_dir: konfig)
+
+      assert code == 1
+      assert Enum.any?(texts(meldungen), &(&1 =~ "keine Geheimnisse aus"))
+      assert Enum.any?(texts(meldungen), &(&1 =~ "blieben ungeprueft"))
+    end
+
+    test "unlesbare Kassette: Meldung und Exit 1, Rest laeuft weiter" do
+      area = tmp_area!("check-unlesbar")
+      kassetten = tmp_area!("check-unlesbar-dir")
+      konfig = konfig!(area, "", @kanarie)
+      kassette_mit_body!(kassetten, "0001-get-a.json", ~s({"ok":1}))
+      verriegelt = Path.join(kassetten, "0002-get-b.json")
+      File.write!(verriegelt, ~s({"x":"#{@kanarie}"}))
+      File.chmod!(verriegelt, 0o000)
+
+      {code, meldungen} = RisKassetten.run(["check", kassetten], config_dir: konfig)
+
+      assert code == 1
+      zeilen = texts(meldungen)
+      assert Enum.any?(zeilen, fn z -> z =~ "0002-get-b.json" and z =~ "unlesbar" end)
+      assert Enum.any?(zeilen, &(&1 =~ "1 Kassette(n) geprueft, 1 unlesbar"))
+      assert List.last(zeilen) =~ "Gesamt: 1 Kassette(n) geprueft, 0 Funde, 1 unlesbar"
+
+      File.chmod!(verriegelt, 0o600)
+    end
+
+    test "fehlendes Verzeichnis: Exit 1" do
+      area = tmp_area!("check-fehlt")
+      konfig = konfig!(area, "", @kanarie)
+
+      {code, meldungen} =
+        RisKassetten.run(["check", Path.join(area, "gibts-nicht")], config_dir: konfig)
+
+      assert code == 1
+      assert Enum.any?(texts(meldungen), &(&1 =~ "Verzeichnis fehlt"))
+    end
+
+    test "--tresor ohne Wert: Exit 2 mit Usage" do
+      dir = tmp_area!("check-usage")
+
+      {code, meldungen} = RisKassetten.run(["check", "--tresor"], [])
+
+      assert code == 2
+      assert Enum.any?(texts(meldungen), &(&1 =~ "Aufruf:"))
+    end
+  end
+
   describe "tresor-Protokoll" do
     test "Exit-Codes werden zu Gruenden (3/4/5/9)" do
       dir = tmp_area!("exit-codes")

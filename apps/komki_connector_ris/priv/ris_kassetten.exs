@@ -5,6 +5,7 @@
 #     elixir apps/komki_connector_ris/priv/ris_kassetten.exs seal <verzeichnis>
 #     elixir apps/komki_connector_ris/priv/ris_kassetten.exs unseal <verzeichnis>
 #     elixir apps/komki_connector_ris/priv/ris_kassetten.exs status <verzeichnis>
+#     elixir apps/komki_connector_ris/priv/ris_kassetten.exs check [verzeichnis]
 #
 # init (einmalig) erzeugt einen 32-Byte-Schluessel und legt ihn als Siegel
 # von komki-tresor im macOS-Schluesselbund ab (Eintrag 'ris-kassetten'). Das
@@ -26,6 +27,13 @@
 # Klartext-Kassetten auch; seal/unseal lehnen Repos ab (RisHttp.repo_free?,
 # wie ris_recorder — auch durch Symlinks hindurch). Replay und ris_skeleton
 # lesen *.json: vorher unseal, danach seal.
+#
+# check (#328) sucht Geheimnisse in Klartext-Kassetten, bevor sie versiegelt
+# werden: die Werte aus .env (RIS_EMAIL, RIS_PASSWORD) und der token-Datei
+# des Konfig-Verzeichnisses, im Rohtext jeder Kassette und in den Base64-
+# dekodierten Bodies. Ohne Verzeichnis prueft es alle Zeitstempel-Verzeichnisse
+# der Kassetten-Basis. Keine Freigabe noetig (wie status), Meldungen nennen
+# Namen und Zaehler, nie Geheimnis-Werte.
 #
 # Nur OTP (:crypto, Ports), keine Deps. Die Port-Muster sind aus komki_cli
 # dupliziert statt importiert (Unix-Prinzip; Andockpunkt: Tresor-Kern #224).
@@ -64,7 +72,13 @@ defmodule KomkiConnectorRis.RisKassetten do
   # security still auf 128 Byte kuerzt.
   @word ~r/\A[A-Za-z0-9@._+\/=-]+\z/
 
-  @usage "Aufruf: init | seal <verzeichnis> | unseal <verzeichnis> | status <verzeichnis> [--tresor <programm>]"
+  @usage "Aufruf: init | seal <verzeichnis> | unseal <verzeichnis> | status <verzeichnis> | check [verzeichnis] [--tresor <programm>]"
+
+  # check liest nur Klartext — Konfig- und Basis-Verzeichnis sind fuer Tests
+  # ueberschreibbar (run/2-opts), der Aufruf am Terminal nutzt die Defaults.
+  @config_dir "~/.config/kommunalpolitik_ki"
+  @cassette_base "~/.local/share/kommunalpolitik_ki/ris-cassettes"
+  @secret_env_keys ~w(RIS_EMAIL RIS_PASSWORD)
 
   @type tresor_error ::
           :missing_bin | :no_enclave | :refused | :invalid | :timeout | {:failed, integer()}
@@ -76,7 +90,7 @@ defmodule KomkiConnectorRis.RisKassetten do
   @doc false
   @spec parse_cli([String.t()]) ::
           {:ok, {String.t(), String.t() | nil, keyword()}} | {:error, String.t()}
-  def parse_cli([cmd | rest]) when cmd in ~w(init seal unseal status) do
+  def parse_cli([cmd | rest]) when cmd in ~w(init seal unseal status check) do
     case parse_flags(cmd, rest, nil, []) do
       {:ok, dir, opts} -> {:ok, {cmd, dir, opts}}
       :error -> {:error, @usage}
@@ -92,11 +106,13 @@ defmodule KomkiConnectorRis.RisKassetten do
     do: parse_flags(cmd, rest, dir, Keyword.put(opts, :tresor, value))
 
   defp parse_flags(cmd, [dir | rest], nil, opts)
-       when cmd in ~w(seal unseal status) and
+       when cmd in ~w(seal unseal status check) and
               (byte_size(dir) < 2 or binary_part(dir, 0, 2) != "--"),
        do: parse_flags(cmd, rest, dir, opts)
 
   defp parse_flags("init", [], nil, opts), do: {:ok, nil, opts}
+  # check ohne Verzeichnis: alle Zeitstempel-Verzeichnisse der Basis.
+  defp parse_flags("check", [], nil, opts), do: {:ok, nil, opts}
   defp parse_flags(_cmd, [], dir, opts) when is_binary(dir), do: {:ok, dir, opts}
   defp parse_flags(_cmd, _other, _dir, _opts), do: :error
 
@@ -119,6 +135,10 @@ defmodule KomkiConnectorRis.RisKassetten do
           "unseal" -> unseal(dir, opts)
           "status" -> status(dir, opts)
         end
+
+      {:ok, {"check", dir, flag}} ->
+        opts = Keyword.merge(opts, flag)
+        check(if(dir, do: Path.expand(dir)), opts)
 
       {:error, usage} ->
         {2, [{:err, "ris_kassetten: #{usage}"}]}
@@ -831,6 +851,265 @@ defmodule KomkiConnectorRis.RisKassetten do
       {:error, code, msg} -> {code, [{:err, msg}]}
     end
   end
+
+  # --- check: Geheimnisse in Klartext-Kassetten (#328) -------------------------------------
+  #
+  # Geprueft werden *.json und *.json.new (Klartext-Rest eines abgestuerzten
+  # unseal); Chiffretext (*.json.enc, *.json.enc.new) und sonstige Dateien
+  # werden uebersprungen und gemeldet. Ohne Verzeichnis: alle Zeitstempel-
+  # Verzeichnisse unter der Kassetten-Basis; ein Verzeichnis ohne eigenen
+  # Klartext mit Unterverzeichnissen gilt als Sammel-Verzeichnis. Ist Klartext
+  # da, aber kein Geheimnis ladbar, gilt die Pruefung als gescheitert —
+  # nichts geprueft ist nicht sauber.
+
+  @spec check(Path.t() | nil, keyword()) :: {non_neg_integer(), [meldung()]}
+  defp check(nil, opts) do
+    base = Path.expand(Keyword.get(opts, :cassette_base, @cassette_base))
+
+    case subdirs(base) do
+      [] ->
+        {0, [{:out, "ris_kassetten: keine Kassetten-Verzeichnisse unter #{base}"}]}
+
+      dirs ->
+        check_dirs(dirs, opts)
+    end
+  end
+
+  defp check(dir, opts) do
+    with :ok <- require_dir(dir) do
+      case plain_files(dir) do
+        {:ok, []} ->
+          case subdirs(dir) do
+            [] -> {0, [{:out, skip_note(dir)}]}
+            dirs -> check_dirs(dirs, opts)
+          end
+
+        {:ok, _files} ->
+          check_dirs([dir], opts)
+
+        {:error, code, msg} ->
+          {code, [{:err, msg}]}
+      end
+    else
+      {:error, code, msg} -> {code, [{:err, msg}]}
+    end
+  end
+
+  # Verzeichnisse zusammen pruefen: Skip- und Fehlermeldungen laufen mit,
+  # der Rest konvergiert weiter (wie seal bei nicht loeschbaren Dateien).
+  # Ein unlesbares Verzeichnis verhindert die Aussage "sauber": Exit 1.
+  defp check_dirs(dirs, opts) do
+    {skips, scanable, errors} =
+      Enum.reduce(dirs, {[], [], []}, fn dir, {sk, acc, err} ->
+        case plain_files(dir) do
+          {:ok, []} -> {[skip_note(dir) | sk], acc, err}
+          {:ok, files} -> {sk, [{dir, files} | acc], err}
+          {:error, _code, msg} -> {sk, acc, [msg | err]}
+        end
+      end)
+
+    fehler_zeilen = Enum.map(Enum.reverse(errors), &{:err, &1})
+    skip_zeilen = Enum.map(Enum.reverse(skips), &{:out, &1})
+
+    cond do
+      scanable == [] and errors == [] ->
+        {0, skip_zeilen}
+
+      scanable == [] ->
+        {1, fehler_zeilen ++ skip_zeilen}
+
+      true ->
+        case load_secrets(opts) do
+          [] ->
+            config = Path.expand(Keyword.get(opts, :config_dir, @config_dir))
+
+            {1,
+             fehler_zeilen ++
+               skip_zeilen ++
+               [
+                 {:out,
+                  "ris_kassetten: keine Geheimnisse aus #{config} ladbar" <>
+                    " (.env mit #{Enum.join(@secret_env_keys, "/")}, token-Datei)" <>
+                    " — #{length(scanable)} Verzeichnis(se) mit Klartext blieben ungeprueft"}
+               ]}
+
+          secrets ->
+            {funde, geprueft, unlesbar, meldungen} = scan_dirs(scanable, secrets)
+            skipped = length(skips)
+
+            gesamt =
+              "ris_kassetten: Gesamt: #{geprueft} Kassette(n) geprueft, #{funde} Funde" <>
+                skip_text(skipped) <> unlesbar_text(unlesbar)
+
+            exit = if funde > 0 or unlesbar > 0 or errors != [], do: 1, else: 0
+
+            {exit, fehler_zeilen ++ skip_zeilen ++ Enum.reverse(meldungen) ++ [{:out, gesamt}]}
+        end
+    end
+  end
+
+  defp scan_dirs(scanable, secrets) do
+    Enum.reduce(scanable, {0, 0, 0, []}, fn {dir, files}, {f, g, u, acc} ->
+      {dir_funde, dir_unlesbar, dir_meldungen} = scan_dir(dir, files, secrets)
+
+      funde = f + dir_funde
+      geprueft = g + length(files) - dir_unlesbar
+      unlesbar = u + dir_unlesbar
+
+      summary =
+        "ris_kassetten: #{Path.basename(dir)}: #{length(files) - dir_unlesbar} Kassette(n)" <>
+          " geprueft#{unlesbar_text(dir_unlesbar)}, #{dir_funde} Funde"
+
+      {funde, geprueft, unlesbar, [{:out, summary} | dir_meldungen ++ acc]}
+    end)
+  end
+
+  defp scan_dir(dir, files, secrets) do
+    {funde, unlesbar, meldungen} =
+      Enum.reduce(files, {0, 0, []}, fn name, {f, u, acc} ->
+        case File.read(Path.join(dir, name)) do
+          {:ok, raw} ->
+            content = raw |> blobs() |> Enum.uniq()
+
+            hits =
+              for {sname, sval} <- secrets,
+                  Enum.any?(content, &String.contains?(&1, sval)),
+                  do: sname
+
+            fund_zeilen =
+              for sname <- hits,
+                  do: {:out, "ris_kassetten: FUND: #{sname} in #{name} (#{Path.basename(dir)})"}
+
+            {f + length(hits), u, fund_zeilen ++ acc}
+
+          {:error, reason} ->
+            {f, u + 1,
+             [
+               {:err,
+                "ris_kassetten: #{name} (#{Path.basename(dir)}) unlesbar, uebersprungen" <>
+                  " (#{inspect(reason)})"}
+               | acc
+             ]}
+        end
+      end)
+
+    {funde, unlesbar, Enum.reverse(meldungen)}
+  end
+
+  # Klartext einer Kassette: Rohtext plus die Base64-dekodierten Bodies von
+  # Anfrage und Antwort. Ungueltiges JSON (etwa ein Crash-Rest) bleibt beim
+  # Rohtext — auch dann wird ein Geheimnis im Klartext gefunden.
+  defp blobs(raw) do
+    case decode_json(raw) do
+      %{} = cassette ->
+        [raw | Enum.flat_map(["request", "response"], &part_body(cassette, &1))]
+
+      nil ->
+        [raw]
+    end
+  end
+
+  defp decode_json(raw) do
+    try do
+      case :json.decode(raw) do
+        %{} = map -> map
+        _ -> nil
+      end
+    rescue
+      _ -> nil
+    end
+  end
+
+  defp part_body(cassette, part) do
+    case cassette do
+      %{^part => %{} = p} -> body_of(p)
+      _ -> []
+    end
+  end
+
+  defp body_of(%{"body_b64" => b64}) when is_binary(b64) do
+    case Base.decode64(b64, ignore: :whitespace) do
+      {:ok, bin} -> [bin]
+      :error -> []
+    end
+  end
+
+  defp body_of(_), do: []
+
+  # Geheimnisse aus dem Konfig-Verzeichnis — nie von der Kommandozeile
+  # (Shell-History). Fehlende Dateien sind keine Fehler: wer keine .env hat,
+  # dessen token bleibt pruefbar.
+  defp load_secrets(opts) do
+    config = Path.expand(Keyword.get(opts, :config_dir, @config_dir))
+    read_env_secrets(Path.join(config, ".env")) ++ read_token(Path.join(config, "token"))
+  end
+
+  defp read_env_secrets(path) do
+    case File.read(path) do
+      {:ok, content} ->
+        content
+        |> String.split("\n")
+        |> Enum.map(&String.trim/1)
+        |> Enum.reject(&(String.length(&1) == 0 or String.starts_with?(&1, "#")))
+        |> Enum.flat_map(fn line ->
+          case String.split(line, "=", parts: 2) do
+            [key, value] when key in @secret_env_keys and value != "" -> [{key, value}]
+            _ -> []
+          end
+        end)
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  defp read_token(path) do
+    case File.read(path) do
+      {:ok, token} ->
+        token = String.trim(token)
+        if token == "", do: [], else: [{"token", token}]
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  # Klartext-Kassetten des Verzeichnisses: *.json plus *.json.new-Rest aus
+  # einem abgestuerzten unseal. Chiffretext-Reste (*.json.enc.new) und
+  # sonstige Dateien zaehlen nicht — sie tragen nie Klartext.
+  defp plain_files(dir) do
+    case list_ok(dir) do
+      {:ok, files} ->
+        rests = Enum.filter(files.other, &String.ends_with?(&1, ".json.new"))
+        {:ok, Enum.sort(files.json ++ rests)}
+
+      {:error, code, msg} ->
+        {:error, code, msg}
+    end
+  end
+
+  defp subdirs(dir) do
+    case File.ls(dir) do
+      {:ok, names} ->
+        names
+        |> Enum.map(&Path.join(dir, &1))
+        |> Enum.filter(&File.dir?/1)
+        |> Enum.sort()
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  defp skip_note(dir),
+    do:
+      "ris_kassetten: #{Path.basename(dir)}: kein Klartext (versiegelt oder leer), uebersprungen"
+
+  defp skip_text(0), do: ""
+  defp skip_text(n), do: ", #{n} Verzeichnis(se) uebersprungen"
+
+  defp unlesbar_text(0), do: ""
+  defp unlesbar_text(n), do: ", #{n} unlesbar"
 
   # --- gemeinsame Vorpruefung -------------------------------------------------------------
 
