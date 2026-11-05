@@ -176,6 +176,26 @@ Committbare Testdaten entstehen nie aus den Kassetten selbst, sondern aus synthe
 echten Format. Das inferred schema ist die Vorlage dieses Generators; ein Verifier (N-Gramm-Abgleich
 gegen die Aufzeichnungen) ist als Freigabetor vor jedem Committen von Kassetten geplant.
 
+### Struktur-Extraktor: Belegung ohne Inhalte
+
+`priv/ris_struktur.exs` (Ticket #313) gewinnt aus Kassetten die Belegung je Sitzung und TOP: welche
+Sitzungsteile `protectedpart` tragen, welche TOPs `restricted` sind, wie viele Textblöcke,
+Abstimmungen und Dokumente sie haben, wie lang ihre Titel sind. Das Profil ist wie der Skelett-Bericht
+inhaltsfrei und committbar; tragbar ist nur, was Gäste am RIS ebenfalls sehen könnten:
+
+- Titellängen nur für nachweislich öffentliche TOPs (`restricted: false` **und** ungeschützter
+  Sitzungsteil, fail-closed wie der Connector-Filter),
+- Abstimmungsergebnisse nie, Gremien nur als anonyme Indizes (`c1`, `c2`, …),
+- Dokumentnamen und Suchterme nie; nicht verstandene Endpunkte werden nur gezählt.
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_struktur.exs --cassette <dir> [--out <datei>]
+```
+
+Der Generator aus #313 liest Skelett-Bericht (Formate) und Strukturprofil (Belegung) und füllt beides
+mit erfundenen Inhalten. Weil die Kassetten nach der Session versiegelt sind, läuft der Extraktor wie
+Skelett und Replay nach `unseal` und vor dem erneuten `seal`.
+
 ### Kassetten verschlüsseln (Touch ID)
 
 `priv/ris_cassettes.exs` verschlüsselt ein Kassettenverzeichnis mit AES-256-GCM, damit kein Prozess —
@@ -193,7 +213,7 @@ elixir apps/komki_connector_ris/priv/ris_cassettes.exs status <verzeichnis>
 elixir apps/komki_connector_ris/priv/ris_cassettes.exs check [verzeichnis]
 ```
 
-Ablauf einer Session: aufzeichnen, dann `check` (Leak-Prüfung), inferred schema, danach `seal` —
+Ablauf einer Session: aufzeichnen, dann `check` (Leak-Prüfung), inferred schema und Strukturprofil, danach `seal` —
 dann liegen nur noch `<name>.json.enc` (Magic `rkt1`, je Datei eigene Nonce). `seal` löscht den
 Klartext erst nach bestandener Gegenprobe von der Platte. Dateien, die keine `*.json` sind,
 bleiben unberührt und werden gemeldet — sie sind keine Kassetten. Meldungen nennen nie Schlüssel,
@@ -215,7 +235,7 @@ Klartext seine Unterverzeichnisse. Exit 1 gilt bei Funden, bei unlesbaren Dateie
 Verzeichnissen und wenn Klartext da ist, aber kein Geheimnis geladen werden konnte —
 nichts geprüft ist nicht sauber.
 
-- Replay und `priv/ris_skeleton.exs` lesen `*.json`: vorher `unseal`, danach `seal`.
+- Replay, `priv/ris_skeleton.exs` und `priv/ris_struktur.exs` lesen `*.json`: vorher `unseal`, danach `seal`.
 - Abbrüche lassen einen sichtbaren Zwischenzustand: `status` zeigt ihn, ein erneutes
   `seal`/`unseal` vollendet. Nicht löschbare Dateien werden übersprungen und gemeldet; eine
   Restdatei `<name>.json.new` aus einem Crash blockiert mit klarer Meldung. Beide überschreiben
