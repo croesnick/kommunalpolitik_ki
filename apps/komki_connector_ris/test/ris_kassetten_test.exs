@@ -520,7 +520,7 @@ defmodule KomkiConnectorRis.RisKassettenTest do
   describe "check" do
     # check braucht weder tresor noch Schluesselbund: Geheimnisse kommen aus
     # dem (Fake-)Konfig-Verzeichnis, Kassetten aus dem (Fake-)Zeitstempel-Baum.
-    defp konfig!(dir, env \\ "", token \\ nil) do
+    defp konfig!(dir, env, token) do
       File.write!(Path.join(dir, ".env"), env)
       if token, do: File.write!(Path.join(dir, "token"), token)
       dir
@@ -718,8 +718,6 @@ defmodule KomkiConnectorRis.RisKassettenTest do
     end
 
     test "--tresor ohne Wert: Exit 2 mit Usage" do
-      dir = tmp_area!("check-usage")
-
       {code, meldungen} = RisKassetten.run(["check", "--tresor"], [])
 
       assert code == 2
