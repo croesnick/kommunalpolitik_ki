@@ -55,7 +55,7 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
     end)
   end
 
-  test "Formate stimmen mit dem echten Skelett-Bericht ueberein" do
+  test "Formate stimmen mit dem echten inferred schema ueberein" do
     dir = tmp_dir()
     {:ok, _dir, _n} = RisGartenstadt.generate(out: dir)
 
@@ -63,7 +63,7 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
     real = @realbericht |> File.read!() |> :json.decode()
 
     assert Enum.sort(Map.keys(synth["endpoints"]) -- @gast_detail_endpunkte) == [
-             "GET /agendaitems/documents/{meetingId-agendaId-docId}",
+             "GET /agendaitems/documents/{meetingId-agendaId-documentId}",
              "GET /agendaitems/{meetingId-agendaId}",
              "GET /committees",
              "GET /fulltextsearch",
@@ -112,7 +112,7 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
            ]
   end
 
-  test "Compare gegen den echten Skelett-Bericht: kein Drift" do
+  test "Compare gegen das echte inferred schema: kein Drift" do
     dir = tmp_dir()
     {:ok, _dir, _n} = RisGartenstadt.generate(out: dir)
 
@@ -121,7 +121,7 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
     # Expected are only the endpoints this recording does not know: the
     # inferred guest details and the download (session 20261105).
     assert RisSkeleton.compare(real, RisSkeleton.extract(dir)) == [
-             "Endpunkt nur in rechts: GET /agendaitems/documents/{meetingId-agendaId-docId}",
+             "Endpunkt nur in rechts: GET /agendaitems/documents/{meetingId-agendaId-documentId}",
              "Endpunkt nur in rechts: GET /guestagendaitems/{meetingId-agendaId}",
              "Endpunkt nur in rechts: GET /guestmeetings/{id}"
            ]

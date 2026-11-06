@@ -181,7 +181,7 @@ gegen die Aufzeichnungen ist das zweite Freigabetor vor jedem Committen von Kass
 
 `priv/ris_struktur.exs` (Ticket #313) gewinnt aus Kassetten die Belegung je Sitzung und TOP: welche
 Sitzungsteile `protectedpart` tragen, welche TOPs `restricted` sind, wie viele Textblöcke,
-Abstimmungen und Dokumente sie haben, wie lang ihre Titel sind. Das Profil ist wie der Skelett-Bericht
+Abstimmungen und Dokumente sie haben, wie lang ihre Titel sind. Das Profil ist wie das inferred schema
 inhaltsfrei und committbar; tragbar ist nur, was Gäste am RIS ebenfalls sehen könnten:
 
 - Titellängen nur für nachweislich öffentliche TOPs (`restricted: false` **und** ungeschützter
@@ -194,8 +194,8 @@ elixir apps/komki_connector_ris/priv/ris_struktur.exs --cassette <dir> [--out <d
 ```
 
 Der Generator aus #313 liest nur das Strukturprofil (Belegung) und füllt es mit erfundenen
-Inhalten; dass die Formate sitzen, erzwingt der Konformitätstest gegen den Skelett-Bericht. Weil die
-Kassetten nach der Session versiegelt sind, läuft der Extraktor wie Skelett und Replay nach `unseal`
+Inhalten; dass die Formate sitzen, erzwingt der Konformitätstest gegen das inferred schema. Weil die
+Kassetten nach der Session verschlüsselt sind, läuft der Extraktor wie `ris_skeleton` und Replay nach `unseal`
 und vor dem erneuten `seal`.
 
 ### Synthetische Kassetten: der Gartenstadt-Generator
@@ -220,7 +220,7 @@ Sichtbarkeit, Nummernform, leere oder belegte Felder). Aus 33 Sitzungen und 374 
 Sitzungen mit 39 TOPs und 97 Kassetten. `ris_skeleton --compare` gegen die Aufnahme
 20261101T112819Z meldet nur die drei Endpunkte, die diese Aufnahme nicht kennt (die inferierten
 Gast-Details und den Download aus der Session 20261105); ein Test in `ris_gartenstadt_test.exs`
-hält das gegen den committeten Skelett-Bericht fest. Die anderen Aufnahmen widersprechen ihr in
+hält das gegen das committete inferred schema fest. Die anderen Aufnahmen widersprechen ihr in
 Einzelheiten (etwa `unreadop` immer `null`) und sind deshalb kein Compare-Ziel. Gast-Liste und Suchen
 führen weiterhin alle Sitzungen des Profils, weil ihre Länge Teil des beobachteten Formats ist.
 Tagesordnungen und TOPs außerhalb der Auswahl antworten im Replay mit 404, das der Connector als
@@ -260,8 +260,8 @@ elixir apps/komki_connector_ris/priv/ris_ngramm.exs \
   --echt ~/.local/share/kommunalpolitik_ki/ris-cassettes/<zeitstempel>
 ```
 
-Dazu `unseal` des Echt-Verzeichnisses vorher und `seal` nachher — derselbe Bogen wie beim
-Skelett-Extraktor. Das Ergebnis gehört als Freigabe in den PR des Generators.
+Dazu `unseal` des Echt-Verzeichnisses vorher und `seal` nachher — derselbe Bogen wie bei
+`ris_skeleton`. Das Ergebnis gehört als Freigabe in den PR des Generators.
 
 ### Kassetten verschlüsseln (Touch ID)
 
@@ -307,7 +307,7 @@ nichts geprüft ist nicht sauber.
   `seal`/`unseal` vollendet. Nicht löschbare Dateien werden übersprungen und gemeldet; eine
   Restdatei `<name>.json.new` aus einem Crash blockiert mit klarer Meldung. Beide überschreiben
   nie und lehnen Verzeichnisse in Git-Repos ab, wie der Recorder.
-- Exit-Codes von `ris_kassetten.exs`: 0 ok (auch „nichts zu tun“), 1 fachliche Ablehnung oder
+- Exit-Codes von `ris_cassettes.exs`: 0 ok (auch „nichts zu tun“), 1 fachliche Ablehnung oder
   Umwelt, 2 Aufruf falsch,
   3 kein oder nicht ausführbares `komki-tresor`/keine Secure Enclave, 4 Freigabe verweigert
   oder abgebrochen, 5 Siegel oder Datei ungültig.

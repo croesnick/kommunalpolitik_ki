@@ -139,7 +139,7 @@ defmodule KomkiConnectorRis.RisStruktur do
   end
 
   # Endpoint key without concrete ids: digits become {id}, pairs become
-  # {meetingId-agendaId}, triples become {meetingId-agendaId-docId}.
+  # {meetingId-agendaId}, triples become {meetingId-agendaId-documentId}.
   defp endpoint_key(cassette) do
     path =
       cassette.request["path"]
@@ -152,7 +152,7 @@ defmodule KomkiConnectorRis.RisStruktur do
 
   defp normalize_segment(segment) do
     cond do
-      Regex.match?(~r/^\d+-\d+-\d+$/, segment) -> "{meetingId-agendaId-docId}"
+      Regex.match?(~r/^\d+-\d+-\d+$/, segment) -> "{meetingId-agendaId-documentId}"
       Regex.match?(~r/^\d+-\d+$/, segment) -> "{meetingId-agendaId}"
       Regex.match?(~r/^\d+$/, segment) -> "{id}"
       true -> segment

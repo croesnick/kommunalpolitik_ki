@@ -152,7 +152,6 @@ defmodule KomkiConnectorRis.RisSkeleton do
 
   defp normalize_segment(segment) do
     cond do
-      Regex.match?(~r/^\d+-\d+-\d+$/, segment) -> "{meetingId-agendaId-docId}"
       Regex.match?(~r/^\d+$/, segment) -> "{id}"
       Regex.match?(~r/^\d+-\d+$/, segment) -> "{meetingId-agendaId}"
       Regex.match?(~r/^\d+-\d+-\d+$/, segment) -> "{meetingId-agendaId-documentId}"
