@@ -13,8 +13,9 @@ import { llamaGet } from "./measure.mjs";
  * --offline --no-webui --no-slots -c <ctx> --alias local-model`, API key
  * from a file), but without a Seatbelt profile, on its own port, with its
  * own key and log under the run directory — never via the komki instance.
- * Only the GGUF, its sampling flags, the seed and per-arm extra server
- * arguments (thinking switch, MTP drafter) vary.
+ * Only the GGUF, its sampling flags, the seed, per-arm extra server
+ * arguments (thinking switch, MTP drafter) and — #320 — the binary
+ * itself vary.
  *
  * Returns the same shape as resolveLlama() (port, pid, apiKey, baseUrl,
  * gguf, ctx, logPath), so run-smoke.mjs measures both paths alike, plus

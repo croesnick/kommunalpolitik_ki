@@ -386,7 +386,7 @@ const fmt = (value, digits = 0) =>
 const fmtSpread = (s, digits = 0, unit = "") =>
   s.n === 0 ? "–" : `${fmt(s.median, digits)}${unit} (${fmt(s.min, digits)}–${fmt(s.max, digits)})`;
 
-async function report(root, { perfOnly = false } = {}) {
+async function report(root, { perfOnly = false, reference = "A" } = {}) {
   // --perf-only: studies without text grading (speed, loops) skip blinding
   const readJson = async (file) => JSON.parse(await readFile(path.join(root, file), "utf8"));
   const key = perfOnly ? {} : await readJson("blind-key.json");
@@ -468,11 +468,12 @@ async function report(root, { perfOnly = false } = {}) {
     };
   }
 
-  // gates (pre-registered): arm A (the pin) is the reference
+  // gates (pre-registered): the reference arm (the pin) is --reference,
+  // default A as in #285; the #320 build A/B passes --reference V7.
   const gates = {};
   for (const arm of arms) {
     const a = byArm[arm];
-    const pin = byArm.A;
+    const pin = byArm[reference];
     const h1 = a.factViolationsTask3.length > 0 && a.factViolationsTask3.every((v) => v.length === 0);
     const h2 = pin && a.repairRate !== null && pin.repairRate !== null ? a.repairRate <= pin.repairRate : null;
     const better = [1, 2, 3].filter((t) => pin && a.quality[t].median !== null && a.quality[t].median >= pin.quality[t].median);
@@ -567,7 +568,13 @@ async function main() {
   const root = rootIndex >= 0 ? rest[rootIndex + 1] : null;
   if (!root) throw new Error("--root <ab-root> fehlt");
   if (command === "blind") return blind(root);
-  if (command === "report") return report(root, { perfOnly: rest.includes("--perf-only") });
+  if (command === "report") {
+    const refIndex = rest.indexOf("--reference");
+    return report(root, {
+      perfOnly: rest.includes("--perf-only"),
+      reference: refIndex >= 0 ? rest[refIndex + 1] : "A",
+    });
+  }
   throw new Error("Befehl: blind | report");
 }
 

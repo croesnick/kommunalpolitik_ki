@@ -9,7 +9,16 @@
  * the llama-server default of 0.05. C carries the thinking-mode
  * recommendation of the Qwen3.8-27B model card (min_p 0, presence and
  * repetition penalties neutral).
+ *
+ * The server-build A/B (Ticket #320) keeps GGUF, drafter, sampling, flags
+ * and seed fixed and varies only the llama-server binary: arms with a
+ * `bin` override KOMKI_LLAMA_SERVER for their runs.
  */
+
+import path from "node:path";
+
+import { EXPERIMENTS_ROOT } from "../lib/config.mjs";
+import { DEFAULT_LLAMA_SERVER } from "./staging-server.mjs";
 
 const GEMMA_SAMPLING = { temp: 1.0, "top-p": 0.95, "top-k": 64 };
 
@@ -91,6 +100,30 @@ ARMS.A0M = {
   draft: DRAFTS.A,
   serverArgs: [...ARMS.A0.serverArgs, ...MTP_ARGS],
   port: 49618,
+};
+
+// Server-build arms (Ticket #320): the production configuration after #319
+// (thinking off via --reasoning, MTP drafter). GGUF, drafter, sampling,
+// flags and seed are identical for both arms — only the llama-server binary
+// varies. V7 is the Homebrew pin (the live instance's binary), V8 the
+// side-by-side v0.8.0 release build b11960, commit 8642541b2, extracted
+// from the release asset llama-b11960-bin-macos-arm64.tar.gz
+// (SHA-256 58e5a5e1d7c2bf66cedd9c29e0323f3e570660a70a1e2156d32eed08f4cc1e3c).
+const PRODUCTION_ARGS = ["--reasoning", "off", ...MTP_ARGS];
+
+ARMS.V7 = {
+  ...ARMS.A,
+  label: "Production config on llama-server 0.7.0 (build 11669, Homebrew pin)",
+  draft: DRAFTS.A,
+  serverArgs: PRODUCTION_ARGS,
+  bin: DEFAULT_LLAMA_SERVER,
+  port: 49619,
+};
+ARMS.V8 = {
+  ...ARMS.V7,
+  label: "Production config on llama-server 0.8.0 (build 11960, v0.8.0)",
+  bin: path.join(EXPERIMENTS_ROOT, "downloads", "b11960", "llama-b11960", "llama-server"),
+  port: 49620,
 };
 
 /**
