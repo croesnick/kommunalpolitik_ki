@@ -24,7 +24,7 @@
 #
 # Verschluesselte Verzeichnisse gehoeren ausserhalb jedes Git-Repos wie die
 # Klartext-Kassetten auch; seal/unseal lehnen Repos ab (RisHttp.repo_free?,
-# wie ris_recorder — auch durch Symlinks hindurch). Replay und Skelett
+# wie ris_recorder — auch durch Symlinks hindurch). Replay und ris_skeleton
 # lesen *.json: vorher unseal, danach seal.
 #
 # Nur OTP (:crypto, Ports), keine Deps. Die Port-Muster sind aus komki_cli

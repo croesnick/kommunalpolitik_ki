@@ -1,4 +1,4 @@
-# Mock, Aufzeichnungs-Proxy und Skelett-Extraktor sind eigenstaendige Skripte
+# Mock, Aufzeichnungs-Proxy und ris_skeleton (inferred schema) sind eigenstaendige Skripte
 # (auch ausserhalb der Tests startbar) und werden hier nur geladen.
 Code.require_file("../priv/mock_ris.exs", __DIR__)
 Code.require_file("../priv/ris_kassetten.exs", __DIR__)
