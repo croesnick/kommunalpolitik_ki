@@ -187,8 +187,10 @@ export async function llamaLogOffset(llama) {
 
 /**
  * Liest das Log-Segment [startOffset, endOffset) und zerlegt es in Requests:
- * je `task N` ein Paar aus prompt-eval und eval-Zeile.
- * [{ task, promptTokens, promptMs, evalTokens, evalMs, tokensPerSecond }]
+ * je `task N` ein Paar aus prompt-eval und eval-Zeile, mit MTP-Drafter dazu
+ * die draft acceptance.
+ * [{ task, promptTokens, promptMs, evalTokens, evalMs, draftAccepted,
+ *    draftGenerated, tokensPerSecond }]
  */
 export async function llamaLogSegment(llama, startOffset, endOffset) {
   let text = "";
@@ -205,12 +207,25 @@ export async function llamaLogSegment(llama, startOffset, endOffset) {
     const line = match[2];
     let entry = byTask.get(task);
     if (!entry) {
-      entry = { task, promptTokens: null, promptMs: null, evalTokens: null, evalMs: null };
+      entry = {
+        task,
+        promptTokens: null,
+        promptMs: null,
+        evalTokens: null,
+        evalMs: null,
+        draftAccepted: null,
+        draftGenerated: null,
+      };
       byTask.set(task, entry);
     }
     const prompt = /prompt eval time =\s*([\d.]+) ms \/(\s*\d+) tokens/.exec(line);
     const evalm = /(?<!prompt )eval time =\s*([\d.]+) ms \/(\s*\d+) tokens/.exec(line);
-    if (prompt) {
+    // #372: speculative decoding (MTP drafter) logs its acceptance per task.
+    const draft = /draft acceptance = [\d.]+ \(\s*(\d+) accepted \/\s*(\d+) generated\)/.exec(line);
+    if (draft) {
+      entry.draftAccepted = Number(draft[1]);
+      entry.draftGenerated = Number(draft[2]);
+    } else if (prompt) {
       entry.promptMs = Number(prompt[1]);
       entry.promptTokens = Number(prompt[2]);
     } else if (evalm) {

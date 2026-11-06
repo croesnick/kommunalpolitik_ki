@@ -121,6 +121,12 @@ node smoke/grade-ab.mjs blind --root <ab-root>   # dann blind/grades.json ausfü
 node smoke/grade-ab.mjs report --root <ab-root> --reference V7
 ```
 
+Das A/B zu 0.9.0 (#372) ergänzt den Arm `V9` (Release-Bundle b12110,
+side-by-side) und läuft mit `--arms V7,V8,V9 --seed-base 372000`. Seit #372
+liest der Harness die draft acceptance des MTP-Drafters aus dem llama-Log
+(gepoolt und je Aufgabe im Bericht). Der Bericht listet außerdem Läufe, in
+denen eine Messgröße fehlt, als Hinweis auf ein geändertes Log-Format.
+
 Zusätzlich misst der Proxy seit #285 je Request die Zeit bis zum ersten
 Delta (`firstTokenMs`, Thinking eingeschlossen) und bis zur ersten sichtbaren
 Antwort (`firstAnswerMs`) und hält den Thinking-Text (`reasoning`) fest. Der

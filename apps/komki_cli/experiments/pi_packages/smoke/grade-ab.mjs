@@ -305,6 +305,17 @@ async function repetitionLoops(dir) {
   return loops;
 }
 
+/** Pooled MTP draft acceptance over llama-log requests (#372). */
+function draftTotals(serverRequests) {
+  const accepted = serverRequests.reduce((s, r) => s + (r.draftAccepted ?? 0), 0);
+  const generated = serverRequests.reduce((s, r) => s + (r.draftGenerated ?? 0), 0);
+  return { accepted, generated, rate: generated ? accepted / generated : null };
+}
+
+function sumDraft(list) {
+  return draftTotals(list.map((d) => ({ draftAccepted: d?.accepted, draftGenerated: d?.generated })));
+}
+
 async function runMetrics(results, summary, dir) {
   const tasks = {};
   const all = [];
@@ -312,6 +323,7 @@ async function runMetrics(results, summary, dir) {
     const measures = measuresOf(result);
     all.push(...measures);
     const requests = measures.flatMap((m) => m.proxyRequests ?? []);
+    const taskServer = measures.flatMap((m) => m.serverRequests ?? []);
     tasks[result.id] = {
       verdict: result.verdict ?? "harness-error",
       wallMs: measures.reduce((s, m) => s + (m.durationMs ?? 0), 0),
@@ -321,6 +333,7 @@ async function runMetrics(results, summary, dir) {
       completionTokens: measures.reduce((s, m) => s + (m.usageProxy?.completion ?? 0), 0),
       reasoningTokens: measures.reduce((s, m) => s + (m.reasoningTokens ?? 0), 0),
       requests: requests.length,
+      draft: draftTotals(taskServer),
     };
   }
   const requests = all.flatMap((m) => m.proxyRequests ?? []);
@@ -342,6 +355,7 @@ async function runMetrics(results, summary, dir) {
   return {
     tasks,
     loadMs: summary.llama?.staging?.loadMs ?? null,
+    draft: draftTotals(server),
     wallMsTotal: Object.values(tasks).reduce((s, t) => s + t.wallMs, 0),
     decodeTps: evalMs ? (evalTokens / evalMs) * 1000 : null,
     prefillTps: promptMs ? (promptTokens / promptMs) * 1000 : null,
@@ -436,6 +450,10 @@ async function report(root, { perfOnly = false, reference = "A" } = {}) {
       reasoningTokens: pick((m) => m.reasoningTokens),
       footprintMaxMiB: pick((m) => m.footprintMaxMiB),
       lengthClamped: pick((m) => m.lengthClamped),
+      draft: sumDraft(armRuns.map((r) => r.metrics.draft)),
+      taskDraft: Object.fromEntries(
+        Object.keys(armRuns[0]?.metrics.tasks ?? {}).map((t) => [t, sumDraft(armRuns.map((r) => r.metrics.tasks[t]?.draft))]),
+      ),
       runsWithLoop: armRuns.filter((r) => r.metrics.loops.length > 0).length,
       taskWallMs: Object.fromEntries(
         Object.keys(armRuns[0]?.metrics.tasks ?? {}).map((t) => [t, pick((m) => m.tasks[t]?.wallMs)]),
@@ -505,6 +523,7 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
   row("Prompt-Token", (a) => fmtSpread(a.promptTokens));
   row("Completion-Token", (a) => fmtSpread(a.completionTokens));
   row("davon Thinking-Token", (a) => fmtSpread(a.reasoningTokens));
+  row("draft acceptance (gepoolt)", (a) => fmtDraft(a.draft));
   row("footprint max", (a) => fmtSpread(a.footprintMaxMiB, 0, " MiB"));
   row("längengeklemmte Requests", (a) => fmtSpread(a.lengthClamped));
   row("Tool-Calls / invalide / Reparaturen", (a) => `${a.toolCalls} / ${a.toolCallClasses ? Object.entries(a.toolCallClasses).filter(([k]) => k !== "ok" && k !== "extra-keys").reduce((x, [, v]) => x + v, 0) : 0} / ${a.repairs} (${fmt((a.repairRate ?? 0) * 100, 1)} %)`);
@@ -519,6 +538,19 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
       return `${s.n ? fmtSpread({ ...s, median: s.median / 1000, min: s.min / 1000, max: s.max / 1000 }, 1, " s") : "–"} · ${(a.verdicts[task] ?? []).join("/")}`;
     });
   }
+  lines.push("");
+  lines.push(`| Aufgabe: draft acceptance (gepoolt) | ${arms.join(" | ")} |`);
+  lines.push(`|---|${arms.map(() => "---").join("|")}|`);
+  for (const task of Object.keys(byArm[arms[0]].taskDraft)) row(task, (a) => fmtDraft(a.taskDraft[task]));
+  lines.push("");
+  // #372: a metric missing in some run hints at a changed llama log format.
+  const missing = perRun.flatMap((run) =>
+    ["loadMs", "decodeTps", "prefillTps", "ttftMedianMs", "footprintMaxMiB"]
+      .filter((k) => run.metrics[k] === null)
+      .concat(run.metrics.draft.generated === 0 ? ["draft"] : [])
+      .map((k) => `${run.dir}: ${k}`),
+  );
+  lines.push(`Fehlende Messwerte: ${missing.join(", ") || "keine"}`);
   lines.push("");
   if (perfOnly) return renderRuns(lines, perRun);
   lines.push(`| Qualität (Punkte, Median, Spanne) | ${arms.join(" | ")} |`);
@@ -546,6 +578,10 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
     lines.push(`| ${id} | ${q.task} | ${q.arm} | ${q.round} | ${q.points}/${q.max} | ${q.factViolations.join(", ") || "–"} | ${q.notiz.replace(/\|/g, "/")} |`);
   }
   return lines.join("\n") + "\n";
+}
+
+function fmtDraft(d) {
+  return d.rate === null ? "–" : `${fmt(d.rate, 3)} (${d.accepted} von ${d.generated})`;
 }
 
 function renderRuns(lines, perRun) {

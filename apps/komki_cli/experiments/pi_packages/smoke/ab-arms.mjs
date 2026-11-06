@@ -125,6 +125,16 @@ ARMS.V8 = {
   bin: path.join(EXPERIMENTS_ROOT, "downloads", "b11960", "llama-b11960", "llama-server"),
   port: 49620,
 };
+// Ticket #372: V9 is the v0.9.0 release build b12110, commit cd959bae9,
+// extracted from llama-b12110-bin-macos-arm64.tar.gz (SHA-256
+// 4f5b8de12e0b9516658ca6a5764c6ffb3d7c659c3dd538556b1413c7b4050662).
+// V8 runs along as a descriptive arm; the gates compare V9 against V7.
+ARMS.V9 = {
+  ...ARMS.V7,
+  label: "Production config on llama-server 0.9.0 (build 12110, v0.9.0)",
+  bin: path.join(EXPERIMENTS_ROOT, "downloads", "b12110", "llama-b12110", "llama-server"),
+  port: 49622,
+};
 
 /**
  * Seed per round: round 0 is the warm-up, 1..n are measured runs; all arms
