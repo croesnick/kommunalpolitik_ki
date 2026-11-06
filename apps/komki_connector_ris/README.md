@@ -173,8 +173,95 @@ Schlüssel und überlappende Array-Längen gelten nicht als Drift, weil sie mit 
 schwanken. Damit lässt sich prüfen, ob der Mock oder ein späterer Generator formatgetreu ist.
 
 Committbare Testdaten entstehen nie aus den Kassetten selbst, sondern aus synthetischen Inhalten im
-echten Format. Das inferred schema ist die Vorlage dieses Generators; ein Verifier (N-Gramm-Abgleich
-gegen die Aufzeichnungen) ist als Freigabetor vor jedem Committen von Kassetten geplant.
+echten Format. Die Vorlage ist das Strukturprofil; dass die Formate sitzen, erzwingt der
+Konformitätstest der Connector-Suite gegen das committete inferred schema. Der N-Gramm-Abgleich
+gegen die Aufzeichnungen ist das zweite Freigabetor vor jedem Committen von Kassetten.
+
+### Struktur-Extraktor: Belegung ohne Inhalte
+
+`priv/ris_struktur.exs` (Ticket #313) gewinnt aus Kassetten die Belegung je Sitzung und TOP: welche
+Sitzungsteile `protectedpart` tragen, welche TOPs `restricted` sind, wie viele Textblöcke,
+Abstimmungen und Dokumente sie haben, wie lang ihre Titel sind. Das Profil ist wie das inferred schema
+inhaltsfrei und committbar; tragbar ist nur, was Gäste am RIS ebenfalls sehen könnten:
+
+- Titellängen nur für nachweislich öffentliche TOPs (`restricted: false` **und** ungeschützter
+  Sitzungsteil, fail-closed wie der Connector-Filter),
+- Abstimmungsergebnisse nie, Gremien nur als anonyme Indizes (`c1`, `c2`, …),
+- Dokumentnamen und Suchterme nie; nicht verstandene Endpunkte werden nur gezählt.
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_struktur.exs --cassette <dir> [--out <datei>]
+```
+
+Der Generator aus #313 liest nur das Strukturprofil (Belegung) und füllt es mit erfundenen
+Inhalten; dass die Formate sitzen, erzwingt der Konformitätstest gegen das inferred schema. Weil die
+Kassetten nach der Session verschlüsselt sind, läuft der Extraktor wie `ris_skeleton` und Replay nach `unseal`
+und vor dem erneuten `seal`.
+
+### Synthetische Kassetten: der Gartenstadt-Generator
+
+`priv/ris_gartenstadt.exs` (Ticket #313) erzeugt aus dem Strukturprofil synthetische
+Kassetten im Format des Recorders — abspielbar mit `--mode replay`:
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_gartenstadt.exs --out <leeres-verzeichnis> \
+  [--struktur <datei>]
+```
+
+Er transkribiert das Strukturprofil der Session 20261101T112819Z: Jede beobachtete Belegung —
+geschützte Teile, `restricted`-Flags, Zähler für Textblöcke, Abstimmungen und Dokumente — wird
+übernommen und mit Inhalten aus dem Universum „Gartenstadt“ (`priv/gartenstadt_daten.exs`) gefüllt.
+Echte Inhalte fließen nie ein, und jede Array-Länge der synthetischen Menge ist eine im echten RIS
+beobachtete Länge. Das Ausgabeverzeichnis muss leer sein.
+
+Kassetten je Sitzung entstehen nur für eine **Auswahl nach Abdeckung**: Der Generator wählt so
+wenige Sitzungen, dass jedes Merkmal des Profils einmal vorkommt (Teil-Layout, Sitzungsstatus,
+Sichtbarkeit, Nummernform, leere oder belegte Felder). Aus 33 Sitzungen und 374 TOPs werden so 5
+Sitzungen mit 39 TOPs und 97 Kassetten. `ris_skeleton --compare` gegen die Aufnahme
+20261101T112819Z meldet nur die drei Endpunkte, die diese Aufnahme nicht kennt (die inferierten
+Gast-Details und den Download aus der Session 20261105); ein Test in `ris_gartenstadt_test.exs`
+hält das gegen das committete inferred schema fest. Die anderen Aufnahmen widersprechen ihr in
+Einzelheiten (etwa `unreadop` immer `null`) und sind deshalb kein Compare-Ziel. Gast-Liste und Suchen
+führen weiterhin alle Sitzungen des Profils, weil ihre Länge Teil des beobachteten Formats ist.
+Tagesordnungen und TOPs außerhalb der Auswahl antworten im Replay mit 404, das der Connector als
+nicht gefunden überspringt.
+
+Die Sonderfälle des bisherigen Mocks sind bewusste Testfälle (Spiegel von `mock_ris.exs`): Die
+Teststraße Lindenallee steht in zwei öffentlichen TOPs (einmal Titel, einmal nur im Text) und zwei
+nicht-öffentlichen — eins davon als `restricted`-im-öffentlichen-Teil, den die reale Datenlage nie
+zeigt —, dazu ein nur-nicht-öffentlicher Begriff und die Prompt-Injection im öffentlichen Text. Die
+Sonderfälle liegen in den datumsneuesten Sitzungen der Auswahl, weil das Anfragebudget des
+Connectors nach 33 Tagesordnungsabrufen nur wenige Textabfragen erlaubt. Die Text-Träger wählt der
+Generator aus TOPs mit Textblöcken — ein Profil, das die Sonderfälle nicht tragen kann, scheitert
+bei der Erzeugung laut, statt sie still fallen zu lassen.
+
+`test/fixtures/gartenstadt` enthält den committeten Satz; ein Integritätstest regeneriert ihn
+byteidentisch. Connector und ratsinfo laufen in ihren Tests gegen das Replay dieser Kassetten
+(`mock_ris.exs --mode replay --cassette test/fixtures/gartenstadt`).
+
+Vor dem Merge gelten zwei menschliche Freigaben, beide mit `unseal` vorher und `seal` nachher:
+`ris_skeleton --compare` (synthetisch gegen die echte Aufnahme) und der N-Gramm-Abgleich — ihre
+Ergebniszeilen gehören als Freigabe in den PR. Das Compare-Fenster ist nur für das committete
+Strukturprofil der Session 20261101T112819Z garantiert; ein Satz aus einem anderen `--struktur`
+muss beide Freigaben erneut durchlaufen, bevor er committet wird.
+
+### N-Gramm-Abgleich: Freigabetor vor dem Commit
+
+`priv/ris_ngramm.exs` (Ticket #313) prüft, dass in synthetischen Kassetten keine echten Inhalte
+durchgerutscht sind: Wort-N-Gramm (Standard 6) über alle String-Werte der Antwortkörper,
+Base64-HTML dekodiert; ein übereinstimmendes Gramm ist ein Fund (Exit 1). Die FUND-Zeile druckt den
+gefundenen Streifen bewusst aus — er ist ja gerade der Leak; alle übrigen Meldungen nennen nur
+Dateinamen und Zähler. Das läuft lokal bei der nutzenden Person über die entschlüsselten echten
+Kassetten, weil echte Kassetten kein Agent liest:
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_ngramm.exs \
+  --synthetisch apps/komki_connector_ris/test/fixtures/gartenstadt \
+  --echt ~/.local/share/kommunalpolitik_ki/ris-cassettes/<zeitstempel>
+```
+
+Dazu `unseal` des Echt-Verzeichnisses vorher und `seal` nachher — derselbe Bogen wie bei
+`ris_skeleton`. Das Ergebnis gehört als Freigabe in den PR des Generators.
 
 ### Kassetten verschlüsseln (Touch ID)
 
@@ -193,7 +280,7 @@ elixir apps/komki_connector_ris/priv/ris_cassettes.exs status <verzeichnis>
 elixir apps/komki_connector_ris/priv/ris_cassettes.exs check [verzeichnis]
 ```
 
-Ablauf einer Session: aufzeichnen, dann `check` (Leak-Prüfung), inferred schema, danach `seal` —
+Ablauf einer Session: aufzeichnen, dann `check` (Leak-Prüfung), inferred schema und Strukturprofil, danach `seal` —
 dann liegen nur noch `<name>.json.enc` (Magic `rkt1`, je Datei eigene Nonce). `seal` löscht den
 Klartext erst nach bestandener Gegenprobe von der Platte. Dateien, die keine `*.json` sind,
 bleiben unberührt und werden gemeldet — sie sind keine Kassetten. Meldungen nennen nie Schlüssel,
@@ -215,12 +302,13 @@ Klartext seine Unterverzeichnisse. Exit 1 gilt bei Funden, bei unlesbaren Dateie
 Verzeichnissen und wenn Klartext da ist, aber kein Geheimnis geladen werden konnte —
 nichts geprüft ist nicht sauber.
 
-- Replay und `priv/ris_skeleton.exs` lesen `*.json`: vorher `unseal`, danach `seal`.
+- Replay, `priv/ris_skeleton.exs` und `priv/ris_struktur.exs` lesen `*.json`: vorher `unseal`, danach `seal`.
 - Abbrüche lassen einen sichtbaren Zwischenzustand: `status` zeigt ihn, ein erneutes
   `seal`/`unseal` vollendet. Nicht löschbare Dateien werden übersprungen und gemeldet; eine
   Restdatei `<name>.json.new` aus einem Crash blockiert mit klarer Meldung. Beide überschreiben
   nie und lehnen Verzeichnisse in Git-Repos ab, wie der Recorder.
-- Exit-Codes: 0 ok (auch „nichts zu tun“), 1 fachliche Ablehnung oder Umwelt, 2 Aufruf falsch,
+- Exit-Codes von `ris_cassettes.exs`: 0 ok (auch „nichts zu tun“), 1 fachliche Ablehnung oder
+  Umwelt, 2 Aufruf falsch,
   3 kein oder nicht ausführbares `komki-tresor`/keine Secure Enclave, 4 Freigabe verweigert
   oder abgebrochen, 5 Siegel oder Datei ungültig.
 

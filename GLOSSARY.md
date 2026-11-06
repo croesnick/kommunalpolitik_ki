@@ -1002,16 +1002,21 @@ schmale Schnittstelle.
 
 ### Kassette
 
-**Definition:** Eine aufgezeichnete Anfrage samt Antwort an das echte RIS,
+**Definition:** Eine aufgezeichnete Anfrage samt Antwort an eine RIS-API,
 als JSON-Datei, wie bei VCR oder ExVCR. Der Aufzeichnungs-Proxy (Recorder)
 schreibt sie, der Mock spielt sie im Replay-Modus zurück, und aus mehreren
-Kassetten entsteht ein inhaltsfreies inferred schema.
+Kassetten entstehen inhaltsfreie Berichte: das inferred schema und das
+Strukturprofil.
 
-**Abgrenzung:** Kassetten enthalten echte, auch nicht-öffentliche Inhalte.
-Sie liegen nie im Repo; committbar ist nur das inferred schema. Aufbewahrt
-werden sie verschlüsselt (`priv/ris_cassettes.exs`, Freigabe per Touch ID) —
-Details im Connector-README, Abschnitt „Kassetten verschlüsseln“; bis zur
-Verschlüsselung ist eine Kassette Klartext.
+**Arten:** *Echte Kassetten* enthalten echte, auch nicht-öffentliche
+Inhalte. Sie liegen nie im Repo und laufen nie durch eine Agenten-Session;
+aufbewahrt werden sie verschlüsselt (`priv/ris_cassettes.exs`, Freigabe per
+Touch ID) — Details im Connector-README, Abschnitt „Kassetten
+verschlüsseln“; bis zur Verschlüsselung ist eine Kassette Klartext. Committbar
+sind die inhaltsfreien Berichte (inferred schema, Strukturprofil) und
+*synthetische Kassetten* aus dem Gartenstadt-Generator: erfundene Inhalte
+im echten Format, per Konstruktion ohne echten Bezug und über den
+N-Gramm-Abgleich freigegeben (`test/fixtures/gartenstadt/`).
 
 **Wo:** [`apps/komki_connector_ris/README.md`](apps/komki_connector_ris/README.md)
 § „Aufzeichnung und Replay echter Antwortformate“.
@@ -1033,6 +1038,77 @@ committbares Berichtsformat. Datei- und Verzeichnisnamen heißen noch
 
 **Wo:** [`apps/komki_connector_ris/README.md`](apps/komki_connector_ris/README.md)
 § „Schema inference: Format ohne Inhalte“.
+
+---
+
+### Strukturprofil
+
+**Definition:** Der inhaltsfreie Bericht des Struktur-Extraktors
+(`priv/ris_struktur.exs`) über die Belegung einer Aufzeichnung: je Sitzung
+Teil-Layout und Status, je TOP restricted-Flag, Sichtbarkeit und Zähler für
+Textblöcke, Abstimmungen und Dokumente. Tragbar ist nur, was Gäste am RIS
+ebenfalls sehen könnten (fail-closed wie der Connector-Filter): Titellängen
+nur für nachweislich öffentliche TOPs, Abstimmungsergebnisse nie, Gremien
+nur als anonyme Indizes (`c1`, `c2`, …). Es ist die Vorlage des
+Gartenstadt-Generators — die Antwortformate erzwingt der Konformitätstest
+gegen das inferred schema.
+
+**Wo:** committet unter `apps/komki_connector_ris/priv/strukturen/`.
+
+---
+
+### Gartenstadt
+
+**Definition:** Das erfundene Datenuniversum der synthetischen Kassetten
+(`priv/gartenstadt_daten.exs`): eine Kleinstadt mit erfundenen Gremien,
+Themen, Straßen und Namen, deren Problemlagen nicht auf die Themen der
+echten Aufzeichnungen zurückführbar sind (Negativliste — Sicherheit per
+Konstruktion statt nur per Prüfung, Entscheidung in #313). Die Lindenallee
+ist die reservierte Teststraße der Sonderfälle und fehlt im Straßenpool.
+
+**Wo:** `apps/komki_connector_ris/priv/gartenstadt_daten.exs`;
+Fixtures unter `apps/komki_connector_ris/test/fixtures/gartenstadt/`.
+
+---
+
+### N-Gramm-Abgleich
+
+**Definition:** Das Freigabetor vor jedem Commit synthetischer Kassetten
+(`priv/ris_ngramm.exs`): Wort-N-Gramm (Standard 6) über alle String-Werte
+der Antwortkörper, Base64-HTML dekodiert, gegen die echten Aufzeichnungen.
+Ein übereinstimmendes Gramm ist ein Fund (Exit 1). Läuft lokal bei der
+nutzenden Person über die entschlüsselten echten Kassetten — echte Kassetten
+liest kein Agent; die Fund-Zeile druckt den Streifen bewusst, er ist ja der
+Leak.
+
+**Wo:** `apps/komki_connector_ris/priv/ris_ngramm.exs`.
+
+---
+
+### Leak-Prüfung
+
+**Definition:** Der Schritt zwischen Aufzeichnung und Versiegelung einer
+Session: `ris_cassettes.exs check` durchsucht Klartext-Kassetten nach den
+Geheimnissen aus `.env` und token-Datei (Auswertung exakt wie ratsinfo:
+erste Fundstelle, auch auskommentierte oder `export`-Zeilen), im Rohtext
+und in den Base64-dekodierten Bodies. Exit 1 gilt bei Funden und wenn die
+Prüfung nicht vollständig war (unlesbare Dateien oder Verzeichnisse, kein
+Geheimnis ladbar) — nichts geprüft ist nicht sauber.
+
+**Wo:** `apps/komki_connector_ris/priv/ris_cassettes.exs`, Verb `check`
+(#328).
+
+---
+
+### Sammel-Verzeichnis
+
+**Definition:** Ein Kassettenverzeichnis ohne eigenen Klartext, das nur
+Unterverzeichnisse hält — etwa die Kassetten-Basis
+(`~/.local/share/kommunalpolitik_ki/ris-cassettes/`) mit ihren
+Zeitstempel-Verzeichnissen. `check` steigt in es hinein und prüft die
+Unterverzeichnisse statt seiner selbst.
+
+**Wo:** `ris_cassettes.exs check` ohne Verzeichnisargument.
 
 ---
 
