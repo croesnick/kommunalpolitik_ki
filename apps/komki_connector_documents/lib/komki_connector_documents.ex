@@ -1,27 +1,24 @@
 defmodule KomkiConnectorDocuments do
   @moduledoc """
-  Dokument-Connector (Fassung `komki-documents/1`, Ticket #169): liest die
-  Raumdokumente `<documents_dir>/<document_id>.md` und seit #290 auch
-  `<documents_dir>/<document_id>.pdf` fuer `admit_document`.
+  Documents connector (version `komki-documents/1`, ticket #169): reads the
+  room documents `<documents_dir>/<document_id>.md` and, since #290,
+  `<documents_dir>/<document_id>.pdf` for `admit_document`.
 
-  Der Connector entscheidet nichts. Ob ein Dokument in den Kontext darf,
-  hat der Vermittler vorher ueber die Objekt-Labels aus `room.json`
-  entschieden; gerufen wird der Connector erst nach einem permit. Damit
-  braucht der Vermittler keinen Lesezugriff auf die Dokumente mehr.
+  The connector decides nothing. The mediator has already decided via the
+  object labels from `room.json` whether a document may enter the context;
+  the connector is only called after a permit, so the mediator itself needs
+  no read access to the documents.
 
-  Pfadhaertung: `document_id` erfuellt das Manifest-Pattern `^[a-z0-9-]+$`
-  (keine Pfadtrenner, kein `..`); die Datei selbst darf kein Symlink sein.
-  Bei gleichem Namen gewinnen Markdown-Dateien vor PDFs — die Aufnahme
-  vergibt eine Objekt-ID je Inhalt (R.2.1), beide Formen derselben ID
-  koennen darum nicht als Objekte im Raum liegen.
+  Path hardening: `document_id` matches the manifest pattern `^[a-z0-9-]+$`
+  (no separators, no `..`), and the file itself must not be a symlink.
+  Markdown wins over a PDF of the same name; intake keeps a single format
+  per object ID, so both never coexist in a room.
 
-  PDFs liest `KomkiConnectorDocuments.Pdf`: Text je Seite mit
-  Seitenanker, dazu die Highlights mit Kommentar und markiertem Text;
-  Lizenz und Herkunft des NIF stehen im Moduledoc dort. Die PDF-Form
-  braucht einen NIF, der im Escript-Kontext nicht ladbar ist — die
-  Antwort ist dann ein klarer Fehler, die Programmform entscheidet #288.
+  PDFs are rendered by `KomkiConnectorDocuments.Pdf` (license and NIF
+  origin are documented there). Its NIF cannot load in an escript; the
+  read then fails with a clear error until #288 settles the program form.
 
-  Zustand: `%{dir: <documents_dir>}`.
+  State: `%{dir: <documents_dir>}`.
   """
 
   @behaviour Sidecar.Server
@@ -30,10 +27,8 @@ defmodule KomkiConnectorDocuments do
 
   @max_bytes 1_048_576
 
-  # Dateigrenze fuer PDFs: ex_pdfium liest die ganze Datei in den Speicher
-  # und parst sie im Connector-Prozess (kein Speicherlimit im Profil);
-  # 64 MiB deckt gescannte Drucksachen ab und grenzt die Last. Der
-  # extrahierte Text bleibt ohnehin auf die Frame-Grenze begrenzt.
+  # ex_pdfium parses the whole file in memory in the connector process
+  # (no memory limit in the profile); 64 MiB covers scanned council papers.
   @max_pdf_file_bytes 64 * 1024 * 1024
 
   @impl true
@@ -50,55 +45,39 @@ defmodule KomkiConnectorDocuments do
 
   @impl true
   def handle_op("read", %{"document_id" => document_id}, _context, state) do
-    case resolve(state.dir, document_id) do
-      {:md, file} -> read_markdown(document_id, file)
-      {:pdf, file} -> read_pdf(document_id, file)
-      {:error, code, detail} -> {:error, code, detail}
+    with {:ok, format, stat} <- resolve(state.dir, document_id),
+         {:ok, content} <- read(format, stat) do
+      {:ok, %{"document_id" => document_id, "content" => content}}
     end
   end
 
-  # Markdown zuerst, dann PDF; ein Treffer ungleicher Art (Symlink,
-  # Verzeichnis) gewinnt vor dem Weitersehen.
+  # Markdown first, then PDF; a non-regular entry (symlink, directory)
+  # stops the lookup instead of falling through.
   defp resolve(dir, document_id) do
-    case take(dir, document_id, ".md") do
-      :missing -> take_or_missing(dir, document_id, ".pdf", :pdf)
-      {:ok, file} -> {:md, file}
-      {:error, _code, _detail} = error -> error
-    end
+    Enum.find_value([md: ".md", pdf: ".pdf"], {:error, "not-found", "Dokument nicht gefunden"}, fn
+      {format, ext} ->
+        path = Path.join(dir, document_id <> ext)
+
+        case File.lstat(path) do
+          {:ok, %File.Stat{type: :regular, size: size}} ->
+            {:ok, format, %{path: path, size: size}}
+
+          {:ok, %File.Stat{}} ->
+            {:error, "forbidden-path", "kein regulaeres Dokument"}
+
+          {:error, _} ->
+            nil
+        end
+    end)
   end
 
-  defp take_or_missing(dir, document_id, ext, kind) do
-    case take(dir, document_id, ext) do
-      :missing -> {:error, "not-found", "Dokument nicht gefunden"}
-      {:ok, file} -> {kind, file}
-      {:error, _code, _detail} = error -> error
-    end
-  end
+  defp read(:md, %{size: size}) when size > @max_bytes,
+    do: {:error, "too-large", "Dokument groesser als 1 MiB"}
 
-  defp take(dir, document_id, ext) do
-    path = Path.join(dir, document_id <> ext)
+  defp read(:md, %{path: path}), do: {:ok, File.read!(path)}
 
-    case File.lstat(path) do
-      {:ok, %File.Stat{type: :regular, size: size}} -> {:ok, %{path: path, size: size}}
-      {:ok, %File.Stat{}} -> {:error, "forbidden-path", "kein regulaeres Dokument"}
-      {:error, _} -> :missing
-    end
-  end
+  defp read(:pdf, %{size: size}) when size > @max_pdf_file_bytes,
+    do: {:error, "too-large", "PDF-Datei groesser als 64 MiB"}
 
-  defp read_markdown(document_id, %{path: path, size: size}) do
-    if size > @max_bytes,
-      do: {:error, "too-large", "Dokument groesser als 1 MiB"},
-      else: {:ok, %{"document_id" => document_id, "content" => File.read!(path)}}
-  end
-
-  defp read_pdf(document_id, %{path: path, size: size}) do
-    if size > @max_pdf_file_bytes do
-      {:error, "too-large", "PDF-Datei groesser als 64 MiB"}
-    else
-      case Pdf.render(path) do
-        {:ok, content} -> {:ok, %{"document_id" => document_id, "content" => content}}
-        {:error, code, detail} -> {:error, code, detail}
-      end
-    end
-  end
+  defp read(:pdf, %{path: path}), do: Pdf.render(path)
 end

@@ -105,12 +105,10 @@ defmodule KomkiCli.CLI do
     halt(code)
   end
 
-  # Exqlite ist die einzige NIF-Abhaengigkeit des Haupt-CLI (SQLite-Registry
-  # des Label-Store); ex_pdfium (#290) nutzt nur die Connector-Rolle und
-  # laesst sich im Escript ohnehin nicht laden (dlopen aus dem Archiv
-  # scheitert, errno=20) — die Programmform entscheidet #288. Ein
-  # Pfad-Bootstrap dafuer gibt es darum nicht.
-  # `Application.app_dir(:exqlite)/ebin` schaut auf dem
+  # ex_pdfium (#290) needs no bootstrap here: only the documents connector
+  # role uses it, and it cannot load from an escript anyway (#288).
+  # Exqlite ist die einzige NIF-Abhaengigkeit (SQLite-Registry des
+  # Label-Store). `Application.app_dir(:exqlite)/ebin` schaut auf dem
   # Code-Pfad; im Escript-Kontext ist exqlite im Zip und der Pfad zeigt in
   # das Zip-Archiv — die NIF muss aber vom realen Dateisystem laden. Die
   # Build-Tree-Pfade decken den Escript-Alltag ab (`mix escript.build`).

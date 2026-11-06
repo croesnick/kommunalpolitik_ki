@@ -1,33 +1,31 @@
 defmodule KomkiConnectorDocuments.TestPDF do
   @moduledoc """
-  Baut die Test-PDFs des Connectors selbst (Ticket #290): kein Binär-Fixture
-  im Repo — die Bytes entstehen im Test. Fünf Formen:
+  Builds the connector's test PDFs in the test itself (ticket #290), so no
+  binary fixture lives in the repo. Five shapes:
 
-    * `multi_page/1` — zwei Seiten mit Text; auf Seite 2 drei
-      Highlight-Annotationen mit Kommentar: eine einzeilig, eine
-      mehrzeilig, eine versteckt (/F 6) — versteckte Markierungen
-      gehoeren nicht in den Agentenkontext.
-    * `no_text/1` — eine Seite ohne Textebene (gefülltes Rechteck statt
-      Text, wie ein Scan ohne OCR).
-    * `lone_cr/1` — eine Seite mit einzelnem \\r im Text: pdfium reicht
-      rohe Steuerzeichen durch, der Connector normalisiert zu \\n.
-    * `big/1` — extrahierbarer Text über 1 MiB, für die Frame-Grenze.
-    * `invalid/1` — eine Datei mit PDF-Endung, aber kaputten Bytes.
+    * `multi_page/1`: two pages of text; page 2 carries three highlight
+      annotations with comments: one single-line, one multi-line, one
+      hidden (/F 6), which must stay out of the agent context.
+    * `no_text/1`: one page without a text layer (a filled rectangle, like
+      a scan without OCR).
+    * `lone_cr/1`: one page with a lone \\r in its text; pdfium passes raw
+      control characters through, the connector normalizes them to \\n.
+    * `big/1`: more than 1 MiB of extractable text, for the frame limit.
+    * `invalid/1`: a file with a PDF extension but broken bytes.
 
-  Die PDF-Syntax ist handgeschrieben und absichtlich minimal: Catalog,
-  Pages, eine Helvetica-Type1-Font, je Seite ein Content-Stream mit
-  absoluter Textmatrix (`Tm`), dazu die Annotationen mit /Subtype
-  /Highlight, /Rect und /Contents. Die xref wird mit echten Offsets
-  berechnet, damit jedes PDF ohne Reparatur lesbar ist.
+  The PDF syntax is handwritten and deliberately minimal: catalog, pages,
+  one Helvetica Type1 font, one content stream per page with an absolute
+  text matrix (`Tm`), plus `/Subtype /Highlight` annotations with `/Rect`
+  and `/Contents`. The xref uses real offsets, so pdfium opens every file
+  without repair.
   """
 
   @doc """
-  Zweiseitiges PDF. Seite 1: zwei Zeilen. Seite 2: drei Zeilen mit
-  Highlights — Zeile 1 ganz markiert (Kommentar „Wichtige Stelle“), die
-  Zeilen 2 und 3 zusammen markiert (Kommentar „Mehrzeilige Markierung“);
-  die dritte Annotation (Kommentar „Versteckte Markierung“) trägt das
-  Hidden-Flag (/F 6) und darf nicht erscheinen. Alle Koordinaten sind
-  PDF-Punkte, Ursprung unten links.
+  Two pages. Page 1: two lines. Page 2: three lines; line 1 is highlighted
+  on its own (comment „Wichtige Stelle“), lines 2 and 3 together (comment
+  „Mehrzeilige Markierung“); the third annotation (comment „Versteckte
+  Markierung“) is hidden (/F 6) and must not appear. Coordinates are PDF
+  points, origin bottom left.
   """
   @spec multi_page(Path.t()) :: :ok
   def multi_page(path) do
@@ -61,9 +59,8 @@ defmodule KomkiConnectorDocuments.TestPDF do
   end
 
   @doc """
-  Einseitiges PDF ohne Textebene: nur ein gefülltes Rechteck (Scan ohne
-  OCR). Der Connector muss das als klaren Fehler melden, nicht als leeren
-  Text.
+  One page without a text layer, just a filled rectangle (a scan without
+  OCR). The connector must report an error, not empty text.
   """
   @spec no_text(Path.t()) :: :ok
   def no_text(path) do
@@ -79,11 +76,11 @@ defmodule KomkiConnectorDocuments.TestPDF do
     File.write!(path, assemble(objects))
   end
 
-  @doc "Eine Seite mit einzelnem \\r im Text (kein \\r\\n-Paar)."
+  @doc "One page with a lone \\r in its text (no \\r\\n pair)."
   @spec lone_cr(Path.t()) :: :ok
   def lone_cr(path) do
     stream =
-      "BT\n/F1 12 Tf\n1 0 0 1 72 700 Tm\n(Zeile mit Wagenruecklauf) Tj\n1 0 0 1 72 650 Tm\n(Dritte Zeile) Tj\nET\n"
+      "BT\n/F1 12 Tf\n1 0 0 1 72 700 Tm\n(Zeile mit\\rWagenruecklauf) Tj\n1 0 0 1 72 650 Tm\n(Dritte Zeile) Tj\nET\n"
 
     objects = [
       "<< /Type /Catalog /Pages 2 0 R >>",
@@ -96,23 +93,20 @@ defmodule KomkiConnectorDocuments.TestPDF do
     File.write!(path, assemble(objects))
   end
 
-  @doc "Datei mit PDF-Endung und kaputten Bytes."
+  @doc "A file with a PDF extension and broken bytes."
   @spec invalid(Path.t()) :: :ok
   def invalid(path), do: File.write!(path, "kein PDF, nur Bytes mit Endung\n")
 
   @doc """
-  Einseitiges PDF mit ueber 1 MiB extrahierbarem Text — fuer die
-  Frame-Grenze des Protokolls. pdfium kuerzt einzelne ueberlange Zeilen,
-  der Text kommt deshalb aus vielen kurzen Zeilen; jede liegt auf
-  eigener Baseline, damit pdfium sie nicht zu einer ueberlangen Zeile
-  verschmilzt.
+  One page with more than 1 MiB of extractable text, for the protocol's
+  frame limit. pdfium truncates overlong lines, so the text comes from many
+  short lines spread over distinct baselines that pdfium cannot merge.
   """
   @spec big(Path.t()) :: :ok
   def big(path) do
     lines =
       Enum.map(1..40_000//1, fn number ->
-        # 3 000 verteilte Baseline-Slots (0,2 Pt Abstand): gut 13 kurze
-        # Zeilen je Slot, nirgends eine verschmelzbare Riesenzeile.
+        # 3 000 baseline slots 0.2 pt apart: about 13 short lines each.
         y = 700 - rem(number, 3000) * 0.2
         "1 0 0 1 72 #{y} Tm\n(Zeile #{number} des grossen Testdokuments.) Tj\n"
       end)
@@ -130,10 +124,6 @@ defmodule KomkiConnectorDocuments.TestPDF do
     File.write!(path, assemble(objects))
   end
 
-  # ------------------------------------------------------------------
-  # PDF-Syntax
-  # ------------------------------------------------------------------
-
   defp text_stream(lines) do
     entries =
       Enum.map(lines, fn {{x, y}, text} ->
@@ -143,8 +133,8 @@ defmodule KomkiConnectorDocuments.TestPDF do
     "BT\n/F1 12 Tf\n" <> Enum.join(entries) <> "ET\n"
   end
 
-  # opts: :parent, :contents, :annots (optional), :no_font (Scan-Seiten
-  # ohne Text brauchen die Font-Resource nicht).
+  # opts: :parent, :contents, :annots (optional), :no_font (scan pages
+  # need no font resource).
   defp page(opts) do
     parent = Keyword.fetch!(opts, :parent)
     contents = Keyword.fetch!(opts, :contents)
@@ -155,9 +145,7 @@ defmodule KomkiConnectorDocuments.TestPDF do
       "/Resources #{resources} /Contents #{contents}#{annots} >>"
   end
 
-  # /F: 4 = Print-Flag (sichtbar), 6 = Hidden+Print — versteckte
-  # Markierungen bleiben dem Viewer verborgen und dem Connector auch.
-  # /C [1 1 0] = typische Highlight-Farbe gelb.
+  # /F: 4 = print (visible), 6 = hidden + print. /C [1 1 0] = yellow.
   defp annot({left, bottom, right, top}, contents, flags) do
     "<< /Type /Annot /Subtype /Highlight /Rect [#{left} #{bottom} #{right} #{top}] " <>
       "/Contents (#{contents}) /C [1 1 0] /F #{flags} >>"
@@ -166,30 +154,28 @@ defmodule KomkiConnectorDocuments.TestPDF do
   defp assemble(objects) do
     header = "%PDF-1.4\n"
 
-    {body, offsets} =
+    {chunks, offsets} =
       objects
       |> Enum.with_index(1)
-      |> Enum.reduce({[], []}, fn {content, number}, {chunks, offsets} ->
-        offset = chunks |> iodata_size() |> Kernel.+(byte_size(header))
+      |> Enum.map_reduce(byte_size(header), fn {content, number}, offset ->
         chunk = object_chunk(number, content)
-        {[chunks, chunk], [{number, offset} | offsets]}
+        {{chunk, offset}, offset + byte_size(chunk)}
       end)
+      |> then(fn {pairs, _end} -> Enum.unzip(pairs) end)
 
-    body = :erlang.iolist_to_binary(body)
-    xref_offset = byte_size(body) + byte_size(header)
+    body = Enum.join(chunks)
     count = length(objects)
 
     xref_entries =
-      for number <- 1..count//1 do
-        offset = offsets |> List.keyfind(number, 0) |> elem(1)
+      Enum.map(offsets, fn offset ->
         String.pad_leading(Integer.to_string(offset), 10, "0") <> " 00000 n \n"
-      end
+      end)
 
     header <>
       body <>
       "xref\n0 #{count + 1}\n0000000000 65535 f \n" <>
       Enum.join(xref_entries) <>
-      "trailer\n<< /Size #{count + 1} /Root 1 0 R >>\nstartxref\n#{xref_offset}\n%%EOF\n"
+      "trailer\n<< /Size #{count + 1} /Root 1 0 R >>\nstartxref\n#{byte_size(header) + byte_size(body)}\n%%EOF\n"
   end
 
   defp object_chunk(number, {:stream, data}) do
@@ -199,6 +185,4 @@ defmodule KomkiConnectorDocuments.TestPDF do
   defp object_chunk(number, content) do
     "#{number} 0 obj\n#{content}\nendobj\n"
   end
-
-  defp iodata_size(chunks), do: :erlang.iolist_size(chunks)
 end

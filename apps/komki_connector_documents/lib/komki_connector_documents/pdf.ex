@@ -1,59 +1,49 @@
 defmodule KomkiConnectorDocuments.Pdf do
   @moduledoc """
-  Liest ein PDF als Text fuer `admit_document` (Ticket #290): je Seite ein
-  Seitenanker `[Seite N]` mit dem Seitentext, danach die Highlights der
-  nutzenden Person, je mit Kommentar und markiertem Text.
+  Renders a PDF as text for `admit_document` (ticket #290): each page as a
+  page anchor `[Seite N]` followed by its text, then the highlights of the
+  user, each with its comment and the marked text.
 
-  ## Lizenz und Herkunft des NIF
+  ## License and origin of the NIF
 
-  Grundlage ist `ex_pdfium` 0.6.0 (MIT): ein NIF ueber die Rust-Kiste
-  `pdfium-render`, der das pdfium des Chromium-Projekts (BSD-3-Clause,
-  Google) anbindet. Der vorkompilierte NIF kommt per `rustler_precompiled`
-  aus den GitHub-Releases des ex_pdfium-Projekts (je Plattform genau ein
-  Artefakt, NIF-ABI 2.15 fuer OTP 27/28/29+, gegen die Release-Checksummen
-  der Paketquelle verifiziert); das gebuendelte `libpdfium` baut das
-  Projekt aus bblanchon/pdfium-binaries ein. Keine Rust-Toolchain, kein
-  pdfium-Bau, kein OCR (ob eines gebraucht wird, klaert #289).
+  Built on `ex_pdfium` 0.6.0 (MIT), a NIF over the Rust crate
+  `pdfium-render` that binds Chromium's pdfium (BSD-3-Clause, Google).
+  `rustler_precompiled` fetches the precompiled NIF from the GitHub
+  releases of the ex_pdfium project (one artifact per platform, NIF ABI
+  2.15 for OTP 27/28/29+, verified against the release checksums of the
+  package); the bundled `libpdfium` comes from bblanchon/pdfium-binaries.
+  No Rust toolchain, no pdfium build, no OCR (whether OCR is needed is
+  ticket #289).
 
-  ## Grenzen
+  ## Limits
 
-  Ein PDF ohne Textebene (etwa ein Scan) ist ein klarer Fehler
-  (`upstream-error`), kein leerer Text. Den markierten Text eines
-  Highlights liefert der Schnitt der Zeichenboxen mit dem Rechteck der
-  Annotation (Probe #278): ex_pdfium liest die QuadPoints nicht,
-  mehrzeilige Highlights sind darum nur ungefaehr — gelesen wird von
-  oben nach unten, Zeilen mit Leerzeichen verbunden. Nur
-  /Subtype /Highlight zaehlt als Highlight, versteckte Markierungen
-  (/F-Hidden-Flag) bleiben aussen vor; Unterstreichungen und Notizen
-  sind unberuecksichtigt.
+  A PDF without a text layer (e.g. a scan) is an error (`upstream-error`),
+  not empty text. The marked text of a highlight is the intersection of
+  the character boxes with the annotation rectangle (probe #278):
+  ex_pdfium does not expose QuadPoints, so multi-line highlights are
+  approximate, read top to bottom with lines joined by a space. Only
+  visible `/Subtype /Highlight` annotations count; hidden ones (/F hidden
+  flag), underlines and notes are ignored.
 
-  Der Seitenindex des NIF ist 16 Bit: Dokumente ab 65 535 Seiten sind
-  nicht zuverlaessig zaehlbar und werden abgelehnt.
+  The NIF's page index is 16 bit, so documents with 65 535 pages or more
+  cannot be counted reliably and are rejected.
   """
 
-  # Frame-Grenze des Connector-Protokolls (Sidecar.Frame.max_bytes/0):
-  # groesserer extrahierter Text ist ein zu grosses Dokument, kein Fehler
-  # erst beim Versand. Der Seitenlauf stoppt frueh, sobald die Summe der
-  # Seitentexte die Grenze reisst — Anker, Verbinder und Highlights
-  # kommen nur noch dazu.
-  @max_bytes 1_048_576
+  # Larger extracted text would not fit into a protocol frame anyway; page
+  # extraction stops as soon as the page texts alone exceed it.
+  @max_bytes Sidecar.Frame.max_bytes()
 
-  # Luecken zwischen Zeichenboxen: pdfium synthetisiert Leerzeichen ohne
-  # eigene Box; ab diesem Anteil der Schriftgroesse zaehlt eine Luecke
-  # als Wortgrenze.
+  # pdfium synthesizes spaces without a box: a gap of this share of the
+  # font size counts as a word boundary.
   @word_gap_factor 0.2
 
-  # 16-Bit-Seitenindex des NIF (pdfium-render): ab hier zaehlt page_count
-  # modulo 65 536 und ist unzuverlaessig (Doku von ex_pdfium.page_count).
+  # From here on the NIF's page_count wraps modulo 65 536.
   @page_limit 65_535
 
-  @type highlight :: %{page: pos_integer(), text: String.t(), comment: String.t()}
-
   @doc """
-  Liest das PDF unter `path` und rendert es als Text mit Seitenankern und
-  Highlights. Erfolg: `{:ok, content}`. Fehler: `{:error, code, detail}`
-  mit einem Code aus der geschlossenen Menge des Frame-Protokolls; der
-  deutsche `detail` geht nur ins Connector-Log (CONTRACT.md §3).
+  Renders the PDF at `path` as text with page anchors and highlights.
+  Errors carry a code from the closed set of the frame protocol; the German
+  `detail` only goes to the connector log (CONTRACT.md §3).
   """
   @spec render(Path.t()) :: {:ok, String.t()} | {:error, String.t(), String.t()}
   def render(path) do
@@ -61,22 +51,16 @@ defmodule KomkiConnectorDocuments.Pdf do
       try do
         content(doc)
       after
-        # Deterministisch schliessen — auch im Fehlerfall; sonst haelt
-        # erst die GC das geparste Dokument frei (ex_pdfium-Vertrag:
-        # nicht auf die GC verlassen).
+        # ex_pdfium asks callers not to rely on GC to free documents.
         _ = ExPdfium.close(doc)
       end
     end
   rescue
-    # Z. B. im Escript-Kontext: der NIF laesst sich aus dem Archiv nicht
-    # per dlopen laden. Klarer Fehler statt Crash der Verbindung — die
-    # Programmform fuer NIF-Connectoren entscheidet #288. Klasse und
-    # Meldung: Der detail steht nur im lokalen Connector-Log, und ohne
-    # Meldung bleibt die Ursache undiagnostizierbar.
+    # E.g. in an escript, where the NIF cannot be dlopen'ed from the
+    # archive (#288). The detail only reaches the local connector log.
     exception ->
       {:error, "internal",
-       "PDF-Lesung fehlgeschlagen: " <>
-         to_string(exception.__struct__) <> " " <> Exception.message(exception)}
+       "PDF-Lesung fehlgeschlagen: #{inspect(exception.__struct__)} #{Exception.message(exception)}"}
   end
 
   defp open(path) do
@@ -97,7 +81,7 @@ defmodule KomkiConnectorDocuments.Pdf do
         {:error, "not-found", "Dokument nicht gefunden"}
 
       {:error, reason} ->
-        {:error, "internal", "PDF-Oeffnung fehlgeschlagen: " <> Kernel.inspect(reason)}
+        {:error, "internal", "PDF-Oeffnung fehlgeschlagen: #{inspect(reason)}"}
     end
   end
 
@@ -106,15 +90,12 @@ defmodule KomkiConnectorDocuments.Pdf do
          {:ok, pages} <- read_pages(doc, count),
          :ok <- require_text(pages),
          {:ok, highlights} <- read_highlights(doc, count) do
-      case assemble(pages, highlights) do
-        content when byte_size(content) > @max_bytes ->
-          {:error, "too-large", "extrahierter Text groesser als 1 MiB"}
-
-        content ->
-          {:ok, content}
-      end
+      content = assemble(pages, highlights)
+      if byte_size(content) > @max_bytes, do: too_large(), else: {:ok, content}
     end
   end
+
+  defp too_large, do: {:error, "too-large", "extrahierter Text groesser als 1 MiB"}
 
   defp page_count(doc) do
     case ExPdfium.page_count(doc) do
@@ -122,151 +103,113 @@ defmodule KomkiConnectorDocuments.Pdf do
         {:error, "upstream-error", "PDF ohne Seiten"}
 
       {:ok, count} when count >= @page_limit ->
-        # Entweder wirklich so gross oder schon umgebrochen gezaehlt —
-        # beides ist nicht mehr zuverlaessig lesbar, und der Text einer
-        # solchen Seitezahl ueberschritte die Frame-Grenze ohnehin.
         {:error, "too-large", "PDF mit #{count} oder mehr Seiten (Lesegrenze 65 535)"}
 
       {:ok, count} ->
         {:ok, count}
 
       {:error, reason} ->
-        {:error, "internal", "Seitenzahl nicht lesbar: " <> Kernel.inspect(reason)}
+        {:error, "internal", "Seitenzahl nicht lesbar: #{inspect(reason)}"}
     end
   end
 
-  # [{Seitenzahl 1-basiert, Text}] — leere Seiten bleiben leer, der
-  # Anker nennt sie trotzdem. pdfium trennt Zeilen mit \r\n; auch einzelne
-  # \r werden zu \n, der Text bekommt einheitlich \n.
+  # [{page number, text}]; empty pages keep their anchor. Line breaks are
+  # normalized to \n (pdfium emits \r\n and occasionally a lone \r).
   defp read_pages(doc, count) do
-    case reduce_pages(doc, count) do
-      {:ok, pages} -> {:ok, pages}
-      {:error, :too_large} -> {:error, "too-large", "extrahierter Text groesser als 1 MiB"}
-      {:error, reason} -> {:error, "internal", "Seite nicht lesbar: " <> Kernel.inspect(reason)}
-    end
-  end
-
-  defp reduce_pages(doc, count) do
     0..(count - 1)//1
-    |> Enum.reduce_while({:ok, [], 0}, fn index, {:ok, acc, bytes} ->
-      page_text(doc, index, acc, bytes)
-    end)
+    |> Enum.reduce_while({[], 0}, &add_page(doc, &1, &2))
     |> case do
-      {:ok, pages, _bytes} -> {:ok, Enum.reverse(pages)}
-      {:error, _reason} = error -> error
+      {pages, _bytes} -> {:ok, Enum.reverse(pages)}
+      error -> error
     end
   end
 
-  # Eine Seite lesen und auf die Summe anwenden: Ueberschreitet der
-  # kumulierte Seitentext die Frame-Grenze, stoppt der Lauf frueh —
-  # Anker, Verbinder und Highlights kommen nur noch dazu.
-  defp page_text(doc, index, acc, bytes) do
+  # Stops early once the page texts alone exceed the frame limit.
+  defp add_page(doc, index, {pages, bytes}) do
     case ExPdfium.extract_text(doc, index) do
       {:ok, text} ->
         text = text |> String.replace(["\r\n", "\r"], "\n") |> String.trim()
-        total = bytes + byte_size(text)
+        bytes = bytes + byte_size(text)
 
-        if total > @max_bytes,
-          do: {:halt, {:error, :too_large}},
-          else: {:cont, {:ok, [{index + 1, text} | acc], total}}
+        if bytes > @max_bytes,
+          do: {:halt, too_large()},
+          else: {:cont, {[{index + 1, text} | pages], bytes}}
 
       {:error, reason} ->
-        {:halt, {:error, reason}}
+        {:halt, {:error, "internal", "Seite nicht lesbar: #{inspect(reason)}"}}
     end
   end
 
-  # Ein PDF, aus dem sich ueberhaupt kein Text ziehen laesst, ist ein
-  # Scan ohne Textebene: klarer Fehler statt leeren Texts (Ticket #290,
-  # kein OCR bis #289).
+  # No text at all means a scan without a text layer (no OCR until #289).
   defp require_text(pages) do
-    if Enum.any?(pages, fn {_no, text} -> text != "" end) do
-      :ok
-    else
-      {:error, "upstream-error", "PDF ohne Textebene (Scan ohne OCR, Ticket #289)"}
-    end
+    if Enum.any?(pages, fn {_page, text} -> text != "" end),
+      do: :ok,
+      else: {:error, "upstream-error", "PDF ohne Textebene (Scan ohne OCR, Ticket #289)"}
   end
 
-  # Highlights je Seite; innerhalb der Seite von oben nach unten, dann
-  # von links nach rechts (Rechteck-Enden, nicht Baseline: das Rechteck
-  # ist das Sortierkriterium, das pdfium liefert). Ein Fehler beim Lesen
-  # der Annotationen oder Zeichen ist wie bei read_pages fatal — eine
-  # still unterschlagene Markierung waere von einer markierungsfreien
-  # Seite nicht unterscheidbar. Die Zeichen liest jede Seite nur einmal,
-  # egal wie viele Markierungen sie traegt.
+  # Read errors are fatal: a silently dropped highlight would look like a
+  # page without highlights.
   defp read_highlights(doc, count) do
-    case reduce_highlights(doc, count) do
-      {:ok, highlights} ->
-        {:ok, sort_highlights(highlights)}
-
-      {:error, reason} ->
-        {:error, "internal", "Highlights nicht lesbar: " <> Kernel.inspect(reason)}
-    end
-  end
-
-  defp reduce_highlights(doc, count) do
-    Enum.reduce_while(0..(count - 1)//1, {:ok, []}, fn index, {:ok, acc} ->
+    0..(count - 1)//1
+    |> Enum.reduce_while([], fn index, acc ->
       case page_highlights(doc, index) do
-        {:ok, highlights} -> {:cont, {:ok, acc ++ highlights}}
-        {:error, reason} -> {:halt, {:error, reason}}
+        {:ok, highlights} ->
+          {:cont, [highlights | acc]}
+
+        {:error, reason} ->
+          {:halt, {:error, "internal", "Highlights nicht lesbar: #{inspect(reason)}"}}
       end
     end)
-  end
-
-  # Annotationen und Zeichen einer Seite; ein Fehler bei einem der
-  # beiden Aufrufe ist fatal, eine still fehlende Markierung waere von
-  # einer markierungsfreien Seite nicht unterscheidbar.
-  defp page_highlights(doc, index) do
-    case ExPdfium.annotations(doc, index) do
-      {:ok, annotations} -> marked_highlights(doc, index, annotations)
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  # Nur sichtbare Highlights: Das Hidden-Flag (/F 2) nennt der Viewer,
-  # wenn die nutzende Person eine Markierung versteckt hat — sie nicht
-  # in den Agentenkontext zu holen, ist der Sinn der Sichtbarkeit.
-  # Die Zeichen liest die Seite nur einmal, egal wie viele es sind.
-  defp marked_highlights(doc, index, annotations) do
-    annotations
-    |> Enum.filter(&(&1.type == :highlight and not &1.hidden))
     |> case do
-      [] ->
-        {:ok, []}
-
-      visible ->
-        case ExPdfium.chars(doc, index) do
-          {:ok, chars} -> {:ok, Enum.map(visible, &page_highlight(index, &1, chars))}
-          {:error, reason} -> {:error, reason}
-        end
+      {:error, _code, _detail} = error -> error
+      per_page -> {:ok, per_page |> Enum.reverse() |> Enum.concat()}
     end
   end
 
-  defp page_highlight(index, annotation, chars) do
+  # Highlights the user hid in the viewer stay out of the agent context.
+  # Characters are only read for pages that carry a visible highlight.
+  defp page_highlights(doc, index) do
+    with {:ok, annotations} <- ExPdfium.annotations(doc, index) do
+      annotations
+      |> Enum.filter(&(&1.type == :highlight and not &1.hidden))
+      |> with_marked_text(doc, index)
+    end
+  end
+
+  defp with_marked_text([], _doc, _index), do: {:ok, []}
+
+  defp with_marked_text(visible, doc, index) do
+    with {:ok, chars} <- ExPdfium.chars(doc, index) do
+      {:ok,
+       visible
+       |> Enum.sort_by(&rect_position(&1.bounds))
+       |> Enum.map(&highlight(index + 1, &1, chars))}
+    end
+  end
+
+  # Top to bottom (PDF y grows upwards), then left to right.
+  defp rect_position(nil), do: {0, 0}
+  defp rect_position(rect), do: {-rect.top, rect.left}
+
+  defp highlight(page, annotation, chars) do
     %{
-      page: index + 1,
+      page: page,
       text: marked_text(chars, annotation.bounds),
-      comment: clean(annotation.contents),
-      top: annotation.bounds && annotation.bounds.top,
-      left: annotation.bounds && annotation.bounds.left
+      comment: clean(annotation.contents)
     }
   end
 
-  defp sort_highlights(highlights) do
-    Enum.sort_by(highlights, &{&1.page, -(&1.top || 0), &1.left || 0})
-  end
-
-  # Der markierte Text: Schnitt der Zeichenboxen mit dem Rechteck der
-  # Annotation, gelesen oben nach unten, Zeilen mit Leerzeichen verbunden
-  # (Probe #278 — QuadPoints liest ex_pdfium nicht).
   defp marked_text(_chars, nil), do: ""
 
   defp marked_text(chars, rect) do
     chars
-    # Weißraum-Zeichen (pdfium meldet Zeilenumbrueche als eigene
-    # Zeichen) faellen weg; Luecken und Zeilenwechsel setzt join_chars.
-    |> Enum.reject(fn char -> char.char =~ ~r/\s/ end)
-    |> Enum.filter(fn char -> char.bounds && overlap?(char.bounds, rect) end)
-    |> sort_reading_order()
+    # pdfium reports line breaks as characters; join_chars re-inserts gaps.
+    |> Enum.reject(&(&1.char =~ ~r/\s/))
+    |> Enum.filter(&(&1.bounds && overlap?(&1.bounds, rect)))
+    |> Enum.sort_by(fn char ->
+      %{x: x, y: y} = pen_position(char)
+      {-y, x}
+    end)
     |> join_chars()
   end
 
@@ -275,87 +218,59 @@ defmodule KomkiConnectorDocuments.Pdf do
       box.bottom < rect.top and box.top > rect.bottom
   end
 
-  # Lesereihenfolge: Baseline von oben nach unten (PDF-y wachst nach
-  # oben), innerhalb der Zeile nach x. Die Baseline (origin) ist der
-  # stabile Anker; ohne Origin dient die Boxmitte.
-  defp sort_reading_order(chars) do
-    Enum.sort_by(chars, fn char ->
-      %{x: x, y: y} = pen_position(char)
-      {-y, x}
-    end)
-  end
-
+  # The baseline origin is the stable anchor; synthesized characters may
+  # lack it, then the box center stands in.
   defp pen_position(%{origin: %{x: x, y: y}}), do: %{x: x, y: y}
 
   defp pen_position(%{bounds: %{left: left, right: right, bottom: bottom, top: top}}),
     do: %{x: (left + right) / 2, y: (bottom + top) / 2}
 
-  defp pen_position(_char), do: %{x: 0, y: 0}
+  defp join_chars([]), do: ""
 
-  # Zeichen zu Text: eine Luecke ab einem Fuenftel der Schriftgroesse
-  # wird zum Leerzeichen (pdfium synthetisiert Leerzeichen ohne Box),
-  # ein Zeilenwechsel ebenfalls.
-  defp join_chars(chars), do: join_chars(chars, [], nil)
+  defp join_chars([first | _rest] = chars) do
+    rest =
+      chars
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.map(fn [previous, char] -> [separator(previous, char), char.char] end)
 
-  defp join_chars([], acc, _previous) do
-    acc |> Enum.reverse() |> :erlang.iolist_to_binary()
+    IO.iodata_to_binary([first.char | rest])
   end
 
-  defp join_chars([char | rest], acc, previous) do
-    join_chars(rest, [char.char, separate(previous, char) | acc], char)
+  # A space at word gaps and line changes, nothing inside a word.
+  defp separator(previous, char) do
+    if same_line?(previous, char) and not word_gap?(previous, char), do: "", else: " "
   end
 
-  defp separate(nil, _char), do: ""
-
-  defp separate(previous, char) do
-    cond do
-      same_line?(previous, char) and word_gap?(previous, char) -> " "
-      same_line?(previous, char) -> ""
-      true -> " "
-    end
-  end
-
-  defp same_line?(previous, char) do
-    %{y: previous_y} = pen_position(previous)
-    %{y: current_y} = pen_position(char)
-    abs(current_y - previous_y) < 1
-  end
+  defp same_line?(previous, char), do: abs(pen_position(char).y - pen_position(previous).y) < 1
 
   defp word_gap?(previous, char) do
     char.bounds.left - previous.bounds.right > previous.font_size * @word_gap_factor
   end
 
-  # ------------------------------------------------------------------
-  # Darstellung
-  # ------------------------------------------------------------------
-
   defp assemble(pages, highlights) do
-    text = Enum.map_join(pages, "\n\n", fn {no, text} -> "[Seite #{no}]\n" <> text end)
+    text = Enum.map_join(pages, "\n\n", fn {page, text} -> "[Seite #{page}]\n" <> text end)
 
     case highlights do
       [] ->
         text
 
-      _entries ->
+      _ ->
         text <> "\n\n---\n\nHighlights:\n\n" <> Enum.map_join(highlights, "\n", &highlight_line/1)
     end
   end
 
   defp highlight_line(highlight) do
-    "- Seite #{highlight.page}: " <> marked_part(highlight) <> comment_part(highlight)
+    "- Seite #{highlight.page}: " <>
+      marked_part(highlight.text) <> comment_part(highlight.comment)
   end
 
-  defp marked_part(%{text: text}) when text != "", do: "„#{text}“"
+  defp marked_part(""), do: "(keinen markierten Text erkannt)"
+  defp marked_part(text), do: "„#{text}“"
 
-  defp marked_part(_highlight), do: "(keinen markierten Text erkannt)"
+  defp comment_part(""), do: ""
+  defp comment_part(comment), do: " — Kommentar: " <> comment
 
-  defp comment_part(%{comment: ""}), do: ""
-
-  defp comment_part(%{comment: comment}), do: " — Kommentar: " <> comment
-
-  # Kommentare koennen mehrzeilig sein; fuer eine Zeile je Highlight wird
-  # Weißraum zu einem Leerzeichen zusammengezogen.
+  # Comments may span lines; one line per highlight collapses whitespace.
   defp clean(nil), do: ""
-
   defp clean(text), do: text |> String.split() |> Enum.join(" ")
 end

@@ -71,7 +71,7 @@ defmodule KomkiCli.SessionIntakeTest do
   end
 
   # ========================================================================
-  # PDF-Aufnahme (Ticket #290)
+  # PDF intake (#290)
   # ========================================================================
 
   test "PDF-Quelle: permit landet als <objekt>.pdf, Header nennt die document_id", %{
@@ -101,12 +101,9 @@ defmodule KomkiCli.SessionIntakeTest do
     assert File.read!(entry.destination) == pdf_bytes()
   end
 
-  # .md und .pdf derselben Objekt-ID sind zwei Fassungen desselben
-  # Raumdokuments: Der Connector liest .md zuerst, eine zweite Form bliebe
-  # ungelesen und widerspraeche der Version im Raum (#290, Code-Review).
-  # Der Store erlaubt beide Fassungen (v1 md, v2 pdf, R.2.1) — die
-  # Aufnahme muss sie verweigern.
-  test "zwei Fassungen einer Objekt-ID (md v1 + pdf v2) -> dieselbe Objekt-ID, Fehler", %{
+  # The store allows two versions of one object ID (R.2.1); as .md and .pdf
+  # they would be one room document in two formats, so intake refuses.
+  test "eine Objekt-ID als md (v1) und pdf (v2) -> Fehler", %{
     base: base,
     db: db
   } do
@@ -128,8 +125,7 @@ defmodule KomkiCli.SessionIntakeTest do
     refute File.exists?(Path.join([base, "mediator", "documents", "vorlage.pdf"]))
   end
 
-  # Cross-Session: Ein frueherer Lauf hat vorlage.md hinterlassen; die
-  # spaetere PDF-Fassung derselben Objekt-ID bliebe ungelesen.
+  # Across sessions: an earlier run left vorlage-alt.md behind.
   test "PDF-Fassung einer vorhandenen Markdown-Fassung -> Fehler", %{base: base, db: db} do
     documents = Path.join([base, "mediator", "documents"])
     File.mkdir_p!(documents)
@@ -795,10 +791,8 @@ defmodule KomkiCli.SessionIntakeTest do
 
   defp seed_term, do: @seed_path |> File.read!() |> JSON.decode!()
 
-  # Minimal-PDF: die Aufnahme prueft nur den %PDF-Header (#290) — aber die
-  # Bytes sind ein echtes, von pdfium oeffnbares PDF (ohne xref; pdfium
-  # repariert), damit der Fixture keine Datei enshrined, die der
-  # Dokument-Connector nur ablehnen koennte (Code-Review zu #290).
+  # Intake only checks the %PDF- header, but these bytes are a real PDF
+  # that pdfium opens (it repairs the missing xref).
   defp pdf_bytes,
     do: """
     %PDF-1.4
@@ -832,8 +826,7 @@ defmodule KomkiCli.SessionIntakeTest do
   defp register_classified!(db, object_id, path, labels),
     do: register_classified!(db, object_id, "v1", path, labels)
 
-  # Objekt-Fassungen koennen Versionen tragen (R.2.1): gleiche Objekt-ID,
-  # andere Version, anderer Inhalt.
+  # Same object ID, another version, other content (R.2.1).
   defp register_classified!(db, object_id, version, path, labels) do
     register_with_content_ref!(db, object_id, version, content_sha(path), labels)
   end
