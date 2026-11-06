@@ -319,8 +319,10 @@ defmodule KomkiConnectorRis.RisGartenstadt do
   defp titel(index) do
     thema = Daten.dreher(Daten.themen(), index)
     strasse = Daten.dreher(Daten.strassen(), index)
-    flur = Daten.dreher(Daten.flurstuecke(), index)
-    hnr = Daten.dreher(Daten.hausnummern(), index)
+    # Flurstueck und Hausnummer laufen ueber div statt rem: Die Bauvorlage
+    # trifft nur Indizes mit rem(index, 6) == 2, sonst kaeme immer dasselbe Paar.
+    flur = Daten.dreher(Daten.flurstuecke(), div(index, 6))
+    hnr = Daten.dreher(Daten.hausnummern(), div(index, 6))
     vorname = Daten.dreher(Daten.vornamen(), index)
     nachname = Daten.dreher(Daten.nachnamen(), index)
 
@@ -345,7 +347,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
           @beschluss
 
       3 ->
-        "Neufassung der Ortsregel zur " <> thema <> @beschluss
+        "Neufassung der Ortsregel: " <> thema <> @beschluss
 
       4 ->
         "Mitteilungen der Gartenstadt-Verwaltung (zur Kenntnis)"
@@ -726,7 +728,8 @@ defmodule KomkiConnectorRis.RisGartenstadt do
       "locationprintname" => "Rathaus Gartenstadt, Rathausgarten 1",
       "locationshortname" => "Rathaus",
       "locationstreet" => "Rathausgarten",
-      "locationzip" => "87654",
+      # Neutrale Postleitzahl ohne Bezug zu einer echten Region.
+      "locationzip" => "00000",
       "meetingdate" => s.datum,
       "name" => s.name,
       "nonepublicendtime" => uhr.("T21:00:00"),
