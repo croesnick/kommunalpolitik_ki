@@ -8,16 +8,17 @@
  * Reads the -lv 4 server log of every run in <root>/schedule.json and writes
  * <root>/probe.json and <root>/PROBE.md: Flash Attention lines per context
  * (main model, drafter), context checkpoints created and restored, and the
- * draft acceptance of requests with and without a restored checkpoint.
+ * draft acceptance of requests with and without a restored checkpoint, plus
+ * per request in log order (so the request after a restore is visible too).
  * Debug logging costs time, so the probe reports no speed values.
  */
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { fmtDraft } from "./grade-ab.mjs";
 import { llamaDebugSummary } from "./measure.mjs";
 
-const fmtDraft = (d) =>
-  d.rate === null ? "–" : `${d.rate.toFixed(3).replace(".", ",")} (${d.accepted} von ${d.generated}, ${d.requests} Requests)`;
+const fmtPool = (d) => (d.rate === null ? "–" : `${fmtDraft(d)}, ${d.requests} Requests`);
 
 async function main() {
   const rootIndex = process.argv.indexOf("--root");
@@ -40,9 +41,16 @@ async function main() {
     "|---|---|---|---|---|---|---|---|---|",
     ...runs.map(
       (r) =>
-        `| ${r.dir} | ${r.arm} | ${r.seed} | ${fa(r, "main")} | ${fa(r, "draft")} | ${r.checkpointsCreated} | ${r.checkpointsRestored} | ${fmtDraft(r.draft.withRestore)} | ${fmtDraft(r.draft.withoutRestore)} |`,
+        `| ${r.dir} | ${r.arm} | ${r.seed} | ${fa(r, "main")} | ${fa(r, "draft")} | ${r.checkpointsCreated} | ${r.checkpointsRestored} | ${fmtPool(r.draft.withRestore)} | ${fmtPool(r.draft.withoutRestore)} |`,
     ),
   ];
+  for (const run of runs) {
+    lines.push("", `## ${run.dir} (${run.arm})`, "", "| Request | Task | Restore | draft acceptance |", "|---|---|---|---|");
+    run.requests.forEach((r, i) => {
+      const rate = r.generated ? r.accepted / r.generated : null;
+      lines.push(`| ${i + 1} | ${r.task} | ${r.restored ? "ja" : "–"} | ${fmtDraft({ ...r, rate })} |`);
+    });
+  }
   await writeFile(path.join(root, "PROBE.md"), lines.join("\n") + "\n");
   console.log(`Sonde: ${path.join(root, "PROBE.md")}`);
 }

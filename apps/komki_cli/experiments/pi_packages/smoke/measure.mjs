@@ -185,10 +185,20 @@ export async function llamaLogOffset(llama) {
   }
 }
 
+// #372: speculative decoding (MTP drafter) logs its acceptance per task.
+const DRAFT_ACCEPTANCE = /task\s+(\d+)\s*\|\s*draft acceptance = [\d.]+ \(\s*(\d+) accepted \/\s*(\d+) generated\)/;
+
+/** Pools draft acceptance over [{ accepted, generated }]; missing values count as 0. */
+export function poolDraft(list) {
+  const accepted = list.reduce((s, d) => s + (d?.accepted ?? 0), 0);
+  const generated = list.reduce((s, d) => s + (d?.generated ?? 0), 0);
+  return { accepted, generated, rate: generated ? accepted / generated : null };
+}
+
 /**
- * Liest das Log-Segment [startOffset, endOffset) und zerlegt es in Requests:
- * je `task N` ein Paar aus prompt-eval und eval-Zeile, mit MTP-Drafter dazu
- * die draft acceptance.
+ * Reads the log segment [startOffset, endOffset) and splits it into
+ * requests: per `task N` a prompt-eval and an eval line, with an MTP
+ * drafter also the draft acceptance.
  * [{ task, promptTokens, promptMs, evalTokens, evalMs, draftAccepted,
  *    draftGenerated, tokensPerSecond }]
  */
@@ -220,11 +230,10 @@ export async function llamaLogSegment(llama, startOffset, endOffset) {
     }
     const prompt = /prompt eval time =\s*([\d.]+) ms \/(\s*\d+) tokens/.exec(line);
     const evalm = /(?<!prompt )eval time =\s*([\d.]+) ms \/(\s*\d+) tokens/.exec(line);
-    // #372: speculative decoding (MTP drafter) logs its acceptance per task.
-    const draft = /draft acceptance = [\d.]+ \(\s*(\d+) accepted \/\s*(\d+) generated\)/.exec(line);
+    const draft = DRAFT_ACCEPTANCE.exec(match[0]);
     if (draft) {
-      entry.draftAccepted = Number(draft[1]);
-      entry.draftGenerated = Number(draft[2]);
+      entry.draftAccepted = Number(draft[2]);
+      entry.draftGenerated = Number(draft[3]);
     } else if (prompt) {
       entry.promptMs = Number(prompt[1]);
       entry.promptTokens = Number(prompt[2]);
@@ -245,12 +254,13 @@ export async function llamaLogSegment(llama, startOffset, endOffset) {
 /**
  * Summary of a llama-server log written with -lv 4 (#372 debug probe).
  * Contexts in load order (main model, then MTP drafter) with their Flash
- * Attention lines; context checkpoints created and restored; draft
- * acceptance pooled over requests with and without a restored checkpoint.
+ * Attention lines (labelled main/draft only if exactly two contexts load);
+ * context checkpoints created and restored; draft acceptance per request in
+ * log order and pooled over requests with and without a restored checkpoint.
  */
 export function llamaDebugSummary(text) {
   const contexts = [];
-  const draftByTask = new Map();
+  const requests = [];
   const restoredTasks = new Set();
   let created = 0;
   let restored = 0;
@@ -264,20 +274,20 @@ export function llamaDebugSummary(text) {
       restored += 1;
       restoredTasks.add(restore[1]);
     }
-    const draft = /task (\d+) \| draft acceptance = [\d.]+ \(\s*(\d+) accepted \/\s*(\d+) generated\)/.exec(line);
-    if (draft) draftByTask.set(draft[1], { accepted: Number(draft[2]), generated: Number(draft[3]) });
+    const draft = DRAFT_ACCEPTANCE.exec(line);
+    if (draft) requests.push({ task: draft[1], accepted: Number(draft[2]), generated: Number(draft[3]) });
   }
+  for (const request of requests) request.restored = restoredTasks.has(request.task);
   const pool = (withRestore) => {
-    const list = [...draftByTask].filter(([task]) => restoredTasks.has(task) === withRestore).map(([, d]) => d);
-    const accepted = list.reduce((s, d) => s + d.accepted, 0);
-    const generated = list.reduce((s, d) => s + d.generated, 0);
-    return { requests: list.length, accepted, generated, rate: generated ? accepted / generated : null };
+    const list = requests.filter((r) => r.restored === withRestore);
+    return { requests: list.length, ...poolDraft(list) };
   };
+  const roles = contexts.length === 2 ? ["main", "draft"] : [];
   return {
-    contexts: contexts.map((fa, i) => ({ role: ["main", "draft"][i] ?? `context ${i}`, fa })),
+    contexts: contexts.map((fa, i) => ({ role: roles[i] ?? `context ${i}`, fa })),
     checkpointsCreated: created,
     checkpointsRestored: restored,
-    restoredTasks: [...restoredTasks],
+    requests,
     draft: { withRestore: pool(true), withoutRestore: pool(false) },
   };
 }

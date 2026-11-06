@@ -26,6 +26,7 @@ import path from "node:path";
 import { parseSessionFile } from "../lib/session.mjs";
 import { checkAnswer } from "./criteria.mjs";
 import { ENTWURF_BESCHLUSSVORLAGE, factTokens, missingFacts } from "./fixtures.mjs";
+import { poolDraft } from "./measure.mjs";
 
 // ---------------------------------------------------------------- checklists
 
@@ -307,13 +308,12 @@ async function repetitionLoops(dir) {
 
 /** Pooled MTP draft acceptance over llama-log requests (#372). */
 function draftTotals(serverRequests) {
-  const accepted = serverRequests.reduce((s, r) => s + (r.draftAccepted ?? 0), 0);
-  const generated = serverRequests.reduce((s, r) => s + (r.draftGenerated ?? 0), 0);
-  return { accepted, generated, rate: generated ? accepted / generated : null };
+  return poolDraft(serverRequests.map((r) => ({ accepted: r.draftAccepted, generated: r.draftGenerated })));
 }
 
-function sumDraft(list) {
-  return draftTotals(list.map((d) => ({ draftAccepted: d?.accepted, draftGenerated: d?.generated })));
+/** Llama-log requests with a missing timing or draft line (#372: changed log format). */
+function incompleteServerRequests(serverRequests) {
+  return serverRequests.filter((r) => [r.promptTokens, r.evalTokens, r.draftGenerated].includes(null)).length;
 }
 
 async function runMetrics(results, summary, dir) {
@@ -334,6 +334,8 @@ async function runMetrics(results, summary, dir) {
       reasoningTokens: measures.reduce((s, m) => s + (m.reasoningTokens ?? 0), 0),
       requests: requests.length,
       draft: draftTotals(taskServer),
+      incompleteServerRequests: incompleteServerRequests(taskServer),
+      serverRequestCountMismatch: measures.some((m) => m.serverRequestCountMismatch),
     };
   }
   const requests = all.flatMap((m) => m.proxyRequests ?? []);
@@ -450,9 +452,10 @@ async function report(root, { perfOnly = false, reference = "A" } = {}) {
       reasoningTokens: pick((m) => m.reasoningTokens),
       footprintMaxMiB: pick((m) => m.footprintMaxMiB),
       lengthClamped: pick((m) => m.lengthClamped),
-      draft: sumDraft(armRuns.map((r) => r.metrics.draft)),
+      draft: poolDraft(armRuns.map((r) => r.metrics.draft)),
+      draftRate: pick((m) => m.draft.rate),
       taskDraft: Object.fromEntries(
-        Object.keys(armRuns[0]?.metrics.tasks ?? {}).map((t) => [t, sumDraft(armRuns.map((r) => r.metrics.tasks[t]?.draft))]),
+        Object.keys(armRuns[0]?.metrics.tasks ?? {}).map((t) => [t, poolDraft(armRuns.map((r) => r.metrics.tasks[t]?.draft))]),
       ),
       runsWithLoop: armRuns.filter((r) => r.metrics.loops.length > 0).length,
       taskWallMs: Object.fromEntries(
@@ -524,6 +527,7 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
   row("Completion-Token", (a) => fmtSpread(a.completionTokens));
   row("davon Thinking-Token", (a) => fmtSpread(a.reasoningTokens));
   row("draft acceptance (gepoolt)", (a) => fmtDraft(a.draft));
+  row("draft acceptance je Lauf", (a) => fmtSpread(a.draftRate, 3));
   row("footprint max", (a) => fmtSpread(a.footprintMaxMiB, 0, " MiB"));
   row("längengeklemmte Requests", (a) => fmtSpread(a.lengthClamped));
   row("Tool-Calls / invalide / Reparaturen", (a) => `${a.toolCalls} / ${a.toolCallClasses ? Object.entries(a.toolCallClasses).filter(([k]) => k !== "ok" && k !== "extra-keys").reduce((x, [, v]) => x + v, 0) : 0} / ${a.repairs} (${fmt((a.repairRate ?? 0) * 100, 1)} %)`);
@@ -544,10 +548,19 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
   for (const task of Object.keys(byArm[arms[0]].taskDraft)) row(task, (a) => fmtDraft(a.taskDraft[task]));
   lines.push("");
   // #372: a metric missing in some run hints at a changed llama log format.
+  // Per task as well, so that one request without a timing or draft line
+  // shows up instead of silently adding 0 to the run totals.
   const missing = perRun.flatMap((run) =>
-    ["loadMs", "decodeTps", "prefillTps", "ttftMedianMs", "footprintMaxMiB"]
+    ["loadMs", "decodeTps", "prefillTps", "ttftMedianMs", "firstAnswerMedianMs", "footprintMaxMiB", "rssMaxMiB"]
       .filter((k) => run.metrics[k] === null)
       .concat(run.metrics.draft.generated === 0 ? ["draft"] : [])
+      .concat(
+        Object.entries(run.metrics.tasks).flatMap(([task, t]) => [
+          ...(t.requests > 0 && t.draft.generated === 0 ? [`${task} draft`] : []),
+          ...(t.incompleteServerRequests > 0 ? [`${task} ${t.incompleteServerRequests} Log-Requests unvollständig`] : []),
+          ...(t.serverRequestCountMismatch ? [`${task} Requests Log ≠ Proxy`] : []),
+        ]),
+      )
       .map((k) => `${run.dir}: ${k}`),
   );
   lines.push(`Fehlende Messwerte: ${missing.join(", ") || "keine"}`);
@@ -580,7 +593,7 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
   return lines.join("\n") + "\n";
 }
 
-function fmtDraft(d) {
+export function fmtDraft(d) {
   return d.rate === null ? "–" : `${fmt(d.rate, 3)} (${d.accepted} von ${d.generated})`;
 }
 
