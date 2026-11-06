@@ -1,6 +1,7 @@
 # Labbook: llama-server-A/B — 0.7.0-Pin gegen 0.9.0 (mit 0.8.0 als Vergleich)
 
 - **Status:** gemessen, 2026-11-06 (Ticket #372). Die Pre-Registration ist unverändert; die Ergebnisse stehen ab [Ergebnisübersicht](#ergebnisübersicht).
+- **GO:** Die nutzende Person hat am 06.11.2026 um 23:00 Uhr das GO zum Upgrade gegeben, entgegen der Empfehlung nach Regel 2. Vor dem Re-Pin wird das Homebrew-Bottle nachgemessen: [Nach dem GO](#nach-dem-go-homebrew-bottle-nachmessen).
 - **Empfehlung:** 0.7.0-Pin vorerst behalten. V9 besteht alle registrierten Gates, bringt aber außer der Ladezeit keinen belastbaren Gewinn. Herleitung und Abwägung im Abschnitt [Empfehlung](#empfehlung). Die Entscheidung trifft die nutzende Person.
 - **Vorgänger:** [Labbook: llama-server-A/B 0.7.0 gegen 0.8.0](2026-10-31-llama-server-0.8.0-ab.md) (#320: Arme V7/V8, Empfehlung „Pin behalten“), [Labbook: Modell-A/B](2026-10-31-modell-ab.md) (#285: Protokoll, Gates, Checklisten)
 - **Harness:** `apps/komki_cli/experiments/pi_packages/smoke/` (`run-ab.mjs`, `grade-ab.mjs`), erweitert um den Arm `V9` und die draft acceptance im Bericht
@@ -221,6 +222,33 @@ Für die Entscheidung der nutzenden Person zählt dazu dreierlei:
 
 Wer deshalb upgraden will, misst nach dem GO zuerst das Homebrew-Bottle `0.9.0` mit einem Arm wie V9 nach (Grenze aus #320). Erst danach folgen Re-Pin, `komki setup`, `komki doctor`, ein echter Lauf mit `komki up` und `run-smoke.mjs` sowie die Doku-Stellen aus #320. Dieses Ticket pinnt nichts um. Die Live-Instanz bleibt auf 0.7.0.
 
+## Nach dem GO: Homebrew-Bottle nachmessen
+
+Die nutzende Person hat am 06.11.2026 um 23:00 Uhr das GO zum Upgrade gegeben. Nach Entscheidungsregel 4 wird vorher das Homebrew-Bottle nachgemessen, denn es ist nicht das gemessene b12110.
+
+### Was das Bottle von V9 unterscheidet
+
+Die Formel `llama.cpp 0.9.0` baut denselben Commit `cd959bae9` wie b12110, linkt aber gegen die eigene Formel `ggml 0.29.0` statt gegen das ggml aus dem llama.cpp-Baum. Das Rechen-Backend (Metal-Kernels, CPU, BLAS) stammt also aus einem anderen Quellstand als in V9. Die Ergebnisse von V9 lassen sich deshalb nicht auf das Bottle übertragen. Abgerufen über `formulae.brew.sh/api/formula/{llama.cpp,ggml}.json` am 06.11.2026:
+
+| Bottle (`arm64_golden_gate`) | SHA-256 (Formel = Download) |
+|---|---|
+| `llama.cpp 0.9.0` (Tag `v0.9.0`, Commit `cd959bae99ff4bed22bef2604f45241c09bbb8c8`) | `a620e51b63c8ccd5594c74df5006a9ee46425d13a5a94afb8922a565a4e3d9c2` |
+| `ggml 0.29.0` (Quelle `ggml-org/ggml` `v0.29.0`) | `d1b27be65fc1a346a2c40cc21cb716d90b1cad2e219cceb8db33528ba356f6f2` |
+
+Installiert ist heute `ggml 0.27.0`; auch `whisper.cpp` und die Formel `croesnick/tap/komki` hängen davon ab. `brew upgrade llama.cpp` hebt ggml mit an.
+
+Damit das Bottle neben der Live-Instanz laufen kann, ohne sie zu berühren, werden beide Bottles in ein Seitenverzeichnis entpackt und so hergerichtet wie bei `brew install`. Die Platzhalter `@@HOMEBREW_PREFIX@@` in den Ladebefehlen zeigen danach für ggml und llama.cpp auf die Seitenkopien, für openssl@4 und libomp auf `/opt/homebrew`. Alle Mach-O-Dateien werden ad hoc neu signiert. ggml sucht seine Backends fest in `/opt/homebrew/Cellar/ggml/0.29.0/libexec` und danach im Verzeichnis der Binärdatei. Deshalb liegen die Backends neben `llama-server`. Das Skript steht unter [Reproduktion](#reproduktion). Ergebnis: `version: 0.9.0 (build 12110, commit cd959bae9)`, Geräte Metal und BLAS, SHA-256 der hergerichteten Binärdatei `1777572466923a52b335dfdc4a8879f83bf46f135c1204785a224bcd5ec7e9d3`.
+
+Preflight (`ab-372/bottle/preflight/`): V7 3,5 s, VB 7,8 s. Ein zweiter Preflight (`ab-372/bottle-preflight2/`) ergab VB 2,8 s und V7 3,3 s. Der erste Start nach dem Signieren ist also langsamer. Diesen Effekt fängt die Aufwärmrunde ab.
+
+### Pre-Registration der Nachmessung
+
+- **Arme:** V7 (Referenz, unverändert) und VB (Bottle, `ab-arms.mjs`, Port 49623). Gleiche Produktivkonfiguration, eine Variable: Binärdatei samt ggml.
+- **Protokoll:** wie der Hauptlauf. Warm-up und 3 verzahnte Messrunden, Aufgaben 1, 2, 3, 4 und 6, `--timeout-factor 6`, Seed-Basis **372 500**. Vor dem Start gelten dieselben Umgebungsprüfungen wie bei `main-2`.
+- **Gates:** H1, H2, Q und Regel 1 unverändert, VB gegen `--reference V7`. Blindbewertung der Aufgaben 1, 2 und 3 aus allen Messläufen beider Arme, abgeschlossen vor dem Lesen des Schlüssels. Dazu kommt die Liste „Fehlende Messwerte“ im Bericht.
+- **V9 wird nicht erneut gemessen.** Vergleiche zwischen VB und V9 aus `main-2` sind rein beschreibend, weil sie aus getrennten Läufen stammen.
+- **Entscheidung:** Das GO ist erteilt, Regel 2 entfällt damit. Besteht VB alle vier Gates, folgen `brew upgrade llama.cpp`, Re-Pin mit `komki setup`, `komki doctor`, ein echter Lauf mit `komki up` und `run-smoke.mjs` sowie die Doku-Stellen aus #320. Scheitert VB an einem Gate, wird nicht upgegradet; der Befund geht an die nutzende Person.
+
 ## Grenzen
 
 - n = 3 bei temp 1,0. Der Schleifenlauf nimmt V7 effektiv einen Messlauf für die Tempo-Werte. Die Mediane sind robust, die Spannen von V7 nicht.
@@ -262,6 +290,33 @@ node smoke/grade-ab.mjs report --root $R --reference V7
 P=$TMPDIR/komki-pi-experiments/ab-372/probe-lv4
 node smoke/run-ab.mjs --root $P --arms V7D,V9D --runs 0 --timeout-factor 6 --seed-base 372800
 node smoke/probe-lv4.mjs --root $P
+
+# Nach dem GO: Homebrew-Bottle 0.9.0 (VB) gegen V7, Seed-Basis 372 500
+X=$TMPDIR/komki-pi-experiments/downloads/brew-0.9.0/x
+# Bottles laden (anonymes ghcr-Token), SHA-256 gegen die Formel prüfen, entpacken
+curl -fL -H "Authorization: Bearer QQ==" -o llama.cpp.tar.gz \
+  https://ghcr.io/v2/homebrew/core/llama.cpp/blobs/sha256:a620e51b63c8ccd5594c74df5006a9ee46425d13a5a94afb8922a565a4e3d9c2
+curl -fL -H "Authorization: Bearer QQ==" -o ggml.tar.gz \
+  https://ghcr.io/v2/homebrew/core/ggml/blobs/sha256:d1b27be65fc1a346a2c40cc21cb716d90b1cad2e219cceb8db33528ba356f6f2
+mkdir -p $X && tar xzf llama.cpp.tar.gz -C $X && tar xzf ggml.tar.gz -C $X
+# Herrichten wie brew beim Installieren
+LL=$X/llama.cpp/0.9.0 GG=$X/ggml/0.29.0
+chmod -R u+w $X && cp $GG/libexec/*.so $LL/bin/
+for f in $LL/lib/*.dylib $GG/lib/*.dylib $LL/bin/*; do
+  [ -L "$f" ] && continue; file -b "$f" | grep -q Mach-O || continue
+  id=$(otool -D "$f" | tail -n +2)
+  map() { p=${1/@@HOMEBREW_PREFIX@@\/opt\/ggml\//$GG/}; p=${p/@@HOMEBREW_PREFIX@@\/opt\/llama.cpp\//$LL/}; echo ${p/@@HOMEBREW_PREFIX@@//opt/homebrew}; }
+  case $id in @@HOMEBREW_PREFIX@@*) install_name_tool -id "$(map $id)" "$f";; esac
+  for old in $(otool -L "$f" | tail -n +2 | awk '{print $1}' | grep '^@@HOMEBREW_PREFIX@@'); do
+    install_name_tool -change "$old" "$(map $old)" "$f"
+  done
+  codesign --force --sign - "$f"
+done
+B=$TMPDIR/komki-pi-experiments/ab-372/bottle
+node smoke/run-ab.mjs --root $B --arms V7,VB --preflight
+node smoke/run-ab.mjs --root $B --arms V7,VB --runs 3 --timeout-factor 6 --seed-base 372500
+node smoke/grade-ab.mjs blind --root $B     # dann blind/grades.json ausfüllen
+node smoke/grade-ab.mjs report --root $B --reference V7
 ```
 
 Node 24.22.1 über asdf (`ASDF_NODEJS_VERSION=24.22.1`), wie in #285 und #320.

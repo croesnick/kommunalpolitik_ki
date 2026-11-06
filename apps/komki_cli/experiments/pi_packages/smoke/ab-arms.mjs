@@ -135,6 +135,16 @@ ARMS.V9 = {
   bin: path.join(EXPERIMENTS_ROOT, "downloads", "b12110", "llama-b12110", "llama-server"),
   port: 49622,
 };
+// After the GO (#372): VB is the Homebrew bottle llama.cpp 0.9.0 (same commit
+// as b12110, SHA-256 a620e51b…d9c2) on its separate ggml 0.29.0 bottle
+// (SHA-256 d1b27be6…f6f2), relocated side by side like brew's pour (see the
+// labbook). Gated against V7 before the re-pin.
+ARMS.VB = {
+  ...ARMS.V7,
+  label: "Production config on llama-server 0.9.0 (Homebrew bottle, ggml 0.29.0)",
+  bin: path.join(EXPERIMENTS_ROOT, "downloads", "brew-0.9.0", "x", "llama.cpp", "0.9.0", "bin", "llama-server"),
+  port: 49623,
+};
 // Debug probe (#372, descriptive, no gate): V7 and V9 with debug logging,
 // which is the only way to see context-checkpoint restores and the FA mode
 // per context in the llama log. Evaluated by probe-lv4.mjs.

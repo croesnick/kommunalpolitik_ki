@@ -126,6 +126,8 @@ side-by-side) und läuft mit `--arms V7,V8,V9 --seed-base 372000`. Seit #372
 liest der Harness die draft acceptance des MTP-Drafters aus dem llama-Log
 (gepoolt und je Aufgabe im Bericht). Der Bericht listet außerdem Läufe, in
 denen eine Messgröße fehlt, als Hinweis auf ein geändertes Log-Format.
+Der Arm `VB` ist das Homebrew-Bottle 0.9.0 samt ggml-Bottle, hergerichtet
+neben der Live-Instanz. Herkunft und Skript stehen im Labbook zu #372.
 
 Context-Checkpoints und den FA-Modus je Kontext zeigt das llama-Log nur mit
 `-lv 4`. Dafür gibt es die Debug-Arme `V7D`/`V9D` (V7/V9 plus `-lv 4`) und
