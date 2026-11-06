@@ -1,32 +1,31 @@
-# Kassetten verschluesseln: AES-256-GCM je Kassette, Schluessel nur per
-# Touch ID aus der Secure Enclave (komki-tresor).
+# Encrypt cassettes: AES-256-GCM per cassette, key only via Touch ID from
+# the Secure Enclave (komki-tresor).
 #
-#     elixir apps/komki_connector_ris/priv/ris_kassetten.exs init
-#     elixir apps/komki_connector_ris/priv/ris_kassetten.exs seal <verzeichnis>
-#     elixir apps/komki_connector_ris/priv/ris_kassetten.exs unseal <verzeichnis>
-#     elixir apps/komki_connector_ris/priv/ris_kassetten.exs status <verzeichnis>
-#     elixir apps/komki_connector_ris/priv/ris_kassetten.exs check [verzeichnis]
+#     elixir apps/komki_connector_ris/priv/ris_cassettes.exs init
+#     elixir apps/komki_connector_ris/priv/ris_cassettes.exs seal <verzeichnis>
+#     elixir apps/komki_connector_ris/priv/ris_cassettes.exs unseal <verzeichnis>
+#     elixir apps/komki_connector_ris/priv/ris_cassettes.exs status <verzeichnis>
+#     elixir apps/komki_connector_ris/priv/ris_cassettes.exs check [verzeichnis]
 #
-# init (einmalig) erzeugt einen 32-Byte-Schluessel und legt ihn als Siegel
-# von komki-tresor im macOS-Schluesselbund ab (Eintrag 'ris-kassetten'). Das
-# Siegel oeffnet nur die Secure Enclave dieses Macs — kein Restore auf einem
-# anderen Mac, kein Key-Escrow; ist der Eintrag weg, sind die Kassetten weg.
-# Jede Ver- und Entschluesselung braucht genau eine Freigabe per Touch ID
-# (oder Passwort des Macs). seal schreibt je Kassette <name>.json.enc (Magic
-# rkt1, Nonce, Chiffretext, Tag; Nonce frisch je Datei) und loescht den
-# Klartext erst nach bestandener Gegenprobe von der Platte.
+# init (once) generates a 32-byte key and stores it as a komki-tresor seal
+# in the macOS keychain (entry 'ris-kassetten'). Only this Mac's Secure
+# Enclave opens the seal — no restore on another Mac, no key escrow; if the
+# entry is gone, the cassettes are gone. Every encryption and decryption
+# needs exactly one release via Touch ID (or the Mac's password). seal
+# writes <name>.json.enc per cassette (magic rkt1, nonce, ciphertext, tag;
+# fresh nonce per file) and deletes the plaintext from disk only after the
+# read-back verification passed.
 #
-# Bedrohungsmodell: Gesichert ist die Ablage — kein Prozess (auch kein
-# Agent) liest verschluesselte Kassetten ohne die Person am Mac. Nicht gesichert
-# sind Laufzeitfenster: waehrend der Aufzeichnung und waehrend unseal liegt
-# Klartext auf der Platte (optionale Haertung: Recorder --out auf eine
-# RAM-Disk, siehe README). Meldungen nennen nie Schluessel, Siegel oder
-# Kassetteninhalte, nur Namen und Zaehler.
+# Threat model: storage is protected — no process (no agent either) reads
+# encrypted cassettes without the person at the Mac. Runtime windows are
+# not: during recording and during unseal, plaintext sits on disk
+# (optional hardening: recorder --out on a RAM disk, see README). Messages
+# never name keys, seals or cassette contents, only names and counters.
 #
-# Verschluesselte Verzeichnisse gehoeren ausserhalb jedes Git-Repos wie die
-# Klartext-Kassetten auch; seal/unseal lehnen Repos ab (RisHttp.repo_free?,
-# wie ris_recorder — auch durch Symlinks hindurch). Replay und ris_skeleton
-# lesen *.json: vorher unseal, danach seal.
+# Encrypted directories belong outside any Git repo, just like plaintext
+# cassettes; seal/unseal reject repos (RisHttp.repo_free?, like
+# ris_recorder — through symlinks too). Replay and ris_skeleton read
+# *.json: unseal first, seal afterwards.
 #
 # check (#328) scans plaintext cassettes for secrets before sealing: the
 # values from .env (RIS_EMAIL, RIS_PASSWORD) and the token file of the
@@ -35,30 +34,33 @@
 # the cassette base. No Touch ID release needed (like status); messages
 # name names and counters, never secret values.
 #
-# Nur OTP (:crypto, Ports), keine Deps. Die Port-Muster sind aus komki_cli
-# dupliziert statt importiert (Unix-Prinzip; Andockpunkt: Tresor-Kern #224).
+# OTP only (:crypto, ports), no deps: a script started with `elixir` cannot
+# load komki_cli, so the port patterns are duplicated from it instead of
+# imported (docking point: tresor core #224).
 
 Code.require_file("./ris_http.exs", __DIR__)
 
-defmodule KomkiConnectorRis.RisKassetten do
+defmodule KomkiConnectorRis.RisCassettes do
   @moduledoc false
 
   alias KomkiConnectorRis.RisHttp
 
+  # Stored state, not an identifier: the key of every encrypted cassette
+  # lives under this keychain entry. Renaming it would orphan them.
   @service "ris-kassetten"
-  # Format-Label von komki-tresor (native/komki-tresor/main.swift): so beginnt
-  # ein Siegel. Bewusst ein anderes Praefix als @magic, damit Siegel und
-  # Kassetten-Container nie verwechselt werden.
+  # Format label of komki-tresor (native/komki-tresor/main.swift): every seal
+  # starts with it. Deliberately a different prefix than @magic so seals and
+  # cassette containers are never confused.
   @tresor_prefix "ktv1."
   @tresor_program "komki-tresor"
   @seal_timeout_ms 10_000
-  # Oeffnen wartet auf Touch ID oder Passwort.
+  # Opening waits for Touch ID or the password.
   @open_timeout_ms 120_000
   @check_timeout_ms 10_000
 
   @security "/usr/bin/security"
   @security_timeout_ms 5_000
-  # security(1): Exit 44 = errSecItemNotFound
+  # security(1): exit 44 = errSecItemNotFound
   @not_found 44
 
   @magic "rkt1"
@@ -66,10 +68,10 @@ defmodule KomkiConnectorRis.RisKassetten do
   @nonce_bytes 12
   @tag_bytes 16
 
-  # security -i zerlegt die Zeile selbst: nur Zeichen ohne Sonderbedeutung
-  # (Regel kopiert aus komki_cli/lib/komki_cli/keychain.ex). Ein ktv1.-Siegel
-  # aus Standard-Base64 erfuellt sie; vor dem Speichern pruefen, damit nicht
-  # security still auf 128 Byte kuerzt.
+  # security -i splits the line itself: only characters without special
+  # meaning (rule copied from komki_cli/lib/komki_cli/keychain.ex). A ktv1.
+  # seal in standard Base64 satisfies it; check before storing so security
+  # does not silently truncate to 128 bytes.
   @word ~r/\A[A-Za-z0-9@._+\/=-]+\z/
 
   @usage "Aufruf: init | seal <verzeichnis> | unseal <verzeichnis> | status <verzeichnis> | check [verzeichnis] [--tresor <programm>]"
@@ -80,12 +82,12 @@ defmodule KomkiConnectorRis.RisKassetten do
   @cassette_base "~/.local/share/kommunalpolitik_ki/ris-cassettes"
   @secret_env_keys ~w(RIS_EMAIL RIS_PASSWORD)
   # Recorder session directories are named YYYYMMDDTHHMMSSZ.
-  @zeitstempel ~r/\A\d{8}T\d{6}Z\z/
+  @timestamp ~r/\A\d{8}T\d{6}Z\z/
 
   @type tresor_error ::
           :missing_bin | :no_enclave | :refused | :invalid | :timeout | {:failed, integer()}
   @type kc_error :: :missing | :timeout | :invalid | :not_stored | {:failed, integer()}
-  @type meldung :: {:out | :err, String.t()}
+  @type message :: {:out | :err, String.t()}
 
   # --- CLI ------------------------------------------------------------------
 
@@ -101,9 +103,9 @@ defmodule KomkiConnectorRis.RisKassetten do
 
   def parse_cli(_other), do: {:error, @usage}
 
-  # Genau ein Pfad (init: keiner), Flags in beliebiger Reihenfolge danach.
-  # Ein Token mit --Praefix ist nie ein Pfad: ein --tresor ohne Wert waere
-  # sonst still der Pfad und der Aufruf melden ein fehlendes Verzeichnis.
+  # Exactly one path (init: none), flags in any order after it. A token
+  # with a -- prefix is never a path: a --tresor without a value would
+  # otherwise silently become the path and report a missing directory.
   defp parse_flags(cmd, ["--tresor", value | rest], dir, opts),
     do: parse_flags(cmd, rest, dir, Keyword.put(opts, :tresor, value))
 
@@ -119,10 +121,10 @@ defmodule KomkiConnectorRis.RisKassetten do
   defp parse_flags(_cmd, _other, _dir, _opts), do: :error
 
   @doc """
-  Kommandozeile abarbeiten und `{exit_code, meldungen}` liefern (statt selbst
-  zu enden) — Tests laufen darueber, der Runner druckt nur noch.
+  Process the command line and return `{exit_code, messages}` (instead of
+  exiting) — tests run through this, the runner only prints.
   """
-  @spec run([String.t()], keyword()) :: {non_neg_integer(), [meldung()]}
+  @spec run([String.t()], keyword()) :: {non_neg_integer(), [message()]}
   def run(argv, opts \\ []) do
     case parse_cli(argv) do
       {:ok, {"init", nil, flag}} ->
@@ -143,11 +145,11 @@ defmodule KomkiConnectorRis.RisKassetten do
         check(if(dir, do: Path.expand(dir)), opts)
 
       {:error, usage} ->
-        {2, [{:err, "ris_kassetten: #{usage}"}]}
+        {2, [{:err, "ris_cassettes: #{usage}"}]}
     end
   end
 
-  # --- komki-tresor (Binaer per Pipe) ----------------------------------------
+  # --- komki-tresor (binary over a pipe) -------------------------------------
 
   @doc false
   @spec tresor_bin(keyword()) :: String.t() | nil
@@ -156,22 +158,22 @@ defmodule KomkiConnectorRis.RisKassetten do
       nil ->
         System.find_executable(@tresor_program)
 
-      # Tippfehler im --tresor-Pfad: nil statt haesslichem Port-Crash. Ein
-      # existierender, aber nicht ausfuehrbarer Pfad faengt erst beim Spawn
-      # auf (sicher_spawn) und wird ebenso zu missing_bin.
+      # Typo in the --tresor path: nil instead of an ugly port crash. An
+      # existing but non-executable path is only caught at spawn
+      # (safe_spawn) and becomes missing_bin as well.
       path ->
         if path |> Path.expand() |> File.exists?(), do: Path.expand(path), else: nil
     end
   end
 
   @doc """
-  Secure Enclave des Programms pruefen (`check`-Subkommando), mit Timeout:
-  ein haengendes Programm blockt init nicht fuer immer.
+  Check the program's Secure Enclave (`check` subcommand), with a timeout:
+  a hanging program must not block init forever.
   """
   @spec tresor_check(String.t(), keyword()) ::
           :ok | {:error, :no_enclave | :timeout | tresor_error()}
   def tresor_check(command, opts \\ []) do
-    case sicher_spawn(command, ["check"]) do
+    case safe_spawn(command, ["check"]) do
       {:ok, port} ->
         timeout = Keyword.get(opts, :check_timeout, @check_timeout_ms)
 
@@ -187,7 +189,7 @@ defmodule KomkiConnectorRis.RisKassetten do
     end
   end
 
-  @doc "Klartext versiegeln. Keine Rueckfrage: Versiegeln braucht nur den oeffentlichen Schluessel."
+  @doc "Seal plaintext. No prompt: sealing only needs the public key."
   @spec tresor_seal(String.t(), keyword()) :: {:ok, String.t()} | {:error, tresor_error()}
   def tresor_seal(value, opts) do
     if one_line?(value) do
@@ -203,7 +205,7 @@ defmodule KomkiConnectorRis.RisKassetten do
     end
   end
 
-  @doc "Siegel oeffnen; macOS fragt mit `reason` nach Touch ID oder Passwort."
+  @doc "Open a seal; macOS asks for Touch ID or the password, showing `reason`."
   @spec tresor_open(String.t(), String.t(), keyword()) ::
           {:ok, String.t()} | {:error, tresor_error()}
   def tresor_open(sealed, reason, opts) do
@@ -219,16 +221,16 @@ defmodule KomkiConnectorRis.RisKassetten do
     end
   end
 
-  # Klartext und Siegel gehen nur ueber stdin/stdout, nie ueber argv
-  # (komki-tresor-Konvention). Ein Fehlstart (nicht ausfuehrbar, Gatekeeper)
-  # wird zu missing_bin statt zu einer Roh-Exception.
+  # Plaintext and seals travel only over stdin/stdout, never argv
+  # (komki-tresor convention). A failed start (not executable, Gatekeeper)
+  # becomes missing_bin instead of a raw exception.
   defp tresor_call(args, input, timeout, opts) do
     case tresor_bin(opts) do
       nil ->
         {:error, :missing_bin}
 
       bin ->
-        case sicher_spawn(bin, args) do
+        case safe_spawn(bin, args) do
           {:ok, port} ->
             Port.command(port, input <> "\n")
             collect(port, [], System.monotonic_time(:millisecond) + timeout, &tresor_on_exit/2)
@@ -239,15 +241,15 @@ defmodule KomkiConnectorRis.RisKassetten do
     end
   end
 
-  defp sicher_spawn(bin, args) do
+  defp safe_spawn(bin, args) do
     {:ok, Port.open({:spawn_executable, bin}, [:binary, :exit_status, :use_stdio, args: args])}
   rescue
     _unhandled -> :spawn_failed
   end
 
-  # stderr bleibt im Terminal (Meldungen des Programms, ohne Werte); stdout
-  # traegt genau eine Zeile. Exit-Codes wie komki-tresor: 3 keine Enclave,
-  # 4 keine Freigabe, 5 ungueltiges Siegel.
+  # stderr stays in the terminal (the program's messages, without values);
+  # stdout carries exactly one line. Exit codes as in komki-tresor: 3 no
+  # enclave, 4 no release, 5 invalid seal.
   defp collect(port, acc, deadline, on_exit) do
     left = max(deadline - System.monotonic_time(:millisecond), 0)
 
@@ -277,8 +279,8 @@ defmodule KomkiConnectorRis.RisKassetten do
   def tresor_text(:timeout), do: "keine Freigabe rechtzeitig"
   def tresor_text({:failed, code}), do: "komki-tresor fehlgeschlagen (exit #{code})"
 
-  # Exit-Codes: 3 Tresor/Enclave fehlt, 4 keine Freigabe, 5 Siegel ungueltig,
-  # 1 Programm sonstwie gescheitert.
+  # Exit codes: 3 tresor/enclave missing, 4 no release, 5 invalid seal,
+  # 1 program failed otherwise.
   defp tresor_exit(:missing_bin), do: 3
   defp tresor_exit(:no_enclave), do: 3
   defp tresor_exit(:refused), do: 4
@@ -286,8 +288,8 @@ defmodule KomkiConnectorRis.RisKassetten do
   defp tresor_exit(:invalid), do: 5
   defp tresor_exit({:failed, _code}), do: 1
 
-  # Versiegeln loest keine Freigabe aus: ein Timeout ist dort kein
-  # Freigabe-Abbruch, sondern ein haengendes Programm (Exit 1, nicht 4).
+  # Sealing triggers no release: a timeout there is not an aborted
+  # release but a hanging program (exit 1, not 4).
   defp tresor_seal_exit(:timeout), do: 1
   defp tresor_seal_exit({:failed, _code}), do: 1
   defp tresor_seal_exit(other), do: tresor_exit(other)
@@ -295,7 +297,7 @@ defmodule KomkiConnectorRis.RisKassetten do
   defp one_line?(value),
     do: is_binary(value) and value != "" and not String.contains?(value, ["\n", "\r"])
 
-  # --- Schluesselbund ---------------------------------------------------------
+  # --- Keychain ---------------------------------------------------------------
 
   @doc false
   @spec kc_present(String.t(), keyword()) :: :ok | {:error, kc_error()}
@@ -322,14 +324,14 @@ defmodule KomkiConnectorRis.RisKassetten do
   end
 
   @doc """
-  Wert als generisches Passwort ANLEGEN (nur init). Der Wert steht nie in argv
-  (dort saehe ihn jeder Prozess per ps); `add-generic-password -w` ohne Wert
-  kuertzte ihn interaktiv auf 128 Byte, deshalb geht der ganze Befehl als eine
-  Zeile an `security -i` (Muster aus komki_cli/lib/komki_cli/keychain.ex).
-  Ohne `-U`: existiert der Eintrag inzwischen doch (Rennen mit einem zweiten
-  init), scheitert der Befehl, statt still zu ersetzen — ein neuer Schluessel
-  wuerde alle bisher verschluesselten Kassetten unlesbar machen. Danach
-  zuruecklesen und vergleichen.
+  CREATE a value as a generic password (init only). The value never appears
+  in argv (every process would see it via ps); `add-generic-password -w`
+  without a value would truncate it interactively to 128 bytes, so the whole
+  command goes as one line to `security -i` (pattern from
+  komki_cli/lib/komki_cli/keychain.ex). No `-U`: if the entry exists after
+  all (race with a second init), the command fails instead of silently
+  replacing — a new key would make every cassette encrypted so far
+  unreadable. Read back and compare afterwards.
   """
   @spec kc_put_new(String.t(), String.t(), keyword()) :: :ok | {:error, kc_error()}
   def kc_put_new(service, value, opts) do
@@ -352,7 +354,7 @@ defmodule KomkiConnectorRis.RisKassetten do
     if Enum.all?(words, &(&1 =~ @word)), do: :ok, else: :invalid
   end
 
-  # `head -n 1` beendet stdin nach der einen Zeile; `security -i` endet dann.
+  # `head -n 1` closes stdin after the one line; `security -i` then exits.
   defp kc_interactive(service, account, value, opts) do
     command = Keyword.get(opts, :security, @security)
 
@@ -376,8 +378,8 @@ defmodule KomkiConnectorRis.RisKassetten do
   def kc_text({:failed, code}),
     do: "Schluesselbund-Befehl fehlgeschlagen (exit #{code})"
 
-  # Port statt System.cmd: nur so laesst sich ein haengendes security nach dem
-  # Timeout beenden. stderr wird verworfen und taucht nie in Meldungen auf.
+  # A port instead of System.cmd: the only way to stop a hanging security
+  # after the timeout. stderr is discarded and never shows up in messages.
   defp kc_run(args, opts) do
     command = Keyword.get(opts, :security, @security)
 
@@ -404,10 +406,10 @@ defmodule KomkiConnectorRis.RisKassetten do
   defp kc_on_exit(@not_found, _acc), do: {:error, :missing}
   defp kc_on_exit(code, _acc), do: {:error, {:failed, code}}
 
-  # Nach dem Timeout koennte das Programm noch laufen. Bei Pipelines
-  # (security -i) wuerden die Kinder beim Tod des Parents sonst zu Waisen und
-  # weiterlaufen — deshalb zunaechst die Kinder, dann der Parent. badarg
-  # faengt den Fall, dass der Port schon weg ist.
+  # After the timeout the program may still be running. With pipelines
+  # (security -i) the children would otherwise be orphaned when the parent
+  # dies and keep running — so children first, then the parent. badarg
+  # covers a port that is already gone.
   defp kill(port) do
     case Port.info(port, :os_pid) do
       {:os_pid, pid} ->
@@ -427,19 +429,19 @@ defmodule KomkiConnectorRis.RisKassetten do
     :error, :badarg -> {:error, :timeout}
   end
 
-  # --- Krypto -----------------------------------------------------------------
+  # --- Crypto -------------------------------------------------------------------
 
-  # AES-256-GCM, frische Nonce je Datei, Magic als AAD bindet die
-  # Container-Version an den Chiffretext. OTP 29: Encrypt liefert
-  # {chiffretext, tag}; Decrypt meldet Falsches als :error statt zu werfen.
-  # Auch leere Kassetten sind zulaessig (Chiffretext der Laenge 0).
+  # AES-256-GCM, fresh nonce per file, magic as AAD binds the container
+  # version to the ciphertext. OTP 29: encrypt returns {ciphertext, tag};
+  # decrypt reports a mismatch as :error instead of raising. Empty
+  # cassettes are allowed too (ciphertext of length 0).
   defp sealed_blob(plain, key) do
     nonce = :crypto.strong_rand_bytes(@nonce_bytes)
     {ct, tag} = :crypto.crypto_one_time_aead(:aes_256_gcm, key, nonce, plain, @magic, true)
     [@magic, nonce, ct, tag]
   end
 
-  # {:ok, klartext} | {:error, :bad_magic | :too_short | :bad_tag}
+  # {:ok, plaintext} | {:error, :bad_magic | :too_short | :bad_tag}
   defp open_blob(blob, key) do
     cond do
       not String.starts_with?(blob, @magic) ->
@@ -458,17 +460,17 @@ defmodule KomkiConnectorRis.RisKassetten do
 
         case :crypto.crypto_one_time_aead(:aes_256_gcm, key, nonce, ct, @magic, tag, false) do
           plain when is_binary(plain) -> {:ok, plain}
-          _korrupt -> {:error, :bad_tag}
+          _corrupt -> {:error, :bad_tag}
         end
     end
   end
 
-  # --- Schluessel laden --------------------------------------------------------
+  # --- Loading the key ----------------------------------------------------------
 
-  # Genau EINE Freigabe je Lauf: Siegel einmal lesen, einmal oeffnen. Der
-  # Tresor wird zuerst geprueft — ein fehlendes Programm ist die grundlegendere
-  # Stoerung und darf nicht hinter einer Keychain-Meldung versteckt werden.
-  # Ein Eintrag ohne ktv1.-Praefix ist Klartext — oeffnen waere sinnlos.
+  # Exactly ONE release per run: read the seal once, open it once. The
+  # tresor is checked first — a missing program is the more fundamental
+  # failure and must not hide behind a keychain message. An entry without
+  # the ktv1. prefix is plaintext — opening it would be pointless.
   defp load_master_key(reason, opts) do
     case tresor_bin(opts) do
       nil ->
@@ -502,27 +504,27 @@ defmodule KomkiConnectorRis.RisKassetten do
   end
 
   defp master_key_error(:unsealed),
-    do: {5, [{:err, "ris_kassetten: Eintrag '#{@service}' ist kein Siegel; init laufen lassen"}]}
+    do: {5, [{:err, "ris_cassettes: Eintrag '#{@service}' ist kein Siegel; init laufen lassen"}]}
 
   defp master_key_error(:invalid_key),
-    do: {5, [{:err, "ris_kassetten: Schluessel im Siegel hat falsche Form"}]}
+    do: {5, [{:err, "ris_cassettes: Schluessel im Siegel hat falsche Form"}]}
 
   defp master_key_error({:keychain, :missing}),
-    do: {5, [{:err, "ris_kassetten: Eintrag '#{@service}' fehlt; zuerst init"}]}
+    do: {5, [{:err, "ris_cassettes: Eintrag '#{@service}' fehlt; zuerst init"}]}
 
   defp master_key_error({:keychain, reason}),
-    do: {1, [{:err, "ris_kassetten: #{kc_text(reason)}"}]}
+    do: {1, [{:err, "ris_cassettes: #{kc_text(reason)}"}]}
 
   defp master_key_error({:tresor, reason}),
-    do: {tresor_exit(reason), [{:err, "ris_kassetten: #{tresor_text(reason)}"}]}
+    do: {tresor_exit(reason), [{:err, "ris_cassettes: #{tresor_text(reason)}"}]}
 
-  # --- Verzeichnisse -------------------------------------------------------------
+  # --- Directories ----------------------------------------------------------------
 
   @doc """
-  `:ok`, wenn `dir` ausserhalb jedes Git-Repos liegt — auch Worktrees (deren
-  `.git` eine Datei ist) und Symlinks, die hineinfuehren (RisHttp.repo_free?
-  loest vorhandene Pfade auf). Verschluesselte Kassetten gehoeren genauso
-  wenig ins Repo wie Klartext.
+  `:ok` if `dir` lies outside any Git repo — worktrees too (whose `.git` is
+  a file) and symlinks leading into one (RisHttp.repo_free? resolves
+  existing paths). Encrypted cassettes belong in a repo as little as
+  plaintext does.
   """
   @spec check_dir(Path.t()) :: :ok | {:error, {:dir_in_repo, Path.t()}}
   def check_dir(dir) do
@@ -532,9 +534,9 @@ defmodule KomkiConnectorRis.RisKassetten do
     end
   end
 
-  # Eine Auflistung je Lauf (statt File.ls! plus je Datei ein File.exists?):
-  # Zaehler und Kollisionspruefungen stammen aus derselben Aufnahme.
-  # ".json.enc" endet nicht auf ".json" — die Mengen sind disjunkt.
+  # One listing per run (instead of File.ls! plus one File.exists? per
+  # file): counters and collision checks come from the same snapshot.
+  # ".json.enc" does not end in ".json" — the sets are disjoint.
   @spec list_dir(Path.t()) ::
           {:ok, %{json: [String.t()], enc: [String.t()], other: [String.t()]}} | {:error, term()}
   defp list_dir(dir) do
@@ -548,7 +550,7 @@ defmodule KomkiConnectorRis.RisKassetten do
 
   defp json_of_enc(name), do: String.replace_suffix(name, ".enc", "")
 
-  # --- Subkommandos ---------------------------------------------------------------
+  # --- Subcommands -------------------------------------------------------------------
 
   defp init(opts) do
     case kc_present(@service, opts) do
@@ -556,7 +558,7 @@ defmodule KomkiConnectorRis.RisKassetten do
         {1,
          [
            {:err,
-            "ris_kassetten: Eintrag '#{@service}' existiert bereits; bewusst entfernen mit " <>
+            "ris_cassettes: Eintrag '#{@service}' existiert bereits; bewusst entfernen mit " <>
               "security delete-generic-password -s #{@service} — danach sind alle bisher " <>
               "verschluesselten Kassetten unlesbar"}
          ]}
@@ -565,14 +567,14 @@ defmodule KomkiConnectorRis.RisKassetten do
         init_create(opts)
 
       {:error, reason} ->
-        {1, [{:err, "ris_kassetten: Schluesselbund nicht abfragbar: #{kc_text(reason)}"}]}
+        {1, [{:err, "ris_cassettes: Schluesselbund nicht abfragbar: #{kc_text(reason)}"}]}
     end
   end
 
   defp init_create(opts) do
     case tresor_bin(opts) do
       nil ->
-        {3, [{:err, "ris_kassetten: #{tresor_text(:missing_bin)}"}]}
+        {3, [{:err, "ris_cassettes: #{tresor_text(:missing_bin)}"}]}
 
       bin ->
         case tresor_check(bin, opts) do
@@ -580,21 +582,21 @@ defmodule KomkiConnectorRis.RisKassetten do
             init_key(opts)
 
           {:error, :no_enclave} ->
-            {3, [{:err, "ris_kassetten: #{tresor_text(:no_enclave)}"}]}
+            {3, [{:err, "ris_cassettes: #{tresor_text(:no_enclave)}"}]}
 
-          # Spawn gescheitert (nicht ausfuehrbar): derselbe Fehler wie ein
-          # nicht gefundenes Programm.
+          # Spawn failed (not executable): the same error as a program that
+          # was not found.
           {:error, :missing_bin} ->
-            {3, [{:err, "ris_kassetten: #{tresor_text(:missing_bin)}"}]}
+            {3, [{:err, "ris_cassettes: #{tresor_text(:missing_bin)}"}]}
 
           {:error, reason} ->
-            {1, [{:err, "ris_kassetten: #{tresor_text(reason)}"}]}
+            {1, [{:err, "ris_cassettes: #{tresor_text(reason)}"}]}
         end
     end
   end
 
-  # Versiegeln braucht keine Freigabe; die EINE Freigabe hier ist die
-  # Rundweg-Kontrolle VOR dem Speichern — kein persistierter Halbfertig-Zustand.
+  # Sealing needs no release; the ONE release here is the roundtrip test
+  # BEFORE storing — no half-finished state is ever persisted.
   defp init_key(opts) do
     line = Base.encode64(:crypto.strong_rand_bytes(@key_bytes))
 
@@ -604,17 +606,17 @@ defmodule KomkiConnectorRis.RisKassetten do
           {:ok, ^line} ->
             init_store(sealed, opts)
 
-          {:ok, _anderer} ->
-            {5, [{:err, "ris_kassetten: Rundweg-Kontrolle fehlgeschlagen; nichts gespeichert"}]}
+          {:ok, _other} ->
+            {5, [{:err, "ris_cassettes: Roundtrip-Test fehlgeschlagen; nichts gespeichert"}]}
 
           {:error, reason} ->
             {tresor_exit(reason),
-             [{:err, "ris_kassetten: Rundweg-Kontrolle: #{tresor_text(reason)}"}]}
+             [{:err, "ris_cassettes: Roundtrip-Test: #{tresor_text(reason)}"}]}
         end
 
       {:error, reason} ->
         {tresor_seal_exit(reason),
-         [{:err, "ris_kassetten: Versiegeln des Schluessels: #{tresor_text(reason)}"}]}
+         [{:err, "ris_cassettes: Versiegeln des Schluessels: #{tresor_text(reason)}"}]}
     end
   end
 
@@ -624,30 +626,30 @@ defmodule KomkiConnectorRis.RisKassetten do
         {0,
          [
            {:out,
-            "ris_kassetten: Schluessel versiegelt im macOS-Schluesselbund (Eintrag '#{@service}')"},
+            "ris_cassettes: Schluessel versiegelt im macOS-Schluesselbund (Eintrag '#{@service}')"},
            {:out,
-            "ris_kassetten: Das Siegel oeffnet nur die Secure Enclave dieses Macs — kein Backup, " <>
+            "ris_cassettes: Das Siegel oeffnet nur die Secure Enclave dieses Macs — kein Backup, " <>
               "kein Restore auf einem anderen Mac; ohne diesen Mac sind verschluesselte Kassetten unwiederbringlich"},
            {:out,
-            "ris_kassetten: Naechster Schritt: elixir apps/komki_connector_ris/priv/ris_kassetten.exs seal <kassettenverzeichnis>"}
+            "ris_cassettes: Naechster Schritt: elixir apps/komki_connector_ris/priv/ris_cassettes.exs seal <kassettenverzeichnis>"}
          ]}
 
       {:error, reason} ->
         {kc_store_exit(reason),
-         [{:err, "ris_kassetten: Speichern im Schluesselbund fehlgeschlagen: #{kc_text(reason)}"}]}
+         [{:err, "ris_cassettes: Speichern im Schluesselbund fehlgeschlagen: #{kc_text(reason)}"}]}
     end
   end
 
-  # Gescheiterte Umgebung (Timeout, Exit ungleich 0) ist keine Siegel-Frage;
-  # ein abgewichener oder unlesbarer Wert schon.
+  # A failed environment (timeout, non-zero exit) is not a seal problem; a
+  # diverging or unreadable value is.
   defp kc_store_exit(:timeout), do: 1
   defp kc_store_exit({:failed, _code}), do: 1
   defp kc_store_exit(_other), do: 5
 
   # --- seal -------------------------------------------------------------------------
 
-  # Billige Pruefungen zuerst (Verzeichnis, Repo, Auflistung, Kollisionen):
-  # ein abgelehnter Lauf darf nie eine Freigabe ausloesen.
+  # Cheap checks first (directory, repo, listing, collisions): a rejected
+  # run must never trigger a release.
   defp seal(dir, opts) do
     with :ok <- require_dir(dir),
          :ok <- require_repo_free(dir),
@@ -661,12 +663,12 @@ defmodule KomkiConnectorRis.RisKassetten do
 
   defp seal_files(files, dir, opts) do
     if files.json == [] do
-      {0, [{:out, "ris_kassetten: keine Kassetten zu verschluesseln (nur *.json), nichts zu tun"}]}
+      {0, [{:out, "ris_cassettes: keine Kassetten zu verschluesseln (nur *.json), nichts zu tun"}]}
     else
       case load_master_key("RIS-Kassetten verschluesseln", opts) do
         {:ok, key} ->
-          {0, meldungen} = seal_each(files.json, dir, key, 0, [])
-          {0, meldungen ++ other_warning(files)}
+          {0, messages} = seal_each(files.json, dir, key, 0, [])
+          {0, messages ++ other_warning(files)}
 
         {:error, reason} ->
           master_key_error(reason)
@@ -674,15 +676,15 @@ defmodule KomkiConnectorRis.RisKassetten do
     end
   end
 
-  # Dateien, die keine *.json-Kassetten sind, bleiben unberuehrt Klartext —
-  # sichtbar machen statt einen verschluesselten Schein zu erwecken.
+  # Files that are not *.json cassettes stay plaintext, untouched — make
+  # that visible instead of pretending they are encrypted.
   defp other_warning(files) do
     if files.other == [] do
       []
     else
       [
         {:err,
-         "ris_kassetten: #{length(files.other)} sonstige Datei(en) sind keine *.json-Kassetten " <>
+         "ris_cassettes: #{length(files.other)} sonstige Datei(en) sind keine *.json-Kassetten " <>
            "und bleiben Klartext: #{Enum.join(files.other, ", ")}"}
       ]
     end
@@ -692,7 +694,7 @@ defmodule KomkiConnectorRis.RisKassetten do
     {0,
      [
        {:out,
-        "ris_kassetten: #{n} Kassette(n) verschluesselt; der Schluessel war nur fuer diesen Lauf im Speicher"}
+        "ris_cassettes: #{n} Kassette(n) verschluesselt; der Schluessel war nur fuer diesen Lauf im Speicher"}
        | Enum.reverse(acc)
      ]}
   end
@@ -702,28 +704,28 @@ defmodule KomkiConnectorRis.RisKassetten do
       :ok ->
         seal_each(rest, dir, key, n + 1, [{:out, "verschluesselt: #{name}"} | acc])
 
-      # Nicht loeschbarer Klartext ist ein lokales Problem dieser Datei
-      # (Flag, Rechte): eigene .enc entsorgen, ueberspringen, weitermachen —
-      # ein erneutes seal konvergiert.
+      # Undeletable plaintext is a local problem of this file (flag,
+      # permissions): discard our own .enc, skip, carry on — a repeated
+      # seal converges.
       {:skip, msg} ->
         seal_each(rest, dir, key, n, [{:err, "uebersprungen: #{name} — #{msg}"} | acc])
 
-      # Gegenprobe/Schreib-Fehler sind systemisch: abbrechen. Auch dann ist
-      # der Zustand konvergent, weil die eigene .enc entsorgt wurde und der
-      # Klartext bleibt.
+      # Verification/write errors are systemic: abort. The state still
+      # converges, because our own .enc was discarded and the plaintext
+      # stays.
       {:error, msg} ->
         {1,
          [
            {:err,
-            "ris_kassetten: abgebrochen bei #{name}: #{msg}; #{n} verschluesselt, " <>
+            "ris_cassettes: abgebrochen bei #{name}: #{msg}; #{n} verschluesselt, " <>
               "#{length(rest) + 1} offen — Stand mit status pruefen, erneutes seal vollendet"}
            | Enum.reverse(acc)
          ]}
     end
   end
 
-  # Eine Kassette verschluesseln: atomar schreiben (Exklusiv, sync, 0600, rename),
-  # Gegenprobe von der Platte, erst dann den Klartext loeschen.
+  # Encrypt one cassette: write atomically (exclusive, sync, 0600, rename),
+  # verify by reading back from disk, only then delete the plaintext.
   defp seal_one(json, key) do
     enc = json <> ".enc"
 
@@ -740,15 +742,15 @@ defmodule KomkiConnectorRis.RisKassetten do
           {:skip, "Klartext nicht loeschbar (#{inspect(reason)}); .enc entsorgt"}
       end
     else
-      {:ok, _anderer} -> gegenprobe_fehl(enc)
-      {:error, :bad_tag} -> gegenprobe_fehl(enc)
-      {:error, {:restdatei, tmp}} -> {:error, "Restdatei #{Path.basename(tmp)} blockiert"}
+      {:ok, _other} -> verify_failed(enc)
+      {:error, :bad_tag} -> verify_failed(enc)
+      {:error, {:leftover, tmp}} -> {:error, "Restdatei #{Path.basename(tmp)} blockiert"}
       {:error, {:write, reason}} -> {:error, "Schreiben fehlgeschlagen: #{inspect(reason)}"}
       {:error, reason} -> {:error, "Lesen fehlgeschlagen: #{inspect(reason)}"}
     end
   end
 
-  defp gegenprobe_fehl(enc) do
+  defp verify_failed(enc) do
     _ = File.rm(enc)
     {:error, "Gegenprobe fehlgeschlagen: #{Path.basename(enc)}"}
   end
@@ -768,7 +770,7 @@ defmodule KomkiConnectorRis.RisKassetten do
 
   defp unseal_files(files, dir, opts) do
     if files.enc == [] do
-      {0, [{:out, "ris_kassetten: keine verschluesselten Kassetten, nichts zu tun"}]}
+      {0, [{:out, "ris_cassettes: keine verschluesselten Kassetten, nichts zu tun"}]}
     else
       case load_master_key("RIS-Kassetten entschluesseln", opts) do
         {:ok, key} -> unseal_each(files.enc, dir, key, 0, [])
@@ -781,7 +783,7 @@ defmodule KomkiConnectorRis.RisKassetten do
     {0,
      [
        {:out,
-        "ris_kassetten: #{n} Kassette(n) entschluesselt; der Schluessel war nur fuer diesen Lauf im Speicher"}
+        "ris_cassettes: #{n} Kassette(n) entschluesselt; der Schluessel war nur fuer diesen Lauf im Speicher"}
        | Enum.reverse(acc)
      ]}
   end
@@ -800,17 +802,17 @@ defmodule KomkiConnectorRis.RisKassetten do
         {code,
          [
            {:err,
-            "ris_kassetten: abgebrochen bei #{name}: #{msg}; #{n} entschluesselt, " <>
+            "ris_cassettes: abgebrochen bei #{name}: #{msg}; #{n} entschluesselt, " <>
               "#{length(rest) + 1} verschluesselt — Stand mit status pruefen, erneutes unseal vollendet"}
            | Enum.reverse(acc)
          ]}
     end
   end
 
-  # Der GCM-Tag ist die Integritaetspruefung (die Entschluesselung verifiziert
-  # sich selbst) — keine zweite Gegenprobe noetig. Laesst sich die .enc nach
-  # dem Schreiben nicht loeschen, wird die eigene Klartextdatei entfernt:
-  # kein .json-UND-.enc-Zustand durch uns, ein erneutes unseal konvergiert.
+  # The GCM tag is the integrity check (decryption verifies itself) — no
+  # second verification needed. If the .enc cannot be deleted after
+  # writing, our own plaintext file is removed: we never leave a .json AND
+  # .enc state behind, a repeated unseal converges.
   defp unseal_one(enc, key) do
     json = json_of_enc(enc)
 
@@ -829,7 +831,7 @@ defmodule KomkiConnectorRis.RisKassetten do
       {:error, :bad_magic} -> {:error, 5, "keine rkt1-Kassette"}
       {:error, :too_short} -> {:error, 5, "zu kurz fuer rkt1"}
       {:error, :bad_tag} -> {:error, 5, "korrumpiert oder mit anderem Schluessel verschluesselt"}
-      {:error, {:restdatei, tmp}} -> {:error, 1, "Restdatei #{Path.basename(tmp)} blockiert"}
+      {:error, {:leftover, tmp}} -> {:error, 1, "Restdatei #{Path.basename(tmp)} blockiert"}
       {:error, {:write, reason}} -> {:error, 1, "Schreiben fehlgeschlagen: #{inspect(reason)}"}
       {:error, reason} -> {:error, 1, "Lesen oder Schreiben fehlgeschlagen: #{inspect(reason)}"}
     end
@@ -840,14 +842,14 @@ defmodule KomkiConnectorRis.RisKassetten do
   defp status(dir, _opts) do
     with :ok <- require_dir(dir),
          {:ok, files} <- list_ok(dir) do
-      sonstige =
+      others =
         if files.other == [], do: "", else: ", #{length(files.other)} sonstige Datei(en)"
 
       {0,
        [
          {:out,
-          "ris_kassetten: #{length(files.json)} Klartext-Kassette(n), #{length(files.enc)} verschluesselt" <>
-            sonstige}
+          "ris_cassettes: #{length(files.json)} Klartext-Kassette(n), #{length(files.enc)} verschluesselt" <>
+            others}
        ]}
     else
       {:error, code, msg} -> {code, [{:err, msg}]}
@@ -864,13 +866,13 @@ defmodule KomkiConnectorRis.RisKassetten do
   # present but no secret loadable, the run counts as failed — nothing
   # checked is not clean.
 
-  @spec check(Path.t() | nil, keyword()) :: {non_neg_integer(), [meldung()]}
+  @spec check(Path.t() | nil, keyword()) :: {non_neg_integer(), [message()]}
   defp check(nil, opts) do
     base = Path.expand(Keyword.get(opts, :cassette_base, @cassette_base))
 
-    case zeitstempel_dirs(base) do
+    case timestamp_dirs(base) do
       [] ->
-        {0, [{:out, "ris_kassetten: keine Zeitstempel-Verzeichnisse unter #{base}"}]}
+        {0, [{:out, "ris_cassettes: keine Zeitstempel-Verzeichnisse unter #{base}"}]}
 
       dirs ->
         check_dirs(dirs, opts)
@@ -911,15 +913,15 @@ defmodule KomkiConnectorRis.RisKassetten do
         end
       end)
 
-    fehler_zeilen = Enum.map(Enum.reverse(errors), &{:err, &1})
-    skip_zeilen = Enum.map(Enum.reverse(skips), &{:out, &1})
+    error_lines = Enum.map(Enum.reverse(errors), &{:err, &1})
+    skip_lines = Enum.map(Enum.reverse(skips), &{:out, &1})
 
     cond do
       scanable == [] and errors == [] ->
-        {0, skip_zeilen}
+        {0, skip_lines}
 
       scanable == [] ->
-        {1, fehler_zeilen ++ skip_zeilen}
+        {1, error_lines ++ skip_lines}
 
       true ->
         case load_secrets(opts) do
@@ -927,49 +929,49 @@ defmodule KomkiConnectorRis.RisKassetten do
             config = config_dir(opts)
 
             {1,
-             fehler_zeilen ++
-               skip_zeilen ++
+             error_lines ++
+               skip_lines ++
                [
                  {:out,
-                  "ris_kassetten: keine Geheimnisse aus #{config} ladbar" <>
+                  "ris_cassettes: keine Geheimnisse aus #{config} ladbar" <>
                     " (.env mit #{Enum.join(@secret_env_keys, "/")}, token-Datei)" <>
                     " — #{length(scanable)} Verzeichnis(se) mit Klartext blieben ungeprueft"}
                ]}
 
           secrets ->
-            {funde, geprueft, unlesbar, meldungen} = scan_dirs(scanable, secrets)
+            {findings, checked, unreadable, messages} = scan_dirs(scanable, secrets)
             skipped = length(skips)
 
-            gesamt =
-              "ris_kassetten: Gesamt: #{geprueft} Kassette(n) geprueft, #{funde} Funde" <>
-                skip_text(skipped) <> unlesbar_text(unlesbar)
+            total =
+              "ris_cassettes: Gesamt: #{checked} Kassette(n) geprueft, #{findings} Funde" <>
+                skip_text(skipped) <> unreadable_text(unreadable)
 
-            exit = if funde > 0 or unlesbar > 0 or errors != [], do: 1, else: 0
+            exit = if findings > 0 or unreadable > 0 or errors != [], do: 1, else: 0
 
-            {exit, fehler_zeilen ++ skip_zeilen ++ Enum.reverse(meldungen) ++ [{:out, gesamt}]}
+            {exit, error_lines ++ skip_lines ++ Enum.reverse(messages) ++ [{:out, total}]}
         end
     end
   end
 
   defp scan_dirs(scanable, secrets) do
-    Enum.reduce(scanable, {0, 0, 0, []}, fn {dir, files}, {f, g, u, acc} ->
-      {dir_funde, dir_unlesbar, dir_meldungen} = scan_dir(dir, files.plain, secrets)
+    Enum.reduce(scanable, {0, 0, 0, []}, fn {dir, files}, {f, c, u, acc} ->
+      {dir_findings, dir_unreadable, dir_messages} = scan_dir(dir, files.plain, secrets)
 
-      funde = f + dir_funde
-      geprueft = g + length(files.plain) - dir_unlesbar
-      unlesbar = u + dir_unlesbar
+      findings = f + dir_findings
+      checked = c + length(files.plain) - dir_unreadable
+      unreadable = u + dir_unreadable
 
       summary =
-        "ris_kassetten: #{Path.basename(dir)}: #{length(files.plain) - dir_unlesbar} Kassette(n)" <>
-          " geprueft#{unlesbar_text(dir_unlesbar)}#{versiegelt_text(files.sealed)}" <>
-          ", #{dir_funde} Funde"
+        "ris_cassettes: #{Path.basename(dir)}: #{length(files.plain) - dir_unreadable} Kassette(n)" <>
+          " geprueft#{unreadable_text(dir_unreadable)}#{encrypted_text(files.sealed)}" <>
+          ", #{dir_findings} Funde"
 
-      {funde, geprueft, unlesbar, [{:out, summary} | dir_meldungen ++ acc]}
+      {findings, checked, unreadable, [{:out, summary} | dir_messages ++ acc]}
     end)
   end
 
   defp scan_dir(dir, files, secrets) do
-    {funde, unlesbar, meldungen} =
+    {findings, unreadable, messages} =
       Enum.reduce(files, {0, 0, []}, fn name, {f, u, acc} ->
         case File.read(Path.join(dir, name)) do
           {:ok, raw} ->
@@ -980,24 +982,24 @@ defmodule KomkiConnectorRis.RisKassetten do
                   Enum.any?(content, &String.contains?(&1, sval)),
                   do: sname
 
-            fund_zeilen =
+            finding_lines =
               for sname <- hits,
-                  do: {:out, "ris_kassetten: FUND: #{sname} in #{name} (#{Path.basename(dir)})"}
+                  do: {:out, "ris_cassettes: FUND: #{sname} in #{name} (#{Path.basename(dir)})"}
 
-            {f + length(hits), u, fund_zeilen ++ acc}
+            {f + length(hits), u, finding_lines ++ acc}
 
           {:error, reason} ->
             {f, u + 1,
              [
                {:err,
-                "ris_kassetten: #{name} (#{Path.basename(dir)}) unlesbar — " <>
+                "ris_cassettes: #{name} (#{Path.basename(dir)}) unlesbar — " <>
                   "Pruefung unvollstaendig (#{inspect(reason)})"}
                | acc
              ]}
         end
       end)
 
-    {funde, unlesbar, Enum.reverse(meldungen)}
+    {findings, unreadable, Enum.reverse(messages)}
   end
 
   # Plaintext parts of a cassette: raw text plus the Base64-decoded
@@ -1088,11 +1090,11 @@ defmodule KomkiConnectorRis.RisKassetten do
   defp plain_files(dir) do
     case list_ok(dir) do
       {:ok, files} ->
-        rests = Enum.filter(files.other, &String.ends_with?(&1, ".json.new"))
-        chiffre = Enum.filter(files.other, &String.ends_with?(&1, ".enc.new"))
+        leftovers = Enum.filter(files.other, &String.ends_with?(&1, ".json.new"))
+        cipher = Enum.filter(files.other, &String.ends_with?(&1, ".enc.new"))
 
         {:ok,
-         %{plain: Enum.sort(files.json ++ rests), sealed: length(files.enc) + length(chiffre)}}
+         %{plain: Enum.sort(files.json ++ leftovers), sealed: length(files.enc) + length(cipher)}}
 
       {:error, code, msg} ->
         {:error, code, msg}
@@ -1115,29 +1117,29 @@ defmodule KomkiConnectorRis.RisKassetten do
   # The recorder creates one timestamp directory per session; the default
   # call (no directory) checks exactly those (#328). Anything else under
   # the base is not a recording session.
-  defp zeitstempel_dirs(base) do
+  defp timestamp_dirs(base) do
     base
     |> subdirs()
-    |> Enum.filter(&(Path.basename(&1) =~ @zeitstempel))
+    |> Enum.filter(&(Path.basename(&1) =~ @timestamp))
   end
 
   defp skip_note(dir),
     do:
-      "ris_kassetten: #{Path.basename(dir)}: kein Klartext (versiegelt oder leer), uebersprungen"
+      "ris_cassettes: #{Path.basename(dir)}: kein Klartext (verschluesselt oder leer), uebersprungen"
 
   defp skip_text(0), do: ""
   defp skip_text(n), do: ", #{n} Verzeichnis(se) uebersprungen"
 
-  defp unlesbar_text(0), do: ""
-  defp unlesbar_text(n), do: ", #{n} unlesbar"
+  defp unreadable_text(0), do: ""
+  defp unreadable_text(n), do: ", #{n} unlesbar"
 
-  defp versiegelt_text(0), do: ""
-  defp versiegelt_text(n), do: ", #{n} versiegelt uebersprungen"
+  defp encrypted_text(0), do: ""
+  defp encrypted_text(n), do: ", #{n} verschluesselt uebersprungen"
 
-  # --- gemeinsame Vorpruefung -------------------------------------------------------------
+  # --- Shared pre-checks --------------------------------------------------------------------
 
   defp require_dir(dir) do
-    if File.dir?(dir), do: :ok, else: {:error, 1, "ris_kassetten: Verzeichnis fehlt: #{dir}"}
+    if File.dir?(dir), do: :ok, else: {:error, 1, "ris_cassettes: Verzeichnis fehlt: #{dir}"}
   end
 
   defp require_repo_free(dir) do
@@ -1147,24 +1149,24 @@ defmodule KomkiConnectorRis.RisKassetten do
 
       {:error, {:dir_in_repo, repo}} ->
         {:error, 1,
-         "ris_kassetten: #{dir} liegt im Git-Repo #{repo}; Kassetten gehoeren ausserhalb jedes Repos"}
+         "ris_cassettes: #{dir} liegt im Git-Repo #{repo}; Kassetten gehoeren ausserhalb jedes Repos"}
     end
   end
 
-  # Auflistung darf nicht knallen (File.ls!): ein unlesbares Verzeichnis ist
-  # eine Meldung wert, auch fuer status — gerade es zeigt den kaputten Zustand.
+  # Listing must not blow up (File.ls!): an unreadable directory deserves a
+  # message, for status too — that is exactly where the broken state shows.
   defp list_ok(dir) do
     case list_dir(dir) do
       {:ok, files} ->
         {:ok, files}
 
       {:error, reason} ->
-        {:error, 1, "ris_kassetten: Verzeichnis nicht lesbar: #{dir} (#{inspect(reason)})"}
+        {:error, 1, "ris_cassettes: Verzeichnis nicht lesbar: #{dir} (#{inspect(reason)})"}
     end
   end
 
-  # Kollisionen vor der Freigabe: seal/unseal ueberschreiben nie. Die Pruefung
-  # laeuft ueber die eine Auflistung, nicht ueber je Datei ein File.exists?.
+  # Collisions before the release: seal/unseal never overwrite. The check
+  # runs over the one listing, not one File.exists? per file.
   defp require_collision_free(files, :seal) do
     enc_set = MapSet.new(files.enc)
 
@@ -1173,7 +1175,7 @@ defmodule KomkiConnectorRis.RisKassetten do
         :ok
 
       name ->
-        {:error, 1, "ris_kassetten: #{name}.enc existiert bereits; erst unseal oder Hand anlegen"}
+        {:error, 1, "ris_cassettes: #{name}.enc existiert bereits; erst unseal oder Hand anlegen"}
     end
   end
 
@@ -1186,15 +1188,16 @@ defmodule KomkiConnectorRis.RisKassetten do
 
       name ->
         {:error, 1,
-         "ris_kassetten: #{json_of_enc(name)} existiert bereits; erst seal oder Hand anlegen"}
+         "ris_cassettes: #{json_of_enc(name)} existiert bereits; erst seal oder Hand anlegen"}
     end
   end
 
-  # --- atomares Schreiben ------------------------------------------------------------------
+  # --- Atomic write ------------------------------------------------------------------------
 
-  # Exklusiv (clobbert keine Restdatei aus einem Crash), sync (die Gegenprobe
-  # liest nicht nur den Seitencache), 0600 (auch Klartext nie breiter lesbar),
-  # rename im selben Verzeichnis (atomar). Misserfolg raeumt die Temp-Datei weg.
+  # Exclusive (never clobbers a leftover from a crash), sync (the read-back
+  # verification must not just hit the page cache), 0600 (plaintext is
+  # never readable more widely either), rename within the same directory
+  # (atomic). On failure the temp file is cleaned up.
   defp write_atomic(path, content) do
     tmp = path <> ".new"
 
@@ -1214,7 +1217,7 @@ defmodule KomkiConnectorRis.RisKassetten do
         end
 
       {:error, :eexist} ->
-        {:error, {:restdatei, tmp}}
+        {:error, {:leftover, tmp}}
 
       {:error, reason} ->
         {:error, {:write, reason}}
@@ -1223,9 +1226,9 @@ defmodule KomkiConnectorRis.RisKassetten do
 end
 
 KomkiConnectorRis.RisHttp.cli(System.argv(), fn argv ->
-  {code, meldungen} = KomkiConnectorRis.RisKassetten.run(argv)
+  {code, messages} = KomkiConnectorRis.RisCassettes.run(argv)
 
-  Enum.each(meldungen, fn
+  Enum.each(messages, fn
     {:out, text} -> IO.puts(text)
     {:err, text} -> IO.puts(:stderr, text)
   end)

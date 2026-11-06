@@ -102,7 +102,7 @@ paths = [
   '''\.env\.example$''',
   '''\.env\.template$''',
   '''\.env\.dist$''',
-  '''apps/komki_connector_ris/test/ris_kassetten_test\.exs$''',
+  '''apps/komki_connector_ris/test/ris_cassettes_test\.exs$''',
 ]
 
 # Regex-Patterns, die auch in anderen Dateien als false positives auftreten:

@@ -106,7 +106,7 @@ oder ExVCR.
   Client und Upstream erhalten alles ungeschwärzt, nur die Datei ist geschwärzt.
 
 Geschwärzt heißt nicht verschlüsselt: Was nicht geschwärzt wurde, bleibt in der Kassette Klartext.
-`priv/ris_kassetten.exs` verschlüsselt deshalb nach der Session alle `*.json` des Verzeichnisses
+`priv/ris_cassettes.exs` verschlüsselt deshalb nach der Session alle `*.json` des Verzeichnisses
 (AES-256-GCM, Schlüssel per Touch ID aus der Secure Enclave; Abschnitt „Kassetten verschlüsseln“
 unten). Ohne diese Freigabe bleibt jedem Prozess — auch jedem Agenten — nur der Chiffretext.
 
@@ -178,18 +178,19 @@ gegen die Aufzeichnungen) ist als Freigabetor vor jedem Committen von Kassetten 
 
 ### Kassetten verschlüsseln (Touch ID)
 
-`priv/ris_kassetten.exs` verschlüsselt ein Kassettenverzeichnis mit AES-256-GCM, damit kein Prozess —
+`priv/ris_cassettes.exs` verschlüsselt ein Kassettenverzeichnis mit AES-256-GCM, damit kein Prozess —
 auch kein Agent — die Kassetten ohne die Person am Mac lesen kann. Der Schlüssel liegt nur als
 Siegel von `komki-tresor` im macOS-Schlüsselbund (Eintrag `ris-kassetten`), gebunden an die Secure
 Enclave dieses Macs; jede Ver- und Entschlüsselung löst genau eine Freigabe per Touch ID (oder
-Passwort des Macs) aus.
+Passwort des Macs) aus. Der Eintrag heißt anders als das Skript, weil er gespeicherter Zustand ist:
+Ein neuer Name fände den Schlüssel der schon verschlüsselten Kassetten nicht mehr.
 
 ```bash
-elixir apps/komki_connector_ris/priv/ris_kassetten.exs init                 # einmalig
-elixir apps/komki_connector_ris/priv/ris_kassetten.exs seal <verzeichnis>
-elixir apps/komki_connector_ris/priv/ris_kassetten.exs unseal <verzeichnis>
-elixir apps/komki_connector_ris/priv/ris_kassetten.exs status <verzeichnis>
-elixir apps/komki_connector_ris/priv/ris_kassetten.exs check [verzeichnis]
+elixir apps/komki_connector_ris/priv/ris_cassettes.exs init                 # einmalig
+elixir apps/komki_connector_ris/priv/ris_cassettes.exs seal <verzeichnis>
+elixir apps/komki_connector_ris/priv/ris_cassettes.exs unseal <verzeichnis>
+elixir apps/komki_connector_ris/priv/ris_cassettes.exs status <verzeichnis>
+elixir apps/komki_connector_ris/priv/ris_cassettes.exs check [verzeichnis]
 ```
 
 Ablauf einer Session: aufzeichnen, dann `check` (Leak-Prüfung), inferred schema, danach `seal` —
@@ -207,7 +208,7 @@ keine Kommentar-Ausnahme — auch auskommentierte oder `export`-Zeilen werden ge
 die könnte ratsinfo senden. Der Token zählt nur ab 11 Bytes (`Ratsinfo.Auth` sendet kürzere
 nie). Geprüft werden `*.json` und `*.json.new` (Klartext-Rest eines abgestürzten `unseal`);
 Chiffretext (`*.json.enc`, `*.json.enc.new`) wird übersprungen und gemeldet — auch im
-Mischverzeichnis („N versiegelt uebersprungen“ je Verzeichnis). Ohne Verzeichnis prüft es die
+Mischverzeichnis („N verschluesselt uebersprungen“ je Verzeichnis). Ohne Verzeichnis prüft es die
 Zeitstempel-Verzeichnisse unter `~/.local/share/kommunalpolitik_ki/ris-cassettes/` (andere
 Unterverzeichnisse dort sind keine Recorder-Sessions), ein Sammel-Verzeichnis ohne eigenen
 Klartext seine Unterverzeichnisse. Exit 1 gilt bei Funden, bei unlesbaren Dateien oder
@@ -215,7 +216,7 @@ Verzeichnissen und wenn Klartext da ist, aber kein Geheimnis geladen werden konn
 nichts geprüft ist nicht sauber.
 
 - Replay und `priv/ris_skeleton.exs` lesen `*.json`: vorher `unseal`, danach `seal`.
-- Abbrüche lassen einen sichtbaren Mischzustand: `status` zeigt ihn, ein erneutes
+- Abbrüche lassen einen sichtbaren Zwischenzustand: `status` zeigt ihn, ein erneutes
   `seal`/`unseal` vollendet. Nicht löschbare Dateien werden übersprungen und gemeldet; eine
   Restdatei `<name>.json.new` aus einem Crash blockiert mit klarer Meldung. Beide überschreiben
   nie und lehnen Verzeichnisse in Git-Repos ab, wie der Recorder.

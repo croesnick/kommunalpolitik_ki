@@ -1,12 +1,12 @@
-# Fake-komki-tresor fuer die Tests: rundreisefaehig wie das echte Programm
-# (eine Zeile stdin, eine Zeile stdout, Exit 0/2/5), aber ohne Secure Enclave
-# und ohne Touch ID. Das Siegel ist hier base64(nonce <> chiffretext <> tag)
-# desselben hartkodierten AES-256-GCM-Schluessels, den open wieder anwendet —
-# verhaltenstreu, nicht formatkompatibel; das genuegt, weil ris_kassetten das
-# Praefix ktv1. nur als Label prueft. Aufgerufen nur aus
-# ris_kassetten_test.exs ueber einen Shell-Wrapper.
+# Fake komki-tresor for the tests: roundtrip-capable like the real program
+# (one line stdin, one line stdout, exit 0/2/5), but without the Secure
+# Enclave and without Touch ID. The seal here is base64(nonce <> ciphertext
+# <> tag) under one hard-coded AES-256-GCM key that open applies again —
+# behaviourally faithful, not format-compatible; that is enough because
+# ris_cassettes checks the ktv1. prefix only as a label. Called only from
+# ris_cassettes_test.exs through a shell wrapper.
 
-key = :crypto.hash(:sha256, "ris-kassetten-fake")
+key = :crypto.hash(:sha256, "ris-cassettes-fake")
 aad = "rkt1-fake"
 
 read_line = fn ->
@@ -38,7 +38,7 @@ open = fn text ->
 
     case :crypto.crypto_one_time_aead(:aes_256_gcm, key, nonce, ct, aad, tag, false) do
       plain when is_binary(plain) -> IO.puts(plain)
-      _korrupt -> fail.(5, "Siegel ungueltig")
+      _corrupt -> fail.(5, "Siegel ungueltig")
     end
   else
     _ -> fail.(5, "Siegel ungueltig")

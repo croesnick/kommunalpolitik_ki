@@ -1009,7 +1009,7 @@ Kassetten entsteht ein inhaltsfreies inferred schema.
 
 **Abgrenzung:** Kassetten enthalten echte, auch nicht-öffentliche Inhalte.
 Sie liegen nie im Repo; committbar ist nur das inferred schema. Aufbewahrt
-werden sie verschlüsselt (`priv/ris_kassetten.exs`, Freigabe per Touch ID) —
+werden sie verschlüsselt (`priv/ris_cassettes.exs`, Freigabe per Touch ID) —
 Details im Connector-README, Abschnitt „Kassetten verschlüsseln“; bis zur
 Verschlüsselung ist eine Kassette Klartext.
 

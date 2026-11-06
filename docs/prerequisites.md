@@ -381,7 +381,7 @@ Programm mit. Ohne Secure Enclave (Intel-Mac ohne T2) gibt es keine
 versiegelten Geheimnisse, die Websuche bleibt dann aus.
 
 Dieselbe Binary versiegelt auch den Schlüssel der RIS-Kassetten:
-`apps/komki_connector_ris/priv/ris_kassetten.exs` ruft `komki-tresor` über den
+`apps/komki_connector_ris/priv/ris_cassettes.exs` ruft `komki-tresor` über den
 PATH auf (Override mit `--tresor <pfad>`, aus dem Checkout gebaut liegt es in
 `apps/komki_cli/priv/`). `init` und jedes `seal`/`unseal` brauchen Touch ID auf
 diesem Mac; Details im Connector-README, Abschnitt „Kassetten verschlüsseln“.
