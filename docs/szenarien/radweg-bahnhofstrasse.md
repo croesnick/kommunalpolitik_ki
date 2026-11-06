@@ -173,7 +173,7 @@ Ein Arbeitsraum W hat eine feste Bindungsmenge B_W. Für jede Eingabe x und jede
 [R.5.4](../rfcs/0003-vertrauliche-ki-arbeitsraeume.md#r54-aufnahme)). Im Zielbild legt Miriam Räume nicht von
 Hand an. Sie nennt die Aufgabe, und komki schlägt den Raum vor (B7).
 
-| Raum | B_W (ohne die öffentlichen Bindungen) | Weg nach draußen | Akt |
+| Raum (Titel) | B_W (ohne die öffentlichen Bindungen) | Weg nach draußen | Akt |
 |---|---|---|---|
 | `recherche` | keine | RIS, Brave | I, IV |
 | `fall-031` | `buergerfall-031` | Antwort an die Absenderin | II |
@@ -236,6 +236,38 @@ flowchart LR
     BO -.->|"Versand"| OV
     PUB -.->|"Veröffentlichung"| OEF
 ```
+
+### Wie Räume entstehen, heißen und enden
+
+Entschieden am 2026-11-06 im Ticket
+[Raummodell](https://github.com/croesnick/kommunalpolitik_ki/issues/353). Die Bedienung steht als Zielbild in #270.
+
+- **Raum und Session.** Ein Raum ist eine dauerhafte Arbeitsmappe zu einer Aufgabe. Darin führt Miriam beliebig
+  viele Sessions und setzt jede frei fort. Das ist immer sicher, weil alle Sessions eines Raums dieselben Bindungen
+  teilen. Eine Session gehört zu genau einem Raum. Sie in einem anderen Raum fortzusetzen, ist eine Übergabe ihres
+  Verlaufs. Das geht ohne GO, aber nur in einen Raum mit mindestens denselben Bindungen.
+- **Feste Bindungen.** Ohne Startvertrag gibt es keinen Raum, und seine Bindungen sind die einzige Angabe von B_W
+  (#214). Ein Raumwechsel wechselt den Raum, nie dessen Bindungen. Eine neue Aufgabe oder eine neue Bindungsversion
+  wie `ratsarbeit@2` (Szene 9) braucht einen neuen Raum.
+- **Mehrere Räume gleichzeitig.** Miriam arbeitet an Seiten eines Themas mit verschiedener Geheimhaltung
+  nebeneinander, etwa am Antrag und am Kurzzitat. Jeder laufende Raum hat seinen eigenen pi, seine eigene Sandbox und
+  ein Token, das an den Raum gebunden ist.
+- **Kennung und Titel.** Schon die Themenwahl kann vertraulich sein. Die Kennung ist deshalb ein inhaltsleeres
+  Wortpaar wie `stiller-reiher`. Nur sie steht in Pfaden, Prozessen, Absichten und im Journal. Der Titel, etwa
+  „Plan Radweg“, trägt die Bindungen des Raums und erscheint nur in Miriams Oberfläche. Die Namen in der Tabelle oben
+  sind Titel in Kurzform.
+- **Was zum Raum gehört.** Startvertrag, GO-Stand, Sessions, Raumdokumente und der private Schreibbereich. Γ,
+  Label-Store, Connectoren, Egress, Schlüssel, Modell, Vermittler und das Journal gehören zur Instanz. Jeder
+  Journaleintrag nennt die Raumkennung.
+- **Offen und geschlossen.** Für den Kalkül braucht es diese Zustände nicht: Ein Raum, der nie endet, verletzt keine
+  Regel. Sie halten drei Dinge fest. Der Zweck endet: Ist die Antwort an die Absenderin verschickt, soll niemand in
+  `fall-031` mit ihren Daten weiterarbeiten. Fristen bekommen einen Startpunkt: „nach Abschluss löschen“ (Szene 9,
+  B21). Und die Liste der Räume bleibt übersichtlich. Ein geschlossener Raum nimmt nichts mehr auf und startet keine
+  Session mehr, bleibt aber Quelle für spätere Übergaben. Schließen kann nur Miriam, komki darf es vorschlagen.
+  Wiederöffnen gibt es nicht; wer weitermachen will, legt einen neuen Raum an.
+- **Anlegen.** Bis zum Raum-Assistenten (B7) legt Miriam einen Raum aus einer Raumvorlage an, vergibt einen Titel und
+  bestätigt den Startvertrag einmal. Bindungslisten tippt sie nicht. Eine neue Instanz bringt die Räume „Recherche“
+  und „Vertraulich“ mit.
 
 ## 5. Die Szenen
 

@@ -617,7 +617,26 @@ unterscheiden und wird für jeden gewählten Verarbeitungszweig betrachtet.
 mit eigenem Zustand und einer festen Menge von Bindungen. Sein unveränderlicher
 Startvertrag legt diese Bindungen, den Zweck, zulässige Operationen und den
 Lebenszyklus fest. Ein Chatfenster
-allein bildet noch keinen solchen Arbeitsraum.
+allein bildet noch keinen solchen Arbeitsraum. Ohne Startvertrag gibt es
+keinen Arbeitsraum; seine Bindungen sind die einzige Angabe von B_W. Eine
+andere Bindungsmenge heißt ein anderer Arbeitsraum, nie ein geänderter.
+
+**Kennung und Titel:** Die Kennung ist ein inhaltsleeres Wortpaar wie
+`stiller-reiher`. komki vergibt sie, sie ist je komki-Instanz eindeutig,
+bleibt unverändert und wird nie neu vergeben. Der Titel, etwa „Mappe
+Stadtrat 17.11.“, nennt das Thema. Weil schon die Themenwahl vertraulich
+sein kann, trägt er die Bindungen des Raums und erscheint nur der
+nutzenden Person, nie in technischen Spuren.
+
+**Session im Raum:** Jede Session gehört zu genau einem Arbeitsraum. Ein
+Raum kann beliebig viele Sessions haben. Eine Session in einem anderen Raum
+fortzusetzen, ist eine Übergabe ihres Verlaufs und nur in einen Raum mit
+mindestens denselben Bindungen zulässig.
+
+**Offen und geschlossen:** Ein geschlossener Raum hat seine Aufgabe
+erledigt. Er nimmt nichts mehr auf und startet keine Session mehr, bleibt
+aber Quelle für spätere Übergaben. Schließen kann nur die nutzende Person,
+ein Wiederöffnen gibt es nicht.
 
 **Kurzform:** „Raum“ ist als Kurzform erlaubt, wo der Zusammenhang eindeutig
 ist (Doku-Site, `komki raum`, Referenzszenario).
