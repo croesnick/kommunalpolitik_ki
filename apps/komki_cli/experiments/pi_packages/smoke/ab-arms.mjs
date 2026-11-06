@@ -135,6 +135,11 @@ ARMS.V9 = {
   bin: path.join(EXPERIMENTS_ROOT, "downloads", "b12110", "llama-b12110", "llama-server"),
   port: 49622,
 };
+// Debug probe (#372, descriptive, no gate): V7 and V9 with debug logging,
+// which is the only way to see context-checkpoint restores and the FA mode
+// per context in the llama log. Evaluated by probe-lv4.mjs.
+ARMS.V7D = { ...ARMS.V7, label: `${ARMS.V7.label}, -lv 4`, serverArgs: [...PRODUCTION_ARGS, "-lv", "4"] };
+ARMS.V9D = { ...ARMS.V9, label: `${ARMS.V9.label}, -lv 4`, serverArgs: [...PRODUCTION_ARGS, "-lv", "4"] };
 
 /**
  * Seed per round: round 0 is the warm-up, 1..n are measured runs; all arms

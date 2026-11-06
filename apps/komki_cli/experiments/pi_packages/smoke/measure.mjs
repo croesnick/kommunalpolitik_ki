@@ -242,6 +242,46 @@ export async function llamaLogSegment(llama, startOffset, endOffset) {
   }));
 }
 
+/**
+ * Summary of a llama-server log written with -lv 4 (#372 debug probe).
+ * Contexts in load order (main model, then MTP drafter) with their Flash
+ * Attention lines; context checkpoints created and restored; draft
+ * acceptance pooled over requests with and without a restored checkpoint.
+ */
+export function llamaDebugSummary(text) {
+  const contexts = [];
+  const draftByTask = new Map();
+  const restoredTasks = new Set();
+  let created = 0;
+  let restored = 0;
+  for (const line of text.split("\n")) {
+    if (line.includes("llama_context: constructing llama_context")) contexts.push([]);
+    const fa = /resolve_fused_ops: (Flash Attention.*)$/.exec(line);
+    if (fa && contexts.length > 0) contexts.at(-1).push(fa[1].trim());
+    if (line.includes("created context checkpoint")) created += 1;
+    const restore = /task (\d+) \| restored context checkpoint/.exec(line);
+    if (restore) {
+      restored += 1;
+      restoredTasks.add(restore[1]);
+    }
+    const draft = /task (\d+) \| draft acceptance = [\d.]+ \(\s*(\d+) accepted \/\s*(\d+) generated\)/.exec(line);
+    if (draft) draftByTask.set(draft[1], { accepted: Number(draft[2]), generated: Number(draft[3]) });
+  }
+  const pool = (withRestore) => {
+    const list = [...draftByTask].filter(([task]) => restoredTasks.has(task) === withRestore).map(([, d]) => d);
+    const accepted = list.reduce((s, d) => s + d.accepted, 0);
+    const generated = list.reduce((s, d) => s + d.generated, 0);
+    return { requests: list.length, accepted, generated, rate: generated ? accepted / generated : null };
+  };
+  return {
+    contexts: contexts.map((fa, i) => ({ role: ["main", "draft"][i] ?? `context ${i}`, fa })),
+    checkpointsCreated: created,
+    checkpointsRestored: restored,
+    restoredTasks: [...restoredTasks],
+    draft: { withRestore: pool(true), withoutRestore: pool(false) },
+  };
+}
+
 // ---------------------------------------------------------------- Tool-Validierung
 
 function normalizeCall(call) {

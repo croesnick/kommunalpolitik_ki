@@ -127,6 +127,16 @@ liest der Harness die draft acceptance des MTP-Drafters aus dem llama-Log
 (gepoolt und je Aufgabe im Bericht). Der Bericht listet außerdem Läufe, in
 denen eine Messgröße fehlt, als Hinweis auf ein geändertes Log-Format.
 
+Context-Checkpoints und den FA-Modus je Kontext zeigt das llama-Log nur mit
+`-lv 4`. Dafür gibt es die Debug-Arme `V7D`/`V9D` (V7/V9 plus `-lv 4`) und
+[`probe-lv4.mjs`](probe-lv4.mjs). Diese beschreibende Sonde geht in kein Gate
+ein:
+
+```bash
+node smoke/run-ab.mjs --root <probe-root> --arms V7D,V9D --runs 0 --seed-base 372800
+node smoke/probe-lv4.mjs --root <probe-root>   # probe.json, PROBE.md
+```
+
 Zusätzlich misst der Proxy seit #285 je Request die Zeit bis zum ersten
 Delta (`firstTokenMs`, Thinking eingeschlossen) und bis zur ersten sichtbaren
 Antwort (`firstAnswerMs`) und hält den Thinking-Text (`reasoning`) fest. Der

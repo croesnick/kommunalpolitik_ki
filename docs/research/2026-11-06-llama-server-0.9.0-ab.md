@@ -100,15 +100,30 @@ Unverändert aus #320, V9 gegen `--reference V7`:
 3. Scheitert V9 an einem Gate, bleibt es beim Pin; der Befund steht in diesem Labbook und im Ticket.
 4. Das Upgrade selbst (brew, Re-Pin, Profil-Regeneration, Doku) läuft nur nach ausdrücklichem GO der nutzenden Person. Homebrew bietet am 06.11.2026 als stable 0.8.0 an. Liefert Homebrew später einen anderen Build als b12110, wird dieser vor dem Re-Pin nachgemessen.
 
+## Abweichungen vom Protokoll
+
+**Hauptlauf `main` abgebrochen und als `main-2` neu gestartet.** Der erste Hauptlauf (`ab-372/main`, 06.11.2026 15:06–19:34 Uhr MEZ) kam in vier Stunden nur bis Lauf 4 von 12. Danach endete die Session, die ihn gestartet hatte. Eine Störung der Umgebung hat die Daten verfälscht, und zwar in allen drei Armen:
+
+- Der llama-server blieb minutenlang stehen, ohne dass das am Build lag. Ein Beispiel aus `01-r0-V7`: `prompt eval time = 593935.23 ms / 269 tokens`, also rund zehn Minuten für einen Prefill, der sonst etwa eine Sekunde braucht. Decode und Prefill zwischen den Hängern liefen normal schnell (etwa 70 t/s, 500–650 t/s).
+- `schedule.json` zeigt den Zustand des Systems: Alle vier Läufe starteten im Akkubetrieb, die Loadavg stieg auf 22 bis 47 (in #320 lag die Gesamtdauer eines Laufs bei rund 90 s), und vor Lauf 1 waren nur 12,7 GB Speicher frei. Das Bild passt zu Speicherdruck, unter dem die per mmap geladenen Gewichte ausgelagert und neu eingelesen werden. Zu dieser Zeit liefen weitere Sessions auf derselben Maschine.
+- Folge: Aufgabe 2 in `04-r1-V7` scheiterte am Timeout (1 827 s). Lauf 4 endete mit Exit-Code 1.
+
+Diese Läufe gehen in keine Auswertung ein; von ihnen wurde nichts verblindet und nichts bewertet. Der Neustart nutzt dasselbe Protokoll mit denselben Seeds (372 000 + Runde), denselben Armen und demselben Harness-Stand für alle Messgrößen. Neu ist nur `probe-lv4.mjs` für die getrennte Debug-Sonde, die schon vorab registriert war. Vor dem Start werden Netzbetrieb, Loadavg und freier Speicher geprüft. Läuft ein anderer llama-server, wird nicht gestartet. Die Rohdaten von `main` bleiben zur Nachvollziehbarkeit liegen.
+
 ## Reproduktion
 
 ```bash
 cd apps/komki_cli/experiments/pi_packages
-R=$TMPDIR/komki-pi-experiments/ab-372/main
+R=$TMPDIR/komki-pi-experiments/ab-372/main-2
 node smoke/run-ab.mjs --root $R --arms V7,V8,V9 --preflight
 node smoke/run-ab.mjs --root $R --arms V7,V8,V9 --runs 3 --timeout-factor 6 --seed-base 372000
 node smoke/grade-ab.mjs blind --root $R     # dann blind/grades.json ausfüllen
 node smoke/grade-ab.mjs report --root $R --reference V7
+
+# Debug-Sonde (beschreibend): V7 und V9 mit -lv 4, eine Runde, Seed 372 800
+P=$TMPDIR/komki-pi-experiments/ab-372/probe-lv4
+node smoke/run-ab.mjs --root $P --arms V7D,V9D --runs 0 --timeout-factor 6 --seed-base 372800
+node smoke/probe-lv4.mjs --root $P
 ```
 
 Node 24.22.1 über asdf (`ASDF_NODEJS_VERSION=24.22.1`), wie in #285 und #320.
