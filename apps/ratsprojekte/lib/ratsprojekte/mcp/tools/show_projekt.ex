@@ -7,7 +7,8 @@ defmodule Ratsprojekte.MCP.Tools.ShowProjekt do
   - Alle Realisierungsstränge (A/B/C) mit Bedingung und Erfüllt-Status
   - Vorbedingungen mit rechtlicher Grundlage und Erfüllt-Status
   - Geordnete Schritte mit optionalen Fristen
-  - Quellen mit URL, Paragraf und Typ
+  - Quellen mit URL, Paragraf und Typ; Sitzungs-Quellen tragen die
+    strukturierte RIS-Referenz (ris_sitzung_id, ris_top, beschluss_nr)
 
   Verwende list_projekte, um den Slug zu finden.
   """
@@ -59,6 +60,10 @@ defmodule Ratsprojekte.MCP.Tools.ShowProjekt do
       beschreibung: projekt.beschreibung,
       status: projekt.status,
       prioritaet: projekt.prioritaet,
+      beschlussvorschlag: projekt.beschlussvorschlag,
+      adressat: projekt.adressat,
+      value_proposition: projekt.value_proposition,
+      success_metrics: projekt.success_metrics,
       realisierungsstraenge: Enum.map(projekt.realisierungsstraenge, &format_strang/1),
       projekt_quellen: Enum.map(projekt.quellen, &format_quelle/1)
     }
@@ -107,7 +112,10 @@ defmodule Ratsprojekte.MCP.Tools.ShowProjekt do
       titel: quelle.titel,
       url: quelle.url,
       paragraf: quelle.paragraf,
-      abrufdatum: quelle.abrufdatum
+      abrufdatum: quelle.abrufdatum,
+      ris_sitzung_id: quelle.ris_sitzung_id,
+      ris_top: quelle.ris_top,
+      beschluss_nr: quelle.beschluss_nr
     }
   end
 end

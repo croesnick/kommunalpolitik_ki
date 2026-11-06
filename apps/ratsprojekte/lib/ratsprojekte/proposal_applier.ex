@@ -48,10 +48,11 @@ defmodule Ratsprojekte.ProposalApplier do
     decision_attrs = decision_attrs(:approved, opts)
 
     Repo.transaction(fn ->
-      record = Repo.insert!(Projekt.changeset(struct(Projekt), proposal.payload))
-      _ = record
-
-      Repo.update!(PendingProposal.decision_changeset(proposal, decision_attrs))
+      commit_insert(
+        Projekt.changeset(struct(Projekt), proposal.payload),
+        proposal,
+        decision_attrs
+      )
     end)
   end
 
@@ -60,12 +61,11 @@ defmodule Ratsprojekte.ProposalApplier do
     decision_attrs = decision_attrs(:approved, opts)
 
     Repo.transaction(fn ->
-      record =
-        Repo.insert!(Realisierungsstrang.changeset(struct(Realisierungsstrang), strang_attrs))
-
-      _ = record
-
-      Repo.update!(PendingProposal.decision_changeset(proposal, decision_attrs))
+      commit_insert(
+        Realisierungsstrang.changeset(struct(Realisierungsstrang), strang_attrs),
+        proposal,
+        decision_attrs
+      )
     end)
   end
 
@@ -87,8 +87,7 @@ defmodule Ratsprojekte.ProposalApplier do
     decision_attrs = decision_attrs(:approved, opts)
 
     Repo.transaction(fn ->
-      Repo.update!(Projekt.changeset(projekt, update_attrs))
-      Repo.update!(PendingProposal.decision_changeset(proposal, decision_attrs))
+      commit_update(Projekt.changeset(projekt, update_attrs), proposal, decision_attrs)
     end)
   end
 
@@ -102,7 +101,22 @@ defmodule Ratsprojekte.ProposalApplier do
           Map.put(acc, :beschreibung, v)
 
         {"prioritaet", v}, acc when is_binary(v) ->
-          Map.put(acc, :prioritaet, String.to_existing_atom(v))
+          # Bewusst den String durchreichen: Ecto.Enum/cast lehnt unbekannte
+          # Werte als Changeset-Fehler ab (graceful über Repo.rollback),
+          # statt hier mit String.to_existing_atom/1 das GO crashen zu lassen.
+          Map.put(acc, :prioritaet, v)
+
+        {"beschlussvorschlag", v}, acc when is_binary(v) ->
+          Map.put(acc, :beschlussvorschlag, v)
+
+        {"adressat", v}, acc when is_binary(v) ->
+          Map.put(acc, :adressat, v)
+
+        {"value_proposition", v}, acc when is_binary(v) ->
+          Map.put(acc, :value_proposition, v)
+
+        {"success_metrics", v}, acc when is_binary(v) ->
+          Map.put(acc, :success_metrics, v)
 
         _, acc ->
           acc
@@ -111,8 +125,7 @@ defmodule Ratsprojekte.ProposalApplier do
     decision_attrs = decision_attrs(:approved, opts)
 
     Repo.transaction(fn ->
-      Repo.update!(Projekt.changeset(projekt, update_attrs))
-      Repo.update!(PendingProposal.decision_changeset(proposal, decision_attrs))
+      commit_update(Projekt.changeset(projekt, update_attrs), proposal, decision_attrs)
     end)
   end
 
@@ -150,8 +163,11 @@ defmodule Ratsprojekte.ProposalApplier do
       decision_attrs = decision_attrs(:approved, opts)
 
       Repo.transaction(fn ->
-        Repo.update!(Realisierungsstrang.changeset(strang, update_attrs))
-        Repo.update!(PendingProposal.decision_changeset(proposal, decision_attrs))
+        commit_update(
+          Realisierungsstrang.changeset(strang, update_attrs),
+          proposal,
+          decision_attrs
+        )
       end)
     end
   end
@@ -174,6 +190,30 @@ defmodule Ratsprojekte.ProposalApplier do
   end
 
   # --- Helpers (entsprechend der bisherigen LiveView-Logik) ---
+
+  # Beide laufen innerhalb der Transaktion des Aufrufers: Schlägt das
+  # Anlegen/Aktualisieren fehl, rollt die Transaktion zurück und das
+  # Proposal bleibt `pending` — die Changeset-Fehler gehen als
+  # {:error, changeset} an den Aufrufer (LiveView wie decide_proposal).
+  defp commit_insert(changeset, proposal, decision_attrs) do
+    case Repo.insert(changeset) do
+      {:ok, _record} ->
+        Repo.update!(PendingProposal.decision_changeset(proposal, decision_attrs))
+
+      {:error, changeset} ->
+        Repo.rollback(changeset)
+    end
+  end
+
+  defp commit_update(changeset, proposal, decision_attrs) do
+    case Repo.update(changeset) do
+      {:ok, _record} ->
+        Repo.update!(PendingProposal.decision_changeset(proposal, decision_attrs))
+
+      {:error, changeset} ->
+        Repo.rollback(changeset)
+    end
+  end
 
   defp decision_attrs(status, opts) do
     %{

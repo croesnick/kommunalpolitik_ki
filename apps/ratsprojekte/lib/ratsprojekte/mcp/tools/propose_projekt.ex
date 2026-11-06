@@ -40,6 +40,18 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjekt do
 
     field(:beschreibung, :string, description: "Beschreibung des Projekts (optional)")
 
+    field(:value_proposition, :string,
+      description:
+        "Welches konkrete Problem löst das Projekt, für wen? Kein reines " <>
+          "\"Digitalisierung von X\" (Hard Gate, > 20 Zeichen, optional)"
+    )
+
+    field(:success_metrics, :string,
+      description:
+        "Woran wird der Erfolg gemessen? Mindestens eine messbare Größe " <>
+          "(Hard Gate, > 10 Zeichen, optional)"
+    )
+
     field(:prioritaet, :string,
       description: "Priorität: 'hoch', 'mittel' (default) oder 'niedrig' (optional)"
     )
@@ -73,7 +85,9 @@ defmodule Ratsprojekte.MCP.Tools.ProposeProjekt do
         "titel" => params[:titel],
         "slug" => params[:slug],
         "beschreibung" => params[:beschreibung],
-        "prioritaet" => params[:prioritaet] || "mittel"
+        "prioritaet" => params[:prioritaet] || "mittel",
+        "value_proposition" => params[:value_proposition],
+        "success_metrics" => params[:success_metrics]
       }
 
       attrs = %{

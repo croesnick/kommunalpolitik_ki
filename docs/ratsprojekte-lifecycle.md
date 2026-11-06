@@ -26,7 +26,7 @@ stateDiagram-v2
     }
     note right of Proposal_Pending
         pending_proposals (DB)
-        typ: add_projekt | add_realisierungsstrang | change_status
+        typ: add_projekt | add_realisierungsstrang | change_status | update_projekt | update_strang
         KI schlägt vor, Mensch entscheidet (GO-Prinzip).
     end note
 
@@ -129,12 +129,17 @@ nicht antragsreif, auch wenn alle anderen Hard Gates passieren.
 
 ### Enforcement-Status
 
-- **Policy-level (ab sofort verbindlich):** Die KI prüft VP+SM vor jedem
-  `propose_*`-Aufruf und trägt sie in die `begruendung` ein. Ein Proposal
-  ohne VP+SM wird nicht vorgeschlagen.
-- **Code-level (Roadmap):** Die Felder `value_proposition` und
-  `success_metrics` werden als Projekt-Spalten + Hard Gates in
-  `check_antragsreife` nachgezogen. Bis dahin ist die Regel dokumentenbasiert.
+- **Code-level (verbindlich, #37):** `value_proposition` und `success_metrics`
+  sind Spalten an `projekte`. `check_antragsreife` prüft beide als Hard Gates
+  (`value_proposition_vorhanden` > 20 Zeichen,
+  `success_metrics_vorhanden` > 10 Zeichen). Die Felder sind per Proposal
+  setzbar (`propose_projekt`, `propose_projekt_update`) — das GO-Prinzip
+  bleibt gewahrt. Die Kriterien im Detail: `priv/antragsreife_kriterien.md`
+  in `apps/ratsprojekte`.
+- **Policy-level (weiterhin gültig):** Die KI prüft VP+SM vor jedem
+  `propose_*`-Aufruf. Ein Proposal ohne VP+SM wird nicht vorgeschlagen —
+  seit #37 trägt die KI sie in die eigenen Felder, nicht nur in die
+  `begruendung`.
 
 ## Beziehung zum Vault-Workflow
 

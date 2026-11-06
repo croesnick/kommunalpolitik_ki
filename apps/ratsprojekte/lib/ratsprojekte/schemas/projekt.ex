@@ -1,6 +1,7 @@
 defmodule Ratsprojekte.Schemas.Projekt do
   use Ecto.Schema
   import Ecto.Changeset
+  import Ratsprojekte.Present
 
   schema "projekte" do
     field(:titel, :string)
@@ -9,6 +10,8 @@ defmodule Ratsprojekte.Schemas.Projekt do
     field(:prioritaet, Ecto.Enum, values: [:hoch, :mittel, :niedrig], default: :mittel)
     field(:beschlussvorschlag, :string)
     field(:adressat, :string)
+    field(:value_proposition, :string)
+    field(:success_metrics, :string)
     field(:abgeschlossen_am, :date)
     field(:verworfen_am, :date)
     field(:verworfen_grund, :string)
@@ -20,6 +23,14 @@ defmodule Ratsprojekte.Schemas.Projekt do
     timestamps(type: :utc_datetime)
   end
 
+  # Schwellen spiegeln die Hard Gates in check_antragsreife bzw.
+  # priv/antragsreife_kriterien.md: VP und SM sind dort erst ab
+  # mehr als 20 bzw. mehr als 10 Zeichen konkret genug. Die inhaltliche
+  # Qualität (kein reines „Digitalisierung von X") prüft das Gate als
+  # :warn — ein Changeset-Veto am GO des Stadtrats wäre der falsche Ort.
+  @value_proposition_min_chars 21
+  @success_metrics_min_chars 11
+
   def changeset(projekt, attrs) do
     projekt
     |> cast(attrs, [
@@ -29,6 +40,8 @@ defmodule Ratsprojekte.Schemas.Projekt do
       :prioritaet,
       :beschlussvorschlag,
       :adressat,
+      :value_proposition,
+      :success_metrics,
       :abgeschlossen_am,
       :verworfen_am,
       :verworfen_grund,
@@ -36,6 +49,8 @@ defmodule Ratsprojekte.Schemas.Projekt do
     ])
     |> validate_required([:titel, :slug])
     |> validate_format(:slug, ~r/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    |> validate_length(:value_proposition, min: @value_proposition_min_chars)
+    |> validate_length(:success_metrics, min: @success_metrics_min_chars)
     |> unique_constraint(:slug)
     |> validate_status_dates()
   end
@@ -64,9 +79,4 @@ defmodule Ratsprojekte.Schemas.Projekt do
         changeset
     end
   end
-
-  defp present?(nil), do: false
-  defp present?(""), do: false
-  defp present?(value) when is_binary(value), do: String.trim(value) != ""
-  defp present?(_), do: true
 end

@@ -97,5 +97,5 @@ Proposal einbringen). OpenCode lädt sie automatisch aus `skills/`.
 | 4 | Slug-Routen (`/projekte/:slug`) | fertig |
 | 5 | AI-Skills `ratsprojekt_stand`, `ratsprojekt_delta`, `ratsprojekt_proposal` | fertig |
 | 6 | Antragsvorlagen-Generator (#15) | offen |
-| 7 | Ratsinfo-Integration: Quellen mit Sitzung/TOP verlinken | offen |
-| 8 | `value_proposition` + `success_metrics` als Antragsreife-Gates (#37) | offen |
+| 7 | Ratsinfo-Integration: Quellen mit Sitzung/TOP verlinken | fertig (#32) — Felder, Anzeige, lesende Tools; Erfassung nur über Seeds/direkte DB |
+| 8 | `value_proposition` + `success_metrics` als Antragsreife-Gates (#37) | fertig (#37) |
