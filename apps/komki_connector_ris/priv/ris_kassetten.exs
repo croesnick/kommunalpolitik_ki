@@ -16,7 +16,7 @@
 # Klartext erst nach bestandener Gegenprobe von der Platte.
 #
 # Bedrohungsmodell: Gesichert ist die Ablage — kein Prozess (auch kein
-# Agent) liest versiegelte Kassetten ohne die Person am Mac. Nicht gesichert
+# Agent) liest verschluesselte Kassetten ohne die Person am Mac. Nicht gesichert
 # sind Laufzeitfenster: waehrend der Aufzeichnung und waehrend unseal liegt
 # Klartext auf der Platte (optionale Haertung: Recorder --out auf eine
 # RAM-Disk, siehe README). Meldungen nennen nie Schluessel, Siegel oder
@@ -639,7 +639,7 @@ defmodule KomkiConnectorRis.RisKassetten do
 
   defp seal_files(files, dir, opts) do
     if files.json == [] do
-      {0, [{:out, "ris_kassetten: keine Kassetten zu versiegeln (nur *.json), nichts zu tun"}]}
+      {0, [{:out, "ris_kassetten: keine Kassetten zu verschluesseln (nur *.json), nichts zu tun"}]}
     else
       case load_master_key("RIS-Kassetten verschluesseln", opts) do
         {:ok, key} ->
@@ -653,7 +653,7 @@ defmodule KomkiConnectorRis.RisKassetten do
   end
 
   # Dateien, die keine *.json-Kassetten sind, bleiben unberuehrt Klartext —
-  # sichtbar machen statt einen versiegelten Schein zu erwecken.
+  # sichtbar machen statt einen verschluesselten Schein zu erwecken.
   defp other_warning(files) do
     if files.other == [] do
       []
@@ -670,7 +670,7 @@ defmodule KomkiConnectorRis.RisKassetten do
     {0,
      [
        {:out,
-        "ris_kassetten: #{n} Kassette(n) versiegelt; der Schluessel war nur fuer diesen Lauf im Speicher"}
+        "ris_kassetten: #{n} Kassette(n) verschluesselt; der Schluessel war nur fuer diesen Lauf im Speicher"}
        | Enum.reverse(acc)
      ]}
   end
@@ -678,7 +678,7 @@ defmodule KomkiConnectorRis.RisKassetten do
   defp seal_each([name | rest], dir, key, n, acc) do
     case seal_one(Path.join(dir, name), key) do
       :ok ->
-        seal_each(rest, dir, key, n + 1, [{:out, "versiegelt: #{name}"} | acc])
+        seal_each(rest, dir, key, n + 1, [{:out, "verschluesselt: #{name}"} | acc])
 
       # Nicht loeschbarer Klartext ist ein lokales Problem dieser Datei
       # (Flag, Rechte): eigene .enc entsorgen, ueberspringen, weitermachen —
@@ -693,14 +693,14 @@ defmodule KomkiConnectorRis.RisKassetten do
         {1,
          [
            {:err,
-            "ris_kassetten: abgebrochen bei #{name}: #{msg}; #{n} versiegelt, " <>
+            "ris_kassetten: abgebrochen bei #{name}: #{msg}; #{n} verschluesselt, " <>
               "#{length(rest) + 1} offen — Stand mit status pruefen, erneutes seal vollendet"}
            | Enum.reverse(acc)
          ]}
     end
   end
 
-  # Eine Kassette versiegeln: atomar schreiben (Exklusiv, sync, 0600, rename),
+  # Eine Kassette verschluesseln: atomar schreiben (Exklusiv, sync, 0600, rename),
   # Gegenprobe von der Platte, erst dann den Klartext loeschen.
   defp seal_one(json, key) do
     enc = json <> ".enc"
@@ -779,7 +779,7 @@ defmodule KomkiConnectorRis.RisKassetten do
          [
            {:err,
             "ris_kassetten: abgebrochen bei #{name}: #{msg}; #{n} entschluesselt, " <>
-              "#{length(rest) + 1} versiegelt — Stand mit status pruefen, erneutes unseal vollendet"}
+              "#{length(rest) + 1} verschluesselt — Stand mit status pruefen, erneutes unseal vollendet"}
            | Enum.reverse(acc)
          ]}
     end
@@ -801,7 +801,7 @@ defmodule KomkiConnectorRis.RisKassetten do
 
         {:error, reason} ->
           _ = File.rm(json)
-          {:skip, "versiegelte Datei nicht loeschbar (#{inspect(reason)}); zurueckgerollt"}
+          {:skip, "verschluesselte Datei nicht loeschbar (#{inspect(reason)}); zurueckgerollt"}
       end
     else
       {:error, :bad_magic} -> {:error, 5, "keine rkt1-Kassette"}
@@ -824,7 +824,7 @@ defmodule KomkiConnectorRis.RisKassetten do
       {0,
        [
          {:out,
-          "ris_kassetten: #{length(files.json)} Klartext-Kassette(n), #{length(files.enc)} versiegelt" <>
+          "ris_kassetten: #{length(files.json)} Klartext-Kassette(n), #{length(files.enc)} verschluesselt" <>
             sonstige}
        ]}
     else

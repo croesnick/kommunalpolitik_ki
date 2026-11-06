@@ -237,9 +237,9 @@ defmodule KomkiConnectorRis.RisKassettenTest do
                zweite
              ] = for({:out, text} <- seal_meldungen, do: text)
 
-      assert summary =~ "2 Kassette(n) versiegelt"
-      assert erste == "versiegelt: 0001-get-guestmeetings.json"
-      assert zweite == "versiegelt: 0002-post-auth.json"
+      assert summary =~ "2 Kassette(n) verschluesselt"
+      assert erste == "verschluesselt: 0001-get-guestmeetings.json"
+      assert zweite == "verschluesselt: 0002-post-auth.json"
 
       Enum.each(kassetten, fn {name, _content} ->
         enc = Path.join(dir, name <> ".enc")
@@ -364,7 +364,7 @@ defmodule KomkiConnectorRis.RisKassettenTest do
       assert File.read!(Path.join(dir, "0001-get-x.json.new")) == "alt"
     end
 
-    test "Mischzustand: seal versiegelt nur offene Kassetten und laesst .enc in Ruhe" do
+    test "Mischzustand: seal verschluesselt nur offene Kassetten und laesst .enc in Ruhe" do
       dir = tmp_area!("gemischt")
       opts = initialisiert!(dir)
       kassette!(dir, "0001-get-a.json", ~s({"a":"#{@kanarie}"}))
@@ -377,7 +377,7 @@ defmodule KomkiConnectorRis.RisKassettenTest do
       assert File.read!(Path.join(dir, "0003-get-c.json.enc")) == fremd
 
       {0, meldungen} = RisKassetten.run(["status", dir], opts)
-      assert Enum.any?(texts(meldungen), &(&1 =~ "0 Klartext-Kassette(n), 3 versiegelt"))
+      assert Enum.any?(texts(meldungen), &(&1 =~ "0 Klartext-Kassette(n), 3 verschluesselt"))
     end
 
     test "nicht-Kassetten bleiben sichtbar: Warnung beim seal, Zaehler bei status" do
@@ -394,7 +394,7 @@ defmodule KomkiConnectorRis.RisKassettenTest do
 
       assert Enum.any?(
                texts(status_meldungen),
-               &(&1 =~ "0 Klartext-Kassette(n), 1 versiegelt" and &1 =~ "sonstige")
+               &(&1 =~ "0 Klartext-Kassette(n), 1 verschluesselt" and &1 =~ "sonstige")
              )
     end
 
@@ -511,7 +511,7 @@ defmodule KomkiConnectorRis.RisKassettenTest do
 
       {0, meldungen} = RisKassetten.run(["status", dir], tresor: tresor, security: security)
 
-      assert Enum.any?(texts(meldungen), &(&1 =~ "1 Klartext-Kassette(n), 1 versiegelt"))
+      assert Enum.any?(texts(meldungen), &(&1 =~ "1 Klartext-Kassette(n), 1 verschluesselt"))
       refute File.exists?(Path.join(dir, "tresor-marker"))
       refute File.exists?(Path.join(dir, "security-marker"))
     end

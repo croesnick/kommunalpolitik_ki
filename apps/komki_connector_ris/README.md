@@ -106,7 +106,7 @@ oder ExVCR.
   Client und Upstream erhalten alles ungeschwärzt, nur die Datei ist geschwärzt.
 
 Geschwärzt heißt nicht verschlüsselt: Was nicht geschwärzt wurde, bleibt in der Kassette Klartext.
-`priv/ris_kassetten.exs` versiegelt deshalb nach der Session alle `*.json` des Verzeichnisses
+`priv/ris_kassetten.exs` verschlüsselt deshalb nach der Session alle `*.json` des Verzeichnisses
 (AES-256-GCM, Schlüssel per Touch ID aus der Secure Enclave; Abschnitt „Kassetten verschlüsseln“
 unten). Ohne diese Freigabe bleibt jedem Prozess — auch jedem Agenten — nur der Chiffretext.
 
@@ -156,7 +156,7 @@ Abdeckung eine Aufzeichnungs-Session mit allen Flows fahren und die Suchterme va
 üblich aus `RIS_EMAIL`/`RIS_PASSWORD`), Sitzungsliste, TOP-Details, Volltextsuche mit mehreren
 Termen, Anlagen-Downloads, Gremienliste.
 
-### Skelett-Extraktor: Format ohne Inhalte
+### Schema inference: Format ohne Inhalte
 
 `priv/ris_skeleton.exs` (Ticket #232) gewinnt aus Kassetten eine rein strukturelle
 Formatspezifikation: rekursive Schlüsselmengen, Typen, Formen (ISO-Datum, ID-Muster, Base64-HTML)
@@ -173,12 +173,12 @@ Schlüssel und überlappende Array-Längen gelten nicht als Drift, weil sie mit 
 schwanken. Damit lässt sich prüfen, ob der Mock oder ein späterer Generator formatgetreu ist.
 
 Committbare Testdaten entstehen nie aus den Kassetten selbst, sondern aus synthetischen Inhalten im
-echten Format. Der Skelett-Bericht ist die Vorlage dieses Generators; ein Verifier (N-Gramm-Abgleich
+echten Format. Das inferred schema ist die Vorlage dieses Generators; ein Verifier (N-Gramm-Abgleich
 gegen die Aufzeichnungen) ist als Freigabetor vor jedem Committen von Kassetten geplant.
 
 ### Kassetten verschlüsseln (Touch ID)
 
-`priv/ris_kassetten.exs` versiegelt ein Kassettenverzeichnis mit AES-256-GCM, damit kein Prozess —
+`priv/ris_kassetten.exs` verschlüsselt ein Kassettenverzeichnis mit AES-256-GCM, damit kein Prozess —
 auch kein Agent — die Kassetten ohne die Person am Mac lesen kann. Der Schlüssel liegt nur als
 Siegel von `komki-tresor` im macOS-Schlüsselbund (Eintrag `ris-kassetten`), gebunden an die Secure
 Enclave dieses Macs; jede Ver- und Entschlüsselung löst genau eine Freigabe per Touch ID (oder
@@ -191,13 +191,13 @@ elixir apps/komki_connector_ris/priv/ris_kassetten.exs unseal <verzeichnis>
 elixir apps/komki_connector_ris/priv/ris_kassetten.exs status <verzeichnis>
 ```
 
-Ablauf einer Session: aufzeichnen, Leak-Prüfung und Skelett-Bericht wie gehabt, danach `seal` —
+Ablauf einer Session: aufzeichnen, Leak-Prüfung und inferred schema wie gehabt, danach `seal` —
 dann liegen nur noch `<name>.json.enc` (Magic `rkt1`, je Datei eigene Nonce). `seal` löscht den
 Klartext erst nach bestandener Gegenprobe von der Platte. Dateien, die keine `*.json` sind,
 bleiben unberührt und werden gemeldet — sie sind keine Kassetten. Meldungen nennen nie Schlüssel,
 Siegel oder Inhalte, nur Namen und Zähler.
 
-- Replay und Skelett-Extraktor lesen `*.json`: vorher `unseal`, danach `seal`.
+- Replay und `priv/ris_skeleton.exs` lesen `*.json`: vorher `unseal`, danach `seal`.
 - Abbrüche lassen einen sichtbaren Mischzustand: `status` zeigt ihn, ein erneutes
   `seal`/`unseal` vollendet. Nicht löschbare Dateien werden übersprungen und gemeldet; eine
   Restdatei `<name>.json.new` aus einem Crash blockiert mit klarer Meldung. Beide überschreiben
