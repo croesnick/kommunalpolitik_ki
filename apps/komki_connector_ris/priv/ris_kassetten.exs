@@ -28,12 +28,12 @@
 # wie ris_recorder — auch durch Symlinks hindurch). Replay und ris_skeleton
 # lesen *.json: vorher unseal, danach seal.
 #
-# check (#328) sucht Geheimnisse in Klartext-Kassetten, bevor sie versiegelt
-# werden: die Werte aus .env (RIS_EMAIL, RIS_PASSWORD) und der token-Datei
-# des Konfig-Verzeichnisses, im Rohtext jeder Kassette und in den Base64-
-# dekodierten Bodies. Ohne Verzeichnis prueft es alle Zeitstempel-Verzeichnisse
-# der Kassetten-Basis. Keine Freigabe noetig (wie status), Meldungen nennen
-# Namen und Zaehler, nie Geheimnis-Werte.
+# check (#328) scans plaintext cassettes for secrets before sealing: the
+# values from .env (RIS_EMAIL, RIS_PASSWORD) and the token file of the
+# config directory, in each cassette's raw text and in the Base64-decoded
+# bodies. Without a directory it checks the timestamp directories under
+# the cassette base. No Touch ID release needed (like status); messages
+# name names and counters, never secret values.
 #
 # Nur OTP (:crypto, Ports), keine Deps. Die Port-Muster sind aus komki_cli
 # dupliziert statt importiert (Unix-Prinzip; Andockpunkt: Tresor-Kern #224).
@@ -74,11 +74,13 @@ defmodule KomkiConnectorRis.RisKassetten do
 
   @usage "Aufruf: init | seal <verzeichnis> | unseal <verzeichnis> | status <verzeichnis> | check [verzeichnis] [--tresor <programm>]"
 
-  # check liest nur Klartext — Konfig- und Basis-Verzeichnis sind fuer Tests
-  # ueberschreibbar (run/2-opts), der Aufruf am Terminal nutzt die Defaults.
+  # check reads plaintext only — config and base directories are
+  # overridable for tests (run/2 opts); the terminal call uses the defaults.
   @config_dir "~/.config/kommunalpolitik_ki"
   @cassette_base "~/.local/share/kommunalpolitik_ki/ris-cassettes"
   @secret_env_keys ~w(RIS_EMAIL RIS_PASSWORD)
+  # Recorder session directories are named YYYYMMDDTHHMMSSZ.
+  @zeitstempel ~r/\A\d{8}T\d{6}Z\z/
 
   @type tresor_error ::
           :missing_bin | :no_enclave | :refused | :invalid | :timeout | {:failed, integer()}
@@ -111,7 +113,7 @@ defmodule KomkiConnectorRis.RisKassetten do
        do: parse_flags(cmd, rest, dir, opts)
 
   defp parse_flags("init", [], nil, opts), do: {:ok, nil, opts}
-  # check ohne Verzeichnis: alle Zeitstempel-Verzeichnisse der Basis.
+  # check without a directory: the timestamp directories of the base.
   defp parse_flags("check", [], nil, opts), do: {:ok, nil, opts}
   defp parse_flags(_cmd, [], dir, opts) when is_binary(dir), do: {:ok, dir, opts}
   defp parse_flags(_cmd, _other, _dir, _opts), do: :error
@@ -852,23 +854,23 @@ defmodule KomkiConnectorRis.RisKassetten do
     end
   end
 
-  # --- check: Geheimnisse in Klartext-Kassetten (#328) -------------------------------------
+  # --- check: secrets in plaintext cassettes (#328) ---------------------------------------
   #
-  # Geprueft werden *.json und *.json.new (Klartext-Rest eines abgestuerzten
-  # unseal); Chiffretext (*.json.enc, *.json.enc.new) und sonstige Dateien
-  # werden uebersprungen und gemeldet. Ohne Verzeichnis: alle Zeitstempel-
-  # Verzeichnisse unter der Kassetten-Basis; ein Verzeichnis ohne eigenen
-  # Klartext mit Unterverzeichnissen gilt als Sammel-Verzeichnis. Ist Klartext
-  # da, aber kein Geheimnis ladbar, gilt die Pruefung als gescheitert —
-  # nichts geprueft ist nicht sauber.
+  # Scanned are *.json and *.json.new (plaintext leftover of a crashed
+  # unseal); ciphertext (*.json.enc, *.json.enc.new) is skipped and
+  # reported. Without a directory: the timestamp directories under the
+  # cassette base; a directory without own plaintext but with
+  # subdirectories counts as a collection directory. With plaintext
+  # present but no secret loadable, the run counts as failed — nothing
+  # checked is not clean.
 
   @spec check(Path.t() | nil, keyword()) :: {non_neg_integer(), [meldung()]}
   defp check(nil, opts) do
     base = Path.expand(Keyword.get(opts, :cassette_base, @cassette_base))
 
-    case subdirs(base) do
+    case zeitstempel_dirs(base) do
       [] ->
-        {0, [{:out, "ris_kassetten: keine Kassetten-Verzeichnisse unter #{base}"}]}
+        {0, [{:out, "ris_kassetten: keine Zeitstempel-Verzeichnisse unter #{base}"}]}
 
       dirs ->
         check_dirs(dirs, opts)
@@ -878,7 +880,7 @@ defmodule KomkiConnectorRis.RisKassetten do
   defp check(dir, opts) do
     with :ok <- require_dir(dir) do
       case plain_files(dir) do
-        {:ok, []} ->
+        {:ok, %{plain: []}} ->
           case subdirs(dir) do
             [] -> {0, [{:out, skip_note(dir)}]}
             dirs -> check_dirs(dirs, opts)
@@ -895,14 +897,15 @@ defmodule KomkiConnectorRis.RisKassetten do
     end
   end
 
-  # Verzeichnisse zusammen pruefen: Skip- und Fehlermeldungen laufen mit,
-  # der Rest konvergiert weiter (wie seal bei nicht loeschbaren Dateien).
-  # Ein unlesbares Verzeichnis verhindert die Aussage "sauber": Exit 1.
+  # Directories checked together: skip and error lines ride along, the
+  # rest keeps converging (like seal on undeletable files). An unreadable
+  # file or directory voids the verdict "clean": exit 1 — deliberate
+  # extension of #328's exit codes, nothing checked is not clean.
   defp check_dirs(dirs, opts) do
     {skips, scanable, errors} =
       Enum.reduce(dirs, {[], [], []}, fn dir, {sk, acc, err} ->
         case plain_files(dir) do
-          {:ok, []} -> {[skip_note(dir) | sk], acc, err}
+          {:ok, %{plain: []}} -> {[skip_note(dir) | sk], acc, err}
           {:ok, files} -> {sk, [{dir, files} | acc], err}
           {:error, _code, msg} -> {sk, acc, [msg | err]}
         end
@@ -921,7 +924,7 @@ defmodule KomkiConnectorRis.RisKassetten do
       true ->
         case load_secrets(opts) do
           [] ->
-            config = Path.expand(Keyword.get(opts, :config_dir, @config_dir))
+            config = config_dir(opts)
 
             {1,
              fehler_zeilen ++
@@ -950,15 +953,16 @@ defmodule KomkiConnectorRis.RisKassetten do
 
   defp scan_dirs(scanable, secrets) do
     Enum.reduce(scanable, {0, 0, 0, []}, fn {dir, files}, {f, g, u, acc} ->
-      {dir_funde, dir_unlesbar, dir_meldungen} = scan_dir(dir, files, secrets)
+      {dir_funde, dir_unlesbar, dir_meldungen} = scan_dir(dir, files.plain, secrets)
 
       funde = f + dir_funde
-      geprueft = g + length(files) - dir_unlesbar
+      geprueft = g + length(files.plain) - dir_unlesbar
       unlesbar = u + dir_unlesbar
 
       summary =
-        "ris_kassetten: #{Path.basename(dir)}: #{length(files) - dir_unlesbar} Kassette(n)" <>
-          " geprueft#{unlesbar_text(dir_unlesbar)}, #{dir_funde} Funde"
+        "ris_kassetten: #{Path.basename(dir)}: #{length(files.plain) - dir_unlesbar} Kassette(n)" <>
+          " geprueft#{unlesbar_text(dir_unlesbar)}#{versiegelt_text(files.sealed)}" <>
+          ", #{dir_funde} Funde"
 
       {funde, geprueft, unlesbar, [{:out, summary} | dir_meldungen ++ acc]}
     end)
@@ -969,7 +973,7 @@ defmodule KomkiConnectorRis.RisKassetten do
       Enum.reduce(files, {0, 0, []}, fn name, {f, u, acc} ->
         case File.read(Path.join(dir, name)) do
           {:ok, raw} ->
-            content = raw |> blobs() |> Enum.uniq()
+            content = raw |> plaintext_parts() |> Enum.uniq()
 
             hits =
               for {sname, sval} <- secrets,
@@ -986,8 +990,8 @@ defmodule KomkiConnectorRis.RisKassetten do
             {f, u + 1,
              [
                {:err,
-                "ris_kassetten: #{name} (#{Path.basename(dir)}) unlesbar, uebersprungen" <>
-                  " (#{inspect(reason)})"}
+                "ris_kassetten: #{name} (#{Path.basename(dir)}) unlesbar — " <>
+                  "Pruefung unvollstaendig (#{inspect(reason)})"}
                | acc
              ]}
         end
@@ -996,10 +1000,10 @@ defmodule KomkiConnectorRis.RisKassetten do
     {funde, unlesbar, Enum.reverse(meldungen)}
   end
 
-  # Klartext einer Kassette: Rohtext plus die Base64-dekodierten Bodies von
-  # Anfrage und Antwort. Ungueltiges JSON (etwa ein Crash-Rest) bleibt beim
-  # Rohtext — auch dann wird ein Geheimnis im Klartext gefunden.
-  defp blobs(raw) do
+  # Plaintext parts of a cassette: raw text plus the Base64-decoded
+  # request and response bodies. Invalid JSON (a crash leftover, say)
+  # falls back to raw text — a secret in plaintext is found either way.
+  defp plaintext_parts(raw) do
     case decode_json(raw) do
       %{} = cassette ->
         [raw | Enum.flat_map(["request", "response"], &part_body(cassette, &1))]
@@ -1036,25 +1040,27 @@ defmodule KomkiConnectorRis.RisKassetten do
 
   defp body_of(_), do: []
 
-  # Geheimnisse aus dem Konfig-Verzeichnis — nie von der Kommandozeile
-  # (Shell-History). Fehlende Dateien sind keine Fehler: wer keine .env hat,
-  # dessen token bleibt pruefbar.
+  # Secrets come from the config directory — never from the command line
+  # (shell history). Missing files are not errors: without a .env the
+  # token stays checkable.
   defp load_secrets(opts) do
-    config = Path.expand(Keyword.get(opts, :config_dir, @config_dir))
+    config = config_dir(opts)
     read_env_secrets(Path.join(config, ".env")) ++ read_token(Path.join(config, "token"))
   end
 
+  defp config_dir(opts), do: Path.expand(Keyword.get(opts, :config_dir, @config_dir))
+
+  # .env parsing mirrors Ratsinfo.Config.parse_env exactly: unanchored
+  # regex, first occurrence wins, no comment handling. A commented-out or
+  # export-prefixed value is one ratsinfo would send — what ratsinfo
+  # could send is what check must search for.
   defp read_env_secrets(path) do
     case File.read(path) do
       {:ok, content} ->
-        content
-        |> String.split("\n")
-        |> Enum.map(&String.trim/1)
-        |> Enum.reject(&(String.length(&1) == 0 or String.starts_with?(&1, "#")))
-        |> Enum.flat_map(fn line ->
-          case String.split(line, "=", parts: 2) do
-            [key, value] when key in @secret_env_keys and value != "" -> [{key, value}]
-            _ -> []
+        Enum.flat_map(@secret_env_keys, fn key ->
+          case Regex.run(~r/#{key}=(.+)/, content, capture: :all_but_first) do
+            [value | _] -> [{key, value}]
+            nil -> []
           end
         end)
 
@@ -1063,25 +1069,30 @@ defmodule KomkiConnectorRis.RisKassetten do
     end
   end
 
+  # Parity with Ratsinfo.Auth: a token of 10 bytes or less is never sent,
+  # so searching for it would only add noise.
   defp read_token(path) do
     case File.read(path) do
       {:ok, token} ->
         token = String.trim(token)
-        if token == "", do: [], else: [{"token", token}]
+        if byte_size(token) > 10, do: [{"token", token}], else: []
 
       {:error, _} ->
         []
     end
   end
 
-  # Klartext-Kassetten des Verzeichnisses: *.json plus *.json.new-Rest aus
-  # einem abgestuerzten unseal. Chiffretext-Reste (*.json.enc.new) und
-  # sonstige Dateien zaehlen nicht — sie tragen nie Klartext.
+  # Plaintext cassettes of a directory: *.json plus *.json.new leftovers
+  # of a crashed unseal, and the count of skipped ciphertext (*.json.enc,
+  # *.json.enc.new — never plaintext). Other files are neither.
   defp plain_files(dir) do
     case list_ok(dir) do
       {:ok, files} ->
         rests = Enum.filter(files.other, &String.ends_with?(&1, ".json.new"))
-        {:ok, Enum.sort(files.json ++ rests)}
+        chiffre = Enum.filter(files.other, &String.ends_with?(&1, ".enc.new"))
+
+        {:ok,
+         %{plain: Enum.sort(files.json ++ rests), sealed: length(files.enc) + length(chiffre)}}
 
       {:error, code, msg} ->
         {:error, code, msg}
@@ -1101,6 +1112,15 @@ defmodule KomkiConnectorRis.RisKassetten do
     end
   end
 
+  # The recorder creates one timestamp directory per session; the default
+  # call (no directory) checks exactly those (#328). Anything else under
+  # the base is not a recording session.
+  defp zeitstempel_dirs(base) do
+    base
+    |> subdirs()
+    |> Enum.filter(&(Path.basename(&1) =~ @zeitstempel))
+  end
+
   defp skip_note(dir),
     do:
       "ris_kassetten: #{Path.basename(dir)}: kein Klartext (versiegelt oder leer), uebersprungen"
@@ -1110,6 +1130,9 @@ defmodule KomkiConnectorRis.RisKassetten do
 
   defp unlesbar_text(0), do: ""
   defp unlesbar_text(n), do: ", #{n} unlesbar"
+
+  defp versiegelt_text(0), do: ""
+  defp versiegelt_text(n), do: ", #{n} versiegelt uebersprungen"
 
   # --- gemeinsame Vorpruefung -------------------------------------------------------------
 
