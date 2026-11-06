@@ -94,6 +94,10 @@ defmodule KomkiCli.DoctorBootTest do
     # Ticket #176: run startet fehlende Prozesse selbst (wie up). In diesem
     # Testumfeld scheitert der Start; die Ursache kommt mit Runtime-Exit 4,
     # statt dass run auf 'komki up' verweist.
+    #
+    # Boots the real llama-server with the 17 GB model (~45 s on this host),
+    # so ExUnit's default 60 s limit flakes under parallel load.
+    @tag timeout: 180_000
     test "run ohne laufenden llama-server startet selbst; scheitert der Start, kommt die Ursache (Exit 4)" do
       # Der Startversuch kann einen echten llama-server hochfahren: danach
       # immer stoppen, sonst bleibt er als Waise auf dem Testport.

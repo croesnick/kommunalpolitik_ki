@@ -15,16 +15,18 @@ defmodule KomkiMediator.Tools.AdmitDocument do
   alias KomkiMediator.{Env, Gate, PDR}
   alias Sidecar.Client
 
-  # Schema und Beschreibung wie im Manifest `documents` (Ticket #169);
+  # Schema wie im Manifest `documents` (Ticket #169);
   # KomkiMediator.FassungTest haelt beide gleich.
   schema do
     field(:document_id, :string, required: true, max_length: 64, pattern: "^[a-z0-9-]+$")
   end
 
+  # The manifest is the single source of the description.
+  {:ok, manifest, op} = Manifest.by_tool("admit_document")
+  @description manifest.ops[op].description
+
   @impl true
-  def description,
-    do:
-      "Ein Raumdokument anhand seiner document_id zum Agentenkontext zulassen (z. B. \"doc-oeffentlich\")."
+  def description, do: @description
 
   @impl true
   def execute(params, frame) do
