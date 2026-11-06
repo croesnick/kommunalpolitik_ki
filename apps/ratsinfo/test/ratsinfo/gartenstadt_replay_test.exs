@@ -1,11 +1,11 @@
 defmodule Ratsinfo.GartenstadtReplayTest do
-  # Nicht async: RIS_BASE_URL ist knotenweit, MockRis bindet einen Port.
+  # Not async: RIS_BASE_URL is node-global, and MockRis binds a port.
   use ExUnit.Case, async: false
 
-  # Der RIS-Mock ist ein eigenstaendiges Nur-OTP-Skript der Connector-App.
-  # Im Monorepo liegt es nebenan und wird hier per require_file geladen, ohne
-  # eine mix-Abhaengigkeit: ratsinfo spricht HTTP gegen denselben Loopback
-  # und kennt keine Interna der Connector-App (Unix-Prinzip).
+  # The RIS mock is a standalone OTP-only script of the connector app.
+  # In the monorepo it lives next door and is loaded here via require_file,
+  # without a mix dependency: ratsinfo speaks plain HTTP to the same
+  # loopback and knows no internals of the connector app (Unix principle).
   @mock Path.expand("../../../komki_connector_ris/priv/mock_ris.exs", __DIR__)
   @fixtures Path.expand("../../../komki_connector_ris/test/fixtures/gartenstadt", __DIR__)
 
@@ -22,19 +22,19 @@ defmodule Ratsinfo.GartenstadtReplayTest do
 
     token = "gartenstadt-synthese-token"
 
-    # Login liefert das synthetische Token aus der Kassette.
+    # Login returns the synthetic token from the cassette.
     assert {:ok, ^token} = ApiClient.login("gartenstadt", "synthetisch")
 
-    # Gast-Liste: alle 33 Sitzungen des Strukturprofils.
+    # Guest list: all 33 meetings of the structure profile.
     assert {:ok, sitzungen} = ApiClient.list_sitzungen()
     assert length(sitzungen) == 33
 
-    # Gremienliste: neun Eintraege wie im echten Format.
+    # Committee list: nine entries as in the real format.
     assert {:ok, gremien} = ApiClient.list_gremien(token)
     assert length(gremien) == 9
 
-    # TOP-Details im authentifizierten Format; Kassetten gibt es nur fuer die
-    # Auswahl nach Abdeckung, die TOP-ID kommt deshalb aus dem Fixture-Satz.
+    # TOP details in the authenticated format; cassettes exist only for the
+    # coverage selection, so the TOP ID comes from the fixture set.
     [sitzung_id, top_id] =
       @fixtures
       |> File.ls!()
@@ -46,8 +46,8 @@ defmodule Ratsinfo.GartenstadtReplayTest do
     assert {:ok, top} = ApiClient.get_top(String.to_integer(sitzung_id), top_id, token)
     assert is_binary(top["name"]) and is_list(top["textblocks"])
 
-    # Volltextsuche: Alle vier Lindenallee-TOPs, mit restricted-Flags — als
-    # Angemeldete sieht ratsinfo mehr als der Connector (zwei Treffer).
+    # Full-text search: all four Lindenallee TOPs, with restricted flags -
+    # logged in, ratsinfo sees more than the connector (two hits).
     assert {:ok, volltext} = ApiClient.fulltext_search("Lindenallee", token: token)
     assert length(volltext["agendaitems"]) == 4
     assert Enum.count(volltext["agendaitems"], & &1["restricted"]) == 2
@@ -58,7 +58,7 @@ defmodule Ratsinfo.GartenstadtReplayTest do
     assert {:ok, leer} = ApiClient.fulltext_search("qqxsichtbar", token: token)
     assert leer["agendaitems"] == []
 
-    # Download: octet-stream (wie das echte RIS, Fund 2026-11-05), PDF-Body.
+    # Download: octet-stream (like the real RIS, finding 2026-11-05), PDF body.
     [erste | _] =
       @fixtures
       |> File.ls!()

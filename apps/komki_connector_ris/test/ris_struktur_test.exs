@@ -9,15 +9,16 @@ defmodule KomkiConnectorRis.RisStrukturTest do
 
     profil = RisStruktur.extract(dir)
 
-    # Sitzungen: sortiert nach Id, Gremien als anonyme Indizes (c1 = Bau, c2 =
-    # Rat nach alphabetischer Ordnung der echten Namen — nie die Namen selbst).
+    # Meetings: sorted by id, committees as anonymous indices (c1 = Bau, c2 =
+    # Rat, following alphabetical order of the real names -- never the names
+    # themselves).
     assert profil["gremien"] == 2
     [bau, rat] = profil["sitzungen"]
     assert bau["id"] == 50 and bau["gremium"] == "c1"
     assert rat["id"] == 100 and rat["gremium"] == "c2"
 
-    # Teile und Tagesordnungs-TOPs: Flags und Zaehler; Titellaengen nur bei
-    # nachweislich oeffentlichen TOPs.
+    # Parts and agenda TOPs: flags and counters; title lengths only for
+    # verifiably public TOPs.
     [oeffentlich, geschuetzt] = rat["teile"]
     refute oeffentlich["protectedpart"]
     assert geschuetzt["protectedpart"]
@@ -34,7 +35,7 @@ defmodule KomkiConnectorRis.RisStrukturTest do
 
     assert rat["dokumente"] == [%{"fileext" => "pdf", "isprotected" => true}]
 
-    # TOP-Details: Zaehler und Gast-Sichtbarkeit, keine Abstimmungsergebnisse.
+    # TOP details: counters and guest visibility, no voting results.
     details = Map.new(profil["tops"], &{&1["id"], &1})
 
     assert details["100-1"]["textbloecke"] == 2
@@ -48,16 +49,16 @@ defmodule KomkiConnectorRis.RisStrukturTest do
     refute Map.has_key?(details["100-2"], "titellaenge")
     refute Map.has_key?(details["100-3"], "titellaenge")
 
-    # TOP ohne belegte Tagesordnung: fail-closed, keine Titellaenge.
+    # TOP without agenda occupancy: fail-closed, no title length.
     refute Map.has_key?(details["100-9"], "titellaenge")
 
-    # Downloads nach Content-Type, nicht verstandene Endpunkte nur gezaehlt.
+    # Downloads by content type, unrecognized endpoints only counted.
     assert profil["downloads"] == ["pdf"]
     assert profil["uebersprungen"]["GET /fulltextsearch"] == 1
     assert profil["uebersprungen"]["GET /meetings/{id}"] == 1
 
-    # Das Profil ist inhaltsfrei: keine Titel, Gremien-, Dokumentnamen, keine
-    # Suchterme, keine Abstimmungsfelder.
+    # The profile is content-free: no titles, committee or document names, no
+    # search terms, no voting fields.
     json = profil |> :json.encode() |> IO.iodata_to_binary()
 
     refute json =~ "Beispiel-Titel"
@@ -91,8 +92,8 @@ defmodule KomkiConnectorRis.RisStrukturTest do
 
     assert profil["sitzungen"] == []
     assert profil["uebersprungen"]["GET /meetings/{id}"] == 1
-    # octet-stream ist der echte Download-Typ (Fund 2026-11-05, #313),
-    # wirklich Unbekanntes bleibt "unbekannt".
+    # octet-stream is the real download type (finding from 2026-11-05, #313),
+    # anything genuinely unknown stays "unbekannt".
     assert profil["downloads"] == ["octet-stream", "unbekannt"]
   end
 
@@ -207,7 +208,7 @@ defmodule KomkiConnectorRis.RisStrukturTest do
         "documents": [], "meetingdocuments": []})
   end
 
-  # --- Hilfsgross ----------------------------------------------------------------
+  # --- Helpers -------------------------------------------------------------------
 
   defp tmp_dir do
     dir = Path.join(System.tmp_dir!(), "ris-struktur-#{System.unique_integer([:positive])}")

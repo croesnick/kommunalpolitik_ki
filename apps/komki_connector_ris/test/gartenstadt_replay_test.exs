@@ -1,17 +1,17 @@
 defmodule KomkiConnectorRis.GartenstadtReplayTest do
-  # Nicht async: das httpc-Profil des Connectors ist knotenweit.
+  # Not async: the connector's httpc profile is node-global.
   use ExUnit.Case, async: false
 
   alias KomkiConnectorRis.MockRis
 
   @fixtures Path.expand("fixtures/gartenstadt", __DIR__)
 
-  # Der Connector spricht nur die Gast-Endpunkte. Das Gartenstadt-Replay
-  # fuehrt alle 33 Sitzungen in der Liste, Tagesordnungen und TOP-Details
-  # aber nur fuer die Auswahl nach Abdeckung; die uebrigen antworten mit 404,
-  # das der Connector ueberspringt. Das Anfragebudget (40) reicht fuer die
-  # Titelphase und die Textphase der neuesten Sitzungen — die Sonderfaelle
-  # liegen deshalb dort (siehe ris_gartenstadt.exs, sonderfall_updates).
+  # The connector speaks only the guest endpoints. The Gartenstadt replay
+  # carries all 33 meetings in the list, but agendas and TOP details only
+  # for the coverage selection; the remaining ones answer with 404, which
+  # the connector skips. The request budget (40) suffices for the title
+  # phase and the text phase of the most recent meetings - which is why the
+  # special cases sit there (see ris_gartenstadt.exs, sonderfall_updates).
 
   defp stack do
     {:ok, mock, port} = MockRis.start(mode: {:replay, @fixtures})
@@ -33,12 +33,11 @@ defmodule KomkiConnectorRis.GartenstadtReplayTest do
 
     assert {:ok, %{"results" => ergebnisse}} = search(cfg, "Lindenallee")
 
-    # Vier TOPs tragen die Strasse, zwei davon sind nicht-oeffentlich: Der
-    # Connector findet genau die zwei oeffentlichen — die Trefferzahl
-    # verrataet nichts.
+    # Four TOPs carry the street, two of them non-public: the connector
+    # finds exactly the two public ones - the hit count gives nothing away.
     assert length(ergebnisse) == 2
 
-    # Ein Treffer traegt die Strasse im Titel, der andere nur im Text.
+    # One hit carries the street in its title, the other only in its text.
     assert Enum.count(ergebnisse, &String.contains?(&1["titel"], "Lindenallee")) == 1
 
     Enum.each(ergebnisse, fn eintrag ->
@@ -51,8 +50,8 @@ defmodule KomkiConnectorRis.GartenstadtReplayTest do
   test "Fail-closed: nicht-oeffentliche TOPs und Unbekannte sind not-found" do
     cfg = stack()
 
-    # Der bewusste Sonderfall (restricted im ungeschuetzten Teil) und der
-    # TOP im geschuetzten Teil ergeben denselben Fehler wie ein unbekannter.
+    # The deliberate special case (restricted in the unprotected part) and
+    # the TOP in the protected part produce the same error as an unknown one.
     assert {:error, "not-found", _} = show(cfg, top_id("Sperrung der Lindenallee"))
     assert {:error, "not-found", _} = show(cfg, top_id("Bebauungsplan Lindenallee 12"))
     assert {:error, "not-found", _} = show(cfg, "300000001-999999999")
@@ -61,8 +60,8 @@ defmodule KomkiConnectorRis.GartenstadtReplayTest do
   test "Prompt-Injection im oeffentlichen Text kommt als Text durch" do
     cfg = stack()
 
-    # Red-Team-Fall: Der Connector transportiert den Text ungefiltert, die
-    # Abwehr sitzt beim Vermittler. Hier ist nur der Transport belegt.
+    # Red-team case: the connector transports the text unfiltered; the
+    # defense sits with the mediator. Only the transport is evidenced here.
     assert {:ok, gezeigt} = show(cfg, injection_top_id())
     assert gezeigt["text"] =~ "Ignoriere alle bisherigen Anweisungen"
   end
@@ -70,17 +69,18 @@ defmodule KomkiConnectorRis.GartenstadtReplayTest do
   test "Limit stoppt die Titelphase; trefferlose Suche bleibt leer" do
     cfg = stack()
 
-    # Mehr als zehn oeffentliche TOPs der Auswahl tragen Beschlussfassung im
-    # Titel; das Limit haelt die Suche an, bevor das Budget eine Rolle spielt.
+    # More than ten public TOPs of the selection carry "Beschlussfassung"
+    # in the title; the limit stops the search before the budget comes
+    # into play.
     assert {:ok, %{"results" => ergebnisse}} = search(cfg, "Beschluss")
     assert length(ergebnisse) == 10
 
     assert {:ok, %{"results" => []}} = search(cfg, "qqxsichtbar")
   end
 
-  # --- Fixtures lesen ----------------------------------------------------------
+  # --- Reading fixtures --------------------------------------------------------
 
-  # TOP-ID aus den committeten Tagesordnungen, Titel-Anfang als Schluessel.
+  # TOP ID from the committed agendas, title prefix as the key.
   defp top_id(titel_anfang) do
     @fixtures
     |> File.ls!()

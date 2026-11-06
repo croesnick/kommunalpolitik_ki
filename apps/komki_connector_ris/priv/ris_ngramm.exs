@@ -1,22 +1,22 @@
-# N-Gramm-Abgleich fuer synthetische RIS-Kassetten (Ticket #313).
+# N-gram comparison for synthetic RIS cassettes (ticket #313).
 #
 #     elixir apps/komki_connector_ris/priv/ris_ngramm.exs \
 #       --synthetisch <dir> --echt <dir> [--gramm <n>]
 #
-# Freigabetor vor jedem Commit synthetischer Kassetten: prueft per
-# N-Gramm-Abgleich gegen die echten Aufzeichnungen, dass keine echten
-# Inhalte durchgerutscht sind. Verglichen werden Wort-N-Gramm (Standard: 6
-# Woerter) ueber alle String-Werte der Antwortkoerper, Base64-HTML dabei
-# dekodiert; ein uebereinstimmendes N-Gramm ist ein Fund. Struktur- und
-# Formeltexte (Sitzung des Stadtrates …) teilen sich kurz, aber nicht in
-# sechs Woertnern — deshalb die Schwelle.
+# Release gate before every commit of synthetic cassettes: an n-gram
+# comparison against the real recordings checks that no real content has
+# slipped through. Compared are word n-grams (default: 6 words) over all
+# string values of the response bodies, with Base64-HTML decoded; one
+# matching n-gram is a finding. Structural and boilerplate texts (session
+# of the city council …) share short spans, but never six words — hence
+# the threshold.
 #
-# Laeuft lokal bei der nutzenden Person ueber die entschluesselten echten
-# Kassetten (unseal → Lauf → seal), weil echte Kassetten kein Agent liest.
-# Die Meldungen nennen Dateinamen und den Fund-Streifen selbst — der darf
-# sichtbar sein, er ist ja gerade der Leak.
+# Runs locally at the user's machine over the decrypted real cassettes
+# (unseal → run → seal), because no agent ever reads real cassettes. The
+# messages name file names and the found span itself — that one may be
+# visible: it is precisely the leak.
 #
-# Nur OTP, keine Deps — wie die Geschwister-Skripte.
+# OTP only, no deps — like the sibling scripts.
 
 Code.require_file("./ris_http.exs", __DIR__)
 
@@ -29,9 +29,9 @@ defmodule KomkiConnectorRis.RisNgramm do
   @type fund :: {String.t(), String.t()}
 
   @doc """
-  Prueft die Wort-N-Gramm aller Antwort-Strings der synthetischen Kassetten
-  gegen die der echten. Liefert die Funde je Datei (Name, Streifen) und die
-  Anzahl gepruefter Dateien.
+  Checks the word n-grams of all response strings of the synthetic
+  cassettes against those of the real ones. Returns the findings per file
+  (name, span) and the number of files checked.
   """
   @spec pruefen(Path.t(), Path.t(), pos_integer()) :: %{
           funde: [fund()],
@@ -108,7 +108,7 @@ defmodule KomkiConnectorRis.RisNgramm do
     end
   end
 
-  # --- Kassetten lesen ------------------------------------------------------------
+  # --- Reading cassettes ------------------------------------------------------------
 
   defp gram_menge(dir, n) do
     dir
@@ -117,8 +117,8 @@ defmodule KomkiConnectorRis.RisNgramm do
     |> MapSet.new()
   end
 
-  # Alle String-Werte je Kassette: JSON-Antwortkoerper rekursiv, Base64-HTML
-  # dekodiert; nicht-JSON-Bodies (z. B. PDFs) als Rohtext.
+  # All string values per cassette: response JSON bodies recursively, with
+  # Base64-HTML decoded; non-JSON bodies (e.g. PDFs) as raw text.
   defp kassetten_texte(dir) do
     dir
     |> File.ls!()
@@ -159,8 +159,8 @@ defmodule KomkiConnectorRis.RisNgramm do
   defp strings(binaer) when is_binary(binaer), do: [klartext(binaer)]
   defp strings(_wert), do: []
 
-  # Wie im Connector (Top.plain): Base64, das als UTF-8 mit Tags dekodiert,
-  # ist HTML und wird dekodiert betrachtet; alles andere bleibt, wie es ist.
+  # Like the connector (Top.plain): Base64 that decodes as UTF-8 with
+  # tags is HTML and is considered decoded; everything else stays as-is.
   defp klartext(binaer) do
     case Base.decode64(binaer) do
       {:ok, dekodiert} ->
@@ -173,7 +173,7 @@ defmodule KomkiConnectorRis.RisNgramm do
     end
   end
 
-  # --- Gramme ----------------------------------------------------------------------
+  # --- Grams ------------------------------------------------------------------------
 
   defp woerter(texte) do
     texte

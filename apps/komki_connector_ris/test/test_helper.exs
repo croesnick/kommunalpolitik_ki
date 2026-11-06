@@ -1,5 +1,5 @@
-# Mock, recorder, ris_cassettes, extractors, and generator are standalone
-# scripts (startable outside the tests too) and are only loaded here.
+# The mock, recording proxy, extractors, and generator are standalone
+# scripts (startable outside the tests as well) and are only loaded here.
 Code.require_file("../priv/gartenstadt_daten.exs", __DIR__)
 Code.require_file("../priv/mock_ris.exs", __DIR__)
 Code.require_file("../priv/ris_cassettes.exs", __DIR__)

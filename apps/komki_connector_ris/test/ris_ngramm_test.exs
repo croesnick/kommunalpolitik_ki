@@ -19,7 +19,7 @@ defmodule KomkiConnectorRis.RisNgrammTest do
     assert [{datei, streifen}] = ergebnis.funde
     assert datei == "1.json"
 
-    # Zwei uebereinander geschobene 6er-Fenster des durchgerutschten Satzes.
+    # Two overlapping 6-gram windows of the sentence that slipped through.
     assert "die verwaltung hat die anregungen sorgfaeltig" in streifen
     assert "verwaltung hat die anregungen sorgfaeltig geprueft" in streifen
   end
@@ -104,7 +104,7 @@ defmodule KomkiConnectorRis.RisNgrammTest do
     assert {:error, _} = RisNgramm.gramm_aus(Keyword.put(opts, :gramm, "abc"))
   end
 
-  # --- Helfer -------------------------------------------------------------------
+  # --- Helpers ------------------------------------------------------------------
 
   defp kassette(dir, name, body) do
     cassette = %{

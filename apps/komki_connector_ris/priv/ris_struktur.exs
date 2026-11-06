@@ -1,22 +1,23 @@
-# Struktur-Extraktor fuer RIS-Kassetten (priv/ris_recorder.exs).
+# Structure extractor for RIS cassettes (priv/ris_recorder.exs).
 #
 #     elixir apps/komki_connector_ris/priv/ris_struktur.exs --cassette <dir> \
-#       [--out <datei>]
+#       [--out <file>]
 #
-# Ergaenzung zum Skelett-Bericht fuer den Generator aus #313: Das Strukturprofil
-# traegt die Belegung je Sitzung und TOP — welche Sitzungsteile geschuetzt sind,
-# welche TOPs restricted, wie viele Textbloecke, Abstimmungen und Dokumente sie
-# haben, wie lang ihre Titel sind. Keine Inhalte: tragbar ist nur, was Gaeste am
-# RIS ebenfalls sehen koennten. Titellaengen nur fuer nachweislich oeffentliche
-# TOPs (restricted=false UND ungeschuetzter Sitzungsteil, fail-closed wie der
-# Connector-Filter), Abstimmungsergebnisse nie, Gremien nur als anonyme Indizes,
-# Dokumentnamen und Suchterme nie. Nicht verstandene Endpunkte werden nur
-# gezaehlt (uebersprungen).
+# Companion to the skeleton report for the generator from #313: the structure
+# profile carries the occupancy per meeting and TOP -- which meeting parts are
+# protected, which TOPs are restricted, how many text blocks, votes and
+# documents they have, how long their titles are. No contents: only what
+# guests could also see in the RIS is portable. Title lengths only for
+# verifiably public TOPs (restricted=false AND unprotected meeting part,
+# fail-closed like the connector filter), voting results never, committees
+# only as anonymous indices, document names and search terms never. Endpoints
+# that are not understood are only counted (skipped).
 #
-# Der Generator (#313) liest Skelett-Bericht (Formate) plus Strukturprofil
-# (Belegung) und fuellt beides mit erfundenen Inhalten (Universum Gartenstadt).
+# The generator (#313) reads the skeleton report (formats) plus the structure
+# profile (occupancy) and fills both with invented contents (Gartenstadt
+# universe).
 #
-# Nur OTP, keine Deps — wie die Geschwister-Skripte.
+# OTP only, no deps -- like the sibling scripts.
 
 Code.require_file("./ris_http.exs", __DIR__)
 
@@ -84,7 +85,7 @@ defmodule KomkiConnectorRis.RisStruktur do
 
   defp parse_flags(_other, _acc), do: {:error, @usage}
 
-  # --- Kassetten laden ---------------------------------------------------------
+  # --- Loading cassettes -------------------------------------------------------
 
   defp cassette_files(dir) do
     dir
@@ -106,10 +107,10 @@ defmodule KomkiConnectorRis.RisStruktur do
     %{request: request, response: response, response_body: response_body}
   end
 
-  # --- Klassifizieren ----------------------------------------------------------
+  # --- Classifying -------------------------------------------------------------
 
-  # Reihenfolge: documents vor agendaitems, damit der Download-Pfad nie als
-  # TOP-Detail missverstanden wird.
+  # Order: documents before agendaitems, so the download path is never
+  # mistaken for a TOP detail.
   defp classify(cassette) do
     path = cassette.request["path"]
 
@@ -137,8 +138,8 @@ defmodule KomkiConnectorRis.RisStruktur do
     end
   end
 
-  # Endpunktschluessel ohne konkrete Ids: Ziffern zu {id}, Paare zu
-  # {meetingId-agendaId}, Tripel zu {meetingId-agendaId-docId}.
+  # Endpoint key without concrete ids: digits become {id}, pairs become
+  # {meetingId-agendaId}, triples become {meetingId-agendaId-docId}.
   defp endpoint_key(cassette) do
     path =
       cassette.request["path"]
@@ -164,9 +165,9 @@ defmodule KomkiConnectorRis.RisStruktur do
     _ -> :error
   end
 
-  # --- Profile -----------------------------------------------------------------
+  # --- Profiles ----------------------------------------------------------------
 
-  # gremium_name ist transient: Es fliegt erst in den Index, dann raus.
+  # gremium_name is transient: it goes into the index first, then out.
   defp meeting_profile(body) do
     %{
       "id" => body["id"],
@@ -223,9 +224,9 @@ defmodule KomkiConnectorRis.RisStruktur do
       "dokumente" => Enum.map(array(body["documents"]), &top_dokument/1)
     }
 
-    # Fail-closed: Nur wenn der TOP in einer aufgezeichneten Tagesordnung als
-    # oeffentlich belegt ist (restricted=false in ungeschuetztem Teil), darf
-    # seine Titellaenge ins Profil — nie nach dem Detail-Body allein.
+    # Fail-closed: only if the TOP is listed as public in a recorded agenda
+    # (restricted=false in an unprotected part) may its title length enter the
+    # profile -- never from the detail body alone.
     if profile["restricted"] == false and body["id"] in public_ids do
       Map.put(profile, "titellaenge", String.length(body["name"] || ""))
     else
@@ -263,11 +264,11 @@ defmodule KomkiConnectorRis.RisStruktur do
     end)
   end
 
-  # --- Sichtbarkeit und Flaggen --------------------------------------------------
+  # --- Visibility and flags ------------------------------------------------------
 
-  # Nachweislich oeffentlich ist ein TOP nur mit restricted=false in einem
-  # ungeschuetzten Teil — die Ids dafuer stammen ausschliesslich aus
-  # aufgezeichneten Tagesordnungen (meetings/{id}), nie aus TOP-Details.
+  # A TOP is verifiably public only with restricted=false in an unprotected
+  # part -- the ids for this come exclusively from recorded agendas
+  # (meetings/{id}), never from TOP details.
   defp public_top_ids(sitzungen) do
     sitzungen
     |> Enum.flat_map(& &1["teile"])
@@ -278,12 +279,12 @@ defmodule KomkiConnectorRis.RisStruktur do
     |> MapSet.new()
   end
 
-  # Fail-closed wie im Connector: alles ausser explizit false gilt als
-  # nicht-oeffentlich bzw. geschuetzt.
+  # Fail-closed as in the connector: everything except an explicit false
+  # counts as non-public or protected, respectively.
   defp restricted?(value), do: value != false
   defp protected?(value), do: value != false
 
-  # Faehigkeits-Flaggen: fehlende Werte gelten als abwesend.
+  # Capability flags: missing values count as absent.
   defp flag(value), do: value == true
 
   defp committee_indices(sitzungen) do

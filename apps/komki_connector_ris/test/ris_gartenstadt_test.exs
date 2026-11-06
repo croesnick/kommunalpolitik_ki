@@ -17,11 +17,11 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
     assert {:ok, ^dir, 97} = RisGartenstadt.generate(out: dir)
     assert length(File.ls!(dir)) == 97
 
-    # Tagesordnungen nur fuer die Auswahl, je Gast- und Auth-Sicht.
+    # Agendas only for the selection, in both guest and auth views.
     assert length(tops_aus(dir, ~r/-get-meetings-\d+\.json$/)) == 39
     assert dir |> File.ls!() |> Enum.count(&Regex.match?(~r/-get-meetings-\d+\.json$/, &1)) == 5
 
-    # Die Gast-Liste fuehrt alle 33 Sitzungen des Profils (beobachtete Laenge).
+    # The guest list carries all 33 meetings of the profile (observed length).
     [liste] = dir |> File.ls!() |> Enum.filter(&String.ends_with?(&1, "-get-guestmeetings.json"))
     kassette = liste |> Path.expand(dir) |> File.read!() |> :json.decode()
     body = kassette["response"]["body_b64"] |> Base.decode64!() |> :json.decode()
@@ -74,9 +74,8 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
 
     assert Enum.sort(@gast_detail_endpunkte -- Map.keys(synth["endpoints"])) == []
 
-    # Der echte Bericht ist der Vertrag fuer jeden Endpunkt, den er kennt:
-    # Query-Schluessel, Kopfzeilen-Namen und die Schluesselmenge des
-    # Antwortkoerpers muessen stimmen.
+    # The real report is the contract for every endpoint it knows: query
+    # keys, header names, and the key set of the response body must match.
     vertrag = Map.keys(real["endpoints"])
 
     Enum.each(Map.keys(synth["endpoints"]), fn name ->
@@ -93,8 +92,8 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
       end
     end)
 
-    # Inferierte Gast-Detail-Endpunkte (Bewusst-offen, #313): Kopfzeilen-Namen
-    # wie bei der echten Gast-Liste, ohne authorization.
+    # Inferred guest detail endpoints (deliberately open, #313): header
+    # names as in the real guest list, without authorization.
     gast = real["endpoints"]["GET /guestmeetings"]
 
     Enum.each(@gast_detail_endpunkte, fn name ->
@@ -104,7 +103,7 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
       assert Enum.sort(s["response_headers"]) == Enum.sort(gast["response_headers"]), name
     end)
 
-    # Textbloecke sind Base64-HTML oder leer wie im echten RIS.
+    # Text blocks are base64-HTML or empty, as in the real RIS.
     top = synth["endpoints"]["GET /agendaitems/{meetingId-agendaId}"]["response_body"]
 
     assert top["keys"]["textblocks"]["items"]["keys"]["content"]["formats"] == [
@@ -119,8 +118,8 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
 
     real = @realbericht |> File.read!() |> :json.decode()
 
-    # Erwartet sind nur die Endpunkte, die diese Aufnahme nicht kennt: die
-    # inferierten Gast-Details und der Download (Session 20261105).
+    # Expected are only the endpoints this recording does not know: the
+    # inferred guest details and the download (session 20261105).
     assert RisSkeleton.compare(real, RisSkeleton.extract(dir)) == [
              "Endpunkt nur in rechts: GET /agendaitems/documents/{meetingId-agendaId-docId}",
              "Endpunkt nur in rechts: GET /guestagendaitems/{meetingId-agendaId}",
@@ -147,30 +146,30 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
     dir = tmp_dir()
     {:ok, _dir, _n} = RisGartenstadt.generate(out: dir)
 
-    # Gast- und Auth-Sicht der Tagesordnungen sind konsistent.
+    # Guest and auth views of the agendas are consistent.
     gast_tops = tops_aus(dir, ~r/-get-guestmeetings-\d+\.json$/)
     auth_tops = tops_aus(dir, ~r/-get-meetings-\d+\.json$/)
 
     assert Enum.map(gast_tops, &{&1["name"], &1["restricted"]}) ==
              Enum.map(auth_tops, &{&1["name"], &1["restricted"]})
 
-    # Drei TOPs tragen die Teststrasse im Titel: einer oeffentlich und zwei
-    # nicht-oeffentliche (geschuetzter Teil und der bewusste
-    # restricted-im-ungeschuetzten-Teil-Fall); ein vierter, oeffentlicher
-    # traegt sie nur im Text — zusammen vier Suchtreffer.
+    # Three TOPs carry the test street in their title: one public and two
+    # non-public (protected part and the deliberate
+    # restricted-in-unprotected-part case); a fourth, public one carries it
+    # only in the text - four search hits in total.
     lindenalle = Enum.filter(gast_tops, &String.contains?(&1["name"], "Lindenallee"))
 
     assert length(lindenalle) == 3
     assert Enum.count(lindenalle, & &1["restricted"]) == 2
     assert Enum.count(lindenalle, &(!&1["geschuetzt"] and &1["restricted"])) == 1
 
-    # Rosenhang-West steht nur in einem nicht-oeffentlichen TOP.
+    # Rosenhang-West appears only in one non-public TOP.
     rosenhang = Enum.filter(gast_tops, &String.contains?(&1["name"], "Rosenhang-West"))
 
     assert length(rosenhang) == 1
     assert hd(rosenhang)["geschuetzt"]
 
-    # Prompt-Injection genau einmal, im oeffentlichen Text.
+    # Prompt injection exactly once, in the public text.
     injectionen = injection_tops(dir)
 
     assert length(injectionen) == 1
@@ -223,8 +222,8 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
     {:ok, _dir, _n} = RisGartenstadt.generate(out: dir)
     tops = tops_aus(dir, ~r/-get-meetings-\d+\.json$/)
 
-    # Der Fail-closed-Fall des Connectors: genau ein TOP im ungeschuetzten
-    # Teil traegt restricted — mit der Teststrasse im Namen.
+    # The connector's fail-closed case: exactly one TOP in the unprotected
+    # part carries restricted - with the test street in its name.
     uebertritte = Enum.filter(tops, &(!&1["geschuetzt"] and &1["restricted"]))
 
     assert length(uebertritte) == 1
@@ -251,12 +250,12 @@ defmodule KomkiConnectorRis.RisGartenstadtTest do
     assert {:error, _usage} = RisGartenstadt.parse_cli(["--kein-flag"])
   end
 
-  # --- Helfer ------------------------------------------------------------------
+  # --- Helpers -----------------------------------------------------------------
 
   defp schluessel(%{"keys" => keys}), do: keys |> Map.keys() |> MapSet.new()
 
-  # Tagesordnungs-TOPs aus den Kassetten, die auf das Muster passen: Name,
-  # restricted-Flag und Sitzungsteil-Kontext.
+  # Agenda TOPs from the cassettes that match the pattern: name, restricted
+  # flag, and meeting part context.
   defp tops_aus(dir, muster) do
     dir
     |> File.ls!()

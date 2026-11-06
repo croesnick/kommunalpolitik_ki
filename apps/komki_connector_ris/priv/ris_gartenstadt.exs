@@ -1,29 +1,29 @@
-# Gartenstadt-Generator (Ticket #313): synthetische Kassetten aus
-# Strukturprofil und Skelett-Bericht.
+# Gartenstadt generator (ticket #313): synthetic cassettes built from a
+# structure profile and a skeleton report.
 #
 #     elixir apps/komki_connector_ris/priv/ris_gartenstadt.exs \
-#       [--out <verzeichnis>] [--struktur <datei>]
+#       [--out <directory>] [--struktur <file>]
 #
-# Erzeugt Kassetten im Format des Recorders (priv/ris_recorder.exs), spielbar
-# mit mock_ris.exs --mode replay. Vorlage ist das Strukturprofil der Session
-# 20261101T112819Z: Die Transkription uebernimmt jede beobachtete Belegung —
-# geschuetzte Teile, restricted-Flags, Zaehler fuer Textbloecke, Abstimmungen
-# und Dokumente — und fuellt sie mit Inhalten aus dem Universum "Gartenstadt"
-# (priv/gartenstadt_daten.exs). Echte Inhalte fliessen nie ein: Der Generator
-# liest nur committbare, inhaltsfreie Berichte. Jede Array-Laenge der
-# synthetischen Menge ist damit eine im echten RIS beobachtete Laenge, und
-# ris_skeleton --compare bleibt kardinalitaetskompatibel.
+# Generates cassettes in the recorder's format (priv/ris_recorder.exs),
+# playable with mock_ris.exs --mode replay. The template is the structure
+# profile of session 20261101T112819Z: the transcription adopts every
+# observed occupancy - protected parts, restricted flags, counters for text
+# blocks, votes and documents - and fills them with content from the
+# "Gartenstadt" universe (priv/gartenstadt_daten.exs). Real content never
+# enters: the generator reads only committable, content-free reports. Every
+# array length in the synthetic set is thus a length observed in the real
+# RIS, and ris_skeleton --compare stays cardinality-compatible.
 #
-# Kassetten pro Sitzung gibt es nur fuer eine Auswahl nach Abdeckung
-# (auswahl/2): so wenige Sitzungen, dass jede beobachtete Belegung einmal
-# vorkommt. Gast-Liste und Suchen fuehren alle Sitzungen des Profils, weil
-# ihre Laenge Teil des beobachteten Formats ist; Tagesordnungen und TOPs
-# ausserhalb der Auswahl antworten im Replay mit 404.
+# Cassettes per meeting exist only for a (coverage) selection (auswahl/2):
+# so few meetings that every observed occupancy occurs once. The guest list
+# and the searches contain all meetings of the profile, because their
+# length is part of the observed format; agendas and TOPs outside the
+# selection answer with 404 in replay.
 #
-# Das Ausgabeverzeichnis muss leer sein (bei Regeneration vorher leeren),
-# damit keine Reste frueherer Laeufe liegenbleiben.
+# The output directory must be empty (clear it before regenerating), so
+# that no leftovers from earlier runs remain.
 #
-# Nur OTP, keine Deps — wie die Geschwister-Skripte.
+# OTP only, no deps - like the sibling scripts.
 
 Code.require_file("./gartenstadt_daten.exs", __DIR__)
 Code.require_file("./ris_http.exs", __DIR__)
@@ -41,7 +41,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
   @top_basis 400_000_000
   @dokument_basis 500_000
 
-  # Kopfzeilen-Namen wie in den Skelett-Berichten; alle Werte erfunden.
+  # Header names as in the skeleton reports; all values invented.
   @anfrage_kopf [
     ["accept", "application/json"],
     ["user-agent", "gartenstadt/1.0"],
@@ -60,9 +60,9 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     ["x-powered-by", "Gartenstadt"]
   ]
 
-  # Download-Antwort wie das echte RIS (Fund 2026-11-05, #313):
-  # application/octet-stream, nicht application/pdf; Dateiname in
-  # content-disposition. Kopfnamen folgen dem echten Skelett-Bericht.
+  # Download response like the real RIS (finding 2026-11-05, #313):
+  # application/octet-stream, not application/pdf; file name in
+  # content-disposition. Header names follow the real skeleton report.
   @download_kopf [
     ["content-disposition", "attachment; filename=\"Gartenstadt_Anlage.pdf\""],
     ["content-type", "application/octet-stream"],
@@ -72,8 +72,8 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     ["x-powered-by", "Gartenstadt"]
   ]
 
-  # Kleines strukturiertes PDF als Download-Body: bytetreu speicherbar,
-  # vollstaendig erfunden.
+  # Small structured PDF as the download body: storable byte-for-byte,
+  # entirely invented.
   @pdf """
   %PDF-1.4
   1 0 obj
@@ -158,7 +158,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
 
   defp parse_flags(_other, _acc), do: {:error, @usage}
 
-  # --- Vorlage -------------------------------------------------------------------
+  # --- Template ------------------------------------------------------------------
 
   defp vorlage_laden(datei) do
     {:ok, :json.decode(File.read!(datei))}
@@ -182,11 +182,11 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     |> Enum.map(fn {{name, _aktiv}, i} -> %{id: i, name: name} end)
   end
 
-  # --- Auswahl nach Abdeckung ---------------------------------------------------------
+  # --- Selection by coverage ----------------------------------------------------------
   #
-  # Greedy-Mengenueberdeckung: Immer die Sitzung mit den meisten noch fehlenden
-  # Merkmalen, bei Gleichstand die mit weniger TOPs, dann die fruehere im
-  # Profil. Schluss, sobald keine Sitzung mehr ein neues Merkmal bringt.
+  # Greedy set cover: always the meeting with the most still-missing
+  # markers, on a tie the one with fewer TOPs, then the earlier one in the
+  # profile. Stop as soon as no meeting contributes a new marker.
 
   defp auswahl(vorlagen, details) do
     kandidaten = Enum.map(vorlagen, &{&1["id"], merkmale(&1, details), top_zahl(&1)})
@@ -213,10 +213,10 @@ defmodule KomkiConnectorRis.RisGartenstadt do
 
   defp neue(merkmale, gedeckt), do: MapSet.size(MapSet.difference(merkmale, gedeckt))
 
-  # Merkmale, die Format oder Verhalten praegen: Teil-Layout und Status der
-  # Sitzung; je TOP Sichtbarkeit, Nummernform (der Compare unterscheidet
-  # "digits" von "text") und ob ein Feld leer oder belegt ist — Textbloecke
-  # mit genauer Zahl, weil sie die Laenge im Compare abdecken.
+  # Markers that shape format or behavior: part layout and meeting state;
+  # per TOP visibility, numbering form (the compare distinguishes "digits"
+  # from "text") and whether a field is empty or occupied - text blocks
+  # with the exact count, because they cover the length in the compare.
   defp merkmale(s, details) do
     sitzung = [{:teile, Enum.map(s["teile"], & &1["protectedpart"])}, {:state, s["state"]}]
 
@@ -244,20 +244,20 @@ defmodule KomkiConnectorRis.RisGartenstadt do
 
   defp top_zahl(s), do: s["teile"] |> Enum.map(&length(&1["tops"])) |> Enum.sum()
 
-  # --- Transkription ----------------------------------------------------------------
+  # --- Transcription ----------------------------------------------------------------
 
   defp sitzung_uebersetzen(s, nr, details, aktive) do
     id = @sitzungs_basis + nr
     gremium = Enum.at(aktive, gremium_index(s) - 1) || hd(aktive)
 
-    {teile, _lauf} =
-      Enum.map_reduce(s["teile"], 0, fn teil, lauf ->
-        {tops, laauf} =
-          Enum.map_reduce(teil["tops"], lauf, fn top, l ->
+    {teile, _bisher} =
+      Enum.map_reduce(s["teile"], 0, fn teil, bisher ->
+        {tops, lauf} =
+          Enum.map_reduce(teil["tops"], bisher, fn top, l ->
             {top_uebersetzen(top, teil["protectedpart"], l + 1, id, nr, details), l + 1}
           end)
 
-        {%{protectedpart: teil["protectedpart"], tops: tops}, laauf}
+        {%{protectedpart: teil["protectedpart"], tops: tops}, lauf}
       end)
 
     %{
@@ -278,9 +278,9 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     end
   end
 
-  # Nummer und Namensmuster sind erfunden: Die echte Sitzungsnummer neben dem
-  # echten Datum ergaebe mit dem echten Namensmuster dieselbe Wortfolge wie im
-  # RIS (N-Gramm-Fund, #313).
+  # The number and naming pattern are invented: the real meeting number next
+  # to the real date, with the real naming pattern, would yield the same word
+  # sequence as in the RIS (n-gram finding, #313).
   defp sitzungsname(gremium, nr) do
     kurz = Daten.gremium_kurz(gremium.name)
     "Gartenstadt-" <> kurz <> ", Zusammenkunft Nr. " <> Integer.to_string(nr)
@@ -311,20 +311,21 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     }
   end
 
-  # Eigene Wendungen statt der Formeln des echten RIS: Die frueheren Vorlagen
-  # trugen echten Wortlaut und fielen im N-Gramm-Abgleich auf (#313). Das Wort
-  # Beschlussfassung bleibt, die Breitensuche filtert danach.
+  # Own phrasing instead of the real RIS formulas: earlier templates carried
+  # real wording and stood out in the n-gram comparison (#313). The word
+  # "Beschlussfassung" stays; the broad search filters on it.
   @beschluss " – Vorlage zur Beschlussfassung im Gartenstadt-Gremium"
 
   defp titel(index) do
-    thema = Daten.dreher(Daten.themen(), index)
-    strasse = Daten.dreher(Daten.strassen(), index)
-    # Flurstueck und Hausnummer laufen ueber div statt rem: Die Bauvorlage
-    # trifft nur Indizes mit rem(index, 6) == 2, sonst kaeme immer dasselbe Paar.
-    flur = Daten.dreher(Daten.flurstuecke(), div(index, 6))
-    hnr = Daten.dreher(Daten.hausnummern(), div(index, 6))
-    vorname = Daten.dreher(Daten.vornamen(), index)
-    nachname = Daten.dreher(Daten.nachnamen(), index)
+    thema = Daten.nth_cyclic(Daten.themen(), index)
+    strasse = Daten.nth_cyclic(Daten.strassen(), index)
+    # Plot and house number cycle via div instead of rem: the building
+    # template only hits indices with rem(index, 6) == 2, otherwise the same
+    # pair would come up every time.
+    flur = Daten.nth_cyclic(Daten.flurstuecke(), div(index, 6))
+    hnr = Daten.nth_cyclic(Daten.hausnummern(), div(index, 6))
+    vorname = Daten.nth_cyclic(Daten.vornamen(), index)
+    nachname = Daten.nth_cyclic(Daten.nachnamen(), index)
 
     case rem(index, 6) do
       0 ->
@@ -357,7 +358,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     end
   end
 
-  # --- Eintraege ----------------------------------------------------------------------
+  # --- Entries ------------------------------------------------------------------------
 
   defp auth_eintrag do
     anfrage =
@@ -365,9 +366,9 @@ defmodule KomkiConnectorRis.RisGartenstadt do
 
     body = IO.iodata_to_binary(anfrage)
 
-    # Der Login postet einen Body (content-type, content-length) und traegt
-    # natuerlich noch keinen authorization-Kopf — die Namen folgen dem echten
-    # Skelett-Bericht.
+    # The login posts a body (content-type, content-length) and naturally
+    # carries no authorization header yet - the names follow the real
+    # skeleton report.
     kopf = [
       ["accept", "application/json"],
       ["content-length", Integer.to_string(byte_size(body))],
@@ -499,10 +500,10 @@ defmodule KomkiConnectorRis.RisGartenstadt do
 
   defp alle_tops(s), do: Enum.flat_map(s.teile, & &1.tops)
 
-  # Gast-Sicht der Sitzung (inferiert, Bewusst-offen in #313): Rahmen wie der
-  # echte Gast-Endpunkt, Tagesordnung wie meetings/{id} — genau die Felder,
-  # die der Connector laut README liest (protectedpart, restricted, name,
-  # numbering, id).
+  # Guest view of the meeting (inferred, deliberately open in #313): frame
+  # like the real guest endpoint, agenda like meetings/{id} - exactly the
+  # fields the connector reads according to the README (protectedpart,
+  # restricted, name, numbering, id).
   defp sitzungs_gast_body(s) do
     %{
       "id" => s.id,
@@ -515,15 +516,14 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     }
   end
 
-  # --- Sonderfaelle (bewusste Testfaelle, Spiegel des bisherigen Mocks) --------------
+  # --- Special cases (deliberate test cases, mirror of the previous mock) ------------
   #
-  # "Lindenallee" steht in zwei oeffentlichen TOPs (einmal Titel, einmal nur
-  # im Text) und in zwei nicht-oeffentlichen: einmal als restricted-TOP im
-  # ungeschuetzten Teil — der Fail-closed-Fall, den die reale Datenlage nie
-  # zeigt — und einmal im geschuetzten Teil. Das ist der Zaehltest: Die
-  # Trefferzahl des Connectors darf nichts verraten. "Rosenhang-West" steht
-  # nur in einem nicht-oeffentlichen TOP, die Prompt-Injection nur im
-  # oeffentlichen Text.
+  # "Lindenallee" appears in two public TOPs (once in the title, once only
+  # in the text) and in two non-public ones: once as a restricted TOP in the
+  # unprotected part - the fail-closed case the real data never shows - and
+  # once in the protected part. This is the counting test: the connector's
+  # hit count must not give anything away. "Rosenhang-West" appears in only
+  # one non-public TOP, the prompt injection only in the public text.
 
   defp sonderfaelle(sitzungen, ausgewaehlt) do
     updates =
@@ -552,57 +552,84 @@ defmodule KomkiConnectorRis.RisGartenstadt do
   defp sonderfall_updates(sitzungen) do
     paare = Enum.flat_map(sitzungen, fn s -> Enum.map(alle_tops(s), &{s, &1}) end)
 
-    # Datum-absteigend, innerhalb der Sitzung in Tagesordnungs-Reihenfolge:
-    # Der Connector liest die neuesten Sitzungen zuerst, und nach 33
-    # Tagesordnungsabrufen (auch die 404 ausserhalb der Auswahl kosten
-    # Budget) bleibt seinem Restbudget nur Platz fuer wenige Textabfragen.
-    # Die Sonderfaelle muessen deshalb in den neuesten ausgewaehlten
-    # Sitzungen liegen, damit der Zaehltest sie wirklich erreicht.
+    # Date-descending, within a meeting in agenda order: the connector reads
+    # the newest meetings first, and after 33 agenda fetches (the 404s
+    # outside the selection also cost budget) its leftover budget has room
+    # for only a few text queries. The special cases must therefore sit in
+    # the newest selected meetings, so the counting test actually reaches
+    # them.
     sortiert = Enum.sort_by(paare, fn {s, _top} -> s.datum end, :desc)
 
     oeffentliche =
       Enum.reject(sortiert, fn {_s, top} -> top.geschuetzt or top.vorlage["restricted"] end)
 
+    # A zusatz_satz reaches the cassette only through a text block; a TOP
+    # without blocks would silently drop the sentence. Text carriers are
+    # therefore chosen from public TOPs WITH blocks, so that the text
+    # special case and the injection are preserved for future profiles too.
+    # Both sit as early as possible in the newest-first order - the
+    # connector's leftover budget reaches them.
+    texttraeger =
+      Enum.filter(oeffentliche, fn {_s, top} -> (top.detail["textbloecke"] || 0) > 0 end)
+
+    # Title carriers take the remaining public TOPs: no TOP carries two
+    # cases, and all four sit among the newest public ones.
+    titeltraeger =
+      Enum.reject(oeffentliche, fn {_s, top} ->
+        top.id_paar in Enum.map(Enum.take(texttraeger, 2), &paar_id/1)
+      end)
+
     geschuetzte =
       Enum.filter(sortiert, fn {_s, top} -> top.geschuetzt and top.vorlage["restricted"] end)
 
     [
-      {Enum.at(oeffentliche, 0),
+      {traeger!(titeltraeger, 0, "Lindenallee im Titel"),
        %{
          titel:
            "Antrag auf Verlegung der Lindenallee in die Tempo-30-Zone" <> @beschluss
        }},
-      {Enum.at(oeffentliche, 1),
+      {traeger!(texttraeger, 0, "Lindenallee im Text"),
        %{zusatz_satz: "Anwohner der Lindenallee regen eine Prüfung der Tempo-30-Zone an."}},
-      {Enum.at(oeffentliche, 2),
+      {traeger!(titeltraeger, 1, "restricted im ungeschuetzten Teil"),
        %{
          titel:
            "Antrag auf Sperrung der Lindenallee für den Durchgangsverkehr" <> @beschluss,
          restricted_override: true
        }},
-      {Enum.at(oeffentliche, 3), %{zusatz_satz: Daten.injection()}},
-      {Enum.at(geschuetzte, 0),
+      {traeger!(texttraeger, 1, "Prompt-Injection"), %{zusatz_satz: Daten.injection()}},
+      {traeger!(geschuetzte, 0, "Rosenhang-West"),
        %{
          titel:
            "Antrag auf Erwerb des Grundstücks Rosenhang-West" <> @beschluss
        }},
-      {Enum.at(geschuetzte, 1),
+      {traeger!(geschuetzte, 1, "Lindenallee im geschuetzten Teil"),
        %{
          titel:
            "Bebauungsplan Lindenallee 12; Aufstellung" <> @beschluss
        }}
     ]
-    |> Enum.reject(fn {paar, _aenderung} -> is_nil(paar) end)
     |> Map.new(fn {{_s, top}, aenderung} -> {top.id_paar, aenderung} end)
   end
 
-  # --- Suchkassetten -----------------------------------------------------------------
+  # Carriers are mandatory, not best-effort: a missing selection would
+  # silently drop a planned test case from the fixture set - better to fail
+  # loudly at generation time (review #313).
+  defp traeger!(list, n, zweck) do
+    case Enum.at(list, n) do
+      nil -> raise "ris_gartenstadt: kein TOP als Traeger fuer #{zweck} im Strukturprofil"
+      paar -> paar
+    end
+  end
+
+  defp paar_id({_s, top}), do: top.id_paar
+
+  # --- Search cassettes --------------------------------------------------------------
   #
-  # Drei Suchbegriffe: "Beschluss" als Breitensuche mit 98 Treffern (Spiegel
-  # der einzigen echten Beobachtung — damit bleibt die Kardinalitaet im
-  # Compare-Fenster, und wie dort tragen alle Treffer rein numerische
-  # Nummern), "Lindenallee" fuer den Zaehltest und ein trefferloser Begriff
-  # fuer die leere Antwortform.
+  # Three search terms: "Beschluss" as a broad search with 98 hits (mirror
+  # of the only real observation - this keeps the cardinality inside the
+  # compare window, and as there, all hits carry purely numeric numbers),
+  # "Lindenallee" for the counting test, and a zero-hit term for the empty
+  # response form.
 
   defp such_eintraege(sitzungen) do
     paare = Enum.flat_map(sitzungen, fn s -> Enum.map(alle_tops(s), &{s, &1}) end)
@@ -670,7 +697,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
       else: top.titel
   end
 
-  # --- Download-Kassetten --------------------------------------------------------------
+  # --- Download cassettes --------------------------------------------------------------
 
   defp download_eintraege(sitzungen) do
     sitzungen
@@ -693,7 +720,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     end)
   end
 
-  # --- Sitzungs- und TOP-Koerper --------------------------------------------------------
+  # --- Meeting and TOP bodies -----------------------------------------------------------
 
   defp sitzungs_body(s) do
     tag = String.slice(s.datum, 0, 10)
@@ -728,7 +755,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
       "locationprintname" => "Rathaus Gartenstadt, Rathausgarten 1",
       "locationshortname" => "Rathaus",
       "locationstreet" => "Rathausgarten",
-      # Neutrale Postleitzahl ohne Bezug zu einer echten Region.
+      # Neutral zip code with no reference to a real region.
       "locationzip" => "00000",
       "meetingdate" => s.datum,
       "name" => s.name,
@@ -821,22 +848,23 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     }
   end
 
-  # unreadop ist im echten RIS mal Zaehler, mal null (Skelett: mixed).
+  # unreadop is sometimes a counter, sometimes null in the real RIS
+  # (skeleton: mixed).
   defp ungelesen(n), do: if(rem(n, 2) == 0, do: 0)
 
   defp top_art(top) do
     if restricted?(top), do: "beratend", else: "beschliessend"
   end
 
-  # Effektive Sichtbarkeit: Ein bewusster Sonderfall (Fail-closed-Test des
-  # Connectors) darf einen TOP im ungeschuetzten Teil auf restricted setzen —
-  # die reale Datenlage kennt das nicht, der Connector-Filter muss es trotzdem
-  # wegwerfen (sonderfaelle/1 setzt genau einen).
+  # Effective visibility: a deliberate special case (the connector's
+  # fail-closed test) may set a TOP in the unprotected part to restricted -
+  # the real data never shows that, but the connector filter must still
+  # throw it away (sonderfaelle/1 sets exactly one).
   defp restricted?(%{restricted_override: true}), do: true
   defp restricted?(top), do: top.vorlage["restricted"]
 
-  # Der dritte Block bleibt leer: Im echten RIS ist content mal Base64-HTML,
-  # mal schlichter Text (Skelett: Formate base64-html und text).
+  # The third block stays empty: in the real RIS, content is sometimes
+  # Base64-HTML, sometimes plain text (skeleton: formats base64-html and text).
   defp textbloecke(top) do
     ["Sachverhalt", "Beschlussvorschlag", "Abwaegung"]
     |> Enum.take(top.detail["textbloecke"] || 0)
@@ -856,7 +884,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
   defp textblock(caption, saat_index, zusatz) do
     inhalt =
       1..3
-      |> Enum.map(&Daten.dreher(Daten.saetze(), saat_index + &1))
+      |> Enum.map(&Daten.nth_cyclic(Daten.saetze(), saat_index + &1))
       |> Enum.join(" ")
 
     inhalt = if zusatz, do: inhalt <> " " <> zusatz, else: inhalt
@@ -868,12 +896,12 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     }
   end
 
-  # Abstimmungen wechseln zwischen erfasster (Ergebnis, Beschreibung, ein
-  # Textblock) und offener (alles null, keine Textbloecke) — beide Formen
-  # zeigt das echte RIS (Skelett: mixed mit null, textblocks 0..1).
+  # Votes alternate between recorded (result, description, one text block)
+  # and open (everything null, no text blocks) - the real RIS shows both
+  # forms (skeleton: mixed with null, textblocks 0..1).
   defp abstimmungen(top) do
-    # Range.new mit Schritt 1: Zaehler 0 bleibt leer (1..0 waere in Elixir
-    # 1.20 absteigend und wuerde zwei Elemente liefern).
+    # Range.new with step 1: a count of 0 stays empty (1..0 would be
+    # descending in Elixir 1.20 and would yield two elements).
     Enum.map(Range.new(1, top.detail["abstimmungen"] || 0, 1), fn i ->
       leer = %{
         "attendeecount" => nil,
@@ -911,7 +939,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
         "fileext" => vorlage["fileext"],
         "guestvisible" => vorlage["guestvisible"],
         "id" => dokument_id(top, i),
-        "name" => Daten.dreher(Daten.dokumentnamen(), top.lauf + i)
+        "name" => Daten.nth_cyclic(Daten.dokumentnamen(), top.lauf + i)
       }
     end)
   end
@@ -935,7 +963,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     end)
   end
 
-  # --- Schreiben -------------------------------------------------------------------------
+  # --- Writing ---------------------------------------------------------------------------
 
   defp schreibe(out, n, eintrag) do
     body =
@@ -966,7 +994,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
     File.write!(datei, IO.iodata_to_binary(:json.encode(cassette)) <> "\n")
   end
 
-  # OTP :json schreibt das Atom nil als String "nil"; das RIS liefert null.
+  # OTP :json writes the atom nil as the string "nil"; the RIS returns null.
   defp json_wert(nil, _encode), do: "null"
   defp json_wert(wert, encode), do: :json.encode_value(wert, encode)
 
