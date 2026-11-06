@@ -74,7 +74,7 @@ defmodule KomkiConnectorRis.RisStrukturTest do
     refute json =~ "resultyes"
   end
 
-  test "Nicht-JSON-Bodies und unbekannte Download-Typen werden gezaehlt" do
+  test "Nicht-JSON-Bodies und Download-Typen werden gezaehlt" do
     dir = tmp_dir()
 
     write_cassette(dir, "1.json", "/meetings/300", "<html>kein JSON</html>")
@@ -83,11 +83,17 @@ defmodule KomkiConnectorRis.RisStrukturTest do
       headers: [["content-type", "application/octet-stream"]]
     )
 
+    write_cassette(dir, "3.json", "/agendaitems/documents/1-2-4", "ROHDATEN",
+      headers: [["content-type", "application/x-nichts"]]
+    )
+
     profil = RisStruktur.extract(dir)
 
     assert profil["sitzungen"] == []
     assert profil["uebersprungen"]["GET /meetings/{id}"] == 1
-    assert profil["downloads"] == ["unbekannt"]
+    # octet-stream ist der echte Download-Typ (Fund 2026-11-05, #313),
+    # wirklich Unbekanntes bleibt "unbekannt".
+    assert profil["downloads"] == ["octet-stream", "unbekannt"]
   end
 
   test "Extraktion ist deterministisch" do

@@ -48,7 +48,7 @@ defmodule KomkiConnectorRis.RisStruktur do
       "sitzungen" =>
         sitzungen |> Enum.sort_by(& &1["id"]) |> Enum.map(&finalize_sitzung(&1, gremien)),
       "tops" => Enum.sort_by(tops, & &1["id"]),
-      "downloads" => for({:download, ext} <- classified, do: ext),
+      "downloads" => for({:download, ext} <- classified, do: ext) |> Enum.sort(),
       "uebersprungen" => count_skipped(classified)
     }
   end
@@ -243,6 +243,7 @@ defmodule KomkiConnectorRis.RisStruktur do
     case header_value(response["headers"], "content-type") do
       "application/pdf" <> _ -> "pdf"
       "application/json" <> _ -> "json"
+      "application/octet-stream" <> _ -> "octet-stream"
       "text/html" <> _ -> "html"
       _ -> "unbekannt"
     end

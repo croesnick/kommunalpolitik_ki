@@ -196,6 +196,61 @@ Der Generator aus #313 liest Skelett-Bericht (Formate) und Strukturprofil (Beleg
 mit erfundenen Inhalten. Weil die Kassetten nach der Session versiegelt sind, läuft der Extraktor wie
 Skelett und Replay nach `unseal` und vor dem erneuten `seal`.
 
+### Synthetische Kassetten: der Gartenstadt-Generator
+
+`priv/ris_gartenstadt.exs` (Ticket #313) erzeugt aus Skelett-Bericht und Strukturprofil synthetische
+Kassetten im Format des Recorders — abspielbar mit `--mode replay`:
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_gartenstadt.exs --out <leeres-verzeichnis> \
+  [--struktur <datei>]
+```
+
+Er transkribiert das Strukturprofil der Session 20261101T112819Z: Jede beobachtete Belegung —
+geschützte Teile, `restricted`-Flags, Zähler für Textblöcke, Abstimmungen und Dokumente — wird
+übernommen und mit Inhalten aus dem Universum „Gartenstadt“ (`priv/gartenstadt_daten.exs`) gefüllt.
+Echte Inhalte fließen nie ein, und jede Array-Länge der synthetischen Menge ist eine im echten RIS
+beobachtete Länge. Das Ausgabeverzeichnis muss leer sein.
+
+Kassetten je Sitzung entstehen nur für eine **Auswahl nach Abdeckung**: Der Generator wählt so
+wenige Sitzungen, dass jedes Merkmal des Profils einmal vorkommt (Teil-Layout, Sitzungsstatus,
+Sichtbarkeit, Nummernform, leere oder belegte Felder). Aus 33 Sitzungen und 374 TOPs werden so 5
+Sitzungen mit 39 TOPs und 97 Kassetten. `ris_skeleton --compare` gegen die Aufnahme
+20261101T112819Z meldet nur die drei Endpunkte, die diese Aufnahme nicht kennt (die inferierten
+Gast-Details und den Download aus der Session 20261105); ein Test in `ris_gartenstadt_test.exs`
+hält das gegen den committeten Skelett-Bericht fest. Die anderen Aufnahmen widersprechen ihr in
+Einzelheiten (etwa `unreadop` immer `null`) und sind deshalb kein Compare-Ziel. Gast-Liste und Suchen
+führen weiterhin alle Sitzungen des Profils, weil ihre Länge Teil des beobachteten Formats ist.
+Tagesordnungen und TOPs außerhalb der Auswahl antworten im Replay mit 404, das der Connector als
+nicht gefunden überspringt.
+
+Die Sonderfälle des bisherigen Mocks sind bewusste Testfälle (Spiegel von `mock_ris.exs`): Die
+Teststraße Lindenallee steht in zwei öffentlichen TOPs (einmal Titel, einmal nur im Text) und zwei
+nicht-öffentlichen — eins davon als `restricted`-im-öffentlichen-Teil, den die reale Datenlage nie
+zeigt —, dazu ein nur-nicht-öffentlicher Begriff und die Prompt-Injection im öffentlichen Text. Die
+Sonderfälle liegen in den datumsneuesten Sitzungen der Auswahl, weil das Anfragebudget des
+Connectors nach 33 Tagesordnungsabrufen nur wenige Textabfragen erlaubt.
+
+`test/fixtures/gartenstadt` enthält den committeten Satz; ein Integritätstest regeneriert ihn
+byteidentisch. Connector und ratsinfo laufen in ihren Tests gegen das Replay dieser Kassetten
+(`mock_ris.exs --mode replay --cassette test/fixtures/gartenstadt`).
+
+### N-Gramm-Abgleich: Freigabetor vor dem Commit
+
+`priv/ris_ngramm.exs` (Ticket #313) prüft, dass in synthetischen Kassetten keine echten Inhalte
+durchgerutscht sind: Wort-N-Gramm (Standard 6) über alle String-Werte der Antwortkörper,
+Base64-HTML dekodiert; ein übereinstimmendes Gramm ist ein Fund (Exit 1). Das läuft lokal bei der
+nutzenden Person über die entschlüsselten echten Kassetten, weil echte Kassetten kein Agent liest:
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_ngramm.exs \
+  --synthetisch apps/komki_connector_ris/test/fixtures/gartenstadt \
+  --echt ~/.local/share/kommunalpolitik_ki/ris-cassettes/<zeitstempel>
+```
+
+Dazu `unseal` des Echt-Verzeichnisses vorher und `seal` nachher — derselbe Bogen wie beim
+Skelett-Extraktor. Das Ergebnis gehört als Freigabe in den PR des Generators.
+
 ### Kassetten verschlüsseln (Touch ID)
 
 `priv/ris_cassettes.exs` verschlüsselt ein Kassettenverzeichnis mit AES-256-GCM, damit kein Prozess —
