@@ -130,6 +130,28 @@ defmodule KomkiConnectorRis.RisSkeletonTest do
     assert RisSkeleton.extract(dir)["endpoints"]["GET /x"]["query_keys"] == []
   end
 
+  test "mehrteilige IDs im Pfad werden Platzhalter, keine ID landet im Bericht" do
+    dir = tmp_dir()
+
+    for {name, path} <- [
+          {"doc.json", "/agendaitems/documents/4711-1-815"},
+          {"lang.json", "/x/1-2-3-4"}
+        ] do
+      cassette =
+        @fixtures
+        |> Path.join("0005-get-guestagendaitems-4711-1.json")
+        |> File.read!()
+        |> String.replace("/guestagendaitems/4711-1", path)
+
+      File.write!(Path.join(dir, name), cassette)
+    end
+
+    assert Enum.sort(Map.keys(RisSkeleton.extract(dir)["endpoints"])) == [
+             "GET /agendaitems/documents/{meetingId-agendaId-documentId}",
+             "GET /x/{ids}"
+           ]
+  end
+
   test "parse_cli meldet fehlende Verzeichnisse" do
     assert {:error, usage} = RisSkeleton.parse_cli(["--out", "/tmp/x"])
     assert usage =~ "Aufruf"

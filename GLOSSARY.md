@@ -1004,15 +1004,35 @@ schmale Schnittstelle.
 
 **Definition:** Eine aufgezeichnete Anfrage samt Antwort an das echte RIS,
 als JSON-Datei, wie bei VCR oder ExVCR. Der Aufzeichnungs-Proxy (Recorder)
-schreibt sie, der Mock spielt sie im Replay-Modus zurück, der
-Skelett-Extraktor gewinnt daraus einen inhaltsfreien Formatbericht
-(Skelett-Bericht).
+schreibt sie, der Mock spielt sie im Replay-Modus zurück, und aus mehreren
+Kassetten entsteht ein inhaltsfreies inferred schema.
 
 **Abgrenzung:** Kassetten enthalten echte, auch nicht-öffentliche Inhalte.
-Sie liegen nie im Repo; committbar ist nur der Skelett-Bericht.
+Sie liegen nie im Repo; committbar ist nur das inferred schema. Aufbewahrt
+werden sie verschlüsselt (`priv/ris_cassettes.exs`, Freigabe per Touch ID) —
+Details im Connector-README, Abschnitt „Kassetten verschlüsseln“; bis zur
+Verschlüsselung ist eine Kassette Klartext.
 
 **Wo:** [`apps/komki_connector_ris/README.md`](apps/komki_connector_ris/README.md)
 § „Aufzeichnung und Replay echter Antwortformate“.
+
+---
+
+### Inferred schema
+
+**Definition:** Ein aus Beispieldaten abgeleitetes Formatschema (schema
+inference): je RIS-Endpunkt die Schlüssel, Typen, Formen (ISO-Datum,
+ID-Muster, Base64-HTML) und Array-Längen der Antworten, aber keine Inhalte.
+Es entsteht aus Kassetten und ist der Vertrag zwischen echtem RIS und Mock;
+`--compare` meldet Abweichungen zwischen zwei Aufnahmen (Schema-Drift).
+
+**Abgrenzung:** Kein JSON Schema im Sinne des Standards, sondern ein eigenes,
+committbares Berichtsformat. Datei- und Verzeichnisnamen heißen noch
+`skeleton` (`priv/ris_skeleton.exs`, `priv/skeletons/`); früher hieß es
+„Skelett-Bericht“.
+
+**Wo:** [`apps/komki_connector_ris/README.md`](apps/komki_connector_ris/README.md)
+§ „Schema inference: Format ohne Inhalte“.
 
 ---
 

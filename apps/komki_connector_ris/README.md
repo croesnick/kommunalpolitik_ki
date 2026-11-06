@@ -105,6 +105,11 @@ oder ExVCR.
   niemand vorhergesehen hat (die Struktur bleibt); sonst die Felder `token`/`access_token`/`jwt`.
   Client und Upstream erhalten alles ungeschwärzt, nur die Datei ist geschwärzt.
 
+Geschwärzt heißt nicht verschlüsselt: Was nicht geschwärzt wurde, bleibt in der Kassette Klartext.
+`priv/ris_cassettes.exs` verschlüsselt deshalb nach der Session alle `*.json` des Verzeichnisses
+(AES-256-GCM, Schlüssel per Touch ID aus der Secure Enclave; Abschnitt „Kassetten verschlüsseln“
+unten). Ohne diese Freigabe bleibt jedem Prozess — auch jedem Agenten — nur der Chiffretext.
+
 Gegen den Recorder aufzeichnen:
 
 - komki: `"ris_mock_port": 4020` in komkis `config.json`. Loopback gilt als Mock, der
@@ -151,7 +156,7 @@ Abdeckung eine Aufzeichnungs-Session mit allen Flows fahren und die Suchterme va
 üblich aus `RIS_EMAIL`/`RIS_PASSWORD`), Sitzungsliste, TOP-Details, Volltextsuche mit mehreren
 Termen, Anlagen-Downloads, Gremienliste.
 
-### Skelett-Extraktor: Format ohne Inhalte
+### Schema inference: Format ohne Inhalte
 
 `priv/ris_skeleton.exs` (Ticket #232) gewinnt aus Kassetten eine rein strukturelle
 Formatspezifikation: rekursive Schlüsselmengen, Typen, Formen (ISO-Datum, ID-Muster, Base64-HTML)
@@ -168,8 +173,73 @@ Schlüssel und überlappende Array-Längen gelten nicht als Drift, weil sie mit 
 schwanken. Damit lässt sich prüfen, ob der Mock oder ein späterer Generator formatgetreu ist.
 
 Committbare Testdaten entstehen nie aus den Kassetten selbst, sondern aus synthetischen Inhalten im
-echten Format. Der Skelett-Bericht ist die Vorlage dieses Generators; ein Verifier (N-Gramm-Abgleich
+echten Format. Das inferred schema ist die Vorlage dieses Generators; ein Verifier (N-Gramm-Abgleich
 gegen die Aufzeichnungen) ist als Freigabetor vor jedem Committen von Kassetten geplant.
+
+### Kassetten verschlüsseln (Touch ID)
+
+`priv/ris_cassettes.exs` verschlüsselt ein Kassettenverzeichnis mit AES-256-GCM, damit kein Prozess —
+auch kein Agent — die Kassetten ohne die Person am Mac lesen kann. Der Schlüssel liegt nur als
+Siegel von `komki-tresor` im macOS-Schlüsselbund (Eintrag `ris-kassetten`), gebunden an die Secure
+Enclave dieses Macs; jede Ver- und Entschlüsselung löst genau eine Freigabe per Touch ID (oder
+Passwort des Macs) aus. Der Eintrag heißt anders als das Skript, weil er gespeicherter Zustand ist:
+Ein neuer Name fände den Schlüssel der schon verschlüsselten Kassetten nicht mehr.
+
+```bash
+elixir apps/komki_connector_ris/priv/ris_cassettes.exs init                 # einmalig
+elixir apps/komki_connector_ris/priv/ris_cassettes.exs seal <verzeichnis>
+elixir apps/komki_connector_ris/priv/ris_cassettes.exs unseal <verzeichnis>
+elixir apps/komki_connector_ris/priv/ris_cassettes.exs status <verzeichnis>
+elixir apps/komki_connector_ris/priv/ris_cassettes.exs check [verzeichnis]
+```
+
+Ablauf einer Session: aufzeichnen, dann `check` (Leak-Prüfung), inferred schema, danach `seal` —
+dann liegen nur noch `<name>.json.enc` (Magic `rkt1`, je Datei eigene Nonce). `seal` löscht den
+Klartext erst nach bestandener Gegenprobe von der Platte. Dateien, die keine `*.json` sind,
+bleiben unberührt und werden gemeldet — sie sind keine Kassetten. Meldungen nennen nie Schlüssel,
+Siegel oder Inhalte, nur Namen und Zähler.
+
+`check` sucht Geheimnisse in Klartext-Kassetten und braucht keine Freigabe wie `status`: Es
+durchsucht den Rohtext jeder Kassette und die Base64-dekodierten Bodies von Anfrage und Antwort
+nach den Werten aus `RIS_EMAIL`/`RIS_PASSWORD` (`.env`) und der `token`-Datei des
+Konfig-Verzeichnisses — nie von der Kommandozeile. Die `.env`-Auswertung spiegelt exakt, was
+ratsinfo lädt (`Ratsinfo.Config.parse_env`): unverankerte Muster, erste Fundstelle gewinnt,
+keine Kommentar-Ausnahme — auch auskommentierte oder `export`-Zeilen werden gesucht, denn genau
+die könnte ratsinfo senden. Der Token zählt nur ab 11 Bytes (`Ratsinfo.Auth` sendet kürzere
+nie). Geprüft werden `*.json` und `*.json.new` (Klartext-Rest eines abgestürzten `unseal`);
+Chiffretext (`*.json.enc`, `*.json.enc.new`) wird übersprungen und gemeldet — auch im
+Mischverzeichnis („N verschluesselt uebersprungen“ je Verzeichnis). Ohne Verzeichnis prüft es die
+Zeitstempel-Verzeichnisse unter `~/.local/share/kommunalpolitik_ki/ris-cassettes/` (andere
+Unterverzeichnisse dort sind keine Recorder-Sessions), ein Sammel-Verzeichnis ohne eigenen
+Klartext seine Unterverzeichnisse. Exit 1 gilt bei Funden, bei unlesbaren Dateien oder
+Verzeichnissen und wenn Klartext da ist, aber kein Geheimnis geladen werden konnte —
+nichts geprüft ist nicht sauber.
+
+- Replay und `priv/ris_skeleton.exs` lesen `*.json`: vorher `unseal`, danach `seal`.
+- Abbrüche lassen einen sichtbaren Zwischenzustand: `status` zeigt ihn, ein erneutes
+  `seal`/`unseal` vollendet. Nicht löschbare Dateien werden übersprungen und gemeldet; eine
+  Restdatei `<name>.json.new` aus einem Crash blockiert mit klarer Meldung. Beide überschreiben
+  nie und lehnen Verzeichnisse in Git-Repos ab, wie der Recorder.
+- Exit-Codes: 0 ok (auch „nichts zu tun“), 1 fachliche Ablehnung oder Umwelt, 2 Aufruf falsch,
+  3 kein oder nicht ausführbares `komki-tresor`/keine Secure Enclave, 4 Freigabe verweigert
+  oder abgebrochen, 5 Siegel oder Datei ungültig.
+
+Grenzen, bewusst:
+
+- **Klartext-Fenster.** Bis zum ersten `seal` und während `unseal` liegt Klartext auf der Platte.
+  Optionale Härtung ohne eigenen Code: Recorder mit `--out` auf eine RAM-Disk schreiben
+  (`dev=$(hdiutil attach -nomount ram://524288)`, dann `diskutil eraseVolume APFS Kassetten
+  "$dev"`, Aufzeichnung nach `/Volumes/Kassetten`). Am Ende `seal` auf der RAM-Disk ausführen
+  und das Verzeichnis **vor** dem `diskutil eject` auf die Platte verschieben:
+  `mv /Volumes/Kassetten ~/.local/share/kommunalpolitik_ki/ris-cassettes/<zeitstempel>` —
+  der eject verwirft alles, was noch auf der RAM-Disk liegt. RAM-Disk-Inhalte sind auch bei
+  einem Crash weg, Größe also klein halten.
+- **Kein Key-Escrow, kein Restore.** Das Siegel öffnet nur die Secure Enclave dieses Macs. Ist der
+  Schlüsselbund-Eintrag weg (gelöscht, Mac-Neuaufsetzung, anderer Mac), sind verschlüsselte
+  Kassetten unwiederbringlich. Entfernen nur bewusst:
+  `security delete-generic-password -s ris-kassetten` — `init` verweigert Überschreiben.
+- `komki-tresor` muss im PATH liegen (im komki-Paket enthalten; aus dem Checkout gebaut:
+  `--tresor apps/komki_cli/priv/komki-tresor`).
 
 ## Grenzen
 

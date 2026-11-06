@@ -95,10 +95,14 @@ keywords = ["@token"]
 description = "Allowlist für Platzhalter-Beispiele und Metadaten"
 
 # Dateien, die bewusst leere Platzhalter enthalten — pauschal zulassen.
+# Dazu die Kassetten-Tests: check testet gerade, dass Fake-Geheimnisse
+# gefunden werden — die Fake-Werte stehen bewusst lesbar im Quelltext
+# (Pfad-Allowlist statt String-Splits, prerequisites.md „Allowlist pflegen“).
 paths = [
   '''\.env\.example$''',
   '''\.env\.template$''',
   '''\.env\.dist$''',
+  '''apps/komki_connector_ris/test/ris_cassettes_test\.exs$''',
 ]
 
 # Regex-Patterns, die auch in anderen Dateien als false positives auftreten:

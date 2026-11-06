@@ -154,6 +154,9 @@ defmodule KomkiConnectorRis.RisSkeleton do
     cond do
       Regex.match?(~r/^\d+$/, segment) -> "{id}"
       Regex.match?(~r/^\d+-\d+$/, segment) -> "{meetingId-agendaId}"
+      Regex.match?(~r/^\d+-\d+-\d+$/, segment) -> "{meetingId-agendaId-documentId}"
+      # Jede weitere Ziffernfolge ist eine ID und darf nie im Bericht landen.
+      Regex.match?(~r/^\d+(-\d+)+$/, segment) -> "{ids}"
       true -> segment
     end
   end
