@@ -490,6 +490,21 @@ oracle; ersetzt die frühere Prägung „Auswerter-Orakel“.
 
 ---
 
+### Referenzszenario
+
+**Definition:** Eine erfundene, durchgehende Geschichte aus der Ratsarbeit,
+die alle kanonischen Workflows aus RFC 0003 und alle Quellen von komki
+verbindet. Sie beschreibt, was komki können soll, und dient zugleich als
+Spezifikation der Szenario-Tests und als Vorlage für die Doku-Site.
+
+**Abgrenzung:** Ein kanonischer Workflow (RFC 0003, R.7.1–R.7.3) ist ein
+einzelner normativer Ablauf; das Referenzszenario setzt die Workflows zu
+einer Geschichte zusammen und erfindet keine eigenen Regeln.
+
+**Siehe:** [Referenzszenario „Radweg Bahnhofstraße“](docs/szenarien/radweg-bahnhofstrasse.md).
+
+---
+
 ## Sicherheitsmodell
 
 Die folgenden Begriffe beschreiben das Modell für vertrauliche
@@ -603,6 +618,9 @@ Startvertrag legt diese Bindungen, den Zweck, zulässige Operationen und den
 Lebenszyklus fest. Ein Chatfenster
 allein bildet noch keinen solchen Arbeitsraum.
 
+**Kurzform:** „Raum“ ist als Kurzform erlaubt, wo der Zusammenhang eindeutig
+ist (Doku-Site, `komki raum`, Referenzszenario).
+
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 
 In komki steht der Startvertrag als `contract`-Block in
@@ -649,6 +667,51 @@ sein Nutzinhalt. Dazu gehören die Auswahl, das Ziel, Metadaten sowie das
 Auftreten und die Reihenfolge des Vorgangs.
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+
+---
+
+### Aufnahme
+
+**Definition:** Der Schritt, mit dem ein Eingang Teil eines Arbeitsraums
+wird. Zulässig nur, wenn das Label des Eingangs in der Bindungsmenge des
+Raums liegt, der Raum gültig ist und die Aufnahme unter allen
+Raumbindungen erlaubt ist. Auftrag, Verlauf, geladene Anweisungen und
+Ergebnisse von Sub-Agenten sind ebenfalls Eingänge.
+
+**Abgrenzung:** Eine Leseberechtigung an der Quelle ersetzt die Aufnahme
+nicht. Im Vermittler heißt der Schritt `admit` (Gate 2).
+
+**Siehe:** RFC 0003 R.5.4.
+
+---
+
+### Übergabe
+
+**Definition:** Der Schritt, mit dem eine Ausgabe den Arbeitsraum verlässt:
+an einen Empfänger, einen Speicher oder einen anderen Arbeitsraum.
+Zulässig nur unter dem Label der Ausgabe; ein Zielraum prüft zusätzlich
+seine eigene Aufnahme.
+
+**Abgrenzung:** Eine Übergabe entfernt keine Bindung, dafür braucht es eine
+Lockerung. Im Vermittler heißt der Schritt `transfer`, beim Schreiben in
+einen Speicher `store` (beides Gate 1).
+
+**Siehe:** RFC 0003 R.5.6, [Aufnahme](#aufnahme), [Lockerung und Lockerungsbefugnis](#lockerung-und-lockerungsbefugnis).
+
+---
+
+### Lockerung und Lockerungsbefugnis
+
+**Definition:** Eine Lockerung erzeugt aus einer Ausgabe eine neue Ausgabe
+mit weniger Bindungen, gedeckt durch eine konkrete Offenlegungsfreigabe.
+Die Lockerungsbefugnis ist der Eintrag in einer Bindung, wer welche
+Einschränkung für welche Ausgabe lockern darf. Ohne Eintrag ist keine
+Lockerung zulässig.
+
+**Abgrenzung:** Original und laufender Arbeitsraum behalten ihr Label. Ein
+GO ersetzt keine fehlende Lockerungsbefugnis.
+
+**Siehe:** RFC 0003 R.2.2, R.5.7; [Aktionsfreigabe und Offenlegungsfreigabe](#aktionsfreigabe-und-offenlegungsfreigabe).
 
 ---
 
@@ -738,6 +801,35 @@ Lockern von Bindungen (Herabstufungsbefugnis); sie ist in
 `komki_policy` bewusst nicht implementiert (`unsupported`).
 
 **Siehe:** RFC 0003 R.6.1–R.6.3; [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.6, § 4.6.
+
+---
+
+### Manuelle Inhaltsfreigabe und begrenzte Faktenfreigabe
+
+**Definition:** Die zwei Modi kontrollierter Offenlegung. Bei der manuellen
+Inhaltsfreigabe prüft eine berechtigte Person einen konkreten Text und gibt
+genau ihn frei. Bei der begrenzten Faktenfreigabe werden Quelle, Version,
+Fakten, Auswahl und Veröffentlichungsweise unabhängig vom geschützten
+Agenten festgelegt; ein neuer Arbeitsraum schreibt den Text nur aus diesen
+Fakten.
+
+**Abgrenzung:** Die manuelle Inhaltsfreigabe sichert nur die unveränderte
+Ausführung des freigegebenen Texts, nicht die Abwesenheit verdeckter
+Kodierung. Die begrenzte Faktenfreigabe gibt die stärkere Zusage.
+
+**Siehe:** RFC 0003 R.6.4, R.7.2.
+
+---
+
+### Freigabefenster
+
+**Definition:** Das Fenster außerhalb des Agenten, in dem die nutzende
+Person ein GO für ein konkretes Ereignis erteilt oder verweigert. Der
+Agent kann es weder öffnen noch beschreiben noch nachahmen.
+
+_Vermeiden:_ komki-Fenster, GO-Fenster.
+
+**Siehe:** [Freigabe und Freigabedienst](#freigabe-und-freigabedienst), [GO](#go).
 
 ---
 
