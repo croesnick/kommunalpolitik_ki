@@ -1,0 +1,92 @@
+# Dev-Loop: Tickets unbeaufsichtigt abarbeiten
+
+Stand: 2026-11-07, Ticket #389. Der Dev-Loop arbeitet freie Tickets ab, auch wenn niemand am Rechner sitzt. Für jedes Ticket setzt eine Agent-Session um, eine zweite prüft. Danach entscheidet das Skript nach festen Regeln: mergen, auf ein GO warten oder an die nutzende Person übergeben. Eine dritte Session, die Product-Owner-Rolle (PO), verfeinert unterdessen Tickets und macht nur Vorschläge. Die Regeln für die Agenten stehen nicht hier, sondern im [Lane-Protokoll](lane-protocol.md) und in den [AI-Stufen](ai-tiers.md). Der Loop setzt sie durch.
+
+## Ablauf
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pick: ready-for-agent, Stufe A/B, kein offener Blocker, kein Assignee, nicht belegt
+    Pick --> Implement: Assignee + Board "In Progress"
+    Implement --> Review: Gates grün, PR mit "Closes #n", Board "In Review"
+    Implement --> Human: blocked.md oder zweiter Fehlversuch
+    Review --> Implement: rework (höchstens 2 Runden, je frische Session)
+    Review --> Merge: B-Tier, approve, kein geschützter Pfad
+    Review --> WartetGO: A-Tier, approve
+    Review --> Human: human, S-Tier, geschützter Pfad oder Runde 3
+    Merge --> Implement: Rebase-Konflikt oder CI rot (zählt als Rework-Runde)
+    Merge --> Pick: CI grün auf dem Head-SHA, Squash-Merge
+    WartetGO --> Pick: zugewiesen, Brief im Morgen-Kommentar
+    Human --> Pick: ready-for-human + Kommentar
+```
+
+- **Auswahl:** Zuerst kommen Tickets mit dem Label `next`, dann B vor A, dann die kleinste Nummer. Als *belegt* gelten Tickets, die zu einem offenen PR gehören, deren Nummer im Branch eines PR oder eines lokalen Worktrees steht (`lane-152-…`, `brave-mock-340`) oder die auf dem Board „In Progress“ stehen. So bleiben von Hand geöffnete Lanes unberührt.
+- **Merge:** B-Tier wird automatisch gemergt. A-Tier wartet zugewiesen auf „In Review“, die nutzende Person mergt von Hand. S-Tier wird nie automatisch gemergt.
+- **Geschützte Pfade:** Neben den Pfaden aus `ai-tiers.md` schützt der Loop seine eigenen Regeln: `scripts/dev_loop*`, `.github/`, `docs/agents/` und `AGENTS.md`. Ein Diff, der einen dieser Pfade berührt, geht immer an die nutzende Person.
+- **Fehler:** Scheitert eine Umsetzung (rote Gates, kein Commit, Zeitlimit, Absturz), versucht der Loop es einmal in einer frischen Session neu. Scheitert auch das, übergibt er das Ticket an die nutzende Person, ebenso bei einer Eskalation des Agenten (`.dev-loop/blocked.md`).
+- **PO:** Die PO läuft zu Beginn jedes Laufs und noch einmal, wenn keine Tickets mehr zur Auswahl stehen. Je Lauf nimmt sie höchstens 5 Tickets, die `needs-triage` sind oder A/B ohne Zielbild. Sie schreibt einen Zielbild-Entwurf oder Rückfragen als Kommentar. Stufen, `ready-for-agent` und Abhängigkeiten schlägt sie nur im Morgen-Kommentar vor. `ai:s-tier`, `ready-for-human` und `wayfinder:*` fasst sie nicht an.
+- **Morgen-Kommentar:** Am Ende jedes Laufs kommentiert der Loop auf #389, was gemergt wurde, was auf ein GO wartet, was an die nutzende Person übergeben wurde und was die PO vorschlägt.
+
+## Rollen und Modelle
+
+| Rolle | Erst | Fallback bei erschöpftem Konto |
+|---|---|---|
+| Umsetzung | `claude` mit Sonnet 5.5 | `tt` mit Default-Modell |
+| Review | `claude` mit Opus 5.5 | `tt` mit Default-Modell, Effort `max` |
+| PO | `claude` mit Opus 5.5 | `tt` mit Default-Modell, Effort `max` |
+
+Jede Stufe läuft als frische Session ohne Oberfläche (`claude -p`). Die Prompts liegen unter `scripts/dev_loop/prompts/`. Sind beide Konten erschöpft, beendet sich der Lauf sauber und meldet sich per Notification (herdr, falls `HERDR_ENV=1`, sonst macOS).
+
+## Sicherheitsgrenze
+
+- **Nur das Skript schreibt nach GitHub.** Agenten bekommen kein Token. Sie arbeiten im Worktree und übergeben ihre Ergebnisse als Dateien unter `.dev-loop/` (gitignored): `pr.md`, `brief.md`, `blocked.md`, `review.json`, `po.json`.
+- **PAT:** Fine-grained, nur für dieses Repo. Er liegt im Schlüsselbund unter `dev-loop-gh-pat`. Das Skript reicht ihn als `GH_TOKEN` nur an die eigenen `gh`-Aufrufe und an `git push` über HTTPS weiter.
+- **Agenten:**
+  - `--permission-mode auto --permission-prompts none`
+  - Bash-Sandbox von Claude Code und Deny-Regeln aus `scripts/dev_loop/agent_settings.json` (`gh`, `git push`, `security`, `ssh`, `curl`, Lesen von `~/.ssh`, `~/.config/gh`, Schlüsselbund)
+  - keine MCP-Server (`--strict-mcp-config`)
+  - kein `GH_TOKEN` in der Umgebung
+- **Prüfen:** `elixir scripts/dev_loop.exs --check-sandbox` lässt eine Session harmlose Befehle ausführen, die durchgehen müssen, und dann an Zugangsdaten scheitern. Die Befehle der Probe beweisen nur den Zugriff (Login-Name, Byte-Zahlen) und geben selbst bei einem Fehlschlag kein Geheimnis an das Modell. Zuletzt lief die Probe am 2026-11-07 auf `claude`: alle vier Versuche abgelehnt, die Positivkontrollen (`git status`, `mix --version`) liefen.
+- **Grenze der Grenze:** Der Loop läuft im Konto `crn`. Sandbox und Deny-Regeln sind Policy von Claude Code, keine Trennung durch das Betriebssystem. Ein eigenes macOS-Konto wäre die härtere Variante, die bewusst nicht gewählt wurde (Grilling zu #389, Q3).
+- **Branch Protection** auf `main` mit Pflicht-Checks: Eine rote CI blockiert den Merge auch dann, wenn das Skript einen Fehler hat.
+
+## Bedienung
+
+```bash
+elixir scripts/dev_loop.exs --dry-run                   # Plan: Auswahl, Belegung, PO-Kandidaten; keine Agenten, keine Writes
+elixir scripts/dev_loop.exs --only 392 --no-po          # ein Ticket, unter Aufsicht
+elixir scripts/dev_loop.exs --until 07:00               # über Nacht, höchstens 5 Tickets (--max-tickets)
+touch ~/.dev-loop/STOP                                   # Not-Aus: greift vor der nächsten Stufe; Datei danach löschen
+```
+
+- **Wach bleiben:** Solange das Skript läuft, hält es den Mac per `caffeinate` wach. Ein Lock in `~/.dev-loop/lock` verhindert einen zweiten Lauf.
+- **Zeitfenster:** `--until` startet nach der angegebenen Uhrzeit kein neues Ticket mehr. Eine laufende Stufe darf bis zu 4 Stunden dauern.
+- **Cockpit in herdr:** Das Skript läuft in einer herdr-Pane. Eine zweite Pane zeigt das aktuelle Stufen-Log:
+  ```bash
+  tail -f "$(ls -td ~/.dev-loop/logs/*/ | head -1)"run.log
+  ```
+  Die Logs jeder Stufe liegen als `*.jsonl` (stream-json von Claude Code) im selben Lauf-Verzeichnis.
+- **Neustart:** Der ganze Zustand liegt auf GitHub. Dazu gehören der Board-Status und die Review-Marker `<!-- dev-loop:review verdict=… sha=… -->` in den PR-Kommentaren. Nach einem Absturz macht ein neuer Lauf zuerst offene Loop-PRs ohne Freigabe des aktuellen Heads weiter, dann Loop-Worktrees ohne PR (`.claude/worktrees/loop-<n>`).
+
+## Einrichtung (einmalig)
+
+1. **PAT anlegen:** github.com → Settings → Developer settings → Fine-grained tokens → Generate.
+   - Name `dev-loop`, Ablauf 90 Tage
+   - Repository access: *Only select* → `kommunalpolitik_ki`
+   - Repository permissions: Contents, Pull requests und Issues mit Schreibrecht. Actions und Commit statuses nur lesend. Kein Workflow, kein Admin.
+   - Nicht verifiziert ist, ob ein fine-grained PAT ein Board schreiben darf, das dem Nutzer gehört. Scheitert das, protokolliert das Skript die Warnung und arbeitet weiter. Den Status setzen dann die eingebauten Board-Workflows.
+2. **PAT in den Schlüsselbund**, ohne Shell-History. `security` fragt den Wert interaktiv ab:
+   ```bash
+   security add-generic-password -a "$USER" -s dev-loop-gh-pat -w
+   ```
+3. **Board:** Im Feld Status die Option **„In Review“** zwischen „In Progress“ und „Done“ anlegen (Projekt-Einstellungen → Fields → Status).
+4. **Branch Protection** für `main`: CI-Check „Elixir quality gates“ als Pflicht.
+5. **Probe:** `elixir scripts/dev_loop.exs --check-sandbox`, danach einmal `--only <n>` unter Aufsicht.
+
+## Bekannte Grenzen (v1)
+
+- Seriell, eine Lane. Parallele Lanes sind bewusst offen.
+- **A-Tier ohne echten Lauf:** Die Abnahme von A-Tier braucht einen echten Lauf. Ohne Aufsicht trägt das erst die Mock-Welt (#347). Bis dahin endet A-Tier bei „In Review“.
+- **`DoctorBootTest`** startet auf einem Mac mit Staging-Modell einen echten llama-server, bis #392 ihn per Tag aus dem Standardlauf nimmt. Der Staging-Pfad hängt fest an `~/.local/share/komki`, `KOMKI_HOME` umgeht ihn nicht.
+- **Erschöpftes Konto:** Die Erkennung beruht auf den dokumentierten Meldungen („You've hit your … limit“, „spend limit reached“; `code.claude.com/docs/en/errors`, abgerufen am 2026-11-07). An einem echten Limit ist sie noch nicht beobachtet.
+- Die Sandbox-Probe lief bisher nur auf `claude`, nicht auf `tt`.

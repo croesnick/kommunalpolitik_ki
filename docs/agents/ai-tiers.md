@@ -44,6 +44,8 @@ Ein `ai:a-tier`- oder `ai:b-tier`-Ticket hat ein Zielbild. Es beschreibt das Zie
 - `ai:a-tier`: Self-Review und echter Lauf laut Lane-Protokoll ([lane-protocol.md](lane-protocol.md)).
 - `ai:b-tier`: Ein Modell der Stufe S oder A oder die nutzende Person liest den Diff, bevor er gemergt wird. Günstige Modelle übersehen eher Nebenwirkungen als offensichtliche Fehler.
 
+Der Dev-Loop ([dev-loop.md](dev-loop.md)) setzt diese Regeln im Code durch. Er mergt nur `ai:b-tier`, und nur nach einem Review durch ein S-Modell. Bei `ai:a-tier` endet er bei „In Review“ und wartet auf das GO. `ai:s-tier` und Diffs, die geschützte Pfade berühren, übergibt er an die nutzende Person.
+
 ## Welche Modelle heute welche Stufe tragen
 
 Quelle: [Artificial Analysis, Leaderboard Models](https://artificialanalysis.ai/leaderboards/models), abgerufen am 2026-10-29. Der Intelligence Index ist ein zusammengesetzter Benchmark und kein Maß für Elixir-Kenntnis oder Deutsch. Die Zuordnung ist ein Startwert. Bewährt sich ein Modell in einer Stufe nicht, wird diese Tabelle angepasst, nicht das Label.

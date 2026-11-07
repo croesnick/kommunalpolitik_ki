@@ -72,3 +72,6 @@ dist/
 
 # pi fuers komki-Paket (make komki-paket installiert es hier)
 packaging/pi/node_modules/
+
+# Dev loop (#389): agent hand-off files inside loop worktrees
+.dev-loop/

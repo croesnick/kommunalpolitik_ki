@@ -1,0 +1,265 @@
+# GitHub and git side of the dev loop (#389). The script is the only GitHub
+# writer; agents never see a token. Every `gh` call gets the PAT as
+# GH_TOKEN, pushes go over HTTPS with gh as credential helper, so neither
+# the SSH key nor the keyring login of the person are used.
+#
+# With `dry_run: true` in the context, writes are logged instead of sent;
+# reads then use whatever gh login exists.
+
+defmodule DevLoop.GitHub do
+  @moduledoc false
+
+  @repo "croesnick/kommunalpolitik_ki"
+  @project_owner "croesnick"
+  @project_number "1"
+
+  def repo, do: @repo
+  def issue_url(n), do: "https://github.com/#{@repo}/issues/#{n}"
+
+  # -- reads ---------------------------------------------------------------
+
+  @doc "Open issues with labels, assignees, comments and open blockers."
+  def open_issues(ctx) do
+    listed =
+      gh!(
+        ctx,
+        ~w(issue list --repo #{@repo} --state open --limit 500 --json number,title,body,labels,assignees,comments)
+      )
+      |> JSON.decode!()
+
+    # issue list has no dependency info; the REST list carries the summary.
+    blockers =
+      gh!(ctx, [
+        "api",
+        "--paginate",
+        "repos/#{@repo}/issues?state=open&per_page=100",
+        "--jq",
+        ".[] | select(.pull_request == null) | [.number, (.issue_dependencies_summary.blocked_by // 0)] | @tsv"
+      ])
+      |> String.split("\n", trim: true)
+      |> Map.new(fn line ->
+        [n, b] = String.split(line, "\t")
+        {String.to_integer(n), String.to_integer(b)}
+      end)
+
+    for i <- listed do
+      %{
+        number: i["number"],
+        title: i["title"],
+        body: i["body"] || "",
+        labels: Enum.map(i["labels"], & &1["name"]),
+        assignees: Enum.map(i["assignees"], & &1["login"]),
+        comments: Enum.map(i["comments"], & &1["body"]),
+        open_blockers: Map.get(blockers, i["number"], 0)
+      }
+    end
+  end
+
+  @doc "Open PRs as `%{number, branch, sha, closes: [n]}`."
+  def open_prs(ctx) do
+    gh!(
+      ctx,
+      ~w(pr list --repo #{@repo} --state open --limit 200 --json number,headRefName,headRefOid,closingIssuesReferences)
+    )
+    |> JSON.decode!()
+    |> Enum.map(fn p ->
+      %{
+        number: p["number"],
+        branch: p["headRefName"],
+        sha: p["headRefOid"],
+        closes: Enum.map(p["closingIssuesReferences"], & &1["number"])
+      }
+    end)
+  end
+
+  @doc "Issue numbers on the board with the given status; [] if the board is unreadable."
+  def board_numbers(ctx, status) do
+    case gh(
+           ctx,
+           ~w(project item-list #{@project_number} --owner #{@project_owner} --limit 1000 --format json)
+         ) do
+      {:ok, out} ->
+        for %{"status" => ^status, "content" => %{"number" => n}} <- JSON.decode!(out)["items"],
+            do: n
+
+      {:error, out} ->
+        log(ctx, "Board nicht lesbar, Status wird ignoriert: #{String.slice(out, 0, 200)}")
+        []
+    end
+  end
+
+  # PR 0 is the placeholder a rehearsal "creates".
+  def pr_comments(%{dry_run: true}, 0), do: []
+
+  def pr_comments(ctx, pr) do
+    gh!(ctx, ~w(pr view #{pr} --repo #{@repo} --json comments))
+    |> JSON.decode!()
+    |> Map.fetch!("comments")
+    |> Enum.map(& &1["body"])
+  end
+
+  @doc "`:pending`, `:green` or `{:red, names}` for all workflow runs of a commit."
+  def ci_state(ctx, sha) do
+    runs =
+      gh!(ctx, ~w(run list --repo #{@repo} --commit #{sha} --json status,conclusion,workflowName))
+      |> JSON.decode!()
+
+    cond do
+      runs == [] or Enum.any?(runs, &(&1["status"] != "completed")) ->
+        :pending
+
+      Enum.all?(runs, &(&1["conclusion"] in ["success", "skipped", "neutral"])) ->
+        :green
+
+      true ->
+        {:red,
+         for(
+           r <- runs,
+           r["conclusion"] not in ["success", "skipped", "neutral"],
+           do: r["workflowName"]
+         )}
+    end
+  end
+
+  # -- writes --------------------------------------------------------------
+
+  def comment(ctx, n, body),
+    do: write(ctx, ~w(issue comment #{n} --repo #{@repo} --body-file -), body)
+
+  def pr_comment(ctx, pr, body),
+    do: write(ctx, ~w(pr comment #{pr} --repo #{@repo} --body-file -), body)
+
+  def assign_me(ctx, n), do: write(ctx, ~w(issue edit #{n} --repo #{@repo} --add-assignee @me))
+
+  def unassign_me(ctx, n),
+    do: write(ctx, ~w(issue edit #{n} --repo #{@repo} --remove-assignee @me))
+
+  def add_label(ctx, n, label),
+    do: write(ctx, ["issue", "edit", "#{n}", "--repo", @repo, "--add-label", label])
+
+  @doc "Board status; a missing option or an unwritable board is logged, not fatal."
+  def set_status(ctx, n, status) do
+    args =
+      ~w(project item-edit --owner #{@project_owner} --url #{issue_url(n)} --field Status --value) ++
+        [status]
+
+    case write(ctx, args) do
+      {:error, out} ->
+        log(ctx, "Board-Status '#{status}' für ##{n} nicht gesetzt: #{String.slice(out, 0, 200)}")
+
+      ok ->
+        ok
+    end
+  end
+
+  @doc "Creates the PR and returns its number."
+  def create_pr(ctx, branch, title, body) do
+    case write(
+           ctx,
+           [
+             "pr",
+             "create",
+             "--repo",
+             @repo,
+             "--base",
+             "main",
+             "--head",
+             branch,
+             "--title",
+             title,
+             "--body-file",
+             "-"
+           ],
+           body
+         ) do
+      {:ok, url} ->
+        url |> String.trim() |> String.split("/") |> List.last() |> String.to_integer()
+
+      {:dry, _} ->
+        0
+
+      {:error, out} ->
+        raise "PR für #{branch} nicht angelegt: #{out}"
+    end
+  end
+
+  @doc """
+  Squash merge of exactly the reviewed head. Subject and an empty body are
+  set explicitly so no agent commit trailer ends up on main.
+  """
+  def merge(ctx, pr, sha, subject) do
+    write(
+      ctx,
+      ~w(pr merge #{pr} --repo #{@repo} --squash --delete-branch --match-head-commit #{sha}) ++
+        ["--subject", subject, "--body", ""]
+    )
+  end
+
+  @doc "Force-pushes the loop branch over HTTPS with the PAT (loop branches belong to the loop)."
+  def push(ctx, worktree, branch) do
+    args = [
+      "-C",
+      worktree,
+      "-c",
+      "credential.helper=",
+      "-c",
+      "credential.helper=!gh auth git-credential",
+      "push",
+      "--force",
+      "https://github.com/#{@repo}.git",
+      "HEAD:refs/heads/#{branch}"
+    ]
+
+    if ctx.dry_run do
+      log(ctx, "[dry-run] git push #{branch}")
+      {:dry, ""}
+    else
+      run("git", args, ctx)
+    end
+  end
+
+  # -- plumbing ------------------------------------------------------------
+
+  defp write(ctx, args, stdin \\ nil) do
+    if ctx.dry_run do
+      log(ctx, "[dry-run] gh " <> Enum.join(args, " "))
+      {:dry, ""}
+    else
+      gh(ctx, args, stdin)
+    end
+  end
+
+  defp gh!(ctx, args) do
+    case gh(ctx, args) do
+      {:ok, out} -> out
+      {:error, out} -> raise "gh #{Enum.join(Enum.take(args, 2), " ")} fehlgeschlagen: #{out}"
+    end
+  end
+
+  defp gh(ctx, args, stdin \\ nil) do
+    if stdin do
+      # System.cmd has no stdin; a temp file keeps bodies out of argv and logs.
+      path = Path.join(System.tmp_dir!(), "dev-loop-#{System.unique_integer([:positive])}.md")
+      File.write!(path, stdin)
+
+      try do
+        run("gh", Enum.map(args, &if(&1 == "-", do: path, else: &1)), ctx)
+      after
+        File.rm(path)
+      end
+    else
+      run("gh", args, ctx)
+    end
+  end
+
+  defp run(cmd, args, ctx) do
+    env = if ctx.token, do: [{"GH_TOKEN", ctx.token}], else: []
+
+    case System.cmd(cmd, args, env: env, stderr_to_stdout: true) do
+      {out, 0} -> {:ok, out}
+      {out, _} -> {:error, out}
+    end
+  end
+
+  defp log(ctx, msg), do: ctx.log.(msg)
+end
