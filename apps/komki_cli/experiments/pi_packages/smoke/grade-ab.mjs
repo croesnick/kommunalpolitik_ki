@@ -26,6 +26,7 @@ import path from "node:path";
 import { parseSessionFile } from "../lib/session.mjs";
 import { checkAnswer } from "./criteria.mjs";
 import { ENTWURF_BESCHLUSSVORLAGE, factTokens, missingFacts } from "./fixtures.mjs";
+import { poolDraft } from "./measure.mjs";
 
 // ---------------------------------------------------------------- checklists
 
@@ -305,6 +306,16 @@ async function repetitionLoops(dir) {
   return loops;
 }
 
+/** Pooled MTP draft acceptance over llama-log requests (#372). */
+function draftTotals(serverRequests) {
+  return poolDraft(serverRequests.map((r) => ({ accepted: r.draftAccepted, generated: r.draftGenerated })));
+}
+
+/** Llama-log requests with a missing timing or draft line (#372: changed log format). */
+function incompleteServerRequests(serverRequests) {
+  return serverRequests.filter((r) => [r.promptTokens, r.evalTokens, r.draftGenerated].includes(null)).length;
+}
+
 async function runMetrics(results, summary, dir) {
   const tasks = {};
   const all = [];
@@ -312,6 +323,7 @@ async function runMetrics(results, summary, dir) {
     const measures = measuresOf(result);
     all.push(...measures);
     const requests = measures.flatMap((m) => m.proxyRequests ?? []);
+    const taskServer = measures.flatMap((m) => m.serverRequests ?? []);
     tasks[result.id] = {
       verdict: result.verdict ?? "harness-error",
       wallMs: measures.reduce((s, m) => s + (m.durationMs ?? 0), 0),
@@ -321,6 +333,9 @@ async function runMetrics(results, summary, dir) {
       completionTokens: measures.reduce((s, m) => s + (m.usageProxy?.completion ?? 0), 0),
       reasoningTokens: measures.reduce((s, m) => s + (m.reasoningTokens ?? 0), 0),
       requests: requests.length,
+      draft: draftTotals(taskServer),
+      incompleteServerRequests: incompleteServerRequests(taskServer),
+      serverRequestCountMismatch: measures.some((m) => m.serverRequestCountMismatch),
     };
   }
   const requests = all.flatMap((m) => m.proxyRequests ?? []);
@@ -342,6 +357,7 @@ async function runMetrics(results, summary, dir) {
   return {
     tasks,
     loadMs: summary.llama?.staging?.loadMs ?? null,
+    draft: draftTotals(server),
     wallMsTotal: Object.values(tasks).reduce((s, t) => s + t.wallMs, 0),
     decodeTps: evalMs ? (evalTokens / evalMs) * 1000 : null,
     prefillTps: promptMs ? (promptTokens / promptMs) * 1000 : null,
@@ -436,6 +452,11 @@ async function report(root, { perfOnly = false, reference = "A" } = {}) {
       reasoningTokens: pick((m) => m.reasoningTokens),
       footprintMaxMiB: pick((m) => m.footprintMaxMiB),
       lengthClamped: pick((m) => m.lengthClamped),
+      draft: poolDraft(armRuns.map((r) => r.metrics.draft)),
+      draftRate: pick((m) => m.draft.rate),
+      taskDraft: Object.fromEntries(
+        Object.keys(armRuns[0]?.metrics.tasks ?? {}).map((t) => [t, poolDraft(armRuns.map((r) => r.metrics.tasks[t]?.draft))]),
+      ),
       runsWithLoop: armRuns.filter((r) => r.metrics.loops.length > 0).length,
       taskWallMs: Object.fromEntries(
         Object.keys(armRuns[0]?.metrics.tasks ?? {}).map((t) => [t, pick((m) => m.tasks[t]?.wallMs)]),
@@ -505,6 +526,8 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
   row("Prompt-Token", (a) => fmtSpread(a.promptTokens));
   row("Completion-Token", (a) => fmtSpread(a.completionTokens));
   row("davon Thinking-Token", (a) => fmtSpread(a.reasoningTokens));
+  row("draft acceptance (gepoolt)", (a) => fmtDraft(a.draft));
+  row("draft acceptance je Lauf", (a) => fmtSpread(a.draftRate, 3));
   row("footprint max", (a) => fmtSpread(a.footprintMaxMiB, 0, " MiB"));
   row("längengeklemmte Requests", (a) => fmtSpread(a.lengthClamped));
   row("Tool-Calls / invalide / Reparaturen", (a) => `${a.toolCalls} / ${a.toolCallClasses ? Object.entries(a.toolCallClasses).filter(([k]) => k !== "ok" && k !== "extra-keys").reduce((x, [, v]) => x + v, 0) : 0} / ${a.repairs} (${fmt((a.repairRate ?? 0) * 100, 1)} %)`);
@@ -519,6 +542,28 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
       return `${s.n ? fmtSpread({ ...s, median: s.median / 1000, min: s.min / 1000, max: s.max / 1000 }, 1, " s") : "–"} · ${(a.verdicts[task] ?? []).join("/")}`;
     });
   }
+  lines.push("");
+  lines.push(`| Aufgabe: draft acceptance (gepoolt) | ${arms.join(" | ")} |`);
+  lines.push(`|---|${arms.map(() => "---").join("|")}|`);
+  for (const task of Object.keys(byArm[arms[0]].taskDraft)) row(task, (a) => fmtDraft(a.taskDraft[task]));
+  lines.push("");
+  // #372: a metric missing in some run hints at a changed llama log format.
+  // Per task as well, so that one request without a timing or draft line
+  // shows up instead of silently adding 0 to the run totals.
+  const missing = perRun.flatMap((run) =>
+    ["loadMs", "decodeTps", "prefillTps", "ttftMedianMs", "firstAnswerMedianMs", "footprintMaxMiB", "rssMaxMiB"]
+      .filter((k) => run.metrics[k] === null)
+      .concat(run.metrics.draft.generated === 0 ? ["draft"] : [])
+      .concat(
+        Object.entries(run.metrics.tasks).flatMap(([task, t]) => [
+          ...(t.requests > 0 && t.draft.generated === 0 ? [`${task} draft`] : []),
+          ...(t.incompleteServerRequests > 0 ? [`${task} ${t.incompleteServerRequests} Log-Requests unvollständig`] : []),
+          ...(t.serverRequestCountMismatch ? [`${task} Requests Log ≠ Proxy`] : []),
+        ]),
+      )
+      .map((k) => `${run.dir}: ${k}`),
+  );
+  lines.push(`Fehlende Messwerte: ${missing.join(", ") || "keine"}`);
   lines.push("");
   if (perfOnly) return renderRuns(lines, perRun);
   lines.push(`| Qualität (Punkte, Median, Spanne) | ${arms.join(" | ")} |`);
@@ -546,6 +591,10 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
     lines.push(`| ${id} | ${q.task} | ${q.arm} | ${q.round} | ${q.points}/${q.max} | ${q.factViolations.join(", ") || "–"} | ${q.notiz.replace(/\|/g, "/")} |`);
   }
   return lines.join("\n") + "\n";
+}
+
+export function fmtDraft(d) {
+  return d.rate === null ? "–" : `${fmt(d.rate, 3)} (${d.accepted} von ${d.generated})`;
 }
 
 function renderRuns(lines, perRun) {

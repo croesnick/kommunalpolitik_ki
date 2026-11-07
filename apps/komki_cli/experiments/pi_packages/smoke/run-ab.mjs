@@ -23,6 +23,10 @@
  * is skipped on the next invocation. Provenance (hardware, versions,
  * SHA-256 of binary and GGUFs, git state) and the schedule with the system
  * state per run go to <root>/provenance.json and <root>/schedule.json.
+ *
+ * Idle sleep is held off with `caffeinate -i` for as long as this process
+ * lives (#372: an idle-sleeping Mac stalled the server for minutes and
+ * spoiled the timing of a whole measurement).
  */
 import { execFileSync, spawn } from "node:child_process";
 import { createWriteStream, existsSync, realpathSync } from "node:fs";
@@ -224,6 +228,7 @@ async function main() {
   const root = args.root ?? path.join(EXPERIMENTS_ROOT, "ab-285", timestamp());
   await mkdir(root, { recursive: true });
   console.log(`A/B-Root: ${root}`);
+  spawn("/usr/bin/caffeinate", ["-i", "-w", String(process.pid)], { stdio: "ignore", detached: true }).unref();
 
   const prov = await provenance(args);
   await writeFile(path.join(root, `provenance-${timestamp()}.json`), JSON.stringify(prov, null, 2));
