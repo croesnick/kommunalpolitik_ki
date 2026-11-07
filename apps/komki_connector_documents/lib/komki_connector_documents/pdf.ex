@@ -18,12 +18,17 @@ defmodule KomkiConnectorDocuments.Pdf do
   ## Limits
 
   A PDF without a text layer (e.g. a scan) is an error (`upstream-error`),
-  not empty text. The marked text of a highlight is the intersection of
-  the character boxes with the annotation rectangle (probe #278):
-  ex_pdfium does not expose QuadPoints, so multi-line highlights are
-  approximate, read top to bottom with lines joined by a space. Only
-  visible `/Subtype /Highlight` annotations count; hidden ones (/F hidden
-  flag), underlines and notes are ignored.
+  not empty text. The marked text of a highlight is made of the
+  characters whose box overlaps the annotation rectangle horizontally and
+  whose baseline (box center if the character has none) lies inside it
+  (#368): the loose character boxes of ex_pdfium are taller than the line
+  spacing, so a plain box overlap would take in neighboring lines. A
+  rectangle that contains no baseline yields no marked text
+  (`(keinen markierten Text erkannt)`). ex_pdfium does not expose
+  QuadPoints (probe #278), so multi-line highlights are approximate, read
+  top to bottom with lines joined by a space. Only visible
+  `/Subtype /Highlight` annotations count; hidden ones (/F hidden flag),
+  underlines and notes are ignored.
 
   The NIF's page index is 16 bit, so documents with 65 535 pages or more
   cannot be counted reliably and are rejected.

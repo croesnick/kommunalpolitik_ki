@@ -99,9 +99,9 @@ defmodule KomkiConnectorDocuments.TestPDF do
   One page, five lines in 12 pt Helvetica at 14.4 pt line spacing (baselines
   700, 685.6, 671.2, 656.8, 642.4). Highlight 1 covers line 3 only (comment
   „Einzeilig“), highlight 2 covers lines 4 and 5 (comment „Zweizeilig“).
-  The rectangles span roughly the line pitch, as viewers draw them; the
-  character boxes of the neighboring lines reach into them, but their
-  baselines lie outside.
+  The rectangles are slightly taller than the line pitch, as viewers draw
+  them: the loose character boxes of the lines directly above and below
+  reach into them, but the baselines of those lines lie outside.
   """
   @spec tight_lines(Path.t()) :: :ok
   def tight_lines(path) do
@@ -120,8 +120,8 @@ defmodule KomkiConnectorDocuments.TestPDF do
       page(parent: "2 0 R", contents: "4 0 R", annots: "[6 0 R 7 0 R]"),
       {:stream, stream},
       "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-      annot({70, 666.5, 200, 683}, "Einzeilig", 4),
-      annot({70, 637, 200, 668}, "Zweizeilig", 4)
+      annot({70, 666.5, 200, 684.5}, "Einzeilig", 4),
+      annot({70, 637, 200, 670}, "Zweizeilig", 4)
     ]
 
     File.write!(path, assemble(objects))
