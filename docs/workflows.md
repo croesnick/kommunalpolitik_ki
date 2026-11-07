@@ -339,8 +339,8 @@ vorschlägt. Direkt als Vortragsgrundlage nutzbar.
 | TOPs pro Sitzung abrufen | `ratsinfo show <id>` | ✅ |
 | Vault-Notizen zu TOPs sammeln | `obsidian search` / `vault_suche` | ✅ (Fallback: nachfragen falls keine Treffer) |
 | AZ-Artikel (optional, nur Top-Themen) | `allgaeuer_zeitung_mcp` | ✅ |
-| Bericht im Vault persistieren | `obsidian-cli` write | ✅ |
-| YAML-Frontmatter validieren | pyyaml-Check | ✅ (analog sitzungsvorbereitung) |
+| Bericht im Vault persistieren (nur nach GO mit Vorschau) | `obsidian-cli` write | ✅ |
+| YAML-Frontmatter validieren (vor dem GO, Nachprüfung danach) | pyyaml-Check | ✅ (analog sitzungsvorbereitung) |
 
 ### Lücken
 
