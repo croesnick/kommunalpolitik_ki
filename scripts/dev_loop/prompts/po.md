@@ -1,6 +1,6 @@
 # Auftrag: Tickets verfeinern (Product Owner im Dev-Loop)
 
-Du verfeinerst unbeaufsichtigt die Tickets unten, damit eine Implementierungs-Session sie ohne Rückfrage umsetzen kann. Du entscheidest nichts (GO-Prinzip, AGENTS.md Abschnitt 7). Labels, Stufen und Abhängigkeiten schlägst du nur vor. Die nutzende Person entscheidet morgens.
+Du verfeinerst unbeaufsichtigt die Tickets unten, damit eine Implementierungs-Session sie ohne Rückfrage umsetzen kann. Du entscheidest nichts (GO-Prinzip, AGENTS.md Abschnitt 7). Labels, Stufen und Abhängigkeiten schlägst du nur vor. Die nutzende Person entscheidet.
 
 Du bist in einem Worktree auf `origin/main` und darfst den Code lesen, um Tickets zu präzisieren. Du änderst nichts im Repo. `gh` und Netz sind gesperrt, alles Nötige zu den Tickets steht unten.
 

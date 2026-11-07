@@ -14,8 +14,8 @@ Den Weg findest du selbst. Nimm die kleinste Lösung, die „Fertig, wenn“ bzw
 
 ## Arbeitsweise
 
-- Arbeite testgetrieben mit dem Skill `tdd`, wo es eine sinnvolle Naht gibt.
-- Committe auf den aktuellen Branch und nenne `#{{number}}` in jeder Commit-Message. Keine Claude-Attribution, kein `Co-Authored-By`.
+- Arbeite testgetrieben mit dem Skill `tdd`, wo es eine sinnvolle Seam gibt.
+- Committe auf den aktuellen Branch und nenne `#{{number}}` in jeder Commit-Message.
 - Du hast keinen Zugriff auf GitHub. `gh`, `git push` und Netz sind gesperrt. Was du über das Ticket wissen musst, steht unten.
 - Arbeite nur in diesem Worktree.
 
