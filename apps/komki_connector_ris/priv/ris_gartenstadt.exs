@@ -5,7 +5,7 @@
 #       [--out <directory>] [--struktur <file>]
 #
 # Generates cassettes in the recorder's format (priv/ris_recorder.exs),
-# playable with mock_ris.exs --mode replay. The template is the structure
+# playable with the replay adapter of apps/komki_mock. The template is the structure
 # profile of session 20261101T112819Z: the transcription adopts every
 # observed occupancy - protected parts, restricted flags, counters for text
 # blocks, votes and documents - and fills them with content from the
