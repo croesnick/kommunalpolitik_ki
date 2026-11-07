@@ -43,6 +43,16 @@ defmodule KomkiMock.Adapters.ReplayTest do
     assert headers == [{"content-type", "application/json"}]
   end
 
+  test "the order of query parameters does not matter", %{data: data} do
+    assert {{200, _, "[]"}, _} =
+             Replay.handle(request("GET", "/fulltextsearch", "q=Linde"), data)
+
+    data = put_in(data, ["cassettes", Access.at(2), "query"], "client=32&q=Linde")
+
+    assert {{200, _, "[]"}, _} =
+             Replay.handle(request("GET", "/fulltextsearch", "q=Linde&client=32"), data)
+  end
+
   test "a recording without query matches an empty query", %{data: data} do
     assert {{200, [], ~s({"token":"t"})}, _} = Replay.handle(request("POST", "/auth", ""), data)
   end
