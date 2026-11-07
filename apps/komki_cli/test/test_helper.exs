@@ -8,6 +8,10 @@ sandbox? =
   File.exists?("/usr/bin/sandbox-exec") and is_binary(KomkiCli.Config.resolve_escript_bin())
 
 exclude = if sandbox?, do: exclude, else: [:sandbox | exclude]
+
+# Echter llama-server-Boot (DoctorBootTest, Ticket #392): nur mit
+# `mix test --include llama_boot`, nie im Standardlauf.
+exclude = [:llama_boot | exclude]
 ExUnit.start(exclude: exclude)
 
 # Ticket #146: kein Test fragt den echten Schluesselbund ab (auch nicht der

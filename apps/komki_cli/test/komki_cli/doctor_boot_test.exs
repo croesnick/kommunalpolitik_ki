@@ -7,9 +7,17 @@ defmodule KomkiCli.DoctorBootTest do
   verifizierte GGUF-Artefakt der Sandbox-Forschung am erwarteten Pfad
   liegt (seit Ticket #318 auch der MTP-Drafter); ohne beides findet dieser
   Modul keine Tests statt.
+
+  Der Test kopiert etwa 17 GB und bootet einen echten llama-server (Port
+  59999). Deshalb ist er mit `:llama_boot` getaggt und im Standardlauf
+  ausgeschlossen (`test_helper.exs`, Ticket #392). Ausführen:
+
+      cd apps/komki_cli && mix test --include llama_boot
   """
 
   use ExUnit.Case, async: false
+
+  @moduletag :llama_boot
 
   alias KomkiCli.Config
 
