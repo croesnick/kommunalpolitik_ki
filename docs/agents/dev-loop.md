@@ -36,7 +36,7 @@ stateDiagram-v2
 | Review | `claude` mit Opus 5.5 | `tt` mit Default-Modell, Effort `max` |
 | PO | `claude` mit Opus 5.5 | `tt` mit Default-Modell, Effort `max` |
 
-Jede Stufe läuft als frische Session ohne Oberfläche (`claude -p`). Die Prompts liegen unter `scripts/dev_loop/prompts/`. Sind beide Konten erschöpft, beendet sich der Lauf sauber und meldet sich per Notification (herdr, falls `HERDR_ENV=1`, sonst macOS).
+Jede Stufe läuft als frische Session ohne Oberfläche (`claude -p`). Die Prompts liegen unter `scripts/dev_loop/prompts/`. Sind beide Konten erschöpft, beendet sich der Lauf sauber und meldet sich per macOS-Notification.
 
 ## Sicherheitsgrenze
 
@@ -63,10 +63,11 @@ touch ~/.dev-loop/STOP                                   # Not-Aus: greift vor d
 
 - **Wach bleiben:** Solange das Skript läuft, hält es den Mac per `caffeinate` wach. Ein Lock in `~/.dev-loop/lock` verhindert einen zweiten Lauf.
 - **Zeitfenster:** `--until` startet nach der angegebenen Uhrzeit kein neues Ticket mehr. Eine laufende Stufe darf bis zu 4 Stunden dauern.
-- **Cockpit in herdr:** Startet man das Skript in einer herdr-Pane, öffnet es für jede Stufe daneben eine eigene Pane, etwa „implement · claude · loop-392“. Diese Pane zeigt die Session live: den Text des Agenten, jeden Tool-Aufruf mit Ergebnis, die Ablehnungen und am Ende Turns und Dauer. In herdr erscheint sie als arbeitender Agent. Am Ende der Stufe schließt das Skript die Pane wieder. Bricht ein Lauf ab (Ctrl-C, Absturz), bleibt die Pane mit dem letzten Stand stehen. Der nächste Lauf schließt sie beim Start, erkennbar am Präfix „dev-loop ·“.
-  - Den ganzen Kontakt mit herdr bündelt `scripts/dev_loop/herdr.exs`. Fällt herdr aus, protokolliert der Loop das und arbeitet ohne Pane weiter.
+- **Cockpit in Herdr:** Gemeint ist die Desktop-App Herdr auf herdr-core (`hc`), nicht das ältere Terminal-Programm `herdr`. Startet man das Skript in einem Herdr-Terminal, öffnet es für jede Stufe einen eigenen Tab im selben Space, etwa „loop-368-review-claude“. Der Tab zeigt die Session live: den Text des Agenten, jeden Tool-Aufruf mit Ergebnis, die Ablehnungen und am Ende Turns und Dauer. Am Ende der Stufe beendet das Skript den Tab wieder. Bricht ein Lauf ab (Ctrl-C, Absturz), bleibt der Tab mit dem letzten Stand stehen. Der nächste Lauf beendet ihn beim Start, erkennbar am hc-Label `dev-loop=viewer`.
+  - Den ganzen Kontakt mit Herdr bündelt `scripts/dev_loop/herdr.exs`: `hc run` mit dem Label `herdr.space=<Space>` für den Tab, `herdr-app` für den Space und den Tab-Namen. Fällt Herdr aus, protokolliert der Loop das und arbeitet ohne Tab weiter.
+  - Herdr zeigt im Tab keinen Agenten-Status (working/done), denn dort läuft `tail | jq` und kein Agent. Den Fortschritt zeigt der Tab-Inhalt.
   - Die Agenten bleiben Kindprozesse des Skripts ohne Oberfläche (`claude -p`). Die Pane liest nur das Log mit (`tail -F … | jq -f scripts/dev_loop/viewer.jq`). Eingreifen lässt sich dort nicht, dafür gilt die Sicherheitsgrenze unverändert.
-  - Außerhalb von herdr öffnet das Skript keine Pane. Den Verlauf zeigt dann:
+  - Außerhalb von Herdr öffnet das Skript keinen Tab. Den Verlauf zeigt dann:
     ```bash
     tail -f "$(ls -td ~/.dev-loop/logs/*/ | head -1)"run.log
     ```

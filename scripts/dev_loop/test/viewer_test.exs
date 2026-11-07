@@ -56,6 +56,12 @@ defmodule DevLoop.ViewerTest do
     assert String.ends_with?(line, "…")
   end
 
+  test "terminal names fit hc's rules" do
+    assert DevLoop.Herdr.terminal_name("loop-392-review-claude") == "loop-392-review-claude"
+    assert DevLoop.Herdr.terminal_name("Loop 392 · Review") == "loop-392-review"
+    assert String.length(DevLoop.Herdr.terminal_name(String.duplicate("a", 50))) == 32
+  end
+
   test "the viewer command quotes paths for the shell" do
     assert DevLoop.Herdr.viewer_command("/logs/it's here.jsonl") =~
              ~S(tail -n +1 -F '/logs/it'\''s here.jsonl' | jq -rR --unbuffered -f ')

@@ -87,6 +87,7 @@ defmodule DevLoop do
     end
 
     root = git_root()
+    herdr_space = Herdr.space()
 
     %{
       # --rehearse runs agents and gates for real but only logs GitHub writes.
@@ -98,11 +99,12 @@ defmodule DevLoop do
       stamp: fn -> Calendar.strftime(NaiveDateTime.local_now(), "%H%M%S") end,
       stop_file: Path.join(@home, "STOP"),
       stage_timeout_ms: @stage_timeout_ms,
-      # Wraps every agent stage; in herdr it adds a live viewer pane.
+      # Wraps every agent stage; in Herdr it adds a tab with a live viewer.
+      herdr_space: herdr_space,
       watch:
-        if(Herdr.active?(),
-          do: &Herdr.watch(&1, &2, &3, log),
-          else: fn _label, _stage_log, fun -> fun.() end
+        if(herdr_space,
+          do: &Herdr.watch(herdr_space, &1, &2, &3, log),
+          else: fn _name, _stage_log, fun -> fun.() end
         ),
       root: root,
       worktrees: Path.join(root, ".claude/worktrees"),
@@ -174,7 +176,7 @@ defmodule DevLoop do
       "Dev-Loop startet: bis #{ctx.deadline || "Queue leer"}, höchstens #{ctx.max_tickets} Tickets"
     )
 
-    if Herdr.active?(), do: Herdr.sweep(ctx.log)
+    if ctx.herdr_space, do: Herdr.sweep(ctx.log)
 
     {report, reason} =
       try do
@@ -917,8 +919,6 @@ defmodule DevLoop do
   defp now_text, do: Calendar.strftime(NaiveDateTime.local_now(), "%d.%m.%Y %H:%M")
 
   defp notify(title, body) do
-    if Herdr.active?(), do: Herdr.notify(title, body)
-
     System.cmd("osascript", [
       "-e",
       "display notification #{inspect(body)} with title #{inspect(title)}"

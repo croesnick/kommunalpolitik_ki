@@ -56,7 +56,7 @@ defmodule DevLoop.Agent do
            --strict-mcp-config --settings #{@settings}) ++ extra
 
     outcome =
-      ctx.watch.("#{role} · #{account} · #{Path.basename(cwd)}", log, fn ->
+      ctx.watch.("#{Path.basename(cwd)}-#{role}-#{account}", log, fn ->
         Proc.run("claude", args,
           cd: cwd,
           env: env(account),
