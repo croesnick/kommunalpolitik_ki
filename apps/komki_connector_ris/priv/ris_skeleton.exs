@@ -17,7 +17,7 @@
 # schwanken mit den Aufnahmen; driftig ist nur das strukturell andere Format.
 # Damit laesst sich pruefen, ob der synthetische Mock formatgetreu ist.
 #
-# Nur OTP, keine Deps — wie mock_ris.exs.
+# Nur OTP, keine Deps — wie ris_recorder.exs.
 
 Code.require_file("./ris_http.exs", __DIR__)
 

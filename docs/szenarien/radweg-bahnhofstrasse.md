@@ -27,7 +27,7 @@ Der Abschnitt [Trägt der Kalkül?](#7-trägt-der-kalkül) fasst zusammen, wo RF
 Präzisierung braucht und wo er bewusst eine Grenze zieht.
 
 Das Szenario baut auf den vorhandenen Fixtures auf: Test-Vault (`apps/komki_connector_vault/priv/test-vault`),
-Übungs-RIS (`apps/komki_connector_ris/priv/mock_ris.exs`), Raumvorlage (`KomkiMediator.Templates`) und die Fälle
+Übungs-RIS (`apps/komki_mock`, Adapter `KomkiMock.Adapters.Ris`), Raumvorlage (`KomkiMediator.Templates`) und die Fälle
 der Engine (`apps/komki_policy/priv/fixtures`). Bahnhofstraße, Grundstück Gewerbegebiet Nord, Radverkehrskonzept
 und Leserbrief mit Injection werden hier zu einer zusammenhängenden Geschichte.
 

@@ -174,9 +174,23 @@ defmodule KomkiCli.ConfigTest do
       assert cfg.vault_dir == nil
     end
 
+    test "Web-Mock-Port: Basis-URL auf den Mock, ohne Port keine" do
+      base = TestSupport.tmp_area!("komki-cfg-web")
+
+      refute Config.web_mock?(Config.defaults(base))
+      assert Config.web_mock_url(Config.defaults(base)) == nil
+
+      cfg = Config.defaults(base, web_mock_port: 4020)
+      assert Config.web_mock?(cfg)
+      assert Config.web_mock_url(cfg) == "http://127.0.0.1:4020/"
+    end
+
     test "Roundtrip mit allen neuen Feldern" do
       cfg = %{
-        Config.defaults(TestSupport.tmp_area!("komki-cfg-conn"), ris_mock_port: 4011)
+        Config.defaults(TestSupport.tmp_area!("komki-cfg-conn"),
+          ris_mock_port: 4011,
+          web_mock_port: 4021
+        )
         | escript_bin: "/opt/erl/bin/escript",
           egress_bin: "/opt/bin/komki-egress",
           connector_bins: %{"ris" => "/opt/bin/r", "vault" => nil, "web" => "/opt/bin/w"},
@@ -195,13 +209,14 @@ defmodule KomkiCli.ConfigTest do
         |> Config.encode()
         |> JSON.decode!()
         |> Map.drop(
-          ~w(escript_bin egress_bin connector_bins egress_ports ris_base_url ris_mock_port vault_dir)
+          ~w(escript_bin egress_bin connector_bins egress_ports ris_base_url ris_mock_port web_mock_port vault_dir)
         )
 
       assert {:ok, loaded} = Config.from_map(old)
       assert loaded.egress_ports == Config.default_egress_ports()
       assert loaded.ris_base_url == Config.default_ris_base_url()
       assert loaded.vault_dir == nil
+      assert loaded.web_mock_port == nil
       assert loaded.connector_bins == %{}
     end
 

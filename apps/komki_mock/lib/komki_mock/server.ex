@@ -15,6 +15,10 @@ defmodule KomkiMock.Server do
   - `ports.json` — `data` and `control` port of this run
   - `requests.jsonl` — one line per data request; cleared by seed and reset
 
+  Data changes come from the adapter (a write route of the mocked system) or
+  from `put_data/2`, which replaces the data wholesale: that is how tests set
+  up a state for a read-only system. `reset` brings the seed back either way.
+
   Scenarios: `ok`; `error` (every request answers 500); `slow` (every reply
   waits `delay_ms`); `refused` (the data port accepts no connections).
   """
@@ -58,6 +62,10 @@ defmodule KomkiMock.Server do
 
   @spec reset(GenServer.server()) :: {:ok, public_state()}
   def reset(server), do: GenServer.call(server, :reset)
+
+  @doc "Replace the data; seed, scenario and request log stay as they are."
+  @spec put_data(GenServer.server(), term()) :: {:ok, public_state()}
+  def put_data(server, data), do: GenServer.call(server, {:put_data, data})
 
   @spec scenario(GenServer.server(), String.t(), pos_integer() | nil) ::
           {:ok, public_state()} | {:error, :unknown_scenario}
@@ -130,6 +138,12 @@ defmodule KomkiMock.Server do
   def handle_call(:reset, _from, state) do
     {:ok, data} = state.adapter.seed(state.seed)
     state = restart(state, state.seed, data)
+    {:reply, {:ok, public(state)}, state}
+  end
+
+  def handle_call({:put_data, data}, _from, state) do
+    state = %{state | data: normalize(data)}
+    persist(state)
     {:reply, {:ok, public(state)}, state}
   end
 

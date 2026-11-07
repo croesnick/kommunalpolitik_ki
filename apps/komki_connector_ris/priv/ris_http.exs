@@ -1,8 +1,6 @@
-# Gemeinsamer HTTP-Sockel-Kram fuer mock_ris.exs und ris_recorder.exs.
-#
-# Beide Skripte sind eigenstaendig startbar und laden diese Datei per
-# Code.require_file — weiterhin nur OTP, keine Deps. Hier lebt, was sonst in
-# beiden Skripten dupliziert waere (und der Body-Bug dann doppelt drin):
+# Gemeinsamer HTTP-Sockel- und CLI-Kram der eigenstaendigen Skripte unter
+# priv/ (Recorder, Extraktoren, Generator, Kassetten). Sie laden diese Datei
+# per Code.require_file — weiterhin nur OTP, keine Deps.
 
 defmodule KomkiConnectorRis.RisHttp do
   @moduledoc false
@@ -11,8 +9,7 @@ defmodule KomkiConnectorRis.RisHttp do
 
   @doc """
   Liest eine HTTP-Anfrage vom Sockel: `{:ok, Methode, Pfad, Kopfzeilen, Body}`
-  oder `:error`. Der Body wird komplett gelesen (auch wenn ihn nur der
-  Recorder braucht): ein Socket mit ungelesenen Daten sendet beim Schliessen
+  oder `:error`. Der Body wird komplett gelesen: ein Socket mit ungelesenen Daten sendet beim Schliessen
   RST, die Antwort kaeme beim Client nie an.
   """
   @spec read_request(:gen_tcp.socket()) ::

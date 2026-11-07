@@ -1,15 +1,14 @@
-defmodule KomkiConnectorRis.MockRisReplayTest do
+defmodule KomkiConnectorRis.RisReplayTest do
   # Nicht async: das httpc-Profil des Connectors ist knotenweit.
   use ExUnit.Case, async: false
 
-  alias KomkiConnectorRis.{Http, MockRis}
+  alias KomkiConnectorRis.{Http, RisMock}
 
   @cassettes Path.expand("fixtures/replay", __DIR__)
   @headers [{"accept", "application/json"}]
 
   test "spielt aufgezeichnete Antworten bytetreu zurueck" do
-    {:ok, mock, port} = MockRis.start(mode: {:replay, @cassettes})
-    on_exit(fn -> MockRis.stop(mock) end)
+    {_mock, port} = RisMock.start({:replay, @cassettes})
     :ok = Http.start(nil)
     base = "http://127.0.0.1:#{port}/"
 
@@ -47,8 +46,7 @@ defmodule KomkiConnectorRis.MockRisReplayTest do
   end
 
   test "greift bei abweichender Query nur fuer Zeitfenster-Endpunkte zurueck" do
-    {:ok, mock, port} = MockRis.start(mode: {:replay, @cassettes})
-    on_exit(fn -> MockRis.stop(mock) end)
+    {_mock, port} = RisMock.start({:replay, @cassettes})
     :ok = Http.start(nil)
 
     # Aufgezeichnet ist guestmeetings/4711 ohne Query. Eine andere Frage an
@@ -63,8 +61,7 @@ defmodule KomkiConnectorRis.MockRisReplayTest do
   end
 
   test "spielt auch POST-Anfragen zurueck (Login)" do
-    {:ok, mock, port} = MockRis.start(mode: {:replay, @cassettes})
-    on_exit(fn -> MockRis.stop(mock) end)
+    {_mock, port} = RisMock.start({:replay, @cassettes})
     :ok = Http.start(nil)
 
     {:ok, {{_, 200, _}, _headers, body}} =
@@ -79,20 +76,15 @@ defmodule KomkiConnectorRis.MockRisReplayTest do
     assert :json.decode(body) == %{"token" => "beispiel-token"}
   end
 
-  test "parse_cli meldet fehlendes Kassettenverzeichnis" do
-    assert {:error, missing} =
-             MockRis.parse_cli([
-               "--port",
-               "4010",
-               "--mode",
-               "replay",
-               "--cassette",
-               "/gibt-es-nicht"
-             ])
+  test "ein fehlendes Kassettenverzeichnis verhindert den Start" do
+    dir = Path.join(System.tmp_dir!(), "kmris-#{System.unique_integer([:positive])}")
+    on_exit(fn -> File.rm_rf(dir) end)
 
-    assert missing =~ "existiert nicht"
-
-    assert {:ok, _opts} =
-             MockRis.parse_cli(["--port", "4010", "--mode", "replay", "--cassette", @cassettes])
+    assert {:error, {:unknown_seed, "/gibt-es-nicht"}} =
+             GenServer.start(KomkiMock.Server,
+               adapter: KomkiMock.Adapters.Replay,
+               dir: dir,
+               seed: "/gibt-es-nicht"
+             )
   end
 end
