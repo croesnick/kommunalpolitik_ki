@@ -61,11 +61,14 @@ touch ~/.dev-loop/STOP                                   # Not-Aus: greift vor d
 
 - **Wach bleiben:** Solange das Skript läuft, hält es den Mac per `caffeinate` wach. Ein Lock in `~/.dev-loop/lock` verhindert einen zweiten Lauf.
 - **Zeitfenster:** `--until` startet nach der angegebenen Uhrzeit kein neues Ticket mehr. Eine laufende Stufe darf bis zu 4 Stunden dauern.
-- **Cockpit in herdr:** Das Skript läuft in einer herdr-Pane. Eine zweite Pane zeigt das aktuelle Stufen-Log:
-  ```bash
-  tail -f "$(ls -td ~/.dev-loop/logs/*/ | head -1)"run.log
-  ```
-  Die Logs jeder Stufe liegen als `*.jsonl` (stream-json von Claude Code) im selben Lauf-Verzeichnis.
+- **Cockpit in herdr:** Startet man das Skript in einer herdr-Pane, öffnet es für jede Stufe daneben eine eigene Pane, etwa „implement · claude · loop-392“. Diese Pane zeigt die Session live: den Text des Agenten, jeden Tool-Aufruf mit Ergebnis, die Ablehnungen und am Ende Turns und Dauer. In herdr erscheint sie als arbeitender Agent. Am Ende der Stufe schließt das Skript die Pane wieder. Bricht ein Lauf ab (Ctrl-C, Absturz), bleibt die Pane mit dem letzten Stand stehen. Der nächste Lauf schließt sie beim Start, erkennbar am Präfix „dev-loop ·“.
+  - Den ganzen Kontakt mit herdr bündelt `scripts/dev_loop/herdr.exs`. Fällt herdr aus, protokolliert der Loop das und arbeitet ohne Pane weiter.
+  - Die Agenten bleiben Kindprozesse des Skripts ohne Oberfläche (`claude -p`). Die Pane liest nur das Log mit (`tail -F … | jq -f scripts/dev_loop/viewer.jq`). Eingreifen lässt sich dort nicht, dafür gilt die Sicherheitsgrenze unverändert.
+  - Außerhalb von herdr öffnet das Skript keine Pane. Den Verlauf zeigt dann:
+    ```bash
+    tail -f "$(ls -td ~/.dev-loop/logs/*/ | head -1)"run.log
+    ```
+  - Die Logs jeder Stufe liegen als `*.jsonl` (stream-json von Claude Code) im selben Lauf-Verzeichnis. Eine abgeschlossene Stufe lässt sich nachlesen mit `jq -rR -f scripts/dev_loop/viewer.jq <stufe>.jsonl`.
 - **Neustart:** Der ganze Zustand liegt auf GitHub. Dazu gehören der Board-Status und die Review-Marker `<!-- dev-loop:review verdict=… sha=… -->` in den PR-Kommentaren. Nach einem Absturz macht ein neuer Lauf zuerst offene Loop-PRs ohne Freigabe des aktuellen Heads weiter, dann Loop-Worktrees ohne PR (`.claude/worktrees/loop-<n>`).
 
 ## Einrichtung (einmalig)

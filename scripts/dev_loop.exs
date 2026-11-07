@@ -15,12 +15,13 @@
 # hidden markers), so a restart after a crash picks up where it stopped.
 # Stop switch: touch ~/.dev-loop/STOP (checked before every stage).
 
-for file <- ~w(core proc agent github), do: Code.require_file("dev_loop/#{file}.exs", __DIR__)
+for file <- ~w(core proc herdr agent github),
+    do: Code.require_file("dev_loop/#{file}.exs", __DIR__)
 
 defmodule DevLoop do
   @moduledoc false
 
-  alias DevLoop.{Agent, Core, GitHub, Proc}
+  alias DevLoop.{Agent, Core, GitHub, Herdr, Proc}
 
   @home Path.expand("~/.dev-loop")
   @prompts Path.expand("dev_loop/prompts", __DIR__)
@@ -97,6 +98,12 @@ defmodule DevLoop do
       stamp: fn -> Calendar.strftime(NaiveDateTime.local_now(), "%H%M%S") end,
       stop_file: Path.join(@home, "STOP"),
       stage_timeout_ms: @stage_timeout_ms,
+      # Wraps every agent stage; in herdr it adds a live viewer pane.
+      watch:
+        if(Herdr.active?(),
+          do: &Herdr.watch(&1, &2, &3, log),
+          else: fn _label, _stage_log, fun -> fun.() end
+        ),
       root: root,
       worktrees: Path.join(root, ".claude/worktrees"),
       deadline: deadline(opts[:until]),
@@ -166,6 +173,8 @@ defmodule DevLoop do
     ctx.log.(
       "Dev-Loop startet: bis #{ctx.deadline || "Queue leer"}, höchstens #{ctx.max_tickets} Tickets"
     )
+
+    if Herdr.active?(), do: Herdr.sweep(ctx.log)
 
     {report, reason} =
       try do
@@ -887,8 +896,7 @@ defmodule DevLoop do
   defp now_text, do: Calendar.strftime(NaiveDateTime.local_now(), "%d.%m.%Y %H:%M")
 
   defp notify(title, body) do
-    if System.get_env("HERDR_ENV") == "1",
-      do: System.cmd("herdr", ["notification", "show", title, "--body", body])
+    if Herdr.active?(), do: Herdr.notify(title, body)
 
     System.cmd("osascript", [
       "-e",

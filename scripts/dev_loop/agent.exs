@@ -56,12 +56,14 @@ defmodule DevLoop.Agent do
            --strict-mcp-config --settings #{@settings}) ++ extra
 
     outcome =
-      Proc.run("claude", args,
-        cd: cwd,
-        env: env(account),
-        timeout_ms: ctx.stage_timeout_ms,
-        log: log
-      )
+      ctx.watch.("#{role} · #{account} · #{Path.basename(cwd)}", log, fn ->
+        Proc.run("claude", args,
+          cd: cwd,
+          env: env(account),
+          timeout_ms: ctx.stage_timeout_ms,
+          log: log
+        )
+      end)
 
     case classify(outcome) do
       :exhausted ->

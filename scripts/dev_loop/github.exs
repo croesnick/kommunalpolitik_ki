@@ -83,7 +83,7 @@ defmodule DevLoop.GitHub do
             do: n
 
       {:error, out} ->
-        log(ctx, "Board nicht lesbar, Status wird ignoriert: #{String.slice(out, 0, 200)}")
+        log(ctx, "Board nicht lesbar, Status wird ignoriert: #{first_line(out)}")
         []
     end
   end
@@ -140,12 +140,12 @@ defmodule DevLoop.GitHub do
   @doc "Board status; a missing option or an unwritable board is logged, not fatal."
   def set_status(ctx, n, status) do
     args =
-      ~w(project item-edit --owner #{@project_owner} --url #{issue_url(n)} --field Status --value) ++
-        [status]
+      ~w(project item-edit #{@project_number} --owner #{@project_owner} --url #{issue_url(n)}
+         --field Status --value) ++ [status]
 
     case write(ctx, args) do
       {:error, out} ->
-        log(ctx, "Board-Status '#{status}' für ##{n} nicht gesetzt: #{String.slice(out, 0, 200)}")
+        log(ctx, "Board-Status '#{status}' für ##{n} nicht gesetzt: #{first_line(out)}")
 
       ok ->
         ok
@@ -262,4 +262,7 @@ defmodule DevLoop.GitHub do
   end
 
   defp log(ctx, msg), do: ctx.log.(msg)
+
+  # gh prints its whole usage text after some errors; the first line says it.
+  defp first_line(out), do: out |> String.trim() |> String.split("\n", parts: 2) |> hd()
 end
