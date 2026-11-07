@@ -415,6 +415,75 @@ export function validateToolCalls(requests) {
   return calls;
 }
 
+/**
+ * From this many identical tool calls in a row on, a run counts as a
+ * tool-call loop (#383). Calibrated on the #372 proxy logs: clean runs
+ * never repeat a call, benign retries reach 3 (`read` of one note), the
+ * loops that ended on their own reached 7 and 10, the ones that ran into
+ * the timeout 600 and 647.
+ */
+export const TOOL_LOOP_REPEATS = 5;
+
+/** Compaction requests of pi: a side request, not a turn of the agent. */
+export function isSummaryRequest(record) {
+  try {
+    const system = JSON.parse(record.body).messages?.find((m) => m.role === "system");
+    const text = typeof system?.content === "string" ? system.content : JSON.stringify(system?.content ?? "");
+    return text.startsWith("You are a context summarization assistant.");
+  } catch {
+    return false;
+  }
+}
+
+function callSignature(raw) {
+  const call = normalizeCall(raw);
+  try {
+    const parsed = JSON.parse(call.arguments);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const sorted = Object.fromEntries(Object.entries(parsed).sort(([a], [b]) => a.localeCompare(b)));
+      return { name: call.name, arguments: JSON.stringify(sorted) };
+    }
+  } catch {
+    // unparsable arguments compare as raw text
+  }
+  return { name: call.name, arguments: call.arguments };
+}
+
+/**
+ * Tool-call loops in a proxy log (#383): runs of at least `minRepeats`
+ * consecutive model turns with identical tool calls (same names, same
+ * arguments up to key order). A turn without tool calls ends a run;
+ * compaction summaries are skipped. Result per loop:
+ *   { name, arguments, repeats, firstAt }
+ */
+export function toolCallLoops(records, minRepeats = TOOL_LOOP_REPEATS) {
+  const loops = [];
+  let run = null;
+  const close = () => {
+    if (run?.repeats >= minRepeats) {
+      const single = run.calls.length === 1;
+      loops.push({
+        name: run.calls.map((c) => c.name).join("+"),
+        arguments: single ? run.calls[0].arguments : JSON.stringify(run.calls.map((c) => c.arguments)),
+        repeats: run.repeats,
+        firstAt: run.firstAt,
+      });
+    }
+    run = null;
+  };
+  for (const record of records) {
+    if (isSummaryRequest(record)) continue;
+    const calls = (record.response?.toolCalls ?? []).map(callSignature);
+    const key = JSON.stringify(calls);
+    if (calls.length === 0 || key !== run?.key) close();
+    if (calls.length === 0) continue;
+    if (run) run.repeats += 1;
+    else run = { key, calls, repeats: 1, firstAt: record.at };
+  }
+  close();
+  return loops;
+}
+
 /** Summiert die usage aus den Proxy-Antworten (falls der Server sie liefert). */
 export function usageTotals(requests) {
   let prompt = 0;
