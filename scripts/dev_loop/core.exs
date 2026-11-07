@@ -103,8 +103,18 @@ defmodule DevLoop.Core do
 
   defp pickable?(i, busy) do
     "ready-for-agent" in i.labels and tier(i.labels) in [:a, :b] and
-      i.open_blockers == 0 and i.assignees == [] and i.number not in busy
+      i.open_blockers == 0 and i.assignees == [] and i.number not in busy and
+      confirmed_zielbild?(i)
   end
+
+  # An A/B ticket needs a Zielbild (ai-tiers.md), and the implementer reads it
+  # as the contract. A draft by the PO has no GO yet, so it does not count.
+  defp confirmed_zielbild?(i) do
+    String.contains?(i.body, "## Zielbild") or
+      Enum.any?(i.comments, &(String.contains?(&1, "## Zielbild") and not po_comment?(&1)))
+  end
+
+  defp po_comment?(text), do: String.contains?(text, @po_marker)
 
   def loop_branch(n), do: "loop/#{n}"
 
@@ -140,7 +150,7 @@ defmodule DevLoop.Core do
 
   defp po_candidate?(i) do
     not Enum.any?(i.labels, &po_off_limits?/1) and
-      not Enum.any?(i.comments, &String.contains?(&1, @po_marker)) and
+      not Enum.any?(i.comments, &po_comment?/1) and
       ("needs-triage" in i.labels or (tier(i.labels) in [:a, :b] and not zielbild?(i)))
   end
 

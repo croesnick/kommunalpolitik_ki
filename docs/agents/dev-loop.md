@@ -6,7 +6,7 @@ Stand: 2026-11-07, Ticket #389. Der Dev-Loop arbeitet freie Tickets ab, auch wen
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Pick: ready-for-agent, Stufe A/B, kein offener Blocker, kein Assignee, nicht belegt
+    [*] --> Pick: ready-for-agent, Stufe A/B, Zielbild, kein offener Blocker, kein Assignee, nicht belegt
     Pick --> Implement: Assignee + Board "In Progress"
     Implement --> Review: Gates grün, PR mit "Closes #n", Board "In Review"
     Implement --> Human: blocked.md oder zweiter Fehlversuch
@@ -20,7 +20,7 @@ stateDiagram-v2
     Human --> Pick: ready-for-human statt ready-for-agent, Kommentar
 ```
 
-- **Auswahl:** Zuerst kommen Tickets mit dem Label `next`, dann B vor A, dann die kleinste Nummer. Als *belegt* gelten Tickets, die zu einem offenen PR gehören, deren Nummer im Branch eines PR oder eines lokalen Worktrees steht (`lane-152-…`, `brave-mock-340`) oder die auf dem Board „In Progress“ stehen. So bleiben von Hand geöffnete Lanes unberührt.
+- **Auswahl:** Ein Ticket braucht ein Zielbild im Text oder in einem Kommentar (`ai-tiers.md`). Ein Zielbild-Entwurf der PO zählt nicht, denn er hat noch kein GO. Zuerst kommen Tickets mit dem Label `next`, dann B vor A, dann die kleinste Nummer. Als *belegt* gelten Tickets, die zu einem offenen PR gehören, deren Nummer im Branch eines PR oder eines lokalen Worktrees steht (`lane-152-…`, `brave-mock-340`) oder die auf dem Board „In Progress“ stehen. So bleiben von Hand geöffnete Lanes unberührt.
 - **Review:** Vor dem Review führt das Skript die Gates auf dem PR-Head selbst aus, außerhalb der Sandbox. Sind sie rot, zählt das ohne Review als Rework-Runde. Sind sie grün, bekommt das Review das Ergebnis als Beleg und prüft Abnahme und Diff. Was die Sandbox nicht messen lässt (etwa `lsof`, lokale Ports), führt nicht zu `human`. Das Review nennt den Punkt dann in seiner Zusammenfassung.
 - **Merge:** B-Tier wird automatisch gemergt. A-Tier wartet zugewiesen auf „In Review“, die nutzende Person mergt von Hand. S-Tier wird nie automatisch gemergt.
 - **Geschützte Pfade:** Neben den Pfaden aus `ai-tiers.md` schützt der Loop seine eigenen Regeln: `scripts/dev_loop*`, `.github/`, `docs/agents/` und `AGENTS.md`. Ein Diff, der einen dieser Pfade berührt, geht immer an die nutzende Person.

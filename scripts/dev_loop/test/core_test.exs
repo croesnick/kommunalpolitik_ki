@@ -63,25 +63,40 @@ defmodule DevLoop.CoreTest do
   end
 
   describe "candidates/2" do
+    @zb [body: "## Zielbild\n**Ziel:** x"]
+
     test "only ready A/B tickets without blocker, assignee or running lane" do
       issues = [
-        issue(1, ["ready-for-agent", "ai:b-tier"]),
-        issue(2, ["ready-for-agent", "ai:s-tier"]),
-        issue(3, ["ai:b-tier"]),
-        issue(4, ["ready-for-agent", "ai:a-tier"], open_blockers: 1),
-        issue(5, ["ready-for-agent", "ai:a-tier"], assignees: ["croesnick"]),
-        issue(6, ["ready-for-agent", "ai:a-tier"])
+        issue(1, ["ready-for-agent", "ai:b-tier"], @zb),
+        issue(2, ["ready-for-agent", "ai:s-tier"], @zb),
+        issue(3, ["ai:b-tier"], @zb),
+        issue(4, ["ready-for-agent", "ai:a-tier"], [open_blockers: 1] ++ @zb),
+        issue(5, ["ready-for-agent", "ai:a-tier"], [assignees: ["croesnick"]] ++ @zb),
+        issue(6, ["ready-for-agent", "ai:a-tier"], @zb)
       ]
 
       assert Enum.map(Core.candidates(issues, [6]), & &1.number) == [1]
     end
 
+    test "only with a Zielbild that is not a PO draft" do
+      ready = ["ready-for-agent", "ai:a-tier"]
+
+      issues = [
+        issue(1, ready),
+        issue(2, ready, comments: [Core.po_marker() <> "\n## Zielbild\nEntwurf"]),
+        issue(3, ready, comments: ["## Zielbild\nvon Hand"]),
+        issue(4, ready, @zb)
+      ]
+
+      assert Enum.map(Core.candidates(issues, []), & &1.number) == [3, 4]
+    end
+
     test "order: next, then B before A, then number" do
       issues = [
-        issue(10, ["ready-for-agent", "ai:a-tier"]),
-        issue(11, ["ready-for-agent", "ai:b-tier"]),
-        issue(12, ["ready-for-agent", "ai:a-tier", "next"]),
-        issue(9, ["ready-for-agent", "ai:a-tier"])
+        issue(10, ["ready-for-agent", "ai:a-tier"], @zb),
+        issue(11, ["ready-for-agent", "ai:b-tier"], @zb),
+        issue(12, ["ready-for-agent", "ai:a-tier", "next"], @zb),
+        issue(9, ["ready-for-agent", "ai:a-tier"], @zb)
       ]
 
       assert Enum.map(Core.candidates(issues, []), & &1.number) == [12, 11, 9, 10]
