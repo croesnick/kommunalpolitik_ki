@@ -17,10 +17,11 @@ stateDiagram-v2
     Merge --> Implement: Rebase-Konflikt oder CI rot (zählt als Rework-Runde)
     Merge --> Pick: CI grün auf dem Head-SHA, Squash-Merge
     WartetGO --> Pick: zugewiesen, Brief im Morgen-Kommentar
-    Human --> Pick: ready-for-human + Kommentar
+    Human --> Pick: ready-for-human statt ready-for-agent, Kommentar
 ```
 
 - **Auswahl:** Zuerst kommen Tickets mit dem Label `next`, dann B vor A, dann die kleinste Nummer. Als *belegt* gelten Tickets, die zu einem offenen PR gehören, deren Nummer im Branch eines PR oder eines lokalen Worktrees steht (`lane-152-…`, `brave-mock-340`) oder die auf dem Board „In Progress“ stehen. So bleiben von Hand geöffnete Lanes unberührt.
+- **Review:** Vor dem Review führt das Skript die Gates auf dem PR-Head selbst aus, außerhalb der Sandbox. Sind sie rot, zählt das ohne Review als Rework-Runde. Sind sie grün, bekommt das Review das Ergebnis als Beleg und prüft Abnahme und Diff. Was die Sandbox nicht messen lässt (etwa `lsof`, lokale Ports), führt nicht zu `human`. Das Review nennt den Punkt dann in seiner Zusammenfassung.
 - **Merge:** B-Tier wird automatisch gemergt. A-Tier wartet zugewiesen auf „In Review“, die nutzende Person mergt von Hand. S-Tier wird nie automatisch gemergt.
 - **Geschützte Pfade:** Neben den Pfaden aus `ai-tiers.md` schützt der Loop seine eigenen Regeln: `scripts/dev_loop*`, `.github/`, `docs/agents/` und `AGENTS.md`. Ein Diff, der einen dieser Pfade berührt, geht immer an die nutzende Person.
 - **Fehler:** Scheitert eine Umsetzung (rote Gates, kein Commit, Zeitlimit, Absturz), versucht der Loop es einmal in einer frischen Session neu. Scheitert auch das, übergibt er das Ticket an die nutzende Person, ebenso bei einer Eskalation des Agenten (`.dev-loop/blocked.md`).
@@ -44,9 +45,10 @@ Jede Stufe läuft als frische Session ohne Oberfläche (`claude -p`). Die Prompt
 - **Agenten:**
   - `--permission-mode auto --permission-prompts none`
   - Bash-Sandbox von Claude Code und Deny-Regeln aus `scripts/dev_loop/agent_settings.json` (`gh`, `git push`, `security`, `ssh`, `curl`, Lesen von `~/.ssh`, `~/.config/gh`, Schlüsselbund)
+  - Schreiben darf die Sandbox nur im Worktree, in den Hex- und Mix-Caches und in `/tmp`. `/tmp` braucht die Test-Suite von komki_cli für kurze Socket-Pfade (103-Byte-Grenze). Dort liegt nichts Geheimes, andere Prozesse des Kontos können es aber lesen.
   - keine MCP-Server (`--strict-mcp-config`)
   - kein `GH_TOKEN` in der Umgebung
-- **Prüfen:** `elixir scripts/dev_loop.exs --check-sandbox` lässt eine Session harmlose Befehle ausführen, die durchgehen müssen, und dann an Zugangsdaten scheitern. Die Befehle der Probe beweisen nur den Zugriff (Login-Name, Byte-Zahlen) und geben selbst bei einem Fehlschlag kein Geheimnis an das Modell. Zuletzt lief die Probe am 2026-11-07 auf `claude`, mit dem PAT im Schlüsselbund: alle vier Versuche abgelehnt, die Positivkontrollen (`git status`, `mix --version`) liefen.
+- **Prüfen:** `elixir scripts/dev_loop.exs --check-sandbox` lässt eine Session harmlose Befehle ausführen, die durchgehen müssen, und dann an Zugangsdaten scheitern. Die Befehle der Probe beweisen nur den Zugriff (Login-Name, Byte-Zahlen) und geben selbst bei einem Fehlschlag kein Geheimnis an das Modell. Zuletzt lief die Probe am 2026-11-07 auf `claude`, mit dem PAT im Schlüsselbund: alle vier Versuche abgelehnt, die Positivkontrollen (`git status`, `mix --version`, Schreiben in `/tmp`) liefen.
 - **Grenze der Grenze:** Der Loop läuft im Konto `crn`. Sandbox und Deny-Regeln sind Policy von Claude Code, keine Trennung durch das Betriebssystem. Ein eigenes macOS-Konto wäre die härtere Variante, die bewusst nicht gewählt wurde (Grilling zu #389, Q3).
 - **Branch Protection** auf `main` mit Pflicht-Checks: Eine rote CI blockiert den Merge auch dann, wenn das Skript einen Fehler hat.
 

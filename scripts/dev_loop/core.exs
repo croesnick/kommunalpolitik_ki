@@ -203,6 +203,16 @@ defmodule DevLoop.Core do
     end
   end
 
+  @doc "The review a red gate on the reviewed head stands for: one rework round."
+  def gate_failure_review(gate_text) do
+    %{
+      verdict: "rework",
+      summary: "Die Gates des Skripts sind auf diesem Head rot.\n\n```\n#{gate_text}\n```",
+      brief: "",
+      findings: []
+    }
+  end
+
   @doc "Validates `.dev-loop/po.json`: a list of `{issue, comment, proposals}`."
   def parse_po(json, allowed) do
     case JSON.decode(json) do

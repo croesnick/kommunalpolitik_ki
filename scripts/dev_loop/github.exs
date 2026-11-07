@@ -137,6 +137,9 @@ defmodule DevLoop.GitHub do
   def add_label(ctx, n, label),
     do: write(ctx, ["issue", "edit", "#{n}", "--repo", @repo, "--add-label", label])
 
+  def remove_label(ctx, n, label),
+    do: write(ctx, ["issue", "edit", "#{n}", "--repo", @repo, "--remove-label", label])
+
   @doc "Board status; a missing option or an unwritable board is logged, not fatal."
   def set_status(ctx, n, status) do
     args =

@@ -14,13 +14,16 @@ defmodule DevLoop.Proc do
     exe = System.find_executable(cmd) || raise "#{cmd} nicht gefunden"
     log = File.open!(Keyword.fetch!(opts, :log), [:append, :utf8])
 
+    # A port keeps the child's stdin open, and `claude -p` waits for input on
+    # it before it starts. The shell hands the program /dev/null instead and
+    # execs it, so the port's OS pid stays the program's pid (kill/1).
     port =
-      Port.open({:spawn_executable, exe}, [
+      Port.open({:spawn_executable, "/bin/sh"}, [
         :binary,
         :exit_status,
         :stderr_to_stdout,
         {:line, 10_000_000},
-        args: args,
+        args: ["-c", ~S(exec "$0" "$@" < /dev/null), exe | args],
         cd: Keyword.get(opts, :cd, File.cwd!()),
         env: for({k, v} <- Keyword.get(opts, :env, []), do: {~c"#{k}", v && ~c"#{v}"})
       ])

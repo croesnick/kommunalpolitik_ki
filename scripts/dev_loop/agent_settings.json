@@ -13,7 +13,7 @@
         "~/.claude-tt/anthropic-token.sh",
         "~/Library/Keychains"
       ],
-      "allowWrite": ["~/.hex", "~/.mix", "~/.cache"]
+      "allowWrite": ["~/.hex", "~/.mix", "~/.cache", "/tmp", "/private/tmp"]
     },
     "network": {
       "allowedDomains": ["hex.pm", "repo.hex.pm", "builds.hex.pm"]

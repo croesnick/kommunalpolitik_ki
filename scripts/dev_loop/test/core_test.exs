@@ -202,6 +202,14 @@ defmodule DevLoop.CoreTest do
       assert {:error, :invalid_review} = Core.parse_review("kein json")
     end
 
+    test "red gates stand for a rework round that carries the gate output" do
+      review = Core.gate_failure_review("Gate rot: mix format --check-formatted")
+
+      assert Core.decide(:b, review.verdict, [], 0) == :rework
+      assert Core.findings_text(review) =~ "Gate rot: mix format --check-formatted"
+      assert Core.review_comment(review, "abc") =~ Core.marker("rework", "abc")
+    end
+
     test "drops PO items for tickets it was not given" do
       json = ~s([{"issue":1,"comment":"c"},{"issue":99,"comment":"x"}])
       assert {:ok, [%{issue: 1, comment: "c"}]} = Core.parse_po(json, [1, 2])
