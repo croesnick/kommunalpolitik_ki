@@ -217,6 +217,10 @@ Hinweise zu den einzelnen Schritten:
   Netz gibt es einen Mock auf der Mock-Runtime:
   `cd apps/komki_mock && mix komki_mock.serve --adapter KomkiMock.Adapters.Ris --dir /tmp/mock-ris --data-port 49640`
   und `komki init --force --ris-mock-port 49640`.
+* **Websuche ohne Netz:** Der Brave-Mock läuft genauso
+  (`--adapter KomkiMock.Adapters.Brave --data-port 49641`), dazu
+  `komki init --force --web-mock-port 49641`. Der Web-Connector spricht dann
+  direkt mit dem Mock statt über den Egress-Proxy mit `api.search.brave.com`.
 * **Raum wechseln:** `komki raum` zeigt den Raum, `komki raum vertraulich`
   bzw. `komki raum recherche` wechselt (Ticket #268). Default ist
   **recherche** (`doc-oeffentlich@2`, `ris-oeffentlich@1`,

@@ -13,7 +13,7 @@ defmodule KomkiCli.CLI do
       komki secret set NAME | komki secret list
       komki journal verify
       komki init  [--gguf-from PATH] [--drafter-from PATH] [--port N] [--ctx N]
-                  [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--force]
+                  [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--web-mock-port N] [--force]
       komki doctor
       komki up    [--ctx N]
       komki down
@@ -287,6 +287,12 @@ defmodule KomkiCli.CLI do
             long: "ris-mock-port",
             parser: :integer,
             help: "RIS-Mock auf 127.0.0.1:N statt echter API (ohne Egress-Proxy)"
+          ],
+          web_mock_port: [
+            value_name: "N",
+            long: "web-mock-port",
+            parser: :integer,
+            help: "Brave-Mock auf 127.0.0.1:N statt echter Websuche (ohne Egress-Proxy)"
           ]
         ],
         flags: [

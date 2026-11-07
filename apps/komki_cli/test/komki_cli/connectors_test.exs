@@ -55,6 +55,14 @@ defmodule KomkiCli.ConnectorsTest do
       assert [{49_532, "web", _}] = Connectors.egress_ports(cfg)
     end
 
+    test "Web-Mock: direkter Port, kein Egress-Port für web" do
+      cfg = cfg(web_mock_port: 4020)
+      assert Connectors.upstream(cfg, Manifest.fetch!("web")) == {:direct, 4020}
+      assert [{49_531, "ris", _}] = Connectors.egress_ports(cfg)
+
+      refute Connectors.egress_needed?(cfg(ris_mock_port: 4010, web_mock_port: 4020))
+    end
+
     test "egress_stdin: Format von komki-egress" do
       assert JSON.decode!(Connectors.egress_stdin(cfg())) == %{
                "ports" => %{
@@ -83,6 +91,31 @@ defmodule KomkiCli.ConnectorsTest do
       args = Connectors.connector_args(cfg(ris_mock_port: 4010), Manifest.fetch!("ris"))
       refute "--proxy" in args
       assert ["--base-url", "http://127.0.0.1:4010/"] == Enum.take(args, -2)
+    end
+
+    test "web im Mock: kein Proxy, Basis-URL auf den Mock, auch in der Spawn-Zeile von up" do
+      cfg = cfg(web_mock_port: 4020)
+      args = Connectors.connector_args(cfg, Manifest.fetch!("web"))
+
+      assert args == [
+               "--socket",
+               Path.join(cfg.base_dir, "run/connectors/web.sock"),
+               "--base-url",
+               "http://127.0.0.1:4020/"
+             ]
+
+      spawn =
+        Connectors.spawn_line(
+          cfg,
+          Connectors.profile_path(cfg, "web"),
+          "/opt/komki/bin/komki-connector-web",
+          args,
+          Connectors.log_path(cfg, "web")
+        )
+
+      assert spawn =~ "--base-url"
+      assert spawn =~ "http://127.0.0.1:4020/"
+      refute spawn =~ "--proxy"
     end
 
     test "vault: --vault-dir, web: --proxy" do
