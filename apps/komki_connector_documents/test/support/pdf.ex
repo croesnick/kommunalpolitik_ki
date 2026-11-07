@@ -12,6 +12,8 @@ defmodule KomkiConnectorDocuments.TestPDF do
       control characters through, the connector normalizes them to \\n.
     * `big/1`: more than 1 MiB of extractable text, for the frame limit.
     * `invalid/1`: a file with a PDF extension but broken bytes.
+    * `tight_lines/1`: five lines of 12 pt text at 14.4 pt line spacing with
+      a single-line and a two-line highlight (ticket #368).
 
   The PDF syntax is handwritten and deliberately minimal: catalog, pages,
   one Helvetica Type1 font, one content stream per page with an absolute
@@ -88,6 +90,38 @@ defmodule KomkiConnectorDocuments.TestPDF do
       page(parent: "2 0 R", contents: "4 0 R"),
       {:stream, stream},
       "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    ]
+
+    File.write!(path, assemble(objects))
+  end
+
+  @doc """
+  One page, five lines in 12 pt Helvetica at 14.4 pt line spacing (baselines
+  700, 685.6, 671.2, 656.8, 642.4). Highlight 1 covers line 3 only (comment
+  „Einzeilig“), highlight 2 covers lines 4 and 5 (comment „Zweizeilig“).
+  The rectangles span roughly the line pitch, as viewers draw them; the
+  character boxes of the neighboring lines reach into them, but their
+  baselines lie outside.
+  """
+  @spec tight_lines(Path.t()) :: :ok
+  def tight_lines(path) do
+    stream =
+      text_stream([
+        {{72, 700}, "Alpha eins"},
+        {{72, 685.6}, "Beta zwei"},
+        {{72, 671.2}, "Gamma drei"},
+        {{72, 656.8}, "Delta vier"},
+        {{72, 642.4}, "Epsilon fuenf"}
+      ])
+
+    objects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      page(parent: "2 0 R", contents: "4 0 R", annots: "[6 0 R 7 0 R]"),
+      {:stream, stream},
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+      annot({70, 666.5, 200, 683}, "Einzeilig", 4),
+      annot({70, 637, 200, 668}, "Zweizeilig", 4)
     ]
 
     File.write!(path, assemble(objects))

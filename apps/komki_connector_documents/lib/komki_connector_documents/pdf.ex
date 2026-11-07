@@ -205,7 +205,7 @@ defmodule KomkiConnectorDocuments.Pdf do
     chars
     # pdfium reports line breaks as characters; join_chars re-inserts gaps.
     |> Enum.reject(&(&1.char =~ ~r/\s/))
-    |> Enum.filter(&(&1.bounds && overlap?(&1.bounds, rect)))
+    |> Enum.filter(&(&1.bounds && marked?(&1, rect)))
     |> Enum.sort_by(fn char ->
       %{x: x, y: y} = pen_position(char)
       {-y, x}
@@ -213,9 +213,15 @@ defmodule KomkiConnectorDocuments.Pdf do
     |> join_chars()
   end
 
-  defp overlap?(box, rect) do
+  # Horizontally the box must overlap the rectangle, vertically the
+  # baseline must lie inside it: the loose character boxes of ex_pdfium
+  # are taller than the line spacing and would pull in neighboring lines
+  # (ticket #368).
+  defp marked?(%{bounds: box} = char, rect) do
+    %{y: y} = pen_position(char)
+
     box.left < rect.right and box.right > rect.left and
-      box.bottom < rect.top and box.top > rect.bottom
+      y >= rect.bottom and y <= rect.top
   end
 
   # The baseline origin is the stable anchor; synthesized characters may
