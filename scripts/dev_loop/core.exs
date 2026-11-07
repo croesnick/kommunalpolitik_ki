@@ -282,6 +282,9 @@ defmodule DevLoop.Core do
     |> String.trim()
   end
 
+  # Multi-line briefs stay inside their list item.
+  defp bullet(text), do: "- " <> (text |> String.trim() |> String.replace("\n", "\n  "))
+
   @doc "The morning comment: one section per outcome, empty sections left out."
   def brief(report) do
     sections = [
@@ -293,7 +296,7 @@ defmodule DevLoop.Core do
 
     body =
       for {title, [_ | _] = items} <- sections, into: "" do
-        "### #{title}\n\n" <> Enum.map_join(items, "\n", &"- #{&1}") <> "\n\n"
+        "### #{title}\n\n" <> Enum.map_join(items, "\n", &bullet/1) <> "\n\n"
       end
 
     """

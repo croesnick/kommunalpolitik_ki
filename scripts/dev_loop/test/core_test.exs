@@ -223,7 +223,7 @@ defmodule DevLoop.CoreTest do
       Core.brief(%{
         started: "22:00",
         finished: "07:00",
-        merged: ["#392 Tag – PR #400"],
+        merged: ["#392 Tag – PR #400: Anders: x\nGeprüft: y"],
         await_go: [],
         human: [],
         po: [],
@@ -231,6 +231,7 @@ defmodule DevLoop.CoreTest do
       })
 
     assert text =~ "### Gemergt"
+    assert text =~ "- #392 Tag – PR #400: Anders: x\n  Geprüft: y"
     refute text =~ "Wartet auf GO"
     assert text =~ "**Ende:** Zeitfenster abgelaufen"
   end
