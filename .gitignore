@@ -20,6 +20,8 @@ apps/komki_cli/.build-report.md
 /docs/rfcs/0001-scratchpad.md
 cover/
 apps/*/cover/
+# ExUnit @tmp_dir output
+apps/*/tmp/
 
 # Python
 __pycache__/
