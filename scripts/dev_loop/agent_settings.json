@@ -1,0 +1,40 @@
+{
+  "includeCoAuthoredBy": false,
+  "attribution": { "commit": "", "pr": "" },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "autoAllowBashIfSandboxed": true,
+    "filesystem": {
+      "denyRead": [
+        "~/.ssh",
+        "~/.config/gh",
+        "~/.dev-loop",
+        "~/.claude-tt/anthropic-token.sh",
+        "~/Library/Keychains"
+      ],
+      "allowWrite": ["~/.hex", "~/.mix", "~/.cache", "/tmp", "/private/tmp"]
+    },
+    "network": {
+      "allowedDomains": ["hex.pm", "repo.hex.pm", "builds.hex.pm"]
+    }
+  },
+  "permissions": {
+    "deny": [
+      "Bash(gh *)",
+      "Bash(git push *)",
+      "Bash(git remote *)",
+      "Bash(git config *)",
+      "Bash(security *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(osascript *)",
+      "Read(~/.ssh/**)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.dev-loop/**)",
+      "Read(~/Library/Keychains/**)"
+    ]
+  }
+}
