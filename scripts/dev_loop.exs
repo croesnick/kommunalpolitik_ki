@@ -779,6 +779,8 @@ defmodule DevLoop do
     path = Path.join(ctx.worktrees, "loop-#{n}")
     branch = Core.loop_branch(n)
 
+    exclude_handoff(ctx)
+
     unless File.dir?(path) do
       git!(ctx.root, ~w(fetch -q origin main))
       base = if remote_branch?(ctx, branch), do: "origin/#{branch}", else: "origin/main"
@@ -791,11 +793,25 @@ defmodule DevLoop do
 
   defp fresh_worktree(ctx, name, ref, deps?) do
     path = Path.join(ctx.worktrees, name)
+    exclude_handoff(ctx)
     remove_worktree(ctx, path)
     git!(ctx.root, ~w(fetch -q origin main))
     git!(ctx.root, ~w(worktree add -q --detach #{path} #{ref}))
     if deps?, do: prepare(ctx, path)
     path
+  end
+
+  # Loop worktrees branch off origin/main, whose .gitignore may predate the
+  # hand-off directory; the shared info/exclude covers every worktree.
+  defp exclude_handoff(ctx) do
+    exclude = Path.join([ctx.root, ".git", "info", "exclude"])
+    current = if File.exists?(exclude), do: File.read!(exclude), else: ""
+
+    unless String.contains?(current, "\n.dev-loop/\n") or
+             String.starts_with?(current, ".dev-loop/\n") do
+      File.mkdir_p!(Path.dirname(exclude))
+      File.write!(exclude, "\n# dev loop (#389) hand-off files\n.dev-loop/\n", [:append])
+    end
   end
 
   defp remove_worktree(ctx, path) do
