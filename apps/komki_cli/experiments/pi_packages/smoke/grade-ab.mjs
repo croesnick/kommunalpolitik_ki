@@ -26,7 +26,7 @@ import path from "node:path";
 import { parseSessionFile } from "../lib/session.mjs";
 import { checkAnswer } from "./criteria.mjs";
 import { ENTWURF_BESCHLUSSVORLAGE, factTokens, missingFacts } from "./fixtures.mjs";
-import { poolDraft } from "./measure.mjs";
+import { isSummaryRequest, poolDraft, TOOL_LOOP_REPEATS, toolCallLoops } from "./measure.mjs";
 
 // ---------------------------------------------------------------- checklists
 
@@ -269,38 +269,36 @@ async function errorResults(measures) {
 /** A line repeated this often within one model response counts as a loop. */
 export const LOOP_LINE_REPEATS = 8;
 
-function isSummaryRequest(record) {
-  try {
-    const system = JSON.parse(record.body).messages?.find((m) => m.role === "system");
-    const text = typeof system?.content === "string" ? system.content : JSON.stringify(system?.content ?? "");
-    return text.startsWith("You are a context summarization assistant.");
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Repetition loops of a run: model responses (compaction summaries
- * excluded) in which one non-empty line occurs at least LOOP_LINE_REPEATS
- * times. Reads the proxy logs under <run>/task-N/harness/.
- */
-async function repetitionLoops(dir) {
-  const loops = [];
+/** Proxy logs of a run, one per pi invocation: <run>/task-N/harness/<invocation>/requests.jsonl. */
+async function proxyLogs(dir) {
+  const logs = [];
   const taskDirs = (await readdir(dir).catch(() => [])).filter((name) => name.startsWith("task-"));
   for (const taskDir of taskDirs) {
     const harness = path.join(dir, taskDir, "harness");
     for (const invocation of await readdir(harness).catch(() => [])) {
       const log = await readMaybe(path.join(harness, invocation, "requests.jsonl"));
-      for (const line of (log ?? "").split("\n").filter(Boolean)) {
-        const record = JSON.parse(line);
-        if (isSummaryRequest(record)) continue;
-        const counts = new Map();
-        for (const text of (record.response?.text ?? "").split("\n").map((l) => l.trim()).filter(Boolean)) {
-          counts.set(text, (counts.get(text) ?? 0) + 1);
-        }
-        const [top, repeats] = [...counts].sort((x, y) => y[1] - x[1])[0] ?? [null, 0];
-        if (repeats >= LOOP_LINE_REPEATS) loops.push({ task: taskDir, repeats, line: top.slice(0, 80) });
+      logs.push({ task: taskDir, records: (log ?? "").split("\n").filter(Boolean).map((line) => JSON.parse(line)) });
+    }
+  }
+  return logs;
+}
+
+/**
+ * Repetition loops of a run: model responses (compaction summaries
+ * excluded) in which one non-empty line occurs at least LOOP_LINE_REPEATS
+ * times.
+ */
+function repetitionLoops(logs) {
+  const loops = [];
+  for (const { task, records } of logs) {
+    for (const record of records) {
+      if (isSummaryRequest(record)) continue;
+      const counts = new Map();
+      for (const text of (record.response?.text ?? "").split("\n").map((l) => l.trim()).filter(Boolean)) {
+        counts.set(text, (counts.get(text) ?? 0) + 1);
       }
+      const [top, repeats] = [...counts].sort((x, y) => y[1] - x[1])[0] ?? [null, 0];
+      if (repeats >= LOOP_LINE_REPEATS) loops.push({ task, repeats, line: top.slice(0, 80) });
     }
   }
   return loops;
@@ -354,6 +352,7 @@ async function runMetrics(results, summary, dir) {
   const promptMs = server.reduce((s, r) => s + (r.promptMs ?? 0), 0);
   const task6 = results.find((r) => r.id === "task-6-compaction");
   const req = (r, id) => r?.requirements?.find((x) => x.id === id)?.status ?? null;
+  const logs = await proxyLogs(dir);
   return {
     tasks,
     loadMs: summary.llama?.staging?.loadMs ?? null,
@@ -372,7 +371,9 @@ async function runMetrics(results, summary, dir) {
     toolResultsError: toolErrors.length,
     lengthClamped: all.reduce((s, m) => s + (m.lengthClampedRequests?.length ?? 0), 0),
     finishReasons,
-    loops: await repetitionLoops(dir),
+    loops: repetitionLoops(logs),
+    // #383: identical tool calls in a row, which the text detector misses.
+    toolLoops: logs.flatMap(({ task, records }) => toolCallLoops(records).map((loop) => ({ task, ...loop }))),
     footprintMaxMiB: Math.max(0, ...all.map((m) => m.footprintLlamaMiB ?? 0)) || null,
     rssMaxMiB: Math.max(0, ...all.map((m) => m.rssLlamaMiB?.after ?? 0)) || null,
     compaction: task6
@@ -458,6 +459,7 @@ async function report(root, { perfOnly = false, reference = "A" } = {}) {
         Object.keys(armRuns[0]?.metrics.tasks ?? {}).map((t) => [t, poolDraft(armRuns.map((r) => r.metrics.tasks[t]?.draft))]),
       ),
       runsWithLoop: armRuns.filter((r) => r.metrics.loops.length > 0).length,
+      runsWithToolLoop: armRuns.filter((r) => r.metrics.toolLoops.length > 0).length,
       taskWallMs: Object.fromEntries(
         Object.keys(armRuns[0]?.metrics.tasks ?? {}).map((t) => [t, pick((m) => m.tasks[t]?.wallMs)]),
       ),
@@ -533,6 +535,7 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
   row("Tool-Calls / invalide / Reparaturen", (a) => `${a.toolCalls} / ${a.toolCallClasses ? Object.entries(a.toolCallClasses).filter(([k]) => k !== "ok" && k !== "extra-keys").reduce((x, [, v]) => x + v, 0) : 0} / ${a.repairs} (${fmt((a.repairRate ?? 0) * 100, 1)} %)`);
   row("finishReasons", (a) => Object.entries(a.finishReasons).map(([k, v]) => `${k} ${v}`).join(", "));
   row(`Läufe mit repetition loop (Zeile ≥ ${LOOP_LINE_REPEATS}×)`, (a) => `${a.runsWithLoop} von ${a.runs.length}`);
+  row(`Läufe mit Tool-Call-Schleife (gleicher Call ≥ ${TOOL_LOOP_REPEATS}× in Folge)`, (a) => `${a.runsWithToolLoop} von ${a.runs.length}`);
   lines.push("");
   lines.push(`| Aufgabe: Gesamtdauer · Prüfergebnisse | ${arms.join(" | ")} |`);
   lines.push(`|---|${arms.map(() => "---").join("|")}|`);
@@ -603,7 +606,11 @@ function renderRuns(lines, perRun) {
   lines.push("| Lauf | Arm | Runde | Seed | Ladezeit | Gesamtdauer | Decode t/s | Schleifen |");
   lines.push("|---|---|---|---|---|---|---|---|");
   for (const run of perRun) {
-    const loops = run.metrics.loops.map((l) => `${l.task} ${l.repeats}×`).join(", ") || "–";
+    const loops =
+      [
+        ...run.metrics.loops.map((l) => `${l.task} Zeile ${l.repeats}×`),
+        ...run.metrics.toolLoops.map((l) => `${l.task} \`${l.name}\` ${l.repeats}×`),
+      ].join(", ") || "–";
     lines.push(`| ${run.dir} | ${run.arm} | ${run.round} | ${run.seed} | ${fmt(run.metrics.loadMs / 1000, 1)} s | ${fmt(run.metrics.wallMsTotal / 1000)} s | ${fmt(run.metrics.decodeTps, 1)} | ${loops} |`);
   }
   return lines.join("\n") + "\n";

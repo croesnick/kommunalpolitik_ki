@@ -159,6 +159,7 @@ Harness zählt die Thinking-Token mit dem Tokenizer des laufenden Servers
 - llama-server-Log-Segment je Aufgabe: prompt-/eval-Tokens und Tokens/s je Request
 - RSS des llama-server vor/nach jeder Aufgabe (`ps`, Richtwert — Metal-Speicher wird nicht vollständig erfasst)
 - Tool-Call-Validierung: jedes vom Modell gelieferte Argument gegen das JSON-Schema aus dem aufgezeichneten Request; Fehlerklassen inkl. Truncation-Erkennung (`invalid-json`, `unknown-tool`, `missing-required`, `wrong-type`, `extra-keys`)
+- Schleifen je Lauf (`grade-ab.mjs`): Textschleifen (eine Zeile ≥ 8× in einer Antwort) und seit #383 Tool-Call-Schleifen (derselbe Tool-Call mit denselben Argumenten ≥ 5× in Folge, `toolCallLoops` in `measure.mjs`; Tests: `node --test smoke/measure.test.mjs`)
 - Benchmark (Aufgabe 1): Muss-Kriterien K1–K8 je Lauf, inkl. Erfindungs-Check — jede Zahl der Antwort muss aus der Quelle stammen oder als Summe/Differenz aus Quellenzahlen ableitbar sein
 - Session-Zustand: Persistenz (`rpiv-todo-state`), `--continue`-Verhalten, Compaction-Entries
 
