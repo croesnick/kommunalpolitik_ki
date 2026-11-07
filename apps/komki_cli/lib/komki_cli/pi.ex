@@ -41,7 +41,7 @@ defmodule KomkiCli.Pi do
   node -> cli.js gestartet (der asdf-Shim scheitert unter dem Profil stumm).
   """
 
-  alias KomkiCli.{Anzeige, Config}
+  alias KomkiCli.{Anzeige, Config, LoopDetection}
   require Config
 
   @session_term "xterm-256color"
@@ -266,6 +266,7 @@ defmodule KomkiCli.Pi do
         "--offline"
         | mcp_contract_flags()
       ] ++
+        loop_detection_flags(cfg) ++
         anzeige_flags(cfg) ++
         [
           "--no-skills",
@@ -298,6 +299,12 @@ defmodule KomkiCli.Pi do
   # Verbindung (pi >= 1.0; Issue #103: kein Pin).
   defp mcp_contract_flags, do: ["--no-extensions", "-e", "builtin:mcp"]
 
+  # Ticket #383, identical in session and one-shot run: pi has no limit on
+  # turns or tool calls; this extension stops a run after five identical
+  # tool calls in a row. Loaded explicitly, like builtin:mcp, despite
+  # --no-extensions.
+  defp loop_detection_flags(cfg), do: LoopDetection.flags(cfg)
+
   # Nur in der Session: lesbare Vermittler-Antworten statt Roh-JSON, die
   # Vorlagen für die Ratsarbeit und das komki-Theme (KomkiCli.Anzeige). Die
   # Extension zeichnet nur; der Einmal-Lauf hat keine TUI. Die expliziten
@@ -319,9 +326,10 @@ defmodule KomkiCli.Pi do
 
   # ---------------------------------------------------------------- Helfer
 
-  defp pi_flags(mode, scratch_dir) do
+  defp pi_flags(cfg, mode, scratch_dir) do
     ["--print", "--mode", Atom.to_string(mode), "--offline"] ++
       mcp_contract_flags() ++
+      loop_detection_flags(cfg) ++
       [
         "--no-skills",
         "--no-context-files",
@@ -378,7 +386,7 @@ defmodule KomkiCli.Pi do
       cfg.node_bin,
       cfg.cli_js
     ] ++
-      pi_flags(mode, scratch_dir) ++
+      pi_flags(cfg, mode, scratch_dir) ++
       [prompt]
   end
 
