@@ -117,33 +117,14 @@ defmodule KomkiConnectorRis.RisRecorder do
   @doc false
   @spec parse_cli([String.t()]) :: {:ok, keyword()} | {:error, String.t()}
   def parse_cli(argv) do
-    case parse_flags(argv, []) do
+    case RisHttp.parse_flags(argv, port: :integer, upstream: :string, out: :string) do
       {:ok, opts} ->
         if Keyword.has_key?(opts, :port), do: {:ok, opts}, else: {:error, @usage}
 
-      {:error, _} ->
+      :error ->
         {:error, @usage}
     end
   end
-
-  # Flags in beliebiger Reihenfolge; Unbekanntes oder Ungueltiges fuehrt zur
-  # Meldung statt zum stillen Nichtstun.
-  defp parse_flags([], acc), do: {:ok, acc}
-
-  defp parse_flags(["--port", value | rest], acc) do
-    case Integer.parse(value) do
-      {port, ""} -> parse_flags(rest, Keyword.put(acc, :port, port))
-      _ -> {:error, @usage}
-    end
-  end
-
-  defp parse_flags(["--upstream", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :upstream, value))
-
-  defp parse_flags(["--out", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :out, value))
-
-  defp parse_flags(_other, _acc), do: {:error, @usage}
 
   @doc "Ersetzt die Werte der Kopfzeilen in `secret` durch \"<redacted>\"."
   @spec scrub_headers([{String.t(), String.t()}], [String.t()]) :: [{String.t(), String.t()}]
@@ -324,7 +305,7 @@ defmodule KomkiConnectorRis.RisRecorder do
   # (z. B. PDF-Downloads) bleibt bytetreu — ausser beim Login, dort wird ein
   # Nicht-JSON-Body ganz ersetzt.
   defp scrub_body(@auth_path, body) do
-    case decode_json(body) do
+    case RisHttp.decode_json(body) do
       {:ok, term} -> IO.iodata_to_binary(:json.encode(redact_all(term)))
       :error when body == "" -> body
       :error -> @redacted
@@ -332,16 +313,10 @@ defmodule KomkiConnectorRis.RisRecorder do
   end
 
   defp scrub_body(_path, body) do
-    case decode_json(body) do
+    case RisHttp.decode_json(body) do
       {:ok, term} -> IO.iodata_to_binary(:json.encode(redact_json(term, @secret_body_keys)))
       :error -> body
     end
-  end
-
-  defp decode_json(body) do
-    {:ok, :json.decode(body)}
-  rescue
-    _ -> :error
   end
 
   # :json.encode kennt keine Tupel: Kopfzeilen als [name, value]-Listen.

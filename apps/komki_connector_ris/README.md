@@ -84,6 +84,9 @@ Aufzeichnungen des Recorders zurück (siehe unten).
 Die Daten des Mocks sind handgespiegelt. Um die Antwortformate gegen das echte RIS zu verifizieren
 und komki ohne echtes RIS testen zu können, gibt es einen Aufzeichnungs-Proxy
 (`priv/ris_recorder.exs`, Ticket #231). Er ist rein deterministischer Code ohne LLM.
+`priv/ris_http.exs` ist das geteilte Gerüst der Skriptfamilie (Sockel-Kram, Kassetten-Listing,
+JSON- und Körper-Dekode, Flag-Parser): Wer ein neues Familienmitglied schreibt, lädt es per
+`Code.require_file` und kopiert nichts mehr vom Nachbarn.
 
 ```bash
 elixir apps/komki_connector_ris/priv/ris_recorder.exs --port 4020 \

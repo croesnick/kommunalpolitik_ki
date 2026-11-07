@@ -238,6 +238,27 @@ defmodule KomkiConnectorRis.RisRecorderTest do
              }
   end
 
+  test "parse_cli nimmt Flaggen in jeder Reihenfolge, Port nur ganz" do
+    assert {:ok, opts} =
+             RisRecorder.parse_cli([
+               "--upstream",
+               "http://127.0.0.1:9/",
+               "--port",
+               "4020",
+               "--out",
+               "/tmp/kassetten"
+             ])
+
+    assert Keyword.get(opts, :port) == 4020
+    assert Keyword.get(opts, :upstream) == "http://127.0.0.1:9/"
+    assert Keyword.get(opts, :out) == "/tmp/kassetten"
+
+    for argv <- [["--port", "abc"], ["--upstream", "http://x/"], ["--kein-flag", "y"]] do
+      assert {:error, usage} = RisRecorder.parse_cli(argv)
+      assert usage =~ "Aufruf"
+    end
+  end
+
   # --- Hilfen -------------------------------------------------------------------
 
   defp tmp_out,

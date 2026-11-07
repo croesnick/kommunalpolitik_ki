@@ -24,13 +24,15 @@ Code.require_file("./ris_http.exs", __DIR__)
 defmodule KomkiConnectorRis.RisSkeleton do
   @moduledoc false
 
+  alias KomkiConnectorRis.RisHttp
+
   @usage "Aufruf: --cassette <dir> [--out <datei>] [--compare <dir>]"
 
   @spec extract(Path.t()) :: map()
   def extract(dir) do
     endpoints =
       dir
-      |> cassette_files()
+      |> RisHttp.cassette_files()
       |> Enum.map(&load_cassette/1)
       |> Enum.map(&endpoint/1)
       |> Enum.reduce(%{}, &merge_endpoint/2)
@@ -54,7 +56,7 @@ defmodule KomkiConnectorRis.RisSkeleton do
   @doc false
   @spec parse_cli([String.t()]) :: {:ok, keyword()} | {:error, String.t()}
   def parse_cli(argv) do
-    case parse_flags(argv, []) do
+    case RisHttp.parse_flags(argv, cassette: :string, out: :string, compare: :string) do
       {:ok, opts} ->
         cond do
           not Keyword.has_key?(opts, :cassette) ->
@@ -71,54 +73,21 @@ defmodule KomkiConnectorRis.RisSkeleton do
             {:ok, opts}
         end
 
-      {:error, _} ->
+      :error ->
         {:error, @usage}
     end
   end
 
-  defp parse_flags([], acc), do: {:ok, acc}
-
-  defp parse_flags(["--cassette", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :cassette, value))
-
-  defp parse_flags(["--out", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :out, value))
-
-  defp parse_flags(["--compare", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :compare, value))
-
-  defp parse_flags(_other, _acc), do: {:error, @usage}
-
   # --- Kassetten laden --------------------------------------------------------
-
-  defp cassette_files(dir) do
-    dir
-    |> File.ls!()
-    |> Enum.filter(&String.ends_with?(&1, ".json"))
-    |> Enum.sort()
-    |> Enum.map(&Path.join(dir, &1))
-  end
 
   defp load_cassette(file) do
     %{"request" => request, "response" => response} = file |> File.read!() |> :json.decode()
 
-    request_body =
-      case Map.fetch(request, "body_b64") do
-        {:ok, b64} -> Base.decode64!(b64)
-        :error -> Map.get(request, "body", "")
-      end
-
-    response_body =
-      case Map.fetch(response, "body_b64") do
-        {:ok, b64} -> Base.decode64!(b64)
-        :error -> Map.get(response, "body", "")
-      end
-
     %{
       request: request,
-      request_body: request_body,
+      request_body: RisHttp.part_body(request),
       response: response,
-      response_body: response_body
+      response_body: RisHttp.part_body(response)
     }
   end
 
@@ -179,7 +148,7 @@ defmodule KomkiConnectorRis.RisSkeleton do
 
   # JSON-Bodies werden strukturell zerlegt; alles andere ist HTML oder Binaer.
   defp body_schema(body) do
-    case decode_json(body) do
+    case RisHttp.decode_json(body) do
       {:ok, term} ->
         schema(term)
 
@@ -242,12 +211,6 @@ defmodule KomkiConnectorRis.RisSkeleton do
     else
       false
     end
-  end
-
-  defp decode_json(body) do
-    {:ok, :json.decode(body)}
-  rescue
-    _ -> :error
   end
 
   # --- Mergen ---------------------------------------------------------------------

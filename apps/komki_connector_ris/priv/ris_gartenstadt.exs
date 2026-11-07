@@ -32,6 +32,7 @@ defmodule KomkiConnectorRis.RisGartenstadt do
   @moduledoc false
 
   alias KomkiConnectorRis.GartenstadtDaten, as: Daten
+  alias KomkiConnectorRis.RisHttp
 
   @usage "Aufruf: [--out <verzeichnis>] [--struktur <datei>]"
 
@@ -142,21 +143,11 @@ defmodule KomkiConnectorRis.RisGartenstadt do
   @doc false
   @spec parse_cli([String.t()]) :: {:ok, keyword()} | {:error, String.t()}
   def parse_cli(argv) do
-    case parse_flags(argv, []) do
+    case RisHttp.parse_flags(argv, out: :string, struktur: :string) do
       {:ok, opts} -> {:ok, opts}
-      {:error, _} -> {:error, @usage}
+      :error -> {:error, @usage}
     end
   end
-
-  defp parse_flags([], acc), do: {:ok, acc}
-
-  defp parse_flags(["--out", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :out, value))
-
-  defp parse_flags(["--struktur", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :struktur, value))
-
-  defp parse_flags(_other, _acc), do: {:error, @usage}
 
   # --- Template ------------------------------------------------------------------
 

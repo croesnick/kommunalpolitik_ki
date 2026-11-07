@@ -24,13 +24,15 @@ Code.require_file("./ris_http.exs", __DIR__)
 defmodule KomkiConnectorRis.RisStruktur do
   @moduledoc false
 
+  alias KomkiConnectorRis.RisHttp
+
   @usage "Aufruf: --cassette <dir> [--out <datei>]"
 
   @spec extract(Path.t()) :: map()
   def extract(dir) do
     classified =
       dir
-      |> cassette_files()
+      |> RisHttp.cassette_files()
       |> Enum.map(&load_cassette/1)
       |> Enum.map(&classify/1)
 
@@ -57,7 +59,7 @@ defmodule KomkiConnectorRis.RisStruktur do
   @doc false
   @spec parse_cli([String.t()]) :: {:ok, keyword()} | {:error, String.t()}
   def parse_cli(argv) do
-    case parse_flags(argv, []) do
+    case RisHttp.parse_flags(argv, cassette: :string, out: :string) do
       {:ok, opts} ->
         cond do
           not Keyword.has_key?(opts, :cassette) ->
@@ -70,41 +72,17 @@ defmodule KomkiConnectorRis.RisStruktur do
             {:ok, opts}
         end
 
-      {:error, _} ->
+      :error ->
         {:error, @usage}
     end
   end
 
-  defp parse_flags([], acc), do: {:ok, acc}
-
-  defp parse_flags(["--cassette", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :cassette, value))
-
-  defp parse_flags(["--out", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :out, value))
-
-  defp parse_flags(_other, _acc), do: {:error, @usage}
-
   # --- Loading cassettes -------------------------------------------------------
-
-  defp cassette_files(dir) do
-    dir
-    |> File.ls!()
-    |> Enum.filter(&String.ends_with?(&1, ".json"))
-    |> Enum.sort()
-    |> Enum.map(&Path.join(dir, &1))
-  end
 
   defp load_cassette(file) do
     %{"request" => request, "response" => response} = file |> File.read!() |> :json.decode()
 
-    response_body =
-      case Map.fetch(response, "body_b64") do
-        {:ok, b64} -> Base.decode64!(b64)
-        :error -> Map.get(response, "body", "")
-      end
-
-    %{request: request, response: response, response_body: response_body}
+    %{request: request, response: response, response_body: RisHttp.part_body(response)}
   end
 
   # --- Classifying -------------------------------------------------------------
@@ -122,13 +100,13 @@ defmodule KomkiConnectorRis.RisStruktur do
         {:download, fileext(cassette.response)}
 
       Regex.match?(~r|^/agendaitems/\d+-\d+$|, path) ->
-        case decode_json(cassette.response_body) do
+        case RisHttp.decode_json(cassette.response_body) do
           {:ok, body} when is_map(body) -> {:top, body}
           _ -> {:skip, endpoint_key(cassette)}
         end
 
       Regex.match?(~r|^/meetings/\d+$|, path) ->
-        case decode_json(cassette.response_body) do
+        case RisHttp.decode_json(cassette.response_body) do
           {:ok, body} when is_map(body) -> {:meeting, body}
           _ -> {:skip, endpoint_key(cassette)}
         end
@@ -157,12 +135,6 @@ defmodule KomkiConnectorRis.RisStruktur do
       Regex.match?(~r/^\d+$/, segment) -> "{id}"
       true -> segment
     end
-  end
-
-  defp decode_json(body) do
-    {:ok, :json.decode(body)}
-  rescue
-    _ -> :error
   end
 
   # --- Profiles ----------------------------------------------------------------
