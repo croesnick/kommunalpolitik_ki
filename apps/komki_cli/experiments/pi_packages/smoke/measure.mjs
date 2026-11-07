@@ -185,10 +185,22 @@ export async function llamaLogOffset(llama) {
   }
 }
 
+// #372: speculative decoding (MTP drafter) logs its acceptance per task.
+const DRAFT_ACCEPTANCE = /task\s+(\d+)\s*\|\s*draft acceptance = [\d.]+ \(\s*(\d+) accepted \/\s*(\d+) generated\)/;
+
+/** Pools draft acceptance over [{ accepted, generated }]; missing values count as 0. */
+export function poolDraft(list) {
+  const accepted = list.reduce((s, d) => s + (d?.accepted ?? 0), 0);
+  const generated = list.reduce((s, d) => s + (d?.generated ?? 0), 0);
+  return { accepted, generated, rate: generated ? accepted / generated : null };
+}
+
 /**
- * Liest das Log-Segment [startOffset, endOffset) und zerlegt es in Requests:
- * je `task N` ein Paar aus prompt-eval und eval-Zeile.
- * [{ task, promptTokens, promptMs, evalTokens, evalMs, tokensPerSecond }]
+ * Reads the log segment [startOffset, endOffset) and splits it into
+ * requests: per `task N` a prompt-eval and an eval line, with an MTP
+ * drafter also the draft acceptance.
+ * [{ task, promptTokens, promptMs, evalTokens, evalMs, draftAccepted,
+ *    draftGenerated, tokensPerSecond }]
  */
 export async function llamaLogSegment(llama, startOffset, endOffset) {
   let text = "";
@@ -205,12 +217,24 @@ export async function llamaLogSegment(llama, startOffset, endOffset) {
     const line = match[2];
     let entry = byTask.get(task);
     if (!entry) {
-      entry = { task, promptTokens: null, promptMs: null, evalTokens: null, evalMs: null };
+      entry = {
+        task,
+        promptTokens: null,
+        promptMs: null,
+        evalTokens: null,
+        evalMs: null,
+        draftAccepted: null,
+        draftGenerated: null,
+      };
       byTask.set(task, entry);
     }
     const prompt = /prompt eval time =\s*([\d.]+) ms \/(\s*\d+) tokens/.exec(line);
     const evalm = /(?<!prompt )eval time =\s*([\d.]+) ms \/(\s*\d+) tokens/.exec(line);
-    if (prompt) {
+    const draft = DRAFT_ACCEPTANCE.exec(match[0]);
+    if (draft) {
+      entry.draftAccepted = Number(draft[2]);
+      entry.draftGenerated = Number(draft[3]);
+    } else if (prompt) {
       entry.promptMs = Number(prompt[1]);
       entry.promptTokens = Number(prompt[2]);
     } else if (evalm) {
@@ -225,6 +249,47 @@ export async function llamaLogSegment(llama, startOffset, endOffset) {
         ? Math.round((entry.evalTokens / entry.evalMs) * 1000 * 100) / 100
         : null,
   }));
+}
+
+/**
+ * Summary of a llama-server log written with -lv 4 (#372 debug probe).
+ * Contexts in load order (main model, then MTP drafter) with their Flash
+ * Attention lines (labelled main/draft only if exactly two contexts load);
+ * context checkpoints created and restored; draft acceptance per request in
+ * log order and pooled over requests with and without a restored checkpoint.
+ */
+export function llamaDebugSummary(text) {
+  const contexts = [];
+  const requests = [];
+  const restoredTasks = new Set();
+  let created = 0;
+  let restored = 0;
+  for (const line of text.split("\n")) {
+    if (line.includes("llama_context: constructing llama_context")) contexts.push([]);
+    const fa = /resolve_fused_ops: (Flash Attention.*)$/.exec(line);
+    if (fa && contexts.length > 0) contexts.at(-1).push(fa[1].trim());
+    if (line.includes("created context checkpoint")) created += 1;
+    const restore = /task (\d+) \| restored context checkpoint/.exec(line);
+    if (restore) {
+      restored += 1;
+      restoredTasks.add(restore[1]);
+    }
+    const draft = DRAFT_ACCEPTANCE.exec(line);
+    if (draft) requests.push({ task: draft[1], accepted: Number(draft[2]), generated: Number(draft[3]) });
+  }
+  for (const request of requests) request.restored = restoredTasks.has(request.task);
+  const pool = (withRestore) => {
+    const list = requests.filter((r) => r.restored === withRestore);
+    return { requests: list.length, ...poolDraft(list) };
+  };
+  const roles = contexts.length === 2 ? ["main", "draft"] : [];
+  return {
+    contexts: contexts.map((fa, i) => ({ role: roles[i] ?? `context ${i}`, fa })),
+    checkpointsCreated: created,
+    checkpointsRestored: restored,
+    requests,
+    draft: { withRestore: pool(true), withoutRestore: pool(false) },
+  };
 }
 
 // ---------------------------------------------------------------- Tool-Validierung
