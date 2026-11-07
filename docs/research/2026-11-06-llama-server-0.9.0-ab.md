@@ -1,7 +1,7 @@
 # Labbook: llama-server-A/B — 0.7.0-Pin gegen 0.9.0 (mit 0.8.0 als Vergleich)
 
 - **Status:** gemessen, 2026-11-06 (Ticket #372). Die Pre-Registration ist unverändert; die Ergebnisse stehen ab [Ergebnisübersicht](#ergebnisübersicht).
-- **GO:** Die nutzende Person hat am 06.11.2026 um 23:00 Uhr das GO zum Upgrade gegeben, entgegen der Empfehlung nach Regel 2. Vor dem Re-Pin wird das Homebrew-Bottle nachgemessen: [Nach dem GO](#nach-dem-go-homebrew-bottle-nachmessen).
+- **GO und Ergebnis:** Am 06.11.2026 um 23:00 Uhr gab die nutzende Person das GO zum Upgrade, entgegen der Empfehlung nach Regel 2. Die vorab registrierte Nachmessung des Homebrew-Bottles scheiterte an Regel 1: Eine Tool-Call-Schleife traf einen VB-Lauf. Am 07.11.2026 entschied die nutzende Person deshalb, den 0.7.0-Pin zu behalten. Das Upgrade wird erst wieder angefasst, wenn #383 die Schleifen im Harness erkennt und begrenzt. Siehe [Nach dem GO](#nach-dem-go-homebrew-bottle-nachmessen).
 - **Empfehlung:** 0.7.0-Pin vorerst behalten. V9 besteht alle registrierten Gates, bringt aber außer der Ladezeit keinen belastbaren Gewinn. Herleitung und Abwägung im Abschnitt [Empfehlung](#empfehlung). Die Entscheidung trifft die nutzende Person.
 - **Vorgänger:** [Labbook: llama-server-A/B 0.7.0 gegen 0.8.0](2026-10-31-llama-server-0.8.0-ab.md) (#320: Arme V7/V8, Empfehlung „Pin behalten“), [Labbook: Modell-A/B](2026-10-31-modell-ab.md) (#285: Protokoll, Gates, Checklisten)
 - **Harness:** `apps/komki_cli/experiments/pi_packages/smoke/` (`run-ab.mjs`, `grade-ab.mjs`), erweitert um den Arm `V9` und die draft acceptance im Bericht
@@ -249,11 +249,42 @@ Preflight (`ab-372/bottle/preflight/`): V7 3,5 s, VB 7,8 s. Ein zweiter Prefligh
 - **V9 wird nicht erneut gemessen.** Vergleiche zwischen VB und V9 aus `main-2` sind rein beschreibend, weil sie aus getrennten Läufen stammen.
 - **Entscheidung:** Das GO ist erteilt, Regel 2 entfällt damit. Besteht VB alle vier Gates, folgen `brew upgrade llama.cpp`, Re-Pin mit `komki setup`, `komki doctor`, ein echter Lauf mit `komki up` und `run-smoke.mjs` sowie die Doku-Stellen aus #320. Scheitert VB an einem Gate, wird nicht upgegradet; der Befund geht an die nutzende Person.
 
+### Ablauf der Nachmessung
+
+| Schritt | Zeit (MEZ) | Verzeichnis unter `$TMPDIR/komki-pi-experiments/ab-372/` |
+|---|---|---|
+| Pre-Registration committet | 06.11. 23:10 | Commit `c0f6852` |
+| Warm-up + 3 Runden × V7, VB, verzahnt | 06.11. 23:11 bis 07.11. 01:30 | `bottle/` (`schedule.json`, `provenance.json`) |
+
+Beim Start: Netzbetrieb, Loadavg 2,6, 15,7 GB frei, kein anderer llama-server, keine Thermik-Warnung. Die Live-Instanz lief nicht.
+
+### Ergebnis: Regel 1 nicht bestanden
+
+| Lauf | Aufgabe 4 | Requests | längste Folge gleicher Tool-Calls |
+|---|---|---|---|
+| `03-r1-V7`, `05-r2-V7`, `07-r3-V7` | pass | 9, 9, 13 | 1 |
+| `04-r1-VB` | **fail** (Timeout) | 607 | 600 × `todo {"action":"update","id":2,"status":"completed"}` |
+| `06-r2-VB`, `08-r3-VB` | pass | 9, 13 | 1 |
+
+Alle übrigen Aufgaben enden in beiden Armen wie gewohnt (Aufgabe 1 `partial`, sonst `pass`). Damit scheitert VB einmal, V7 nie. Nach der registrierten Regel 1 ist VB durchgefallen. Ausgewertet wurde nichts weiter (keine Blindbewertung, kein `REPORT.md`), denn das Ergebnis von Regel 1 entscheidet für sich allein.
+
+Die Schleife hängt nicht am Build. Dasselbe Muster traf in `main-2` den Referenzarm (`10-r3-V7`, 647 gleiche Aufrufe, Befund 4), und kürzere Wiederholungen gab es dort bei V7 (10) und V8 (7). Bei drei Läufen je Arm entscheidet Regel 1 deshalb praktisch der Zufall: Welcher Arm die Schleife abbekommt, scheitert. Die Schleife in `04-r1-VB` begann um 23:16 Uhr, eine knappe Stunde vor dem Einschlafen des Macs (nächster Abschnitt). Sie ist kein Artefakt der Pausen.
+
+### Störung: Der Mac schlief ein
+
+`pmset -g log` zeigt ab 00:11:43 Uhr „Entering Sleep state due to 'Idle Sleep'“ und danach bis zum Ende der Messung einen Wechsel aus Schlaf und kurzen DarkWakes. Der llama-server stand dabei immer wieder still. Ein Beispiel aus `06-r2-VB`, Aufgabe 2: `eval time = 1000643.57 ms / 19 tokens`. Ab 00:11 Uhr brauchten einzelne Requests 175 s bis 1 006 s statt weniger Sekunden, in `04-r1-VB` (Aufgabe 6), `06-r2-VB`, `07-r3-V7` und `08-r3-VB`. Die Tempo- und Zeitwerte ab Lauf 4 sind deshalb unbrauchbar. Die Verdikte bleiben gültig. Der einzige Timeout traf die Schleife in `04-r1-VB`, und die lief schon seit 23:16 Uhr mit 600 gleichen Aufrufen.
+
+Gegenmaßnahme im Harness: `run-ab.mjs` hält den Idle Sleep jetzt mit `caffeinate -i -w <pid>` ab, solange der Lauf dauert.
+
+### Entscheidung
+
+Die nutzende Person entschied am 07.11.2026, den **0.7.0-Pin zu behalten**, wie die registrierte Regel es verlangt. Ein Nachmessen mit neuen Seeds hätte dasselbe Zufallsproblem gehabt. Regel 1 im Nachhinein für Schleifen anzupassen hätte die Regel nach Kenntnis der Daten geändert. Das Upgrade wird erst wieder angefasst, wenn #383 Tool-Call-Schleifen im Harness erkennt und begrenzt. Bis dahin gilt Befund 6: Ein beliebiges `brew upgrade` hebt die Maschine auf 0.9.0 und ggml 0.29.0 und bricht damit den Pin.
+
 ## Grenzen
 
 - n = 3 bei temp 1,0. Der Schleifenlauf nimmt V7 effektiv einen Messlauf für die Tempo-Werte. Die Mediane sind robust, die Spannen von V7 nicht.
 - Die Blindbewertung lag wie in #285 und #320 bei derselben Session, die den Harness erweitert hat. Sie arbeitete nur an den verblindeten Kopien und war abgeschlossen, bevor der Schlüssel gelesen wurde. Die zwei M3-Abzüge und der M2-Abzug sind Urteile. Strenger oder milder gewertet, verschiebt sich Aufgabe 1 um einen Punkt, Q bliebe bestanden.
-- Gemessen wurde das Nightly-Artefakt b12110 des Release-Commits, nicht das Homebrew-Bottle (Befund 6).
+- Gemessen wurde im Hauptlauf das Nightly-Artefakt b12110 des Release-Commits. Das Homebrew-Bottle (Befund 6) scheiterte in der Nachmessung an Regel 1; seine Tempowerte sind wegen des Idle Sleep unbrauchbar.
 - Die Debug-Sonde ist eine Runde mit Debug-Logging. Ihre acceptance-Werte sind beschreibend, ihre Tempowerte fließen nirgends ein.
 
 ## Harness nach dem Lauf
