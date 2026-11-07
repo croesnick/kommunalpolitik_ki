@@ -13,10 +13,9 @@ description: >
   Stadtrat", "Ich brauche einen Bericht für den Stammtisch / die
   Fraktionssitzung / den Vorstand", "Was ist seit dem letzten Bericht
   passiert?", "Fasse die letzten Ausschüsse zusammen", "Was gab es seit X
-  im Stadtrat?". Der Skill endet mit der Berichtsnotiz im Vault, geschrieben erst nach GO mit
-  Vorschau. Keine
-  Anträge, keine Positionen, keine Öffentlichkeitsarbeit — Anträge macht der
-  Skill `antrag_generieren`, Öffentlichkeitsarbeit ist WF 10.
+  im Stadtrat?". Der Skill endet mit der Berichtsnotiz im Vault, geschrieben
+  erst nach GO mit Vorschau. Keine Anträge, keine Positionen, keine Öffentlichkeitsarbeit —
+  Anträge macht der Skill `antrag_generieren`, Öffentlichkeitsarbeit ist WF 10.
 ---
 
 # Bericht aus dem Stadtrat Skill
@@ -243,34 +242,22 @@ Beispiel: `1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Sta
 
 `<YYYY-MM-DD>` = Datum des anstehenden Termins.
 
+**Existenz prüfen** (vor der Vorschau, lesend): Gibt es die Datei schon, kommt
+das Überschreiben in die Vorschau; Alternative ist ein Suffix `_v2`.
+
 **GO einholen:** Zielpfad und Gliederung zeigen; bei existierender Datei
 ausdrücklich auf das Überschreiben hinweisen. Ohne GO kein Write — das gilt
 auch für das Neuanlegen und für den Ordner `Berichte`.
 
-**Nach dem GO: Ordner sicherstellen** (falls noch nicht vorhanden):
+**Nach dem GO: Ordner anlegen und die geprüfte Temp-Datei übernehmen**
+(derselbe Befehl wie in `sitzungsvorbereitung` Schritt 5):
 
 ```bash
-obsidian vault="<vault-name>" eval code="require('fs').mkdirSync('1 - Projects/Stadtrat Buchloe/Berichte', { recursive: true })"
+obsidian vault="<vault-name>" eval code="app.vault.adapter.mkdir('1 - Projects/Stadtrat Buchloe/Berichte').then(() => app.vault.adapter.write('1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Stadtrat.md', require('fs').readFileSync('<temp-datei>', 'utf8')))"
 ```
 
-**Nach dem GO: Datei schreiben** — zwei Varianten:
-
-Variante A (Empfehlung, wenn der Inhalt sauber übergeben werden kann):
-
-```bash
-obsidian vault="<vault-name>" create path="1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Stadtrat.md" content="..."
-```
-
-Dabei Newlines im Content als `\n` kodieren.
-
-Variante B (für mehrzeilige Inhalte robuster):
-
-```bash
-obsidian vault="<vault-name>" eval code="app.vault.create('1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Stadtrat.md', `<inhalt-mit-backticks>`)"
-```
-
-Vor der Vorschau prüfen, ob die Datei bereits existiert — ggf. überschreiben
-(nur nach ausdrücklichem GO, siehe GO-Prinzip) oder mit Suffix `_v2` anlegen.
+So landet genau die geprüfte und vorgezeigte Datei im Vault; `adapter.write`
+überschreibt eine bestehende Datei, aber nur mit dem GO.
 
 ### YAML-Frontmatter: Quoting-Regel
 
@@ -501,7 +488,7 @@ nutzenden Person.
 | 3 | Keine persistente Liste der Bericht-Termine/Stichtage im Vault | Termine müssen jedes Mal gesucht/erfragt werden | Zukünftig: eigener Bericht-Kalender im Vault (Notiz-Tabelle) oder in Nextcloud (WF 9, `nc_calendar_list_events`) |
 | 4 | Kein automatischer Zeitraum-Filter in `ratsinfo sessions` | CLI listet alle Sitzungen, Filterung nach Datum manuell | KI filtert die Ausgabe von `ratsinfo sessions` gegen `zeitraum_von`/`heute` |
 | 5 | Kein automatisches Themen-Clustering | TOPs werden chronologisch gelistet, thematische Bündelung muss ad-hoc passieren | KI clustert manuell nach Schwerpunkten (Klima, Mobilität, Bauen, etc.) |
-| 6 | YAML-Frontmatter kann durch externe Strings (deutsche Anführungszeichen in AZ-Titeln) brechen | Properties in Obsidian nicht sichtbar / kaputt | Single-Quotes für alle YAML-Strings mit externem Text; YAML nach Vault-Write re-validieren (siehe "Validierung nach dem Vault-Write") |
+| 6 | YAML-Frontmatter kann durch externe Strings (deutsche Anführungszeichen in AZ-Titeln) brechen | Properties in Obsidian nicht sichtbar / kaputt | Single-Quotes für alle YAML-Strings mit externem Text; YAML der Temp-Datei vor dem GO validieren, nach dem Write nachprüfen (siehe "Validierung vor dem Vault-Write und Nachprüfung") |
 
 Siehe auch [`docs/workflows.md`](../../docs/workflows.md) WF 11 "Lücken"
 für die strategische Einordnung.
