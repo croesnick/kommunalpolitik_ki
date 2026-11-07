@@ -5,7 +5,7 @@ defmodule KomkiConnectorRisTest do
   import ExUnit.CaptureLog
 
   alias KomkiConnector.Text
-  alias KomkiConnectorRis.MockRis
+  alias KomkiConnectorRis.RisMock
   alias Sidecar.{Client, Server}
 
   @search_keys ~w(datum nummer sitzung titel top_id url)
@@ -14,7 +14,7 @@ defmodule KomkiConnectorRisTest do
   # Startet Mock (im gegebenen Modus) und Connector auf einem echten
   # Unix-Socket unter /tmp (macOS: Pfad < 104 Byte).
   defp start_stack(mode, overrides \\ %{}) do
-    {:ok, mock, port} = MockRis.start(mode: mode)
+    {mock, port} = RisMock.start(mode)
     base_url = "http://127.0.0.1:#{port}/"
     path = "/tmp/kmX#{System.unique_integer([:positive])}.sock"
 
@@ -26,11 +26,10 @@ defmodule KomkiConnectorRisTest do
 
     on_exit(fn ->
       Process.exit(pid, :kill)
-      MockRis.stop(mock)
       File.rm(path)
     end)
 
-    %{path: path, base_url: base_url}
+    %{path: path, base_url: base_url, mock: mock}
   end
 
   # So ruft auch der Vermittler: die deutschen Texte der komki-Seite.
@@ -45,6 +44,27 @@ defmodule KomkiConnectorRisTest do
   describe "gegen den Mock" do
     setup do
       start_stack(:ok)
+    end
+
+    test "ein eingespielter Zustand gilt bis zum Reset", %{path: path, mock: mock} do
+      %{"data" => %{"meetings" => [meeting | rest]} = data} = KomkiMock.Server.state(mock)
+
+      top = %{
+        "id" => "1001-9",
+        "nr" => "9",
+        "name" => "Kreisverkehr am Rathausplatz",
+        "restricted" => false,
+        "text" => "Neu eingespielt."
+      }
+
+      meeting = Map.update!(meeting, "tops", &(&1 ++ [top]))
+      {:ok, _} = KomkiMock.Server.put_data(mock, %{data | "meetings" => [meeting | rest]})
+
+      assert {:ok, result} = search(path, %{"text" => "Kreisverkehr"})
+      assert ids(result) == ["1001-9"]
+
+      {:ok, _} = KomkiMock.Server.reset(mock)
+      assert {:ok, %{"results" => []}} = search(path, %{"text" => "Kreisverkehr"})
     end
 
     test "search findet oeffentliche TOPs in Titel und Text", %{path: path, base_url: base_url} do

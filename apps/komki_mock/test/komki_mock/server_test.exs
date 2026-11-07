@@ -48,6 +48,24 @@ defmodule KomkiMock.ServerTest do
       assert {404, _} = post(ports.control, "/seed", %{"name" => "nope"})
     end
 
+    test "PUT /data replaces the data until reset", %{ports: ports, tmp_dir: dir} do
+      data = %{"next_id" => 8, "notes" => [%{"id" => 7, "text" => "Gesetzt"}]}
+
+      assert {200, %{"data" => ^data, "seed" => "default"}} = put(ports.control, "/data", data)
+      assert {200, [%{"text" => "Gesetzt"}]} = get(ports.data, "/notes")
+
+      assert dir |> Path.join("state.json") |> File.read!() |> JSON.decode!() |> Map.get("data") ==
+               data
+
+      post(ports.control, "/reset", %{})
+      assert {200, [_, _]} = get(ports.data, "/notes")
+    end
+
+    test "PUT /data rejects a body that is not JSON", %{ports: ports} do
+      assert {400, _} = decode(request(:put, ports.control, "/data", "kein json"))
+      assert {200, [_, _]} = get(ports.data, "/notes")
+    end
+
     test "parallel requests stay consistent", %{ports: ports, tmp_dir: dir} do
       1..40
       |> Task.async_stream(&post(ports.data, "/notes", %{"text" => "n#{&1}"}),
@@ -149,13 +167,14 @@ defmodule KomkiMock.ServerTest do
 
   defp get(port, path), do: decode(request(:get, port, path))
   defp post(port, path, body), do: decode(request(:post, port, path, JSON.encode!(body)))
+  defp put(port, path, body), do: decode(request(:put, port, path, JSON.encode!(body)))
 
   defp request(:get, port, path),
     do: :httpc.request(:get, {url(port, path), [{~c"connection", ~c"close"}]}, [], [])
 
-  defp request(:post, port, path, body) do
+  defp request(method, port, path, body) do
     :httpc.request(
-      :post,
+      method,
       {url(port, path), [{~c"connection", ~c"close"}], ~c"application/json", body},
       [],
       []

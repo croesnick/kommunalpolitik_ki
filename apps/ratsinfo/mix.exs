@@ -27,6 +27,7 @@ defmodule Ratsinfo.MixProject do
   defp deps do
     [
       {:shared, path: "../shared"},
+      {:komki_mock, path: "../komki_mock", only: :test},
       {:req, "~> 0.7"},
       {:optimus, "~> 0.6"},
       {:jason, "~> 1.4"},
