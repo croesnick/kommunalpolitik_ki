@@ -14,6 +14,8 @@
 # calls only. All state lives on GitHub (board status, PR comments with
 # hidden markers), so a restart after a crash picks up where it stopped.
 # Stop switch: touch ~/.dev-loop/STOP (checked before every stage).
+# Takeover: touch ~/.dev-loop/TAKEOVER ends the running agent session and
+# continues it interactively in a Herdr tab; the ticket goes to the human.
 
 for file <- ~w(core proc herdr agent github),
     do: Code.require_file("dev_loop/#{file}.exs", __DIR__)
@@ -91,6 +93,9 @@ defmodule DevLoop do
 
     root = git_root()
     herdr_space = Herdr.space()
+    # A request left over from an earlier run must not take over this one.
+    takeover_file = Path.join(@home, "TAKEOVER")
+    File.rm(takeover_file)
 
     %{
       # --rehearse runs agents and gates for real but only logs GitHub writes.
@@ -101,6 +106,7 @@ defmodule DevLoop do
       logs: run_dir,
       stamp: fn -> Calendar.strftime(NaiveDateTime.local_now(), "%H%M%S") end,
       stop_file: Path.join(@home, "STOP"),
+      takeover_file: takeover_file,
       stage_timeout_ms: @stage_timeout_ms,
       # Wraps every agent stage; in Herdr it adds a tab with a live viewer.
       herdr_space: herdr_space,
@@ -108,6 +114,13 @@ defmodule DevLoop do
         if(herdr_space,
           do: &Herdr.watch(herdr_space, &1, &2, &3, log),
           else: fn _name, _stage_log, fun -> fun.() end
+        ),
+      # Continues a taken-over session in a tab; outside Herdr the
+      # escalation text says how to continue it by hand.
+      take_over:
+        if(herdr_space,
+          do: &Herdr.take_over(herdr_space, &1, &2, &3, log),
+          else: fn _name, _cwd, _command -> nil end
         ),
       root: root,
       worktrees: Path.join(root, ".claude/worktrees"),
@@ -377,6 +390,9 @@ defmodule DevLoop do
       {:error, text} ->
         {:failed, "Agent-Session gescheitert: " <> text}
 
+      {:taken_over, text} ->
+        {:blocked, text}
+
       {:ok, _} ->
         cond do
           File.exists?(Path.join(out, "blocked.md")) ->
@@ -437,6 +453,9 @@ defmodule DevLoop do
       {:error, why} ->
         escalate(ctx, issue, pr, "Das Review ist zweimal gescheitert:\n\n" <> why, report)
 
+      {:taken_over, text} ->
+        escalate(ctx, issue, pr, "Das Review eskaliert:\n\n" <> text, report)
+
       {:ok, review} ->
         rounds = Core.rework_rounds(GitHub.pr_comments(ctx, pr.number))
         hits = Core.protected_hits(changed_files(wt, sha))
@@ -495,7 +514,7 @@ defmodule DevLoop do
           {:ok, Core.gate_failure_review(text)}
       end
 
-    remove_worktree(ctx, rwt)
+    release_worktree(ctx, rwt, result)
 
     case result do
       {:error, why} when attempt == 1 ->
@@ -521,6 +540,7 @@ defmodule DevLoop do
     case Agent.run(:review, prompt, rwt, ctx) do
       :exhausted -> throw(:exhausted)
       {:error, text} -> {:error, "Agent-Session gescheitert: " <> text}
+      {:taken_over, _} = taken_over -> taken_over
       {:ok, _} -> read_review(Path.join(rwt, ".dev-loop/review.json"))
     end
   end
@@ -692,12 +712,15 @@ defmodule DevLoop do
             {:error, text} ->
               {:error, text}
 
+            {:taken_over, _} = taken_over ->
+              taken_over
+
             {:ok, _} ->
               with {:ok, json} <- File.read(Path.join(wt, ".dev-loop/po.json")),
                    do: Core.parse_po(json, Enum.map(tickets, & &1.number))
           end
 
-        remove_worktree(ctx, wt)
+        release_worktree(ctx, wt, items)
         by_number = Map.new(tickets, &{&1.number, &1})
 
         case items do
@@ -715,6 +738,9 @@ defmodule DevLoop do
                 do: add(acc, :po, "#{ref(by_number[item.issue], nil)}: #{item.proposals}"),
                 else: acc
             end)
+
+          {:taken_over, text} ->
+            add(report, :po, Core.summary_line(text))
 
           error ->
             ctx.log.("PO gescheitert: #{inspect(error) |> String.slice(0, 300)}")
@@ -786,7 +812,7 @@ defmodule DevLoop do
 
     result = Agent.run(:implement, prompt, wt, ctx)
     probe = File.read(Path.join(wt, ".dev-loop/probe.txt"))
-    remove_worktree(ctx, wt)
+    release_worktree(ctx, wt, result)
 
     leaked =
       ctx.logs
@@ -863,6 +889,10 @@ defmodule DevLoop do
       File.write!(exclude, "\n# dev loop (#389) hand-off files\n.dev-loop/\n", [:append])
     end
   end
+
+  # A taken-over session keeps working in its worktree; it is the human's now.
+  defp release_worktree(_ctx, _path, {:taken_over, _}), do: :ok
+  defp release_worktree(ctx, path, _result), do: remove_worktree(ctx, path)
 
   defp remove_worktree(ctx, path) do
     if File.dir?(path),

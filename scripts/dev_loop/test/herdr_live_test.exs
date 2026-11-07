@@ -31,6 +31,11 @@ defmodule DevLoop.HerdrLiveTest do
 
   defp tabs, do: for(s <- app_ls(), s["id"] == @space, t <- s["tabs"], do: t["name"])
 
+  defp active_tab,
+    do:
+      for(s <- app_ls(), s["id"] == @space, t <- s["tabs"], t["active"], do: t["name"])
+      |> List.first()
+
   defp app_ls do
     {out, 0} = System.cmd("herdr-app", ["ls"])
     JSON.decode!(out)["spaces"]
@@ -116,6 +121,32 @@ defmodule DevLoop.HerdrLiveTest do
     assert ctx.name in viewers()
     Herdr.sweep(&flunk/1)
     assert eventually(fn -> ctx.name not in viewers() and ctx.name not in tabs() end)
+  end
+
+  test "a takeover tab runs its command where asked, belongs to the person and outlives a sweep",
+       ctx do
+    dir = Path.dirname(ctx.log)
+    terminal = Herdr.take_over(@space, ctx.name, dir, "pwd; sleep 30", &flunk/1)
+
+    try do
+      assert ctx.name in tabs()
+      refute ctx.name in viewers()
+      # The person asked for it, so the tab is shown right away.
+      assert active_tab() == ctx.name
+
+      assert eventually(fn ->
+               {screen, 0} = System.cmd("hc", ["read", terminal, "--lines", "5"])
+               screen =~ Path.basename(dir)
+             end)
+
+      Herdr.sweep(&flunk/1)
+      Process.sleep(500)
+      assert ctx.name in tabs()
+    after
+      System.cmd("hc", ["kill", terminal, "--json"], stderr_to_stdout: true)
+    end
+
+    assert eventually(fn -> ctx.name not in tabs() end)
   end
 
   test "outside a Herdr terminal there is no space" do

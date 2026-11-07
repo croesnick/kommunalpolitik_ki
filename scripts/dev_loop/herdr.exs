@@ -5,10 +5,11 @@
 # stage's state, so Herdr lists it under Agents. The tab goes away when the
 # stage ends; the log stays in the run directory.
 #
-# Observation only: the agents stay headless child processes of the script.
-# agent.exs reaches this module through `ctx.watch` and does not know about
-# Herdr. Every call is best effort: a failure is logged and never stops the
-# loop.
+# The agents stay headless child processes of the script; agent.exs reaches
+# this module through `ctx.watch` and `ctx.take_over` and does not know
+# about Herdr. When the person takes a stage over, its session continues
+# interactively in a tab of its own (take_over/5). Every call is best
+# effort: a failure is logged and never stops the loop.
 
 defmodule DevLoop.Herdr do
   @moduledoc false
@@ -17,6 +18,8 @@ defmodule DevLoop.Herdr do
   # Viewer terminals carry this label, so a later run can find and end the
   # ones a killed run left behind (sweep/1).
   @label "dev-loop=viewer"
+  # Taken-over sessions belong to the person: sweep/1 leaves them alone.
+  @takeover_label "dev-loop=takeover"
 
   @doc "The Herdr space of the terminal running the script, or nil outside Herdr."
   def space do
@@ -42,6 +45,17 @@ defmodule DevLoop.Herdr do
     end
   end
 
+  @doc """
+  Opens a tab in `space` that runs `command` in `cwd` and shows it; the tab
+  lives until its program ends. Returns the terminal or nil.
+  """
+  def take_over(space, name, cwd, command, log) do
+    with {terminal, tab} <- start(space, @takeover_label, name, cwd, command, log) do
+      if tab, do: cmd("herdr-app", ["do", "tab.select", "--id", tab])
+      terminal
+    end
+  end
+
   @doc "Ends viewer terminals of earlier runs."
   def sweep(log) do
     case cmd("hc", ~w(ls --json --label #{@label})) do
@@ -61,35 +75,43 @@ defmodule DevLoop.Herdr do
   def terminal_name(stage),
     do: stage |> String.downcase() |> String.replace(~r/[^a-z0-9_-]+/, "-") |> String.slice(0, 32)
 
-  # --no-parent: a viewer is nobody's sub-agent, it gets its own tab and no
-  # notes go to the terminal that started the script.
   defp open(space, name, stage_log, log) do
+    command = viewer_command(stage_log, name)
+
+    with {terminal, _tab} <- start(space, @label, name, Path.dirname(stage_log), command, log),
+         do: terminal
+  end
+
+  # Returns {terminal, tab | nil} or nil. --no-parent: nobody's sub-agent,
+  # it gets its own tab and no notes go to the terminal that started the
+  # script.
+  defp start(space, label, name, cwd, command, log) do
     args =
-      ~w(run --bg --json --no-parent --no-notify --rm --label #{@label}) ++
+      ~w(run --bg --json --no-parent --no-notify --rm --label #{label}) ++
         ["--label", "herdr.space=#{space}", "--name", terminal_name(name)] ++
-        ["--cwd", Path.dirname(stage_log), viewer_command(stage_log, name)]
+        ["--cwd", cwd, command]
 
     case cmd("hc", args) do
       {:ok, %{"address" => terminal}} ->
-        name_tab(space, terminal, name)
-        terminal
+        {terminal, name_tab(space, terminal, name)}
 
       error ->
-        log.("Herdr: Viewer nicht geöffnet: #{inspect(error)}")
+        log.("Herdr: Tab nicht geöffnet: #{inspect(error)}")
         nil
     end
   end
 
   # Herdr makes the tab shortly after it sees the terminal and calls it by
-  # its number; the stage name is more useful. Cosmetic: after about two
-  # seconds without a tab it gives up.
+  # its number; the stage name is more useful. Returns the tab, or nil when
+  # none showed up within about two seconds (cosmetic, nothing fails).
   defp name_tab(space, terminal, name, tries \\ 10)
-  defp name_tab(_space, _terminal, _name, 0), do: :ok
+  defp name_tab(_space, _terminal, _name, 0), do: nil
 
   defp name_tab(space, terminal, name, tries) do
     with {:ok, %{"spaces" => spaces}} <- cmd("herdr-app", ["ls"]),
          tab when is_binary(tab) <- tab_of(spaces, space, terminal) do
       cmd("herdr-app", ["do", "tab.rename", "--id", tab, "--name", name])
+      tab
     else
       _ ->
         Process.sleep(200)

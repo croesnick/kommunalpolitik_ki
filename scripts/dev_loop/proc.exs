@@ -6,9 +6,11 @@ defmodule DevLoop.Proc do
   @moduledoc false
 
   @doc """
-  Returns `{:ok, lines}`, `{:error, status, lines}` or `{:timeout, lines}`;
-  `lines` are the last #{200} output lines. Options: `:cd`, `:env`
-  (`{name, value | false}`), `:timeout_ms`, `:log` (file path).
+  Returns `{:ok, lines}`, `{:error, status, lines}`, `{:timeout, lines}` or
+  `{:cancelled, lines}`; `lines` are the last #{200} output lines. Options:
+  `:cd`, `:env` (`{name, value | false}`), `:timeout_ms`, `:log` (file
+  path), `:cancel` (checked every second; when it returns true the program
+  is ended).
   """
   def run(cmd, args, opts) do
     exe = System.find_executable(cmd) || raise "#{cmd} nicht gefunden"
@@ -29,35 +31,57 @@ defmodule DevLoop.Proc do
       ])
 
     deadline = System.monotonic_time(:millisecond) + Keyword.fetch!(opts, :timeout_ms)
+    # A tick every second checks deadline and cancel, also while output
+    # keeps streaming in.
+    tick = make_ref()
+    {:ok, timer} = :timer.send_interval(1000, {tick, :tick})
 
     try do
-      collect(port, log, deadline, [], "")
+      collect(port, log, {tick, deadline, Keyword.get(opts, :cancel, fn -> false end)}, [], "")
     after
+      :timer.cancel(timer)
+      flush(tick)
       File.close(log)
     end
   end
 
-  defp collect(port, log, deadline, tail, partial) do
-    left = max(deadline - System.monotonic_time(:millisecond), 0)
-
+  defp collect(port, log, {tick, deadline, cancel} = limits, tail, partial) do
     receive do
       {^port, {:data, {:noeol, chunk}}} ->
-        collect(port, log, deadline, tail, partial <> chunk)
+        collect(port, log, limits, tail, partial <> chunk)
 
       {^port, {:data, {:eol, chunk}}} ->
         line = partial <> chunk
         IO.write(log, line <> "\n")
-        collect(port, log, deadline, Enum.take([line | tail], 200), "")
+        collect(port, log, limits, Enum.take([line | tail], 200), "")
 
       {^port, {:exit_status, 0}} ->
         {:ok, Enum.reverse(tail)}
 
       {^port, {:exit_status, status}} ->
         {:error, status, Enum.reverse(tail)}
+
+      {^tick, :tick} ->
+        cond do
+          System.monotonic_time(:millisecond) >= deadline ->
+            kill(port)
+            {:timeout, Enum.reverse(tail)}
+
+          cancel.() ->
+            kill(port)
+            {:cancelled, Enum.reverse(tail)}
+
+          true ->
+            collect(port, log, limits, tail, partial)
+        end
+    end
+  end
+
+  defp flush(tick) do
+    receive do
+      {^tick, :tick} -> flush(tick)
     after
-      left ->
-        kill(port)
-        {:timeout, Enum.reverse(tail)}
+      0 -> :ok
     end
   end
 

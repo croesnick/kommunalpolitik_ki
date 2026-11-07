@@ -10,6 +10,11 @@
 # shell function. Agents run in auto mode with the Bash sandbox and the
 # deny rules of agent_settings.json, without MCP servers and without any
 # GitHub token in their environment.
+#
+# Takeover: every session gets its id up front. When the person asks for
+# it (the takeover file), the headless session is ended and continues
+# interactively under the same id, account and rules, in a Herdr tab or by
+# hand; the loop treats the stage as handed to the human.
 
 defmodule DevLoop.Agent do
   @moduledoc false
@@ -34,8 +39,9 @@ defmodule DevLoop.Agent do
   @doc """
   Runs `role` in `cwd` with the prompt file `.dev-loop/prompt.md`.
   Returns `{:ok, result}` (the final stream-json result object),
-  `{:error, text}` or `:exhausted` when every account of the chain is used up.
-  Throws `:stop` when the stop file exists.
+  `{:error, text}`, `{:taken_over, text}` when the person took the session
+  over, or `:exhausted` when every account of the chain is used up. Throws
+  `:stop` when the stop file exists.
   """
   def run(role, prompt, cwd, ctx) do
     if File.exists?(ctx.stop_file), do: throw(:stop)
@@ -54,20 +60,24 @@ defmodule DevLoop.Agent do
 
   defp try_chain([{account, extra} | rest], role, cwd, ctx) do
     log = Path.join(ctx.logs, "#{ctx.stamp.()}-#{role}-#{account}.jsonl")
-    ctx.log.("#{role}: #{account} startet (Log: #{log})")
+    session = uuid4()
+    stage = "#{Path.basename(cwd)}-#{role}-#{account}"
+    ctx.log.("#{role}: #{account} startet (Session #{session}, Log: #{log})")
 
     args =
       ["-p", "Lies .dev-loop/prompt.md und führe den Auftrag dort vollständig aus."] ++
         ~w(--output-format stream-json --verbose --permission-mode auto --permission-prompts none
-           --strict-mcp-config --settings #{@settings}) ++ extra
+           --session-id #{session}) ++ rules(extra)
 
     outcome =
-      ctx.watch.("#{Path.basename(cwd)}-#{role}-#{account}", log, fn ->
+      ctx.watch.(stage, log, fn ->
         Proc.run("claude", args,
           cd: cwd,
           env: env(account),
           timeout_ms: ctx.stage_timeout_ms,
-          log: log
+          log: log,
+          # Consumed by the stage that sees it, so it takes over one stage.
+          cancel: fn -> File.rm(ctx.takeover_file) == :ok end
         )
       end)
 
@@ -76,12 +86,55 @@ defmodule DevLoop.Agent do
         ctx.log.("#{role}: #{account} ist erschöpft, nächstes Konto")
         try_chain(rest, role, cwd, ctx)
 
+      :taken_over ->
+        ctx.take_over.("#{stage}-hand", cwd, resume_command(account, session, extra))
+        ctx.log.("#{role}: von Hand übernommen (Session #{session})")
+        {:taken_over, taken_over_text(account, session, cwd)}
+
       other ->
         other
     end
   end
 
+  # The same rules for the headless session and for its interactive
+  # continuation after a takeover.
+  defp rules(extra), do: ~w(--strict-mcp-config --settings #{@settings}) ++ extra
+
+  @doc """
+  The shell command that continues `session` interactively: same account,
+  model and rules. The tt token is read by the shell when the command
+  runs, never put into the command itself.
+  """
+  def resume_command(account, session, extra) do
+    exe = System.find_executable("claude") || "claude"
+
+    vars =
+      case account do
+        :claude ->
+          []
+
+        :tt ->
+          ["CLAUDE_CONFIG_DIR=#{q(@tt_dir)}", ~s[ANTHROPIC_AUTH_TOKEN="$(#{q(token_script())})"]]
+      end
+
+    Enum.join(
+      ["env"] ++
+        vars ++
+        ["CLAUDE_CODE_DISABLE_AUTO_MEMORY=1", q(exe), "--resume", q(session)] ++
+        Enum.map(~w(--permission-mode auto) ++ rules(extra), &q/1),
+      " "
+    )
+  end
+
+  defp taken_over_text(account, session, cwd) do
+    """
+    Von Hand übernommen: Session `#{session}` (Konto `#{account}`) in `#{cwd}`.
+    Weiter von Hand: `cd #{q(cwd)} && #{account} --resume #{session}`
+    """
+  end
+
   defp classify({:timeout, _}), do: {:error, "Zeitlimit der Stufe überschritten"}
+  defp classify({:cancelled, _}), do: :taken_over
   defp classify({:ok, lines}), do: classify_lines(lines)
   defp classify({:error, _status, lines}), do: classify_lines(lines)
 
@@ -119,9 +172,21 @@ defmodule DevLoop.Agent do
   end
 
   defp tt_token do
-    case System.cmd(Path.join(@tt_dir, "anthropic-token.sh"), [], stderr_to_stdout: false) do
+    case System.cmd(token_script(), [], stderr_to_stdout: false) do
       {token, 0} -> String.trim(token)
       _ -> raise "tt: Token-Skript fehlgeschlagen"
     end
   end
+
+  defp token_script, do: Path.join(@tt_dir, "anthropic-token.sh")
+
+  # A random (version 4) UUID, the form --session-id wants.
+  defp uuid4 do
+    <<a::48, _::4, b::12, _::2, c::62>> = :crypto.strong_rand_bytes(16)
+    hex = Base.encode16(<<a::48, 4::4, b::12, 2::2, c::62>>, case: :lower)
+    <<p1::binary-8, p2::binary-4, p3::binary-4, p4::binary-4, p5::binary-12>> = hex
+    Enum.join([p1, p2, p3, p4, p5], "-")
+  end
+
+  defp q(s), do: "'" <> String.replace(s, "'", ~S('\'')) <> "'"
 end
