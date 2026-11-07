@@ -1006,23 +1006,12 @@ defmodule KomkiConnectorRis.RisCassettes do
   # request and response bodies. Invalid JSON (a crash leftover, say)
   # falls back to raw text — a secret in plaintext is found either way.
   defp plaintext_parts(raw) do
-    case decode_json(raw) do
-      %{} = cassette ->
+    case RisHttp.decode_json(raw) do
+      {:ok, %{} = cassette} ->
         [raw | Enum.flat_map(["request", "response"], &part_body(cassette, &1))]
 
-      nil ->
+      _no_cassette_map ->
         [raw]
-    end
-  end
-
-  defp decode_json(raw) do
-    try do
-      case :json.decode(raw) do
-        %{} = map -> map
-        _ -> nil
-      end
-    rescue
-      _ -> nil
     end
   end
 
@@ -1033,6 +1022,11 @@ defmodule KomkiConnectorRis.RisCassettes do
     end
   end
 
+  # Deliberately not RisHttp.part_body: the leak scan decodes tolerantly
+  # (ignore: :whitespace), never falls back to a plaintext "body" field,
+  # and yields nothing on invalid Base64 instead of raising — the check
+  # must neither crash on odd cassettes nor get more lenient (#328/#331).
+  # One caller, so it stays local (lift threshold: three scripts, #333).
   defp body_of(%{"body_b64" => b64}) when is_binary(b64) do
     case Base.decode64(b64, ignore: :whitespace) do
       {:ok, bin} -> [bin]

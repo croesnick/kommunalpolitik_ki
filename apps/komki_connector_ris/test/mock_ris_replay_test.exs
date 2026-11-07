@@ -95,4 +95,15 @@ defmodule KomkiConnectorRis.MockRisReplayTest do
     assert {:ok, _opts} =
              MockRis.parse_cli(["--port", "4010", "--mode", "replay", "--cassette", @cassettes])
   end
+
+  test "parse_cli prueft Port-Zahl und Flaggen" do
+    assert {:error, usage} = MockRis.parse_cli(["--port", "abc", "--mode", "ok"])
+    assert usage =~ "Aufruf"
+
+    assert {:error, _usage} = MockRis.parse_cli(["--port", "4010", "--unbekannt", "x"])
+
+    assert {:ok, opts} = MockRis.parse_cli(["--port", "4010", "--mode", "slow"])
+    assert Keyword.get(opts, :port) == 4010
+    assert Keyword.get(opts, :mode) == :slow
+  end
 end

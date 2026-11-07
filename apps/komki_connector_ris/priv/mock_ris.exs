@@ -87,30 +87,11 @@ defmodule KomkiConnectorRis.MockRis do
   @doc false
   @spec parse_cli([String.t()]) :: {:ok, keyword()} | {:error, String.t()}
   def parse_cli(argv) do
-    case parse_flags(argv, []) do
+    case RisHttp.parse_flags(argv, port: :integer, mode: :string, cassette: :string) do
       {:ok, opts} -> build_mode(opts)
-      {:error, _} -> {:error, @usage}
+      :error -> {:error, @usage}
     end
   end
-
-  # Flags in beliebiger Reihenfolge; Unbekanntes oder Ungueltiges fuehrt zur
-  # Meldung statt zum stillen Nichtstun.
-  defp parse_flags([], acc), do: {:ok, acc}
-
-  defp parse_flags(["--port", value | rest], acc) do
-    case Integer.parse(value) do
-      {port, ""} -> parse_flags(rest, Keyword.put(acc, :port, port))
-      _ -> {:error, @usage}
-    end
-  end
-
-  defp parse_flags(["--mode", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :mode, value))
-
-  defp parse_flags(["--cassette", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :cassette, value))
-
-  defp parse_flags(_other, _acc), do: {:error, @usage}
 
   defp build_mode(opts) do
     port = Keyword.get(opts, :port)
@@ -189,10 +170,8 @@ defmodule KomkiConnectorRis.MockRis do
   defp normalize_mode({:replay, dir}) do
     entries =
       dir
-      |> File.ls!()
-      |> Enum.filter(&String.ends_with?(&1, ".json"))
-      |> Enum.sort()
-      |> Enum.map(&load_cassette(Path.join(dir, &1)))
+      |> RisHttp.cassette_files()
+      |> Enum.map(&load_cassette/1)
 
     {:replay, entries}
   end
@@ -209,16 +188,12 @@ defmodule KomkiConnectorRis.MockRis do
       query: normalize_null(Map.get(request, "query")),
       status: response["status"],
       headers: response["headers"],
-      body: response_body(response)
+      body: RisHttp.part_body(response)
     }
   end
 
   defp normalize_null(:null), do: nil
   defp normalize_null(other), do: other
-
-  # base64-kodierter Body (Recorder) oder Klartext (handgeschriebene Fixture).
-  defp response_body(%{"body_b64" => b64}) when is_binary(b64), do: Base.decode64!(b64)
-  defp response_body(%{"body" => body}) when is_binary(body), do: body
 
   defp replay(sock, {:replay, entries}, method, target) do
     {path, query} = RisHttp.split_target(target)

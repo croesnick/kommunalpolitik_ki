@@ -1,8 +1,12 @@
-# Gemeinsamer HTTP-Sockel-Kram fuer mock_ris.exs und ris_recorder.exs.
+# Geteiltes Geruest der RIS-Skriptfamilie: mock_ris, ris_recorder, ris_skeleton,
+# ris_struktur, ris_gartenstadt, ris_ngramm und ris_cassettes. Wer ein neues
+# Familienmitglied schreibt, findet hier die Bausteine und kopiert nichts mehr
+# vom Nachbarn.
 #
-# Beide Skripte sind eigenstaendig startbar und laden diese Datei per
+# Jedes Skript bleibt eigenstaendig startbar und laedt diese Datei per
 # Code.require_file — weiterhin nur OTP, keine Deps. Hier lebt, was sonst in
-# beiden Skripten dupliziert waere (und der Body-Bug dann doppelt drin):
+# den Skripten dupliziert waere: der Sockel-Kram, das Kassetten-Listing, der
+# JSON-Dekode, der Koerper-Dekode und das Flag-Geruest der Aufrufzeile.
 
 defmodule KomkiConnectorRis.RisHttp do
   @moduledoc false
@@ -103,6 +107,43 @@ defmodule KomkiConnectorRis.RisHttp do
   def method_label(method) when is_binary(method), do: method
 
   @doc """
+  Sortierte Pfade aller `*.json`-Kassetten eines Verzeichnisses (Aufnahmen
+  des Recorders oder handgeschriebene Fixtures). Wie bisher `File.ls!`: Ein
+  unlesbares Verzeichnis wirft. `*.json.enc` (ris_cassettes) endet nicht auf
+  `.json`, die Mengen sind disjunkt.
+  """
+  @spec cassette_files(Path.t()) :: [Path.t()]
+  def cassette_files(dir) do
+    dir
+    |> File.ls!()
+    |> Enum.filter(&String.ends_with?(&1, ".json"))
+    |> Enum.sort()
+    |> Enum.map(&Path.join(dir, &1))
+  end
+
+  @doc "`:json.decode` mit Auffangnetz: `{:ok, term}` bei gueltigem JSON, sonst `:error`."
+  @spec decode_json(binary()) :: {:ok, term()} | :error
+  def decode_json(body) do
+    {:ok, :json.decode(body)}
+  rescue
+    _ -> :error
+  end
+
+  @doc """
+  Koerper eines Kassetten-Teils (`request` oder `response`): `body_b64` wird
+  mit `Base.decode64!` dekodiert (ungueltiges Base64 wirft), sonst gilt
+  `body`, sonst `""` — handgeschriebene Fixtures tragen den Koerper im
+  Klartext, Recorder-Kassetten base64.
+  """
+  @spec part_body(map()) :: term()
+  def part_body(part) do
+    case Map.fetch(part, "body_b64") do
+      {:ok, b64} -> Base.decode64!(b64)
+      :error -> Map.get(part, "body", "")
+    end
+  end
+
+  @doc """
   `:ok`, wenn `path` ausserhalb jedes Git-Repos liegt (auch Worktrees, deren
   `.git` eine Datei ist), sonst `{:error, {:in_repo, repo}}`. Vorhandene
   Pfade werden per realpath aufgeloest — ein Symlink, der in ein Repo
@@ -147,6 +188,41 @@ defmodule KomkiConnectorRis.RisHttp do
   defp ancestors(path) do
     parent = Path.dirname(path)
     if parent == path, do: [path], else: [path | ancestors(parent)]
+  end
+
+  @doc """
+  Flag-Geruest der Aufrufzeile: `--flag wert`-Paare in beliebiger Reihenfolge.
+  `kinds` nennt die erlaubten Flaggen (ohne `--`) und ihre Wertart: `:string`
+  uebernimmt das naechste Token, `:integer` verlangt eine ganze Zahl. Ein
+  unbekanntes Flag, ein Flag ohne Wert oder ein Wert ohne Flag wird mit
+  `:error` abgewiesen — die Meldung dazu liefert die Aufrufstelle (Usage).
+  Keine Argumente sind gueltig; ob ein Flag fehlen darf, entscheidet die
+  Aufrufstelle. (ris_cassettes mischt Verb und Pfad dazu und behaelt deshalb
+  seinen eigenen Parser.)
+  """
+  @spec parse_flags([String.t()], keyword(:string | :integer)) :: {:ok, keyword()} | :error
+  def parse_flags(argv, kinds) do
+    known = Map.new(kinds, fn {key, kind} -> {Atom.to_string(key), {key, kind}} end)
+    parse_flags(argv, known, [])
+  end
+
+  defp parse_flags([], _known, acc), do: {:ok, acc}
+
+  defp parse_flags(["--" <> name, value | rest], known, acc) do
+    case Map.fetch(known, name) do
+      {:ok, {key, :string}} -> parse_flags(rest, known, Keyword.put(acc, key, value))
+      {:ok, {key, :integer}} -> parse_flags_integer(key, value, rest, known, acc)
+      :error -> :error
+    end
+  end
+
+  defp parse_flags(_argv, _known, _acc), do: :error
+
+  defp parse_flags_integer(key, value, rest, known, acc) do
+    case Integer.parse(value) do
+      {n, ""} -> parse_flags(rest, known, Keyword.put(acc, key, n))
+      _keine_ganze_zahl -> :error
+    end
   end
 
   @doc """

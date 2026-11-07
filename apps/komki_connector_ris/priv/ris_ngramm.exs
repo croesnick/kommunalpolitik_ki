@@ -23,6 +23,8 @@ Code.require_file("./ris_http.exs", __DIR__)
 defmodule KomkiConnectorRis.RisNgramm do
   @moduledoc false
 
+  alias KomkiConnectorRis.RisHttp
+
   @usage "Aufruf: --synthetisch <dir> --echt <dir> [--gramm <n>]"
   @standard_gramm 6
 
@@ -56,7 +58,7 @@ defmodule KomkiConnectorRis.RisNgramm do
   @doc false
   @spec parse_cli([String.t()]) :: {:ok, keyword()} | {:error, String.t()}
   def parse_cli(argv) do
-    case parse_flags(argv, []) do
+    case RisHttp.parse_flags(argv, synthetisch: :string, echt: :string, gramm: :string) do
       {:ok, opts} ->
         cond do
           not Keyword.has_key?(opts, :synthetisch) ->
@@ -75,23 +77,10 @@ defmodule KomkiConnectorRis.RisNgramm do
             {:ok, opts}
         end
 
-      {:error, _} ->
+      :error ->
         {:error, @usage}
     end
   end
-
-  defp parse_flags([], acc), do: {:ok, acc}
-
-  defp parse_flags(["--synthetisch", wert | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :synthetisch, wert))
-
-  defp parse_flags(["--echt", wert | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :echt, wert))
-
-  defp parse_flags(["--gramm", wert | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :gramm, wert))
-
-  defp parse_flags(_other, _acc), do: {:error, @usage}
 
   @doc false
   @spec gramm_aus(keyword()) :: {:ok, pos_integer()} | {:error, String.t()}
@@ -121,34 +110,19 @@ defmodule KomkiConnectorRis.RisNgramm do
   # Base64-HTML decoded; non-JSON bodies (e.g. PDFs) as raw text.
   defp kassetten_texte(dir) do
     dir
-    |> File.ls!()
-    |> Enum.filter(&String.ends_with?(&1, ".json"))
-    |> Enum.sort()
-    |> Enum.map(fn name ->
-      kassette = name |> Path.expand(dir) |> File.read!() |> :json.decode()
-      roh = antwort_body(kassette)
+    |> RisHttp.cassette_files()
+    |> Enum.map(fn pfad ->
+      kassette = pfad |> File.read!() |> :json.decode()
+      roh = RisHttp.part_body(kassette["response"])
 
       texte =
-        case decode_json(roh) do
+        case RisHttp.decode_json(roh) do
           {:ok, term} when is_map(term) or is_list(term) -> strings(term)
           _other -> [roh]
         end
 
-      {name, texte}
+      {Path.basename(pfad), texte}
     end)
-  end
-
-  defp antwort_body(kassette) do
-    case Map.fetch(kassette["response"], "body_b64") do
-      {:ok, b64} -> Base.decode64!(b64)
-      :error -> Map.get(kassette["response"], "body", "")
-    end
-  end
-
-  defp decode_json(body) do
-    {:ok, :json.decode(body)}
-  rescue
-    _ -> :error
   end
 
   defp strings(map) when is_map(map),
