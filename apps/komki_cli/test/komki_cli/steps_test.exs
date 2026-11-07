@@ -6,7 +6,7 @@ defmodule KomkiCli.StepsTest do
   # wie auch vom pi-home aus faendig werden.
   use ExUnit.Case, async: true
 
-  alias KomkiCli.{Config, Denials, Proc, Steps, TestSupport}
+  alias KomkiCli.{Channel, Config, Connectors, Denials, Proc, Steps, TestSupport}
 
   @denials_fixture Path.expand("../fixtures/denials/log-show.txt", __DIR__)
 
@@ -239,7 +239,7 @@ defmodule KomkiCli.StepsTest do
 
       assert {:error, reason, 2} = Steps.require_mediator_up(cfg)
       assert reason =~ "stale pidfile"
-      assert reason =~ "is not komki-mediator"
+      assert reason =~ "is not komki-mediator of this base"
     end
 
     test "lebender eigener Prozess mit pidfile: Durchlass ({:ok, pid})" do
@@ -250,9 +250,8 @@ defmodule KomkiCli.StepsTest do
       # (statt einzelner Befehl) verhindert das sh-exec, das die Argzeile
       # durch den Kindprozess ersetzen wuerde.
       ps_marker = "komki-mediator"
-      cmd = "while :; do sleep 1; done # " <> ps_marker
-      port = Port.open({:spawn_executable, "/bin/sh"}, args: ["-c", cmd])
-      {:os_pid, os_pid} = Port.info(port, :os_pid)
+      anchor = Channel.socket_path(cfg)
+      os_pid = TestSupport.spawn_fake(ps_marker, anchor)
 
       pidfile = Path.join([cfg.base_dir, "tmp", "komki-mediator.pid"])
       File.mkdir_p!(Path.dirname(pidfile))
@@ -262,7 +261,7 @@ defmodule KomkiCli.StepsTest do
 
       # Aufraeumweg ueber die eigene Eskalations-Mechanik (TERM → KILL mit
       # Identitaetscheck): zugleich Regression fuer KomkiCli.Proc.kill_checked.
-      assert :ok = Proc.kill_checked(os_pid, ps_marker)
+      assert :ok = Proc.kill_checked(os_pid, ps_marker, anchor)
     end
   end
 
@@ -591,18 +590,19 @@ defmodule KomkiCli.StepsTest do
 
       # Marker-Prozesse wie im Liveness-Gate-Test: die ps-Kommandozeile
       # traegt den Escript-Namen, den der Identitaetscheck erwartet.
-      pids =
-        for {file, marker} <- [
-              {"komki-egress.pid", "komki-egress"},
-              {"connector-ris.pid", "komki-connector-ris"},
-              {"connector-web.pid", "komki-connector-web"}
-            ] do
-          port =
-            Port.open({:spawn_executable, "/bin/sh"},
-              args: ["-c", "while :; do sleep 1; done # " <> marker]
-            )
+      File.mkdir_p!(Path.dirname(Connectors.egress_log_path(cfg)))
+      File.touch!(Connectors.egress_log_path(cfg))
 
-          {:os_pid, pid} = Port.info(port, :os_pid)
+      pids =
+        for {file, marker, anchor, opts} <- [
+              {"komki-egress.pid", "komki-egress", nil,
+               [open_file: Connectors.egress_log_path(cfg)]},
+              {"connector-ris.pid", "komki-connector-ris",
+               KomkiConnector.Manifest.socket_path(cfg.base_dir, "ris"), []},
+              {"connector-web.pid", "komki-connector-web",
+               KomkiConnector.Manifest.socket_path(cfg.base_dir, "web"), []}
+            ] do
+          pid = TestSupport.spawn_fake(marker, anchor, opts)
           File.write!(Path.join(tmp, file), Integer.to_string(pid) <> "\n")
           pid
         end

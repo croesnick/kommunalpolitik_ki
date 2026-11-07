@@ -39,34 +39,75 @@ defmodule KomkiCli.Proc do
     end
   end
 
-  @doc "Prüft, ob pid existiert und den `marker` in der ps-Kommandozeile fährt."
-  @spec pid_alive?(term(), String.t()) :: boolean()
-  def pid_alive?(pid, marker) when is_integer(pid) and pid > 0 do
-    case System.cmd("/bin/ps", ["-p", to_string(pid), "-o", "command="]) do
-      {out, 0} -> String.contains?(out, marker)
+  @typedoc """
+  Basis-Anker (Ticket #164): ein Pfad, der als ganzes Wort in der
+  ps-Kommandozeile stehen muss (`String.t()`), oder eine Datei, die der
+  Prozess offen hält (`{:open_file, pfad}`, Vergleich über die Inode).
+  """
+  @type anchor :: String.t() | {:open_file, String.t()} | nil
+
+  @doc """
+  Prüft, ob pid existiert, den `marker` in der ps-Kommandozeile fährt und –
+  mit `anchor` – zu genau einer Basis gehört (Ticket #164).
+
+  Der Prozessname allein trennt zwei Basen nicht: ein pidfile mit der PID
+  eines gleichartigen Prozesses einer anderen Basis würde sonst als eigener
+  gelten. Ein Pfad-`anchor` (Socket, Schlüsseldatei) muss als ganzes Wort in
+  der Kommandozeile stehen (`ps -ww`: macOS kürzt lange Zeilen sonst);
+  Wortgrenzen verhindern, dass `/x/run` in `/y/x/run` gefunden wird. Der
+  Egress startet ohne Argumente und trägt die Basis nur in seinem Log
+  (stdout), und macOS zeigt Umgebungen nicht an: dort bindet
+  `{:open_file, log}` über `lsof` an die Inode der Log-Datei. Ohne `anchor`
+  (`nil`) gilt nur der Marker.
+  """
+  @spec pid_alive?(term(), String.t(), anchor()) :: boolean()
+  def pid_alive?(pid, marker, anchor \\ nil)
+
+  def pid_alive?(pid, marker, anchor) when is_integer(pid) and pid > 0 do
+    case System.cmd("/bin/ps", ["-ww", "-p", to_string(pid), "-o", "command="]) do
+      {out, 0} -> String.contains?(out, marker) and anchored?(pid, out, anchor)
       _ -> false
     end
   end
 
-  def pid_alive?(_pid, _marker), do: false
+  def pid_alive?(_pid, _marker, _anchor), do: false
+
+  defp anchored?(_pid, _out, nil), do: true
+
+  defp anchored?(pid, _out, {:open_file, path}) do
+    with {:ok, %File.Stat{inode: inode}} <- File.stat(path),
+         {out, 0} <-
+           System.cmd("/usr/sbin/lsof", ["-nP", "-Fi", "-a", "-p", to_string(pid), "-d", "0-9"]) do
+      ("i" <> Integer.to_string(inode)) in String.split(out, "\n", trim: true)
+    else
+      _ -> false
+    end
+  end
+
+  defp anchored?(_pid, out, anchor) do
+    padded = " " <> String.trim(out) <> " "
+    String.contains?(padded, " " <> anchor <> " ")
+  end
 
   @doc """
   Kill mit Identitaetscheck und Eskalation: SIGTERM, nach 800 ms SIGKILL,
   danach Rest-Lebensprobe. Nur der pid-Prozess mit dem eigenen `marker`
-  (z. B. "llama-server" / "komki-mediator") kriegt Signale; alles andere
-  ist ein stale pidfile und erzeugt `{:error, ...}` statt eines Treffers.
+  (z. B. "llama-server" / "komki-mediator") und dem Basis-`anchor`
+  (`pid_alive?/3`) kriegt Signale; alles andere ist ein stale pidfile bzw.
+  ein Prozess einer fremden Basis und erzeugt `{:error, ...}` statt eines
+  Treffers.
   """
-  @spec kill_checked(term(), String.t()) :: :ok | {:error, String.t()}
-  def kill_checked(pid, marker) do
-    if pid_alive?(pid, marker) do
+  @spec kill_checked(term(), String.t(), anchor()) :: :ok | {:error, String.t()}
+  def kill_checked(pid, marker, anchor \\ nil) do
+    if pid_alive?(pid, marker, anchor) do
       # Burrito-Einzeldatei (Ticket #181): der Wrapper startet die VM als
       # Kindprozess. Nur den Wrapper zu beenden liesse die Rolle als Waise
       # weiterlaufen; deshalb alle Nachfahren mit demselben Marker mit.
-      family = [pid | marked_descendants(pid, marker)]
+      family = [pid | marked_descendants(pid, marker, anchor)]
       signal(family, "-TERM")
       Process.sleep(800)
 
-      case Enum.filter(family, &pid_alive?(&1, marker)) do
+      case Enum.filter(family, &pid_alive?(&1, marker, anchor)) do
         [] ->
           :ok
 
@@ -75,25 +116,33 @@ defmodule KomkiCli.Proc do
           Process.sleep(300)
       end
 
-      if Enum.any?(family, &pid_alive?(&1, marker)) do
+      if Enum.any?(family, &pid_alive?(&1, marker, anchor)) do
         {:error, marker <> " pid " <> to_string(pid) <> " still alive after SIGKILL"}
       else
         :ok
       end
     else
-      {:error,
-       "pid " <> to_string(pid) <> " is not " <> marker <> " (pidfile stale); not sent any signal"}
+      {:error, not_ours(pid, marker)}
     end
+  end
+
+  @doc "Meldung für eine pid, die nicht `marker` dieser Basis ist (stale oder fremd)."
+  @spec not_ours(integer(), String.t()) :: String.t()
+  def not_ours(pid, marker) do
+    "pid " <>
+      to_string(pid) <>
+      " ist nicht (mehr) " <>
+      marker <> " dieser Basis (stale oder fremd) — kein Signal gesendet, pidfile entfernt"
   end
 
   defp signal(pids, sig), do: System.cmd("/bin/kill", [sig | Enum.map(pids, &to_string/1)])
 
   @doc "Nachfahren von `pid` (rekursiv per pgrep -P), die `marker` in der Kommandozeile tragen."
-  @spec marked_descendants(pos_integer(), String.t()) :: [pos_integer()]
-  def marked_descendants(pid, marker) do
+  @spec marked_descendants(pos_integer(), String.t(), anchor()) :: [pos_integer()]
+  def marked_descendants(pid, marker, anchor \\ nil) do
     pid
     |> descendants()
-    |> Enum.filter(&pid_alive?(&1, marker))
+    |> Enum.filter(&pid_alive?(&1, marker, anchor))
   end
 
   defp descendants(pid) do

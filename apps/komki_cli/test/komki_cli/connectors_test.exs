@@ -436,22 +436,23 @@ defmodule KomkiCli.ConnectorsTest do
       Connectors.ensure_run_dirs!(cfg)
       File.mkdir_p!(Path.join(cfg.base_dir, "tmp"))
 
+      File.touch!(Connectors.egress_log_path(cfg))
+
       fakes =
-        for {pidfile, marker} <-
-              [{Connectors.egress_pidfile(cfg), "komki-egress"}] ++
+        for {pidfile, marker, anchor, opts} <-
+              [
+                {Connectors.egress_pidfile(cfg), "komki-egress", nil,
+                 [open_file: Connectors.egress_log_path(cfg)]}
+              ] ++
                 for(
                   id <- ["documents", "ris", "vault", "web"],
-                  do: {Connectors.pidfile(cfg, id), Manifest.fetch!(id).binary}
+                  do:
+                    {Connectors.pidfile(cfg, id), Manifest.fetch!(id).binary,
+                     Manifest.socket_path(cfg.base_dir, id), []}
                 ) do
-          # Compound-Kommando, damit der Marker in der ps-Zeile bleibt
-          port =
-            Port.open({:spawn_executable, "/bin/sh"},
-              args: ["-c", "while :; do sleep 1; done # " <> marker]
-            )
-
-          {:os_pid, pid} = Port.info(port, :os_pid)
+          pid = TestSupport.spawn_fake(marker, anchor, opts)
           File.write!(pidfile, Integer.to_string(pid) <> "\n")
-          {pid, marker}
+          {pid, marker, anchor, opts}
         end
 
       sockets =
@@ -466,7 +467,7 @@ defmodule KomkiCli.ConnectorsTest do
         assert Enum.all?(entries, fn {_name, state} -> match?({:already, _}, state) end)
         assert Enum.all?(sockets, &File.exists?/1)
       after
-        for {pid, marker} <- fakes, do: Proc.kill_checked(pid, marker)
+        for {pid, _, _, _} <- fakes, do: TestSupport.kill_fake(pid)
       end
     end
   end
