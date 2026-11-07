@@ -56,6 +56,7 @@ Jede Stufe läuft als frische Session ohne Oberfläche (`claude -p`). Die Prompt
 
 ```bash
 elixir scripts/dev_loop.exs --dry-run                   # Plan: Auswahl, Belegung, PO-Kandidaten; keine Agenten, keine Writes
+elixir scripts/dev_loop.exs --check-sandbox --account tt # Sandbox-Probe auf einem bestimmten Konto
 elixir scripts/dev_loop.exs --only 392 --no-po          # ein Ticket, unter Aufsicht
 elixir scripts/dev_loop.exs --until 07:00               # über Nacht, höchstens 5 Tickets (--max-tickets)
 touch ~/.dev-loop/STOP                                   # Not-Aus: greift vor der nächsten Stufe; Datei danach löschen
@@ -65,7 +66,7 @@ touch ~/.dev-loop/STOP                                   # Not-Aus: greift vor d
 - **Zeitfenster:** `--until` startet nach der angegebenen Uhrzeit kein neues Ticket mehr. Eine laufende Stufe darf bis zu 4 Stunden dauern.
 - **Cockpit in Herdr:** Gemeint ist die Desktop-App Herdr auf herdr-core (`hc`), nicht das ältere Terminal-Programm `herdr`. Startet man das Skript in einem Herdr-Terminal, öffnet es für jede Stufe einen eigenen Tab im selben Space, etwa „loop-368-review-claude“. Der Tab zeigt die Session live: den Text des Agenten, jeden Tool-Aufruf mit Ergebnis, die Ablehnungen und am Ende Turns und Dauer. Am Ende der Stufe beendet das Skript den Tab wieder. Bricht ein Lauf ab (Ctrl-C, Absturz), bleibt der Tab mit dem letzten Stand stehen. Der nächste Lauf beendet ihn beim Start, erkennbar am hc-Label `dev-loop=viewer`.
   - Den ganzen Kontakt mit Herdr bündelt `scripts/dev_loop/herdr.exs`: `hc run` mit dem Label `herdr.space=<Space>` für den Tab, `herdr-app` für den Space und den Tab-Namen. Fällt Herdr aus, protokolliert der Loop das und arbeitet ohne Tab weiter.
-  - Herdr zeigt im Tab keinen Agenten-Status (working/done), denn dort läuft `tail | jq` und kein Agent. Den Fortschritt zeigt der Tab-Inhalt.
+  - **Unter „Agents“:** Der Viewer meldet den Zustand der Stufe so an herdr-core, wie Claude Code sich selbst meldet (OSC 7501, `app=claude-code`). Während die Stufe läuft, steht dort `working`, und die Statuszeile zeigt den aktuellen Tool-Aufruf, etwa „Bash mix test“. Am Ende meldet der Viewer `done` oder `error`. Herdr führt den Tab deshalb als Agenten. Eingreifen lässt sich dort trotzdem nicht, denn der eigentliche Agent läuft ohne Oberfläche.
   - **Prüfen:** `elixir scripts/dev_loop/test/herdr_live_test.exs` in einem Herdr-Terminal öffnet für ein paar Sekunden echte Tabs. Der Test prüft: Name, Live-Darstellung, Schließen auch nach einem Absturz der Stufe, das Aufräumen nach einem abgebrochenen Lauf und den Betrieb ohne Herdr. In der CI wird er übersprungen.
   - Die Agenten bleiben Kindprozesse des Skripts ohne Oberfläche (`claude -p`). Die Pane liest nur das Log mit (`tail -F … | jq -f scripts/dev_loop/viewer.jq`). Eingreifen lässt sich dort nicht, dafür gilt die Sicherheitsgrenze unverändert.
   - Außerhalb von Herdr öffnet das Skript keinen Tab. Den Verlauf zeigt dann:
@@ -109,6 +110,6 @@ touch ~/.dev-loop/STOP                                   # Not-Aus: greift vor d
 - **A-Tier ohne echten Lauf:** Die Abnahme von A-Tier braucht einen echten Lauf. Ohne Aufsicht trägt das erst die Mock-Welt (#347). Bis dahin endet A-Tier bei „In Review“.
 - **`DoctorBootTest`** startet auf einem Mac mit Staging-Modell einen echten llama-server, bis #392 ihn per Tag aus dem Standardlauf nimmt. Der Staging-Pfad hängt fest an `~/.local/share/komki`, `KOMKI_HOME` umgeht ihn nicht.
 - **Erschöpftes Konto:** Die Erkennung beruht auf den dokumentierten Meldungen („You've hit your … limit“, „spend limit reached“; `code.claude.com/docs/en/errors`, abgerufen am 2026-11-07). An einem echten Limit ist sie noch nicht beobachtet.
-- Die Sandbox-Probe lief bisher nur auf `claude`, nicht auf `tt`.
+- **Sandbox-Probe auf `tt`:** Lief am 2026-11-07 mit `--check-sandbox --account tt`. Drei Versuche lehnten die Regeln von Claude Code ab. Das Lesen von `~/.config/gh` und `~/.ssh` scheiterte an der Sandbox des Betriebssystems („Operation not permitted“). Die Positivkontrollen liefen.
 - **Board-Status:** Mit dem fine-grained PAT setzt der Loop weder „In Progress“ noch „In Review“ (siehe Einrichtung). Er prüft das einmal zu Beginn jedes Laufs und lässt das Board danach in Ruhe. Lanes, die nur auf dem Board auf „In Progress“ stehen, ohne Worktree und ohne PR, erkennt er deshalb nicht als belegt.
 - **Rebase über Workflow-Änderungen:** Hat `main` seit dem Branch eine Datei unter `.github/workflows/` geändert, kann GitHub den Push nach dem Rebase ablehnen, weil der PAT keine Workflows-Permission hat. Der Lauf meldet das als Skriptfehler im Morgen-Kommentar.

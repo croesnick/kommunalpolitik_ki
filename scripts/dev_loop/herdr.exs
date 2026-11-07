@@ -1,8 +1,9 @@
 # The dev loop's only contact with Herdr (#389), the desktop app on top of
 # herdr-core (`hc`). When the script runs in a Herdr terminal, every agent
 # stage gets its own tab in that terminal's space: an hc terminal that
-# renders the stage's stream-json log live (viewer.jq). The tab goes away
-# when the stage ends; the log stays in the run directory.
+# renders the stage's stream-json log live (viewer.jq) and reports the
+# stage's state, so Herdr lists it under Agents. The tab goes away when the
+# stage ends; the log stays in the run directory.
 #
 # Observation only: the agents stay headless child processes of the script.
 # agent.exs reaches this module through `ctx.watch` and does not know about
@@ -49,8 +50,12 @@ defmodule DevLoop.Herdr do
     end
   end
 
-  def viewer_command(stage_log),
-    do: "tail -n +1 -F #{shell_quote(stage_log)} | jq -rR --unbuffered -f #{shell_quote(@viewer)}"
+  # `--arg status 1` makes the viewer report the stage's state (OSC 7501),
+  # so Herdr lists the tab under Agents like a Claude Code session.
+  def viewer_command(stage_log, title),
+    do:
+      "tail -n +1 -F #{shell_quote(stage_log)} | jq -rR --unbuffered " <>
+        "--arg status 1 --arg title #{shell_quote(title)} -f #{shell_quote(@viewer)}"
 
   # Names are unique among live terminals, 1-32 of a-z 0-9 - _.
   def terminal_name(stage),
@@ -62,7 +67,7 @@ defmodule DevLoop.Herdr do
     args =
       ~w(run --bg --json --no-parent --no-notify --rm --label #{@label}) ++
         ["--label", "herdr.space=#{space}", "--name", terminal_name(name)] ++
-        ["--cwd", Path.dirname(stage_log), viewer_command(stage_log)]
+        ["--cwd", Path.dirname(stage_log), viewer_command(stage_log, name)]
 
     case cmd("hc", args) do
       {:ok, %{"address" => terminal}} ->

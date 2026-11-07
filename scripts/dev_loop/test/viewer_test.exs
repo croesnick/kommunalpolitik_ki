@@ -23,12 +23,27 @@ defmodule DevLoop.ViewerTest do
     ~s({"type":"result","is_error":false,"num_turns":30,"duration_ms":354835,"permission_denials":[{"tool_input":{"command":"gh api user"}}]})
   ]
 
-  defp render(lines) do
+  defp render(lines, args \\ []) do
     path = Path.join(System.tmp_dir!(), "viewer-#{System.unique_integer([:positive])}.jsonl")
     File.write!(path, Enum.join(lines, "\n") <> "\n")
-    {out, 0} = System.cmd("jq", ["-rR", "-f", @viewer, path])
+    {out, 0} = System.cmd("jq", ["-rR"] ++ args ++ ["-f", @viewer, path])
     File.rm!(path)
     out |> String.replace(~r/\e\[\d+m/, "") |> String.split("\n", trim: true)
+  end
+
+  # OSC 7501 reports in the output, decoded: {state, msg}.
+  defp reports(lines) do
+    for line <- lines, [_, fields] <- [Regex.run(~r/\e\]7501;([^\e]*)\e\\/, line)] do
+      kv =
+        for f <- String.split(fields, ":"),
+            [k, v] = String.split(f, "=", parts: 2),
+            into: %{},
+            do: {k, v}
+
+      assert kv["app"] == "claude-code"
+      assert Base.decode64!(kv["title"]) == "loop-333-implement-claude"
+      {kv["state"], Base.decode64!(kv["msg"])}
+    end
   end
 
   test "renders model, text, tool calls, results and denials; skips the rest" do
@@ -41,6 +56,26 @@ defmodule DevLoop.ViewerTest do
              "  ✗ Permission denied",
              "■ fertig · 30 Turns · 354 s",
              "  abgelehnt: gh api user"
+           ]
+  end
+
+  test "without status the output has no OSC 7501 report" do
+    refute Enum.any?(render(@events), &String.contains?(&1, "\e]7501"))
+  end
+
+  test "with status it reports start, every tool call and the end like Claude Code" do
+    lines = render(@events, ~w(--arg status 1 --arg title loop-333-implement-claude))
+
+    assert reports(lines) == [
+             {"working", "startet"},
+             {"working", "Bash mix test"},
+             {"done", "fertig"}
+           ]
+
+    error = ~s({"type":"result","is_error":true,"num_turns":1,"duration_ms":1000})
+
+    assert reports(render([error], ~w(--arg status 1 --arg title loop-333-implement-claude))) == [
+             {"error", "Fehler"}
            ]
   end
 
@@ -63,7 +98,7 @@ defmodule DevLoop.ViewerTest do
   end
 
   test "the viewer command quotes paths for the shell" do
-    assert DevLoop.Herdr.viewer_command("/logs/it's here.jsonl") =~
-             ~S(tail -n +1 -F '/logs/it'\''s here.jsonl' | jq -rR --unbuffered -f ')
+    assert DevLoop.Herdr.viewer_command("/logs/it's here.jsonl", "loop-1") =~
+             ~S(tail -n +1 -F '/logs/it'\''s here.jsonl' | jq -rR --unbuffered --arg status 1 --arg title 'loop-1' -f ')
   end
 end

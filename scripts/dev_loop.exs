@@ -44,6 +44,7 @@ defmodule DevLoop do
   Aufruf: elixir scripts/dev_loop.exs [--until HH:MM] [--max-tickets N] [--only N] [--no-po]
           elixir scripts/dev_loop.exs --dry-run | --check-sandbox
           elixir scripts/dev_loop.exs --rehearse --only N
+  --account claude|tt: nur dieses Konto statt der Kette (etwa für --check-sandbox)
   """
 
   def main(argv) do
@@ -56,11 +57,13 @@ defmodule DevLoop do
           no_po: :boolean,
           dry_run: :boolean,
           rehearse: :boolean,
-          check_sandbox: :boolean
+          check_sandbox: :boolean,
+          account: :string
         ]
       )
 
-    if rest != [] or invalid != [], do: abort(@usage)
+    if rest != [] or invalid != [] or opts[:account] not in [nil, "claude", "tt"],
+      do: abort(@usage)
 
     ctx = context(opts)
 
@@ -111,7 +114,8 @@ defmodule DevLoop do
       deadline: deadline(opts[:until]),
       max_tickets: opts[:max_tickets] || 5,
       only: opts[:only],
-      po?: not (opts[:no_po] || false) and is_nil(opts[:only])
+      po?: not (opts[:no_po] || false) and is_nil(opts[:only]),
+      account: opts[:account] && String.to_existing_atom(opts[:account])
     }
     |> with_board()
   end

@@ -36,6 +36,13 @@ defmodule DevLoop.HerdrLiveTest do
     JSON.decode!(out)["spaces"]
   end
 
+  # How Herdr's window sees the terminal: its agent list reads these fields.
+  defp window_entry(name) do
+    Enum.find_value(app_ls(), fn s ->
+      Enum.find_value(s["tabs"], fn t -> Enum.find(t["terminals"], &(&1["name"] == name)) end)
+    end)
+  end
+
   defp viewers do
     {out, 0} = System.cmd("hc", ~w(ls --json --label dev-loop=viewer))
     for t <- JSON.decode!(out)["terminals"], do: t["name"]
@@ -49,7 +56,8 @@ defmodule DevLoop.HerdrLiveTest do
     end
   end
 
-  test "a stage gets a named tab that renders its log and is gone afterwards", ctx do
+  test "a stage gets a tab that renders its log, counts as a working agent and is gone afterwards",
+       ctx do
     result =
       Herdr.watch(
         @space,
@@ -61,6 +69,18 @@ defmodule DevLoop.HerdrLiveTest do
           assert eventually(fn ->
                    {screen, 0} = System.cmd("hc", ["read", ctx.name, "--lines", "5"])
                    screen =~ "▶ probe-model · /probe"
+                 end)
+
+          assert eventually(fn ->
+                   {out, 0} = System.cmd("hc", ["get", ctx.name, "--json"])
+                   JSON.decode!(out)["status"]["state"] == "working"
+                 end)
+
+          assert eventually(fn ->
+                   match?(
+                     %{"status" => "working", "app" => "claude-code"},
+                     window_entry(ctx.name)
+                   )
                  end)
 
           :stage_result

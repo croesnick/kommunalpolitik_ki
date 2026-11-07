@@ -41,8 +41,14 @@ defmodule DevLoop.Agent do
     if File.exists?(ctx.stop_file), do: throw(:stop)
     File.mkdir_p!(Path.join(cwd, ".dev-loop"))
     File.write!(Path.join(cwd, ".dev-loop/prompt.md"), prompt)
-    try_chain(Map.fetch!(@chains, role), role, cwd, ctx)
+    try_chain(chain(role, ctx[:account]), role, cwd, ctx)
   end
+
+  # `--account` pins one account of the chain, e.g. to probe the sandbox on tt.
+  defp chain(role, nil), do: Map.fetch!(@chains, role)
+
+  defp chain(role, account),
+    do: for({^account, _} = entry <- Map.fetch!(@chains, role), do: entry)
 
   defp try_chain([], _role, _cwd, _ctx), do: :exhausted
 
