@@ -63,25 +63,32 @@ Basis-URL und der geprüften ID, nie aus Upstream-Text. `abrufdatum` ist ISO-860
 
 ## Mock
 
-`priv/mock_ris.exs` bildet die drei Gast-Endpunkte nach. Er braucht nur OTP und läuft auch außerhalb
-der Tests:
+Der RIS-Mock ist ein Adapter der Mock-Runtime (`apps/komki_mock`, `KomkiMock.Adapters.Ris`) und
+bildet die drei Gast-Endpunkte nach. Seine Daten liegen als Zustand in einer Datei. Sie kommen aus
+einem Seed (`apps/komki_mock/priv/seeds/ris/default.json`), lassen sich über den Steuer-Port ersetzen
+(`PUT /data`), und `reset` stellt den Seed wieder her. Er läuft auch außerhalb der Tests als
+eigenständiger Dienst:
 
 ```bash
-elixir apps/komki_connector_ris/priv/mock_ris.exs --port 4010 [--mode ok|error500|slow]
+cd apps/komki_mock
+mix komki_mock.serve --adapter KomkiMock.Adapters.Ris --dir /tmp/mock-ris --data-port 4010
 echo '{}' | apps/komki_connector_ris/komki-connector-ris --socket /tmp/kmris.sock --base-url http://127.0.0.1:4010/
 ```
 
-Seine Daten enthalten öffentliche und nicht-öffentliche TOPs. „Bahnhofstraße“ steht in zwei
+Der Seed `default` enthält öffentliche und nicht-öffentliche TOPs. „Bahnhofstraße“ steht in zwei
 öffentlichen TOPs und in zwei nicht-öffentlichen, einem mit `restricted: true` und einem im
 geschützten Sitzungsteil. Damit lässt sich prüfen, dass die Trefferzahl nichts verrät. TOP `1001-3`
 trägt eine Prompt-Injection im öffentlichen Text für Red-Team-Tests. Anders als die echte Gast-API
 liefert der Mock auch nicht-öffentliche TOPs samt Text aus, damit der Filter des Connectors geprüft
-wird. Modus `error500` antwortet immer mit HTTP 500, `slow` antwortet erst nach 3 s, `replay` spielt
-Aufzeichnungen des Recorders zurück (siehe unten).
+wird. Die bisherigen Modi sind Szenarien der Runtime, geschaltet über den Steuer-Port: `error`
+antwortet immer mit HTTP 500, `slow` antwortet erst nach 3 s. Dazu kommt `refused`, bei dem der Port
+keine Verbindungen annimmt. Replay ist ein eigener Adapter (`KomkiMock.Adapters.Replay`), der
+Aufzeichnungen des Recorders zurückspielt (siehe unten). Die Tests starten den Mock über
+`KomkiConnectorRis.RisMock` in `test/test_helper.exs`.
 
 ## Aufzeichnung und Replay echter Antwortformate
 
-Die Daten des Mocks sind handgespiegelt. Um die Antwortformate gegen das echte RIS zu verifizieren
+Die Daten des Seeds sind handgespiegelt. Um die Antwortformate gegen das echte RIS zu verifizieren
 und komki ohne echtes RIS testen zu können, gibt es einen Aufzeichnungs-Proxy
 (`priv/ris_recorder.exs`, Ticket #231). Er ist rein deterministischer Code ohne LLM.
 `priv/ris_http.exs` ist das geteilte Gerüst der Skriptfamilie (Sockel-Kram, Kassetten-Listing,
@@ -124,8 +131,11 @@ Gegen den Recorder aufzeichnen:
 Zurückspielen, sodass komki gegen die Aufzeichnung statt gegen das echte RIS läuft:
 
 ```bash
-elixir apps/komki_connector_ris/priv/mock_ris.exs --port 4010 --mode replay --cassette <verzeichnis>
+cd apps/komki_mock
+mix komki_mock.serve --adapter KomkiMock.Adapters.Replay --seed <verzeichnis> --dir /tmp/mock-replay --data-port 4010
 ```
+
+Der Seed ist hier das Kassettenverzeichnis, am besten als absoluter Pfad: `reset` liest es neu.
 
 Replay sucht den exakten Treffer für `(Methode, Pfad, Query)`. Nur bei `guestmeetings`, wo die Query
 lediglich das Zeitfenster wählt, greift es bei abweichender Query auf die erste Aufnahme desselben
@@ -229,7 +239,7 @@ führen weiterhin alle Sitzungen des Profils, weil ihre Länge Teil des beobacht
 Tagesordnungen und TOPs außerhalb der Auswahl antworten im Replay mit 404, das der Connector als
 nicht gefunden überspringt.
 
-Die Sonderfälle des bisherigen Mocks sind bewusste Testfälle (Spiegel von `mock_ris.exs`): Die
+Die Sonderfälle des RIS-Mocks sind bewusste Testfälle (Spiegel seines Seeds `default`): Die
 Teststraße Lindenallee steht in zwei öffentlichen TOPs (einmal Titel, einmal nur im Text) und zwei
 nicht-öffentlichen — eins davon als `restricted`-im-öffentlichen-Teil, den die reale Datenlage nie
 zeigt —, dazu ein nur-nicht-öffentlicher Begriff und die Prompt-Injection im öffentlichen Text. Die
@@ -240,7 +250,7 @@ bei der Erzeugung laut, statt sie still fallen zu lassen.
 
 `test/fixtures/gartenstadt` enthält den committeten Satz; ein Integritätstest regeneriert ihn
 byteidentisch. Connector und ratsinfo laufen in ihren Tests gegen das Replay dieser Kassetten
-(`mock_ris.exs --mode replay --cassette test/fixtures/gartenstadt`).
+(Replay-Adapter der Mock-Runtime mit dem Seed `test/fixtures/gartenstadt`).
 
 Vor dem Merge gelten zwei menschliche Freigaben, beide mit `unseal` vorher und `seal` nachher:
 `ris_skeleton --compare` (synthetisch gegen die echte Aufnahme) und der N-Gramm-Abgleich — ihre

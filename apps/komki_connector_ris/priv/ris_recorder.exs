@@ -23,9 +23,10 @@
 #
 # Pfade ohne /web/-Praefix geben (Basis also http://127.0.0.1:<port>/, nicht
 # .../<port>/web/); der Proxy ergaenzt den Praefix upstream-seitig.
-# Zurueckspielen: priv/mock_ris.exs --port 4010 --mode replay --cassette <out>.
+# Zurueckspielen: Replay-Adapter der Mock-Runtime (apps/komki_mock),
+#   mix komki_mock.serve --adapter KomkiMock.Adapters.Replay --seed <out> --dir <zustand>
 #
-# Nur OTP (gen_tcp, httpc, ssl, json), keine Deps — wie mock_ris.exs.
+# Nur OTP (gen_tcp, httpc, ssl, json), keine Deps.
 
 Code.require_file("./ris_http.exs", __DIR__)
 

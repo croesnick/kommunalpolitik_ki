@@ -1,4 +1,4 @@
-# Geteiltes Geruest der RIS-Skriptfamilie: mock_ris, ris_recorder, ris_skeleton,
+# Geteiltes Geruest der RIS-Skriptfamilie: ris_recorder, ris_skeleton,
 # ris_struktur, ris_gartenstadt, ris_ngramm und ris_cassettes. Wer ein neues
 # Familienmitglied schreibt, findet hier die Bausteine und kopiert nichts mehr
 # vom Nachbarn.
@@ -15,8 +15,7 @@ defmodule KomkiConnectorRis.RisHttp do
 
   @doc """
   Liest eine HTTP-Anfrage vom Sockel: `{:ok, Methode, Pfad, Kopfzeilen, Body}`
-  oder `:error`. Der Body wird komplett gelesen (auch wenn ihn nur der
-  Recorder braucht): ein Socket mit ungelesenen Daten sendet beim Schliessen
+  oder `:error`. Der Body wird komplett gelesen: ein Socket mit ungelesenen Daten sendet beim Schliessen
   RST, die Antwort kaeme beim Client nie an.
   """
   @spec read_request(:gen_tcp.socket()) ::
