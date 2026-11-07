@@ -113,6 +113,20 @@ defmodule DevLoop do
       only: opts[:only],
       po?: not (opts[:no_po] || false) and is_nil(opts[:only])
     }
+    |> with_board()
+  end
+
+  # A fine-grained PAT cannot reach a project owned by a user account
+  # (docs/agents/dev-loop.md, Einrichtung). One check per run instead of a
+  # failing call per ticket; the assignee marks a ticket as taken anyway.
+  defp with_board(ctx) do
+    board? = GitHub.board?(ctx)
+
+    unless board?,
+      do:
+        ctx.log.("Board nicht erreichbar: Status auf dem Board bleibt in diesem Lauf unverändert")
+
+    Map.put(ctx, :board?, board?)
   end
 
   defp git_root do

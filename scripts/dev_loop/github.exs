@@ -73,6 +73,15 @@ defmodule DevLoop.GitHub do
   end
 
   @doc "Issue numbers on the board with the given status; [] if the board is unreadable."
+  def board?(ctx),
+    do:
+      match?(
+        {:ok, _},
+        gh(ctx, ~w(project view #{@project_number} --owner #{@project_owner} --format json))
+      )
+
+  def board_numbers(%{board?: false}, _status), do: []
+
   def board_numbers(ctx, status) do
     case gh(
            ctx,
@@ -83,7 +92,7 @@ defmodule DevLoop.GitHub do
             do: n
 
       {:error, out} ->
-        log(ctx, "Board nicht lesbar, Status wird ignoriert: #{first_line(out)}")
+        log(ctx, "Board nicht lesbar: #{first_line(out)}")
         []
     end
   end
@@ -141,6 +150,8 @@ defmodule DevLoop.GitHub do
     do: write(ctx, ["issue", "edit", "#{n}", "--repo", @repo, "--remove-label", label])
 
   @doc "Board status; a missing option or an unwritable board is logged, not fatal."
+  def set_status(%{board?: false}, _n, _status), do: :skip
+
   def set_status(ctx, n, status) do
     args =
       ~w(project item-edit #{@project_number} --owner #{@project_owner} --url #{issue_url(n)}
