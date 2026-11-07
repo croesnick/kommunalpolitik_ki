@@ -32,17 +32,7 @@ defmodule KomkiMock.Adapters.Ris do
   @behaviour KomkiMock.Adapter
 
   @impl true
-  def seed(name) do
-    with true <- name =~ ~r/\A[a-z0-9_-]+\z/,
-         {:ok, json} <- File.read(seed_path(name)) do
-      {:ok, JSON.decode!(json)}
-    else
-      _ -> :error
-    end
-  end
-
-  defp seed_path(name),
-    do: Path.join([:code.priv_dir(:komki_mock), "seeds", "ris", name <> ".json"])
+  def seed(name), do: KomkiMock.Seeds.load("ris", name)
 
   @impl true
   def handle(%{method: "GET", path: path}, data),

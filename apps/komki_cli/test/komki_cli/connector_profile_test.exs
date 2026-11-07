@@ -114,6 +114,16 @@ defmodule KomkiCli.ConnectorProfileTest do
       refute text =~ "49531"
     end
 
+    test "Web-Mock: direkter Mock-Port statt Proxy-Port" do
+      text = ConnectorProfile.connector(cfg(web_mock_port: 4020), Manifest.fetch!("web"))
+
+      assert rules_with(text, "(allow network-outbound") == [
+               "(allow network-outbound (remote tcp \"localhost:4020\"))"
+             ]
+
+      refute text =~ "49532"
+    end
+
     test "Vault: kein Netz, {vault_dir} lesen, komki-test schreiben, sonst nichts schreiben" do
       text = ConnectorProfile.connector(cfg(), Manifest.fetch!("vault"))
 
