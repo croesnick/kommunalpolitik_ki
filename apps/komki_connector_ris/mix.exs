@@ -25,7 +25,8 @@ defmodule KomkiConnectorRis.MixProject do
   end
 
   # HTTP ueber :httpc (inets) mit TLS aus :ssl/:public_key — keine
-  # Runtime-Deps ausser der Connector-Bibliothek.
+  # Runtime-Deps ausser der Connector-Bibliothek. Der RIS-Mock der Tests
+  # laeuft auf der Mock-Runtime (komki_mock, nur :test).
   def application do
     [extra_applications: [:logger, :inets, :ssl, :public_key]]
   end
@@ -34,6 +35,7 @@ defmodule KomkiConnectorRis.MixProject do
     [
       {:komki_connector, path: "../komki_connector"},
       {:sidecar, path: "../sidecar"},
+      {:komki_mock, path: "../komki_mock", only: :test},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]

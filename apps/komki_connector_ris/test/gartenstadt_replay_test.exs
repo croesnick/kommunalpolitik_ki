@@ -2,7 +2,7 @@ defmodule KomkiConnectorRis.GartenstadtReplayTest do
   # Not async: the connector's httpc profile is node-global.
   use ExUnit.Case, async: false
 
-  alias KomkiConnectorRis.MockRis
+  alias KomkiConnectorRis.RisMock
 
   @fixtures Path.expand("fixtures/gartenstadt", __DIR__)
 
@@ -14,8 +14,7 @@ defmodule KomkiConnectorRis.GartenstadtReplayTest do
   # special cases sit there (see ris_gartenstadt.exs, sonderfall_updates).
 
   defp stack do
-    {:ok, mock, port} = MockRis.start(mode: {:replay, @fixtures})
-    on_exit(fn -> MockRis.stop(mock) end)
+    {_mock, port} = RisMock.start({:replay, @fixtures})
     {:ok, cfg} = KomkiConnectorRis.init(%{base_url: "http://127.0.0.1:#{port}/"})
     cfg
   end

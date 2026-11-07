@@ -1,21 +1,25 @@
 defmodule Ratsinfo.GartenstadtReplayTest do
-  # Not async: RIS_BASE_URL is node-global, and MockRis binds a port.
+  # Not async: RIS_BASE_URL is node-global.
   use ExUnit.Case, async: false
 
-  # The RIS mock is a standalone OTP-only script of the connector app.
-  # In the monorepo it lives next door and is loaded here via require_file,
-  # without a mix dependency: ratsinfo speaks plain HTTP to the same
-  # loopback and knows no internals of the connector app (Unix principle).
-  @mock Path.expand("../../../komki_connector_ris/priv/mock_ris.exs", __DIR__)
+  # The RIS mock runs on the mock runtime (komki_mock, a test-only
+  # dependency) and replays the connector app's Gartenstadt cassettes.
+  # ratsinfo speaks plain HTTP to it and knows no internals of the connector
+  # app (Unix principle).
   @fixtures Path.expand("../../../komki_connector_ris/test/fixtures/gartenstadt", __DIR__)
-
-  Code.require_file(@mock, __DIR__)
 
   alias Ratsinfo.ApiClient
 
   test "Gartenstadt-Replay: Login, Sitzungen, Suche, Details und Download" do
-    {:ok, mock, port} = KomkiConnectorRis.MockRis.start(mode: {:replay, @fixtures})
-    on_exit(fn -> KomkiConnectorRis.MockRis.stop(mock) end)
+    dir = Path.join(System.tmp_dir!(), "ratsinfo-ris-#{System.unique_integer([:positive])}")
+    on_exit(fn -> File.rm_rf(dir) end)
+
+    mock =
+      start_supervised!(
+        {KomkiMock.Server, adapter: KomkiMock.Adapters.Replay, dir: dir, seed: @fixtures}
+      )
+
+    port = KomkiMock.Server.ports(mock).data
 
     System.put_env("RIS_BASE_URL", "http://127.0.0.1:#{port}/")
     on_exit(fn -> System.delete_env("RIS_BASE_URL") end)

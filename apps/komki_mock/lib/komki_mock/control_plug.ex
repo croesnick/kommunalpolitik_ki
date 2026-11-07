@@ -6,6 +6,7 @@ defmodule KomkiMock.ControlPlug do
       GET  /state                               seed, scenario, delay_ms, data
       POST /seed      {"name": "default"}       load a seed, scenario ok, empty log
       POST /reset                               reload the current seed
+      PUT  /data      <any JSON value>          replace the data
       POST /scenario  {"name": "slow", "delay_ms": 500}
       GET  /log                                 the request log
   """
@@ -31,6 +32,13 @@ defmodule KomkiMock.ControlPlug do
   defp route("GET", ["state"], _conn, server), do: {200, Server.state(server)}
   defp route("GET", ["log"], _conn, server), do: {200, Server.log(server)}
   defp route("POST", ["reset"], _conn, server), do: reply(Server.reset(server))
+
+  defp route("PUT", ["data"], conn, server) do
+    case json_body(conn) do
+      {:ok, data} -> reply(Server.put_data(server, data))
+      :error -> {400, %{"error" => "expected a JSON body"}}
+    end
+  end
 
   defp route("POST", ["seed"], conn, server) do
     case params(conn) do
@@ -62,11 +70,18 @@ defmodule KomkiMock.ControlPlug do
   defp reply({:error, :unknown_scenario}), do: {400, %{"error" => "unknown scenario"}}
 
   defp params(conn) do
-    with {:ok, body, _conn} <- read_body(conn),
-         {:ok, %{} = params} <- JSON.decode(body) do
-      params
-    else
+    case json_body(conn) do
+      {:ok, %{} = params} -> params
       _ -> nil
+    end
+  end
+
+  defp json_body(conn) do
+    with {:ok, body, _conn} <- read_body(conn),
+         {:ok, value} <- JSON.decode(body) do
+      {:ok, value}
+    else
+      _ -> :error
     end
   end
 end
