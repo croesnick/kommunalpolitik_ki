@@ -80,4 +80,30 @@ defmodule KomkiCli.TestSupport do
     Integer.to_string(System.unique_integer([:positive])) <>
       "-" <> Integer.to_string(System.system_time(:millisecond))
   end
+
+  @doc """
+  Startet einen Attrappen-Prozess, dessen ps-Kommandozeile `marker` und
+  `anchor` (Wort) trägt; mit `open_file: pfad` hält er zusätzlich `pfad` als
+  stdout offen (Egress-Anker). Compound-Kommando, damit die Zeile erhalten
+  bleibt. Liefert die OS-pid; der Aufrufer beendet ihn (`Proc.kill_checked/3`
+  oder `kill_fake/1`).
+  """
+  @spec spawn_fake(String.t(), String.t() | nil, keyword()) :: pos_integer()
+  def spawn_fake(marker, anchor \\ nil, opts \\ []) do
+    redirect =
+      case Keyword.get(opts, :open_file) do
+        nil -> ""
+        path -> "exec 1>>'" <> path <> "'; "
+      end
+
+    cmd = redirect <> "while :; do sleep 1; done # " <> marker <> " " <> (anchor || "")
+    port = Port.open({:spawn_executable, "/bin/sh"}, args: ["-c", cmd])
+    {:os_pid, pid} = Port.info(port, :os_pid)
+    pid
+  end
+
+  @doc "Beendet eine Attrappe unbedingt (ohne Identitätscheck)."
+  @spec kill_fake(pos_integer()) :: term()
+  def kill_fake(pid),
+    do: System.cmd("/bin/kill", ["-KILL", Integer.to_string(pid)], stderr_to_stdout: true)
 end
