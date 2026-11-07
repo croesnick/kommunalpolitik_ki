@@ -46,7 +46,7 @@ Jede Stufe läuft als frische Session ohne Oberfläche (`claude -p`). Die Prompt
   - Bash-Sandbox von Claude Code und Deny-Regeln aus `scripts/dev_loop/agent_settings.json` (`gh`, `git push`, `security`, `ssh`, `curl`, Lesen von `~/.ssh`, `~/.config/gh`, Schlüsselbund)
   - keine MCP-Server (`--strict-mcp-config`)
   - kein `GH_TOKEN` in der Umgebung
-- **Prüfen:** `elixir scripts/dev_loop.exs --check-sandbox` lässt eine Session harmlose Befehle ausführen, die durchgehen müssen, und dann an Zugangsdaten scheitern. Die Befehle der Probe beweisen nur den Zugriff (Login-Name, Byte-Zahlen) und geben selbst bei einem Fehlschlag kein Geheimnis an das Modell. Zuletzt lief die Probe am 2026-11-07 auf `claude`: alle vier Versuche abgelehnt, die Positivkontrollen (`git status`, `mix --version`) liefen.
+- **Prüfen:** `elixir scripts/dev_loop.exs --check-sandbox` lässt eine Session harmlose Befehle ausführen, die durchgehen müssen, und dann an Zugangsdaten scheitern. Die Befehle der Probe beweisen nur den Zugriff (Login-Name, Byte-Zahlen) und geben selbst bei einem Fehlschlag kein Geheimnis an das Modell. Zuletzt lief die Probe am 2026-11-07 auf `claude`, mit dem PAT im Schlüsselbund: alle vier Versuche abgelehnt, die Positivkontrollen (`git status`, `mix --version`) liefen.
 - **Grenze der Grenze:** Der Loop läuft im Konto `crn`. Sandbox und Deny-Regeln sind Policy von Claude Code, keine Trennung durch das Betriebssystem. Ein eigenes macOS-Konto wäre die härtere Variante, die bewusst nicht gewählt wurde (Grilling zu #389, Q3).
 - **Branch Protection** auf `main` mit Pflicht-Checks: Eine rote CI blockiert den Merge auch dann, wenn das Skript einen Fehler hat.
 
@@ -90,7 +90,10 @@ touch ~/.dev-loop/STOP                                   # Not-Aus: greift vor d
    security add-generic-password -a "$USER" -s dev-loop-gh-pat -w
    ```
 3. **Board:** Das Feld Status hat die Option **„In Review“** zwischen „In Progress“ und „Done“, angelegt am 2026-11-07. Wer die Optionen über die API ändert, muss die IDs der bestehenden Optionen mitgeben. Sonst verlieren alle Items ihren Status.
-4. **Branch Protection** für `main`: CI-Check „Elixir quality gates“ als Pflicht.
+4. **Branch Protection** für `main`, eingerichtet am 2026-11-07:
+   - Pflicht-Checks „Elixir quality gates“ und „komki-anzeige (Node-Tests)“. Beide laufen bei jedem PR.
+   - Die Regel gilt auch für Admins (`enforce_admins`). Der Loop handelt mit dem PAT als `croesnick`, also als Admin, und ohne diese Einstellung könnte er die Checks umgehen. Folge: Auch von Hand geht nichts mehr direkt auf `main`, alles läuft über einen PR.
+   - Force-Push und Löschen von `main` sind gesperrt.
 5. **Probe:** `elixir scripts/dev_loop.exs --check-sandbox`, danach einmal `--only <n>` unter Aufsicht.
 
 ## Bekannte Grenzen (v1)
