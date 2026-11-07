@@ -647,8 +647,8 @@ defmodule DevLoop do
       GitHub.set_status(ctx, n, "Todo")
     end
 
-    ctx.log.("##{n}: an Mensch übergeben (#{first_line(text)})")
-    add(report, :human, "#{ref(issue, pr)}: #{first_line(text)}")
+    ctx.log.("##{n}: an Mensch übergeben (#{Core.summary_line(text)})")
+    add(report, :human, "#{ref(issue, pr)}: #{Core.summary_line(text)}")
   end
 
   # -- PO ------------------------------------------------------------------

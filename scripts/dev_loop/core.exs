@@ -223,6 +223,20 @@ defmodule DevLoop.Core do
     }
   end
 
+  @doc """
+  The line that says why, for the log and the morning comment: the first one
+  that is neither a heading nor an intro ending in a colon (an escalation
+  text starts with "Die Umsetzung eskaliert:" and the agent's own heading).
+  """
+  def summary_line(text) do
+    lines = text |> String.split("\n") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+
+    Enum.find(lines, hd(lines ++ [""]), fn l ->
+      not String.starts_with?(l, "#") and not String.ends_with?(l, ":")
+    end)
+    |> String.slice(0, 200)
+  end
+
   @doc "Validates `.dev-loop/po.json`: a list of `{issue, comment, proposals}`."
   def parse_po(json, allowed) do
     case JSON.decode(json) do

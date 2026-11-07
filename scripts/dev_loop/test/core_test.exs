@@ -241,6 +241,16 @@ defmodule DevLoop.CoreTest do
     refute Core.exhausted?("All tests passed")
   end
 
+  test "summary_line/1 skips intros and headings" do
+    text =
+      "Die Umsetzung eskaliert:\n\n# Blockiert: #160\n\nIch habe nichts gebaut. Zwei Gründe.\n\n## 1. Pfad"
+
+    assert Core.summary_line(text) == "Ich habe nichts gebaut. Zwei Gründe."
+    assert Core.summary_line("Der Diff berührt geschützte Pfade: `a`") =~ "geschützte Pfade"
+    assert Core.summary_line("Nur Einleitung:") == "Nur Einleitung:"
+    assert Core.summary_line("") == ""
+  end
+
   test "brief/1 leaves out empty sections" do
     text =
       Core.brief(%{
