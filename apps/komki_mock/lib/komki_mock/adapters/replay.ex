@@ -12,9 +12,10 @@ defmodule KomkiMock.Adapters.Replay do
   data; bodies are kept as Base64 so binary responses survive the state
   file.
 
-  Matching: method, path and query exactly; for the paths in
-  `@query_fallback_paths` the first recording of method and path when the
-  query differs. Anything else answers 404.
+  Matching: method, path and query exactly, where the query compares as a
+  set of parameters (clients build it from maps, whose key order is not
+  stable); for the paths in `@query_fallback_paths` the first recording of
+  method and path when the query differs. Anything else answers 404.
   """
 
   @behaviour KomkiMock.Adapter
@@ -78,8 +79,11 @@ defmodule KomkiMock.Adapters.Replay do
 
   defp find(cassettes, %{method: method, path: path, query: query}) do
     same_route = &(&1["method"] == method and &1["path"] == path)
+    params = params(query)
 
-    Enum.find(cassettes, &(same_route.(&1) and &1["query"] == query)) ||
+    Enum.find(cassettes, &(same_route.(&1) and params(&1["query"]) == params)) ||
       if path in @query_fallback_paths, do: Enum.find(cassettes, same_route)
   end
+
+  defp params(query), do: query |> URI.query_decoder() |> Enum.sort()
 end
