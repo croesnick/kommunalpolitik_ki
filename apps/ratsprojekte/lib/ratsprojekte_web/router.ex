@@ -1,16 +1,31 @@
 defmodule RatsprojekteWeb.Router do
   use RatsprojekteWeb, :router
 
-  # CSP-Härtung ist bewusst nicht Teil von #150; der befristete Skip wird in #151
-  # durch eine getestete Policy ersetzt (LiveView/WebSocket brauchen Smoke-Tests).
-  # sobelow_skip ["Config.CSP"]
+  # All assets are served from priv/static, so everything is limited to the own origin.
+  # `connect-src 'self'` covers the LiveView WebSocket (`/live`) in current browsers.
+  # Exception: `style-src 'unsafe-inline'`, because several LiveViews set inline `style`
+  # attributes that LiveView re-applies via setAttribute on every DOM patch.
+  @content_security_policy Enum.join(
+                             [
+                               "default-src 'self'",
+                               "script-src 'self'",
+                               "style-src 'self' 'unsafe-inline'",
+                               "img-src 'self' data:",
+                               "connect-src 'self'",
+                               "base-uri 'self'",
+                               "form-action 'self'",
+                               "frame-ancestors 'self'"
+                             ],
+                             "; "
+                           )
+
   pipeline :browser do
     plug(:accepts, ["html"])
     plug(:fetch_session)
     plug(:fetch_live_flash)
     plug(:put_root_layout, html: {RatsprojekteWeb.Layouts, :root})
     plug(:protect_from_forgery)
-    plug(:put_secure_browser_headers)
+    plug(:put_secure_browser_headers, %{"content-security-policy" => @content_security_policy})
     plug(RatsprojekteWeb.Plugs.Nav)
   end
 
