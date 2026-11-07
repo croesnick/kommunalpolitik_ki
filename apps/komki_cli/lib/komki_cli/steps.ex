@@ -51,6 +51,7 @@ defmodule KomkiCli.Steps do
     Denials,
     Gamma,
     Llama,
+    LoopDetection,
     Mediator,
     Pi,
     Pins,
@@ -1985,12 +1986,14 @@ defmodule KomkiCli.Steps do
   # Auch die mcp.json wird frisch aus der healthz-Antwort geschrieben: das
   # pi-Home ist fuer den Agenten schreibbar, und ein eingetragener
   # MCP-Server darf keinen Lauf ueberdauern (Labbook S-07). Aus demselben
-  # Grund wird die Anzeige-Extension neu geschrieben.
+  # Grund werden die Anzeige-Extension und die Schleifenerkennung (#383) neu
+  # geschrieben.
   defp prepare_channel(cfg) do
     with {:ok, env} <- Channel.prepare_pi(cfg),
          {:ok, "200", health} <- Mediator.fetch_health(cfg) do
       :ok = Mediator.write_mcp_config(cfg, health["tools"])
       :ok = Anzeige.write!(cfg)
+      :ok = LoopDetection.write!(cfg)
       {:ok, env}
     else
       {:ok, code, _health} -> {:error, "komki-mediator /healthz returned " <> code, 2}

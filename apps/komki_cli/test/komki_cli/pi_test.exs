@@ -37,7 +37,7 @@ defmodule KomkiCli.PiTest do
       # Einmal-Lauf: die einzigen werksetzenden Aufrufe sind pi_flags/2
       # hinter argv_for — der MCP-Vertrag gilt hier genauso wie in der Session.
       argv = Pi.argv_for(cfg, "/scratch", :text, "hallo")
-      assert Enum.count(argv, &(&1 == "-e")) == 1
+      assert extensions(argv) == ["builtin:mcp", KomkiCli.LoopDetection.entry(cfg)]
 
       idx = Enum.find_index(argv, &(&1 == "--no-extensions"))
       assert Enum.slice(argv, idx, 3) == ["--no-extensions", "-e", "builtin:mcp"]
@@ -96,17 +96,18 @@ defmodule KomkiCli.PiTest do
       end
     end
 
-    test "genau zwei Extensions: builtin:mcp und die Anzeige aus dem pi-Home", %{cfg: cfg} do
+    test "genau drei Extensions: builtin:mcp, Schleifenerkennung und Anzeige aus dem pi-Home",
+         %{cfg: cfg} do
       for continue? <- [false, true] do
         argv = Pi.argv_session(cfg, @session_dir, continue?)
 
-        extensions =
-          argv
-          |> Enum.with_index()
-          |> Enum.filter(fn {arg, _} -> arg == "-e" end)
-          |> Enum.map(fn {_, i} -> Enum.at(argv, i + 1) end)
+        assert extensions(argv) == [
+                 "builtin:mcp",
+                 KomkiCli.LoopDetection.entry(cfg),
+                 KomkiCli.Anzeige.entry(cfg)
+               ]
 
-        assert extensions == ["builtin:mcp", KomkiCli.Anzeige.entry(cfg)]
+        assert String.starts_with?(KomkiCli.LoopDetection.entry(cfg), cfg.pi_home)
         assert String.starts_with?(KomkiCli.Anzeige.entry(cfg), cfg.pi_home)
       end
     end
@@ -257,5 +258,12 @@ defmodule KomkiCli.PiTest do
       assert {"JITI_FS_CACHE", "false"} in env
       assert Enum.sort(env) == env
     end
+  end
+
+  defp extensions(argv) do
+    argv
+    |> Enum.with_index()
+    |> Enum.filter(fn {arg, _} -> arg == "-e" end)
+    |> Enum.map(fn {_, i} -> Enum.at(argv, i + 1) end)
   end
 end
