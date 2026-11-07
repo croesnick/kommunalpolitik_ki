@@ -73,13 +73,23 @@ touch ~/.dev-loop/STOP                                   # Not-Aus: greift vor d
 1. **PAT anlegen:** github.com → Settings → Developer settings → Fine-grained tokens → Generate.
    - Name `dev-loop`, Ablauf 90 Tage
    - Repository access: *Only select* → `kommunalpolitik_ki`
-   - Repository permissions: Contents, Pull requests und Issues mit Schreibrecht. Actions und Commit statuses nur lesend. Kein Workflow, kein Admin.
-   - Nicht verifiziert ist, ob ein fine-grained PAT ein Board schreiben darf, das dem Nutzer gehört. Scheitert das, protokolliert das Skript die Warnung und arbeitet weiter. Den Status setzen dann die eingebauten Board-Workflows.
+   - Repository permissions:
+
+     | Permission | Zugriff | Wofür |
+     |---|---|---|
+     | Contents | Read and write | Branch pushen, Squash-Merge, Branch nach dem Merge löschen |
+     | Pull requests | Read and write | PR anlegen, Review-Kommentare, mergen |
+     | Issues | Read and write | Tickets und Blocker lesen, kommentieren, zuweisen, `ready-for-human` setzen |
+     | Actions | Read-only | CI-Läufe zum Head-SHA abfragen |
+     | Metadata | Read-only | Pflicht, setzt GitHub automatisch |
+
+   - Alles andere bleibt auf „No access“. **Workflows** fehlt mit Absicht: Ohne diese Permission lehnt GitHub jeden Push ab, der eine Datei unter `.github/workflows/` ändert. Ein Agent kann so keinen geänderten Workflow in die CI bringen.
+   - **Board:** Ein fine-grained PAT erreicht keine Projects, die einem Nutzerkonto gehören. GitHub führt das als bekannte Lücke (Docs „Managing your personal access tokens“, abgerufen am 2026-11-07). Das Skript protokolliert dann eine Warnung und arbeitet weiter. Als belegt gilt ein Ticket trotzdem, weil der Loop es sich zuweist. `Done` setzt der Board-Workflow beim Schließen.
 2. **PAT in den Schlüsselbund**, ohne Shell-History. `security` fragt den Wert interaktiv ab:
    ```bash
    security add-generic-password -a "$USER" -s dev-loop-gh-pat -w
    ```
-3. **Board:** Im Feld Status die Option **„In Review“** zwischen „In Progress“ und „Done“ anlegen (Projekt-Einstellungen → Fields → Status).
+3. **Board:** Das Feld Status hat die Option **„In Review“** zwischen „In Progress“ und „Done“, angelegt am 2026-11-07. Wer die Optionen über die API ändert, muss die IDs der bestehenden Optionen mitgeben. Sonst verlieren alle Items ihren Status.
 4. **Branch Protection** für `main`: CI-Check „Elixir quality gates“ als Pflicht.
 5. **Probe:** `elixir scripts/dev_loop.exs --check-sandbox`, danach einmal `--only <n>` unter Aufsicht.
 
@@ -90,3 +100,5 @@ touch ~/.dev-loop/STOP                                   # Not-Aus: greift vor d
 - **`DoctorBootTest`** startet auf einem Mac mit Staging-Modell einen echten llama-server, bis #392 ihn per Tag aus dem Standardlauf nimmt. Der Staging-Pfad hängt fest an `~/.local/share/komki`, `KOMKI_HOME` umgeht ihn nicht.
 - **Erschöpftes Konto:** Die Erkennung beruht auf den dokumentierten Meldungen („You've hit your … limit“, „spend limit reached“; `code.claude.com/docs/en/errors`, abgerufen am 2026-11-07). An einem echten Limit ist sie noch nicht beobachtet.
 - Die Sandbox-Probe lief bisher nur auf `claude`, nicht auf `tt`.
+- **Board-Status:** Mit dem fine-grained PAT setzt der Loop weder „In Progress“ noch „In Review“ (siehe Einrichtung). Er liest das Board auch nicht und erkennt Lanes, die nur dort auf „In Progress“ stehen, nicht als belegt.
+- **Rebase über Workflow-Änderungen:** Hat `main` seit dem Branch eine Datei unter `.github/workflows/` geändert, kann GitHub den Push nach dem Rebase ablehnen, weil der PAT keine Workflows-Permission hat. Der Lauf meldet das als Skriptfehler im Morgen-Kommentar.
