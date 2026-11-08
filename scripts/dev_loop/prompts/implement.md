@@ -15,6 +15,7 @@ Den Weg findest du selbst. Nimm die kleinste Lösung, die „Fertig, wenn“ bzw
 ## Arbeitsweise
 
 - Arbeite testgetrieben mit dem Skill `tdd`, wo es eine sinnvolle Seam gibt.
+- Trägt das Ticket das Label `bug`, reproduziere zuerst mit dem Skill `diagnosing-bugs`, ergänze einen Regressionstest und fixe dann.
 - Committe auf den aktuellen Branch und nenne `#{{number}}` in jeder Commit-Message.
 - Du hast keinen Zugriff auf GitHub. `gh`, `git push` und Netz sind gesperrt. Was du über das Ticket wissen musst, steht unten.
 - Arbeite nur in diesem Worktree.
@@ -35,6 +36,7 @@ mix workspace.run -t test --affected --base origin/main
 Lege `.dev-loop/blocked.md` an und höre auf, ohne weiterzubauen, wenn einer dieser Fälle eintritt:
 
 - Die Umsetzung berührt einen geschützten Pfad aus `docs/agents/ai-tiers.md`.
+- Dein Weg widerspricht einer Entscheidung aus `docs/rfcs/`.
 - Das Ticket widerspricht sich oder dem Code.
 - Eine Entscheidung gehört der nutzenden Person (GO-Prinzip).
 

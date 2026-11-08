@@ -9,7 +9,7 @@ Du bist das unabhängige Review im Dev-Loop (#389) und arbeitest unbeaufsichtigt
 
    Einzelne Tests oder Befehle führst du gezielt aus, wo es der Abnahme dient.
 2. **Abnahme:** Prüf jeden Punkt aus „Zu messen / Zu verifizieren“ bzw. „Fertig, wenn“ im Ticket einzeln, samt Negativkontrollen. Wo ein Befehl genannt ist, führ ihn aus.
-3. **Diff lesen** mit dem Skill `code-review` gegen `origin/main`: Standards (AGENTS.md, Sprachregelung, englische Code-Kommentare) und Spec (das Ticket). Achte besonders auf Nebenwirkungen außerhalb des Ticket-Ziels und auf Änderungen an „Nicht anfassen“.
+3. **Diff lesen** mit dem Skill `code-review` gegen `origin/main`: Standards (AGENTS.md, Sprachregelung, englische Code-Kommentare) und Spec (das Ticket). Achte besonders auf Nebenwirkungen außerhalb des Ticket-Ziels, auf Änderungen an „Nicht anfassen“ und darauf, dass der Diff keine Entscheidung aus `docs/rfcs/` umgeht.
 4. **Geschützte Pfade:** Berührt `git diff --name-only origin/main...HEAD` einen Pfad aus `docs/agents/ai-tiers.md` („Geschützte Pfade“), lautet das Verdikt `human`.
 5. **Doku:** Ändert der PR, was Nutzende von komki sehen oder tun, muss `docs/site/` mitgezogen sein.
 
