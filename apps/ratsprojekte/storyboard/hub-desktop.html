@@ -313,7 +313,7 @@ footer{padding-block:2rem 3rem;color:var(--ink3);font-size:.875rem}
   <div class="kern">
     <div><b>Erster Wurf</b><span>Lokal auf einem Rechner, eine Person pflegt, kein Login.</span></div>
     <div><b>Andere bekommen einen Stand</b><span>Fraktion und Vorstand lesen eine Fassung, die Miriam vorher sieht und bewusst weitergibt.</span></div>
-    <div><b>Meinungsbild ist austauschbar</b><span>Der Hub kennt Kreise und Dateien. Kein Befragungswerkzeug ist Pflicht, die Übergabe läuft über Dateien.</span></div>
+    <div><b>Meinungsbild ist austauschbar</b><span>Der Hub kennt Kreise und Dateien. Keine Beteiligungsplattform ist Pflicht, die Übergabe läuft über Dateien.</span></div>
   </div>
 </header>
 
@@ -331,7 +331,7 @@ footer{padding-block:2rem 3rem;color:var(--ink3);font-size:.875rem}
   <div class="tabelle-w"><table class="t"><thead><tr><th>Kreis</th><th>Wer</th><th>Fassung</th><th>Wie sie dorthin kommt</th></tr></thead><tbody>
     <tr><td>Redaktion</td><td>Miriam</td><td>Arbeitsansicht: alles, auch private Notizen und Querverweise</td><td>Der Hub selbst, nur auf ihrem Rechner</td></tr>
     <tr><td>Engerer Kreis</td><td>Fraktion und Vorstand</td><td>Stand: Phase, nächster Schritt, Entscheidungen, Meinungsbilder, Anträge</td><td>PDF oder Kurztext nach Vorschau, von Hand weitergegeben</td></tr>
-    <tr><td>Basis</td><td>Wer den Aufruf-Link der Befragung hat</td><td>Befragungstexte: Titel, Situation, Vorschlag, Hintergrund, eigens dafür geschrieben</td><td>Als Datei, vorerst von der Technik-Hilfe ins Befragungswerkzeug übernommen</td></tr>
+    <tr><td>Basis</td><td>Wer den Aufruf-Link der Befragung hat</td><td>Befragungstexte: Titel, Situation, Vorschlag, Hintergrund, eigens dafür geschrieben</td><td>Als Datei, vorerst von der Technik-Hilfe auf die Beteiligungsplattform übernommen</td></tr>
     <tr><td>Externe</td><td>Elternbeirat, Vereine, andere Fraktionen</td><td>Keine. Bekommen nichts aus dem Hub, ihre Aussagen trägt Miriam ins Meinungsbild ein</td><td>Im Gespräch, außerhalb des Hubs</td></tr>
     <tr><td>Öffentlichkeit</td><td>Alle, auch Verwaltung und Presse</td><td>Der eingereichte Antrag und der Beschluss</td><td>Einreichung von Hand, nie aus dem Hub ins RIS</td></tr>
   </tbody></table></div>
@@ -803,7 +803,7 @@ function dialogFuer(s,code){
     case'verweis':return schleier('verweis','Querverweis ergänzen',
       feld('f-za','Wohin?','<select id="f-za" name="art"><option>Ablage</option><option>Recherche in komki</option></select>')+feld('f-zw','Adresse oder Name',ein('f-zw','wert','','required')),'Ergänzen','data-slug="'+sl+'"');
     case'zusammen':return schleier('zusammen','Rücklauf in einem Satz',
-      feld('f-zz','Was sagen die Argumente?','<textarea id="f-zz" name="text" required></textarea>','Die Datei enthält nur Zählungen. Lies die Argumente im Befragungswerkzeug.'),'Sichern','data-slug="'+sl+'" data-befragung="'+x+'"');
+      feld('f-zz','Was sagen die Argumente?','<textarea id="f-zz" name="text" required></textarea>','Die Datei enthält nur Zählungen. Lies die Argumente auf der Beteiligungsplattform.'),'Sichern','data-slug="'+sl+'" data-befragung="'+x+'"');
   }
   return'';
 }
@@ -909,7 +909,7 @@ function vBefragungen(s,o){
     (r.status==='entwurf'?'<div class="hinweis">Wer den Aufruf-Link hat, sieht diese Texte. Behandle das wie eine Veröffentlichung.'+(fertig?'':' Erst alle Texte sichern, dann lassen sie sich ausgeben.')+'</div>':'');
   let koerper='';
   if(r.status==='laeuft'&&o.zuordnung)koerper=vZuordnung(s,r,o.zuordnung);
-  else if(r.status==='laeuft')koerper='<div class="hinweis gruen">Texte ausgegeben am '+de(r.paket)+' Die Befragung läuft.</div><div class="feld"><label for="f-datei">Antworten einlesen</label><input id="f-datei" type="file" accept=".csv,text/csv"><small>Die CSV-Datei aus dem Befragungswerkzeug. Sie enthält nur Zählungen.</small></div><div class="knoepfe" style="justify-content:flex-start"><button type="button" class="btn" data-act="csv-beispiel" data-id="'+r.id+'">Beispieldatei nehmen</button></div>';
+  else if(r.status==='laeuft')koerper='<div class="hinweis gruen">Texte ausgegeben am '+de(r.paket)+' Die Befragung läuft.</div><div class="feld"><label for="f-datei">Antworten einlesen</label><input id="f-datei" type="file" accept=".csv,text/csv"><small>Die CSV-Datei von der Beteiligungsplattform. Sie enthält nur Zählungen.</small></div><div class="knoepfe" style="justify-content:flex-start"><button type="button" class="btn" data-act="csv-beispiel" data-id="'+r.id+'">Beispieldatei nehmen</button></div>';
   else if(r.status==='beendet')koerper='<h4 class="ergebnis-t">Das Ergebnis</h4><p class="klein" style="margin-bottom:.5rem">Rücklauf vom '+de(r.ruecklauf)+' In der Reihenfolge der Ideen, ohne Rangliste. Nicht bindend.</p>'+ergebnisHtml(ergebnisZeilen(s,r),true);
   if(r.status==='entwurf')koerper='<form data-form="basis-alle">'+r.slugs.map(sl=>{const x=p(s,sl),b=x.basis||{titel:x.titel,situation:'',vorschlag:'',hintergrund:''};const len=(b.situation+'\n'+b.vorschlag).length;
       return '<div class="fassung" data-slug="'+sl+'"><span class="zaehl '+(len>GRENZEN.beschreibung?'zuviel':'')+'">'+len+' von '+GRENZEN.beschreibung+' Zeichen</span><div class="klein">'+esc(x.titel)+(x.basis?'':' · <b>noch nicht geschrieben</b>')+'</div><input name="titel:'+sl+'" aria-label="Titel für die Basis" value="'+esc(b.titel)+'"><div class="zweier"><textarea name="situation:'+sl+'" aria-label="Situation" placeholder="Situation: …">'+esc(b.situation)+'</textarea><textarea name="vorschlag:'+sl+'" aria-label="Vorschlag" placeholder="Vorschlag: …">'+esc(b.vorschlag)+'</textarea></div><textarea name="hintergrund:'+sl+'" aria-label="Hintergrund" class="hg" placeholder="Hintergrund, optional">'+esc(b.hintergrund)+'</textarea></div>'}).join('')+'<div class="knoepfe"><button class="btn">Alle Texte sichern</button></div></form>';
@@ -953,7 +953,7 @@ const PERSONEN=[
  {n:'Selin Kaya',r:'Stadträtin in der Fraktion',kreis:'Engerer Kreis',ziel:'Vor der Fraktionssitzung wissen, was ansteht und was an Selin selbst hängt.',moment:'Tablet, zehn Minuten vor der Sitzung, PDF aus der Nextcloud.',hub:'Fasst den Hub nicht an. Liest den Stand, sagt Änderungen in der Sitzung.',angst:'Der Stand ist veraltet oder zu lang. Vor dem Vorstand als säumig dastehen.'},
  {n:'Jonas Brandt',r:'Vorstand des Ortsverbands, kein Ratsmitglied',kreis:'Engerer Kreis',ziel:'Sehen, was aus den Ideen des Verbands wird, und die Basis zur richtigen Zeit einbinden.',moment:'Vor der Vorstandssitzung. Lädt zur Befragung ein.',hub:'Fasst den Hub nicht an. Bekommt den Stand, liest die Befragungstexte gegen.',angst:'Die Basis wird zu spät gefragt. Hört Dinge, die nicht für den Vorstand gedacht waren.'},
  {n:'Ute Lechner',r:'Mitglied, kommt selten zum Stammtisch',kreis:'Basis',ziel:'Mitreden, und merken, dass es etwas bewirkt.',moment:'Abends auf dem Sofa, Telefon, Link im Mitglieder-Chat.',hub:'Weiß nichts vom Hub. Sieht nur die Befragungstexte und später die Rückmeldung.',angst:'Antwortet und hört nie wieder etwas davon.'},
- {n:'Technik-Hilfe',r:'Jemand im Ortsverband, die oder der sich auskennt',kreis:'Kein Kreis: sieht nur, was zum Betrieb nötig ist',ziel:'Dass alles läuft, ohne ständig gerufen zu werden.',moment:'Beim Einrichten, und wenn Texte oder Antworten ins Befragungswerkzeug und zurück müssen.',hub:'Startet und sichert ihn. Tauscht vorerst die Dateien mit dem Befragungswerkzeug aus, weil das noch per Terminal geht.',angst:'Bei jeder Kleinigkeit wird gefragt, und im Urlaub steht alles still.'},
+ {n:'Technik-Hilfe',r:'Jemand im Ortsverband, die oder der sich auskennt',kreis:'Kein Kreis: sieht nur, was zum Betrieb nötig ist',ziel:'Dass alles läuft, ohne ständig gerufen zu werden.',moment:'Beim Einrichten, und wenn Texte oder Antworten auf die Beteiligungsplattform und zurück müssen.',hub:'Startet und sichert ihn. Tauscht vorerst die Dateien mit der Beteiligungsplattform aus, weil das noch per Terminal geht.',angst:'Bei jeder Kleinigkeit wird gefragt, und im Urlaub steht alles still.'},
  {n:'Externe',r:'Elternbeirat, Händlerverein, andere Fraktionen, Kontakte in der Verwaltung',kreis:'Kein Kreis: bekommt nichts aus dem Hub',ziel:'Ernst genommen werden und rechtzeitig mitreden.',moment:'Im Gespräch, per Mail, am Rand einer Sitzung.',hub:'Kein Kontakt. Miriam trägt ein, was gesagt wurde, und wählt, wer es lesen darf.',angst:'Ein vertrauliches Gespräch wird herumgereicht.'},
  {n:'Verwaltung und Öffentlichkeit',r:'Bürgermeister, Bauamt, Presse, Bürgerinnen und Bürger',kreis:'Öffentlichkeit',ziel:'Einen klaren Antrag, über den man beschließen kann.',moment:'Wenn der Antrag eingeht.',hub:'Kein Kontakt. Der Antrag geht von Hand raus.',angst:'Ein Antrag, der nicht beschlussfähig ist.'},
  {n:'komki',r:'Kein Mensch: Miriams vertrauliches Recherche-Werkzeug',kreis:'Liefert nur an die Redaktion',ziel:'Belege und Entwürfe, die ihren Raum nur geprüft verlassen.',moment:'Wenn Miriam im Raum etwas freigibt.',hub:'Schlägt Fakten, Varianten und Entwürfe vor. Entscheidet nie.',angst:'Vertrauliches landet über einen Vorschlag im Stand.'}
@@ -995,15 +995,15 @@ const SZENEN=[
  {k:'4.1',t:'Eine Befragung, vier Texte',u:'localhost:4000/befragungen',html:s=>vBefragungen(s,{r:s.befragungen[0]}),notes:[
   ['','Die Befragung ist der Übergabepunkt','Eine Frage an die Basis zu mehreren Ideen, mit Frist. Hier gehen die Texte hinaus, hier kommen die Antworten zurück, und der Hub merkt sich dazwischen, was zu welchem Projekt gehört.'],
   ['','Die Texte werden eigens geschrieben','Sie kommen nie automatisch aus Notizen oder dem Stand. Die Zeichengrenze stammt aus dem Importformat.'],
-  ['bruch','Die Übergabe per Terminal','Das Befragungswerkzeug nimmt Texte heute nur per Skript an, und an den Admin-Bereich kommt man nur per SSH. Das schaffen weder Miriam noch Jonas. Darum übernimmt das vorerst die Technik-Hilfe, bis das Werkzeug Hoch- und Herunterladen im Browser kann.']]},
- {k:'4.2',t:'Bei Ute: im Befragungswerkzeug',u:'Telefon',telefon:true,html:s=>telefon(basisKarte(fassungBasis(p(s,TB)),'Welche Ideen sollen wir weiterverfolgen?','1 von 4 Ideen'),'21:14'),notes:[
+  ['bruch','Die Übergabe per Terminal','Die Beteiligungsplattform nimmt Texte heute nur per Skript an, und an den Admin-Bereich kommt man nur per SSH. Das schaffen weder Miriam noch Jonas. Darum übernimmt das vorerst die Technik-Hilfe, bis die Plattform Hoch- und Herunterladen im Browser kann.']]},
+ {k:'4.2',t:'Bei Ute: auf der Beteiligungsplattform',u:'Telefon',telefon:true,html:s=>telefon(basisKarte(fassungBasis(p(s,TB)),'Welche Ideen sollen wir weiterverfolgen?','1 von 4 Ideen'),'21:14'),notes:[
   ['','Ute sieht nichts aus dem Hub außer dem Text','Keine Phase, kein „die Fraktion ist dafür“. Die Meinung soll nicht vorgeprägt werden.'],
-  ['','Darstellung nur angenähert','Das Befragungswerkzeug bleibt eigenständig und hat seine eigene Gestaltung. Zu sehen ist hier nur, welcher Text dort ankommt.']]}
+  ['','Darstellung nur angenähert','Die Beteiligungsplattform bleibt eigenständig und hat ihre eigene Gestaltung. Zu sehen ist hier nur, welcher Text dort ankommt.']]}
 ]},
 {id:'s5',wer:'Miriam und komki · Recherche',titel:'Belege aus der Recherche',moment:'<b>Donnerstagabend.</b> Miriam sucht in einem öffentlichen Rechercheraum nach Förderprogrammen für den Radweg. Zwei Funde sind gut. Früher hätte sie die Links in eine Notiz kopiert und das Abrufdatum vergessen.',bilder:[
  {k:'5.0',t:'In komki: die Freigabe',u:'komki · Raum heller-kranich',ohneFenster:true,html:()=>goPanel('Zwei Fakten an Ratsprojekte geben?','Miriam, Fraktion, Vorstand. Denn alles im Hub kann in einen Stand gelangen.','Förderprogramm und Vergleichsfall, je mit Quelle, Fundstelle und Abrufdatum','<b>Erlaubt:</b> Der Raum enthält nur Öffentliches, das darf an alle.','gruen','',true),notes:[
   ['','Das ist der Hauptnutzen des Connectors','Quellen landen samt Fundstelle und Abrufdatum beim Projekt, ohne Kopieren. Darum kommt der Connector früh und nicht erst am Ende.'],
-  ['','Schreiben geht zuerst, Lesen ist heikler','Aus öffentlicher Recherche zu liefern, ist unkritisch. Holt man dagegen den Stand in denselben Raum, könnte das die Websuche blockieren, weil ein Rechercheraum laut Referenzszenario kein Eingangsrecht auf Fraktionsdaten hat. Den Projektnamen nennt Miriam deshalb selbst.'],
+  ['','Schreiben geht zuerst, Lesen ist heikler','Aus öffentlicher Recherche zu liefern, ist unkritisch. Holt man dagegen den Stand in denselben Raum, könnte das die Websuche blockieren, weil ein Rechercheraum laut Referenzszenario kein Eingangsrecht auf Fraktionsdaten hat. Den Projektnamen nennt Miriam deshalb selbst. Formal klärt das das Kalkül.'],
   ['','Noch nicht am echten Vermittler geprüft','Die Einschätzung folgt aus den Regeln. Der erste echte Lauf des Connectors muss sie bestätigen.']]},
  {k:'5.1',t:'Im Hub: die Fakten prüfen',u:'localhost:4000/vorschlaege',html:s=>vVorschlaege(s),notes:[
   ['bruch','Fakten waren nur Links','Ein Fakt ist ein Beleg, an dem wir nicht vorbeikommen: eine Aussage mit Quelle, Fundstelle und Datum. Der Link allein sagt nicht, was daraus folgt.'],
@@ -1014,10 +1014,10 @@ const SZENEN=[
   ['','Die Checkliste rechnet mit','Sie sagt, was für einen Antrag noch fehlt. Sie blockiert nichts, denn die Fraktion entscheidet, ob eingereicht wird.']]}
 ]},
 {id:'s6',wer:'Miriam und komki · Antrag',titel:'Vom Entwurf zum Antrag',moment:'<b>Freitag.</b> Der Antrag muss bis Dienstag stehen. Im vertraulichen Raum hat Miriam einen Entwurf erarbeitet. Sie weiß dort auch von einem möglichen Grunderwerb, von dem nichts nach außen dringen darf.',bilder:[
- {k:'6.0',t:'In komki: die Freigabe aus dem Fraktionsraum',u:'komki · Raum stiller-reiher',ohneFenster:true,html:()=>goPanel('Ergebnis an Ratsprojekte geben?','Miriam, Fraktion, Vorstand. Denn alles im Hub kann in einen Stand gelangen.','Ein Ergebnis mit zwei Teilen: Variante D, Antragsentwurf','<b>Abgelehnt:</b> Dieser Raum trägt <code>fraktion-intern@1</code>. Der Vorstand gehört nicht zu dessen Empfängerkreis.','rot','Weiter geht es nur, wenn Miriam diese Bindung neu fasst oder den Vorschlag in einem Raum mit passender Bindung baut.',false),notes:[
+ {k:'6.0',t:'In komki: die Freigabe aus dem Fraktionsraum',u:'komki · Raum stiller-reiher',ohneFenster:true,html:()=>goPanel('Ergebnis an Ratsprojekte geben?','Miriam, Fraktion, Vorstand. Denn alles im Hub kann in einen Stand gelangen.','Ein Ergebnis mit zwei Teilen: Variante D, Antragsentwurf','<b>Abgelehnt:</b> Dieser Raum trägt <code>fraktion-intern@1</code>. Der Vorstand gehört nicht zu dessen Empfängerkreis.','rot','Miriam liest den Entwurf gegen und entscheidet, welche Teile der Essenz in den Hub dürfen.',false),notes:[
   ['bruch','Der Hub als Empfänger nur von Miriam','R.5.6 verlangt, dass auch die Weiterverarbeitung erfasst ist. Fließt aus dem Hub etwas in den Stand, zählt der engere Kreis mit. Im Referenzszenario enthält <code>fraktion-intern@1</code> den Vorstand aber nicht, also lehnt der Kalkül ab. Das ist korrekt und eine echte offene Frage.'],
   ['bruch','Ein GO über mehrere Vorschläge','Das bräche „ein GO deckt genau ein Ereignis“ (#352). Jetzt ist das Ergebnis eines Raums ein einziges Ereignis mit Teilen: ein GO, eine Entscheidung im Hub, Teile abwählbar.'],
-  ['','Im weiteren Bild angenommen','Für den Rest der Szene gilt: Miriam hat die Bindung als neue Version mit Vorstand gefasst. Der Grunderwerb liegt unter <code>ratsarbeit@1</code> und bleibt so oder so draußen.']]},
+  ['','Der Mensch liest gegen und entscheidet','Das Kalkül sagt, was zulässig ist. Miriam liest, was der Agent produziert hat, und entscheidet, welche Teile der Essenz in den Hub dürfen. Für den Rest der Szene gilt: Das ist geschehen. Der Grunderwerb liegt unter <code>ratsarbeit@1</code> und bleibt so oder so draußen. Die genaue Mechanik klärt ein eigenes Ticket.']]},
  {k:'6.1',t:'Im Hub: der Entwurf',u:'localhost:4000/vorschlaege',html:s=>vVorschlaege(s),notes:[
   ['','Der Querverweis nennt nur die Kennung','Der Raum heißt <code>stiller-reiher</code>, ohne Thema. Der geschützte Titel des Raums kommt nicht in den Hub.'],
   ['','Kein Annehmen aus dem Chat','<code>decide_proposal</code> entfällt. Eine KI führt keine Entscheidung im Hub aus, auch nicht auf Zuruf.']]},
@@ -1034,14 +1034,14 @@ const SZENEN=[
   ['bruch','Rückmeldung immer mit dem Beschlussvorschlag','Bei „Abgelehnt“ las sich der Satz, als sei der Vorschlag beschlossen. Nur „Angenommen“ nennt ihn als Beschluss, sonst heißt es „Beantragt war“. Der Text nutzt nur, was ohnehin öffentlich ist.'],
   ['','Der Beschluss kommt von Hand','Der RIS-Abgleich (#33) kann das später vorschlagen. Für den ersten Wurf reicht es einzutragen. Der Hub schreibt nie ins RIS.']]},
  {k:'7.2',t:'Bei Ute: die Rückmeldung',u:'Mitglieder-Chat',telefon:true,vorher:'7.1',html:s=>telefon('<div class="gr">Mitglieder-Chat</div><div class="blase"><b>Jonas</b>'+esc(rueckmeldung(p(s,RW),p(s,RW).antraege[0]))+'</div><div class="blase"><b>Ute</b>Super, danke für die Info!</div>','08:02'),notes:[
-  ['','Der Hub liefert Text, der Kanal bleibt draußen','Jonas kopiert den Satz in den Chat. Eine Anzeige im Befragungswerkzeug („so hat der Rat entschieden“) wäre schöner, gehört aber dorthin.'],
+  ['','Der Hub liefert Text, der Kanal bleibt draußen','Jonas kopiert den Satz in den Chat. Eine Anzeige auf der Beteiligungsplattform („so hat der Rat entschieden“) wäre schöner, gehört aber dorthin.'],
   ['','Ute hat beim Radweg nie abgestimmt','Die Rückmeldung geht trotzdem an die Basis. Ute wollte vor allem merken, dass etwas bewirkt wird.']]}
 ]},
 {id:'s8',wer:'Technik-Hilfe, Miriam, Fraktion',titel:'Die Basis hat geantwortet',moment:'<b>Dienstag, 1. Dezember.</b> Die Befragung ist zu Ende, die Technik-Hilfe schickt Miriam die Datei. Am Donnerstag berät die Fraktion. Es gibt ein deutliches Bild, und ein Thema, von dem niemand wusste.',bilder:[
  {k:'8.1',t:'Antworten prüfen',u:'localhost:4000/befragungen',html:s=>vBefragungen(s,{r:s.befragungen[0],zuordnung:ordneZu(s,s.befragungen[0],liesCsv(CSV_BEISPIEL).zeilen)}),notes:[
   ['bruch','Eine CSV ins Textfeld kopieren','Das wäre für Miriam unzumutbar. Jetzt wählt sie die Datei aus und sieht direkt die Ansicht hier.'],
   ['','Ideen kommen auch von unten','In der Basis wurde „Bänke auch im Stadtpark“ vorgeschlagen und freigegeben. Im Hub gibt es das nicht, also wird eine neue Idee mit Herkunft Basis daraus.'],
-  ['','Nur Zählungen, die Argumente fehlen noch','Im Format stehen keine Argumente. Darum fasst Miriam sie vorerst in einem Satz zusammen. Ein Export mit Argumenten gehört ins Befragungswerkzeug.']]},
+  ['','Nur Zählungen, die Argumente fehlen noch','Im Format stehen keine Argumente. Darum fasst Miriam sie vorerst in einem Satz zusammen. Ein Export mit Argumenten gehört auf die Beteiligungsplattform.']]},
  {k:'8.2',t:'Das Ergebnis bleibt',u:'localhost:4000/befragungen',html:s=>vBefragungen(s,{r:s.befragungen[0]}),notes:[
   ['bruch','Die beste Ansicht verschwand','Der Überblick über alle Ideen war nur ein Zwischenschritt beim Einlesen. Danach stand dort nur „Beendet“. Jetzt bleibt er als Ergebnisseite stehen, mit Links zu den Projekten.'],
   ['','Keine Rangliste','Die Tabelle steht in der Reihenfolge der Ideen, ohne Prozent oder Sieger. Wer nach Zustimmung sortiert, baut eine Rangliste durch die Hintertür.']]},
@@ -1060,13 +1060,13 @@ const RAND=[
  ['Der Stadtrat lehnt den Antrag ab','Ergebnis „Abgelehnt“. Dann entscheidet die Fraktion: ablegen als Abgeschlossen, oder zurück in die Ausarbeitung für einen neuen Antrag am selben Projekt.','Fraktion'],
  ['Eine andere Fraktion stellt denselben Antrag','Der eigene Antrag „Zurückgezogen“, das Projekt „Ruht“ oder „Abgeschlossen“ mit Grund.','Fraktion, Externe'],
  ['Eine abgelehnte Idee kommt zwei Jahre später wieder','„Wieder aufnehmen“ mit Grund. Der alte Verlauf bleibt lesbar. Das widerspricht dem heutigen Lifecycle.','Fraktion, Miriam'],
- ['Die Verwaltung legt eine Vorlage vor, ohne dass wir etwas beantragt haben','Kein Ratsprojekt. Das Befragungswerkzeug kann dazu ohne den Hub fragen. Berührt es ein Projekt, ist es ein Verlaufseintrag.','Vorstand, Basis'],
+ ['Die Verwaltung legt eine Vorlage vor, ohne dass wir etwas beantragt haben','Kein Ratsprojekt. Die Beteiligungsplattform kann dazu ohne den Hub fragen. Berührt es ein Projekt, ist es ein Verlaufseintrag.','Vorstand, Basis'],
  ['Ein Bürgeranliegen mit Namen und Adresse','Gehört nicht in den Hub (WF 8). Im Hub steht höchstens der Anlass, der Fall bleibt im Vault.','Miriam, Öffentlichkeit'],
  ['Ein Gespräch mit Externen war vertraulich','Eintrag mit „Nur ich“. Dann zählt es auch nicht als Meinungsbild und erscheint nirgends im Stand.','Externe, Miriam'],
  ['Nichtöffentliches Wissen ändert die Lage','Es steht nie im Hub, auch nicht verklausuliert. Das Risiko liegt in Freitext wie „warten, bis das Grundstück geklärt ist“. Dagegen hilft nur die Vorschau.','Miriam, engerer Kreis'],
  ['Etwas Heikles ist schon im letzten Stand','Aus dem Stand nehmen wirkt nur nach vorn. Eine verschickte Ausgabe lässt sich nicht zurückholen.','Miriam'],
  ['Tippfehler in einem Verlaufseintrag','Eintrag korrigierbar mit Vermerk. Im Prototyp noch nicht gebaut.','Miriam'],
- ['Titel im Befragungswerkzeug nachträglich geändert','Beim Einlesen keine Übereinstimmung, Miriam ordnet per Auswahlliste zu.','Technik-Hilfe, Miriam'],
+ ['Titel auf der Beteiligungsplattform nachträglich geändert','Beim Einlesen keine Übereinstimmung, Miriam ordnet per Auswahlliste zu.','Technik-Hilfe, Miriam'],
  ['Die Datei wird zweimal eingelesen','Der Rücklauf derselben Befragung ersetzt die Zahlen, statt ein zweites Meinungsbild anzulegen. Im Klicktest geprüft.','Miriam'],
  ['Nach einer Ausgabe am selben Tag weitergepflegt','Der Prototyp rechnet „neu seit“ tageweise, solche Einträge fielen durch. Die echte App braucht Zeitpunkte statt Daten.','Fraktion, Vorstand'],
  ['Meinungsbild ohne Werkzeug: Handzeichen am Stammtisch','„Neuer Eintrag“ mit Basis und einem Satz. Die Verteilung ist optional.','Miriam'],
@@ -1100,8 +1100,8 @@ const VERWORFEN=[
  ['Betrieb, Jargon und CSV-Textfeld für Miriam','Sie ist keine Technikerin. Terminal, SSH und Fachbegriffe gehen nicht.','Technik-Hilfe als eigene Rolle, Datei-Upload, Alltagssprache.','Dein Feedback']
 ];
 const FRAGEN=[
- ['Kommt der Vorstand in <code>fraktion-intern</code>?','Sonst kann kein Fraktionsraum nach komki-Regeln in den Hub liefern (Szene 6). Öffentliche Recherche geht auch ohne (Szene 5).','Neue Bindungsversion mit Vorstand, weil das der vereinbarte Kreis ist. Γ ändert sich nur nach deinem GO.'],
- ['Darf komki den Stand in einen Rechercheraum lesen?','Das könnte die Websuche im selben Raum blockieren.','Erst nur schreiben. Lesen separat am echten Vermittler prüfen.'],
+ ['Wie kommt die Essenz aus einem Fraktionsraum in den Hub?','Die Regeln lehnen das heute ab, weil der Vorstand nicht zum Empfängerkreis gehört (Szene 6). Öffentliche Recherche geht auch ohne (Szene 5).','Der Mensch liest gegen und wählt die Teile aus. Ob die Bindung sich ändert, klärt das Kalkül. Γ ändert sich nur nach GO.'],
+ ['Darf komki den Stand in einen Rechercheraum lesen?','Das könnte die Websuche im selben Raum blockieren.','Formal im Kalkül klären, dann am echten Vermittler durchtesten. Gebaut wird zuerst nur das Schreiben.'],
  ['Sind die Entscheidungsrechte so richtig?','Die Tabelle oben sind meine Annahmen, zum Beispiel „der Vorstand entscheidet über die Befragung“.','Einmal mit Fraktion und Vorstand durchgehen.'],
  ['Bleibt das zweite GO?','Es hat mit abwählbaren Teilen einen eigenen Sinn. Ob das reicht, zeigt erst echter Gebrauch.','Vorerst behalten, nach der ersten echten Woche prüfen.'],
  ['PDF plus Kurztext oder nur eines?','Selin liest, Jonas postet. Vielleicht reicht eine Fassung.','Mit beiden starten, nach zwei Ausgaben eines streichen.'],
