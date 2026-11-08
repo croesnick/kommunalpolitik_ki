@@ -30,6 +30,11 @@ defmodule DevLoop.Agent do
     po: [{:claude, ["--model", "claude-opus-5-5"]}, {:tt, ["--effort", "max"]}]
   }
 
+  # A stage ends not only at its wall-clock limit but when it has gone
+  # silent: no stream-json line, no tool result, nothing. Long-running
+  # tools keep streaming their output, so silence means stuck.
+  @idle_timeout_ms 30 * 60 * 1000
+
   # Variables of an outer Claude Code session or of the loop itself that a
   # stage must not inherit.
   @scrubbed ~w(GH_TOKEN GITHUB_TOKEN ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY CLAUDE_CONFIG_DIR
@@ -75,6 +80,7 @@ defmodule DevLoop.Agent do
           cd: cwd,
           env: env(account),
           timeout_ms: ctx.stage_timeout_ms,
+          idle_ms: @idle_timeout_ms,
           log: log,
           # Consumed by the stage that sees it, so it takes over one stage.
           cancel: fn -> File.rm(ctx.takeover_file) == :ok end
@@ -90,6 +96,10 @@ defmodule DevLoop.Agent do
         ctx.take_over.("#{stage}-hand", cwd, resume_command(account, session, extra))
         ctx.log.("#{role}: von Hand übernommen (Session #{session})")
         {:taken_over, taken_over_text(account, session, cwd)}
+
+      {:ok, result} = ok ->
+        note_metrics(result, role, account, cwd, ctx)
+        ok
 
       other ->
         other
@@ -134,6 +144,10 @@ defmodule DevLoop.Agent do
   end
 
   defp classify({:timeout, _}), do: {:error, "Zeitlimit der Stufe überschritten"}
+
+  defp classify({:idle, _}),
+    do: {:error, "seit #{div(@idle_timeout_ms, 60_000)} Minuten keine Ausgabe"}
+
   defp classify({:cancelled, _}), do: :taken_over
   defp classify({:ok, lines}), do: classify_lines(lines)
   defp classify({:error, _status, lines}), do: classify_lines(lines)
@@ -179,6 +193,36 @@ defmodule DevLoop.Agent do
   end
 
   defp token_script, do: Path.join(@tt_dir, "anthropic-token.sh")
+
+  # One line per successful stage run, appended to metrics.jsonl in the
+  # run's log directory (core.exs turns them into the morning comment's
+  # statistics). Failed and exhausted attempts have no result event to
+  # read and stay uncounted.
+  defp note_metrics(result, role, account, cwd, ctx) do
+    line =
+      %{
+        stage: role,
+        issue: issue_from_cwd(cwd),
+        account: account,
+        turns: result["num_turns"],
+        duration_ms: result["duration_ms"],
+        tokens_in: get_in(result, ["usage", "input_tokens"]),
+        tokens_out: get_in(result, ["usage", "output_tokens"])
+      }
+      |> Map.reject(fn {_k, v} -> is_nil(v) end)
+      |> JSON.encode!()
+
+    File.write!(Path.join(ctx.logs, "metrics.jsonl"), line <> "\n", [:append])
+  end
+
+  # Worktree names carry the ticket: loop-392, loop-392-review. The PO
+  # worktree and the sandbox probe have none.
+  defp issue_from_cwd(cwd) do
+    case Regex.run(~r/^loop-(\d+)/, Path.basename(cwd)) do
+      [_, n] -> String.to_integer(n)
+      nil -> nil
+    end
+  end
 
   # A random (version 4) UUID, the form --session-id wants.
   defp uuid4 do

@@ -6,11 +6,13 @@ defmodule DevLoop.Proc do
   @moduledoc false
 
   @doc """
-  Returns `{:ok, lines}`, `{:error, status, lines}`, `{:timeout, lines}` or
-  `{:cancelled, lines}`; `lines` are the last #{200} output lines. Options:
-  `:cd`, `:env` (`{name, value | false}`), `:timeout_ms`, `:log` (file
-  path), `:cancel` (checked every second; when it returns true the program
-  is ended).
+  Returns `{:ok, lines}`, `{:error, status, lines}`, `{:timeout, lines}`,
+  `{:idle, lines}` or `{:cancelled, lines}`; `lines` are the last 200
+  output lines. Options: `:cd`, `:env` (`{name, value | false}`),
+  `:timeout_ms`, `:log` (file path), `:cancel` (checked every second;
+  when it returns true the program is ended), `:idle_ms` (likewise: no
+  output for this long ends the program; nil, the default, keeps only
+  the deadline).
   """
   def run(cmd, args, opts) do
     exe = System.find_executable(cmd) || raise "#{cmd} nicht gefunden"
@@ -31,13 +33,17 @@ defmodule DevLoop.Proc do
       ])
 
     deadline = System.monotonic_time(:millisecond) + Keyword.fetch!(opts, :timeout_ms)
-    # A tick every second checks deadline and cancel, also while output
-    # keeps streaming in.
+    # A tick every second checks deadline, cancel and idle time, also while
+    # output keeps streaming in.
     tick = make_ref()
     {:ok, timer} = :timer.send_interval(1000, {tick, :tick})
 
+    limits =
+      {tick, deadline, Keyword.get(opts, :cancel, fn -> false end), Keyword.get(opts, :idle_ms),
+       now()}
+
     try do
-      collect(port, log, {tick, deadline, Keyword.get(opts, :cancel, fn -> false end)}, [], "")
+      collect(port, log, limits, [], "")
     after
       :timer.cancel(timer)
       flush(tick)
@@ -45,15 +51,15 @@ defmodule DevLoop.Proc do
     end
   end
 
-  defp collect(port, log, {tick, deadline, cancel} = limits, tail, partial) do
+  defp collect(port, log, {tick, deadline, cancel, idle_ms, _} = limits, tail, partial) do
     receive do
       {^port, {:data, {:noeol, chunk}}} ->
-        collect(port, log, limits, tail, partial <> chunk)
+        collect(port, log, touch(limits), tail, partial <> chunk)
 
       {^port, {:data, {:eol, chunk}}} ->
         line = partial <> chunk
         IO.write(log, line <> "\n")
-        collect(port, log, limits, Enum.take([line | tail], 200), "")
+        collect(port, log, touch(limits), Enum.take([line | tail], 200), "")
 
       {^port, {:exit_status, 0}} ->
         {:ok, Enum.reverse(tail)}
@@ -71,11 +77,21 @@ defmodule DevLoop.Proc do
             kill(port)
             {:cancelled, Enum.reverse(tail)}
 
+          idle_ms != nil and System.monotonic_time(:millisecond) - elem(limits, 4) >= idle_ms ->
+            kill(port)
+            {:idle, Enum.reverse(tail)}
+
           true ->
             collect(port, log, limits, tail, partial)
         end
     end
   end
+
+  # Any output counts as life; partial lines keep the clock running too.
+  defp touch({_tick, _deadline, _cancel, _idle_ms, _} = limits),
+    do: put_elem(limits, 4, now())
+
+  defp now, do: System.monotonic_time(:millisecond)
 
   defp flush(tick) do
     receive do

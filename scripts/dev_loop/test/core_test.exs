@@ -156,23 +156,28 @@ defmodule DevLoop.CoreTest do
     end
   end
 
-  describe "decide/4" do
+  describe "decide/5" do
     test "protected path always goes to the human" do
-      assert Core.decide(:b, "approve", ["apps/seatbelt/x.ex"], 0) == :human
+      assert Core.decide(:b, "approve", ["apps/seatbelt/x.ex"], [], 0) == :human
+    end
+
+    test "weakened tests always go to the human, even an approved B-tier" do
+      assert Core.decide(:b, "approve", [], ["x_test.exs: Skip ergänzt: `@tag :skip`"], 0) ==
+               :human
     end
 
     test "approve merges B, waits for GO on A, never merges S" do
-      assert Core.decide(:b, "approve", [], 0) == :merge
-      assert Core.decide(:a, "approve", [], 1) == :await_go
-      assert Core.decide(:s, "approve", [], 0) == :human
-      assert Core.decide(nil, "approve", [], 0) == :human
+      assert Core.decide(:b, "approve", [], [], 0) == :merge
+      assert Core.decide(:a, "approve", [], [], 1) == :await_go
+      assert Core.decide(:s, "approve", [], [], 0) == :human
+      assert Core.decide(nil, "approve", [], [], 0) == :human
     end
 
     test "rework until the limit, then the human" do
-      assert Core.decide(:b, "rework", [], 0) == :rework
-      assert Core.decide(:b, "rework", [], 1) == :rework
-      assert Core.decide(:b, "rework", [], 2) == :human
-      assert Core.decide(:a, "human", [], 0) == :human
+      assert Core.decide(:b, "rework", [], [], 0) == :rework
+      assert Core.decide(:b, "rework", [], [], 1) == :rework
+      assert Core.decide(:b, "rework", [], [], 2) == :human
+      assert Core.decide(:a, "human", [], [], 0) == :human
     end
   end
 
@@ -220,7 +225,7 @@ defmodule DevLoop.CoreTest do
     test "red gates stand for a rework round that carries the gate output" do
       review = Core.gate_failure_review("Gate rot: mix format --check-formatted")
 
-      assert Core.decide(:b, review.verdict, [], 0) == :rework
+      assert Core.decide(:b, review.verdict, [], [], 0) == :rework
       assert Core.findings_text(review) =~ "Gate rot: mix format --check-formatted"
       assert Core.review_comment(review, "abc") =~ Core.marker("rework", "abc")
     end
@@ -251,6 +256,126 @@ defmodule DevLoop.CoreTest do
     assert Core.summary_line("") == ""
   end
 
+  describe "trusted_comment_bodies/2" do
+    test "keeps only the owner's comments, in order" do
+      comments = [
+        %{"author" => %{"login" => "someone"}, "body" => "should not reach the agents"},
+        %{"author" => %{"login" => "croesnick"}, "body" => "GO: bauen"},
+        %{"author" => nil, "body" => "ghost"},
+        %{"author" => %{"login" => "croesnick"}, "body" => "Zweitens"}
+      ]
+
+      assert Core.trusted_comment_bodies(comments, "croesnick") == ["GO: bauen", "Zweitens"]
+    end
+  end
+
+  describe "weakened_test_hits/1" do
+    @assertion_diff """
+    diff --git a/apps/komki/test/komki/plan_test.exs b/apps/komki/test/komki/plan_test.exs
+    index 1..2 100644
+    --- a/apps/komki/test/komki/plan_test.exs
+    +++ b/apps/komki/test/komki/plan_test.exs
+    @@ -10,4 +10,3 @@ defmodule Komki.PlanTest do
+     test "plans" do
+    -    assert plan() == :ok
+    -    refute stale(plan())
+    +    assert plan() == :later
+     end
+    """
+
+    test "more removed than added assertions hit" do
+      assert [hit] = Core.weakened_test_hits(@assertion_diff)
+      assert hit == "apps/komki/test/komki/plan_test.exs: 2 Assertions entfernt, 1 ergänzt"
+    end
+
+    test "an even rewrite does not hit" do
+      diff = String.replace(@assertion_diff, "-    refute stale(plan())\n", "")
+
+      assert Core.weakened_test_hits(diff) == []
+    end
+
+    test "an added skip marker hits" do
+      diff = """
+      diff --git a/apps/komki/test/komki/plan_test.exs b/apps/komki/test/komki/plan_test.exs
+      --- a/apps/komki/test/komki/plan_test.exs
+      +++ b/apps/komki/test/komki/plan_test.exs
+      @@ -1,2 +1,3 @@
+       test "plans" do
+      +    @tag :skip
+         assert plan() == :ok
+      """
+
+      assert [hit] = Core.weakened_test_hits(diff)
+      assert hit =~ "Skip ergänzt"
+      assert hit =~ "@tag :skip"
+    end
+
+    test "a deleted test file hits" do
+      diff = """
+      diff --git a/apps/komki/test/komki/plan_test.exs b/apps/komki/test/komki/plan_test.exs
+      deleted file mode 100644
+      index 1..000
+      --- a/apps/komki/test/komki/plan_test.exs
+      +++ /dev/null
+      @@ -1,2 +0,0 @@
+      -test "plans" do
+      -  assert plan() == :ok
+      -end
+      """
+
+      assert ["apps/komki/test/komki/plan_test.exs: Testdatei gelöscht"] =
+               Core.weakened_test_hits(diff)
+    end
+
+    test "assertions outside test files do not hit" do
+      diff = """
+      diff --git a/apps/komki/lib/komki/plan.ex b/apps/komki/lib/komki/plan.ex
+      --- a/apps/komki/lib/komki/plan.ex
+      +++ b/apps/komki/lib/komki/plan.ex
+      @@ -1,2 +1,1 @@
+      -assert plan() == :ok
+      """
+
+      assert Core.weakened_test_hits(diff) == []
+    end
+
+    test "a JS expect removal hits" do
+      diff = """
+      diff --git a/apps/anzeige/test/plan.test.js b/apps/anzeige/test/plan.test.js
+      --- a/apps/anzeige/test/plan.test.js
+      +++ b/apps/anzeige/test/plan.test.js
+      @@ -1,2 +1 @@
+      -expect(page).toHaveTitle("Plan")
+      """
+
+      assert [hit] = Core.weakened_test_hits(diff)
+      assert hit =~ "plan.test.js"
+    end
+  end
+
+  describe "metrics_summary/1" do
+    test "renders one line per stage, skips junk" do
+      lines = [
+        ~s({"stage":"implement","account":"claude","issue":392,"turns":11,"duration_ms":600000,"tokens_in":1234567,"tokens_out":4321}),
+        ~s({"stage":"implement","account":"tt","issue":392,"turns":9,"duration_ms":600000,"tokens_in":0,"tokens_out":0}),
+        ~s({"stage":"review","turns":4,"duration_ms":4500000,"tokens_in":1000,"tokens_out":100}),
+        "kein json"
+      ]
+
+      assert [impl, review] = Core.metrics_summary(lines)
+
+      assert impl ==
+               "Umsetzung: 2 Läufe · 20 min · 1.234.567 Tokens in / 4.321 out · Ø 10,0 Turns"
+
+      assert review == "Review: 1 Lauf · 1 h 15 min · 1.000 Tokens in / 100 out · Ø 4,0 Turns"
+    end
+
+    test "without usage data the token segment stays out" do
+      assert ["PO: 1 Lauf · 2 min · Ø 3,0 Turns"] =
+               Core.metrics_summary([~s({"stage":"po","turns":3,"duration_ms":120000})])
+    end
+  end
+
   test "brief/1 leaves out empty sections" do
     text =
       Core.brief(%{
@@ -266,6 +391,27 @@ defmodule DevLoop.CoreTest do
     assert text =~ "### Gemergt"
     assert text =~ "- #392 Tag – PR #400: Anders: x\n  Geprüft: y"
     refute text =~ "Wartet auf GO"
+    refute text =~ "Statistik"
     assert text =~ "**Ende:** Zeitfenster abgelaufen"
+  end
+
+  test "brief/1 renders the statistics when there are any" do
+    text =
+      Core.brief(%{
+        started: "22:00",
+        finished: "07:00",
+        merged: [],
+        await_go: [],
+        human: [],
+        po: [],
+        stats: %{reviews: 5, first_pass: 3, rework: 2},
+        stage_metrics: ["Umsetzung: 2 Läufe · 20 min"],
+        reason: "Nichts mehr zu tun"
+      })
+
+    assert text =~ "### Statistik"
+    assert text =~ "Reviews: 5, erste Runde approve: 3, Rework-Runden: 2."
+    assert text =~ "Umsetzung: 2 Läufe · 20 min"
+    assert text =~ "**Ende:** Nichts mehr zu tun"
   end
 end

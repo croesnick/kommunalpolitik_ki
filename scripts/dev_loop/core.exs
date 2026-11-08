@@ -79,6 +79,77 @@ defmodule DevLoop.Core do
     end)
   end
 
+  # Assertions and skips looked for in a diff's added and removed lines.
+  # Only the exact macro forms count, so a variable named `expected`
+  # stays a variable.
+  @assertion_re ~r/^(?:assert|refute)[ (]|^assert_(?:receive|received|raise)\b|^refute_receive\b|^expect[ (]/
+  @skip_re ~r/@tag\s+:skip|@moduletag\s+:skip|\bskip:\s*true|ExUnit\.configure\(\s*exclude|[.]skip\(|\bxit\(|\bxdescribe\(/
+
+  @doc """
+  Evidence that a diff weakens tests: a deleted test file, an added skip
+  marker, or more assertion lines removed than added in one test file.
+  A heuristic with a safe failure direction — a false positive hands the
+  ticket to the human, and rewriting an assertion into a weaker one of the
+  same kind is not caught and stays the reviewer's job.
+  """
+  def weakened_test_hits(diff) do
+    diff
+    |> String.split("\ndiff --git ")
+    |> Enum.flat_map(&file_hits/1)
+  end
+
+  # One file's diff: "a/old b/new\n…\n--- a/old\n+++ b/new\n@@ …". Deleted
+  # files carry `+++ /dev/null`; their evidence names the old path.
+  defp file_hits(chunk) do
+    old_path = path_after(chunk, "--- a/")
+    new_path = path_after(chunk, "+++ b/")
+
+    cond do
+      (chunk =~ "+++ /dev/null" and old_path != nil) && test_file?(old_path) ->
+        ["#{old_path}: Testdatei gelöscht"]
+
+      new_path != nil and test_file?(new_path) ->
+        skips = for "+" <> line <- String.split(chunk, "\n"), line =~ @skip_re, do: line
+        {removed, added} = count_assertions(chunk)
+
+        for(skip <- skips, do: "#{new_path}: Skip ergänzt: `#{String.trim(skip)}`") ++
+          if(removed > added,
+            do: ["#{new_path}: #{removed} Assertions entfernt, #{added} ergänzt"],
+            else: []
+          )
+
+      true ->
+        []
+    end
+  end
+
+  defp path_after(chunk, marker) do
+    case Enum.at(String.split(chunk, "\n" <> marker), 1) do
+      rest when is_binary(rest) -> rest |> String.split("\n") |> hd() |> String.trim()
+      nil -> nil
+    end
+  end
+
+  defp test_file?(path) do
+    String.contains?(path, "/test/") or String.starts_with?(path, "test/") or
+      String.ends_with?(path, "_test.exs") or String.contains?(path, ".test.") or
+      String.contains?(path, ".spec.")
+  end
+
+  defp count_assertions(chunk) do
+    lines = String.split(chunk, "\n")
+
+    counted =
+      fn sign ->
+        Enum.count(lines, fn
+          ^sign <> line -> String.trim(line) =~ @assertion_re
+          _ -> false
+        end)
+      end
+
+    {counted.("-"), counted.("+")}
+  end
+
   def tier(labels) do
     cond do
       "ai:s-tier" in labels -> :s
@@ -163,16 +234,23 @@ defmodule DevLoop.Core do
 
   @doc """
   What a review leads to: `:merge`, `:await_go`, `:rework` or `:human`.
-  `rounds` is the number of rework rounds the PR has had so far.
+  `hits` are protected paths in the diff and `weakened` evidence of
+  weakened tests; both end at the human whatever the verdict says — the
+  script outranks the reviewer on exactly these two. `rounds` is the
+  number of rework rounds the PR has had so far.
   """
-  def decide(tier, verdict, protected_hits, rounds)
-  def decide(_tier, _verdict, [_ | _], _rounds), do: :human
-  def decide(_tier, "human", _hits, _rounds), do: :human
-  def decide(_tier, "rework", _hits, rounds) when rounds >= @max_rework_rounds, do: :human
-  def decide(_tier, "rework", _hits, _rounds), do: :rework
-  def decide(:b, "approve", _hits, _rounds), do: :merge
-  def decide(:a, "approve", _hits, _rounds), do: :await_go
-  def decide(_tier, _verdict, _hits, _rounds), do: :human
+  def decide(tier, verdict, hits, weakened, rounds)
+  def decide(_tier, _verdict, [_ | _], _weakened, _rounds), do: :human
+  def decide(_tier, _verdict, _hits, [_ | _], _rounds), do: :human
+  def decide(_tier, "human", _hits, _weakened, _rounds), do: :human
+
+  def decide(_tier, "rework", _hits, _weakened, rounds) when rounds >= @max_rework_rounds,
+    do: :human
+
+  def decide(_tier, "rework", _hits, _weakened, _rounds), do: :rework
+  def decide(:b, "approve", _hits, _weakened, _rounds), do: :merge
+  def decide(:a, "approve", _hits, _weakened, _rounds), do: :await_go
+  def decide(_tier, _verdict, _hits, _weakened, _rounds), do: :human
 
   def marker(verdict, sha), do: "<!-- dev-loop:review verdict=#{verdict} sha=#{sha} -->"
 
@@ -270,6 +348,17 @@ defmodule DevLoop.Core do
     end)
   end
 
+  @doc """
+  Comment bodies the loop may see, in their original order. The repo is
+  public, so anyone can comment on a ticket, and every body would end up
+  in an unsupervised prompt — or confirm a Zielbild. Only the owner's
+  comments pass; the loop and the PO write under the owner's login and
+  carry their own markers on top. The ticket body stays untouched: the
+  owner has read and labelled it before the loop picks it.
+  """
+  def trusted_comment_bodies(comments, owner),
+    do: for(c <- comments, match?(%{"login" => ^owner}, c["author"]), do: c["body"])
+
   @doc "The ticket as the agents read it: title, labels, body, comments."
   def issue_text(i) do
     comments =
@@ -319,6 +408,65 @@ defmodule DevLoop.Core do
   # Multi-line briefs stay inside their list item.
   defp bullet(text), do: "- " <> (text |> String.trim() |> String.replace("\n", "\n  "))
 
+  @doc """
+  One German line per stage from a run's metrics.jsonl: runs, total time,
+  tokens and average turns. Malformed lines are skipped.
+  """
+  def metrics_summary(lines) do
+    lines
+    |> Enum.flat_map(fn line ->
+      case JSON.decode(line) do
+        {:ok, %{"stage" => stage} = m} -> [{stage, m}]
+        _ -> []
+      end
+    end)
+    |> Enum.group_by(fn {stage, _} -> stage end, fn {_, m} -> m end)
+    |> Enum.sort_by(fn {stage, _} -> stage_rank(stage) end)
+    |> Enum.map(fn {stage, ms} -> stage_line(stage, ms) end)
+  end
+
+  defp stage_rank(stage), do: Enum.find_index(~w(implement review po), &(&1 == stage)) || 99
+
+  defp stage_line(stage, ms) do
+    runs = if length(ms) == 1, do: "1 Lauf", else: "#{length(ms)} Läufe"
+
+    [stage_label(stage) <> ": #{runs}", total_time(ms), tokens(ms), turns(ms)]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(" · ")
+  end
+
+  defp stage_label(stage),
+    do: Map.get(%{"implement" => "Umsetzung", "review" => "Review", "po" => "PO"}, stage, stage)
+
+  defp total_time(ms) do
+    total = Enum.sum(for m <- ms, is_number(m["duration_ms"]), do: m["duration_ms"])
+    min = div(total, 60_000)
+    if min >= 60, do: "#{div(min, 60)} h #{rem(min, 60)} min", else: "#{min} min"
+  end
+
+  defp tokens(ms) do
+    if Enum.any?(ms, &is_number(&1["tokens_in"])) do
+      in_total = Enum.sum(for m <- ms, is_number(m["tokens_in"]), do: m["tokens_in"])
+      out_total = Enum.sum(for m <- ms, is_number(m["tokens_out"]), do: m["tokens_out"])
+      "#{format_int(in_total)} Tokens in / #{format_int(out_total)} out"
+    end
+  end
+
+  defp turns(ms) do
+    ns = for m <- ms, is_number(m["turns"]), do: m["turns"]
+    if ns != [], do: "Ø #{format_float(Enum.sum(ns) / length(ns))} Turns"
+  end
+
+  # 1234567 -> "1.234.567", German thousands dots.
+  defp format_int(n),
+    do:
+      n
+      |> round()
+      |> Integer.to_string()
+      |> then(&Regex.replace(~r/\B(?=(\d{3})+(?!\d))/, &1, "."))
+
+  defp format_float(f), do: f |> Float.round(1) |> Float.to_string() |> String.replace(".", ",")
+
   @doc "The morning comment: one section per outcome, empty sections left out."
   def brief(report) do
     sections = [
@@ -331,7 +479,7 @@ defmodule DevLoop.Core do
     body =
       for {title, [_ | _] = items} <- sections, into: "" do
         "### #{title}\n\n" <> Enum.map_join(items, "\n", &bullet/1) <> "\n\n"
-      end
+      end <> stats_text(report)
 
     """
     ## Dev-Loop-Lauf #{report.started} – #{report.finished}
@@ -339,4 +487,19 @@ defmodule DevLoop.Core do
     #{if body == "", do: "Nichts zu tun gefunden.\n\n", else: body}**Ende:** #{report.reason}
     """
   end
+
+  # Rates and stage metrics; the section waits until at least one of them has.
+  defp stats_text(report) do
+    metrics = Map.get(report, :stage_metrics, [])
+    lines = [review_line(Map.get(report, :stats)) | metrics] |> Enum.reject(&is_nil/1)
+
+    if lines == [],
+      do: "",
+      else: "### Statistik\n\n" <> Enum.join(lines, "\n") <> "\n\n"
+  end
+
+  defp review_line(%{reviews: reviews, first_pass: first_pass, rework: rework}) when reviews > 0,
+    do: "Reviews: #{reviews}, erste Runde approve: #{first_pass}, Rework-Runden: #{rework}."
+
+  defp review_line(_), do: nil
 end

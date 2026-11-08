@@ -5,12 +5,18 @@
 #
 # With `dry_run: true` in the context, writes are logged instead of sent;
 # reads then use whatever gh login exists.
+#
+# Comments reach the loop only from the repository owner — core.exs holds
+# the rule and its reasoning.
 
 defmodule DevLoop.GitHub do
   @moduledoc false
 
+  alias DevLoop.Core
+
   @repo "croesnick/kommunalpolitik_ki"
-  @project_owner "croesnick"
+  @owner "croesnick"
+  @project_owner @owner
   @project_number "1"
 
   def repo, do: @repo
@@ -49,7 +55,7 @@ defmodule DevLoop.GitHub do
         body: i["body"] || "",
         labels: Enum.map(i["labels"], & &1["name"]),
         assignees: Enum.map(i["assignees"], & &1["login"]),
-        comments: Enum.map(i["comments"], & &1["body"]),
+        comments: Core.trusted_comment_bodies(i["comments"], @owner),
         open_blockers: Map.get(blockers, i["number"], 0)
       }
     end
@@ -104,15 +110,36 @@ defmodule DevLoop.GitHub do
     gh!(ctx, ~w(pr view #{pr} --repo #{@repo} --json comments))
     |> JSON.decode!()
     |> Map.fetch!("comments")
-    |> Enum.map(& &1["body"])
+    |> Core.trusted_comment_bodies(@owner)
   end
 
   @doc "`:pending`, `:green` or `{:red, names}` for all workflow runs of a commit."
-  def ci_state(ctx, sha) do
-    runs =
+  def ci_state(ctx, sha),
+    do:
       gh!(ctx, ~w(run list --repo #{@repo} --commit #{sha} --json status,conclusion,workflowName))
       |> JSON.decode!()
+      |> runs_state()
 
+  @doc """
+  The circuit breaker's view of `main`: `{:red, names}` only when its CI
+  is red. Pending, green and unreadable all return nil, so a read hiccup
+  cannot end the night — branch protection still guards every merge.
+  """
+  def main_red?(ctx, sha) do
+    case gh(
+           ctx,
+           ~w(run list --repo #{@repo} --commit #{sha} --json status,conclusion,workflowName)
+         ) do
+      {:ok, out} ->
+        redden(JSON.decode!(out) |> runs_state())
+
+      {:error, out} ->
+        log(ctx, "Main-CI nicht prüfbar: #{first_line(out)}")
+        nil
+    end
+  end
+
+  defp runs_state(runs) do
     cond do
       runs == [] or Enum.any?(runs, &(&1["status"] != "completed")) ->
         :pending
@@ -129,6 +156,9 @@ defmodule DevLoop.GitHub do
          )}
     end
   end
+
+  defp redden({:red, names}), do: {:red, names}
+  defp redden(_), do: nil
 
   # -- writes --------------------------------------------------------------
 

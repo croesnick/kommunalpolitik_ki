@@ -115,6 +115,58 @@ defmodule DevLoop.TakeoverTest do
     end
   end
 
+  describe "Agent metrics" do
+    # Prints stream-json with a result event and exits: a finished stage.
+    @result_claude """
+    #!/bin/sh
+    echo '{"type":"system","subtype":"init","model":"fake","cwd":"x"}'
+    echo '{"type":"result","subtype":"success","is_error":false,"num_turns":3,"duration_ms":120000,"usage":{"input_tokens":100,"output_tokens":7}}'
+    """
+
+    setup %{dir: dir} do
+      File.mkdir_p!(Path.join(dir, "bin"))
+      fake = Path.join([dir, "bin", "claude"])
+      File.write!(fake, @result_claude)
+      File.chmod!(fake, 0o755)
+      path = System.get_env("PATH")
+      System.put_env("PATH", Path.join(dir, "bin") <> ":" <> path)
+      on_exit(fn -> System.put_env("PATH", path) end)
+
+      ctx = %{
+        stop_file: Path.join(dir, "STOP"),
+        takeover_file: Path.join(dir, "TAKEOVER"),
+        logs: dir,
+        stamp: fn -> "000000" end,
+        log: fn _ -> :ok end,
+        stage_timeout_ms: 30_000,
+        account: :claude,
+        watch: fn _name, _log, fun -> fun.() end,
+        take_over: fn _name, _cwd, _command -> :ok end
+      }
+
+      %{ctx: ctx, cwd: Path.join(dir, "loop-7")}
+    end
+
+    test "a finished session writes one metrics line", ctx do
+      assert {:ok, _} = Agent.run(:implement, "Auftrag", ctx.cwd, ctx.ctx)
+
+      [line] =
+        Path.join(ctx.dir, "metrics.jsonl") |> File.read!() |> String.split("\n", trim: true)
+
+      assert {:ok, m} = JSON.decode(line)
+
+      assert m == %{
+               "stage" => "implement",
+               "issue" => 7,
+               "account" => "claude",
+               "turns" => 3,
+               "duration_ms" => 120_000,
+               "tokens_in" => 100,
+               "tokens_out" => 7
+             }
+    end
+  end
+
   describe "resume command" do
     test "tt reads its token when the command runs, never carries it" do
       command = Agent.resume_command(:tt, "s-1", ["--effort", "max"])
