@@ -331,7 +331,7 @@ footer{padding-block:2rem 3rem;color:var(--ink3);font-size:.875rem}
   <div class="tabelle-w"><table class="t"><thead><tr><th>Kreis</th><th>Wer</th><th>Fassung</th><th>Wie sie dorthin kommt</th></tr></thead><tbody>
     <tr><td>Redaktion</td><td>Miriam</td><td>Arbeitsansicht: alles, auch private Notizen und Querverweise</td><td>Der Hub selbst, nur auf ihrem Rechner</td></tr>
     <tr><td>Engerer Kreis</td><td>Fraktion und Vorstand</td><td>Stand: Phase, nächster Schritt, Entscheidungen, Meinungsbilder, Anträge</td><td>PDF oder Kurztext nach Vorschau, von Hand weitergegeben</td></tr>
-    <tr><td>Basis</td><td>Wer den Aufruf-Link der Befragung hat</td><td>Befragungstexte: Titel, Situation, Vorschlag, Hintergrund, eigens dafür geschrieben</td><td>Als Datei, vorerst von der Technik-Hilfe auf die Beteiligungsplattform übernommen</td></tr>
+    <tr><td>Basis</td><td>Wer den Aufruf-Link der Befragung hat</td><td>Befragungstexte: Titel, Situation, Vorschlag, Hintergrund, eigens dafür geschrieben</td><td>Als Datei, die Miriam auf die Beteiligungsplattform hochlädt</td></tr>
     <tr><td>Externe</td><td>Elternbeirat, Vereine, andere Fraktionen</td><td>Keine. Bekommen nichts aus dem Hub, ihre Aussagen trägt Miriam ins Meinungsbild ein</td><td>Im Gespräch, außerhalb des Hubs</td></tr>
     <tr><td>Öffentlichkeit</td><td>Alle, auch Verwaltung und Presse</td><td>Der eingereichte Antrag und der Beschluss</td><td>Einreichung von Hand, nie aus dem Hub ins RIS</td></tr>
   </tbody></table></div>
@@ -446,22 +446,29 @@ function handle(s0,a){
     case'basis':pr.basis={titel:a.titel,situation:a.situation,vorschlag:a.vorschlag,hintergrund:a.hintergrund||''};break;
     case'paket':{
       const r=s.befragungen.find(x=>x.id===a.id);r.status='laeuft';r.paket=d;
+      r.paketIds=r.slugs.map((_,i)=>r.id+'-t'+(i+1));
+      r.kennungen=Object.fromEntries(r.paketIds.map((k,i)=>[k,r.slugs[i]]));
       r.slugs.forEach(sl=>eintrag(p(s,sl),d,'befragung','In die Befragung „'+r.name+'“ gegeben, läuft bis '+de(r.bis)));break}
     case'ruecklauf':{
       const r=s.befragungen.find(x=>x.id===a.id);
       a.zeilen.forEach(z=>{
-        if(z.ziel==='ignorieren')return;
+        const merke=ziel=>{if(z.kennung)r.kennungen[z.kennung]=ziel};
+        const argumente=z.argumente||[];
+        if(z.ziel==='ignorieren'){merke('ignorieren');return}
         if(z.ziel==='neu'){
           let slug=slugVon(z.titel); while(p(s,slug))slug+='-2';
           const n=leerProjekt(slug,z.titel,'',r.kreis+' (Befragung „'+r.name+'“)',d);
-          n.meinungen.push({datum:d,kreis:r.kreis,frage:r.frage,zusammen:'',vert:z.vert,befragung:r.id});
-          s.projekte.push(n);r.slugs.push(slug);return}
+          n.meinungen.push({datum:d,kreis:r.kreis,frage:r.frage,zusammen:'',vert:z.vert,argumente,befragung:r.id});
+          s.projekte.push(n);r.slugs.push(slug);merke(slug);return}
+        merke(z.ziel);
+        if(!r.slugs.includes(z.ziel))r.slugs.push(z.ziel);
         const x=p(s,z.ziel);
         const alt=x.meinungen.find(m=>m.befragung===r.id);
-        if(alt){alt.vert=z.vert;alt.datum=d}
-        else x.meinungen.push({datum:d,kreis:r.kreis,frage:r.frage,zusammen:'',vert:z.vert,befragung:r.id});
+        if(alt){alt.vert=z.vert;alt.argumente=argumente;alt.datum=d}
+        else x.meinungen.push({datum:d,kreis:r.kreis,frage:r.frage,zusammen:'',vert:z.vert,argumente,befragung:r.id});
         eintrag(x,d,'ruecklauf','Rücklauf aus der Befragung „'+r.name+'“: '+summe(z.vert)+' Personen');
       });
+      if(a.stand)r.stand=a.stand;
       r.ruecklauf=d;r.status=a.schliessen?'beendet':'laeuft';break}
     case'zusammenfassung':{const m=pr.meinungen.find(x=>x.befragung===a.befragung);if(m)m.zusammen=a.text;break}
     case'stand':s.staende.push({datum:d});break;
@@ -520,7 +527,7 @@ function laufendeBefragung(s,pr){return s.befragungen.find(r=>r.status==='laeuft
 
 /* Die Fassungen. Was hier nicht steht, verlässt den Rechner nicht. */
 function ergebnisZeilen(s,r){
-  return r.slugs.map(sl=>p(s,sl)).map(x=>{const m=x.meinungen.find(y=>y.befragung===r.id);return m?{slug:x.slug,titel:x.titel,vert:m.vert,zusammen:m.zusammen}:null}).filter(Boolean);
+  return r.slugs.map(sl=>p(s,sl)).map(x=>{const m=x.meinungen.find(y=>y.befragung===r.id);return m?{slug:x.slug,titel:x.titel,vert:m.vert,zusammen:m.zusammen,argumente:m.argumente||[]}:null}).filter(Boolean);
 }
 /* Routine wie „In die Befragung gegeben“ oder „aus komki übernommen“ zählt nicht als neu. */
 const ROUTINE=['vorschlag','befragung','ruecklauf'];
@@ -586,17 +593,32 @@ function antragsreife(pr){
     {k:frak?'Fraktion hat sich festgelegt':'Keine Festlegung der Fraktion eingetragen',st:frak?'ok':'hinweis'}
   ];
 }
-function liesCsv(text){
-  const zeilen=text.replace(/^﻿/,'').trim().split(/\r?\n/);
-  const kopf=zeilen.shift().split(';');
-  if(kopf[0]!=='Thema'||kopf.length<7)return{fehler:'Diese Datei passt nicht. Erwartet wird eine Tabelle mit Thema und fünf Stufen.'};
-  return{zeilen:zeilen.map(z=>{const m=z.match(/("([^"]|"")*"|[^;]*)(;|$)/g).map(c=>c.replace(/;$/,''));
-    return{titel:m[0].replace(/^"|"$/g,'').replace(/""/g,'"'),vert:m.slice(1,6).map(Number)}})};
+/* Die Dateien nach docs/schnittstellen/befragung.md. */
+const STUFEN_DATEI=['strongly_against','somewhat_against','neutral','somewhat_for','strongly_for'];
+function paketDatei(s,r){
+  return JSON.stringify({format:'survey-package',version:'1.0.0',survey_id:r.id,name:r.name,question:r.frage,
+    topics:r.paketIds.map(id=>{const b=p(s,r.kennungen[id]).basis;
+      return Object.assign({id,title:b.titel,description:b.situation+'\n'+b.vorschlag},b.hintergrund?{background:b.hintergrund}:{})})},null,2);
+}
+function ladeHerunter(name,text){
+  const u=URL.createObjectURL(new Blob([text],{type:'application/json'}));
+  const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);
+}
+function liesRuecklauf(text,r){
+  let d;
+  try{d=JSON.parse(text)}catch(e){return{fehler:'Diese Datei lässt sich nicht lesen. Lade sie noch einmal von der Beteiligungsplattform herunter.'}}
+  if(d.format!=='survey-results')return{fehler:'Das ist keine Antwort-Datei einer Befragung.'};
+  if(String(d.version).split('.')[0]!=='1')return{fehler:'Diese Datei hat ein Format, das der Hub noch nicht lesen kann.'};
+  if(d.survey_id!==r.id)return{fehler:'Diese Antworten gehören zu einer anderen Befragung.'};
+  if(r.stand&&Date.parse(d.as_of)<Date.parse(r.stand))return{fehler:'Diese Datei ist älter als die zuletzt eingelesene.'};
+  if(r.paketIds.some(id=>!d.topics.some(t=>t.id===id)))return{fehler:'In dieser Datei fehlt ein Thema aus der Befragung. Lade sie noch einmal herunter.'};
+  return{stand:d.as_of,zeilen:d.topics.map(t=>({kennung:t.id,herkunft:t.origin,titel:t.title,beschreibung:t.description,vert:STUFEN_DATEI.map(k=>t.distribution[k]),argumente:t.arguments}))};
 }
 function ordneZu(s,befragung,zeilen){
   return zeilen.map(z=>{
-    const t=befragung.slugs.map(sl=>p(s,sl)).find(x=>(x.basis&&x.basis.titel===z.titel)||x.titel===z.titel);
-    return Object.assign({},z,{ziel:t?t.slug:'neu',treffer:!!t});
+    const ziel=befragung.kennungen[z.kennung];
+    const b=z.herkunft==='package'&&ziel?p(s,ziel).basis:null;
+    return Object.assign({},z,{ziel:ziel||'neu',treffer:!!ziel,geaendert:!!b&&(b.titel!==z.titel||b.situation+'\n'+b.vorschlag!==z.beschreibung)});
   });
 }
 
@@ -651,7 +673,15 @@ const BASIS_TEXTE={
   'mitfahrbaenke-ortsteile':{titel:'Mitfahrbänke in den Ortsteilen',situation:'Situation: Wer kein Auto hat, kommt spontan kaum in die Kernstadt.',vorschlag:'Vorschlag: Die Stadt stellt an drei Punkten Mitfahrbänke auf.',hintergrund:''},
   'sitzbaenke-stadtweiher':{titel:'Sitzbänke am Stadtweiher',situation:'Situation: Rund um den Stadtweiher gibt es auf einem Kilometer nur zwei Bänke.',vorschlag:'Vorschlag: Die Stadt stellt mindestens sechs weitere Bänke auf.',hintergrund:''}
 };
-const CSV_BEISPIEL='Thema;Stufe1;Stufe2;Stufe3;Stufe4;Stufe5;Beteiligung;Datum\r\nTrinkbrunnen am Marktplatz;0;1;2;8;11;22;2026-12-01\r\nBürgerbus für die Ortsteile;2;4;5;6;4;21;2026-12-01\r\nMitfahrbänke in den Ortsteilen;3;6;6;4;1;20;2026-12-01\r\nSitzbänke am Stadtweiher;0;0;3;9;10;22;2026-12-01\r\nBänke auch im Stadtpark;0;1;2;5;4;12;2026-12-01\r\n';
+const ARGUMENTE_BEISPIEL=[{stance:'for',text:'Gerade für Kinder auf dem Spielplatz nebenan wäre das gut.'},{stance:'against',text:'Wer kümmert sich im Winter um Pflege und Hygiene?'}];
+function beispielRuecklauf(s,r){
+  const V=[[0,1,2,8,11],[2,4,5,6,4],[3,6,6,4,1],[0,0,3,9,10]];
+  const verteilung=w=>Object.fromEntries(STUFEN_DATEI.map((k,i)=>[k,w[i]]));
+  const topics=r.paketIds.map((id,i)=>{const b=p(s,r.kennungen[id]).basis;
+    return{id,origin:'package',title:b.titel,description:b.situation+'\n'+b.vorschlag,distribution:verteilung(V[i%V.length]),arguments:i?[]:ARGUMENTE_BEISPIEL}});
+  topics.push({id:'x-17',origin:'proposal',title:'Bänke auch im Stadtpark',description:'Situation: Im Stadtpark fehlen Sitzplätze.\nVorschlag: Die Stadt stellt dort weitere Bänke auf.',distribution:verteilung([0,1,2,5,4]),arguments:[]});
+  return JSON.stringify({format:'survey-results',version:'1.0.0',survey_id:r.id,as_of:s.heute+'T09:00:00+01:00',participants:24,topics});
+}
 const BELEG1='Freigabe in komki, Do 12.11., 20:41 Uhr';
 const BELEG2='Freigabe in komki, Fr 13.11., 9:12 Uhr';
 const GESCHICHTE=[
@@ -685,7 +715,7 @@ const GESCHICHTE=[
          {t:'schritt',slug:TB,schrittText:'Rücklauf der Basis abwarten',schrittWer:'Jonas',schrittBis:'2026-11-30',datum:'2026-11-18'}]],
  ['8.1',[{t:'tag',datum:'2026-12-01'}]],
  ['8.2',[{t:'ruecklauf',id:'r1',schliessen:true,datum:'2026-12-01',zeilen:[
-    {ziel:TB,vert:[0,1,2,8,11]},{ziel:'buergerbus-ortsteile',vert:[2,4,5,6,4]},{ziel:'mitfahrbaenke-ortsteile',vert:[3,6,6,4,1]},{ziel:'sitzbaenke-stadtweiher',vert:[0,0,3,9,10]},{ziel:'neu',titel:'Bänke auch im Stadtpark',vert:[0,1,2,5,4]}]},
+    {ziel:TB,vert:[0,1,2,8,11],argumente:ARGUMENTE_BEISPIEL},{ziel:'buergerbus-ortsteile',vert:[2,4,5,6,4]},{ziel:'mitfahrbaenke-ortsteile',vert:[3,6,6,4,1]},{ziel:'sitzbaenke-stadtweiher',vert:[0,0,3,9,10]},{ziel:'neu',kennung:'x-17',titel:'Bänke auch im Stadtpark',vert:[0,1,2,5,4]}]},
    {t:'zusammenfassung',slug:TB,befragung:'r1',text:'Viel Zustimmung. Gegenargument: Pflege und Hygiene im Winter.',datum:'2026-12-01'}]],
  ['8.3',[]],
  ['8.4',[{t:'eintragen',slug:TB,wer:'Fraktion',text:'Basis deutlich dafür, Folgekosten sind geklärt. Antrag vorbereiten.',phase:'ausarbeitung',schrittText:'Standort mit dem Bauamt klären',schrittWer:'Selin',schrittBis:'2027-01-15',datum:'2026-12-03'},
@@ -803,7 +833,7 @@ function dialogFuer(s,code){
     case'verweis':return schleier('verweis','Querverweis ergänzen',
       feld('f-za','Wohin?','<select id="f-za" name="art"><option>Ablage</option><option>Recherche in komki</option></select>')+feld('f-zw','Adresse oder Name',ein('f-zw','wert','','required')),'Ergänzen','data-slug="'+sl+'"');
     case'zusammen':return schleier('zusammen','Rücklauf in einem Satz',
-      feld('f-zz','Was sagen die Argumente?','<textarea id="f-zz" name="text" required></textarea>','Die Datei enthält nur Zählungen. Lies die Argumente auf der Beteiligungsplattform.'),'Sichern','data-slug="'+sl+'" data-befragung="'+x+'"');
+      feld('f-zz','Was sagen die Argumente?','<textarea id="f-zz" name="text" required></textarea>','Die Argumente stehen auf der Ergebnisseite. Dein Satz ist der Text, den auch komki lesen darf, die Argumente selbst nicht.'),'Sichern','data-slug="'+sl+'" data-befragung="'+x+'"');
   }
   return'';
 }
@@ -854,9 +884,12 @@ function vProjekt(s,slug,o){
     (pr.ende?'':'<div class="block"><button type="button" class="btn link" data-dialog="ablegen:'+pr.slug+'">Projekt ablegen</button></div>')+
     '</aside></div>'+(o.dialog||'')+'</div>';
 }
+function argumenteHtml(l){
+  return l&&l.length?'<ul class="klein" style="margin:.3rem 0 0;padding-left:1rem">'+l.map(a=>'<li>'+(a.stance==='for'?'Dafür: ':'Dagegen: ')+esc(a.text)+'</li>').join('')+'</ul>':'';
+}
 function ergebnisHtml(zeilen,mitLink){
   return '<table class="imp ergebnis"><thead><tr><th>Idee</th><th>So hat die Basis geantwortet</th><th>Was dazu gesagt wurde</th></tr></thead><tbody>'+
-    zeilen.map(z=>'<tr><td>'+(mitLink?'<button type="button" class="btn link" style="text-align:left" data-go="projekt:'+z.slug+'">'+esc(z.titel)+'</button>':'<b>'+esc(z.titel)+'</b>')+'</td><td style="min-width:15rem">'+vertBalken(z.vert)+'</td><td>'+(z.zusammen?esc(z.zusammen):(mitLink?'<span class="klein">Noch nichts eingetragen</span>':''))+'</td></tr>').join('')+'</tbody></table>';
+    zeilen.map(z=>'<tr><td>'+(mitLink?'<button type="button" class="btn link" style="text-align:left" data-go="projekt:'+z.slug+'">'+esc(z.titel)+'</button>':'<b>'+esc(z.titel)+'</b>')+'</td><td style="min-width:15rem">'+vertBalken(z.vert)+'</td><td>'+(z.zusammen?esc(z.zusammen):(mitLink?'<span class="klein">Noch nichts eingetragen</span>':''))+argumenteHtml(z.argumente)+'</td></tr>').join('')+'</tbody></table>';
 }
 function papierStand(st){
   const dran=Object.entries(st.dran);
@@ -895,7 +928,7 @@ function vStand(s){
 }
 function formBefragungNeu(s){
   return '<form data-form="befragung" style="max-width:34rem"><h3 style="font-size:1.375rem">Neue Befragung</h3><p class="klein" style="margin-top:.2rem">Eine Frage an die Basis zu mehreren Ideen, mit Frist. Hier schreibst du die Texte und liest später die Antworten ein.</p>'+
-    feld('f-rn','Name',ein('f-rn','name','','required'))+feld('f-rf','Was wollen wir wissen?',ein('f-rf','frage','','required'))+feld('f-rb','Läuft bis',ein('f-rb','bis','','type="date" required'))+
+    feld('f-rn','Name',ein('f-rn','name','','required maxlength="80"'))+feld('f-rf','Was wollen wir wissen?',ein('f-rf','frage','','required maxlength="120"'))+feld('f-rb','Läuft bis',ein('f-rb','bis','','type="date" required'))+
     '<div class="feld"><span class="lab">Welche Ideen?</span><div class="auswahl">'+s.projekte.filter(x=>!x.ende).map(x=>'<label><input type="checkbox" name="slug" value="'+x.slug+'"> '+esc(x.titel)+' <span class="klein">'+(neuesteMeinung(x,'Basis')?'Basis schon gefragt':'')+'</span></label>').join('')+'</div></div><div class="knoepfe"><button class="btn haupt">Befragung anlegen</button></div></form>';
 }
 function vBefragungen(s,o){
@@ -909,17 +942,18 @@ function vBefragungen(s,o){
     (r.status==='entwurf'?'<div class="hinweis">Wer den Aufruf-Link hat, sieht diese Texte. Behandle das wie eine Veröffentlichung.'+(fertig?'':' Erst alle Texte sichern, dann lassen sie sich ausgeben.')+'</div>':'');
   let koerper='';
   if(r.status==='laeuft'&&o.zuordnung)koerper=vZuordnung(s,r,o.zuordnung);
-  else if(r.status==='laeuft')koerper='<div class="hinweis gruen">Texte ausgegeben am '+de(r.paket)+' Die Befragung läuft.</div><div class="feld"><label for="f-datei">Antworten einlesen</label><input id="f-datei" type="file" accept=".csv,text/csv"><small>Die CSV-Datei von der Beteiligungsplattform. Sie enthält nur Zählungen.</small></div><div class="knoepfe" style="justify-content:flex-start"><button type="button" class="btn" data-act="csv-beispiel" data-id="'+r.id+'">Beispieldatei nehmen</button></div>';
+  else if(r.status==='laeuft')koerper='<div class="hinweis gruen">Texte ausgegeben am '+de(r.paket)+' Lade die Datei auf der Beteiligungsplattform hoch, dort bekommst du den Aufruf-Link.</div><div class="feld"><label for="f-datei">Antworten einlesen</label><input id="f-datei" type="file" accept=".json,application/json"><small>Die Datei von der Beteiligungsplattform: Zählungen und Argumente, ohne Bezug zu einzelnen Personen. Das geht auch mitten in der Befragung, die neue Datei ersetzt die alte.</small></div><div class="knoepfe" style="justify-content:flex-start"><button type="button" class="btn" data-act="paket-laden" data-id="'+r.id+'">Datei noch einmal herunterladen</button><button type="button" class="btn" data-act="ruecklauf-beispiel" data-id="'+r.id+'">Beispieldatei nehmen</button></div>';
   else if(r.status==='beendet')koerper='<h4 class="ergebnis-t">Das Ergebnis</h4><p class="klein" style="margin-bottom:.5rem">Rücklauf vom '+de(r.ruecklauf)+' In der Reihenfolge der Ideen, ohne Rangliste. Nicht bindend.</p>'+ergebnisHtml(ergebnisZeilen(s,r),true);
   if(r.status==='entwurf')koerper='<form data-form="basis-alle">'+r.slugs.map(sl=>{const x=p(s,sl),b=x.basis||{titel:x.titel,situation:'',vorschlag:'',hintergrund:''};const len=(b.situation+'\n'+b.vorschlag).length;
       return '<div class="fassung" data-slug="'+sl+'"><span class="zaehl '+(len>GRENZEN.beschreibung?'zuviel':'')+'">'+len+' von '+GRENZEN.beschreibung+' Zeichen</span><div class="klein">'+esc(x.titel)+(x.basis?'':' · <b>noch nicht geschrieben</b>')+'</div><input name="titel:'+sl+'" aria-label="Titel für die Basis" value="'+esc(b.titel)+'"><div class="zweier"><textarea name="situation:'+sl+'" aria-label="Situation" placeholder="Situation: …">'+esc(b.situation)+'</textarea><textarea name="vorschlag:'+sl+'" aria-label="Vorschlag" placeholder="Vorschlag: …">'+esc(b.vorschlag)+'</textarea></div><textarea name="hintergrund:'+sl+'" aria-label="Hintergrund" class="hg" placeholder="Hintergrund, optional">'+esc(b.hintergrund)+'</textarea></div>'}).join('')+'<div class="knoepfe"><button class="btn">Alle Texte sichern</button></div></form>';
   return '<div class="app">'+appKopf(s,'befragungen')+'<div class="runde">'+liste+'<div style="min-width:0">'+kopf+koerper+'</div></div></div>';
 }
 function vZuordnung(s,r,zeilen){
-  const opts=z=>r.slugs.map(sl=>'<option value="'+sl+'"'+(z.ziel===sl?' selected':'')+'>'+esc(p(s,sl).titel)+'</option>').join('')+'<option value="neu"'+(z.ziel==='neu'?' selected':'')+'>Als neue Idee anlegen</option><option value="ignorieren">Nicht übernehmen</option>';
-  return '<form data-form="ruecklauf" data-id="'+r.id+'"><h4 class="ergebnis-t">Antworten prüfen</h4><p class="klein" style="margin:.2rem 0 .6rem">Stimmt die Zuordnung zu den Ideen? Es gibt keine Rangliste und keine Empfehlung, das entscheiden Menschen.</p>'+
+  const opts=z=>s.projekte.filter(x=>!x.ende).map(x=>'<option value="'+x.slug+'"'+(z.ziel===x.slug?' selected':'')+'>'+esc(x.titel)+'</option>').join('')+'<option value="neu"'+(z.ziel==='neu'?' selected':'')+'>Als neue Idee anlegen</option><option value="ignorieren"'+(z.ziel==='ignorieren'?' selected':'')+'>Nicht übernehmen</option>';
+  const zuordnung=(z,i)=>z.herkunft==='package'?esc(p(s,z.ziel).titel)+'<input type="hidden" name="z'+i+'" value="'+z.ziel+'">':'<select name="z'+i+'" aria-label="Zuordnung für '+esc(z.titel)+'">'+opts(z)+'</select>';
+  return '<form data-form="ruecklauf" data-id="'+r.id+'"><h4 class="ergebnis-t">Antworten prüfen</h4><p class="klein" style="margin:.2rem 0 .6rem">Die Ideen aus der Befragung erkennt der Hub von selbst. Nur neue Vorschläge ordnest du einmal zu. Es gibt keine Rangliste und keine Empfehlung, das entscheiden Menschen.</p>'+
     '<table class="imp"><thead><tr><th>Thema in der Datei</th><th>So hat die Basis geantwortet</th><th>Gehört zu</th></tr></thead><tbody>'+
-    zeilen.map((z,i)=>'<tr><td>'+esc(z.titel)+(z.treffer?'':'<br><span class="marke-k warn">Neu aus der Basis</span>')+'</td><td style="min-width:16rem">'+vertBalken(z.vert)+'</td><td><select name="z'+i+'" aria-label="Zuordnung für '+esc(z.titel)+'">'+opts(z)+'</select></td></tr>').join('')+'</tbody></table>'+
+    zeilen.map((z,i)=>'<tr><td>'+esc(z.titel)+(z.treffer?'':'<br><span class="marke-k warn">Neu aus der Basis</span>')+(z.geaendert?'<br><span class="marke-k warn">Text auf der Plattform geändert</span>':'')+argumenteHtml(z.argumente)+'</td><td style="min-width:16rem">'+vertBalken(z.vert)+'</td><td>'+zuordnung(z,i)+'</td></tr>').join('')+'</tbody></table>'+
     '<div class="knoepfe"><label class="klein"><input type="checkbox" name="schliessen" checked> Befragung hier als beendet führen</label><button class="btn haupt">Antworten übernehmen</button></div></form>';
 }
 function teilText(t,pr){
@@ -953,10 +987,10 @@ const PERSONEN=[
  {n:'Selin Kaya',r:'Stadträtin in der Fraktion',kreis:'Engerer Kreis',ziel:'Vor der Fraktionssitzung wissen, was ansteht und was an Selin selbst hängt.',moment:'Tablet, zehn Minuten vor der Sitzung, PDF aus der Nextcloud.',hub:'Fasst den Hub nicht an. Liest den Stand, sagt Änderungen in der Sitzung.',angst:'Der Stand ist veraltet oder zu lang. Vor dem Vorstand als säumig dastehen.'},
  {n:'Jonas Brandt',r:'Vorstand des Ortsverbands, kein Ratsmitglied',kreis:'Engerer Kreis',ziel:'Sehen, was aus den Ideen des Verbands wird, und die Basis zur richtigen Zeit einbinden.',moment:'Vor der Vorstandssitzung. Lädt zur Befragung ein.',hub:'Fasst den Hub nicht an. Bekommt den Stand, liest die Befragungstexte gegen.',angst:'Die Basis wird zu spät gefragt. Hört Dinge, die nicht für den Vorstand gedacht waren.'},
  {n:'Ute Lechner',r:'Mitglied, kommt selten zum Stammtisch',kreis:'Basis',ziel:'Mitreden, und merken, dass es etwas bewirkt.',moment:'Abends auf dem Sofa, Telefon, Link im Mitglieder-Chat.',hub:'Weiß nichts vom Hub. Sieht nur die Befragungstexte und später die Rückmeldung.',angst:'Antwortet und hört nie wieder etwas davon.'},
- {n:'Technik-Hilfe',r:'Jemand im Ortsverband, die oder der sich auskennt',kreis:'Kein Kreis: sieht nur, was zum Betrieb nötig ist',ziel:'Dass alles läuft, ohne ständig gerufen zu werden.',moment:'Beim Einrichten, und wenn Texte oder Antworten auf die Beteiligungsplattform und zurück müssen.',hub:'Startet und sichert ihn. Tauscht vorerst die Dateien mit der Beteiligungsplattform aus, weil das noch per Terminal geht.',angst:'Bei jeder Kleinigkeit wird gefragt, und im Urlaub steht alles still.'},
+ {n:'Technik-Hilfe',r:'Jemand im Ortsverband, die oder der sich auskennt',kreis:'Kein Kreis: sieht nur, was zum Betrieb nötig ist',ziel:'Dass alles läuft, ohne ständig gerufen zu werden.',moment:'Beim Einrichten, und wenn etwas klemmt.',hub:'Startet und sichert ihn.',angst:'Bei jeder Kleinigkeit wird gefragt, und im Urlaub steht alles still.'},
  {n:'Externe',r:'Elternbeirat, Händlerverein, andere Fraktionen, Kontakte in der Verwaltung',kreis:'Kein Kreis: bekommt nichts aus dem Hub',ziel:'Ernst genommen werden und rechtzeitig mitreden.',moment:'Im Gespräch, per Mail, am Rand einer Sitzung.',hub:'Kein Kontakt. Miriam trägt ein, was gesagt wurde, und wählt, wer es lesen darf.',angst:'Ein vertrauliches Gespräch wird herumgereicht.'},
  {n:'Verwaltung und Öffentlichkeit',r:'Bürgermeister, Bauamt, Presse, Bürgerinnen und Bürger',kreis:'Öffentlichkeit',ziel:'Einen klaren Antrag, über den man beschließen kann.',moment:'Wenn der Antrag eingeht.',hub:'Kein Kontakt. Der Antrag geht von Hand raus.',angst:'Ein Antrag, der nicht beschlussfähig ist.'},
- {n:'komki',r:'Kein Mensch: Miriams vertrauliches Recherche-Werkzeug',kreis:'Liefert nur an die Redaktion',ziel:'Belege und Entwürfe, die ihren Raum nur geprüft verlassen.',moment:'Wenn Miriam im Raum etwas freigibt.',hub:'Schlägt Fakten, Varianten und Entwürfe vor. Entscheidet nie.',angst:'Vertrauliches landet über einen Vorschlag im Stand.'}
+ {n:'komki',r:'Kein Mensch: Miriams vertrauliches Recherche-Werkzeug',kreis:'Liefert nur an die Redaktion',ziel:'Belege und Entwürfe, die ihren Raum nur geprüft verlassen.',moment:'Wenn Miriam im Raum etwas freigibt.',hub:'Schlägt Fakten, Varianten und Entwürfe vor. Entscheidet nie. Liest keine fremden Texte aus Befragungen.',angst:'Vertrauliches landet über einen Vorschlag im Stand.'}
 ];
 function personenHtml(){return PERSONEN.map(x=>'<article class="persona"><h3>'+esc(x.n)+'</h3><div class="rolle">'+esc(x.r)+'</div><dl><div><dt>Kreis</dt><dd>'+esc(x.kreis)+'</dd></div><div><dt>Will</dt><dd>'+esc(x.ziel)+'</dd></div><div><dt>Moment</dt><dd>'+esc(x.moment)+'</dd></div><div><dt>Mit dem Hub</dt><dd>'+esc(x.hub)+'</dd></div><div><dt>Fürchtet</dt><dd>'+esc(x.angst)+'</dd></div></dl></article>').join('')}
 
@@ -991,13 +1025,15 @@ const SZENEN=[
   ['bruch','„Überfällig“ im Papier an den Vorstand','Ein rotes Wort neben einem Namen, gelesen von Leuten außerhalb der Fraktion, ist ein politisches Problem. Im Stand steht neutral „bis 30.10.“. „Überfällig“ gibt es nur in Miriams Ansicht.'],
   ['','Jonas sieht, wer noch nicht gehört ist','„Noch nicht gehört: Vorstand, Basis“ steht bei frühen Projekten. Das ist Jonas’ Stichwort für die nächste Befragung.']]}
 ]},
-{id:'s4',wer:'Jonas, Miriam, Technik-Hilfe, Ute · Basis',titel:'Rein in die Basis',moment:'<b>Mittwoch.</b> Der Vorstand will vier Ideen in die Basis geben. Miriam schreibt die Texte, Jonas liest sie gegen, die Technik-Hilfe startet die Befragung. Ute bekommt abends den Link in den Mitglieder-Chat.',bilder:[
+{id:'s4',wer:'Jonas, Miriam, Ute · Basis',titel:'Rein in die Basis',moment:'<b>Mittwoch.</b> Der Vorstand will vier Ideen in die Basis geben. Miriam schreibt die Texte, Jonas liest sie gegen, Miriam lädt die Datei auf die Beteiligungsplattform hoch. Ute bekommt abends den Link in den Mitglieder-Chat.',bilder:[
  {k:'4.1',t:'Eine Befragung, vier Texte',u:'localhost:4000/befragungen',html:s=>vBefragungen(s,{r:s.befragungen[0]}),notes:[
   ['','Die Befragung ist der Übergabepunkt','Eine Frage an die Basis zu mehreren Ideen, mit Frist. Hier gehen die Texte hinaus, hier kommen die Antworten zurück, und der Hub merkt sich dazwischen, was zu welchem Projekt gehört.'],
-  ['','Die Texte werden eigens geschrieben','Sie kommen nie automatisch aus Notizen oder dem Stand. Die Zeichengrenze stammt aus dem Importformat.'],
-  ['bruch','Die Übergabe per Terminal','Die Beteiligungsplattform nimmt Texte heute nur per Skript an, und an den Admin-Bereich kommt man nur per SSH. Das schaffen weder Miriam noch Jonas. Darum übernimmt das vorerst die Technik-Hilfe, bis die Plattform Hoch- und Herunterladen im Browser kann.']]},
+  ['','Die Texte werden eigens geschrieben','Sie kommen nie automatisch aus Notizen oder dem Stand. Die Zeichengrenzen stehen in der Schnittstellenbeschreibung.'],
+  ['bruch','Die Übergabe per Terminal','Die Beteiligungsplattform nimmt Texte heute nur per Skript an, und an den Admin-Bereich kommt man nur per SSH. Das schaffen weder Miriam noch Jonas. Darum trägt Miriam eine Datei von Hand: aus dem Hub herunterladen, auf der Plattform hochladen. Das Hochladen im Browser muss die Plattform noch lernen.'],
+  ['','Der Aufruf-Link bleibt draußen','Die Plattform zeigt ihn nach dem Hochladen, Miriam schickt ihn in den Chat. Im Hub liegt er nicht, denn wer ihn hat, macht mit.']]},
  {k:'4.2',t:'Bei Ute: auf der Beteiligungsplattform',u:'Telefon',telefon:true,html:s=>telefon(basisKarte(fassungBasis(p(s,TB)),'Welche Ideen sollen wir weiterverfolgen?','1 von 4 Ideen'),'21:14'),notes:[
   ['','Ute sieht nichts aus dem Hub außer dem Text','Keine Phase, kein „die Fraktion ist dafür“. Die Meinung soll nicht vorgeprägt werden.'],
+  ['','Argumente gehen wörtlich weiter','Bevor Ute ein Argument schreibt, sagt die Plattform, dass es wörtlich bei den Befragenden ankommt und im Stand stehen kann. Ein Bezug zu Ute geht nicht mit.'],
   ['','Darstellung nur angenähert','Die Beteiligungsplattform bleibt eigenständig und hat ihre eigene Gestaltung. Zu sehen ist hier nur, welcher Text dort ankommt.']]}
 ]},
 {id:'s5',wer:'Miriam und komki · Recherche',titel:'Belege aus der Recherche',moment:'<b>Donnerstagabend.</b> Miriam sucht in einem öffentlichen Rechercheraum nach Förderprogrammen für den Radweg. Zwei Funde sind gut. Früher hätte sie die Links in eine Notiz kopiert und das Abrufdatum vergessen.',bilder:[
@@ -1037,11 +1073,12 @@ const SZENEN=[
   ['','Der Hub liefert Text, der Kanal bleibt draußen','Jonas kopiert den Satz in den Chat. Eine Anzeige auf der Beteiligungsplattform („so hat der Rat entschieden“) wäre schöner, gehört aber dorthin.'],
   ['','Ute hat beim Radweg nie abgestimmt','Die Rückmeldung geht trotzdem an die Basis. Ute wollte vor allem merken, dass etwas bewirkt wird.']]}
 ]},
-{id:'s8',wer:'Technik-Hilfe, Miriam, Fraktion',titel:'Die Basis hat geantwortet',moment:'<b>Dienstag, 1. Dezember.</b> Die Befragung ist zu Ende, die Technik-Hilfe schickt Miriam die Datei. Am Donnerstag berät die Fraktion. Es gibt ein deutliches Bild, und ein Thema, von dem niemand wusste.',bilder:[
- {k:'8.1',t:'Antworten prüfen',u:'localhost:4000/befragungen',html:s=>vBefragungen(s,{r:s.befragungen[0],zuordnung:ordneZu(s,s.befragungen[0],liesCsv(CSV_BEISPIEL).zeilen)}),notes:[
-  ['bruch','Eine CSV ins Textfeld kopieren','Das wäre für Miriam unzumutbar. Jetzt wählt sie die Datei aus und sieht direkt die Ansicht hier.'],
+{id:'s8',wer:'Miriam, Fraktion',titel:'Die Basis hat geantwortet',moment:'<b>Dienstag, 1. Dezember.</b> Die Befragung ist zu Ende, Miriam lädt die Datei von der Beteiligungsplattform herunter. Am Donnerstag berät die Fraktion. Es gibt ein deutliches Bild, und ein Thema, von dem niemand wusste.',bilder:[
+ {k:'8.1',t:'Antworten prüfen',u:'localhost:4000/befragungen',html:s=>vBefragungen(s,{r:s.befragungen[0],zuordnung:ordneZu(s,s.befragungen[0],liesRuecklauf(beispielRuecklauf(s,s.befragungen[0]),s.befragungen[0]).zeilen)}),notes:[
+  ['bruch','Eine Datei ins Textfeld kopieren','Das wäre für Miriam unzumutbar. Jetzt wählt sie die Datei aus und sieht direkt die Ansicht hier.'],
+  ['','Zuordnung über die Kennung','Die vier Ideen erkennt der Hub an einer Kennung, die die Plattform nur zurückgibt. Eine Titeländerung stört nicht mehr, der Hub zeigt sie nur an. Auswählen muss Miriam nur beim neuen Vorschlag.'],
   ['','Ideen kommen auch von unten','In der Basis wurde „Bänke auch im Stadtpark“ vorgeschlagen und freigegeben. Im Hub gibt es das nicht, also wird eine neue Idee mit Herkunft Basis daraus.'],
-  ['','Nur Zählungen, die Argumente fehlen noch','Im Format stehen keine Argumente. Darum fasst Miriam sie vorerst in einem Satz zusammen. Ein Export mit Argumenten gehört auf die Beteiligungsplattform.']]},
+  ['','Die Argumente kommen mit','Der Rücklauf bringt Zählungen und Argumente wörtlich mit, ohne Bezug zu einzelnen Personen. Menschen lesen sie hier und im Stand. komki liest nur die Zählungen und Miriams Satz, weil sich über fremden Text Anweisungen einschleusen lassen.']]},
  {k:'8.2',t:'Das Ergebnis bleibt',u:'localhost:4000/befragungen',html:s=>vBefragungen(s,{r:s.befragungen[0]}),notes:[
   ['bruch','Die beste Ansicht verschwand','Der Überblick über alle Ideen war nur ein Zwischenschritt beim Einlesen. Danach stand dort nur „Beendet“. Jetzt bleibt er als Ergebnisseite stehen, mit Links zu den Projekten.'],
   ['','Keine Rangliste','Die Tabelle steht in der Reihenfolge der Ideen, ohne Prozent oder Sieger. Wer nach Zustimmung sortiert, baut eine Rangliste durch die Hintertür.']]},
@@ -1066,8 +1103,10 @@ const RAND=[
  ['Nichtöffentliches Wissen ändert die Lage','Es steht nie im Hub, auch nicht verklausuliert. Das Risiko liegt in Freitext wie „warten, bis das Grundstück geklärt ist“. Dagegen hilft nur die Vorschau.','Miriam, engerer Kreis'],
  ['Etwas Heikles ist schon im letzten Stand','Aus dem Stand nehmen wirkt nur nach vorn. Eine verschickte Ausgabe lässt sich nicht zurückholen.','Miriam'],
  ['Tippfehler in einem Verlaufseintrag','Eintrag korrigierbar mit Vermerk. Im Prototyp noch nicht gebaut.','Miriam'],
- ['Titel auf der Beteiligungsplattform nachträglich geändert','Beim Einlesen keine Übereinstimmung, Miriam ordnet per Auswahlliste zu.','Technik-Hilfe, Miriam'],
- ['Die Datei wird zweimal eingelesen','Der Rücklauf derselben Befragung ersetzt die Zahlen, statt ein zweites Meinungsbild anzulegen. Im Klicktest geprüft.','Miriam'],
+ ['Titel auf der Beteiligungsplattform nachträglich geändert','Die Kennung ordnet das Thema trotzdem richtig zu. Der Hub zeigt an, dass über einen anderen Text abgestimmt wurde.','Miriam'],
+ ['Tippfehler entdeckt, nachdem die Befragung läuft','Ein zweites Hochladen ändert vorhandene Themen nicht, Antworten dürfen nicht still einem anderen Text zugerechnet werden. Korrigiert wird auf der Plattform.','Miriam'],
+ ['Die Datei wird zweimal eingelesen','Der Rücklauf derselben Befragung ersetzt die Zahlen, statt ein zweites Meinungsbild anzulegen. Eine ältere Datei wird abgewiesen. Im Klicktest geprüft.','Miriam'],
+ ['Ein Argument enthält eine Anweisung an die KI','Menschen lesen es als Klartext. komki bekommt Argumente und nicht zugeordnete Vorschläge gar nicht zu sehen.','Basis, komki'],
  ['Nach einer Ausgabe am selben Tag weitergepflegt','Der Prototyp rechnet „neu seit“ tageweise, solche Einträge fielen durch. Die echte App braucht Zeitpunkte statt Daten.','Fraktion, Vorstand'],
  ['Meinungsbild ohne Werkzeug: Handzeichen am Stammtisch','„Neuer Eintrag“ mit Basis und einem Satz. Die Verteilung ist optional.','Miriam'],
  ['Miriam ist drei Wochen im Urlaub','Kein Zugriff für andere im ersten Wurf. Der letzte Stand bleibt lesbar, aber er altert. Das ist der Preis von „lokal“.','Engerer Kreis'],
@@ -1097,7 +1136,8 @@ const VERWORFEN=[
  ['Fakten als Links, zusammen mit den Wegen','Fakten sind Belege, Varianten sind Abwägung. Das sind zwei Dinge.','Fakt mit Aussage, Beleg und Prüfstatus. Varianten mit Status und Grund.','Dein Feedback'],
  ['Connector erst ganz am Ende','Quellenrecherche ist der Hauptnutzen.','Früh, beginnend mit „Fakt vorschlagen“ aus öffentlicher Recherche.','Dein Feedback'],
  ['Rücklauf nur als Zwischenschritt beim Einlesen','Die beste Ansicht verschwand, wenn sie am nützlichsten wäre.','Dauerhafte Ergebnisseite, frisch auch oben im Stand.','Dein Feedback'],
- ['Betrieb, Jargon und CSV-Textfeld für Miriam','Sie ist keine Technikerin. Terminal, SSH und Fachbegriffe gehen nicht.','Technik-Hilfe als eigene Rolle, Datei-Upload, Alltagssprache.','Dein Feedback']
+ ['Betrieb, Jargon und CSV-Textfeld für Miriam','Sie ist keine Technikerin. Terminal, SSH und Fachbegriffe gehen nicht.','Technik-Hilfe als eigene Rolle, Datei-Upload, Alltagssprache.','Dein Feedback'],
+ ['Ordner mit Markdown hin, CSV zurück, Zuordnung über den Titel','Ein Ordner lässt sich im Browser kaum hochladen, die CSV trägt weder Kennungen noch Argumente.','Je eine JSON-Datei, von Miriam getragen, mit opaker Kennung.','Dein Feedback']
 ];
 const FRAGEN=[
  ['Wie kommt die Essenz aus einem Fraktionsraum in den Hub?','Die Regeln lehnen das heute ab, weil der Vorstand nicht zum Empfängerkreis gehört (Szene 6). Öffentliche Recherche geht auch ohne (Szene 5).','Der Mensch liest gegen und wählt die Teile aus. Ob die Bindung sich ändert, klärt das Kalkül. Γ ändert sich nur nach GO.'],
@@ -1150,7 +1190,7 @@ blickeZeigen('buergerbus-ortsteile');
 document.getElementById('blickwahl').addEventListener('click',e=>{const b=e.target.closest('[data-blick]');if(b)blickeZeigen(b.dataset.blick)});
 
 /* Selbst klicken */
-const L={s:start(),v:'brett',slug:null,filter:'alle',dialog:null,befragungId:null,befragungNeu:false,zuordnung:null};
+const L={s:start(),v:'brett',slug:null,filter:'alle',dialog:null,befragungId:null,befragungNeu:false,zuordnung:null,stand:null};
 const live=document.getElementById('live'),lstatus=document.getElementById('live-status'),lurl=document.getElementById('live-url');
 function meld(t){lstatus.textContent=t}
 function aktBefragung(){return L.befragungId?L.s.befragungen.find(x=>x.id===L.befragungId):L.s.befragungen[L.s.befragungen.length-1]||null}
@@ -1169,7 +1209,8 @@ function liveZeichnen(){
 }
 function geh(z){L.dialog=null;L.zuordnung=null;L.befragungNeu=false;const[a,b]=z.split(':');if(a==='projekt'){L.v='projekt';L.slug=b}else L.v=a;liveZeichnen()}
 function tu(a,msg){L.s=handle(L.s,Object.assign({datum:L.s.heute},a));if(msg)meld(msg);L.dialog=null;liveZeichnen()}
-function csvLesen(text,id){const r=L.s.befragungen.find(x=>x.id===id);const e=liesCsv(text);if(e.fehler){meld(e.fehler);return}L.zuordnung=ordneZu(L.s,r,e.zeilen);liveZeichnen()}
+function ruecklaufLesen(text,id){const r=L.s.befragungen.find(x=>x.id===id);const e=liesRuecklauf(text,r);if(e.fehler){meld(e.fehler);return}L.zuordnung=ordneZu(L.s,r,e.zeilen);L.stand=e.stand;liveZeichnen()}
+function paketLaden(id){const r=L.s.befragungen.find(x=>x.id===id);ladeHerunter('befragung-'+r.id+'.json',paketDatei(L.s,r))}
 live.addEventListener('click',e=>{
   const t=e.target.closest('button');if(!t)return;
   if(t.dataset.go)return geh(t.dataset.go);
@@ -1183,13 +1224,14 @@ live.addEventListener('click',e=>{
     if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>meld('Kurztext kopiert.'),()=>meld('Kopieren ging nicht. Bitte aus dem Feld markieren.'))}else meld('Bitte aus dem Feld markieren.');return}
   if(act==='sichtbar'){tu({t:'sichtbar',slug:t.dataset.slug,id},'Sichtbarkeit geändert.');return}
   if(act==='ablehnen'){tu({t:'entscheide',id,annehmen:false},'Abgelehnt.');return}
-  if(act==='paket'){tu({t:'paket',id},'Texte ausgegeben. Die Befragung läuft.');return}
+  if(act==='paket'){tu({t:'paket',id},'Texte ausgegeben. Die Datei liegt in deinen Downloads.');paketLaden(id);return}
+  if(act==='paket-laden'){paketLaden(id);meld('Die Datei liegt in deinen Downloads.');return}
   if(act==='befragungneu'){L.befragungNeu=true;L.zuordnung=null;return liveZeichnen()}
-  if(act==='csv-beispiel'){return csvLesen(CSV_BEISPIEL,id)}
+  if(act==='ruecklauf-beispiel'){return ruecklaufLesen(beispielRuecklauf(L.s,L.s.befragungen.find(x=>x.id===id)),id)}
 });
 live.addEventListener('change',e=>{
   if(e.target.id==='f-wer'){const f=e.target.form;f.querySelector('input[name=sicht][value='+(e.target.value===NUR_ICH?'nein':'ja')+']').checked=true}
-  if(e.target.id==='f-datei'&&e.target.files[0]){const r=new FileReader();r.onload=()=>csvLesen(String(r.result),aktBefragung().id);r.readAsText(e.target.files[0])}
+  if(e.target.id==='f-datei'&&e.target.files[0]){const r=new FileReader();r.onload=()=>ruecklaufLesen(String(r.result),aktBefragung().id);r.readAsText(e.target.files[0])}
 });
 live.addEventListener('submit',e=>{
   e.preventDefault();const f=e.target,d=new FormData(f),k=f.dataset.form,sl=f.dataset.slug;
@@ -1210,7 +1252,7 @@ live.addEventListener('submit',e=>{
   if(k==='vorschlag'){const v=L.s.vorschlaege.find(x=>x.id===f.dataset.id);const teile=v.teile.map((_,i)=>i).filter(i=>d.get('t'+i));if(!teile.length){meld('Nichts ausgewählt.');return}return tu({t:'entscheide',id:v.id,annehmen:true,teile},'Übernommen.')}
   if(k==='befragung'){const w=d.getAll('slug');if(!w.length){meld('Wähle mindestens eine Idee.');return}L.befragungNeu=false;L.s=handle(L.s,{t:'befragung',name:d.get('name'),frage:d.get('frage'),bis:d.get('bis'),slugs:w,datum:L.s.heute});L.befragungId='r'+L.s.befragungen.length;meld('Befragung angelegt. Jetzt die Texte schreiben.');return liveZeichnen()}
   if(k==='basis-alle'){let s=L.s;f.querySelectorAll('.fassung').forEach(x=>{const q=x.dataset.slug;const si=d.get('situation:'+q),vo=d.get('vorschlag:'+q);if(si&&vo)s=handle(s,{t:'basis',slug:q,titel:d.get('titel:'+q),situation:si,vorschlag:vo,hintergrund:d.get('hintergrund:'+q)})});L.s=s;meld('Texte gesichert.');return liveZeichnen()}
-  if(k==='ruecklauf'){const z=L.zuordnung.map((x,i)=>Object.assign({},x,{ziel:d.get('z'+i)}));const id=f.dataset.id;L.zuordnung=null;return tu({t:'ruecklauf',id,zeilen:z,schliessen:!!d.get('schliessen')},'Antworten übernommen.')}
+  if(k==='ruecklauf'){const z=L.zuordnung.map((x,i)=>Object.assign({},x,{ziel:d.get('z'+i)}));const id=f.dataset.id;L.zuordnung=null;return tu({t:'ruecklauf',id,zeilen:z,stand:L.stand,schliessen:!!d.get('schliessen')},'Antworten übernommen.')}
 });
 function liveLaden(k,v,slug){L.s=structuredClone(STAND[k]||start());L.v=v;L.slug=slug;L.dialog=null;L.zuordnung=null;L.befragungId=null;L.befragungNeu=false;meld('Zustand aus Bild '+k+' geladen.');liveZeichnen()}
 document.getElementById('live-reset').addEventListener('click',()=>{L.s=start();L.v='brett';L.dialog=null;L.zuordnung=null;L.befragungId=null;L.befragungNeu=false;meld('Zurück auf Anfang.');liveZeichnen()});
