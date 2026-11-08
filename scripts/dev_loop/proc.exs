@@ -11,8 +11,10 @@ defmodule DevLoop.Proc do
   output lines. Options: `:cd`, `:env` (`{name, value | false}`),
   `:timeout_ms`, `:log` (file path), `:cancel` (checked every second;
   when it returns true the program is ended), `:idle_ms` (likewise: no
-  output for this long ends the program; nil, the default, keeps only
-  the deadline).
+  delivered line for this long ends the program; nil, the default, keeps
+  only the deadline), `:finish_on` (a completed line starting with this
+  prefix ends the program at once and reports `{:ok, lines}` — the agent's
+  final result event, so a background wait cannot outlive the stage).
   """
   def run(cmd, args, opts) do
     exe = System.find_executable(cmd) || raise "#{cmd} nicht gefunden"
@@ -40,7 +42,7 @@ defmodule DevLoop.Proc do
 
     limits =
       {tick, deadline, Keyword.get(opts, :cancel, fn -> false end), Keyword.get(opts, :idle_ms),
-       now()}
+       now(), Keyword.get(opts, :finish_on)}
 
     try do
       collect(port, log, limits, [], "")
@@ -51,7 +53,7 @@ defmodule DevLoop.Proc do
     end
   end
 
-  defp collect(port, log, {tick, deadline, cancel, idle_ms, _} = limits, tail, partial) do
+  defp collect(port, log, {tick, deadline, cancel, idle_ms, _, finish_on} = limits, tail, partial) do
     receive do
       {^port, {:data, {:noeol, chunk}}} ->
         collect(port, log, touch(limits), tail, partial <> chunk)
@@ -59,7 +61,15 @@ defmodule DevLoop.Proc do
       {^port, {:data, {:eol, chunk}}} ->
         line = partial <> chunk
         IO.write(log, line <> "\n")
-        collect(port, log, touch(limits), Enum.take([line | tail], 200), "")
+
+        if finish_on != nil and String.starts_with?(line, finish_on) do
+          # The finish line is the stage's end; nothing after it is needed,
+          # and a still-running background task must not outlive it.
+          kill(port)
+          {:ok, Enum.reverse(Enum.take([line | tail], 200))}
+        else
+          collect(port, log, touch(limits), Enum.take([line | tail], 200), "")
+        end
 
       {^port, {:exit_status, 0}} ->
         {:ok, Enum.reverse(tail)}
@@ -87,8 +97,11 @@ defmodule DevLoop.Proc do
     end
   end
 
-  # Any output counts as life; partial lines keep the clock running too.
-  defp touch({_tick, _deadline, _cancel, _idle_ms, _} = limits),
+  # Every delivered line counts as life. The port in line mode keeps a
+  # partial line to itself until the newline arrives (or the 10 MB cap),
+  # so a program writing only unterminated output never touches the idle
+  # clock — stream-json lines are newline-terminated and unaffected.
+  defp touch({_tick, _deadline, _cancel, _idle_ms, _, _} = limits),
     do: put_elem(limits, 4, now())
 
   defp now, do: System.monotonic_time(:millisecond)

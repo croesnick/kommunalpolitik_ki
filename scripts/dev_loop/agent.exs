@@ -30,10 +30,15 @@ defmodule DevLoop.Agent do
     po: [{:claude, ["--model", "claude-opus-5-5"]}, {:tt, ["--effort", "max"]}]
   }
 
-  # A stage ends not only at its wall-clock limit but when it has gone
-  # silent: no stream-json line, no tool result, nothing. Long-running
-  # tools keep streaming their output, so silence means stuck.
-  @idle_timeout_ms 30 * 60 * 1000
+  # Stream-json reports events only for completed messages and tool
+  # results, so one long command inside a session is silent however
+  # healthy it is. The idle window must outlast the longest plausible
+  # in-session command; sixty minutes do, while a dead CLI never
+  # delivers another line at all. The final result line ends the stage
+  # at once (finish_on below), so Claude Code's silent background wait
+  # after the result can burn neither idle time nor wall clock.
+  @idle_timeout_ms 60 * 60 * 1000
+  @result_line ~s({"type":"result")
 
   # Variables of an outer Claude Code session or of the loop itself that a
   # stage must not inherit.
@@ -81,6 +86,7 @@ defmodule DevLoop.Agent do
           env: env(account),
           timeout_ms: ctx.stage_timeout_ms,
           idle_ms: @idle_timeout_ms,
+          finish_on: @result_line,
           log: log,
           # Consumed by the stage that sees it, so it takes over one stage.
           cancel: fn -> File.rm(ctx.takeover_file) == :ok end

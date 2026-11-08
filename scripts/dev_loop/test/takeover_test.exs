@@ -73,9 +73,17 @@ defmodule DevLoop.TakeoverTest do
       File.write!(fake, @fake_claude)
       File.chmod!(fake, 0o755)
       path = System.get_env("PATH")
+      args_env = System.get_env("FAKE_ARGS")
       System.put_env("PATH", Path.join(dir, "bin") <> ":" <> path)
       System.put_env("FAKE_ARGS", Path.join(dir, "args"))
-      on_exit(fn -> System.put_env("PATH", path) end)
+
+      on_exit(fn ->
+        System.put_env("PATH", path)
+
+        if args_env,
+          do: System.put_env("FAKE_ARGS", args_env),
+          else: System.delete_env("FAKE_ARGS")
+      end)
 
       test = self()
       takeover_file = Path.join(dir, "TAKEOVER")

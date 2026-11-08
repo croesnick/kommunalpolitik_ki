@@ -20,16 +20,21 @@ defmodule DevLoop.GitHub do
   @project_number "1"
 
   def repo, do: @repo
+  def owner, do: @owner
   def issue_url(n), do: "https://github.com/#{@repo}/issues/#{n}"
 
   # -- reads ---------------------------------------------------------------
 
-  @doc "Open issues with labels, assignees, comments and open blockers."
+  @doc """
+  Open issues with author, labels, assignees, comments and open blockers.
+  `owner?` marks the owner's own tickets — the only ones whose body may
+  confirm a Zielbild (core.exs); comments are filtered at fetch.
+  """
   def open_issues(ctx) do
     listed =
       gh!(
         ctx,
-        ~w(issue list --repo #{@repo} --state open --limit 500 --json number,title,body,labels,assignees,comments)
+        ~w(issue list --repo #{@repo} --state open --limit 500 --json number,title,body,labels,assignees,author,comments)
       )
       |> JSON.decode!()
 
@@ -49,25 +54,34 @@ defmodule DevLoop.GitHub do
       end)
 
     for i <- listed do
+      author = i["author"]["login"]
+
       %{
         number: i["number"],
         title: i["title"],
         body: i["body"] || "",
         labels: Enum.map(i["labels"], & &1["name"]),
         assignees: Enum.map(i["assignees"], & &1["login"]),
+        author: author,
+        owner?: author == @owner,
         comments: Core.trusted_comment_bodies(i["comments"], @owner),
         open_blockers: Map.get(blockers, i["number"], 0)
       }
     end
   end
 
-  @doc "Open PRs as `%{number, branch, sha, closes: [n]}`."
+  @doc """
+  Open PRs of the base repo as `%{number, branch, sha, closes: [n]}`. Fork
+  PRs are left out: strangers cannot push branches here, so only the base
+  repo's PRs may shape selection, busyness and reviews.
+  """
   def open_prs(ctx) do
     gh!(
       ctx,
-      ~w(pr list --repo #{@repo} --state open --limit 200 --json number,headRefName,headRefOid,closingIssuesReferences)
+      ~w(pr list --repo #{@repo} --state open --limit 200 --json number,headRefName,headRefOid,isCrossRepository,closingIssuesReferences)
     )
     |> JSON.decode!()
+    |> Enum.reject(& &1["isCrossRepository"])
     |> Enum.map(fn p ->
       %{
         number: p["number"],
@@ -118,7 +132,7 @@ defmodule DevLoop.GitHub do
     do:
       gh!(ctx, ~w(run list --repo #{@repo} --commit #{sha} --json status,conclusion,workflowName))
       |> JSON.decode!()
-      |> runs_state()
+      |> Core.runs_state()
 
   @doc """
   The circuit breaker's view of `main`: `{:red, names}` only when its CI
@@ -131,29 +145,11 @@ defmodule DevLoop.GitHub do
            ~w(run list --repo #{@repo} --commit #{sha} --json status,conclusion,workflowName)
          ) do
       {:ok, out} ->
-        redden(JSON.decode!(out) |> runs_state())
+        redden(JSON.decode!(out) |> Core.runs_state())
 
       {:error, out} ->
         log(ctx, "Main-CI nicht prüfbar: #{first_line(out)}")
         nil
-    end
-  end
-
-  defp runs_state(runs) do
-    cond do
-      runs == [] or Enum.any?(runs, &(&1["status"] != "completed")) ->
-        :pending
-
-      Enum.all?(runs, &(&1["conclusion"] in ["success", "skipped", "neutral"])) ->
-        :green
-
-      true ->
-        {:red,
-         for(
-           r <- runs,
-           r["conclusion"] not in ["success", "skipped", "neutral"],
-           do: r["workflowName"]
-         )}
     end
   end
 

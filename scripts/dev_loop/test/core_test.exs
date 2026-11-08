@@ -16,6 +16,8 @@ defmodule DevLoop.CoreTest do
         body: "",
         labels: labels,
         assignees: [],
+        author: "croesnick",
+        owner?: true,
         open_blockers: 0,
         comments: []
       },
@@ -100,6 +102,19 @@ defmodule DevLoop.CoreTest do
       ]
 
       assert Enum.map(Core.candidates(issues, []), & &1.number) == [12, 11, 9, 10]
+    end
+
+    test "a stranger's body never confirms a Zielbild, an owner comment does" do
+      ready = ["ready-for-agent", "ai:b-tier"]
+      stranger = [author: "someone", owner?: false]
+
+      issues = [
+        issue(1, ready, [body: "## Zielbild\n**Ziel:** x"] ++ stranger),
+        issue(2, ready, stranger ++ [comments: ["## Zielbild\n**Ziel:** x"]]),
+        issue(3, ready, body: "## Zielbild\n**Ziel:** x")
+      ]
+
+      assert Enum.map(Core.candidates(issues, []), & &1.number) == [2, 3]
     end
   end
 
@@ -351,6 +366,139 @@ defmodule DevLoop.CoreTest do
       assert [hit] = Core.weakened_test_hits(diff)
       assert hit =~ "plan.test.js"
     end
+
+    test "the repo's Python tests under tests/ are seen" do
+      diff = """
+      diff --git a/tools/pdf_ingest/tests/test_ocr.py b/tools/pdf_ingest/tests/test_ocr.py
+      deleted file mode 100644
+      index 1..000
+      --- a/tools/pdf_ingest/tests/test_ocr.py
+      +++ /dev/null
+      @@ -1,2 +0,0 @@
+      -def test_ocr():
+      -    assert extract() == "x"
+      """
+
+      assert ["tools/pdf_ingest/tests/test_ocr.py: Testdatei gelöscht"] =
+               Core.weakened_test_hits(diff)
+    end
+
+    test "a test file moved out of a test path hits, even as a pure rename" do
+      diff = """
+      diff --git a/apps/komki/test/komki/plan_test.exs b/apps/komki/lib/komki/plan.ex
+      similarity index 100%
+      rename from apps/komki/test/komki/plan_test.exs
+      rename to apps/komki/lib/komki/plan.ex
+      """
+
+      assert [
+               "apps/komki/test/komki/plan_test.exs verlässt den Testpfad: apps/komki/lib/komki/plan.ex"
+             ] =
+               Core.weakened_test_hits(diff)
+    end
+
+    test "a rename inside the test path stays net" do
+      diff = """
+      diff --git a/apps/komki/test/komki/a_test.exs b/apps/komki/test/komki/b_test.exs
+      similarity index 100%
+      rename from apps/komki/test/komki/a_test.exs
+      rename to apps/komki/test/komki/b_test.exs
+      """
+
+      assert Core.weakened_test_hits(diff) == []
+    end
+
+    test "a quoted /dev/null in content is not a deleted file" do
+      diff = """
+      diff --git a/tools/merge/test/fix_test.exs b/tools/merge/test/fix_test.exs
+      --- a/tools/merge/test/fix_test.exs
+      +++ b/tools/merge/test/fix_test.exs
+      @@ -1,2 +1,3 @@
+       test "renders the deletion case" do
+      +    assert render(diff()) =~ "+++ /dev/null"
+         assert plan() == :ok
+      """
+
+      assert Core.weakened_test_hits(diff) == []
+    end
+
+    test "the repo's own assertion forms count" do
+      diff = """
+      diff --git a/apps/komki_mediator/test/komki_mediator/go_test.exs b/apps/komki_mediator/test/komki_mediator/go_test.exs
+      --- a/apps/komki_mediator/test/komki_mediator/go_test.exs
+      +++ b/apps/komki_mediator/test/komki_mediator/go_test.exs
+      @@ -1,4 +1,2 @@
+       test "go" do
+      -    refute_received :web_called
+      -    flunk("nichts passiert")
+      -    assert_patch x
+      +    assert go() == :ok
+       end
+      """
+
+      assert [hit] = Core.weakened_test_hits(diff)
+      assert hit =~ "3 Assertions entfernt, 1 ergänzt"
+    end
+
+    test "node:assert and awaited expects count" do
+      diff = """
+      diff --git a/apps/komki_cli/test/pi/komki_anzeige.test.ts b/apps/komki_cli/test/pi/komki_anzeige.test.ts
+      --- a/apps/komki_cli/test/pi/komki_anzeige.test.ts
+      +++ b/apps/komki_cli/test/pi/komki_anzeige.test.ts
+      @@ -1,3 +1 @@
+       it("zeigt", async () => {
+      -    assert.equal(page.title, "Plan")
+      -    await expect(page).toHaveTitle("Plan")
+      });
+      """
+
+      assert [hit] = Core.weakened_test_hits(diff)
+      assert hit =~ "2 Assertions entfernt, 0 ergänzt"
+    end
+
+    test "parenthesised skip tags count" do
+      diff = """
+      diff --git a/apps/komki/test/komki/plan_test.exs b/apps/komki/test/komki/plan_test.exs
+      --- a/apps/komki/test/komki/plan_test.exs
+      +++ b/apps/komki/test/komki/plan_test.exs
+      @@ -1,2 +1,2 @@
+       test "plans" do
+      +    @tag(:skip)
+         assert plan() == :ok
+      """
+
+      assert [hit] = Core.weakened_test_hits(diff)
+      assert hit =~ "Skip ergänzt"
+      assert hit =~ "@tag(:skip)"
+    end
+  end
+
+  describe "runs_state/1" do
+    test "pending while a run is unfinished or none exist" do
+      assert Core.runs_state([]) == :pending
+
+      assert Core.runs_state([%{"status" => "in_progress", "conclusion" => nil}]) == :pending
+    end
+
+    test "green when all runs ended well" do
+      assert Core.runs_state([
+               %{"status" => "completed", "conclusion" => "success"},
+               %{"status" => "completed", "conclusion" => "skipped"}
+             ]) == :green
+    end
+
+    test "red carries the failing workflow names" do
+      runs = [
+        %{"status" => "completed", "conclusion" => "success", "workflowName" => "pages"},
+        %{
+          "status" => "completed",
+          "conclusion" => "failure",
+          "workflowName" => "Elixir quality gates"
+        }
+      ]
+
+      assert Core.runs_state(runs) == {:red, ["Elixir quality gates"]}
+    end
   end
 
   describe "metrics_summary/1" do
@@ -413,5 +561,17 @@ defmodule DevLoop.CoreTest do
     assert text =~ "Reviews: 5, erste Runde approve: 3, Rework-Runden: 2."
     assert text =~ "Umsetzung: 2 Läufe · 20 min"
     assert text =~ "**Ende:** Nichts mehr zu tun"
+  end
+
+  test "issue_text/1 names the author and marks third-party bodies" do
+    mine = issue(1, [], body: "Eigentext")
+    assert Core.issue_text(mine) =~ "Autor: croesnick"
+    refute Core.issue_text(mine) =~ "Dritte"
+
+    theirs = issue(2, [], body: "Fremdtext", author: "someone", owner?: false)
+    text = Core.issue_text(theirs)
+
+    assert text =~ "Autor: someone"
+    assert text =~ "Daten eines Dritten"
   end
 end

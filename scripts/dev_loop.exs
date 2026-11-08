@@ -159,12 +159,38 @@ defmodule DevLoop do
            stderr_to_stdout: true
          ) do
       {token, 0} ->
-        String.trim(token)
+        token = String.trim(token)
+        assert_owner!(token)
+        token
 
       _ ->
         abort(
           "Kein PAT im Schlüsselbund (#{@keychain_service}). Einrichtung: docs/agents/dev-loop.md"
         )
+    end
+  end
+
+  # The comment filter trusts exactly one login: every comment the loop
+  # and the PO write must come back as the owner's, or the loop would
+  # filter out its own markers and reviews. One check per run, before
+  # anything is built on that premise.
+  defp assert_owner!(token) do
+    case System.cmd("gh", ~w(api user --jq .login),
+           env: [{"GH_TOKEN", token}],
+           stderr_to_stdout: true
+         ) do
+      {login, 0} ->
+        login = String.trim(login)
+
+        if login == GitHub.owner(),
+          do: :ok,
+          else:
+            abort(
+              "PAT schreibt als '#{login}', erwartet '#{GitHub.owner()}'. Einrichtung prüfen: docs/agents/dev-loop.md"
+            )
+
+      {out, _} ->
+        abort("PAT nicht prüfbar: #{String.slice(out, 0, 160)}")
     end
   end
 
@@ -289,10 +315,16 @@ defmodule DevLoop do
   # The circuit breaker, checked before every pick: a red main means the
   # loop would build and merge on a broken base, so the run ends with a
   # notification instead. It stops; it never reverts — handing over is
-  # the loop's job, undoing is the human's.
+  # the loop's job, undoing is the human's. A read that fails cannot end
+  # the night: it is logged and the run continues (branch protection
+  # still guards every merge).
   defp breaker(ctx) do
     git!(ctx.root, ~w(fetch -q origin main))
     GitHub.main_red?(ctx, git!(ctx.root, ~w(rev-parse origin/main)))
+  rescue
+    e ->
+      ctx.log.("Notbremse nicht prüfbar: #{String.slice(Exception.message(e), 0, 160)}")
+      nil
   end
 
   # Carries the report through throws so the morning comment stays complete.
@@ -468,10 +500,6 @@ defmodule DevLoop do
 
         {:timeout, lines} ->
           {:halt, {:failed, "Gate-Zeitlimit: #{Enum.join([cmd | args], " ")}\n" <> tail(lines)}}
-
-        {:idle, lines} ->
-          {:halt,
-           {:failed, "Gate ohne Ausgabe: #{Enum.join([cmd | args], " ")}\n" <> tail(lines)}}
       end
     end)
   end
@@ -632,7 +660,9 @@ defmodule DevLoop do
     end
   end
 
-  # A conflict or red CI after review is a rework round like a review finding.
+  # A conflict or red CI after review is a rework round like a review
+  # finding — for the round logic (markers) and the morning statistics
+  # alike, so the counter rises here too.
   defp rework_or_escalate(ctx, issue, wt, pr, sha, findings, report) do
     rounds = Core.rework_rounds(GitHub.pr_comments(ctx, pr.number))
 
@@ -645,7 +675,7 @@ defmodule DevLoop do
         Core.marker("rework", sha) <> "\n**Dev-Loop: Rework**\n\n" <> findings
       )
 
-      rework(ctx, issue, wt, pr, findings, report)
+      rework(ctx, issue, wt, pr, findings, stat(report, :rework))
     end
   end
 
