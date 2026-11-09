@@ -632,6 +632,29 @@ Beobachter des Bestands. Beispiel: ratsprojekte mit `ratsprojekte@1`.
 
 ---
 
+### Stand
+
+**Definition:** Die Fassung von ratsprojekte für den engeren Kreis, also
+Fraktion und Vorstand: wer dran ist, was neu ist, Meinungsbilder, Fakten,
+Anträge und alle aktiven Projekte. Private Einträge und Querverweise fehlen.
+
+**Nicht:** GO-Stand oder Regelstand Γ (Zustände im Sicherheitsmodell);
+Ausgabe (was ein Arbeitsraum erzeugt).
+
+---
+
+### Ausgegebener Stand
+
+**Definition:** Ein einzelnes, datiertes Dokument aus dem Stand, das die
+Redaktion bewusst an Fraktion und Vorstand weitergegeben hat. Es ändert sich
+danach nicht mehr und lässt sich nicht zurückholen, eine Korrektur wirkt nur
+nach vorn.
+
+**Nicht:** Rückblick (dieselbe Fassung ab einem frei gewählten Tag, nur zur
+Vorbereitung, nicht weitergegeben).
+
+---
+
 ### Maschinenlesbarer Stand
 
 **Definition:** Die Fassung des Stands, die komki lesen darf. Sie enthält nur
