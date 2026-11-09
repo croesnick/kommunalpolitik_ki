@@ -198,6 +198,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `skills/antrag_generieren` | Markdown-Skill | Stadtratsantrag entwerfen (fraktionsneutral; fraktionsspezifische Vorlage via Vault-Tag) | Agent Skill | Funktionsfähig |
 | `skills/terminal_screenshot` | Markdown-Skill + Python-Skripte | Terminal-Sitzung als Screenshot für READMEs (tmux-Capture → SVG, Browser-verifiziert) | Agent Skill | Funktionsfähig |
 | `skills/mermaid_vision_loop` | Markdown-Skill + Python-Skript | Mermaid-Diagramme rendern, vom Vision-Agenten bewerten lassen und refaktorieren, bis sie lesbar sind | Agent Skill | Funktionsfähig |
+| `scripts/dev_loop.exs` | Elixir-Skript | Dev-Loop: arbeitet freie Tickets ab, auch wenn niemand am Rechner sitzt. Eine Session setzt um, eine zweite prüft. Einfache Tickets werden gemergt, alles andere wartet mit einer kurzen Zusammenfassung auf ein GO. Eine dritte Session verfeinert Tickets und macht nur Vorschläge. Regeln und Einrichtung: `docs/agents/dev-loop.md` | CLI (`elixir scripts/dev_loop.exs`) | Prototyp |
 
 ### Externe Abhängigkeiten (nicht im Repo)
 
@@ -350,6 +351,7 @@ kommunalpolitik_ki/
 │   ├── obsidian_mcp/       # Vault nativ lesen/schreiben (AI: MCP)
 │   ├── pdf_ingest/         # PDF-Ingestion (AI: MCP)
 │   └── ratsinfo_mcp/       # MCP-Wrapper um ratsinfo-CLI (AI: MCP)
+├── scripts/                # Dev-Loop: Tickets unbeaufsichtigt umsetzen, reviewen, mergen (docs/agents/dev-loop.md)
 ├── skills/                 # AI-Harness-Skills
 │   ├── foerdermittel_recherche/  # Fördermittel-Recherche (AI: Agent Skill)
 │   ├── ratsprojekt_delta/      # Neue Infos gegen Projektstand halten (AI: Agent Skill)

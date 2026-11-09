@@ -128,6 +128,12 @@ jobs:
         if: github.event_name == 'push'
         run: mix workspace.run -t test
 
+      # Dev-Loop (#389): Entscheidungslogik (Auswahl, Merge-Regel, geschützte
+      # Pfade inkl. Abgleich mit docs/agents/ai-tiers.md) und der Viewer für
+      # herdr (braucht jq, auf ubuntu-latest vorinstalliert).
+      - name: Tests (Dev-Loop)
+        run: for t in scripts/dev_loop/test/*_test.exs; do elixir "$t" || exit 1; done
+
       # Coverage-Gate fuer komki_policy (Schwellwert: apps/komki_policy/
       # mix.exs). Zeilendeckung ist hier Sekundaermetrik; die Orakel-
       # und Property-Suiten tragen die Pruefung. Der Boden verhindert
