@@ -477,7 +477,7 @@ function handle(s0,a){
       s.vorschlaege.push({id:'v'+(s.vorschlaege.length+1),slug:a.slug,raum:a.raum,titel:a.titel,teile:a.teile,status:'offen',datum:d,beleg:a.beleg});break;
     case'entscheide':{
       const v=s.vorschlaege.find(x=>x.id===a.id);const x=p(s,v.slug);
-      if(!a.annehmen){v.status='abgelehnt';eintrag(x,d,'vorschlag','Vorschlag aus komki abgelehnt: '+v.titel,{imStand:false});break}
+      if(!a.annehmen){v.status='abgelehnt';v.teile=[];eintrag(x,d,'vorschlag','Vorschlag aus komki abgelehnt: '+v.titel,{imStand:false});break}
       const wahl=a.teile||v.teile.map((_,i)=>i);
       v.teile.forEach((t,i)=>{
         if(!wahl.includes(i))return;
@@ -489,8 +489,11 @@ function handle(s0,a){
         }
       });
       if(!x.verweise.some(z=>z.wert===v.raum))x.verweise.push({art:'Recherche in komki',wert:v.raum});
-      v.status=wahl.length===v.teile.length?'uebernommen':'teilweise';
-      eintrag(x,d,'vorschlag','Aus komki übernommen: '+wahl.map(i=>v.teile[i].kurz).join(', '));
+      const nicht=v.teile.length-wahl.length;
+      v.status=nicht?'teilweise':'uebernommen';
+      eintrag(x,d,'vorschlag','Aus komki übernommen: '+wahl.map(i=>v.teile[i].kurz).join(', ')+(nicht?' · '+nicht+(nicht>1?' Teile':' Teil')+' nicht übernommen':''));
+      /* Abgewähltes wird gelöscht: Was niemand übernommen hat, soll nicht still weiterliegen. */
+      v.teile=[];
       break}
     case'wert':pr.wert={vp:a.vp,sm:a.sm};break;
     case'verweis':pr.verweise.push({art:a.art,wert:a.wert});break;
@@ -978,7 +981,7 @@ function basisKarte(b,frage,zaehler){
     '<div class="skala" aria-hidden="true">'+STUFEN.map(x=>'<span>'+x.s+'</span>').join('')+'</div><div class="gr" style="margin-top:.35rem">klar dagegen bis klar dafür</div>'+(zaehler?'<div class="gr" style="margin-top:.8rem">'+esc(zaehler)+'</div>':'');
 }
 function goPanel(titel,empf,inhalt,meldung,art,zusatz,knopf){
-  return '<div class="gobuehne"><div class="gopanel"><div class="eyebrow">komki · Freigabefenster (Gestalt noch offen, #360)</div><h4 style="margin-top:.35rem">'+titel+'</h4><p class="emp"><b>Empfänger:</b> '+empf+'</p><div class="diff">'+inhalt+'</div><div class="hinweis '+art+'">'+meldung+'</div>'+(zusatz?'<p class="emp">'+zusatz+'</p>':'')+'<div class="knoepfe"><button class="btn'+(knopf?' haupt':'')+'" '+(knopf?'':'disabled ')+'type="button">Freigeben</button></div></div></div>';
+  return '<div class="gobuehne"><div class="gopanel"><div class="eyebrow">komki · '+(knopf?'Freigabefenster (Gestalt noch offen, #360)':'Erklärung statt Freigabefenster')+'</div><h4 style="margin-top:.35rem">'+titel+'</h4><p class="emp"><b>Empfänger:</b> '+empf+'</p><div class="diff">'+inhalt+'</div><div class="hinweis '+art+'">'+meldung+'</div>'+(zusatz?'<p class="emp">'+zusatz+'</p>':'')+(knopf?'<div class="knoepfe"><button class="btn haupt" type="button">Freigeben</button></div>':'')+'</div></div>';
 }
 
 /* ===== Personas und Szenen ===== */
@@ -1039,21 +1042,24 @@ const SZENEN=[
 {id:'s5',wer:'Miriam und komki · Recherche',titel:'Belege aus der Recherche',moment:'<b>Donnerstagabend.</b> Miriam sucht in einem öffentlichen Rechercheraum nach Förderprogrammen für den Radweg. Zwei Funde sind gut. Früher hätte sie die Links in eine Notiz kopiert und das Abrufdatum vergessen.',bilder:[
  {k:'5.0',t:'In komki: die Freigabe',u:'komki · Raum heller-kranich',ohneFenster:true,html:()=>goPanel('Zwei Fakten an Ratsprojekte geben?','Miriam, Fraktion, Vorstand. Denn alles im Hub kann in einen Stand gelangen.','Förderprogramm und Vergleichsfall, je mit Quelle, Fundstelle und Abrufdatum','<b>Erlaubt:</b> Der Raum enthält nur Öffentliches, das darf an alle.','gruen','',true),notes:[
   ['','Das ist der Hauptnutzen des Connectors','Quellen landen samt Fundstelle und Abrufdatum beim Projekt, ohne Kopieren. Darum kommt der Connector früh und nicht erst am Ende.'],
-  ['','Schreiben geht zuerst, Lesen ist heikler','Aus öffentlicher Recherche zu liefern, ist unkritisch. Holt man dagegen den Stand in denselben Raum, könnte das die Websuche blockieren, weil ein Rechercheraum laut Referenzszenario kein Eingangsrecht auf Fraktionsdaten hat. Den Projektnamen nennt Miriam deshalb selbst. Formal klärt das das Kalkül.'],
+  ['','Der Vermittler setzt die Quelle ein','Der Agent verweist nur auf eine Antwort aus diesem Raum. URL und Abrufdatum setzt der Vermittler ein, eine erfundene Quelle scheitert schon vor dem GO.'],
+  ['','Schreiben geht zuerst, Lesen im eigenen Raum','Aus öffentlicher Recherche zu liefern, ist unkritisch. Der Rechercheraum kann den Stand nicht aufnehmen und sucht deshalb frei. Den Projektnamen nennt Miriam als Hinweis, zugeordnet wird im Hub. Die Antwort an den Raum ist immer gleich, damit sich keine Projekte ausprobieren lassen. Die Regeln stehen als Szenen 11 und 12 im Referenzszenario.'],
   ['','Noch nicht am echten Vermittler geprüft','Die Einschätzung folgt aus den Regeln. Der erste echte Lauf des Connectors muss sie bestätigen.']]},
  {k:'5.1',t:'Im Hub: die Fakten prüfen',u:'localhost:4000/vorschlaege',html:s=>vVorschlaege(s),notes:[
   ['bruch','Fakten waren nur Links','Ein Fakt ist ein Beleg, an dem wir nicht vorbeikommen: eine Aussage mit Quelle, Fundstelle und Datum. Der Link allein sagt nicht, was daraus folgt.'],
   ['','Was die KI findet, gilt als nicht verifiziert','Bis Miriam die Fundstelle selbst nachgeschlagen hat. So will es die Quellenpflicht, und die Checkliste zeigt es an.'],
-  ['','Zweites GO: doppelt oder nicht?','Beide Klicks kommen von Miriam. Sie beantworten aber zwei Fragen: „darf das raus?“ und „passt das zum heutigen Stand?“. Mit abwählbaren Teilen hat die zweite einen eigenen Sinn. Vorerst behalten.']]},
+  ['','Zweites GO: doppelt oder nicht?','Beide Klicks kommen von Miriam. Sie beantworten aber zwei Fragen: „darf das raus?“ und „passt das zum heutigen Stand?“. Mit abwählbaren Teilen hat die zweite einen eigenen Sinn. Vorerst behalten.'],
+  ['','Das Häkchen schützt nichts','Mit dem GO hat der Inhalt den Raum schon verlassen. Das Häkchen beantwortet nur, ob ein Teil zum Stand passt. Abgewählte Teile werden gelöscht, der Verlauf hält nur fest, dass einer nicht übernommen wurde.']]},
  {k:'5.2',t:'Die Fakten am Projekt',u:'localhost:4000/projekte/radweg-bahnhofstrasse',html:s=>vProjekt(s,RW),notes:[
   ['bruch','Fakten und Wege in einem Block','Das sind zwei Dinge: Fakten stehen fest, Varianten wägen wir ab. Jetzt zwei Blöcke, und jede Variante hat einen Status: offen, gewählt oder verworfen.'],
   ['','Die Checkliste rechnet mit','Sie sagt, was für einen Antrag noch fehlt. Sie blockiert nichts, denn die Fraktion entscheidet, ob eingereicht wird.']]}
 ]},
 {id:'s6',wer:'Miriam und komki · Antrag',titel:'Vom Entwurf zum Antrag',moment:'<b>Freitag.</b> Der Antrag muss bis Dienstag stehen. Im vertraulichen Raum hat Miriam einen Entwurf erarbeitet. Sie weiß dort auch von einem möglichen Grunderwerb, von dem nichts nach außen dringen darf.',bilder:[
- {k:'6.0',t:'In komki: die Freigabe aus dem Fraktionsraum',u:'komki · Raum stiller-reiher',ohneFenster:true,html:()=>goPanel('Ergebnis an Ratsprojekte geben?','Miriam, Fraktion, Vorstand. Denn alles im Hub kann in einen Stand gelangen.','Ein Ergebnis mit zwei Teilen: Variante D, Antragsentwurf','<b>Abgelehnt:</b> Dieser Raum trägt <code>fraktion-intern@1</code>. Der Vorstand gehört nicht zu dessen Empfängerkreis.','rot','Miriam liest den Entwurf gegen und entscheidet, welche Teile der Essenz in den Hub dürfen.',false),notes:[
-  ['bruch','Der Hub als Empfänger nur von Miriam','R.5.6 verlangt, dass auch die Weiterverarbeitung erfasst ist. Fließt aus dem Hub etwas in den Stand, zählt der engere Kreis mit. Im Referenzszenario enthält <code>fraktion-intern@1</code> den Vorstand aber nicht, also lehnt der Kalkül ab. Das ist korrekt und eine echte offene Frage.'],
+ {k:'6.0',t:'In komki: die Freigabe aus dem Fraktionsraum',u:'komki · Raum stiller-reiher',ohneFenster:true,html:()=>goPanel('Aus diesem Raum geht nichts an Ratsprojekte','Miriam, Fraktion, Vorstand. Denn alles im Hub kann in einen Stand gelangen.','Ein Ergebnis mit zwei Teilen: Variante D, Antragsentwurf','<b>Abgelehnt, ohne Freigabefenster:</b> Dieser Raum trägt <code>fraktion-intern@1</code>. Der Vorstand gehört nicht zu dessen Empfängerkreis, und ein GO ändert daran nichts.','rot','Bis Lockerungen gebaut sind, trägt Miriam die Essenz von Hand ein. Danach liest sie den Entwurf gegen und legt genau diesen Text offen.',false),notes:[
+  ['bruch','Der Hub als Empfänger nur von Miriam','R.5.6 verlangt, dass auch die Weiterverarbeitung erfasst ist. Fließt aus dem Hub etwas in den Stand, zählt der engere Kreis mit. Im Referenzszenario enthält <code>fraktion-intern@1</code> den Vorstand aber nicht, also lehnt der Kalkül ab. Das ist korrekt. Der Weg ist eine Lockerung im Einzelfall, keine neue Fassung mit Vorstand: Sonst dürfte der Vorstand alles Fraktionsinterne lesen.'],
+  ['bruch','Ein GO für unzulässige Empfänger','Die Engine bietet das heute an. Bei der Sitzungsmappe wäre das ein Verstoß gegen Art. 20 Abs. 2 GO, der nur an einem müden Klick am Abend hängt. Das Fenster warnt zwar, prüft aber nicht, ob Miriam das überhaupt darf. Deshalb erscheint hier keins.'],
   ['bruch','Ein GO über mehrere Vorschläge','Das bräche „ein GO deckt genau ein Ereignis“ (#352). Jetzt ist das Ergebnis eines Raums ein einziges Ereignis mit Teilen: ein GO, eine Entscheidung im Hub, Teile abwählbar.'],
-  ['','Der Mensch liest gegen und entscheidet','Das Kalkül sagt, was zulässig ist. Miriam liest, was der Agent produziert hat, und entscheidet, welche Teile der Essenz in den Hub dürfen. Für den Rest der Szene gilt: Das ist geschehen. Der Grunderwerb liegt unter <code>ratsarbeit@1</code> und bleibt so oder so draußen. Die genaue Mechanik klärt ein eigenes Ticket.']]},
+  ['','Der Mensch liest gegen und entscheidet','Das Kalkül sagt, was zulässig ist. Miriam liest, was der Agent produziert hat, und entscheidet, welche Teile der Essenz in den Hub dürfen. Für den Rest der Szene gilt: Die Lockerung ist gebaut, und das ist geschehen. Der Grunderwerb liegt unter <code>ratsarbeit@1</code> und bleibt so oder so draußen. Die genaue Mechanik klärt ein eigenes Ticket.']]},
  {k:'6.1',t:'Im Hub: der Entwurf',u:'localhost:4000/vorschlaege',html:s=>vVorschlaege(s),notes:[
   ['','Der Querverweis nennt nur die Kennung','Der Raum heißt <code>stiller-reiher</code>, ohne Thema. Der geschützte Titel des Raums kommt nicht in den Hub.'],
   ['','Kein Annehmen aus dem Chat','<code>decide_proposal</code> entfällt. Eine KI führt keine Entscheidung im Hub aus, auch nicht auf Zuruf.']]},
@@ -1117,7 +1123,7 @@ const VERWORFEN=[
  ['Stufen wie „kleiner Kreis, Vorstand, Basis, Recherche“','Ein Projekt ist oft in mehreren zugleich. Recherche läuft vor und nach der Befragung.','Fünf Phasen als Reifegrad, die Kreise getrennt.','Beim Bauen'],
  ['Vault als Pflicht-Vorstufe (AGENTS §10)','Eine Idee in einer Minute erfassen geht damit nicht.','Der Vault bleibt Quelle für Material. Der Stand entsteht im Hub.','Beim Bauen'],
  ['Hub als Speicher, den die Fraktion liest','Beim lokalen Betrieb gibt es keine Fraktion im Hub.','Feste Fassungen. Der Stand ist heute ein PDF und wird später eine Leseansicht.','Beim Bauen'],
- ['Labels im Hub oder gar keine Regel','Labels je Eintrag sind für eine Person zu schwer. Gar keine Regel lässt Vertrauliches über komki durch.','Der Hub ist Empfänger mit dem ganzen engeren Kreis. Der Kalkül prüft beim Vorschlag.','Beim Bauen'],
+ ['Labels im Hub oder gar keine Regel','Labels je Eintrag sind für eine Person zu schwer. Gar keine Regel lässt Vertrauliches über komki durch.','Der ganze Bestand trägt genau ein Label, ratsprojekte@1, und der Empfängerkreis ist der engere Kreis. Der Kalkül prüft beim Vorschlag.','Beim Bauen'],
  ['Antragstext im Hub schreiben','Doppelt zum gemeinsamen Dokument und zu komki.','Status und Querverweis auf die Ablage.','Beim Bauen'],
  ['Harte Gates vor dem Antrag','Der Antrag kann politisch richtig sein, auch mit offenen Punkten.','Antragsreife als Checkliste. Die Mindestlängen aus dem Changeset entfallen.','Beim Bauen'],
  ['Personen als Konten, Priorität als Feld','Lokal gibt es nur eine Person. Priorität wurde nie gebraucht.','„Wer“ ist Text, Filter statt Priorität.','Beim Bauen'],
@@ -1140,8 +1146,7 @@ const VERWORFEN=[
  ['Ordner mit Markdown hin, CSV zurück, Zuordnung über den Titel','Ein Ordner lässt sich im Browser kaum hochladen, die CSV trägt weder Kennungen noch Argumente.','Je eine JSON-Datei, von Miriam getragen, mit opaker Kennung.','Dein Feedback']
 ];
 const FRAGEN=[
- ['Wie kommt die Essenz aus einem Fraktionsraum in den Hub?','Die Regeln lehnen das heute ab, weil der Vorstand nicht zum Empfängerkreis gehört (Szene 6). Öffentliche Recherche geht auch ohne (Szene 5).','Der Mensch liest gegen und wählt die Teile aus. Ob die Bindung sich ändert, klärt das Kalkül. Γ ändert sich nur nach GO.'],
- ['Darf komki den Stand in einen Rechercheraum lesen?','Das könnte die Websuche im selben Raum blockieren.','Formal im Kalkül klären, dann am echten Vermittler durchtesten. Gebaut wird zuerst nur das Schreiben.'],
+ ['Wie kommt die Essenz aus einem Fraktionsraum in den Hub?','Die Regeln lehnen das heute ab, weil der Vorstand nicht zum Empfängerkreis gehört (Szene 6). Öffentliche Recherche geht auch ohne (Szene 5).','Als Lockerung im Einzelfall, die Bindung bleibt. Wie das Gegenlesen aussieht und ob es in den ersten Wurf gehört, klärt ein eigenes Ticket. Bis dahin von Hand.'],
  ['Sind die Entscheidungsrechte so richtig?','Die Tabelle oben sind meine Annahmen, zum Beispiel „der Vorstand entscheidet über die Befragung“.','Einmal mit Fraktion und Vorstand durchgehen.'],
  ['Bleibt das zweite GO?','Es hat mit abwählbaren Teilen einen eigenen Sinn. Ob das reicht, zeigt erst echter Gebrauch.','Vorerst behalten, nach der ersten echten Woche prüfen.'],
  ['PDF plus Kurztext oder nur eines?','Selin liest, Jonas postet. Vielleicht reicht eine Fassung.','Mit beiden starten, nach zwei Ausgaben eines streichen.'],
