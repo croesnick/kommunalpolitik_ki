@@ -37,6 +37,17 @@ Der Vault bleibt Quelle für Material, der Hub wird Quelle für den Stand. Der H
 
 Externe wie Elternbeirat, Vereine oder andere Fraktionen bekommen nichts aus dem Hub. Was sie sagen, wird als Meinungsbild eingetragen, vertrauliche Gespräche als privater Eintrag. Rechte je Eintrag gibt es nicht, nur diese festen Fassungen. Bevor ein Stand hinausgeht, sieht die Redaktion genau das Dokument.
 
+Die Entscheidungsrechte sind mit Fraktion und Vorstand abgestimmt. komki entscheidet keine davon.
+
+| Entscheidung | Wer entscheidet | Wer beteiligt ist |
+|---|---|---|
+| Eine Idee aufnehmen | Fraktion oder Vorstand | Die Basis schlägt vor, die Redaktion trägt ein. |
+| Die Basis befragen | Vorstand, auch darüber, wer den Aufruf-Link bekommt | Die Fraktion wird vorher gehört, kann die Befragung aber nicht verhindern. Die Redaktion bereitet vor. |
+| Weiter ausarbeiten | Fraktion | Der Vorstand wird gehört. Das Meinungsbild der Basis bindet nicht und kennt keine Mindestzahl, Fraktion und Vorstand ordnen es selbst ein. |
+| Antrag einreichen | Fraktion allein, freies Mandat | Vorstand und Basis werden informiert. Die Redaktion reicht ein und trägt nach. |
+| Stand weitergeben | Redaktion, bei jeder Ausgabe | |
+| Vorschlag aus komki übernehmen | Redaktion | komki schlägt vor. |
+
 **Der Stand geht als Druck in einen eigenen Ordner.** Der Hub hat für den Stand eine Druckansicht für A4 und erzeugt selbst kein PDF, das macht der Druckdialog des Browsers. „Stand ausgeben“ speichert genau das Dokument mit Uhrzeit, es bleibt abrufbar und ändert sich nicht mehr. Ab diesem Zeitpunkt zählt „Neu seit“. Die Redaktion druckt es als PDF und legt es von Hand in einen eigenen Nextcloud-Ordner, den Fraktion und Vorstand mit persönlichen Konten öffnen. In den Chat geht nur ein Hinweis ohne Inhalt, etwa „Neuer Stand vom 08.11. liegt im Ordner“. Auf Seite 1 stehen der Überblick und „Wer ist dran“, darauf folgt „Neu seit“ mit nur der Substanz: neue Ideen, Einträge und Entscheidungen samt Phasenwechsel und Antragsstand. Danach kommen das frische Meinungsbild und alle aktiven Projekte zum Nachschlagen. Fristen stehen neutral im Stand, auf abgelaufene weist nur die Vorschau hin. Eine falsche Aussage wird mit einem Eintrag „Korrektur“ richtiggestellt, der unter „Neu seit“ erscheint. Bei einer heiklen löscht die Redaktion die Datei, spricht die Lesenden an, und der nächste Stand nennt nur die Rücknahme. Als Vorbereitung für einen Bericht an Vorstand oder Fraktion zeigt die Stand-Ansicht einen Rückblick ab einem frei gewählten Tag, in derselben Fassung und ohne Speichern. Den Bericht schreibt die Redaktion selbst.
 
 **Das Modell ist klein.**
