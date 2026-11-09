@@ -779,6 +779,7 @@ defmodule KomkiCli.CLI do
             :sealed -> green() <> "versiegelt"
             :unsealed -> red() <> "Klartext"
             :damaged -> red() <> "beschädigt"
+            :outdated -> red() <> "altes Siegel"
             {:error, _} -> red() <> "fehlt"
           end
 

@@ -123,7 +123,7 @@ Einzige Quelle für Fassung, Operationen, Netz, Dateisystem, Credentials und Imp
 | `ops` | Operation → Parameter-Schema (geschlossen, siehe unten) und `kind` (`read` oder `write`) |
 | `egress_hosts` | Host-Allowlist für den Egress-Proxy (`host:port`). Leer heißt: kein Netz, kein Proxy-Port |
 | `fs` | Platzhalter-Pfade (`{vault_dir}`, `{documents_dir}` = `<base>/mediator/documents`) mit Modus `read` oder `write` |
-| `credentials` | Name → Keychain-Service. Der Eintrag enthält nur das Siegel (`ktv1.…`); `komki up` öffnet es mit `komki-tresor` über die Secure Enclave (Touch ID oder Passwort) und schreibt den Klartext nur in die stdin-Zeile. Ein Klartext-Eintrag wird nicht benutzt |
+| `credentials` | Name → Keychain-Service. Der Eintrag enthält nur das Siegel (`ktv2.…`); `komki up` öffnet es mit der Schlüsselvereinbarung von `komki-tresor` über die Secure Enclave (Touch ID oder Passwort) und schreibt den Klartext nur in die stdin-Zeile. Ein Klartext-Eintrag oder ein Siegel im alten Format `ktv1` wird nicht benutzt |
 | `environment` | Umgebung für `transfer` und `store` (modellierte Empfänger der Anfrage), z. B. `web-suche@1` |
 | `import_labels` | erlaubte Labels für Antworten. Bei RIS und Web genau eines. Bei Vault leer: die Notiz trägt ihre Labels im Frontmatter, und der Vermittler lässt jede Bindung aus Γ zu (Ticket #211); der Connector prüft nur die Form einer Bindungs-ID. Geschriebene Notizen tragen λ(y) = B_W (§6.3) |
 

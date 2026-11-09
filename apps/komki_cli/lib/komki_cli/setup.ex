@@ -372,13 +372,10 @@ defmodule KomkiCli.Setup do
         )
 
       :damaged ->
-        ui.say.(pad(entry.name) <> entry.label <> ": Siegel im Schlüsselbund beschädigt")
+        reenter(entry, ui, ": Siegel im Schlüsselbund beschädigt")
 
-        if ui.confirm.("            jetzt neu eingeben?", true) do
-          ui.say.(pad("") <> store_secret(entry, ui))
-        else
-          ui.say.(pad("") <> "übersprungen; später: komki secret set " <> entry.name)
-        end
+      :outdated ->
+        reenter(entry, ui, ": altes Siegelformat im Schlüsselbund")
 
       :unsealed ->
         ui.say.(pad(entry.name) <> entry.label <> " liegt im Klartext im Schlüsselbund")
@@ -397,6 +394,16 @@ defmodule KomkiCli.Setup do
         else
           ui.say.(pad("") <> "übersprungen; später: komki secret set " <> entry.name)
         end
+    end
+  end
+
+  defp reenter(entry, ui, problem) do
+    ui.say.(pad(entry.name) <> entry.label <> problem)
+
+    if ui.confirm.("            jetzt neu eingeben?", true) do
+      ui.say.(pad("") <> store_secret(entry, ui))
+    else
+      ui.say.(pad("") <> "übersprungen; später: komki secret set " <> entry.name)
     end
   end
 

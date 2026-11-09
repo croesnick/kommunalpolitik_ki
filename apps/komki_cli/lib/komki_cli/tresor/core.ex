@@ -1,56 +1,61 @@
 defmodule KomkiCli.Tresor.Core do
   @moduledoc """
-  Tresor-Kern ohne komki (Ticket #224): versiegelt Geheimnisse ueber das
-  Hilfsprogramm `komki-tresor` (Quelle `native/komki-tresor/main.swift`) und
-  oeffnet sie nur nach Freigabe durch die Secure Enclave. Dieser Kern kennt
-  weder komki noch den Schluesselbund und ist als Kern eines
-  eigenstaendigen Pakets (`enclave_seal`) gedacht; die komki-spezifische
-  Programmsuche (neben dem laufenden komki) lebt im Adapter `KomkiCli.Tresor`.
-  Der Programmname `komki-tresor` und die Fehlertexte werden erst beim
-  Herausloesen umbenannt; das Siegel-Praefix `ktv1.` bleibt (Format-Label).
+  Tresor core without komki: seals secrets with `SealedEnvelope` (format
+  `ktv2`, the only schema instance of the format) and opens them only after
+  the Secure Enclave released the key agreement.
 
-  Der private Schluessel verlaesst die Enclave nie; im Siegel steht nur seine
-  von der Enclave verschluesselte Form. Klartext geht nur ueber stdin hinein
-  und stdout heraus, nie ueber argv, Umgebung oder Log.
+  This module is the `SealedEnvelope.KeyAgreement` provider for the helper
+  program `komki-tresor` (source `native/komki-tresor/main.swift`). The
+  program does hardware only: it creates the enclave key, hands out its
+  public key and returns the ECDH shared secret after Touch ID or the Mac's
+  password. Plaintext stays in this process. Key material goes over
+  stdin/stdout, never over argv, environment or log; only the prompt reason
+  is an argument. komki-specific program discovery lives in the adapter
+  `KomkiCli.Tresor`.
 
-  `opts[:command]` ersetzt das Programm (Tests); ohne Angabe gilt `binary/0`
-  (mitgebautes Programm im priv-Verzeichnis, sonst PATH).
+  Seals in the old format `ktv1` are recognised and refused (`:outdated`).
+  There is no fallback: the program that could open them is gone, and the way
+  forward is entering the value again with `komki secret set`.
+
+  Options: `:command` replaces the program (default `binary/0`), `:timeout`
+  bounds its runtime, `:provider` replaces the key agreement altogether
+  (`{module, opts}`, tests).
   """
 
-  @prefix "ktv1."
+  @behaviour SealedEnvelope.KeyAgreement
+
+  @outdated_prefix "ktv1."
   @program "komki-tresor"
-  @seal_timeout_ms 10_000
-  # Oeffnen wartet auf Touch ID oder Passwort.
-  @open_timeout_ms 120_000
+  @recipient_timeout_ms 10_000
+  # The key agreement waits for Touch ID or the password.
+  @agree_timeout_ms 120_000
+  @shared_secret_bytes 32
 
   @type error ::
-          :missing_bin | :no_enclave | :refused | :invalid | :timeout | {:failed, integer()}
+          :missing_bin
+          | :no_enclave
+          | :refused
+          | :invalid
+          | :outdated
+          | :timeout
+          | {:failed, integer()}
 
-  @doc "Ist `text` ein Siegel (und kein Klartext)?"
+  @doc "Does `text` claim to be a seal in the current format (and is it not plaintext)?"
   @spec sealed?(String.t()) :: boolean()
-  def sealed?(text), do: String.starts_with?(text, @prefix)
+  def sealed?(text), do: SealedEnvelope.envelope?(text)
 
-  @doc """
-  Ist das Siegel vollstaendig (Base64, JSON mit `key`, `eph`, `box`)?
-  Prueft nur die Form, oeffnet nichts. Ein gekuerztes Siegel faellt durch.
-  """
+  @doc "Is `text` a seal in the old format `ktv1`, which komki no longer opens?"
+  @spec outdated?(String.t()) :: boolean()
+  def outdated?(text), do: String.starts_with?(text, @outdated_prefix)
+
+  @doc "Is the seal complete? Checks the structure only, opens nothing."
   @spec well_formed?(String.t()) :: boolean()
-  def well_formed?(@prefix <> encoded) do
-    with {:ok, json} <- Base.decode64(encoded),
-         {:ok, %{"key" => k, "eph" => e, "box" => b}} <- JSON.decode(json) do
-      Enum.all?([k, e, b], &(is_binary(&1) and match?({:ok, _}, Base.decode64(&1))))
-    else
-      _ -> false
-    end
-  end
-
-  def well_formed?(_text), do: false
+  def well_formed?(text), do: SealedEnvelope.well_formed?(text)
 
   @doc """
-  Standard-Aufloesung ohne komki: das mitgebaute Programm im priv-Verzeichnis
-  von `app` (Standard: die App, zu der dieser Kern gehoert), sonst PATH. nil,
-  wenn es nirgends liegt. Die kanonische Pfadform (Seatbelt) ist
-  Angelegenheit des Aufrufers.
+  Default lookup without komki: the program built into the priv directory of
+  `app` (default: the app this core belongs to), otherwise PATH. nil if it is
+  nowhere. The canonical path form (Seatbelt) is the caller's business.
   """
   @spec binary(atom() | nil) :: String.t() | nil
   def binary(app \\ Application.get_application(__MODULE__)) do
@@ -74,9 +79,9 @@ defmodule KomkiCli.Tresor.Core do
   end
 
   @doc """
-  Secure-Enclave-Verfuegbarkeit pruefen (`check`-Subkommando). Die Ausgabe
-  (stdout und stderr) wird verworfen, nur der Exit-Code zaehlt. `command`
-  muss existieren; die Suche ist Sache des Aufrufers (`binary/1`).
+  Check Secure Enclave availability (`check` subcommand). Output (stdout and
+  stderr) is discarded, only the exit code counts. `command` must exist;
+  finding it is the caller's business (`binary/1`).
   """
   @spec check(String.t()) :: :ok | {:error, :no_enclave | {:failed, integer()}}
   def check(command) do
@@ -87,12 +92,11 @@ defmodule KomkiCli.Tresor.Core do
     end
   end
 
-  @doc "Klartext versiegeln. Keine Rueckfrage: Versiegeln braucht nur den oeffentlichen Schluessel."
+  @doc "Seal plaintext. No prompt: sealing only needs the public key."
   @spec seal(String.t(), keyword()) :: {:ok, String.t()} | {:error, error()}
   def seal(value, opts \\ []) when is_binary(value) do
-    with :ok <- one_line(value),
-         {:ok, out} <- run(["seal"], value, Keyword.get(opts, :timeout, @seal_timeout_ms), opts) do
-      if sealed?(out), do: {:ok, out}, else: {:error, :invalid}
+    with :ok <- one_line(value) do
+      value |> SealedEnvelope.seal(provider(opts)) |> result()
     end
   end
 
@@ -100,31 +104,70 @@ defmodule KomkiCli.Tresor.Core do
     if value == "" or String.contains?(value, ["\n", "\r"]), do: {:error, :invalid}, else: :ok
   end
 
-  @doc "Siegel oeffnen; macOS fragt mit `reason` nach Touch ID oder Passwort."
+  @doc "Open a seal; macOS asks for Touch ID or the password, showing `reason`."
   @spec open(String.t(), String.t(), keyword()) :: {:ok, String.t()} | {:error, error()}
   def open(sealed, reason, opts \\ []) when is_binary(sealed) and is_binary(reason) do
-    if sealed?(sealed) and not String.contains?(sealed, "\n") do
-      run(
-        ["open", "--reason", reason],
-        sealed,
-        Keyword.get(opts, :timeout, @open_timeout_ms),
-        opts
-      )
+    if outdated?(sealed) do
+      {:error, :outdated}
     else
-      {:error, :invalid}
+      sealed |> SealedEnvelope.open(provider(Keyword.put(opts, :reason, reason))) |> result()
     end
   end
 
-  @doc "Fehler als Text ohne Wert."
+  @doc "Error as text, without a value."
   @spec describe(error()) :: String.t()
   def describe(:missing_bin), do: "komki-tresor nicht gefunden (Installation prüfen)"
   def describe(:no_enclave), do: "dieser Mac hat keine Secure Enclave"
   def describe(:refused), do: "Freigabe per Touch ID oder Passwort verweigert oder abgebrochen"
   def describe(:invalid), do: "Siegel ungültig oder von einem anderen Mac"
+  def describe(:outdated), do: "Siegel im alten Format ktv1; Wert neu eingeben"
   def describe(:timeout), do: "keine Freigabe innerhalb von zwei Minuten"
 
   def describe({:failed, code}),
     do: "komki-tresor fehlgeschlagen (exit " <> to_string(code) <> ")"
+
+  @impl SealedEnvelope.KeyAgreement
+  def recipient(opts) do
+    with {:ok, out} <-
+           run(["recipient"], nil, Keyword.get(opts, :timeout, @recipient_timeout_ms), opts),
+         [ref, public] <- String.split(out, " "),
+         {:ok, ref} <- Base.decode64(ref),
+         {:ok, public} <- Base.decode64(public) do
+      {:ok, ref, public}
+    else
+      {:error, _} = error -> error
+      _ -> {:error, :invalid}
+    end
+  end
+
+  @impl SealedEnvelope.KeyAgreement
+  def agree(key_ref, peer_public, opts) do
+    args = ["agree", "--reason", Keyword.fetch!(opts, :reason)]
+    input = Base.encode64(key_ref) <> " " <> Base.encode64(peer_public)
+
+    with {:ok, out} <- run(args, input, Keyword.get(opts, :timeout, @agree_timeout_ms), opts) do
+      case Base.decode64(out) do
+        {:ok, <<_::binary-size(@shared_secret_bytes)>> = shared} -> {:ok, shared}
+        _ -> {:error, :invalid}
+      end
+    end
+  end
+
+  defp provider(opts), do: Keyword.get(opts, :provider, {__MODULE__, opts})
+
+  # Format errors and failed authentication mean the same to the caller, and
+  # an unknown provider reason (a test double's file error) carries no meaning
+  # here either.
+  defp result({:ok, _} = ok), do: ok
+  defp result({:error, {:key_agreement, reason}}), do: {:error, agreement_error(reason)}
+  defp result({:error, _format}), do: {:error, :invalid}
+
+  defp agreement_error(reason)
+       when reason in [:missing_bin, :no_enclave, :refused, :invalid, :timeout],
+       do: reason
+
+  defp agreement_error({:failed, _code} = reason), do: reason
+  defp agreement_error(_reason), do: :invalid
 
   defp run(args, input, timeout, opts) do
     case Keyword.get_lazy(opts, :command, &binary/0) do
@@ -133,13 +176,13 @@ defmodule KomkiCli.Tresor.Core do
     end
   end
 
-  # stderr des Programms bleibt im Terminal (Meldungen ohne Werte); stdout
-  # traegt genau eine Zeile.
+  # The program's stderr stays in the terminal (messages without values);
+  # stdout carries exactly one line.
   defp spawn(command, args, input, timeout) do
     port =
       Port.open({:spawn_executable, command}, [:binary, :exit_status, :use_stdio, args: args])
 
-    Port.command(port, input <> "\n")
+    if input, do: Port.command(port, input <> "\n")
     collect(port, [], System.monotonic_time(:millisecond) + timeout)
   end
 

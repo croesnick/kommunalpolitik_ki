@@ -427,22 +427,26 @@ selbst alle Prozesse, und nur der Egress-Proxy darf nach außen:
   Erlang-Pfad (`escript_bin`), weil der asdf-Shim unter der Sandbox scheitert.
   Die Escripts findet komki wie den Vermittler: erst `PATH`, dann `<base>/bin`.
 * **Credentials** (heute nur `BRAVE_API_KEY` für die Websuche) liegen im
-  Schlüsselbund nur als Siegel (`ktv1.…`). komki liest es mit
-  `security find-generic-password -s brave-search-api -w`, öffnet es mit
-  `komki-tresor open` über die Secure Enclave (Touch ID oder Passwort) und
-  schreibt den Klartext als eine JSON-Zeile in stdin des Web-Connectors,
+  Schlüsselbund nur als Siegel (`ktv2.…`, Format aus `apps/sealed_envelope`).
+  komki liest es mit `security find-generic-password -s brave-search-api -w`,
+  öffnet es nach der Schlüsselvereinbarung mit `komki-tresor agree` über die
+  Secure Enclave (Touch ID oder Passwort) und schreibt den Klartext als eine JSON-Zeile in stdin des Web-Connectors,
   danach schließt es stdin. Sie stehen nie in argv, Umgebung, Log oder Status.
+  Ein Siegel im alten Format `ktv1` öffnet komki nicht mehr; den Wert gibst du
+  mit `komki secret set` neu ein.
   Fehlt der Eintrag, wird die Freigabe verweigert oder liegt er im Klartext vor,
   startet der Connector ohne Key und meldet `credential-missing`; `up` nennt
   den Grund, `komki doctor` warnt.
 * **komki-tresor** (`native/komki-tresor/main.swift`, bei `mix compile` nach
   `priv/` gebaut und von `make komki`/`make komki-paket` neben komki kopiert):
   ein kleines Swift-Programm, weil
-  Erlang die Secure Enclave nicht erreicht. `seal` erzeugt je Geheimnis einen
-  P-256-Schlüssel in der Secure Enclave mit der Zugriffsregel „userPresence“
-  (nur dieses Gerät, nur entsperrt) und verschlüsselt per ECIES (ECDH,
-  HKDF-SHA256, AES-GCM); der private Schlüssel verlässt die Enclave nie.
-  `open` braucht die Enclave und damit die Freigabe. Ein Siegel lässt sich auf
+  Erlang die Secure Enclave nicht erreicht. Es macht nur die Hardware:
+  `recipient` erzeugt je Geheimnis einen P-256-Schlüssel in der Secure Enclave
+  mit der Zugriffsregel „userPresence“ (nur dieses Gerät, nur entsperrt) und
+  gibt dessen öffentlichen Schlüssel aus; der private Schlüssel verlässt die
+  Enclave nie. `agree` liefert nach der Freigabe das gemeinsame ECDH-Geheimnis.
+  Verschlüsselt wird in Elixir (`apps/sealed_envelope`: ECDH, HKDF-SHA256,
+  AES-256-GCM), Klartext erreicht das Programm nicht. Ein Siegel lässt sich auf
   keinem anderen Mac öffnen.
 * **Connector-Token:** Vor jedem Connector-Start erzeugt `up` ein Token
   (`run/connectors/<id>.token`, `0600`) und gibt es dem Connector über stdin.

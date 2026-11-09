@@ -27,11 +27,10 @@ defmodule KomkiConnectorRis.RisCassettesTest do
   end
 
   # Fake tresor as a wrapper: logs the subcommand (call counter for counting
-  # releases) and loads the Elixir script behind it, which computes real
-  # AES-256-GCM.
+  # releases) and loads the Elixir script behind it, which runs real ECDH.
   defp tresor!(dir) do
     script = Path.join(dir, "komki-tresor")
-    fake = Path.join(__DIR__, "support/fake_tresor.exs")
+    fake = Path.expand("../../komki_cli/test/support/fake_tresor.exs", __DIR__)
 
     File.write!(script, """
     #!/bin/sh
@@ -112,11 +111,11 @@ defmodule KomkiConnectorRis.RisCassettesTest do
       {0, messages} = RisCassettes.run(["init"], opts)
 
       stored = Path.join(dir, "stored")
-      assert String.starts_with?(File.read!(stored), "ktv1.")
+      assert String.starts_with?(File.read!(stored), "ktv2.")
       assert Enum.any?(texts(messages), &(&1 =~ "Secure Enclave"))
       assert calls(dir, "tresor-calls", "check") == 1
-      assert calls(dir, "tresor-calls", "seal") == 1
-      assert calls(dir, "tresor-calls", "open") == 1
+      assert calls(dir, "tresor-calls", "recipient") == 1
+      assert calls(dir, "tresor-calls", "agree") == 1
       assert calls(dir, "security-calls", "-i") == 1
     end
 
@@ -137,19 +136,18 @@ defmodule KomkiConnectorRis.RisCassettesTest do
       tresor =
         script!(
           dir,
-          "komki-tresor",
+          "komki-tresor-rundweg",
           """
           case "$1" in
-            check) exit 0 ;;
-            seal) read -r v; echo "ktv1.$v" ;;
-            open) read -r v; echo "voellig-was-anderes" ;;
+            agree) read -r v; echo "#{Base.encode64(String.duplicate("x", 32))}" ;;
+            *) exec #{tresor!(dir)} "$@" ;;
           esac
           """
         )
 
       {5, messages} = RisCassettes.run(["init"], tresor: tresor, security: security!(dir))
 
-      assert Enum.any?(texts(messages), &(&1 =~ "Roundtrip-Test fehlgeschlagen"))
+      assert Enum.any?(texts(messages), &(&1 =~ "Roundtrip-Test"))
       refute File.exists?(Path.join(dir, "stored"))
     end
 
@@ -192,7 +190,7 @@ defmodule KomkiConnectorRis.RisCassettesTest do
       assert Enum.any?(texts(messages), &(&1 =~ "keine Secure Enclave"))
     end
 
-    test "Siegel ohne ktv1.-Praefix kommt vom Versiegeln zurueck: Exit 5" do
+    test "unbrauchbare Antwort beim Versiegeln: Exit 5" do
       dir = tmp_area!("init-bad-seal")
 
       tresor =
@@ -202,7 +200,7 @@ defmodule KomkiConnectorRis.RisCassettesTest do
           """
           case "$1" in
             check) exit 0 ;;
-            *) read -r v; echo "kein-siegel" ;;
+            *) echo "kein-siegel" ;;
           esac
           """
         )
@@ -249,10 +247,10 @@ defmodule KomkiConnectorRis.RisCassettesTest do
         assert mode(enc) == 0o600
       end)
 
-      assert calls(dir, "tresor-calls", "open") == 2
+      assert calls(dir, "tresor-calls", "agree") == 2
 
       assert {0, _} = RisCassettes.run(["unseal", dir], opts)
-      assert calls(dir, "tresor-calls", "open") == 3
+      assert calls(dir, "tresor-calls", "agree") == 3
 
       Enum.each(cassettes, fn {name, content} ->
         json = Path.join(dir, name)
@@ -302,7 +300,7 @@ defmodule KomkiConnectorRis.RisCassettesTest do
       {1, messages} = RisCassettes.run(["seal", dir], opts)
 
       assert Enum.any?(texts(messages), &(&1 =~ "0001-get-x.json.enc"))
-      assert calls(dir, "tresor-calls", "open") == 0
+      assert calls(dir, "tresor-calls", "agree") == 0
     end
 
     test "unseal verweigert bei existierender Klartextdatei" do
@@ -443,7 +441,7 @@ defmodule KomkiConnectorRis.RisCassettesTest do
       assert Enum.any?(texts(messages), &(&1 =~ "Git-Repo"))
 
       assert RisCassettes.check_dir(System.tmp_dir!()) == :ok
-      assert calls(dir, "tresor-calls", "open") == 0
+      assert calls(dir, "tresor-calls", "agree") == 0
     end
 
     test "Symlink in ein Repo umgeht die Pruefung nicht" do
@@ -812,10 +810,11 @@ defmodule KomkiConnectorRis.RisCassettesTest do
   describe "tresor-Protokoll" do
     test "Exit-Codes werden zu Gruenden (3/4/5/9)" do
       dir = tmp_area!("exit-codes")
+      {:ok, sealed} = RisCassettes.tresor_seal("wert", tresor: tresor!(dir))
 
       for {code, reason} <- [{3, :no_enclave}, {4, :refused}, {5, :invalid}, {9, {:failed, 9}}] do
         cmd = script!(dir, "tresor-#{code}", "read -r v; exit #{code}")
-        assert {:error, ^reason} = RisCassettes.tresor_open("ktv1.x", "Test", tresor: cmd)
+        assert {:error, ^reason} = RisCassettes.tresor_open(sealed, "Test", tresor: cmd)
       end
 
       assert :ok = RisCassettes.tresor_check(script!(dir, "tresor-ok", "exit 0"))
@@ -829,34 +828,56 @@ defmodule KomkiConnectorRis.RisCassettesTest do
       assert {:error, :timeout} = RisCassettes.tresor_check(cmd, check_timeout: 300)
     end
 
-    test "Klartext und Siegel gehen nie ueber argv" do
+    test "Klartext und Siegel erreichen das Programm nicht, der Grund geht ueber argv" do
       dir = tmp_area!("argv")
+      fake = tresor!(dir)
 
-      seal_cmd =
-        script!(dir, "tresor-argv-seal", ~s(echo "$@" > #{dir}/argv; read -r v; echo ktv1.x))
+      cmd =
+        script!(dir, "tresor-rec", """
+        echo "$@" >> #{dir}/argv
+        if [ "$1" = agree ]; then
+          read -r line; echo "$line" >> #{dir}/stdin
+          printf '%s\\n' "$line" | #{fake} "$@"
+        else
+          exec #{fake} "$@"
+        fi
+        """)
 
-      assert {:ok, _} = RisCassettes.tresor_seal("kanarienwert", tresor: seal_cmd)
-      assert File.read!(Path.join(dir, "argv")) == "seal\n"
-
-      open_cmd =
-        script!(dir, "tresor-argv-open", ~s(echo "$@" > #{dir}/argv; read -r v; echo offen))
-
-      assert {:ok, _} =
-               RisCassettes.tresor_open("ktv1.siegelwert", "Grund fuer die Karte",
-                 tresor: open_cmd
-               )
+      assert {:ok, sealed} = RisCassettes.tresor_seal("kanarienwert", tresor: cmd)
+      assert {:ok, "kanarienwert"} = RisCassettes.tresor_open(sealed, "Der Grund", tresor: cmd)
 
       argv = File.read!(Path.join(dir, "argv"))
-      assert argv == "open --reason Grund fuer die Karte\n"
-      refute argv =~ "ktv1.siegelwert"
+      stdin = File.read!(Path.join(dir, "stdin"))
+      assert argv == "recipient\nagree --reason Der Grund\n"
+
+      for seen <- [argv, stdin] do
+        refute seen =~ "kanarienwert"
+        refute seen =~ sealed
+      end
     end
 
     test "Timeout beendet das Programm ohne Freigabe" do
       dir = tmp_area!("timeout")
-      cmd = script!(dir, "komki-tresor", "exec sleep 30")
+      {:ok, sealed} = RisCassettes.tresor_seal("wert", tresor: tresor!(dir))
+      cmd = script!(dir, "komki-tresor-still", "exec sleep 30")
 
       assert {:error, :timeout} =
-               RisCassettes.tresor_open("ktv1.x", "Test", tresor: cmd, open_timeout: 300)
+               RisCassettes.tresor_open(sealed, "Test", tresor: cmd, open_timeout: 300)
+    end
+
+    test "ein Eintrag im alten Format ktv1 oeffnet nichts und bleibt unangetastet" do
+      dir = tmp_area!("ktv1")
+      area = tmp_area!("ktv1-kassetten")
+      opts = [tresor: tresor!(dir), security: security!(dir, "ktv1.altes-siegel")]
+
+      File.write!(Path.join(area, "a.json.enc"), "egal")
+
+      {5, messages} = RisCassettes.run(["unseal", area], opts)
+
+      assert Enum.any?(texts(messages), &(&1 =~ "alte Siegelformat ktv1"))
+      assert Enum.any?(texts(messages), &(&1 =~ "security delete-generic-password"))
+      assert calls(dir, "tresor-calls", "agree") == 0
+      assert File.read!(Path.join(dir, "stored")) == "ktv1.altes-siegel"
     end
   end
 

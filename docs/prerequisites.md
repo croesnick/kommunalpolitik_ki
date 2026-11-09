@@ -372,15 +372,18 @@ Pfad vor, etwa `/private/tmp/komki-test` für eine Wegwerf-Instanz (#246).
 **komki-tresor (Secure Enclave):** `mix compile` baut das kleine Swift-Programm
 `komki-tresor` (`apps/komki_cli/native/komki-tresor/main.swift`) nach
 `apps/komki_cli/priv/`; `make komki` kopiert es neben das Escript.
-Es versiegelt Geheimnisse wie den Brave-Key mit einem Schlüssel der Secure
-Enclave; Öffnen geht nur mit Touch ID oder dem Passwort des Macs. Erlang
+Es hält den Schlüssel der Secure Enclave, mit dem komki Geheimnisse wie den
+Brave-Key versiegelt; das Siegel selbst baut und öffnet `apps/sealed_envelope`
+in Elixir, das Programm sieht keinen Klartext. Öffnen geht nur mit Touch ID
+oder dem Passwort des Macs. Erlang
 erreicht die Secure Enclave nicht, deshalb Swift (Apple-Frameworks CryptoKit,
 LocalAuthentication, Security; keine Fremdbibliothek). Bauen braucht `swiftc`
 aus den Xcode Command Line Tools; das Homebrew-Paket bringt das fertige
 Programm mit. Ohne Secure Enclave (Intel-Mac ohne T2) gibt es keine
 versiegelten Geheimnisse, die Websuche bleibt dann aus.
 
-Dieselbe Binary versiegelt auch den Schlüssel der RIS-Kassetten:
+Dieselbe Binary hält auch den Schlüssel, mit dem der Schlüssel der RIS-Kassetten
+versiegelt ist:
 `apps/komki_connector_ris/priv/ris_cassettes.exs` ruft `komki-tresor` über den
 PATH auf (Override mit `--tresor <pfad>`, aus dem Checkout gebaut liegt es in
 `apps/komki_cli/priv/`). `init` und jedes `seal`/`unseal` brauchen Touch ID auf
