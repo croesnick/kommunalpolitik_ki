@@ -127,6 +127,7 @@ defmodule KomkiCli.Steps do
           port: parse_int!(opts, "port"),
           ctx: parse_int!(opts, "ctx"),
           ris_mock_port: parse_int!(opts, "ris-mock-port"),
+          web_mock_port: parse_int!(opts, "web-mock-port"),
           ris_base_url: Map.get(opts, "ris-base-url"),
           vault_dir: Map.get(opts, "vault-dir")
         )

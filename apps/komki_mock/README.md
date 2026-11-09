@@ -68,6 +68,7 @@ HTTP-Formen wie 403 oder 429 (Rate-Limit) sind Sache der Adapter.
 | Adapter | System | Seeds |
 |---|---|---|
 | `KomkiMock.Adapters.Ris` | Gast-Endpunkte der RIS-API (`guestmeetings`, `guestmeetings/<id>`, `guestagendaitems/<id>`), so wie `komki_connector_ris` sie spricht | JSON-Dateien unter `priv/seeds/ris/`; `default` mit den Testfällen des Connectors (Zähltest, nicht-öffentlicher Begriff, Prompt-Injection) |
+| `KomkiMock.Adapters.Brave` | Brave Web Search (`GET /res/v1/web/search?q=&count=`), Antwortformen nach der API-Referenz; `key` erzwingt einen Schlüssel (sonst 401), `quota` zählt die Suchen herunter und antwortet bei 0 mit 429 (Rate-Limit) | JSON-Dateien unter `priv/seeds/brave/`; `default` (vier Seiten, eine mit Prompt-Injection), `empty` |
 | `KomkiMock.Adapters.Replay` | aufgezeichnete Austausche (Kassetten aus `komki_connector_ris/priv/ris_recorder.exs` oder `ris_gartenstadt.exs`) | der Seed ist das Kassettenverzeichnis, am besten als absoluter Pfad |
 | `KomkiMock.Adapters.Notes` | eine Notizliste; Testobjekt der Runtime und Vorlage | `default`, `empty` |
 

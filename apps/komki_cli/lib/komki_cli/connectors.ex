@@ -110,7 +110,7 @@ defmodule KomkiCli.Connectors do
 
   @doc """
   Netzweg eines Connectors: `:none` (keine egress_hosts), `{:proxy, port}`
-  oder im RIS-Mock-Betrieb `{:direct, mock_port}`.
+  oder im Mock-Betrieb (RIS, Web) `{:direct, mock_port}`.
   """
   @spec upstream(Config.t(), Manifest.t()) ::
           :none | {:proxy, pos_integer()} | {:direct, pos_integer()}
@@ -118,6 +118,7 @@ defmodule KomkiCli.Connectors do
     cond do
       manifest.egress_hosts == [] -> :none
       manifest.id == "ris" and Config.ris_mock?(cfg) -> {:direct, cfg.ris_mock_port}
+      manifest.id == "web" and Config.web_mock?(cfg) -> {:direct, cfg.web_mock_port}
       true -> {:proxy, egress_port!(cfg, manifest.id)}
     end
   end
@@ -173,6 +174,14 @@ defmodule KomkiCli.Connectors do
   defp proxy_args(_), do: []
 
   defp base_url_args(cfg, %{id: "ris"}), do: ["--base-url", Config.ris_url(cfg)]
+
+  defp base_url_args(cfg, %{id: "web"}) do
+    case Config.web_mock_url(cfg) do
+      nil -> []
+      url -> ["--base-url", url]
+    end
+  end
+
   defp base_url_args(_cfg, _manifest), do: []
 
   defp fs_args(cfg, %{id: "vault"}), do: ["--vault-dir", cfg.vault_dir]
