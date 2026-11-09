@@ -7,7 +7,7 @@
 #     elixir apps/komki_connector_ris/priv/ris_cassettes.exs status <verzeichnis>
 #     elixir apps/komki_connector_ris/priv/ris_cassettes.exs check [verzeichnis]
 #
-# init (once) generates a 32-byte key and stores it as a komki-tresor seal
+# init (once) generates a 32-byte key and stores it as a ktv2 seal
 # in the macOS keychain (entry 'ris-kassetten'). Only this Mac's Secure
 # Enclave opens the seal — no restore on another Mac, no key escrow; if the
 # entry is gone, the cassettes are gone. Every encryption and decryption
@@ -36,23 +36,31 @@
 #
 # OTP only (:crypto, ports), no deps: a script started with `elixir` cannot
 # load komki_cli, so the port patterns are duplicated from it instead of
-# imported (docking point: tresor core #224).
+# imported. The seal format is not duplicated: sealed_envelope has no deps
+# either, so its sources load right here, and it stays the only schema
+# instance of ktv2. komki-tresor only does the hardware part (recipient,
+# agree); plaintext never reaches it.
 
 Code.require_file("./ris_http.exs", __DIR__)
+Code.require_file("../../sealed_envelope/lib/sealed_envelope/hkdf.ex", __DIR__)
+Code.require_file("../../sealed_envelope/lib/sealed_envelope/key_agreement.ex", __DIR__)
+Code.require_file("../../sealed_envelope/lib/sealed_envelope.ex", __DIR__)
 
 defmodule KomkiConnectorRis.RisCassettes do
   @moduledoc false
+
+  @behaviour SealedEnvelope.KeyAgreement
 
   alias KomkiConnectorRis.RisHttp
 
   # Stored state, not an identifier: the key of every encrypted cassette
   # lives under this keychain entry. Renaming it would orphan them.
   @service "ris-kassetten"
-  # Format label of komki-tresor (native/komki-tresor/main.swift): every seal
-  # starts with it. Deliberately a different prefix than @magic so seals and
-  # cassette containers are never confused.
-  @tresor_prefix "ktv1."
+  # Seals of the old format, which komki-tresor no longer opens. The entry is
+  # not plaintext and must never be treated as such.
+  @outdated_prefix "ktv1."
   @tresor_program "komki-tresor"
+  @shared_secret_bytes 32
   @seal_timeout_ms 10_000
   # Opening waits for Touch ID or the password.
   @open_timeout_ms 120_000
@@ -69,7 +77,7 @@ defmodule KomkiConnectorRis.RisCassettes do
   @tag_bytes 16
 
   # security -i splits the line itself: only characters without special
-  # meaning (rule copied from komki_cli/lib/komki_cli/keychain.ex). A ktv1.
+  # meaning (rule copied from komki_cli/lib/komki_cli/keychain.ex). A ktv2.
   # seal in standard Base64 satisfies it; check before storing so security
   # does not silently truncate to 128 bytes.
   @word ~r/\A[A-Za-z0-9@._+\/=-]+\z/
@@ -193,13 +201,7 @@ defmodule KomkiConnectorRis.RisCassettes do
   @spec tresor_seal(String.t(), keyword()) :: {:ok, String.t()} | {:error, tresor_error()}
   def tresor_seal(value, opts) do
     if one_line?(value) do
-      case tresor_call(["seal"], value, Keyword.get(opts, :seal_timeout, @seal_timeout_ms), opts) do
-        {:ok, out} ->
-          if String.starts_with?(out, @tresor_prefix), do: {:ok, out}, else: {:error, :invalid}
-
-        {:error, reason} ->
-          {:error, reason}
-      end
+      value |> SealedEnvelope.seal({__MODULE__, opts}) |> envelope_result()
     else
       {:error, :invalid}
     end
@@ -209,21 +211,56 @@ defmodule KomkiConnectorRis.RisCassettes do
   @spec tresor_open(String.t(), String.t(), keyword()) ::
           {:ok, String.t()} | {:error, tresor_error()}
   def tresor_open(sealed, reason, opts) do
-    if String.starts_with?(sealed, @tresor_prefix) and one_line?(sealed) do
-      tresor_call(
-        ["open", "--reason", reason],
-        sealed,
-        Keyword.get(opts, :open_timeout, @open_timeout_ms),
-        opts
-      )
+    sealed
+    |> SealedEnvelope.open({__MODULE__, Keyword.put(opts, :reason, reason)})
+    |> envelope_result()
+  end
+
+  defp envelope_result({:ok, _} = ok), do: ok
+
+  defp envelope_result({:error, {:key_agreement, reason}})
+       when reason in [:invalid_public_key, :invalid_key_ref],
+       do: {:error, :invalid}
+
+  defp envelope_result({:error, {:key_agreement, reason}}), do: {:error, reason}
+  defp envelope_result({:error, _format}), do: {:error, :invalid}
+
+  @impl SealedEnvelope.KeyAgreement
+  def recipient(opts) do
+    with {:ok, out} <-
+           tresor_call(
+             ["recipient"],
+             nil,
+             Keyword.get(opts, :seal_timeout, @seal_timeout_ms),
+             opts
+           ),
+         [ref, public] <- String.split(out, " "),
+         {:ok, ref} <- Base.decode64(ref),
+         {:ok, public} <- Base.decode64(public) do
+      {:ok, ref, public}
     else
-      {:error, :invalid}
+      {:error, _} = error -> error
+      _ -> {:error, :invalid}
     end
   end
 
-  # Plaintext and seals travel only over stdin/stdout, never argv
-  # (komki-tresor convention). A failed start (not executable, Gatekeeper)
-  # becomes missing_bin instead of a raw exception.
+  @impl SealedEnvelope.KeyAgreement
+  def agree(key_ref, peer_public, opts) do
+    args = ["agree", "--reason", Keyword.fetch!(opts, :reason)]
+    input = Base.encode64(key_ref) <> " " <> Base.encode64(peer_public)
+    timeout = Keyword.get(opts, :open_timeout, @open_timeout_ms)
+
+    with {:ok, out} <- tresor_call(args, input, timeout, opts) do
+      case Base.decode64(out) do
+        {:ok, <<_::binary-size(@shared_secret_bytes)>> = shared} -> {:ok, shared}
+        _ -> {:error, :invalid}
+      end
+    end
+  end
+
+  # Key material travels only over stdin/stdout, never argv (komki-tresor
+  # convention). A failed start (not executable, Gatekeeper) becomes
+  # missing_bin instead of a raw exception.
   defp tresor_call(args, input, timeout, opts) do
     case tresor_bin(opts) do
       nil ->
@@ -232,7 +269,7 @@ defmodule KomkiConnectorRis.RisCassettes do
       bin ->
         case safe_spawn(bin, args) do
           {:ok, port} ->
-            Port.command(port, input <> "\n")
+            if input, do: Port.command(port, input <> "\n")
             collect(port, [], System.monotonic_time(:millisecond) + timeout, &tresor_on_exit/2)
 
           :spawn_failed ->
@@ -470,7 +507,7 @@ defmodule KomkiConnectorRis.RisCassettes do
   # Exactly ONE release per run: read the seal once, open it once. The
   # tresor is checked first — a missing program is the more fundamental
   # failure and must not hide behind a keychain message. An entry without
-  # the ktv1. prefix is plaintext — opening it would be pointless.
+  # the ktv2. prefix is not openable — a seal of the old format or plaintext.
   defp load_master_key(reason, opts) do
     case tresor_bin(opts) do
       nil ->
@@ -479,18 +516,27 @@ defmodule KomkiConnectorRis.RisCassettes do
       _bin ->
         case kc_fetch(@service, opts) do
           {:ok, sealed} ->
-            if String.starts_with?(sealed, @tresor_prefix) do
-              case tresor_open(sealed, reason, opts) do
-                {:ok, line} -> decode_key(line)
-                {:error, reason} -> {:error, {:tresor, reason}}
-              end
-            else
-              {:error, :unsealed}
-            end
+            open_master_key(sealed, reason, opts)
 
           {:error, reason} ->
             {:error, {:keychain, reason}}
         end
+    end
+  end
+
+  defp open_master_key(sealed, reason, opts) do
+    cond do
+      SealedEnvelope.envelope?(sealed) ->
+        case tresor_open(sealed, reason, opts) do
+          {:ok, line} -> decode_key(line)
+          {:error, reason} -> {:error, {:tresor, reason}}
+        end
+
+      String.starts_with?(sealed, @outdated_prefix) ->
+        {:error, :outdated}
+
+      true ->
+        {:error, :unsealed}
     end
   end
 
@@ -505,6 +551,18 @@ defmodule KomkiConnectorRis.RisCassettes do
 
   defp master_key_error(:unsealed),
     do: {5, [{:err, "ris_cassettes: Eintrag '#{@service}' ist kein Siegel; init laufen lassen"}]}
+
+  # No migration: cassettes sealed under a ktv1 key are given up deliberately.
+  # Removing the entry stays a conscious step of the person, like in init.
+  defp master_key_error(:outdated),
+    do:
+      {5,
+       [
+         {:err,
+          "ris_cassettes: Eintrag '#{@service}' hat noch das alte Siegelformat ktv1; " <>
+            "damit verschluesselte Kassetten sind nicht mehr lesbar. Neu anfangen: " <>
+            "security delete-generic-password -s #{@service}, dann init"}
+       ]}
 
   defp master_key_error(:invalid_key),
     do: {5, [{:err, "ris_cassettes: Schluessel im Siegel hat falsche Form"}]}
@@ -663,7 +721,8 @@ defmodule KomkiConnectorRis.RisCassettes do
 
   defp seal_files(files, dir, opts) do
     if files.json == [] do
-      {0, [{:out, "ris_cassettes: keine Kassetten zu verschluesseln (nur *.json), nichts zu tun"}]}
+      {0,
+       [{:out, "ris_cassettes: keine Kassetten zu verschluesseln (nur *.json), nichts zu tun"}]}
     else
       case load_master_key("RIS-Kassetten verschluesseln", opts) do
         {:ok, key} ->

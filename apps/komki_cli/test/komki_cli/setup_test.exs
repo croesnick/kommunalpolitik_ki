@@ -52,7 +52,7 @@ defmodule KomkiCli.SetupTest do
   describe "Keychain.store/3" do
     test "Wert geht nur über stdin an security -i, nie über argv; ganz, auch über 128 Byte" do
       {cmd, dir} = recording_fake!()
-      siegel = "ktv1." <> String.duplicate("A", 1000) <> "+/="
+      siegel = "ktv2." <> String.duplicate("A", 1000) <> "+/="
 
       assert :ok = Keychain.store("brave-search-api", siegel, command: cmd, account: "tester")
 
@@ -84,7 +84,7 @@ defmodule KomkiCli.SetupTest do
         """)
 
       _ = dir
-      assert {:error, :not_stored} = Keychain.store("x", "ktv1.lang", command: cmd, account: "t")
+      assert {:error, :not_stored} = Keychain.store("x", "ktv2.lang", command: cmd, account: "t")
     end
 
     test "Fehler von security wird {:failed, code}" do
@@ -111,8 +111,9 @@ defmodule KomkiCli.SetupTest do
       assert message =~ "versiegelt"
       refute message =~ @kanarie
       # In den Schluesselbund geht nur das Siegel, nie der Klartext.
-      {:ok, sealed} = KomkiCli.Tresor.seal(@kanarie)
-      assert File.read!(Path.join(dir, "value")) == sealed
+      stored = File.read!(Path.join(dir, "value"))
+      assert KomkiCli.Tresor.well_formed?(stored)
+      assert {:ok, @kanarie} = KomkiCli.Tresor.open(stored, "Test")
       refute File.read!(Path.join(dir, "stdin")) =~ @kanarie
     end
 

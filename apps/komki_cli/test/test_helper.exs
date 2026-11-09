@@ -18,21 +18,16 @@ ExUnit.start(exclude: exclude)
 # volle Doctor im DoctorBootTest). /usr/bin/false: "Abfrage fehlgeschlagen".
 Application.put_env(:komki_cli, :security, "/usr/bin/false")
 
-# Kein Test fragt die echte Secure Enclave: Der Fake-Tresor "versiegelt"
-# per Base64 hinter dem echten Praefix und oeffnet ohne Rueckfrage.
+# Kein Test fragt die echte Secure Enclave: Der Fake-Tresor spricht das
+# Protokoll des echten Programms mit echtem ECDH, ohne Rueckfrage. PATH steht
+# fest im Wrapper, weil einzelne Tests PATH leeren.
 fake_tresor =
   Path.join(System.tmp_dir!(), "komki-fake-tresor-#{System.unique_integer([:positive])}")
 
-File.write!(fake_tresor, ~S"""
+File.write!(fake_tresor, """
 #!/bin/sh
-b64() { base64 | tr -d '\n'; }
-case "$1" in
-  check) exit 0 ;;
-  seal) read -r v; k=$(printf '%s' "$v" | b64)
-        printf 'ktv1.%s\n' "$(printf '{"key":"%s","eph":"AA==","box":"AA=="}' "$k" | b64)" ;;
-  open) read -r v; printf '%s' "${v#ktv1.}" | base64 -d | sed 's/.*"key":"\([^"]*\)".*/\1/' | base64 -d; echo ;;
-  *) exit 2 ;;
-esac
+[ "$1" = check ] && exit 0
+PATH='#{System.get_env("PATH")}' exec elixir #{Path.expand("support/fake_tresor.exs", __DIR__)} "$@"
 """)
 
 File.chmod!(fake_tresor, 0o755)

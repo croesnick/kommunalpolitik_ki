@@ -280,7 +280,7 @@ Dazu `unseal` des Echt-Verzeichnisses vorher und `seal` nachher — derselbe Bog
 
 `priv/ris_cassettes.exs` verschlüsselt ein Kassettenverzeichnis mit AES-256-GCM, damit kein Prozess —
 auch kein Agent — die Kassetten ohne die Person am Mac lesen kann. Der Schlüssel liegt nur als
-Siegel von `komki-tresor` im macOS-Schlüsselbund (Eintrag `ris-kassetten`), gebunden an die Secure
+ktv2-Siegel (`apps/sealed_envelope`, Schlüsselvereinbarung über `komki-tresor`) im macOS-Schlüsselbund (Eintrag `ris-kassetten`), gebunden an die Secure
 Enclave dieses Macs; jede Ver- und Entschlüsselung löst genau eine Freigabe per Touch ID (oder
 Passwort des Macs) aus. Der Eintrag heißt anders als das Skript, weil er gespeicherter Zustand ist:
 Ein neuer Name fände den Schlüssel der schon verschlüsselten Kassetten nicht mehr.
@@ -341,6 +341,10 @@ Grenzen, bewusst:
   `security delete-generic-password -s ris-kassetten` — `init` verweigert Überschreiben.
 - `komki-tresor` muss im PATH liegen (im komki-Paket enthalten; aus dem Checkout gebaut:
   `--tresor apps/komki_cli/priv/komki-tresor`).
+
+**Altes Siegelformat.** Einen Eintrag im Format `ktv1` öffnet das Skript nicht mehr und meldet Exit 5.
+Eine Migration gibt es bewusst nicht: Damit verschlüsselte Kassetten sind nicht mehr lesbar. Neu anfangen
+geht mit `security delete-generic-password -s ris-kassetten` und danach `init`.
 
 ## Grenzen
 

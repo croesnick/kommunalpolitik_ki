@@ -22,6 +22,14 @@ defmodule SealedEnvelopeTest do
     %{provider: {FileTestDouble, path: Path.join(dir, "key")}, dir: dir}
   end
 
+  describe "envelope?/1" do
+    test "looks at the prefix only" do
+      assert SealedEnvelope.envelope?("ktv2.broken")
+      refute SealedEnvelope.envelope?("ktv1.abc")
+      refute SealedEnvelope.envelope?("plaintext")
+    end
+  end
+
   describe "roundtrip" do
     test "opens what it sealed", %{provider: provider} do
       for plaintext <- ["api-key-123", "", <<0, 255, 10, 13>>, String.duplicate("x", 100_000)] do

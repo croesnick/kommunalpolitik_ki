@@ -10,7 +10,9 @@ defmodule KomkiCli.Secrets do
   fuer jeden Prozess desselben Nutzers lesbar; erst das Siegel bindet das
   Oeffnen an Touch ID oder das Passwort des Macs. Einen Klartext-Eintrag
   aus der Zeit davor benutzt komki nicht (`:unsealed`), sondern bietet an,
-  ihn zu versiegeln.
+  ihn zu versiegeln. Ein Siegel im alten Format `ktv1` oeffnet komki nicht
+  mehr (`:outdated`); den Wert gibt die nutzende Person mit `komki secret set`
+  neu ein. Ein Siegel wird nie selbst versiegelt.
   """
 
   alias KomkiCli.{Keychain, Tresor}
@@ -41,14 +43,14 @@ defmodule KomkiCli.Secrets do
     end
   end
 
-  @type error :: Keychain.error() | {:tresor, Tresor.error()} | :unsealed | :damaged
+  @type error :: Keychain.error() | {:tresor, Tresor.error()} | :unsealed | :damaged | :outdated
 
   @doc """
-  Zustand des Eintrags: versiegelt, Klartext (aus der Zeit vor dem Tresor)
-  oder fehlend. Liest den Eintrag, gibt aber nie seinen Wert heraus.
+  Zustand des Eintrags: versiegelt, Klartext (aus der Zeit vor dem Tresor),
+  beschaedigt, altes Siegelformat oder fehlend. Liest den Eintrag, gibt aber nie seinen Wert heraus.
   """
   @spec state(t() | String.t(), keyword()) ::
-          :sealed | :unsealed | :damaged | {:error, Keychain.error()}
+          :sealed | :unsealed | :damaged | :outdated | {:error, Keychain.error()}
   def state(entry_or_service, opts \\ [])
   def state(%{service: service}, opts), do: state(service, opts)
 
@@ -63,6 +65,7 @@ defmodule KomkiCli.Secrets do
     cond do
       Tresor.well_formed?(value) -> :sealed
       Tresor.sealed?(value) -> :damaged
+      Tresor.outdated?(value) -> :outdated
       true -> :unsealed
     end
   end
@@ -70,14 +73,21 @@ defmodule KomkiCli.Secrets do
   @doc """
   Klartext fuer den Start eines Connectors: Siegel aus dem Schluesselbund
   holen und per Secure Enclave oeffnen (Rueckfrage Touch ID oder Passwort).
-  Klartext im Schluesselbund wird nicht benutzt.
+  Klartext und alte Siegel im Schluesselbund werden nicht benutzt.
   """
   @spec reveal(String.t(), keyword()) :: {:ok, String.t()} | {:error, error()}
   def reveal(service, opts \\ []) when is_binary(service) do
     with {:ok, value} <- Keychain.fetch(service, opts) do
-      if Tresor.sealed?(value),
-        do: value |> Tresor.open(reason(service), tresor_opts(opts)) |> tresor(),
-        else: {:error, :unsealed}
+      cond do
+        Tresor.sealed?(value) ->
+          value |> Tresor.open(reason(service), tresor_opts(opts)) |> tresor()
+
+        Tresor.outdated?(value) ->
+          {:error, :outdated}
+
+        true ->
+          {:error, :unsealed}
+      end
     end
   end
 
@@ -91,13 +101,22 @@ defmodule KomkiCli.Secrets do
 
   @doc """
   Einen Klartext-Eintrag in sein Siegel umwandeln. Der Eintrag wird in
-  place ersetzt; der Klartext steht danach nicht mehr im Schlüsselbund.
+  place ersetzt; der Klartext steht danach nicht mehr im Schlüsselbund. Ein
+  altes Siegel ist kein Klartext und bleibt unangetastet (`:outdated`).
   """
   @spec seal_existing(t(), keyword()) :: :ok | {:error, error()}
   def seal_existing(entry, opts \\ []) do
     case Keychain.fetch(entry.service, opts) do
-      {:ok, value} -> if Tresor.sealed?(value), do: :ok, else: store(entry, value, opts)
+      {:ok, value} -> seal_value(entry, value, opts)
       {:error, _} = error -> error
+    end
+  end
+
+  defp seal_value(entry, value, opts) do
+    cond do
+      Tresor.sealed?(value) -> :ok
+      Tresor.outdated?(value) -> {:error, :outdated}
+      true -> store(entry, value, opts)
     end
   end
 
@@ -119,6 +138,13 @@ defmodule KomkiCli.Secrets do
 
   def describe(service, :damaged),
     do: "Schlüsselbund-Eintrag '" <> service <> "' enthält ein beschädigtes Siegel; neu eingeben"
+
+  def describe(service, :outdated),
+    do:
+      "Schlüsselbund-Eintrag '" <>
+        service <>
+        "' hat noch das alte Siegelformat ktv1; komki öffnet es nicht mehr, Wert neu eingeben mit 'komki secret set " <>
+        short_name(service) <> "'"
 
   def describe(service, {:tresor, error}), do: "'" <> service <> "': " <> Tresor.describe(error)
 

@@ -1,11 +1,10 @@
 defmodule KomkiCli.Tresor do
   @moduledoc """
   Geheimnisse mit der Secure Enclave versiegeln und oeffnen — Adapter auf
-  `KomkiCli.Tresor.Core` (Ticket #224): Der Kern (Ports, Exit-Codes,
-  Siegel-Form) ist komki-frei und soll spaeter als eigenstaendiges Paket
-  herausgezogen werden. Hier wohnt die komki-Seite: die Programmsuche neben
-  dem laufenden komki (Quellbaum, Homebrew `libexec`, Burrito `dist/`) und
-  die Application-Env `:komki_cli, :tresor` (Tests).
+  `KomkiCli.Tresor.Core`, der das Siegel ueber `SealedEnvelope` baut und oeffnet.
+  Hier wohnt die komki-Seite: die Programmsuche neben dem laufenden komki
+  (Quellbaum, Homebrew `libexec`, Burrito `dist/`) und die Application-Env
+  `:komki_cli, :tresor` (Tests).
 
   Der Schluesselbund enthaelt danach nur noch das Siegel. Oeffnen geht nur
   ueber die Secure Enclave dieses Macs und nur mit Touch ID oder dem
@@ -13,9 +12,9 @@ defmodule KomkiCli.Tresor do
   nicht nur fuer komki. Erlang erreicht die Secure Enclave nicht selbst,
   deshalb das eigene Programm (AGENTS.md, Elixir-first, Ausnahme).
 
-  Klartext geht nur ueber stdin hinein und stdout heraus, nie ueber argv,
-  Umgebung oder Log. `opts[:command]` ersetzt das Programm und
-  `opts[:timeout]` begrenzt die Laufzeit (Tests); die Application-Env
+  Das Programm macht nur noch Hardware (Schluessel anlegen, Schluesselvereinbarung
+  nach der Freigabe); Klartext erreicht es nicht. `opts[:command]` ersetzt das
+  Programm und `opts[:timeout]` begrenzt die Laufzeit (Tests); die Application-Env
   `:komki_cli, :tresor` gilt dauerhaft.
   """
 
@@ -56,10 +55,11 @@ defmodule KomkiCli.Tresor do
   @spec sealed?(String.t()) :: boolean()
   def sealed?(text), do: Core.sealed?(text)
 
-  @doc """
-  Ist das Siegel vollstaendig (Base64, JSON mit `key`, `eph`, `box`)?
-  Prueft nur die Form, oeffnet nichts. Ein gekuerztes Siegel faellt durch.
-  """
+  @doc "Ist `text` ein Siegel im alten Format `ktv1`, das komki nicht mehr oeffnet?"
+  @spec outdated?(String.t()) :: boolean()
+  def outdated?(text), do: Core.outdated?(text)
+
+  @doc "Ist das Siegel vollstaendig? Prueft nur die Form, oeffnet nichts."
   @spec well_formed?(String.t()) :: boolean()
   def well_formed?(text), do: Core.well_formed?(text)
 

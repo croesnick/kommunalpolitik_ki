@@ -82,6 +82,10 @@ defmodule SealedEnvelope do
     end
   end
 
+  @doc "Does `text` claim to be a `ktv2` envelope? Says nothing about its structure."
+  @spec envelope?(String.t()) :: boolean()
+  def envelope?(text) when is_binary(text), do: String.starts_with?(text, @prefix)
+
   @doc "Is `text` a structurally complete `ktv2` envelope? Opens nothing."
   @spec well_formed?(String.t()) :: boolean()
   def well_formed?(text) when is_binary(text), do: match?({:ok, _, _, _}, decode(text))
