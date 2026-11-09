@@ -143,7 +143,7 @@ Ein Beobachter ist jede Stelle, die Inhalte oder geschützte Metadaten potenziel
 | `brave-search` | Verarbeitungsdomäne | sieht jeden Suchtext |
 | `az-verlag` | Verarbeitungsdomäne | sieht jeden Abruf aus dem Abo |
 | `mail-provider` | Verarbeitungsdomäne | transportiert ein- und ausgehende Mail |
-| `nextcloud-betreiber` | Verarbeitungsdomäne | hostet den Fraktionsordner |
+| `nextcloud-betreiber` | Verarbeitungsdomäne | hostet den Fraktionsordner und den Ordner, in dem der Stand aus ratsprojekte liegt |
 | `fraktion` | Person (Gruppe) | Kolleginnen und Kollegen der Fraktion |
 | `vorstand` | Person (Gruppe) | Vorstand des Ortsverbands, liest mit der Fraktion den Stand aus ratsprojekte |
 | `ortsverband` | Person (Gruppe) | Mitgliederverteiler der Partei |
@@ -159,7 +159,7 @@ Ein Beobachter ist jede Stelle, die Inhalte oder geschützte Metadaten potenziel
 | `auftrag-sitzung-2026-11-17@1` | Vertraulichkeit des Arbeitsauftrags, schon die Themenwahl | Miriam, pi-agent | keine | Miriam |
 | `fraktion-intern@1` | interne Fraktionsarbeit | Miriam, pi-agent, fraktion, nextcloud-betreiber | keine | Miriam, für konkrete Rechercheaufträge und für gegengelesene Essenz an ratsprojekte |
 | `fraktionsprojekt-radweg@1` | die Projektidee selbst | Miriam, pi-agent, fraktion, nextcloud-betreiber | keine | Miriam, für Rechercheaufträge, die öffentliche Fassung und gegengelesene Essenz an ratsprojekte |
-| `ratsprojekte@1` | der gemeinsam gebundene Bestand von ratsprojekte | Miriam, pi-agent, fraktion, vorstand, dazu Ausgabeweg und Sicherung, sobald sie feststehen | keine | Miriam, für konkrete Rechercheaufträge |
+| `ratsprojekte@1` | der gemeinsam gebundene Bestand von ratsprojekte | Miriam, pi-agent, fraktion, vorstand, nextcloud-betreiber (Weg des Stands), dazu die Sicherung, sobald sie feststeht | keine | Miriam, für konkrete Rechercheaufträge |
 | `abo-az@1` | Volltext aus dem Zeitungsabo | Miriam, pi-agent | Auflage: Quellenangabe mit Urhebername, keine Weitergabe des Volltexts | Miriam, nur für ein Kurzzitat mit Quellenangabe (§ 51, § 63 UrhG) |
 | `buergerfall-031@1` | personenbezogenes Bürgeranliegen | Miriam, pi-agent, absenderin-031, mail-provider | Zweck `antwort-fall-031`, Eingang nur im Fallumfang | Miriam, nur für die Antwort an die Absenderin |
 | `parteimitglieder@1` | Bericht an den Ortsverband | Miriam, pi-agent, ortsverband, mail-provider | keine | keine |
@@ -673,8 +673,9 @@ flowchart LR
 
 **Im Kalkül.** ratsprojekte trennt seine Einträge nicht, also ist der Bestand nach R.4.4 konservativ gemeinsam gebunden:
 Er trägt genau ein Label, `ratsprojekte@1`. Das präzisiert K2. Schreiben ist eine Speicherung (R.5.6) in die Umgebung
-`ratsprojekte-bestand@1` mit den Beobachtern `nutzende-person`, `pi-agent`, `fraktion`, `vorstand`, dazu Ausgabeweg und
-Sicherung, sobald sie feststehen (R.3). Im Raum `recherche` gilt ρ ⊆ R_Γ(λ(y)), denn alle Bindungen sind öffentlich. Γ
+`ratsprojekte-bestand@1` mit den Beobachtern `nutzende-person`, `pi-agent`, `fraktion`, `vorstand` und
+`nextcloud-betreiber`, denn der Stand liegt als Druck in einem Nextcloud-Ordner. Die Sicherung kommt dazu, sobald sie
+feststeht (R.3). Im Raum `recherche` gilt ρ ⊆ R_Γ(λ(y)), denn alle Bindungen sind öffentlich. Γ
 hat keine `store`-Regel, deshalb braucht jedes Schreiben eine Aktionsfreigabe für genau diesen Aufruf (R.4.2, R.6.2).
 
 Der Empfängertest bleibt dabei unberührt (B23). Heute überbrückt ein GO auch `recipient_not_allowed`, das zeigte ein
@@ -768,7 +769,8 @@ Neuschreiben zu verlangen, brächte nichts, weil sich abtippen immer lässt.
 | 12.7 | ratsprojekte bekommt später ein neues Feld. | Es bleibt für den Agenten unsichtbar, bis es ausdrücklich freigeschaltet wird. |
 | 12.8 | Der Agent schlägt aus dem Projektraum einen Fakt für ratsprojekte vor. | Erlaubt, wie 11.0 mit GO. |
 | 12.9 | Ein Raum enthält Stand und Nichtöffentliches. Der Agent will etwas in ratsprojekte eintragen. | Abgelehnt ohne Fenster, wie 11.1. |
-| 12.10 | Der Agent will aus dem Projektraum etwas in den Fraktionsordner legen. | Abgelehnt, weil die Nextcloud-Betreiber den Stand nicht sehen dürfen. Miriam arbeitet dafür in einem getrennten Raum. |
+| 12.10 | Der Agent will aus dem Projektraum etwas in den Fraktionsordner legen. | Nur mit GO: Fraktion und Nextcloud-Betreiber sehen den Stand ohnehin, weil er als Druck in einem Nextcloud-Ordner liegt. Der Empfängertest besteht, das Schreiben braucht trotzdem ein GO. |
+| 12.11 | Der Agent soll aus dem Projektraum einen Bericht für den Ortsverband entwerfen. | Abgelehnt, weil `ortsverband` und `mail-provider` nicht im Empfängerkreis von `ratsprojekte@1` liegen. Miriam schreibt den Bericht selbst, als Vorbereitung dient ihr der Rückblick im Hub. |
 
 **Zu bauen.** B17 (Lesen, [#419](https://github.com/croesnick/kommunalpolitik_ki/issues/419)).
 
@@ -803,7 +805,7 @@ gilt als ihre Entfernung (R.5.7). Deshalb ist der Weg eine Lockerung von B_W auf
 Offenlegungsfreigabe (R.6.1) und einer Befugnis für jede Bindung des Raums, Ausgabeart `ratsprojekte-essenz`. Eine eigene
 Freigabeart gibt es nicht. `ratsarbeit@1` bekommt diese Befugnis nie. `fraktion-intern@1` bleibt unverändert: Eine
 Fassung mit Vorstand hieße, dass der Vorstand alles Fraktionsinterne lesen dürfte und nicht nur das, was Miriam auswählt.
-Auch Ausgabeweg und Sicherung müssten dort hinein. Eine weitere Bindung für den engeren Kreis braucht es nicht, das ist
+Auch Sicherung und die Nextcloud-Betreiber als Weg des Stands müssten dort hinein. Eine weitere Bindung für den engeren Kreis braucht es nicht, das ist
 `ratsprojekte@1`. Der Hub ist ein Speicher und kein Zielraum, also betrifft das die Übergabe zwischen Räumen (K4) nicht.
 
 Vorerst ist das eine manuelle Inhaltsfreigabe (R.6.4), freigegeben wird genau ein Text. G2 will den Faktenweg als

@@ -275,6 +275,17 @@ details.mehr>summary{cursor:pointer;font-size:.875rem;font-weight:600;color:var(
 .seitenpanel h4{font-size:1.0625rem}
 .seitenpanel ul{margin:.4rem 0 0;padding-left:1.05rem}
 .seitenpanel .btn{width:100%;margin-top:.5rem}
+.seitenpanel .btn.link{width:auto;margin-top:0}
+.seitenpanel input[type=date]{display:block;width:100%;margin-top:.2rem;padding:.3rem .45rem;border:1px solid var(--line2);border-radius:.4rem;background:var(--win);color:var(--ink)}
+#druck{display:none}
+@media print{
+  @page{size:A4;margin:16mm 15mm}
+  html.druck-stand body>:not(#druck){display:none!important}
+  html.druck-stand #druck{display:block}
+  #druck .papier{box-shadow:none;padding:0;border-radius:0;font-size:10.5pt}
+  #druck .papier h4{break-after:avoid}
+  #druck .papier .pr,#druck .papier tr,#druck .papier .ueberblick{break-inside:avoid}
+}
 
 .runde{display:grid;grid-template-columns:13rem minmax(0,1fr);gap:1.25rem;padding:1.1rem 1.25rem 1.5rem}
 .auswahl label{display:flex;gap:.45rem;align-items:baseline;padding:.3rem 0;font-size:.9375rem;border-bottom:1px solid var(--line)}
@@ -358,7 +369,7 @@ footer{padding-block:2rem 3rem;color:var(--ink3);font-size:.875rem}
   <p class="moment">Jeder Kreis sieht eine eigene Fassung. Es gibt keine Rechte je Eintrag, sondern feste Ausgaben: Externe bekommen keine, alle anderen genau eine. Was nicht in einer Ausgabe steht, verlässt den Rechner nicht.</p>
   <div class="tabelle-w"><table class="t"><thead><tr><th>Kreis</th><th>Wer</th><th>Fassung</th><th>Wie sie dorthin kommt</th></tr></thead><tbody>
     <tr><td>Redaktion</td><td>Miriam</td><td>Arbeitsansicht: alles, auch private Notizen und Querverweise</td><td>Der Hub selbst, nur auf ihrem Rechner</td></tr>
-    <tr><td>Engerer Kreis</td><td>Fraktion und Vorstand</td><td>Stand: Phase, nächster Schritt, Entscheidungen, Meinungsbilder, Anträge</td><td>PDF oder Kurztext nach Vorschau, von Hand weitergegeben</td></tr>
+    <tr><td>Engerer Kreis</td><td>Fraktion und Vorstand</td><td>Stand: Phase, nächster Schritt, Entscheidungen, Meinungsbilder, Anträge</td><td>Nach der Vorschau im Browser als PDF gedruckt und von Hand in einen eigenen Nextcloud-Ordner gelegt, in den Chat nur ein Hinweis ohne Inhalt</td></tr>
     <tr><td>Basis</td><td>Wer den Aufruf-Link der Befragung hat</td><td>Befragungstexte: Titel, Situation, Vorschlag, Hintergrund, eigens dafür geschrieben</td><td>Als Datei, die Miriam auf die Beteiligungsplattform hochlädt</td></tr>
     <tr><td>Externe</td><td>Elternbeirat, Vereine, andere Fraktionen</td><td>Keine. Bekommen nichts aus dem Hub, ihre Aussagen trägt Miriam ins Meinungsbild ein</td><td>Im Gespräch, außerhalb des Hubs</td></tr>
     <tr><td>Öffentlichkeit</td><td>Alle, auch Verwaltung und Presse</td><td>Der eingereichte Antrag und der Beschluss</td><td>Einreichung von Hand, nie aus dem Hub ins RIS</td></tr>
@@ -516,7 +527,8 @@ function handle(s0,a){
       if(a.stand)r.stand=a.stand;
       r.ruecklauf=d;r.status=a.schliessen?'beendet':'laeuft';break}
     case'zusammenfassung':{const m=pr.meinungen.find(x=>x.befragung===a.befragung);if(m)m.zusammen=a.text;break}
-    case'stand':s.staende.push({datum:d});break;
+    /* Ein ausgegebener Stand bleibt als festes Dokument liegen, damit Miriam sieht, was hinausging. */
+    case'stand':s.staende.push({datum:d,zeit:a.zeit||'',fassung:fassungStand(s,zuletztStand(s))});break;
     /* Ein Ergebnis eines Raums ist ein Ereignis: ein GO in komki, eine Entscheidung im Hub, Teile abwählbar. */
     case'vorschlag':
       s.vorschlaege.push({id:'v'+(s.vorschlaege.length+1),slug:a.slug,raum:a.raum,titel:a.titel,teile:a.teile,status:'offen',datum:d,beleg:a.beleg});
@@ -578,10 +590,11 @@ function laufendeBefragung(s,pr){return s.befragungen.find(r=>r.status==='laeuft
 function ergebnisZeilen(s,r){
   return r.slugs.map(sl=>p(s,sl)).map(x=>{const m=x.meinungen.find(y=>y.befragung===r.id);return m?{slug:x.slug,titel:x.titel,vert:m.vert,zusammen:m.zusammen,argumente:m.argumente||[]}:null}).filter(Boolean);
 }
-/* Routine wie „In die Befragung gegeben“ oder „aus komki übernommen“ zählt nicht als neu. */
-const ROUTINE=['vorschlag','befragung','ruecklauf','schritt','verweis','wert'];
+/* Neu ist nur Substanz: neue Ideen, Einträge und Entscheidungen samt Phasenwechsel und Antragsstand.
+   Fakten, Varianten, angefangene Anträge und Routine stehen weiter unten beim Projekt. */
+const SUBSTANZ=['anlage','notiz','meinung','entscheidung'];
 function neuSeit(s,seit){
-  return seit?s.projekte.flatMap(x=>x.verlauf.filter(e=>e.imStand&&e.datum>seit&&!ROUTINE.includes(e.art)).map(e=>({titel:x.titel,datum:e.datum,text:e.text,von:e.von||null}))).sort((a,b)=>a.datum<b.datum?1:-1):[];
+  return seit?s.projekte.flatMap(x=>x.verlauf.filter(e=>e.imStand&&e.datum>seit&&SUBSTANZ.includes(e.art)).map(e=>({titel:x.titel,datum:e.datum,text:e.text,von:e.von||null}))).sort((a,b)=>a.datum<b.datum?1:-1):[];
 }
 function neuJeProjekt(neu){
   const g={};neu.forEach(n=>{(g[n.titel]=g[n.titel]||[]).push(n)});return Object.entries(g);
@@ -739,7 +752,7 @@ const GESCHICHTE=[
  ['2.1',[{t:'eintragen',slug:TB,wer:NUR_ICH,text:'Eine Anwohnerin hat das angeregt, Name steht im Vault.',datum:'2026-11-05'}]],
  ['2.2',[{t:'eintragen',slug:TB,wer:'Fraktion',text:'Dafür, wenn die Folgekosten geklärt sind. Vorstand und Basis fragen.',phase:'meinung',schrittText:'Folgekosten beim Bauamt erfragen',schrittWer:'Miriam',schrittBis:'2026-11-20',datum:'2026-11-05'}]],
  ['3.1',[{t:'tag',datum:'2026-11-08'}]],
- ['3.2',[{t:'stand',datum:'2026-11-08'}]],
+ ['3.2',[{t:'stand',datum:'2026-11-08',zeit:'19:42'}]],
  ['4.1',[{t:'eintragen',slug:TB,wer:'Vorstand',text:'In die Basis geben, zusammen mit den drei anderen Ideen.',datum:'2026-11-09'},
          {t:'befragung',name:'Ideen für den Winter',frage:'Welche Ideen sollen wir weiterverfolgen?',bis:'2026-11-30',slugs:[TB,'buergerbus-ortsteile','mitfahrbaenke-ortsteile','sitzbaenke-stadtweiher'],datum:'2026-11-11'},
          ...Object.entries(BASIS_TEXTE).map(([slug,b])=>Object.assign({t:'basis',slug,datum:'2026-11-11'},b))]],
@@ -943,15 +956,18 @@ function ergebnisHtml(zeilen,mitLink){
   return '<table class="imp ergebnis"><thead><tr><th>Idee</th><th>So hat die Basis geantwortet</th><th>Was dazu gesagt wurde</th></tr></thead><tbody>'+
     zeilen.map(z=>'<tr><td>'+(mitLink?'<button type="button" class="btn link" style="text-align:left" data-go="projekt:'+z.slug+'">'+esc(z.titel)+'</button>':'<b>'+esc(z.titel)+'</b>')+'</td><td style="min-width:15rem">'+vertBalken(z.vert)+'</td><td>'+(z.zusammen?esc(z.zusammen):(mitLink?'<span class="klein">Noch nichts eingetragen</span>':''))+argumenteHtml(z.argumente)+'</td></tr>').join('')+'</tbody></table>';
 }
-function papierStand(st){
+/* Reihenfolge für die zehn Minuten vor der Sitzung: Überblick und „Wer ist dran“ auf Seite 1, dann Neues, der Rest zum Nachschlagen. */
+function papierStand(st,o){
+  o=o||{};
   const dran=Object.entries(st.dran);
   const nachFrist=l=>[...l].sort((x,y)=>(x.bis||'9')<(y.bis||'9')?-1:1);
   const z=(k,v)=>'<dt>'+k+'</dt><dd>'+v+'</dd>';
-  return '<div class="papier"><div class="eyebrow">Offene Liste Gartenstadt · für Fraktion und Vorstand</div><h3>Stand der Ratsprojekte, '+de(st.datum)+st.datum.slice(0,4)+'</h3>'+
+  const wann=de(st.datum)+st.datum.slice(0,4)+(o.zeit?', '+o.zeit+' Uhr':'');
+  return '<div class="papier"><div class="eyebrow">'+(o.rueckblick?'Rückblick · nicht ausgegeben':'Offene Liste Gartenstadt · für Fraktion und Vorstand')+'</div><h3>Stand der Ratsprojekte, '+wann+'</h3>'+
     '<div class="ueberblick">'+st.gruppen.map(g=>'<div><b>'+g.projekte.length+'</b>'+esc(g.n)+'</div>').join('')+'</div>'+
+    (dran.length?'<h4>Wer ist dran</h4><table class="dran"><tbody>'+dran.map(([w,l])=>'<tr><th colspan="3">'+esc(w)+'</th></tr>'+nachFrist(l).map(x=>'<tr><td>'+esc(x.titel)+'</td><td>'+esc(x.text)+'</td><td>'+(x.bis?'bis '+de(x.bis):'')+'</td></tr>').join('')).join('')+'</tbody></table>':'')+
     (st.seit?'<h4>Neu seit '+de(st.seit)+'</h4>'+(st.neu.length?'<dl class="sgrid">'+neuJeProjekt(st.neu).map(([ti,l])=>z(esc(ti),l.map(n=>'<div>'+esc(n.text)+(n.von?' <span class="gr">('+esc(n.von)+')</span>':'')+'</div>').join(''))).join('')+'</dl>':'<div class="neu">Nichts.</div>'):'')+
     st.befragungen.map(b=>'<h4>Meinungsbild der '+esc(b.kreis)+': '+esc(b.name)+'</h4><p class="gr" style="font-size:.875rem;margin-top:.3rem">'+esc(b.frage)+' Rücklauf vom '+de(b.datum)+' Nicht bindend.</p>'+ergebnisHtml(b.zeilen,false)).join('')+
-    (dran.length?'<h4>Wer ist dran</h4><table class="dran"><tbody>'+dran.map(([w,l])=>'<tr><th colspan="3">'+esc(w)+'</th></tr>'+nachFrist(l).map(x=>'<tr><td>'+esc(x.titel)+'</td><td>'+esc(x.text)+'</td><td>'+(x.bis?'bis '+de(x.bis):'')+'</td></tr>').join('')).join('')+'</tbody></table>':'')+
     st.gruppen.map(g=>'<h4>'+esc(g.n)+'</h4>'+g.projekte.map(x=>'<div class="pr"><b>'+esc(x.titel)+'</b>'+
       (x.kurz?'<p class="gr">'+esc(x.kurz)+'</p>':'')+
       '<dl class="sgrid">'+
@@ -964,24 +980,41 @@ function papierStand(st){
       x.notizen.map(n=>z('Notiz',esc(n))).join('')+
       '</dl></div>').join('')).join('')+
     (st.abgelegt.length?'<h4>Abgelegt</h4><div class="neu">'+st.abgelegt.map(a=>esc(a.titel)+' ('+esc(a.ende)+')').join(', ')+'</div>':'')+
-    '<div class="fuss">Stand vom '+de(st.datum)+st.datum.slice(0,4)+', gepflegt von Miriam Haas. Nur für Fraktion und Vorstand. Enthält nichts Nichtöffentliches.</div></div>';
+    '<div class="fuss">Stand vom '+wann+', gepflegt von Miriam Haas. Nur für Fraktion und Vorstand. Enthält nichts Nichtöffentliches.</div></div>';
 }
-function kurztextStand(st){
-  const z=['Stand der Ratsprojekte, '+de(st.datum)+st.datum.slice(0,4)];
-  if(st.seit)z.push('Neu seit '+de(st.seit)+':');
-  st.neu.filter(n=>n.von).forEach(n=>z.push('- '+n.titel+': '+n.text));
-  if(st.neu.filter(n=>n.von).length===0)z.push('Keine Entscheidungen.');
-  return z.join('\n');
+/* In den Chat geht nur der Hinweis ohne Inhalt. Sonst würde der Messenger Beobachter des ganzen Bestands. */
+function hinweisStand(a){return 'Neuer Stand vom '+de(a.datum)+a.datum.slice(0,4)+' liegt im Ordner „Stand“.'}
+function ausgegebenListe(s){
+  const l=s.staende.map((a,i)=>[a,i]).filter(([a])=>a.fassung).reverse();
+  return l.length?'<p style="margin-top:.8rem"><b>Bisher ausgegeben:</b></p><ul>'+l.map(([a,i])=>'<li><button type="button" class="btn link" data-act="alt" data-id="'+i+'">'+de(a.datum)+a.datum.slice(0,4)+(a.zeit?', '+a.zeit+' Uhr':'')+'</button></li>').join('')+'</ul>':'';
 }
-function vStand(s){
+function rueckblickFeld(seit){return '<label class="klein" style="display:block;margin-top:.8rem">Rückblick ab <input type="date" id="f-seit" value="'+(seit||'')+'"></label>'}
+const DRUCKEN='<button type="button" class="btn" data-act="drucken">Drucken oder als PDF sichern</button>';
+function vStand(s,o){
+  o=o||{};
+  const kopf='<div class="app">'+appKopf(s,'stand')+'<div class="papierbuehne">';
+  if(o.alt!=null){const a=s.staende[o.alt];
+    return kopf+papierStand(a.fassung,{zeit:a.zeit})+
+     '<div class="seitenpanel"><h4>Ausgegeben am '+de(a.datum)+(a.zeit?', '+a.zeit+' Uhr':'')+'</h4><p style="margin-top:.35rem">So ist dieser Stand hinausgegangen. Er ändert sich nicht mehr.</p>'+
+     DRUCKEN+'<p class="klein" style="margin-top:.3rem">Die Datei legst du selbst in den Ordner „Stand“ in der Nextcloud.</p>'+
+     '<p style="margin-top:.7rem"><b>Hinweis für den Chat:</b></p><pre class="kurz">'+esc(hinweisStand(a))+'</pre><button type="button" class="btn" data-act="hinweis" data-id="'+o.alt+'">Hinweis kopieren</button>'+
+     '<button type="button" class="btn" data-act="vorschau">Zur Vorschau</button>'+ausgegebenListe(s)+'</div></div></div>';
+  }
+  if(o.seit){const st=fassungStand(s,o.seit);
+    return kopf+papierStand(st,{rueckblick:true})+
+     '<div class="seitenpanel"><h4>Rückblick</h4><p style="margin-top:.35rem">Alles seit dem gewählten Tag, in derselben Fassung wie der Stand. Gedacht als Vorbereitung für einen Bericht an Vorstand oder Fraktion. Der Rückblick wird nicht gespeichert und setzt nichts zurück.</p>'+
+     rueckblickFeld(o.seit)+DRUCKEN+'<button type="button" class="btn" data-act="vorschau">Zur Vorschau</button></div></div></div>';
+  }
   const seit=zuletztStand(s);
   const st=fassungStand(s,seit);const z=st.zurueckgehalten;
-  return '<div class="app">'+appKopf(s,'stand')+'<div class="papierbuehne">'+papierStand(st)+
+  const abgelaufen=Object.values(st.dran).flat().filter(x=>x.bis&&x.bis<s.heute).length;
+  return kopf+papierStand(st)+
    '<div class="seitenpanel"><h4>So verlässt es den Rechner</h4><p style="margin-top:.35rem">Links steht genau das, was Fraktion und Vorstand bekommen. Durch das Ansehen wird nichts gespeichert.</p>'+
    '<p style="margin-top:.6rem"><b>Bleibt hier:</b></p><ul><li>'+z.notizen+(z.notizen===1?' Notiz':' Notizen')+' nur für dich</li><li>'+z.verweise+' Querverweise</li><li>Herkunft von '+z.herkunft+' Projekten</li><li>'+z.vorschlaege+' offene Vorschläge</li></ul>'+
    '<div class="hinweis">Lies „Wer ist dran“ und die Gründe kurz durch. Dort schreibst du am ehesten etwas, das nicht für alle gedacht ist. Nichtöffentliches gehört nie hierher.</div>'+
-   '<button type="button" class="btn haupt" data-act="stand">Stand ausgeben</button><p class="klein" style="margin-top:.3rem">Ab dann zählt „neu“ von heute an.'+(seit?' Letzte Ausgabe: '+de(seit):'')+'</p>'+
-   '<p style="margin-top:.7rem"><b>Kurztext für den Chat:</b></p><pre class="kurz">'+esc(kurztextStand(st))+'</pre><button type="button" class="btn" data-act="kurz">Kurztext kopieren</button></div></div></div>';
+   (abgelaufen?'<div class="hinweis">'+(abgelaufen===1?'Eine Frist':abgelaufen+' Fristen')+' in „Wer ist dran“ '+(abgelaufen===1?'ist':'sind')+' abgelaufen. Im Stand steht nur das Datum, gelesen wird es trotzdem als überfällig. Frag nach oder pass die Frist an, bevor du ausgibst.</div>':'')+
+   '<button type="button" class="btn haupt" data-act="stand">Stand ausgeben</button><p class="klein" style="margin-top:.3rem">Der Hub merkt sich das Dokument mit Uhrzeit. Ab dann zählt „neu“ von diesem Zeitpunkt an.'+(seit?' Letzte Ausgabe: '+de(seit):'')+'</p>'+
+   rueckblickFeld('')+ausgegebenListe(s)+'</div></div></div>';
 }
 function formBefragungNeu(s){
   return '<form data-form="befragung" style="max-width:34rem"><h3 style="font-size:1.375rem">Neue Befragung</h3><p class="klein" style="margin-top:.2rem">Eine Frage an die Basis zu mehreren Ideen, mit Frist. Hier schreibst du die Texte und liest später die Antworten ein.</p>'+
@@ -1076,7 +1109,8 @@ const SZENEN=[
   ['bruch','Der Hub als gemeinsamer Fraktionsspeicher','Lokal ist Miriam die einzige Person im Hub. Die Grenze für alles Handgeschriebene sitzt also bei der Ausgabe. Jetzt ist der Stand eine eigene Fassung, und die Vorschau zeigt genau dieses Dokument.'],
   ['','Die Notiz zu Selin taucht nicht auf','„Selin ist wegen der Kosten skeptisch“ steht im Bürgerbus-Projekt. Im Stand fehlt sie, das Panel zählt sie nur. Probe unter „Vier Blicke“.'],
   ['','Das ist der Lohn fürs Eintragen','Drei Sätze je Projekt, und vor der Sitzung liegt ein fertiges Dokument da. Ohne diesen Moment wird niemand den Hub pflegen.']]},
- {k:'3.2',t:'Bei Selin: auf dem Tablet, zehn Minuten vor der Sitzung',u:'Nextcloud · Stand 2026-11-08.pdf',vorher:'3.1',html:s=>tablet(papierStand(fassungStand(s,zuletztStand(s)))),notes:[
+ {k:'3.2',t:'Bei Selin: auf dem Tablet, zehn Minuten vor der Sitzung',u:'Nextcloud · Stand 2026-11-08.pdf',vorher:'3.1',html:s=>tablet(papierStand(fassungStand(s,zuletztStand(s)),{zeit:'19:42'})),notes:[
+  ['','Was hinausging, bleibt im Hub','Miriam hat nach der Vorschau „Stand ausgeben“ geklickt. Der Hub hat genau dieses Dokument mit Uhrzeit gespeichert, sie hat es im Browser als PDF gedruckt und in den Ordner „Stand“ gelegt. In den Chat ging nur: „Neuer Stand vom 08.11.2026 liegt im Ordner.“'],
   ['bruch','Selin fand nicht, was an Selin hängt','Im ersten Stand standen die Aufgaben verteilt in den Projekten. Jetzt gibt es oben „Wer ist dran“.'],
   ['bruch','„Überfällig“ im Papier an den Vorstand','Ein rotes Wort neben einem Namen, gelesen von Leuten außerhalb der Fraktion, ist ein politisches Problem. Im Stand steht neutral „bis 30.10.“. „Überfällig“ gibt es nur in Miriams Ansicht.'],
   ['','Jonas sieht, wer noch nicht gehört ist','„Noch nicht gehört: Vorstand, Basis“ steht bei frühen Projekten. Das ist Jonas’ Stichwort für die nächste Befragung.']]}
@@ -1146,7 +1180,7 @@ const SZENEN=[
   ['bruch','Die beste Ansicht verschwand','Der Überblick über alle Ideen war nur ein Zwischenschritt beim Einlesen. Danach stand dort nur „Beendet“. Jetzt bleibt er als Ergebnisseite stehen, mit Links zu den Projekten.'],
   ['','Keine Rangliste','Die Tabelle steht in der Reihenfolge der Ideen, ohne Prozent oder Sieger. Wer nach Zustimmung sortiert, baut eine Rangliste durch die Hintertür.']]},
  {k:'8.3',t:'Am Donnerstag auf dem Tisch',u:'Nextcloud · Stand 2026-12-01.pdf',html:s=>tablet(papierStand(fassungStand(s,zuletztStand(s)))),notes:[
-  ['bruch','„Neu seit“ war zu lang','Im Stand vom Dezember standen hier 17 Zeilen, darunter viel Routine. Jetzt nur noch Substanz, je Projekt eine Zeile. Auch die Zahl neben „Stand“ zählt nur das.'],
+  ['bruch','„Neu seit“ war zu lang','Im Stand vom Dezember standen hier 17 Zeilen, darunter viel Routine. Jetzt nur noch Substanz: neue Ideen, Einträge und Entscheidungen samt Phasenwechsel und Antragsstand. Fakten und Varianten stehen beim Projekt. Auch die Zahl neben „Stand“ zählt nur das.'],
   ['','Das Meinungsbild steht weit oben im Stand','Solange es frisch ist, sieht die Fraktion alle Ideen auf einen Blick, mit dem Hinweis „Nicht bindend“. Es ist genau das, was am Donnerstag auf den Tisch gehört.'],
   ['','Die Auskunft des Bauamts ist jetzt ein Fakt','Damit die Fraktion sagen kann „die Folgekosten sind geklärt“, muss das belegt irgendwo stehen. Im ersten Lauf hing die Begründung in der Luft.']]},
  {k:'8.4',t:'Nach der Fraktionssitzung',u:'localhost:4000',html:s=>vBrett(s),notes:[
@@ -1164,7 +1198,10 @@ const RAND=[
  ['Ein Bürgeranliegen mit Namen und Adresse','Gehört nicht in den Hub (WF 8). Im Hub steht höchstens der Anlass, der Fall bleibt im Vault.','Miriam, Öffentlichkeit'],
  ['Ein Gespräch mit Externen war vertraulich','Eintrag mit „Nur ich“. Dann zählt es auch nicht als Meinungsbild und erscheint nirgends im Stand.','Externe, Miriam'],
  ['Nichtöffentliches Wissen ändert die Lage','Es steht nie im Hub, auch nicht verklausuliert. Das Risiko liegt in Freitext wie „warten, bis das Grundstück geklärt ist“. Dagegen hilft nur die Vorschau.','Miriam, engerer Kreis'],
- ['Etwas Heikles ist schon im letzten Stand','Aus dem Stand nehmen wirkt nur nach vorn. Eine verschickte Ausgabe lässt sich nicht zurückholen.','Miriam'],
+ ['Etwas Heikles ist schon im letzten Stand','Ein ausgegebener Stand lässt sich nicht zurückholen. Miriam löscht die Datei samt Versionen im Ordner und spricht die Lesenden direkt an. Der nächste Stand sagt nur, dass eine Aussage zurückgenommen wurde, ohne sie zu wiederholen.','Miriam'],
+ ['Eine Aussage im letzten Stand war falsch','Ein Eintrag „Korrektur“, der als Substanz unter „Neu seit“ erscheint. Still verschwinden darf sie nicht, Selin hat sie vielleicht schon zitiert. Im Prototyp noch nicht gebaut.','Fraktion, Vorstand'],
+ ['Nichtöffentliches ist in einen Stand geraten','Ein Vorfall nach Art. 20 Abs. 2 GO, kein Vorgang im Hub. Der Hub bietet dafür nichts an.','Miriam'],
+ ['Bericht an die Mitgliederversammlung','„Rückblick ab“ in der Stand-Ansicht: dieselbe Fassung, ab einem frei gewählten Tag. Nicht gespeichert, setzt nichts zurück. Den Bericht schreibt Miriam selbst, komki darf aus dem Stand keinen für die Basis entwerfen.','Miriam, Vorstand'],
  ['Tippfehler in einem Verlaufseintrag','Eintrag korrigierbar mit Vermerk. Im Prototyp noch nicht gebaut.','Miriam'],
  ['Titel auf der Beteiligungsplattform nachträglich geändert','Die Kennung ordnet das Thema trotzdem richtig zu. Der Hub zeigt an, dass über einen anderen Text abgestimmt wurde.','Miriam'],
  ['Tippfehler entdeckt, nachdem die Befragung läuft','Ein zweites Hochladen ändert vorhandene Themen nicht, Antworten dürfen nicht still einem anderen Text zugerechnet werden. Korrigiert wird auf der Plattform.','Miriam'],
@@ -1179,7 +1216,10 @@ const RAND=[
 const VERWORFEN=[
  ['Stufen wie „kleiner Kreis, Vorstand, Basis, Recherche“','Ein Projekt ist oft in mehreren zugleich. Recherche läuft vor und nach der Befragung.','Fünf Phasen als Reifegrad, die Kreise getrennt.','Beim Bauen'],
  ['Vault als Pflicht-Vorstufe (AGENTS §10)','Eine Idee in einer Minute erfassen geht damit nicht.','Der Vault bleibt Quelle für Material. Der Stand entsteht im Hub.','Beim Bauen'],
- ['Hub als Speicher, den die Fraktion liest','Beim lokalen Betrieb gibt es keine Fraktion im Hub.','Feste Fassungen. Der Stand ist heute ein PDF und wird später eine Leseansicht.','Beim Bauen'],
+ ['Hub als Speicher, den die Fraktion liest','Beim lokalen Betrieb gibt es keine Fraktion im Hub.','Feste Fassungen. Der Stand ist heute ein Druck aus dem Browser und wird später eine Leseansicht.','Beim Bauen'],
+ ['PDF im Hub erzeugen','Bräuchte Headless Chrome oder ein Zusatzprogramm, nur für einen Export.','Druckansicht mit CSS für A4, Miriam druckt im Browser als PDF.','Dein Feedback'],
+ ['Kurztext mit Inhalt für den Chat','Der Messenger und sein Betreiber würden Beobachter des ganzen Bestands, schon bei einer Probe. Jonas postet keinen Stand.','Nur ein Hinweis ohne Inhalt, dass ein neuer Stand im Ordner liegt.','Beim Festlegen'],
+ ['Stand per Mail oder als öffentlicher Link','Bei Mail lesen die Anbieter aller Empfänger mit, beim Link weiß niemand, wer liest. Eine unvollständige Beobachterliste lehnt das Kalkül ab.','Eigener Nextcloud-Ordner, Zugang über persönliche Konten.','Beim Festlegen'],
  ['Labels im Hub oder gar keine Regel','Labels je Eintrag sind für eine Person zu schwer. Gar keine Regel lässt Vertrauliches über komki durch.','Der ganze Bestand trägt genau ein Label, ratsprojekte@1, und der Empfängerkreis ist der engere Kreis. Der Kalkül prüft beim Vorschlag.','Beim Bauen'],
  ['Antragstext im Hub schreiben','Doppelt zum gemeinsamen Dokument und zu komki.','Status und Querverweis auf die Ablage.','Beim Bauen'],
  ['Harte Gates vor dem Antrag','Der Antrag kann politisch richtig sein, auch mit offenen Punkten.','Antragsreife als Checkliste. Die Mindestlängen aus dem Changeset entfallen.','Beim Bauen'],
@@ -1193,7 +1233,7 @@ const VERWORFEN=[
  ['Phase und Antragsstatus getrennt pflegen','Drei Aktionen je Ereignis, und ableiten geht nicht.','Ein Dialog am Antrag nimmt Phase und nächsten Schritt mit.','Im Klicktest'],
  ['Mehrere Vorschläge unter einem GO','Bricht „ein GO deckt genau ein Ereignis“ (#352).','Das Ergebnis eines Raums ist ein Ereignis mit abwählbaren Teilen.','Im Klicktest'],
  ['Rückmeldung immer mit dem Beschlussvorschlag','Bei „Abgelehnt“ las sich der Satz wie ein Beschluss.','Sonst „Beantragt war“.','Im Klicktest'],
- ['„Neu seit“ mit jedem Verlaufseintrag','17 Zeilen, viel Routine und interne Wörter wie „aus komki übernommen“. Das liest vor der Sitzung niemand.','Nur Substanz, je Projekt eine Zeile.','Im Klicktest'],
+ ['„Neu seit“ mit jedem Verlaufseintrag','17 Zeilen, viel Routine und interne Wörter wie „aus komki übernommen“. Das liest vor der Sitzung niemand.','Nur Substanz: Entscheidungen, Phasenwechsel, Antragsstand. Fakten und Varianten stehen beim Projekt.','Im Klicktest'],
  ['„Festhalten“ neben „Notiz festhalten“','Unklarer Begriff, falscher Ort, zwei Wege für dieselbe Absicht.','Ein Knopf „Neuer Eintrag“ am Verlauf, die Sichtbarkeit steht immer im Dialog.','Dein Feedback'],
  ['„Pflege“, „Stand-Kreis“, „Partner“, „Still“, „Zeiger“, „Runde“','Unverständlich oder falsch: Der Händlerverein ist kein Partner.','Redaktion, Engerer Kreis, Externe, „Liegt seit …“, Querverweise, Befragung.','Dein Feedback'],
  ['Fakten als Links, zusammen mit den Wegen','Fakten sind Belege, Varianten sind Abwägung. Das sind zwei Dinge.','Fakt mit Aussage, Beleg und Prüfstatus. Varianten mit Status und Grund.','Dein Feedback'],
@@ -1212,8 +1252,7 @@ const VERWORFEN=[
 const FRAGEN=[
  ['Sind die Entscheidungsrechte so richtig?','Die Tabelle oben sind meine Annahmen, zum Beispiel „der Vorstand entscheidet über die Befragung“.','Einmal mit Fraktion und Vorstand durchgehen.'],
  ['Bleibt das zweite GO?','Es hat mit abwählbaren Teilen einen eigenen Sinn. Ob das reicht, zeigt erst echter Gebrauch.','Vorerst behalten, nach der ersten echten Woche prüfen.'],
- ['PDF plus Kurztext oder nur eines?','Selin liest, Jonas postet. Vielleicht reicht eine Fassung.','Mit beiden starten, nach zwei Ausgaben eines streichen.'],
- ['Wie kommt der Stand zu Fraktion und Vorstand?','Nextcloud, Mail, Chat? Bestimmt auch, wer mitliest, etwa der Betreiber.','Nextcloud-Ordner der Fraktion. Dafür Zugang für den Vorstand klären.'],
+ ['Bekommt der Vorstand Konten in der Nextcloud?','Der Stand liegt in einem eigenen Ordner, Zugang nur über persönliche Konten.','Mit Fraktion und Vorstand klären.'],
  ['Ersetzt der Stand das ODS-Sheet?','Sonst pflegt Miriam zwei Dinge (#54).','Ja. Nach dem ersten Stand das Sheet einfrieren.'],
  ['Wer darf den Aufruf-Link einer Befragung bekommen?','Bestimmt, wie weit die Texte reichen und wie man das Ergebnis lesen darf.','Der Vorstand entscheidet je Befragung.'],
  ['Kann komki aus Sitzungsnotizen Einträge vorschlagen?','Das würde die Pflege am stärksten entlasten: Miriam bestätigt nur noch.','Nach dem Connector als eigenes Ticket erproben.'],
@@ -1258,7 +1297,7 @@ blickeZeigen('buergerbus-ortsteile');
 document.getElementById('blickwahl').addEventListener('click',e=>{const b=e.target.closest('[data-blick]');if(b)blickeZeigen(b.dataset.blick)});
 
 /* Selbst klicken */
-const L={s:start(),v:'brett',slug:null,filter:'alle',dialog:null,befragungId:null,befragungNeu:false,zuordnung:null,stand:null};
+const L={s:start(),v:'brett',slug:null,filter:'alle',dialog:null,befragungId:null,befragungNeu:false,zuordnung:null,stand:null,standSeit:null,standAlt:null};
 const live=document.getElementById('live'),lstatus=document.getElementById('live-status'),lurl=document.getElementById('live-url');
 const testModus=new URLSearchParams(location.search).has('test');
 if(testModus)document.documentElement.classList.add('testmodus');
@@ -1269,7 +1308,7 @@ function liveZeichnen(){
   const dlg=L.dialog?dialogFuer(L.s,L.dialog):'';let h;
   if(L.v==='brett'){h=vBrett(L.s,{filter:L.filter,dialog:dlg});lurl.textContent='localhost:4000'}
   else if(L.v==='projekt'){h=vProjekt(L.s,L.slug,{dialog:dlg});lurl.textContent='localhost:4000/projekte/'+L.slug}
-  else if(L.v==='stand'){h=vStand(L.s);lurl.textContent='localhost:4000/stand'}
+  else if(L.v==='stand'){h=vStand(L.s,{seit:L.standSeit,alt:L.standAlt});lurl.textContent='localhost:4000/stand'}
   else if(L.v==='befragungen'){h=vBefragungen(L.s,{r:aktBefragung(),neu:L.befragungNeu,zuordnung:L.zuordnung});lurl.textContent='localhost:4000/befragungen'}
   else{h=vVorschlaege(L.s);lurl.textContent='localhost:4000/vorschlaege'}
   if(L.dialog&&L.v!=='brett'&&L.v!=='projekt')h=h.replace(/<\/div>$/,dlg+'</div>');
@@ -1278,7 +1317,7 @@ function liveZeichnen(){
   const ti=live.querySelector('#f-titel'),sl=live.querySelector('#f-slug');
   if(ti&&sl){ti.addEventListener('input',()=>{if(!sl.dataset.fest)sl.value=slugVon(ti.value)});sl.addEventListener('input',()=>{sl.dataset.fest='1'})}
 }
-function geh(z){L.dialog=null;L.zuordnung=null;L.befragungNeu=false;const[a,b]=z.split(':');if(a==='projekt'){L.v='projekt';L.slug=b}else L.v=a;liveZeichnen()}
+function geh(z){L.dialog=null;L.zuordnung=null;L.befragungNeu=false;L.standSeit=null;L.standAlt=null;const[a,b]=z.split(':');if(a==='projekt'){L.v='projekt';L.slug=b}else L.v=a;liveZeichnen()}
 function tu(a,msg){L.s=handle(L.s,Object.assign({datum:L.s.heute},a));if(msg)meld(msg);L.dialog=null;liveZeichnen()}
 function ruecklaufLesen(text,id){const r=L.s.befragungen.find(x=>x.id===id);const e=liesRuecklauf(text,r);if(e.fehler){meld(e.fehler);return}L.zuordnung=ordneZu(L.s,r,e.zeilen);L.stand=e.stand;liveZeichnen()}
 function paketLaden(id){const r=L.s.befragungen.find(x=>x.id===id);ladeHerunter('befragung-'+r.id+'.json',paketDatei(L.s,r))}
@@ -1290,9 +1329,13 @@ live.addEventListener('click',e=>{
   if(t.dataset.befragung){L.befragungId=t.dataset.befragung;L.befragungNeu=false;L.zuordnung=null;return liveZeichnen()}
   if(t.dataset.phase){const pr=p(L.s,t.dataset.slug);if(pr.phase!==t.dataset.phase){L.dialog='eintragen:'+t.dataset.slug+':'+t.dataset.phase;liveZeichnen()}return}
   const act=t.dataset.act,id=t.dataset.id;
-  if(act==='stand'){tu({t:'stand'},'Stand ausgegeben. Ab jetzt zählt „neu“ von heute an.');return}
-  if(act==='kurz'){const text=kurztextStand(fassungStand(L.s,zuletztStand(L.s)));
-    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>meld('Kurztext kopiert.'),()=>meld('Kopieren ging nicht. Bitte aus dem Feld markieren.'))}else meld('Bitte aus dem Feld markieren.');return}
+  if(act==='stand'){const n=new Date(),zeit=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+    L.standAlt=L.s.staende.length;tu({t:'stand',zeit},'Stand ausgegeben und gespeichert. Jetzt drucken und in den Ordner legen.');return}
+  if(act==='alt'){L.standAlt=+id;L.standSeit=null;return liveZeichnen()}
+  if(act==='vorschau'){L.standAlt=null;L.standSeit=null;return liveZeichnen()}
+  if(act==='drucken'){drucken(live.querySelector('.papier'));return}
+  if(act==='hinweis'){const text=hinweisStand(L.s.staende[+id]);
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>meld('Hinweis kopiert.'),()=>meld('Kopieren ging nicht. Bitte aus dem Feld markieren.'))}else meld('Bitte aus dem Feld markieren.');return}
   if(act==='sichtbar'){tu({t:'sichtbar',slug:t.dataset.slug,id},'Sichtbarkeit geändert.');return}
   if(act==='ablehnen'){tu({t:'entscheide',id,annehmen:false},'Abgelehnt.');return}
   if(act==='paket'){tu({t:'paket',id},'Exportiert. Die Datei liegt in deinen Downloads.');paketLaden(id);return}
@@ -1303,6 +1346,7 @@ live.addEventListener('click',e=>{
 });
 live.addEventListener('change',e=>{
   if(e.target.id==='f-wer'){const f=e.target.form;f.querySelector('input[name=sicht][value='+(e.target.value===NUR_ICH?'nein':'ja')+']').checked=true}
+  if(e.target.id==='f-seit'){L.standSeit=e.target.value||null;L.standAlt=null;return liveZeichnen()}
   if(e.target.id==='f-datei'&&e.target.files[0]){const r=new FileReader();r.onload=()=>ruecklaufLesen(String(r.result),aktBefragung().id);r.readAsText(e.target.files[0])}
 });
 live.addEventListener('submit',e=>{
@@ -1326,8 +1370,12 @@ live.addEventListener('submit',e=>{
   if(k==='basis-alle'){let s=L.s;f.querySelectorAll('.fassung').forEach(x=>{const q=x.dataset.slug;const si=d.get('situation:'+q),vo=d.get('vorschlag:'+q);if(si&&vo)s=handle(s,{t:'basis',slug:q,titel:d.get('titel:'+q),situation:si,vorschlag:vo,hintergrund:d.get('hintergrund:'+q)})});const alt=aktBefragung();L.s=s;meld(alt&&alt.paket&&!aktBefragung().paket?'Texte gesichert. Die Datei ist damit veraltet, bitte neu exportieren.':'Texte gesichert.');return liveZeichnen()}
   if(k==='ruecklauf'){const z=L.zuordnung.map((x,i)=>Object.assign({},x,{ziel:d.get('z'+i)}));const id=f.dataset.id;L.zuordnung=null;return tu({t:'ruecklauf',id,zeilen:z,stand:L.stand,schliessen:!!d.get('schliessen')},'Antworten übernommen.')}
 });
-function liveLaden(k,v,slug){L.s=structuredClone(STAND[k]||start());L.v=v;L.slug=slug;L.dialog=null;L.zuordnung=null;L.befragungId=null;L.befragungNeu=false;meld('Zustand aus Bild '+k+' geladen.');liveZeichnen()}
-document.getElementById('live-reset').addEventListener('click',()=>{L.s=start();L.v='brett';L.dialog=null;L.zuordnung=null;L.befragungId=null;L.befragungNeu=false;meld('Zurück auf Anfang.');liveZeichnen()});
+/* Gedruckt wird nur das Dokument. Der Hub erzeugt kein PDF, das macht der Druckdialog des Browsers. */
+const druck=document.createElement('div');druck.id='druck';document.body.appendChild(druck);
+function drucken(papier){druck.innerHTML=papier.outerHTML;document.documentElement.classList.add('druck-stand');window.print()}
+window.addEventListener('afterprint',()=>document.documentElement.classList.remove('druck-stand'));
+function liveLaden(k,v,slug){L.s=structuredClone(STAND[k]||start());L.v=v;L.slug=slug;L.dialog=null;L.standSeit=null;L.standAlt=null;L.zuordnung=null;L.befragungId=null;L.befragungNeu=false;meld('Zustand aus Bild '+k+' geladen.');liveZeichnen()}
+document.getElementById('live-reset').addEventListener('click',()=>{L.s=start();L.v='brett';L.dialog=null;L.standSeit=null;L.standAlt=null;L.zuordnung=null;L.befragungId=null;L.befragungNeu=false;meld('Zurück auf Anfang.');liveZeichnen()});
 document.getElementById('szenen').addEventListener('click',e=>{
   const b=e.target.closest('[data-ab]');if(!b)return;
   const z=b.dataset.ziel;let v='brett',sl=null;
