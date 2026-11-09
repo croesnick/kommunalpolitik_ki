@@ -65,6 +65,17 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
     refute content =~ "Versteckte Markierung"
   end
 
+  # #368: pdfium's loose character boxes are taller than the line spacing;
+  # the marked text must not take in characters of the neighboring lines.
+  test "Highlights bei engem Zeilenabstand enthalten nur ihre Zeilen", %{dir: dir} do
+    path = Path.join(dir, "doc-eng.pdf")
+    TestPDF.tight_lines(path)
+
+    assert {:ok, content} = KomkiConnectorDocuments.Pdf.render(path)
+    assert content =~ "- Seite 1: „Gamma drei“ — Kommentar: Einzeilig\n"
+    assert content =~ "- Seite 1: „Delta vier Epsilon fuenf“ — Kommentar: Zweizeilig"
+  end
+
   test "PDF ohne Textebene: klarer Fehler statt leerem Text", %{socket: socket} do
     assert {:error, %{"code" => "upstream-error"}} =
              Client.call(socket, "c1", "read", %{"document_id" => "doc-scan"})
