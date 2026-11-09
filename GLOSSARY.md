@@ -348,6 +348,81 @@ Stadtrat (GO).
 
 ---
 
+## Beteiligungsbegriffe
+
+Das Format dieser Begriffe an der Grenze zwischen Hub und Plattform steht in
+[`docs/schnittstellen/befragung.md`](docs/schnittstellen/befragung.md).
+
+### Beteiligungsplattform
+
+**Definition:** Das Werkzeug, das einen Kreis anonym zu mehreren Themen befragt.
+Eigenständig und austauschbar; der Hub kennt weder Namen noch Adresse.
+
+**Nicht:** Meinungsbildungstool, Umfragetool.
+
+### Befragung
+
+**Definition:** Eine Frage an einen Kreis zu mehreren Themen. Sie ist der
+Übergabepunkt zwischen Hub und Beteiligungsplattform.
+
+**Nicht:** Umfrage, Abstimmung, Runde.
+
+### Befragungspaket
+
+**Definition:** Die Datei mit den Texten einer Befragung, die vom Hub zur
+Beteiligungsplattform getragen wird.
+
+### Rücklauf
+
+**Definition:** Die Datei mit Verteilungen und Argumenten einer Befragung, die
+von der Beteiligungsplattform zum Hub getragen wird. Sie ist ein vollständiger
+Schnappschuss und ersetzt den vorigen.
+
+**Nicht:** Ergebnis (das ist die Ansicht im Hub), Export.
+
+### Thema
+
+**Definition:** Ein Eintrag einer Befragung, mit eigens geschriebenem Titel und
+eigener Beschreibung. Es kann zu einem Ratsprojekt gehören, ist aber keins.
+
+### Verteilung
+
+**Definition:** Die Zahl der Personen je Stufe zu einem Thema, über fünf Stufen
+von „klar dagegen“ bis „klar dafür“. Sie ist anonym und nicht bindend.
+
+**Nicht:** Ergebnis, Punktestand, Votum.
+
+### Beteiligung
+
+**Definition:** Die Zahl der Personen mit mindestens einer Antwort in einer
+Befragung.
+
+**Nicht:** Quote.
+
+### Argument
+
+**Definition:** Ein Text dafür oder dagegen zu einem Thema, den eine teilnehmende
+Person schreibt. Er geht wörtlich und ohne Bezug zu ihr an die Befragenden.
+
+**Nicht:** Kommentar, Beitrag.
+
+### Fremder Text
+
+**Definition:** Text in ratsprojekte, den kein Mensch aus der Redaktion geschrieben
+oder gelesen und gespeichert hat, etwa Argumente und noch nicht zugeordnete
+Vorschläge aus einem Rücklauf. Menschen lesen ihn wörtlich, für komki bleibt er
+unsichtbar.
+
+### Meinungsbild
+
+**Definition:** Der Eintrag im Hub, was ein Kreis zu einem Ratsprojekt denkt:
+Datum, ein Satz, optional eine Verteilung. Es kann aus einem Rücklauf entstehen,
+aber auch aus einem Handzeichen am Stammtisch.
+
+**Nicht:** Stimmungsbild, Abstimmungsergebnis.
+
+---
+
 ## KI-/ML-Begriffe
 
 > **Sprachregel:** Fachbegriffe der KI/ML-Community werden nicht ad hoc
@@ -542,6 +617,28 @@ einer Klassifikation. Ein Objekt ohne Label ist nicht dasselbe wie ein
 Objekt mit einem ausdrücklich leeren Label.
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+
+---
+
+### Gemeinsam gebundener Speicher
+
+**Definition:** Ein Speicher, der seine Einträge nicht nachweisbar trennt und
+deshalb als Ganzes genau ein Label trägt. Sein Empfängerkreis sind die
+Beobachter des Bestands. Beispiel: ratsprojekte mit `ratsprojekte@1`.
+
+**Nicht:** labelführender Speicher (der prüft je Eintrag).
+
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md), R.4.4.
+
+---
+
+### Maschinenlesbarer Stand
+
+**Definition:** Die Fassung des Stands, die komki lesen darf. Sie enthält nur
+ausdrücklich erlaubte Felder, also weder private Einträge noch Querverweise,
+offene Vorschläge oder fremden Text.
+
+**Nicht:** Stand (die Fassung für Fraktion und Vorstand, sie zeigt auch Argumente).
 
 ---
 
