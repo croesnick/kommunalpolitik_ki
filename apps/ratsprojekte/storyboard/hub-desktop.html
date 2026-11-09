@@ -1,3 +1,6 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ratsprojekte-Hub Storyboard</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -233,6 +236,7 @@ details.mehr>summary{cursor:pointer;font-size:.875rem;font-weight:600;color:var(
 .feld{display:grid;gap:.2rem;margin-top:.7rem}
 .feld label,.feld .lab{font-size:.8125rem;font-weight:600;color:var(--ink2)}
 .feld input,.feld select,.feld textarea{width:100%;padding:.4rem .55rem;border:1px solid var(--line2);border-radius:.4rem;background:var(--win)}
+.feld input[type=checkbox],.feld input[type=radio]{width:auto;flex:none}
 .feld textarea{min-height:4rem}
 .feld small{font-size:.75rem;color:var(--ink3)}
 .knoepfe{display:flex;gap:.5rem;justify-content:flex-end;margin-top:.9rem;align-items:center;flex-wrap:wrap}
@@ -253,6 +257,18 @@ details.mehr>summary{cursor:pointer;font-size:.875rem;font-weight:600;color:var(
 .papier .pr p{font-size:.875rem;margin-top:.1rem}
 .papier .pr .gr{color:var(--paper-soft)}
 .papier .neu{padding:.1rem 0;font-size:.875rem}
+.papier .ueberblick{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.9rem}
+.papier .ueberblick div{flex:1 1 5.5rem;padding:.4rem .6rem;border:1px solid var(--paper-line);border-radius:.35rem;font-size:.75rem;color:var(--paper-soft)}
+.papier .ueberblick b{display:block;font-size:1.25rem;line-height:1.2;color:var(--paper-ink)}
+.papier .sgrid{display:grid;grid-template-columns:minmax(7rem,10.5rem) minmax(0,1fr);gap:.3rem 1rem;margin-top:.4rem;font-size:.875rem}
+.papier .sgrid>dt{color:var(--paper-soft);font-weight:600}
+.papier .sgrid>dd{margin:0;min-width:0}
+.papier .sgrid>dt small{display:block;font-weight:400;font-size:.75rem}
+.papier table.dran{width:100%;border-collapse:collapse;margin-top:.3rem;font-size:.875rem}
+.papier table.dran th{padding:.55rem 0 .15rem;text-align:left;font-size:.875rem;color:var(--paper-ink)}
+.papier table.dran td{padding:.2rem .8rem .2rem 0;border-top:1px solid var(--paper-line);vertical-align:top}
+.papier table.dran td:first-child{width:38%;font-weight:600}
+.papier table.dran td:last-child{padding-right:0;white-space:nowrap;text-align:right;color:var(--paper-soft)}
 .papier .fuss{margin-top:1rem;font-size:.75rem;color:var(--paper-soft)}
 .papier .vzahl{color:var(--paper-soft)}
 .seitenpanel{padding:.9rem 1rem;border-radius:.5rem;background:var(--win);border:1px solid var(--line);font-size:.875rem}
@@ -304,6 +320,18 @@ details.mehr>summary{cursor:pointer;font-size:.875rem;font-weight:600;color:var(
 #live-wrap .bildschirm{min-height:38rem}
 .leisteklein{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-top:1rem}
 footer{padding-block:2rem 3rem;color:var(--ink3);font-size:.875rem}
+/* Testmodus (?test, #407): nur die App, ohne die Szenen, die die Lösungswege verraten. */
+.testmodus body>:not(#selbst){display:none}
+.testmodus #selbst{padding:0;border:0}
+.testmodus #selbst .wrap{max-width:none;padding:0}
+.testmodus #selbst .wrap>:not(#live-wrap):not(.leisteklein){display:none}
+.testmodus #live-wrap{margin:0}
+.testmodus .rahmen{border:0;border-radius:0;box-shadow:none}
+.testmodus .chrome,.testmodus #live-reset{display:none}
+.testmodus #live-wrap .bildschirm{min-height:100vh}
+.testmodus .leisteklein{margin:0}
+.testmodus #live-status{position:fixed;left:50%;bottom:1.25rem;transform:translateX(-50%);z-index:9;padding:.5rem 1rem;border-radius:.5rem;background:var(--ink,#1a2230);color:#fff;font-size:.9375rem}
+.testmodus #live-status:empty{display:none}
 </style>
 
 <header class="kopf wrap">
@@ -419,7 +447,17 @@ function p(s,slug){return s.projekte.find(x=>x.slug===slug)}
 function eintrag(pr,datum,art,text,extra){pr.verlauf.push(Object.assign({id:'e'+pr.verlauf.length,datum,art,text,imStand:true},extra||{}))}
 function phaseN(k){return PHASEN.find(x=>x.k===k).n}
 function istKreis(k){return KREISE.some(x=>x.k===k)}
-function setzeSchritt(pr,a){if(a.schrittText!==undefined)pr.schritt=a.schrittText?{text:a.schrittText,wer:a.schrittWer||'',bis:a.schrittBis||''}:null}
+/* Die Person, die den Hub führt. Die echte App braucht dafür eine Einstellung. Im Stand bleibt der Name, weil ihn andere lesen. */
+const ICH='Miriam';
+function werAnzeige(w){return w===ICH?'Du':w}
+function setzeSchritt(pr,a,d){
+  if(a.schrittText===undefined)return;
+  const wer=/^(du|ich)$/i.test(a.schrittWer||'')?ICH:(a.schrittWer||'');
+  const neu=a.schrittText?{text:a.schrittText,wer,bis:a.schrittBis||''}:null;
+  if(JSON.stringify(neu)===JSON.stringify(pr.schritt))return;
+  pr.schritt=neu;
+  if(d)eintrag(pr,d,'schritt',neu?'Als Nächstes: '+neu.text+(neu.wer?', '+(neu.wer===ICH?'du':neu.wer):'')+(neu.bis?', bis '+de(neu.bis):''):'Nächsten Schritt entfernt');
+}
 
 function handle(s0,a){
   const s=structuredClone(s0);
@@ -437,17 +475,24 @@ function handle(s0,a){
       if(istKreis(a.wer)&&sichtbar)pr.meinungen.push({datum:d,kreis:a.wer,frage:'',zusammen:a.text,vert:null,befragung:null});
       if(wechsel){const alt=phaseN(pr.phase);pr.phase=a.phase;eintrag(pr,d,'entscheidung',alt+' → '+phaseN(a.phase)+': '+a.text,{von:a.wer})}
       else eintrag(pr,d,sichtbar&&istKreis(a.wer)?'meinung':'notiz',a.text,{von:a.wer,imStand:sichtbar});
-      setzeSchritt(pr,a);break}
-    case'schritt':setzeSchritt(pr,a);break;
+      setzeSchritt(pr,a,d);break}
+    case'schritt':setzeSchritt(pr,a,d);break;
     case'sichtbar':{const e=pr.verlauf.find(x=>x.id===a.id);e.imStand=!e.imStand;break}
     case'befragung':{
       const id='r'+(s.befragungen.length+1);
       s.befragungen.push({id,name:a.name,frage:a.frage,kreis:a.kreis||'Basis',bis:a.bis,slugs:a.slugs,status:'entwurf',angelegt:d});break}
-    case'basis':pr.basis={titel:a.titel,situation:a.situation,vorschlag:a.vorschlag,hintergrund:a.hintergrund||''};break;
+    case'basis':{
+      const neu={titel:a.titel,situation:a.situation,vorschlag:a.vorschlag,hintergrund:a.hintergrund||''};
+      /* Geänderter Text macht eine schon exportierte Datei ungültig. */
+      if(JSON.stringify(neu)!==JSON.stringify(pr.basis))s.befragungen.forEach(r=>{if(r.status==='entwurf'&&r.slugs.includes(a.slug))r.paket=null});
+      pr.basis=neu;break}
     case'paket':{
-      const r=s.befragungen.find(x=>x.id===a.id);r.status='laeuft';r.paket=d;
+      const r=s.befragungen.find(x=>x.id===a.id);r.paket=d;
       r.paketIds=r.slugs.map((_,i)=>r.id+'-t'+(i+1));
-      r.kennungen=Object.fromEntries(r.paketIds.map((k,i)=>[k,r.slugs[i]]));
+      r.kennungen=Object.fromEntries(r.paketIds.map((k,i)=>[k,r.slugs[i]]));break}
+    /* Erst die Bestätigung setzt „läuft“: Der Hub sieht nicht, ob die Datei hochgeladen wurde. */
+    case'hochgeladen':{
+      const r=s.befragungen.find(x=>x.id===a.id);r.status='laeuft';r.laeuftSeit=d;
       r.slugs.forEach(sl=>eintrag(p(s,sl),d,'befragung','In die Befragung „'+r.name+'“ gegeben, läuft bis '+de(r.bis)));break}
     case'ruecklauf':{
       const r=s.befragungen.find(x=>x.id===a.id);
@@ -474,7 +519,8 @@ function handle(s0,a){
     case'stand':s.staende.push({datum:d});break;
     /* Ein Ergebnis eines Raums ist ein Ereignis: ein GO in komki, eine Entscheidung im Hub, Teile abwählbar. */
     case'vorschlag':
-      s.vorschlaege.push({id:'v'+(s.vorschlaege.length+1),slug:a.slug,raum:a.raum,titel:a.titel,teile:a.teile,status:'offen',datum:d,beleg:a.beleg});break;
+      s.vorschlaege.push({id:'v'+(s.vorschlaege.length+1),slug:a.slug,raum:a.raum,titel:a.titel,teile:a.teile,status:'offen',datum:d,beleg:a.beleg});
+      eintrag(p(s,a.slug),d,'vorschlag','Vorschlag aus komki eingegangen: '+a.titel,{imStand:false});break;
     case'entscheide':{
       const v=s.vorschlaege.find(x=>x.id===a.id);const x=p(s,v.slug);
       if(!a.annehmen){v.status='abgelehnt';v.teile=[];eintrag(x,d,'vorschlag','Vorschlag aus komki abgelehnt: '+v.titel,{imStand:false});break}
@@ -495,8 +541,8 @@ function handle(s0,a){
       /* Abgewähltes wird gelöscht: Was niemand übernommen hat, soll nicht still weiterliegen. */
       v.teile=[];
       break}
-    case'wert':pr.wert={vp:a.vp,sm:a.sm};break;
-    case'verweis':pr.verweise.push({art:a.art,wert:a.wert});break;
+    case'wert':pr.wert={vp:a.vp,sm:a.sm};eintrag(pr,d,'wert','Nutzen und Erfolg geändert');break;
+    case'verweis':pr.verweise.push({art:a.art,wert:a.wert});eintrag(pr,d,'verweis','Querverweis ergänzt: '+a.art,{imStand:false});break;
     case'fakt':pr.fakten.push(a.fakt);eintrag(pr,d,'fakt','Fakt ergänzt: '+a.fakt.aussage);break;
     case'variante':pr.varianten.push(a.variante);eintrag(pr,d,'fakt','Variante '+a.variante.label+' ergänzt: '+a.variante.titel);break;
     case'variantenstatus':{
@@ -522,7 +568,12 @@ const heuteJahr='2026';
 function de(iso){if(!iso)return'';const[y,m,d]=iso.split('-');return d+'.'+m+'.'+(y===heuteJahr?'':y)}
 function letzte(pr){return pr.verlauf.reduce((a,e)=>e.datum>a?e.datum:a,'')}
 function tageSeit(a,b){return Math.round((new Date(b)-new Date(a))/864e5)}
-function istFaellig(s,pr){return !pr.ende&&pr.schritt&&pr.schritt.bis&&pr.schritt.bis<s.heute}
+function fristMarke(s,pr){
+  if(pr.ende||!pr.schritt||!pr.schritt.bis)return '';
+  const t=tageSeit(s.heute,pr.schritt.bis);
+  if(t<0)return '<span class="marke-k deny">Überfällig</span>';
+  return t>7?'':'<span class="marke-k warn">'+(t===0?'Heute':t===1?'Morgen':'In '+t+' Tagen')+'</span>';
+}
 /* „Liegt“ heißt: nichts passiert UND nichts vereinbart. Wer auf einen Termin wartet, liegt nicht. */
 function liegt(s,pr){return !pr.ende&&!(pr.schritt&&pr.schritt.bis)&&tageSeit(letzte(pr),s.heute)>28}
 function neuesteMeinung(pr,kreis){return pr.meinungen.filter(m=>m.kreis===kreis).sort((a,b)=>a.datum<b.datum?1:-1)[0]||null}
@@ -533,7 +584,7 @@ function ergebnisZeilen(s,r){
   return r.slugs.map(sl=>p(s,sl)).map(x=>{const m=x.meinungen.find(y=>y.befragung===r.id);return m?{slug:x.slug,titel:x.titel,vert:m.vert,zusammen:m.zusammen,argumente:m.argumente||[]}:null}).filter(Boolean);
 }
 /* Routine wie „In die Befragung gegeben“ oder „aus komki übernommen“ zählt nicht als neu. */
-const ROUTINE=['vorschlag','befragung','ruecklauf'];
+const ROUTINE=['vorschlag','befragung','ruecklauf','schritt','verweis','wert'];
 function neuSeit(s,seit){
   return seit?s.projekte.flatMap(x=>x.verlauf.filter(e=>e.imStand&&e.datum>seit&&!ROUTINE.includes(e.art)).map(e=>({titel:x.titel,datum:e.datum,text:e.text,von:e.von||null}))).sort((a,b)=>a.datum<b.datum?1:-1):[];
 }
@@ -561,7 +612,7 @@ function fassungStand(s,seit){
     }))})).filter(g=>g.projekte.length),
     abgelegt:s.projekte.filter(x=>x.ende).map(x=>({titel:x.titel,ende:ENDEN[x.ende]})),
     zurueckgehalten:{
-      notizen:s.projekte.flatMap(x=>x.verlauf.filter(e=>!e.imStand)).length,
+      notizen:s.projekte.flatMap(x=>x.verlauf.filter(e=>e.art==='notiz'&&!e.imStand)).length,
       verweise:s.projekte.reduce((a,x)=>a+x.verweise.length,0),
       herkunft:s.projekte.filter(x=>x.herkunft).length,
       vorschlaege:s.vorschlaege.filter(v=>v.status==='offen').length
@@ -630,7 +681,7 @@ function start(){
   const pj=(slug,titel,kurz,herkunft,phase,datum,extra)=>Object.assign(leerProjekt(slug,titel,kurz,herkunft,datum),{phase},extra||{});
   const s={heute:'2026-11-03',staende:[{datum:'2026-10-06'}],befragungen:[],vorschlaege:[],projekte:[
     pj('sitzbaenke-stadtweiher','Sitzbänke am Stadtweiher','Rund um den Weiher fehlen Bänke für ältere Menschen.','Seniorenbeirat','idee','2026-09-08'),
-    pj('mitfahrbaenke-ortsteile','Mitfahrbänke in den Ortsteilen','Feste Treffpunkte für spontane Mitfahrten.','Stammtisch','idee','2026-10-20',{schritt:{text:'Beispiel aus dem Nachbarlandkreis anschauen',wer:'Miriam',bis:''}}),
+    pj('mitfahrbaenke-ortsteile','Mitfahrbänke in den Ortsteilen','Feste Treffpunkte für spontane Mitfahrten.','Stammtisch','idee','2026-10-20',{schritt:{text:'Beispiel aus dem Nachbarlandkreis anschauen',wer:'Miriam',bis:'2026-11-06'}}),
     pj('buergerbus-ortsteile','Bürgerbus für die Ortsteile','Ehrenamtlicher Kleinbus an Tagen ohne Linienverkehr.','Mitgliederversammlung','meinung','2026-09-22',{schritt:{text:'Betriebskosten mit Selin klären',wer:'Miriam',bis:'2026-11-12'}}),
     pj('radweg-bahnhofstrasse','Radweg Bahnhofstraße','Sichere Radverkehrsführung im 1. Bauabschnitt, möglichst mit Förderung.','Fraktion','ausarbeitung','2026-09-15',{schritt:{text:'Varianten vergleichen, Förderprogramme klären',wer:'Miriam',bis:'2026-11-13'}}),
     pj('solar-stadthalle','Solaranlage Stadthalle','Dachfläche der Stadthalle für Photovoltaik nutzen.','Fraktion','ausarbeitung','2026-08-18',{schritt:{text:'Statikgutachten bei der Verwaltung anfragen',wer:'Selin',bis:'2026-10-30'}}),
@@ -697,7 +748,7 @@ const GESCHICHTE=[
  ['4.1',[{t:'eintragen',slug:TB,wer:'Vorstand',text:'In die Basis geben, zusammen mit den drei anderen Ideen.',datum:'2026-11-09'},
          {t:'befragung',name:'Ideen für den Winter',frage:'Welche Ideen sollen wir weiterverfolgen?',bis:'2026-11-30',slugs:[TB,'buergerbus-ortsteile','mitfahrbaenke-ortsteile','sitzbaenke-stadtweiher'],datum:'2026-11-11'},
          ...Object.entries(BASIS_TEXTE).map(([slug,b])=>Object.assign({t:'basis',slug,datum:'2026-11-11'},b))]],
- ['4.2',[{t:'paket',id:'r1',datum:'2026-11-11'},
+ ['4.2',[{t:'paket',id:'r1',datum:'2026-11-11'},{t:'hochgeladen',id:'r1',datum:'2026-11-11'},
          {t:'schritt',slug:'buergerbus-ortsteile',schrittText:'Rücklauf der Basis abwarten',schrittWer:'Jonas',schrittBis:'2026-11-30',datum:'2026-11-11'}]],
  ['5.1',[{t:'vorschlag',slug:RW,raum:'heller-kranich',titel:'Zwei Fakten aus der Recherche',beleg:BELEG1,datum:'2026-11-12',teile:[
     {art:'fakt',kurz:'Förderprogramm',inhalt:{aussage:'Das Sonderprogramm Radverkehr fördert solche Maßnahmen, Antragsschluss 31.01.',beleg:'Förderrichtlinie Radverkehr (erfunden), Abschnitt 4',url:'https://foerderung.example/radverkehr',abruf:'2026-11-12',geprueft:false}},
@@ -741,23 +792,23 @@ function zuletztStand(s){return s.staende.length?s.staende[s.staende.length-1].d
 function appKopf(s,akt){
   const offen=s.vorschlaege.filter(v=>v.status==='offen').length;
   const neu=neuSeit(s,zuletztStand(s)).length;
-  const nav=[['brett','Übersicht',0],['befragungen','Befragungen',0],['stand','Stand',neu],['vorschlaege','Vorschläge',offen]];
+  const nav=[['brett','Übersicht',0],['befragungen','Meinungsbild',0],['stand','Stand',neu],['vorschlaege','Vorschläge',offen]];
   return '<div class="appkopf"><span class="marke">Ratsprojekte</span><div class="appnav">'+nav.map(([k,n,z])=>'<button type="button" data-go="'+k+'" class="'+(akt===k?'an':'')+'">'+n+(z?'<span class="zahl">'+z+(k==='stand'?' neu':'')+'</span>':'')+'</button>').join('')+'</div><div class="rechts"><span class="datum">'+de(s.heute)+s.heute.slice(0,4)+'</span><button type="button" class="btn haupt" data-dialog="neu">Neue Idee</button></div></div>';
 }
 function karte(s,pr){
-  const r=laufendeBefragung(s,pr), lg=liegt(s,pr), faellig=istFaellig(s,pr);
+  const r=laufendeBefragung(s,pr), lg=liegt(s,pr);
   return '<button type="button" class="kk" data-go="projekt:'+pr.slug+'"><b>'+esc(pr.titel)+'</b>'+
-    (pr.schritt?'<span class="schr">'+esc(pr.schritt.text)+(pr.schritt.wer?' · '+esc(pr.schritt.wer):'')+(pr.schritt.bis?' · bis '+de(pr.schritt.bis):'')+'</span>':'<span class="schr ohne">Noch kein nächster Schritt</span>')+
+    (pr.schritt?'<span class="schr">'+esc(pr.schritt.text)+(pr.schritt.wer?' · '+esc(werAnzeige(pr.schritt.wer)):'')+(pr.schritt.bis?' · bis '+de(pr.schritt.bis):'')+'</span>':'<span class="schr ohne">Noch kein nächster Schritt</span>')+
     '<span class="fuss">'+KREISE.filter(k=>!k.opt||neuesteMeinung(pr,k.k)).map(k=>{const m=neuesteMeinung(pr,k.k);return '<span class="kreis '+(m?'ja':'')+'" title="'+k.k+(m?' gehört':' noch nicht gehört')+'">'+k.b+'</span>'}).join('')+
-    (r?'<span class="marke-k info">Befragung bis '+de(r.bis)+'</span>':'')+(faellig?'<span class="marke-k deny">Überfällig</span>':lg?'<span class="marke-k warn">Liegt seit '+Math.round(tageSeit(letzte(pr),s.heute)/7)+' Wochen</span>':'')+'</span></button>';
+    (r?'<span class="marke-k info">Befragung bis '+de(r.bis)+'</span>':'')+(fristMarke(s,pr)||(lg?'<span class="marke-k warn">Liegt seit '+Math.round(tageSeit(letzte(pr),s.heute)/7)+' Wochen</span>':''))+'</span></button>';
 }
 function vBrett(s,o){
   o=o||{};const f=o.filter||'alle';
-  const pass=pr=>f==='alle'||(f==='miriam'&&pr.schritt&&pr.schritt.wer==='Miriam')||(f==='achtung'&&(istFaellig(s,pr)||liegt(s,pr)));
+  const pass=pr=>f==='alle'||(f==='du'&&pr.schritt&&pr.schritt.wer===ICH)||(f==='achtung'&&(fristMarke(s,pr)||liegt(s,pr)));
   const aktiv=s.projekte.filter(x=>!x.ende);
   const abg=s.projekte.filter(x=>x.ende);
   return '<div class="app">'+appKopf(s,'brett')+
-   '<div class="filter">'+[['alle','Alle'],['miriam','Miriam ist dran'],['achtung','Braucht Aufmerksamkeit']].map(([k,n])=>'<button type="button" data-filter="'+k+'" class="'+(f===k?'an':'')+'">'+n+'</button>').join('')+
+   '<div class="filter">'+[['alle','Alle'],['du','Du bist dran'],['achtung','Braucht Aufmerksamkeit']].map(([k,n])=>'<button type="button" data-filter="'+k+'" class="'+(f===k?'an':'')+'">'+n+'</button>').join('')+
    '<span class="legende">Wer gehört wurde: F Fraktion, V Vorstand, B Basis, E Externe. Voll heißt ja.</span></div>'+
    '<div class="brett">'+PHASEN.map(ph=>{const l=aktiv.filter(x=>x.phase===ph.k&&pass(x));return '<div class="spalte"><h4>'+ph.n+'<small>'+l.length+'</small></h4><div class="frage">'+ph.f+'</div>'+l.map(x=>karte(s,x)).join('')+'</div>'}).join('')+'</div>'+
    '<div class="ablage">'+(abg.length?'Abgelegt: '+abg.map(x=>'<button type="button" data-go="projekt:'+x.slug+'">'+esc(x.titel)+'</button> ('+ENDEN[x.ende]+')').join(', '):'Nichts abgelegt')+'</div>'+
@@ -773,12 +824,12 @@ function dialogNeu(titel,kurz,herk){
    feld('f-titel','Titel',ein('f-titel','titel',titel,'required maxlength="140"'))+
    feld('f-kurz','Ein Satz, worum es geht',ein('f-kurz','kurz',kurz))+
    feld('f-herk','Woher kommt das?',ein('f-herk','herkunft',herk),'Ein Anlass, kein Name. Namen gehören in den Vault.')+
-   '<details class="mehr"><summary>Stichwort anpassen</summary>'+feld('f-slug','Stichwort',ein('f-slug','neuSlug',titel?slugVon(titel):'','pattern="[a-z0-9]+(-[a-z0-9]+)*"'),'Damit findest du das Projekt auch im Vault. Es bleibt fest, auch wenn sich der Titel ändert.')+'</details>','Idee anlegen');
+   feld('f-slug','Kurzname',ein('f-slug','neuSlug',titel?slugVon(titel):'','pattern="[a-z0-9]+(-[a-z0-9]+)*" title="Nur Kleinbuchstaben, Ziffern und Bindestriche"'),'Entsteht aus dem Titel. Damit findest du das Projekt auch im Vault. Er bleibt fest, auch wenn sich der Titel ändert.'),'Idee anlegen');
 }
 function schrittFelder(pr,v){
   v=v||{};const x=pr.schritt||{};
   return feld('f-st','Als Nächstes',ein('f-st','schrittText',v.text!==undefined?v.text:x.text),'Steht im Stand. Kein Name von Bürgerinnen, nichts Vertrauliches.')+
-   '<div class="zweier">'+feld('f-sw','Wer?',ein('f-sw','schrittWer',v.wer!==undefined?v.wer:x.wer))+feld('f-sb','Bis wann?',ein('f-sb','schrittBis',v.bis!==undefined?v.bis:x.bis,'type="date"'))+'</div>';
+   '<div class="zweier">'+feld('f-sw','Wer?',ein('f-sw','schrittWer',werAnzeige(v.wer!==undefined?v.wer:x.wer)))+feld('f-sb','Bis wann?',ein('f-sb','schrittBis',v.bis!==undefined?v.bis:x.bis,'type="date"'))+'</div>';
 }
 function dialogEintrag(pr,v){
   v=v||{};const ziel=v.phase||pr.phase;const wer=v.wer||'Fraktion';const offen=v.phase||v.schritt;
@@ -880,9 +931,9 @@ function vProjekt(s,slug,o){
     '<button type="button" class="btn link" data-go="brett">Zur Übersicht</button><h3>'+esc(pr.titel)+'</h3><p>'+esc(pr.kurz)+'</p></div>'+
     (pr.ende?'<div class="hinweis blau">'+ENDEN[pr.ende]+'. <button type="button" class="btn link" data-dialog="wieder:'+pr.slug+'">Wieder aufnehmen</button></div>':'')+
     '<div class="phasen" role="group" aria-label="Phase">'+PHASEN.map((ph,i)=>'<button type="button" data-phase="'+ph.k+'" data-slug="'+pr.slug+'" class="'+(i<idx?'war':i===idx?'jetzt':'')+'"'+(i===idx?' aria-current="step"':'')+'>'+ph.n+'</button>').join('')+'</div>'+
-    '<div class="naechst"><span class="klein">Als Nächstes</span>'+(pr.schritt?'<span class="was">'+esc(pr.schritt.text)+'</span><span class="klein">'+esc(pr.schritt.wer)+(pr.schritt.bis?' · bis '+de(pr.schritt.bis):'')+'</span>':'<span class="klein">Noch nichts festgelegt</span>')+'<button type="button" class="btn link" style="margin-left:auto" data-dialog="schritt:'+pr.slug+'">Ändern</button></div>'+
+    '<div class="naechst"><span class="klein">Als Nächstes</span>'+(pr.schritt?'<span class="was">'+esc(pr.schritt.text)+'</span><span class="klein">'+esc(werAnzeige(pr.schritt.wer))+(pr.schritt.bis?' · bis '+de(pr.schritt.bis):'')+'</span>'+fristMarke(s,pr):'<span class="klein">Noch nichts festgelegt</span>')+'<button type="button" class="btn link" style="margin-left:auto" data-dialog="schritt:'+pr.slug+'">Ändern</button></div>'+
     haupt+
-    '</div><aside style="min-width:0">'+reife+'<div class="block"'+(zeigeReife?'':' style="margin-top:0"')+'><h4>Verlauf</h4><button type="button" class="btn haupt breit" data-dialog="eintragen:'+pr.slug+'">Neuer Eintrag</button><ol class="verlauf">'+verlauf+'</ol></div>'+
+    '</div><aside style="min-width:0">'+reife+'<div class="block"'+(zeigeReife?'':' style="margin-top:0"')+'><h4>Verlauf</h4><p class="klein" style="margin:.3rem 0 .5rem">Was du hier im Hub tust, steht von selbst darin, auch was aus komki ankommt. Was anderswo passiert ist, trägst du ein.</p><button type="button" class="btn haupt breit" data-dialog="eintragen:'+pr.slug+'">Neuer Eintrag</button><ol class="verlauf">'+verlauf+'</ol></div>'+
     '<details class="mehr block"><summary>Querverweise ('+zahlV+')</summary><div class="zeiger">Im Vault: <span class="alink">#ratsprojekt/'+esc(pr.slug)+'</span></div>'+pr.verweise.map(z=>'<div class="zeiger">'+esc(z.art)+': <span class="alink">'+esc(z.wert)+'</span></div>').join('')+(pr.herkunft?'<div class="zeiger">Herkunft: '+esc(pr.herkunft)+'</div>':'')+'<button type="button" class="btn link" data-dialog="verweis:'+pr.slug+'">Querverweis ergänzen</button></details>'+
     (pr.ende?'':'<div class="block"><button type="button" class="btn link" data-dialog="ablegen:'+pr.slug+'">Projekt ablegen</button></div>')+
     '</aside></div>'+(o.dialog||'')+'</div>';
@@ -896,19 +947,24 @@ function ergebnisHtml(zeilen,mitLink){
 }
 function papierStand(st){
   const dran=Object.entries(st.dran);
+  const nachFrist=l=>[...l].sort((x,y)=>(x.bis||'9')<(y.bis||'9')?-1:1);
+  const z=(k,v)=>'<dt>'+k+'</dt><dd>'+v+'</dd>';
   return '<div class="papier"><div class="eyebrow">Offene Liste Gartenstadt · für Fraktion und Vorstand</div><h3>Stand der Ratsprojekte, '+de(st.datum)+st.datum.slice(0,4)+'</h3>'+
-    (st.seit?'<h4>Neu seit '+de(st.seit)+'</h4>'+(st.neu.length?neuJeProjekt(st.neu).map(([ti,l])=>'<div class="neu"><b>'+esc(ti)+':</b> '+l.map(n=>esc(n.text)+(n.von?' <span class="gr">('+esc(n.von)+')</span>':'')).join('; ')+'</div>').join(''):'<div class="neu">Nichts.</div>'):'')+
+    '<div class="ueberblick">'+st.gruppen.map(g=>'<div><b>'+g.projekte.length+'</b>'+esc(g.n)+'</div>').join('')+'</div>'+
+    (st.seit?'<h4>Neu seit '+de(st.seit)+'</h4>'+(st.neu.length?'<dl class="sgrid">'+neuJeProjekt(st.neu).map(([ti,l])=>z(esc(ti),l.map(n=>'<div>'+esc(n.text)+(n.von?' <span class="gr">('+esc(n.von)+')</span>':'')+'</div>').join(''))).join('')+'</dl>':'<div class="neu">Nichts.</div>'):'')+
     st.befragungen.map(b=>'<h4>Meinungsbild der '+esc(b.kreis)+': '+esc(b.name)+'</h4><p class="gr" style="font-size:.875rem;margin-top:.3rem">'+esc(b.frage)+' Rücklauf vom '+de(b.datum)+' Nicht bindend.</p>'+ergebnisHtml(b.zeilen,false)).join('')+
-    (dran.length?'<h4>Wer ist dran</h4>'+dran.map(([w,l])=>'<div class="neu"><b>'+esc(w)+':</b> '+l.map(x=>esc(x.titel)+', '+esc(x.text)+(x.bis?' (bis '+de(x.bis)+')':'')).join('; ')+'</div>').join(''):'')+
+    (dran.length?'<h4>Wer ist dran</h4><table class="dran"><tbody>'+dran.map(([w,l])=>'<tr><th colspan="3">'+esc(w)+'</th></tr>'+nachFrist(l).map(x=>'<tr><td>'+esc(x.titel)+'</td><td>'+esc(x.text)+'</td><td>'+(x.bis?'bis '+de(x.bis):'')+'</td></tr>').join('')).join('')+'</tbody></table>':'')+
     st.gruppen.map(g=>'<h4>'+esc(g.n)+'</h4>'+g.projekte.map(x=>'<div class="pr"><b>'+esc(x.titel)+'</b>'+
       (x.kurz?'<p class="gr">'+esc(x.kurz)+'</p>':'')+
-      (x.befragung?'<p>Läuft in der Befragung „'+esc(x.befragung)+'“</p>':'')+
-      x.meinungen.map(m=>'<p>'+esc(m.kreis)+', '+de(m.datum)+': '+esc(m.zusammen||(m.vert?summe(m.vert)+' Personen':''))+'</p>'+(m.vert&&!st.befragungen.some(b=>b.id===m.befragung)?vertBalken(m.vert):'')).join('')+
-      (x.nichtGehoert.length?'<p class="gr">Noch nicht gehört: '+esc(x.nichtGehoert.join(', '))+'</p>':'')+
-      (x.gewaehlt?'<p>Gewählte Variante: '+esc(x.gewaehlt)+'</p>':'')+
-      x.fakten.map(f=>'<p>Fakt: '+esc(f.aussage)+' <span class="gr">('+esc(f.beleg)+(f.geprueft?'':', nicht verifiziert')+')</span></p>').join('')+
-      x.antraege.map(a=>'<p>'+esc(a.art)+' „'+esc(a.titel)+'“: '+esc(a.ergebnis||a.status)+(a.frist?', Bericht bis '+de(a.frist):'')+'</p>').join('')+
-      x.notizen.map(n=>'<p>'+esc(n)+'</p>').join('')+'</div>').join('')).join('')+
+      '<dl class="sgrid">'+
+      (x.befragung?z('Befragung','Läuft: „'+esc(x.befragung)+'“'):'')+
+      x.meinungen.map(m=>z(esc(m.kreis)+'<small>'+de(m.datum)+'</small>',esc(m.zusammen||(m.vert?summe(m.vert)+' Personen':''))+(m.vert&&!st.befragungen.some(b=>b.id===m.befragung)?vertBalken(m.vert):''))).join('')+
+      (x.nichtGehoert.length?z('Noch nicht gehört','<span class="gr">'+esc(x.nichtGehoert.join(', '))+'</span>'):'')+
+      (x.gewaehlt?z('Variante',esc(x.gewaehlt)):'')+
+      x.fakten.map(f=>z('Fakt',esc(f.aussage)+' <span class="gr">('+esc(f.beleg)+(f.geprueft?'':', nicht verifiziert')+')</span>')).join('')+
+      x.antraege.map(a=>z(esc(a.art),'„'+esc(a.titel)+'“: '+esc(a.ergebnis||a.status)+(a.frist?', Bericht bis '+de(a.frist):''))).join('')+
+      x.notizen.map(n=>z('Notiz',esc(n))).join('')+
+      '</dl></div>').join('')).join('')+
     (st.abgelegt.length?'<h4>Abgelegt</h4><div class="neu">'+st.abgelegt.map(a=>esc(a.titel)+' ('+esc(a.ende)+')').join(', ')+'</div>':'')+
     '<div class="fuss">Stand vom '+de(st.datum)+st.datum.slice(0,4)+', gepflegt von Miriam Haas. Nur für Fraktion und Vorstand. Enthält nichts Nichtöffentliches.</div></div>';
 }
@@ -924,7 +980,7 @@ function vStand(s){
   const st=fassungStand(s,seit);const z=st.zurueckgehalten;
   return '<div class="app">'+appKopf(s,'stand')+'<div class="papierbuehne">'+papierStand(st)+
    '<div class="seitenpanel"><h4>So verlässt es den Rechner</h4><p style="margin-top:.35rem">Links steht genau das, was Fraktion und Vorstand bekommen. Durch das Ansehen wird nichts gespeichert.</p>'+
-   '<p style="margin-top:.6rem"><b>Bleibt hier:</b></p><ul><li>'+z.notizen+' Notizen nur für dich</li><li>'+z.verweise+' Querverweise</li><li>Herkunft von '+z.herkunft+' Projekten</li><li>'+z.vorschlaege+' offene Vorschläge</li></ul>'+
+   '<p style="margin-top:.6rem"><b>Bleibt hier:</b></p><ul><li>'+z.notizen+(z.notizen===1?' Notiz':' Notizen')+' nur für dich</li><li>'+z.verweise+' Querverweise</li><li>Herkunft von '+z.herkunft+' Projekten</li><li>'+z.vorschlaege+' offene Vorschläge</li></ul>'+
    '<div class="hinweis">Lies „Wer ist dran“ und die Gründe kurz durch. Dort schreibst du am ehesten etwas, das nicht für alle gedacht ist. Nichtöffentliches gehört nie hierher.</div>'+
    '<button type="button" class="btn haupt" data-act="stand">Stand ausgeben</button><p class="klein" style="margin-top:.3rem">Ab dann zählt „neu“ von heute an.'+(seit?' Letzte Ausgabe: '+de(seit):'')+'</p>'+
    '<p style="margin-top:.7rem"><b>Kurztext für den Chat:</b></p><pre class="kurz">'+esc(kurztextStand(st))+'</pre><button type="button" class="btn" data-act="kurz">Kurztext kopieren</button></div></div></div>';
@@ -932,20 +988,21 @@ function vStand(s){
 function formBefragungNeu(s){
   return '<form data-form="befragung" style="max-width:34rem"><h3 style="font-size:1.375rem">Neue Befragung</h3><p class="klein" style="margin-top:.2rem">Eine Frage an die Basis zu mehreren Ideen, mit Frist. Hier schreibst du die Texte und liest später die Antworten ein.</p>'+
     feld('f-rn','Name',ein('f-rn','name','','required maxlength="80"'))+feld('f-rf','Was wollen wir wissen?',ein('f-rf','frage','','required maxlength="120"'))+feld('f-rb','Läuft bis',ein('f-rb','bis','','type="date" required'))+
-    '<div class="feld"><span class="lab">Welche Ideen?</span><div class="auswahl">'+s.projekte.filter(x=>!x.ende).map(x=>'<label><input type="checkbox" name="slug" value="'+x.slug+'"> '+esc(x.titel)+' <span class="klein">'+(neuesteMeinung(x,'Basis')?'Basis schon gefragt':'')+'</span></label>').join('')+'</div></div><div class="knoepfe"><button class="btn haupt">Befragung anlegen</button></div></form>';
+    '<div class="feld"><span class="lab">Welche Ideen?</span><div class="auswahl">'+PHASEN.flatMap(ph=>s.projekte.filter(x=>!x.ende&&x.phase===ph.k)).map(x=>'<label><input type="checkbox" name="slug" value="'+x.slug+'"> '+esc(x.titel)+' <span class="klein">'+(neuesteMeinung(x,'Basis')?'Basis schon gefragt':'')+'</span><span class="marke-k info" style="margin-left:auto">'+esc(phaseN(x.phase))+'</span></label>').join('')+'</div></div><div class="knoepfe"><button class="btn haupt">Befragung anlegen</button></div></form>';
 }
 function vBefragungen(s,o){
   o=o||{};
-  const liste='<div class="rundenliste"><div class="klein" style="font-weight:600">Befragungen</div>'+s.befragungen.map(x=>'<button type="button" class="'+(!o.neu&&o.r&&o.r.id===x.id?'an':'')+'" data-befragung="'+x.id+'">'+esc(x.name)+'<small>'+({entwurf:'Entwurf',laeuft:'läuft bis '+de(x.bis),beendet:'beendet'})[x.status]+'</small></button>').join('')+'<button type="button" class="btn" data-act="befragungneu">Neue Befragung</button></div>';
+  const liste='<div class="rundenliste"><div class="klein" style="font-weight:600">Befragungen</div>'+s.befragungen.map(x=>'<button type="button" class="'+(!o.neu&&o.r&&o.r.id===x.id?'an':'')+'" data-befragung="'+x.id+'">'+esc(x.name)+'<small>'+({entwurf:x.paket?'Exportiert':'Entwurf',laeuft:'läuft bis '+de(x.bis),beendet:'beendet'})[x.status]+'</small></button>').join('')+'<button type="button" class="btn" data-act="befragungneu">Neue Befragung</button></div>';
   const r=o.r||null;
   if(o.neu||!r)return '<div class="app">'+appKopf(s,'befragungen')+'<div class="runde">'+liste+'<div style="min-width:0">'+formBefragungNeu(s)+'</div></div></div>';
   const fertig=r.slugs.every(sl=>p(s,sl).basis);
   const kopf='<div class="rkopf"><div><h3 style="font-size:1.375rem">'+esc(r.name)+'</h3><p class="klein" style="margin-top:.2rem">'+esc(r.frage)+' · an die '+esc(r.kreis)+' · bis '+de(r.bis)+'</p></div>'+
-    (r.status==='entwurf'?'<div class="rechts"><button type="button" class="btn haupt" data-act="paket" data-id="'+r.id+'"'+(fertig?'':' disabled')+'>Texte ausgeben</button></div>':'')+'</div>'+
-    (r.status==='entwurf'?'<div class="hinweis">Wer den Aufruf-Link hat, sieht diese Texte. Behandle das wie eine Veröffentlichung.'+(fertig?'':' Erst alle Texte sichern, dann lassen sie sich ausgeben.')+'</div>':'');
+    (r.status==='entwurf'?'<div class="rechts"><button type="button" class="btn'+(r.paket?'':' haupt')+'" data-act="paket" data-id="'+r.id+'"'+(fertig?'':' disabled')+'>Export</button></div>':'')+'</div>'+
+    (r.status==='entwurf'&&r.paket?'<div class="hinweis gruen">Exportiert am '+de(r.paket)+' Lade die Datei auf der Beteiligungsplattform hoch, dort bekommst du den Aufruf-Link. Danach bestätigst du es hier.<div class="knoepfe" style="justify-content:flex-start"><button type="button" class="btn haupt" data-act="hochgeladen" data-id="'+r.id+'">Ist hochgeladen</button></div></div>':'')+
+    (r.status==='entwurf'?'<div class="hinweis">Export erzeugt die Datei für die Beteiligungsplattform. Wer den Aufruf-Link hat, sieht diese Texte. Behandle das wie eine Veröffentlichung.'+(fertig?'':' Erst alle Texte sichern, dann lässt sich exportieren.')+'</div>':'');
   let koerper='';
   if(r.status==='laeuft'&&o.zuordnung)koerper=vZuordnung(s,r,o.zuordnung);
-  else if(r.status==='laeuft')koerper='<div class="hinweis gruen">Texte ausgegeben am '+de(r.paket)+' Lade die Datei auf der Beteiligungsplattform hoch, dort bekommst du den Aufruf-Link.</div><div class="feld"><label for="f-datei">Antworten einlesen</label><input id="f-datei" type="file" accept=".json,application/json"><small>Die Datei von der Beteiligungsplattform: Zählungen und Argumente, ohne Bezug zu einzelnen Personen. Das geht auch mitten in der Befragung, die neue Datei ersetzt die alte.</small></div><div class="knoepfe" style="justify-content:flex-start"><button type="button" class="btn" data-act="paket-laden" data-id="'+r.id+'">Datei noch einmal herunterladen</button><button type="button" class="btn" data-act="ruecklauf-beispiel" data-id="'+r.id+'">Beispieldatei nehmen</button></div>';
+  else if(r.status==='laeuft')koerper='<div class="hinweis gruen">Läuft seit '+de(r.laeuftSeit)+' Den Aufruf-Link bekommst du auf der Beteiligungsplattform.</div><div class="feld"><label for="f-datei">Antworten einlesen</label><input id="f-datei" type="file" accept=".json,application/json"><small>Die Datei von der Beteiligungsplattform: Zählungen und Argumente, ohne Bezug zu einzelnen Personen. Das geht auch mitten in der Befragung, die neue Datei ersetzt die alte.</small></div><div class="knoepfe" style="justify-content:flex-start"><button type="button" class="btn" data-act="paket-laden" data-id="'+r.id+'">Datei noch einmal herunterladen</button><button type="button" class="btn" data-act="ruecklauf-beispiel" data-id="'+r.id+'">Beispieldatei nehmen</button></div>';
   else if(r.status==='beendet')koerper='<h4 class="ergebnis-t">Das Ergebnis</h4><p class="klein" style="margin-bottom:.5rem">Rücklauf vom '+de(r.ruecklauf)+' In der Reihenfolge der Ideen, ohne Rangliste. Nicht bindend.</p>'+ergebnisHtml(ergebnisZeilen(s,r),true);
   if(r.status==='entwurf')koerper='<form data-form="basis-alle">'+r.slugs.map(sl=>{const x=p(s,sl),b=x.basis||{titel:x.titel,situation:'',vorschlag:'',hintergrund:''};const len=(b.situation+'\n'+b.vorschlag).length;
       return '<div class="fassung" data-slug="'+sl+'"><span class="zaehl '+(len>GRENZEN.beschreibung?'zuviel':'')+'">'+len+' von '+GRENZEN.beschreibung+' Zeichen</span><div class="klein">'+esc(x.titel)+(x.basis?'':' · <b>noch nicht geschrieben</b>')+'</div><input name="titel:'+sl+'" aria-label="Titel für die Basis" value="'+esc(b.titel)+'"><div class="zweier"><textarea name="situation:'+sl+'" aria-label="Situation" placeholder="Situation: …">'+esc(b.situation)+'</textarea><textarea name="vorschlag:'+sl+'" aria-label="Vorschlag" placeholder="Vorschlag: …">'+esc(b.vorschlag)+'</textarea></div><textarea name="hintergrund:'+sl+'" aria-label="Hintergrund" class="hg" placeholder="Hintergrund, optional">'+esc(b.hintergrund)+'</textarea></div>'}).join('')+'<div class="knoepfe"><button class="btn">Alle Texte sichern</button></div></form>';
@@ -1002,10 +1059,10 @@ const SZENEN=[
  {k:'1.1',t:'Die Übersicht',u:'localhost:4000',html:s=>vBrett(s,{dialog:dialogNeu('Trinkbrunnen am Marktplatz','Kostenloses Trinkwasser im Sommer, kam beim Stammtisch auf.','Stammtisch')}),notes:[
   ['bruch','Eine Stufe je Tätigkeit','Kleiner Kreis, Vorstand, Basis, Recherche als eigene Stufen: Der Radweg war zugleich in der Recherche und beim Vorstand und passte auf keine einzelne Stufe. Jetzt fünf Phasen als Reife, und auf jeder Karte F, V, B und E für alle, die gehört wurden.'],
   ['','Drei Felder, sonst nichts','Kein Vault-Eintrag davor, keine Priorität. Die alte Regel „erst in den Vault“ hätte diese Minute zerstört.'],
-  ['bruch','Technikersprache im Formular','Der Slug ist der Vertrag zum Vault und muss änderbar sein, aber Miriam muss das nicht wissen. Er heißt jetzt „Stichwort“ und ist eingeklappt.']]},
+  ['bruch','Technikersprache im Formular','Der Slug ist der Vertrag zum Vault und muss änderbar sein, aber Miriam muss das Wort nicht kennen. Er heißt jetzt „Kurzname“, füllt sich aus dem Titel und steht sichtbar im Dialog.']]},
  {k:'1.2',t:'Danach',u:'localhost:4000',html:s=>vBrett(s),notes:[
   ['bruch','Eine Warnung auf jeder zweiten Karte','Im ersten Lauf warnte das Brett auch dort, wo nur auf einen Termin gewartet wurde. „Liegt“ gilt jetzt nur, wenn kein Termin vereinbart ist und seit vier Wochen nichts passiert ist.'],
-  ['','Das Brett beantwortet Miriams Frage','„Miriam ist dran“ und „Braucht Aufmerksamkeit“ statt Prioritäten. Hier fallen genau zwei auf: Die Sitzbänke liegen, das Statikgutachten ist überfällig.'],
+  ['','Das Brett beantwortet Miriams Frage','„Du bist dran“ und „Braucht Aufmerksamkeit“ statt Prioritäten. Hier fallen drei auf: Die Sitzbänke liegen, das Statikgutachten ist überfällig, die Mitfahrbänke sind in drei Tagen fällig.'],
   ['','Der Stand zählt mit','Die Zahl neben „Stand“ sagt, wie viel seit der letzten Ausgabe passiert ist. Das erinnert daran, und es zeigt, dass sich die Einträge lohnen.']]}
 ]},
 {id:'s2',wer:'Selin und Miriam · Fraktion',titel:'In der Fraktion',moment:'<b>Donnerstag, nach der Sitzung.</b> Die Fraktion will den Trinkbrunnen weiterdenken, Selin bringt die Folgekosten ein. Fünf weitere Projekte waren dran. Miriam trägt ein, was beschlossen wurde, sie entscheidet es nicht. Sie hat fünf Minuten.',bilder:[
@@ -1140,6 +1197,12 @@ const VERWORFEN=[
  ['„Festhalten“ neben „Notiz festhalten“','Unklarer Begriff, falscher Ort, zwei Wege für dieselbe Absicht.','Ein Knopf „Neuer Eintrag“ am Verlauf, die Sichtbarkeit steht immer im Dialog.','Dein Feedback'],
  ['„Pflege“, „Stand-Kreis“, „Partner“, „Still“, „Zeiger“, „Runde“','Unverständlich oder falsch: Der Händlerverein ist kein Partner.','Redaktion, Engerer Kreis, Externe, „Liegt seit …“, Querverweise, Befragung.','Dein Feedback'],
  ['Fakten als Links, zusammen mit den Wegen','Fakten sind Belege, Varianten sind Abwägung. Das sind zwei Dinge.','Fakt mit Aussage, Beleg und Prüfstatus. Varianten mit Status und Grund.','Dein Feedback'],
+ ['„Stichwort“, eingeklappt','Eigenartiges Wort, und es versteckt den festen Bezug zum Vault.','„Kurzname“, sichtbar im Dialog, füllt sich aus dem Titel.','Dein Feedback'],
+ ['Reiter „Befragungen“','Dort geht es darum, ein Meinungsbild einzuholen. Die Befragung ist nur der Weg dorthin.','Reiter „Meinungsbild“. Die einzelne Frage an einen Kreis heißt weiter Befragung.','Dein Feedback'],
+ ['„Texte ausgeben“, danach sofort „läuft“','Der Name sagte nicht, was passiert, und „läuft“ stand schon beim Download.','Knopf „Export“. „Läuft“ erst nach „Ist hochgeladen“. Geänderter Text verlangt einen neuen Export.','Dein Feedback'],
+ ['„Miriam ist dran“','Personalisiert und auf eine Person gemünzt.','„Du bist dran“ in der Arbeitsansicht. Im Stand bleiben die Namen, weil ihn andere lesen.','Dein Feedback'],
+ ['Verlauf nur aus Einträgen','Sah aus wie etwas, das man pflegen muss.','Aktionen im Hub und Vorschläge aus komki schreiben sich selbst mit, der Knopf bleibt für das, was anderswo passiert ist.','Dein Feedback'],
+ ['Stand als Fließtext','Eine Textwand, in der man vor der Sitzung nichts schnell findet.','Überblick nach Phasen, „Wer ist dran“ als Tabelle, je Projekt beschriftete Zeilen.','Dein Feedback'],
  ['Connector erst ganz am Ende','Quellenrecherche ist der Hauptnutzen.','Früh, beginnend mit „Fakt vorschlagen“ aus öffentlicher Recherche.','Dein Feedback'],
  ['Rücklauf nur als Zwischenschritt beim Einlesen','Die beste Ansicht verschwand, wenn sie am nützlichsten wäre.','Dauerhafte Ergebnisseite, frisch auch oben im Stand.','Dein Feedback'],
  ['Betrieb, Jargon und CSV-Textfeld für Miriam','Sie ist keine Technikerin. Terminal, SSH und Fachbegriffe gehen nicht.','Technik-Hilfe als eigene Rolle, Datei-Upload, Alltagssprache.','Dein Feedback'],
@@ -1197,7 +1260,10 @@ document.getElementById('blickwahl').addEventListener('click',e=>{const b=e.targ
 /* Selbst klicken */
 const L={s:start(),v:'brett',slug:null,filter:'alle',dialog:null,befragungId:null,befragungNeu:false,zuordnung:null,stand:null};
 const live=document.getElementById('live'),lstatus=document.getElementById('live-status'),lurl=document.getElementById('live-url');
-function meld(t){lstatus.textContent=t}
+const testModus=new URLSearchParams(location.search).has('test');
+if(testModus)document.documentElement.classList.add('testmodus');
+let meldTimer;
+function meld(t){lstatus.textContent=t;if(testModus){clearTimeout(meldTimer);meldTimer=setTimeout(()=>{lstatus.textContent=''},5000)}}
 function aktBefragung(){return L.befragungId?L.s.befragungen.find(x=>x.id===L.befragungId):L.s.befragungen[L.s.befragungen.length-1]||null}
 function liveZeichnen(){
   const dlg=L.dialog?dialogFuer(L.s,L.dialog):'';let h;
@@ -1229,7 +1295,8 @@ live.addEventListener('click',e=>{
     if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>meld('Kurztext kopiert.'),()=>meld('Kopieren ging nicht. Bitte aus dem Feld markieren.'))}else meld('Bitte aus dem Feld markieren.');return}
   if(act==='sichtbar'){tu({t:'sichtbar',slug:t.dataset.slug,id},'Sichtbarkeit geändert.');return}
   if(act==='ablehnen'){tu({t:'entscheide',id,annehmen:false},'Abgelehnt.');return}
-  if(act==='paket'){tu({t:'paket',id},'Texte ausgegeben. Die Datei liegt in deinen Downloads.');paketLaden(id);return}
+  if(act==='paket'){tu({t:'paket',id},'Exportiert. Die Datei liegt in deinen Downloads.');paketLaden(id);return}
+  if(act==='hochgeladen'){tu({t:'hochgeladen',id},'Die Befragung läuft.');return}
   if(act==='paket-laden'){paketLaden(id);meld('Die Datei liegt in deinen Downloads.');return}
   if(act==='befragungneu'){L.befragungNeu=true;L.zuordnung=null;return liveZeichnen()}
   if(act==='ruecklauf-beispiel'){return ruecklaufLesen(beispielRuecklauf(L.s,L.s.befragungen.find(x=>x.id===id)),id)}
@@ -1256,7 +1323,7 @@ live.addEventListener('submit',e=>{
   if(k==='zusammen')return tu({t:'zusammenfassung',slug:sl,befragung:f.dataset.befragung,text:d.get('text')},'Gesichert.');
   if(k==='vorschlag'){const v=L.s.vorschlaege.find(x=>x.id===f.dataset.id);const teile=v.teile.map((_,i)=>i).filter(i=>d.get('t'+i));if(!teile.length){meld('Nichts ausgewählt.');return}return tu({t:'entscheide',id:v.id,annehmen:true,teile},'Übernommen.')}
   if(k==='befragung'){const w=d.getAll('slug');if(!w.length){meld('Wähle mindestens eine Idee.');return}L.befragungNeu=false;L.s=handle(L.s,{t:'befragung',name:d.get('name'),frage:d.get('frage'),bis:d.get('bis'),slugs:w,datum:L.s.heute});L.befragungId='r'+L.s.befragungen.length;meld('Befragung angelegt. Jetzt die Texte schreiben.');return liveZeichnen()}
-  if(k==='basis-alle'){let s=L.s;f.querySelectorAll('.fassung').forEach(x=>{const q=x.dataset.slug;const si=d.get('situation:'+q),vo=d.get('vorschlag:'+q);if(si&&vo)s=handle(s,{t:'basis',slug:q,titel:d.get('titel:'+q),situation:si,vorschlag:vo,hintergrund:d.get('hintergrund:'+q)})});L.s=s;meld('Texte gesichert.');return liveZeichnen()}
+  if(k==='basis-alle'){let s=L.s;f.querySelectorAll('.fassung').forEach(x=>{const q=x.dataset.slug;const si=d.get('situation:'+q),vo=d.get('vorschlag:'+q);if(si&&vo)s=handle(s,{t:'basis',slug:q,titel:d.get('titel:'+q),situation:si,vorschlag:vo,hintergrund:d.get('hintergrund:'+q)})});const alt=aktBefragung();L.s=s;meld(alt&&alt.paket&&!aktBefragung().paket?'Texte gesichert. Die Datei ist damit veraltet, bitte neu exportieren.':'Texte gesichert.');return liveZeichnen()}
   if(k==='ruecklauf'){const z=L.zuordnung.map((x,i)=>Object.assign({},x,{ziel:d.get('z'+i)}));const id=f.dataset.id;L.zuordnung=null;return tu({t:'ruecklauf',id,zeilen:z,stand:L.stand,schliessen:!!d.get('schliessen')},'Antworten übernommen.')}
 });
 function liveLaden(k,v,slug){L.s=structuredClone(STAND[k]||start());L.v=v;L.slug=slug;L.dialog=null;L.zuordnung=null;L.befragungId=null;L.befragungNeu=false;meld('Zustand aus Bild '+k+' geladen.');liveZeichnen()}

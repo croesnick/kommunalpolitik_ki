@@ -40,9 +40,9 @@ Externe wie Elternbeirat, Vereine oder andere Fraktionen bekommen nichts aus dem
 **Das Modell ist klein.**
 
 - **Ratsprojekt** mit Phase (Idee, Meinungsbildung, Ausarbeitung, Im Rat, Umsetzung), nächstem Schritt und Ablage (Ruht, Verworfen, Abgeschlossen). Phasen sind frei wechselbar, weil der echte Ablauf Schleifen hat. Ein Grund im Verlauf ersetzt die Sperre im Code.
-- **Verlauf** nur anhängend. Jeder Eintrag sagt, wer ihn lesen darf.
+- **Verlauf** nur anhängend. Jeder Eintrag sagt, wer ihn lesen darf. Was die Redaktion im Hub tut, schreibt sich von selbst mit, von Hand kommt nur dazu, was anderswo passiert ist. Aus komki erscheinen nur eingegangene, übernommene und abgelehnte Vorschläge, denn jede weitere Zeile wäre eine Speicherung mit eigenem GO.
 - **Meinungsbild** je Kreis: Datum, ein Satz, optional eine Verteilung. Der Hub bildet keinen Gesamtwert und keine Rangliste.
-- **Befragung** bündelt mehrere Projekte für eine Frage an einen Kreis, mit Frist. Sie ist der Übergabepunkt zur Beteiligungsplattform und bleibt danach als Ergebnisseite stehen, in der Reihenfolge der Ideen und ohne Sortierung nach Zustimmung.
+- **Befragung** bündelt mehrere Projekte für eine Frage an einen Kreis, mit Frist. Sie ist der Übergabepunkt zur Beteiligungsplattform. Sie läuft erst, wenn die Redaktion das Hochladen bestätigt hat, denn der Hub sieht es nicht. Danach bleibt sie als Ergebnisseite stehen, in der Reihenfolge der Ideen und ohne Sortierung nach Zustimmung.
 - **Fakt:** eine Aussage mit Beleg, Datum und Prüfstatus. Was die KI findet, gilt als nicht verifiziert, bis ein Mensch die Fundstelle nachgeschlagen hat. URL und Abrufdatum setzt der Vermittler aus dem Journal ein, nicht der Agent.
 - **Variante:** eine Alternative zum selben Ziel, mit Vorbedingungen und dem Status offen, gewählt oder verworfen samt Grund. Das ist der bisherige Realisierungsstrang.
 - **Antrag** als eigenes Objekt, mehrere je Projekt, mit Beschlussvorschlag, Adressat, Status, Ergebnis und Querverweis auf die Ablage. Der Text selbst liegt nicht im Hub.
