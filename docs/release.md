@@ -129,7 +129,7 @@ Grundsätze, die beim ersten Release gelten sollen:
   Nutzende erleben.
 - **Echte Hardware:** Was die Mock-Welt nicht nachstellen kann, steht in
   [echte-hardware.md](echte-hardware.md). Vor jedem Release läuft dort der
-  Live-Test für Touch ID (`cd apps/komki_cli && mix test --include live`)
+  Live-Test für Touch ID (`cd apps/komki_cli && mix test --include touch_id`)
   auf einem Mac und zeigt genau eine Rückfrage.
 - **Ein Publish-GO** nach vorgelegtem Smoke-Protokoll, Prüfsummen, Notes und
   Zweit-Maschinen-Check. Ein Draft legt kein Tag an, das Tag entsteht erst
