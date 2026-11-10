@@ -12,6 +12,10 @@ exclude = if sandbox?, do: exclude, else: [:sandbox | exclude]
 # Echter llama-server-Boot (DoctorBootTest, Ticket #392): nur mit
 # `mix test --include llama_boot`, nie im Standardlauf.
 exclude = [:llama_boot | exclude]
+
+# Real Secure Enclave with a Touch ID prompt (TresorLiveTest, ticket #337):
+# only with `mix test --include touch_id`, never in a standard run or on CI.
+exclude = [:touch_id | exclude]
 ExUnit.start(exclude: exclude)
 
 # Ticket #146: kein Test fragt den echten Schluesselbund ab (auch nicht der
