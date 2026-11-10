@@ -191,7 +191,10 @@ dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bz
    ein GO-Beleg mit `outcome: released` direkt nach dem Verbrauch der Nonce (commit vor Wirkung,
    komki_policy CONTRACT §4.6). Der GO-Beleg ist die Entscheidung des Freigabe-Zweigs; für dasselbe Gate
    folgt kein `permitted`. So steht auch bei einem abgelehnten Aufruf jede Prüfung im Journal.
-6. Lehnt Schritt 3 **oder** Schritt 4 ab und kommt kein GO: Antwort mit Remedies, **kein Vollzug**. Die
+6. Lehnt Schritt 3 **oder** Schritt 4 ab und kommt kein GO: Antwort mit Remedies, **kein Vollzug**. Ausnahme:
+   Fällt bei `store` der Empfängertest, gibt es keinen GO-Weg (komki_policy CONTRACT §4.7, Ticket #417). Dann
+   trägt die Antwort nur den `hinweis`, dass nichts übertragen wurde, und `recipients_outside` aus dem Blocker
+   der Engine, ohne Remedies und Lockerungsbefugnisse; den vollen Katalog hält der PDR fest. Die
    Antwort nennt keinen Vorbeleg (`emit_decision_id`), weil es keinen gibt. Nur wenn beide Schritte erlaubt
    sind (per Permit oder GO): der **Vorbeleg vor Wirkung** (`rule: emit`, `outcome: emitted`, `decision:
    null`, R.11), bevor der Connector aufgerufen wird. Er ist keine Entscheidung, die stehen schon im

@@ -146,14 +146,14 @@ Regeln:
 - `checked_label` ist für `admit` und `emit` **immer** B_W = `workspace.bindings`, nie λ(x) (RFC 5.4) und nie λ(y) (RFC 5.5). Für `store` und `transfer` ist es λ(y) = `object.labels` (sortiert): gespeichert oder übergeben wird ein schon erzeugtes Objekt unter seinem Ausgabelabel (RFC 5.6, § 4.7, § 4.8).
 - `remedies`: bei `deny`/`indeterminate` nicht-leer, `permit`: `null` (§ 2.8).
 - `emit`-Entscheidungen tragen zusätzlich die Felder `content_digest` (immer; Echo des technischen Fakts `output_content_digest`, § 4.5), `assigned_label` (bei `permit`: B_W, die vom Vermittler zugeordnete Ausgabe-Menge λ(y); sonst `null`) und — nur bei Permit durch Aktionsfreigabe — `release` (Form § 4.6). `admit`-Entscheidungen bleiben unverändert. `store`- und `transfer`-Entscheidungen tragen `content_digest` (immer) und — nur bei Permit durch Aktionsfreigabe — `release`; kein `assigned_label` (Speichern und Übergeben ordnen kein Label zu).
-- `blockers`: nur bei `deny`, nicht-leer. Jedes Element ist ein geschlossenes Objekt mit **genau** den Schlüsseln `code` (string), `binding` (string|null), `condition` (string|null). `binding` benennt die betroffene Bindung (oder `null`), `condition` das betroffene Fakt-Feld (oder `null`).
+- `blockers`: nur bei `deny`, nicht-leer. Jedes Element ist ein geschlossenes Objekt mit **genau** den Schlüsseln `code` (string), `binding` (string|null), `condition` (string|null); einzige Ausnahme ist `recipient_not_allowed` (unten). `binding` benennt die betroffene Bindung (oder `null`), `condition` das betroffene Fakt-Feld (oder `null`).
 - Blocker-Codes (vollständig, feste Bedeutung):
   - `object_quarantine` — Prämisse 1 verletzt (`binding: null`, `condition: null`)
   - `workspace_invalid` — Prämisse 2 verletzt
   - `basis_right_false` — `has_operation_right` oder `has_object_access_right` ist `false` (`condition` = Faktname)
   - `audit_path_not_ready` — `audit_path_ready` ist `false` (`condition: "audit_path_ready"`)
   - `label_not_included` — λ(x) ⊄ B_W (`binding: null`, `condition: null`)
-  - `recipient_not_allowed` — ρ_Γ(c) ⊄ R_Γ(`checked_label`) (`binding: null`, `condition: null`)
+  - `recipient_not_allowed` — ρ_Γ(c) ⊄ R_Γ(`checked_label`) (`binding: null`, `condition: null`). Trägt zusätzlich `recipients_outside`: die fehlenden Empfänger aus der Prüfung, ρ_Γ(c) \ R_Γ(`checked_label`), sortiert und nicht leer (Ticket #417)
   - `label_not_preserved` — nur `store` und `transfer`: B_W ⊄ λ(y), das Objekt hätte eine Raumbindung verloren (`binding: null`, `condition: null`)
   - `missing_operation_rule` — Bindung hat keinen Eintrag für die geprüfte Operation (`binding` = Bindung, `condition: null`)
   - `binding_condition_false` — Bedingung als `false` bewertet (`binding` = Bindung, `condition` = erstes falsch bewertetes Feld des Ausdrucks in Auswertungsordnung, sonst `null`)
@@ -244,7 +244,7 @@ Regeln (R.6.2 — autorisiert wird ein Ereignis, nicht nur ein Text):
 
 APPA Theorem 5 umgesetzt: zu jedem Blocker und jedem fehlenden Beleg ein begrenzter, aufzählbarer Katalog legaler Fortsetzungen aus **genau vier Übergangstypen**. Der Katalog ist reine Ausgabe („der Katalog erzeugt keine Autorität“): keine Eingabe akzeptiert ihn, keine Fortsetzung wird ausgeführt.
 
-- `remedies`-Eintrag bei `deny` (spiegelt das Blocker-Element in `blockers`-Ordnung): `{"code": ..., "binding": ..., "condition": ..., "transitions": [...]}`.
+- `remedies`-Eintrag bei `deny` (spiegelt das Blocker-Element in `blockers`-Ordnung): `{"code": ..., "binding": ..., "condition": ..., "transitions": [...]}`, bei `recipient_not_allowed` zusätzlich `recipients_outside` wie im Blocker.
 - `remedies`-Eintrag bei `indeterminate` (spiegelt das `missing_evidence`-Element in dessen Ordnung): `{"code": ..., "fact": ..., "binding": ..., "transitions": [...]}`.
 
 Übergangstypen (geschlossene Menge, feste Payload-Schlüssel):
@@ -273,11 +273,11 @@ APPA Theorem 5 umgesetzt: zu jedem Blocker und jedem fehlenden Beleg ein begrenz
 | `missing_operation_rule` | — | — | ✓ | — |
 | `binding_condition_false` | ✓ `facts: [condition]` | — | ✓ | — |
 
-**Anwendbarkeit (Zweige `emit`, `store` und `transfer`, normal):** wie `admit`, zusätzlich `aktionsfreigabe` scope `call` für `basis_right_false`, `audit_path_not_ready`, `recipient_not_allowed`, `missing_operation_rule`, `binding_condition_false` (die Aktionsfreigabe deckt verbindliche Wirkungen des Erzeugens, Speicherns und Übergebens; `workspace_invalid` und `label_not_preserved` bleiben unüberbrückbar — ein GO stellt keine entfernte Bindung wieder her — ein GO belebt keinen ungültigen Vertrag). Für `indeterminate` (`missing_fact`, `recipients_unproven`) gilt `fakt_nachreichen` + `neuer_raum`, **nie** `aktionsfreigabe` — ein GO kann keine Belege herstellen.
+**Anwendbarkeit (Zweige `emit`, `store` und `transfer`, normal):** wie `admit`, zusätzlich `aktionsfreigabe` scope `call` für `basis_right_false`, `audit_path_not_ready`, `recipient_not_allowed` (nicht bei `store`), `missing_operation_rule`, `binding_condition_false` (die Aktionsfreigabe deckt verbindliche Wirkungen des Erzeugens, Speicherns und Übergebens; `workspace_invalid` und `label_not_preserved` bleiben unüberbrückbar — ein GO stellt keine entfernte Bindung wieder her — ein GO belebt keinen ungültigen Vertrag). Bei `store` ist auch `recipient_not_allowed` unüberbrückbar: Kein GO ersetzt den Empfängertest, denn ein GO entscheidet nicht, wer den Speicher liest (R.5.7, Ticket #417). Für `indeterminate` (`missing_fact`, `recipients_unproven`) gilt `fakt_nachreichen` + `neuer_raum`, **nie** `aktionsfreigabe` — ein GO kann keine Belege herstellen.
 
-**Aktionsfreigabe-Zweig (§ 4.6):** jeder Release-Blocker erhält genau einen `aktionsfreigabe`-scope-`call`-Eintrag mit dem **neu berechneten** korrekten `call_hash` (der Katalog sagt dem Menschen, woran ein gültiges GO gebunden sein muss). `workspace_invalid` und `label_not_preserved` behalten ihren `neuer_raum`-Eintrag. Ist einer der beiden unter den Befunden, gilt die Regel unten auch hier: kein call-GO, ein Release-Blocker ohne andere Fortsetzung bekommt `neuer_raum`.
+**Aktionsfreigabe-Zweig (§ 4.6):** jeder Release-Blocker erhält genau einen `aktionsfreigabe`-scope-`call`-Eintrag mit dem **neu berechneten** korrekten `call_hash` (der Katalog sagt dem Menschen, woran ein gültiges GO gebunden sein muss). `workspace_invalid`, `label_not_preserved` und `recipient_not_allowed` (nur `store`) behalten ihren `neuer_raum`-Eintrag. Ist einer davon unter den Befunden, gilt die Regel unten auch hier: kein call-GO, ein Release-Blocker ohne andere Fortsetzung bekommt `neuer_raum`.
 
-**Payload-Regeln:** `neuer_raum.required_bindings` = λ(x) bei `admit`, `[]` bei `emit`, `store` und `transfer` (notwendige Bedingung: der neue Raum muss mindestens die Objekt-Labels decken; ein leichterer Zielraum bleibt legal, B.7 — die kleinste Zuweisung kann trotzdem unzulässig sein). `neuer_raum.required_recipients` = ρ_Γ(c) des aktuellen Snapshot. `registrierte_transformation` listet je Blocker alle passenden Transformationen aufsteigend nach Kennung. `fakt_nachreichen` fällt weg, wenn kein Feld benennbar ist (`condition: null`, etwa bei einer Literal-Regel `false`): eine Fortsetzung ohne benanntes Feld ist keine Fakt-Fortsetzung. Der Katalog je Blocker bleibt nicht-leer (`neuer_raum`, im `emit`-, `store`- und `transfer`-Fall bei weichen Blockern zusätzlich `aktionsfreigabe`, siehe aber den folgenden Satz). Enthält eine Entscheidung einen unüberbrückbaren Blocker (`workspace_invalid`, `label_not_preserved`), bietet **kein** Befund dieser Entscheidung ein call-GO an: der Freigabe-Zweig würde den Blocker erneut feststellen, die Person würde nach einem GO gefragt, das nie wirken kann. Ein Befund, dem dadurch keine Fortsetzung bliebe, bekommt `neuer_raum`; der Katalog je Blocker bleibt nicht-leer.
+**Payload-Regeln:** `neuer_raum.required_bindings` = λ(x) bei `admit`, `[]` bei `emit`, `store` und `transfer` (notwendige Bedingung: der neue Raum muss mindestens die Objekt-Labels decken; ein leichterer Zielraum bleibt legal, B.7 — die kleinste Zuweisung kann trotzdem unzulässig sein). `neuer_raum.required_recipients` = ρ_Γ(c) des aktuellen Snapshot. `registrierte_transformation` listet je Blocker alle passenden Transformationen aufsteigend nach Kennung. `fakt_nachreichen` fällt weg, wenn kein Feld benennbar ist (`condition: null`, etwa bei einer Literal-Regel `false`): eine Fortsetzung ohne benanntes Feld ist keine Fakt-Fortsetzung. Der Katalog je Blocker bleibt nicht-leer (`neuer_raum`, im `emit`-, `store`- und `transfer`-Fall bei weichen Blockern zusätzlich `aktionsfreigabe`, siehe aber den folgenden Satz). Enthält eine Entscheidung einen unüberbrückbaren Blocker (`workspace_invalid`, `label_not_preserved`, bei `store` auch `recipient_not_allowed`), bietet **kein** Befund dieser Entscheidung ein call-GO an, auch nicht ein weicher Blocker wie `missing_operation_rule` daneben: der Freigabe-Zweig würde den Blocker erneut feststellen, die Person würde nach einem GO gefragt, das nie wirken kann. Ein Befund, dem dadurch keine Fortsetzung bliebe, bekommt `neuer_raum`; der Katalog je Blocker bleibt nicht-leer.
 
 ## 3. Beschränkte Policy-Sprache (vollständige B.4-Grammatik)
 
@@ -370,7 +370,7 @@ Erzeugen ist ein Schritt im Raum: die Umgebung des Snapshots ist die Umgebung, i
 `decide` mit vorgelegter Aktionsfreigabe (`--release`/`--stand`) ist nie ein stiller Fallback: normaler Zweig und Freigabe-Zweig sind getrennte Entscheidungen.
 
 1. Struktur: Release (§ 2.6) und Stand (§ 2.7) werden als geschlossene Schemas validiert (Eingabefehler, Exit 2); `kind: offenlegungsfreigabe` oder Operation ∉ {`emit`, `store`, `transfer`} → `unsupported` (Exit 3). Snapshot/Intent-Kohärenz wie § 2.3; Digest-Pflicht wie § 4.5.
-2. `workspace_contract_valid` bleibt Prämisse (`workspace_invalid`): ein GO belebt keinen ungültigen Vertrag. Bei `store` und `transfer` bleibt ebenso `label_preservation` Prämisse (`label_not_preserved`): ein GO stellt keine entfernte Bindung wieder her.
+2. `workspace_contract_valid` bleibt Prämisse (`workspace_invalid`): ein GO belebt keinen ungültigen Vertrag. Bei `store` und `transfer` bleibt ebenso `label_preservation` Prämisse (`label_not_preserved`): ein GO stellt keine entfernte Bindung wieder her. Bei `store` bleibt danach auch `recipient_inclusion` Prämisse (`recipient_not_allowed`): kein GO ersetzt den Empfängertest (R.5.7, Ticket #417). Bei `emit` und `transfer` überbrückt die Aktionsfreigabe einen unzulässigen Empfänger weiterhin (offen bis #354, § 4.8).
 3. Release-Prüfungen in fester Ordnung, jede Verletzung ein Blocker: Call-Hash neu berechnet aus Intent (mit Operation) + Snapshot-Digest, Vergleich mit `release.call_hash` → `release_call_mismatch`; Fenster `valid_from ≤ as_of ≤ valid_until` → `release_not_yet_valid`/`release_expired`; `nonce ∈ stand.consumed` → `release_nonce_consumed`; `release.scope ≠ stand.scope` → `release_scope_mismatch`; `release.authority ∉ 𝒪` → `release_authority_unknown`.
 4. Permit nur ohne Befund: `decision: permit`, `rule` = Operation des Intents, bei `emit` `assigned_label` = B_W (die Aktionsfreigabe ändert λ(y) nicht — Lockerung wäre Offenlegungsfreigabe), `checked_label` wie § 2.4, `proof: null`, Remedies `null`, plus `release`-Objekt als deklarative Wirkung:
    ```json
@@ -383,11 +383,11 @@ Erzeugen ist ein Schritt im Raum: die Umgebung des Snapshots ist die Umgebung, i
    }
    ```
    Der Ausführer muss den Verbrauch über `advance` committen, **bevor** die Wirkung eintritt (commit-before-effect, B.8, PACE-Nonce); zwei konkurrierende Ausführungen verliert genau eine am Versionsabgleich (§ 2.7).
-5. Befunde → `deny` mit Remedies § 2.8 (Aktionsfreigabe-Zweig: ein `aktionsfreigabe`-call-Eintrag je Release-Blocker mit neu berechnetem korrektem `call_hash`; `workspace_invalid` → `neuer_raum`).
+5. Befunde → `deny` mit Remedies § 2.8 (Aktionsfreigabe-Zweig: ein `aktionsfreigabe`-call-Eintrag je Release-Blocker mit neu berechnetem korrektem `call_hash`; `workspace_invalid`, `label_not_preserved` und `recipient_not_allowed` → `neuer_raum`, dann auch für die Release-Blocker derselben Entscheidung).
 
 ### 4.7 Regelzweig `store` — Speicherung (RFC R.5.6)
 
-Ein schon erzeugtes Objekt y wird in einen dauerhaften Speicher gelegt; die Umgebung des Snapshots ist der Speicher (ihre Beobachter sehen den Bestand). Der Vermittler ruft `store` **nach** einem `emit`-Permit für dasselbe Objekt; `emit` ordnet λ(y) zu, `store` erhält es. Fehlt allen Bindungen eine `store`-Regel, ist jedes Speichern verboten (`missing_operation_rule`, B.4) und nur mit Aktionsfreigabe für den exakten Call zulässig.
+Ein schon erzeugtes Objekt y wird in einen dauerhaften Speicher gelegt; die Umgebung des Snapshots ist der Speicher (ihre Beobachter sehen den Bestand). Der Vermittler ruft `store` **nach** einem `emit`-Permit für dasselbe Objekt; `emit` ordnet λ(y) zu, `store` erhält es. Fehlt allen Bindungen eine `store`-Regel, ist jedes Speichern verboten (`missing_operation_rule`, B.4) und nur mit Aktionsfreigabe für den exakten Call zulässig, sofern der Empfängertest besteht. Liegt ein Beobachter des Speichers außerhalb von R_Γ(λ(y)), gibt es keinen Weg über ein GO (Ticket #417).
 
 - **Snapshot-Voraussetzung:** wie § 4.5 (`output_content_digest`, `classification: classified`). `object.labels` ist λ(y), das Ausgabelabel aus der `emit`-Entscheidung.
 - **Prüflabel:** `checked_label` = λ(y) (sortiert), nicht B_W.
@@ -400,7 +400,7 @@ Ein schon erzeugtes Objekt y wird in einen dauerhaften Speicher gelegt; die Umge
   6. `recipient_inclusion` — ρ_Γ(Speicher) ⊆ R_Γ(λ(y)); Verstoß → `recipient_not_allowed`
   7. `binding_condition(b)` — für **jede** Bindung b ∈ λ(y) in sortierter Ordnung: Auswertung von `bindings[b].operations["store"]` (fehlt → **verbietend**, `missing_operation_rule`)
 - Permit-Ausgabe: `decision: permit`, `rule: store`, `content_digest`, Beweisbaum § 2.5; kein `assigned_label`.
-- Deny/indeterminate wie § 4.4, Remedies § 2.8 (wie `emit`, inklusive `aktionsfreigabe` scope `call` mit dem `store`-Call-Hash).
+- Deny/indeterminate wie § 4.4, Remedies § 2.8 (wie `emit`, inklusive `aktionsfreigabe` scope `call` mit dem `store`-Call-Hash). Ausnahme `recipient_not_allowed`: Dann bietet kein Befund der Entscheidung ein call-GO an, auch nicht `missing_operation_rule` daneben, und der Freigabe-Zweig prüft den Empfängertest erneut (§ 4.6). `missing_operation_rule` allein bleibt per GO überbrückbar.
 
 ### 4.8 Regelzweig `transfer` — Übergabe (RFC R.5.6)
 
@@ -417,7 +417,7 @@ Ein schon erzeugtes Objekt y wird an ein Ziel Z übergeben, etwa als Anfrage an 
   6. `recipient_inclusion` — ρ_Γ(Ziel) ⊆ R_Γ(λ(y)); Verstoß → `recipient_not_allowed`
   7. `binding_condition(b)` — für **jede** Bindung b ∈ λ(y) in sortierter Ordnung: Auswertung von `bindings[b].operations["transfer"]` (fehlt → **verbietend**, `missing_operation_rule`)
 - Permit-Ausgabe: `decision: permit`, `rule: transfer`, `content_digest`, Beweisbaum § 2.5; kein `assigned_label`.
-- Deny/indeterminate wie § 4.4, Remedies § 2.8 (wie `store`, inklusive `aktionsfreigabe` scope `call` mit dem `transfer`-Call-Hash). Die Aktionsfreigabe überbrückt wie bei `emit` auch `recipient_not_allowed`; ob ein unzulässiger Empfänger nach R.5.7 stattdessen eine Offenlegungsfreigabe verlangt, ist offen (Ticket #298, Kommentar).
+- Deny/indeterminate wie § 4.4, Remedies § 2.8 (wie `store`, inklusive `aktionsfreigabe` scope `call` mit dem `transfer`-Call-Hash). Die Aktionsfreigabe überbrückt wie bei `emit` auch `recipient_not_allowed`; ob ein unzulässiger Empfänger nach R.5.7 stattdessen eine Offenlegungsfreigabe verlangt, ist für `transfer` offen und wird in „Aktions- oder Offenlegungsfreigabe“ (Ticket #354) entschieden. Für `store` ist die Frage entschieden: kein GO ersetzt den Empfängertest (§ 4.7, Ticket #417).
 - Ein Zielarbeitsraum (zusätzlich dessen Aufnahmeregel, R.5.6) ist nicht Teil dieser Lieferung (Ticket #270).
 
 ## 5. `verify` — unabhängiger Ableitungsprüfer
@@ -471,7 +471,7 @@ Alle Fälle nutzen `priv/fixtures/registry.json` (Bürgerfall-Bindung `buergerfa
 | `case_quarantine` | Objekt `classification: quarantine`, λ=`[]` — Quarantäne ist kein leeres Label (RFC 2.5, D.4) | **deny**, Blocker `object_quarantine` |
 | `case_deny_no_basis` | Öffentlicher Raum B_W=∅, öffentliche Datei, `has_operation_right: false` (D.4 `leeres-label`: ohne Basisrechte erlaubt nichts) | **deny**, Blocker `basis_right_false` |
 | `case_unsupported` | Intent `operation: start` | **unsupported** (keine Decision, Exit 3) |
-| `case_deny_recipient` | B_W=`[buergerfall-4711@1, lizenz-namensnennung@1]`, λ=`[lizenz-namensnennung@1]` (eigene Regel `true` erfüllt), Umgebung `recherche-webdienst@1` mit `webdienst-x` ∉ R_Γ(B_W) (D.4 `empfaengergrenze`: objektbezogenes `true` schaltet keinen unzulässigen Empfänger frei) | **deny**, Blocker `recipient_not_allowed`, `checked_label` = beide Bindungen |
+| `case_deny_recipient` | B_W=`[buergerfall-4711@1, lizenz-namensnennung@1]`, λ=`[lizenz-namensnennung@1]` (eigene Regel `true` erfüllt), Umgebung `recherche-webdienst@1` mit `webdienst-x` ∉ R_Γ(B_W) (D.4 `empfaengergrenze`: objektbezogenes `true` schaltet keinen unzulässigen Empfänger frei) | **deny**, Blocker `recipient_not_allowed` (`recipients_outside: [webdienst-x]`), `checked_label` = beide Bindungen |
 | `case_deny_missing_rule` | B_W=`[nur-start-test@1]` (Bindung ohne `admit`-Eintrag), alle Fakten `true` (B.4: fehlende Operationsregel ≠ leere Konjunktion `true`) | **deny**, Blocker `missing_operation_rule` (nur-start-test@1) |
 | `case_indeterminate_env_false` | Wie permit, aber `environment_observers_complete: false` (D.4 `unvollstaendige-umgebung`) | **indeterminate**, `missing_evidence` → `recipients_unproven` / `environment_observers_complete` |
 | `case_indeterminate_env_missing` | Wie permit, aber Fakt `environment_observers_complete` fehlt (kein Leer-Default, §2.2) | **indeterminate**, `missing_evidence` → `recipients_unproven` / `environment_observers_complete` |
@@ -564,6 +564,8 @@ Die Fixture-Registry trägt dafür bei `lizenz-namensnennung@1` die Regel `store
 | `case_store_wider_label` | B_W = `[lizenz-namensnennung@1]`, λ(y) = `[buergerfall-4711@1, lizenz-namensnennung@1]` | **deny**, Blocker `missing_operation_rule` (buergerfall-4711@1): entschieden wird unter λ(y), nicht unter B_W |
 | `case_store_label_not_preserved` | B_W = `[lizenz-namensnennung@1]`, λ(y) = `[]` | **deny**, Blocker `label_not_preserved`; Remedies nur `neuer_raum` |
 | `case_release_store_permit` | Kontext von `case_store_no_rule`, gültiges GO mit `operation: store` | **permit**, `rule: store`, `proof: null`, `release`-Objekt; ein GO mit dem `emit`-Hash desselben Objekts ergibt `release_call_mismatch` |
+| `case_store_recipient` | B_W = λ(y) = `[buergerfall-4711@1]` (keine `store`-Regel), Speicher `recherche-webdienst@1`: `webdienst-x` ∉ R_Γ(λ(y)) | **deny**, Blocker `recipient_not_allowed` (`recipients_outside: [webdienst-x]`) und `missing_operation_rule` (buergerfall-4711@1); Remedies für beide nur `neuer_raum`, kein call-GO (#417) |
+| `case_release_store_recipient` | Kontext von `case_store_recipient`, dasselbe gültige GO wie `case_release_store_permit` | **deny**, Blocker `recipient_not_allowed`, `release: null`; Remedies nur `neuer_raum` — kein GO ersetzt den Empfängertest |
 
 ### 8.5 `transfer`-Fälle (Übergabe, § 4.8)
 

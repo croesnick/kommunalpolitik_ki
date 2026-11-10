@@ -24,7 +24,12 @@ wird (Ticket #205).
 Gesperrte Aufrufe (`deny`, `indeterminate`, abgelehntes oder ausgebliebenes
 GO) tragen neben dem Remedy-Katalog das Feld `hinweis`: ein fester Satz an
 das Modell, dass Umwege nicht zum Ziel fuehren (Ticket #166,
-`KomkiMediator.Hinweis`).
+`KomkiMediator.Hinweis`). Liegt beim Speichern ein Empfaenger ausserhalb
+des Empfaengerkreises, bietet die Engine kein GO an (Ticket #417): Dann
+traegt die Antwort nur den `hinweis`, dass nichts uebertragen wurde, und
+`recipients_outside` aus dem Blocker der Engine, aus dem die pi-Anzeige
+ihren Satz fuer die nutzende Person baut. Remedies und
+Lockerungsbefugnisse stehen dann nur im Journal.
 
 ## Architektur im komki-Lauf
 
@@ -418,7 +423,8 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
     faellt der Empfaengertest. Γ hat keine `store`-Regel, also ist jedes
     Schreiben ein deny mit Aktionsfreigabe fuer den exakten Call; mit
     Zuhoerer fragt der Vermittler (GO-Anfrage mit `operation: store`
-    bzw. `transfer`), sonst bleibt es beim deny.
+    bzw. `transfer`), sonst bleibt es beim deny. Faellt beim Speichern der
+    Empfaengertest, gibt es kein GO und kein Fenster (#417).
   * Journal: jede Entscheidung kommt sofort ins Journal (`permitted`,
     Ablehnung oder `released`), auch wenn danach nichts vollzogen wird.
     Bei permit folgt der Vorbeleg (`rule: emit`, `outcome: emitted`),

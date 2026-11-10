@@ -480,6 +480,63 @@ defmodule KomkiPolicy.DeriveTest do
 
       assert Enum.map(transitions, & &1["type"]) == ["neuer_raum", "aktionsfreigabe"]
     end
+
+    # Ticket #417: when storing, no GO replaces the recipient test (R.5.7).
+    test "unzulässiger Empfänger: kein call-GO, auch nicht für missing_operation_rule daneben" do
+      snapshot = fixture("case_store_recipient/snapshot.json")
+      intent = fixture("case_store_recipient/intent.json")
+
+      assert {:ok, %{"decision" => "deny", "blockers" => blockers, "remedies" => remedies}} =
+               Derive.decide(registry(), snapshot, intent)
+
+      assert Enum.map(remedies, & &1["code"]) == [
+               "recipient_not_allowed",
+               "missing_operation_rule"
+             ]
+
+      for r <- remedies, do: assert([%{"type" => "neuer_raum"}] = r["transitions"])
+
+      # The check names who lies outside the recipient circle: webdienst-x
+      # observes the target but does not read buergerfall-4711@1.
+      assert [%{"recipients_outside" => ["webdienst-x"]}, _] = blockers
+      assert [%{"recipients_outside" => ["webdienst-x"]}, _] = remedies
+    end
+
+    test "Freigabe-Zweig: ein gültiges GO führt bei unzulässigem Empfänger nicht zu permit" do
+      snapshot = fixture("case_release_store_recipient/snapshot.json")
+      intent = fixture("case_release_store_recipient/intent.json")
+      release = fixture("case_release_store_recipient/release.json")
+      stand = fixture("case_release_store_recipient/stand.json")
+
+      # The same release permits the store into the local environment.
+      permitted = put_in(snapshot, ["workspace", "environment"], "lokale-fallverarbeitung@1")
+
+      assert {:ok, %{"decision" => "permit"}} =
+               Derive.decide_with_release(registry(), permitted, intent, release, stand)
+
+      assert {:ok,
+              %{
+                "decision" => "deny",
+                "blockers" => [%{"code" => "recipient_not_allowed"}],
+                "release" => nil
+              }} = Derive.decide_with_release(registry(), snapshot, intent, release, stand)
+    end
+
+    test "Freigabe-Zweig: neben recipient_not_allowed auch für Release-Blocker nur neuer_raum" do
+      snapshot = fixture("case_release_store_recipient/snapshot.json")
+      intent = fixture("case_release_store_recipient/intent.json")
+      release = fixture("case_release_store_recipient/release.json")
+      stand = fixture("case_release_store_recipient/stand.json")
+
+      expired = Map.put(stand, "as_of", release["valid_until"] + 1)
+
+      assert {:ok, %{"decision" => "deny", "remedies" => remedies}} =
+               Derive.decide_with_release(registry(), snapshot, intent, release, expired)
+
+      assert Enum.map(remedies, & &1["code"]) == ["recipient_not_allowed", "release_expired"]
+
+      for r <- remedies, do: assert([%{"type" => "neuer_raum"}] = r["transitions"])
+    end
   end
 
   describe "transfer (§ 4.8)" do

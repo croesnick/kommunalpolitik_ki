@@ -14,14 +14,47 @@ defmodule KomkiMediator.Hinweis do
   Daten aus dem Aufruf.
   """
 
-  @doc "Hinweis zu einer Antwort ohne Ergebnis: `:deny`, `:go_refused` oder `:go_timeout`."
-  @spec text(:deny | :go_refused | :go_timeout) :: String.t()
+  alias KomkiMediator.Go
+
+  @doc """
+  Is an engine denial of `rule` with its `remedies` a "nothing
+  transmitted" case? True only for a store whose target lies outside the
+  recipient circle while the catalog offers no GO (ticket #417). For emit
+  and transfer a GO still bridges the recipient test (#354).
+  """
+  @spec not_transmitted?(String.t(), [map()]) :: boolean()
+  def not_transmitted?("store", remedies) do
+    Go.offered(remedies) == nil and
+      Enum.any?(remedies, &(&1["code"] == "recipient_not_allowed"))
+  end
+
+  def not_transmitted?(_rule, _remedies), do: false
+
+  @doc """
+  Note for an answer without a result: `:deny`, `:not_transmitted`,
+  `:go_refused` or `:go_timeout`.
+
+  `:not_transmitted` applies when a recipient lies outside the recipient
+  circle and no GO can change that (ticket #417). The model then only
+  learns that nothing was transmitted and gets no prompt towards a
+  cleaned-up version: it would offer one in a room as well whose
+  non-public content could leak into the wording (Gegenprobe 13.5 in the
+  reference scenario).
+  """
+  @spec text(:deny | :not_transmitted | :go_refused | :go_timeout) :: String.t()
   def text(:deny) do
     "Gesperrt: Dieser Aufruf ist in diesem Arbeitsraum nicht zulässig. " <>
       "Ein anderes Werkzeug oder eine umformulierte Anfrage führt nicht zum Ziel, " <>
       "denn die Sperre hängt am Arbeitsraum, nicht an der Formulierung. " <>
       "Versuche es nicht erneut. Sag der nutzenden Person, was gesperrt ist, " <>
       "und nenne die Schritte aus remedies."
+  end
+
+  def text(:not_transmitted) do
+    "Nicht übertragen: Nichts aus diesem Aufruf hat den Arbeitsraum verlassen, " <>
+      "und kein GO ändert das. Versuche es nicht erneut, auch nicht mit einer " <>
+      "gekürzten oder umformulierten Fassung und nicht über ein anderes Werkzeug. " <>
+      "Sag der nutzenden Person nur, dass nichts übertragen wurde."
   end
 
   def text(:go_refused) do

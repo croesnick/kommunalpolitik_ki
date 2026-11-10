@@ -596,6 +596,83 @@ defmodule KomkiPolicy.PropertyTest do
     end
   end
 
+  # =====================================================================
+  # store: no GO replaces the recipient test (ticket #417, R.5.7)
+  # =====================================================================
+
+  describe "store: kein GO ersetzt den Empfängertest (#417)" do
+    alias KomkiPolicy.{Calculus, Derive}
+
+    @bindings ["buergerfall-4711@1", "lizenz-namensnennung@1", "nur-start-test@1"]
+
+    # A store decision over generated environments, labels and base facts.
+    # The release of case_release_store_recipient stays valid throughout:
+    # its call hash binds digest, object, operation and workspace, and the
+    # generator changes none of them.
+    property "mit gültigem GO permit genau dann, wenn Empfängertest und Labelerhalt gelten" do
+      reg = registry()
+      base = fixture("case_release_store_recipient/snapshot.json")
+      intent = fixture("case_release_store_recipient/intent.json")
+      release = fixture("case_release_store_recipient/release.json")
+      stand = fixture("case_release_store_recipient/stand.json")
+
+      check all(
+              environment <-
+                StreamData.member_of(["lokale-fallverarbeitung@1", "recherche-webdienst@1"]),
+              labels <- binding_subset(),
+              bw <- binding_subset(),
+              operation_right <- StreamData.boolean(),
+              purpose <- StreamData.member_of(["antwort-fall-4711", "anderer-zweck"]),
+              initial_seed: @seed,
+              max_runs: @max_runs
+            ) do
+        snapshot =
+          base
+          |> put_in(["workspace", "environment"], environment)
+          |> put_in(["workspace", "bindings"], Enum.sort(bw))
+          |> put_in(["object", "labels"], Enum.sort(labels))
+          |> put_in(["facts", "has_operation_right", "value"], operation_right)
+          |> put_in(["facts", "purpose", "value"], purpose)
+
+        rho = Calculus.actual_recipients(reg, environment)
+
+        recipients_ok? =
+          MapSet.subset?(MapSet.new(rho), MapSet.new(Calculus.allowed_recipients(reg, labels)))
+
+        preserved? = Calculus.labels_subset?(bw, labels)
+
+        {:ok, normal} = Derive.decide(reg, snapshot, intent)
+        {:ok, released} = Derive.decide_with_release(reg, snapshot, intent, release, stand)
+
+        assert released["decision"] ==
+                 if(recipients_ok? and preserved?, do: "permit", else: "deny")
+
+        unless recipients_ok? do
+          outside = rho -- Calculus.allowed_recipients(reg, labels)
+
+          for decision <- [normal, released] do
+            blocker = Enum.find(decision["blockers"], &(&1["code"] == "recipient_not_allowed"))
+            assert blocker["recipients_outside"] == outside
+            refute call_go_offered?(decision["remedies"])
+          end
+        end
+      end
+    end
+
+    # Any subset of the fixture bindings, sorted; the empty set included.
+    defp binding_subset do
+      StreamData.map(StreamData.list_of(StreamData.boolean(), length: length(@bindings)), fn
+        flags -> for {binding, true} <- Enum.zip(@bindings, flags), do: binding
+      end)
+    end
+
+    defp call_go_offered?(remedies) do
+      Enum.any?(remedies, fn r ->
+        Enum.any?(r["transitions"], &(&1["type"] == "aktionsfreigabe" and &1["scope"] == "call"))
+      end)
+    end
+  end
+
   defp corrupted_mutation_context do
     %{
       registry: registry(),

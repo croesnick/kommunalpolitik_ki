@@ -4,7 +4,7 @@ defmodule KomkiMediator.GoStoreTest do
   # genau diesen Call an. Raum recherche, vault_write_test.
   use ExUnit.Case, async: false
 
-  alias KomkiMediator.{ConnectorGate, FakeConnector, Go, GoStand, Templates, TestHelpers}
+  alias KomkiMediator.{ConnectorGate, FakeConnector, Go, GoStand, Hinweis, Templates, TestHelpers}
 
   @params %{"title" => "Notiz", "body" => "Inhalt"}
 
@@ -151,5 +151,69 @@ defmodule KomkiMediator.GoStoreTest do
     assert response["decision"] == "permit"
     assert Go.pending(env.go.dir) == []
     refute Enum.any?(journal(env), fn {rule, _} -> rule == "store" end)
+  end
+
+  # Ticket #417: when storing, no GO replaces the recipient test. Room
+  # vertraulich writes into a vault that a sync service reads as well, so
+  # the store lies outside the recipient circle of vault-vertraulich@1.
+  test "Ziel ausserhalb des Empfaengerkreises: kein Fenster, nichts geschrieben", %{env: env} do
+    env = env |> TestHelpers.vertraulich() |> synced_vault()
+    vault(env, & &1["assigned_label"])
+
+    response = ConnectorGate.call(env, "vault_write_test", @params)
+
+    assert response["decision"] == "deny"
+    assert response["rule"] == "store"
+
+    # Nobody was asked: with a listener, an offered GO would have waited and
+    # set "go".
+    refute Map.has_key?(response, "go")
+    assert Go.pending(env.go.dir) == []
+    refute_received {:written, _, _}
+    assert journal(env) == [{"emit", "permitted"}, {"store", "not_admitted"}]
+
+    # The model sees only that nothing was transmitted and who lies outside
+    # the circle (Gegenprobe 13.5): no catalog, no relaxation authorities.
+    assert response["hinweis"] == Hinweis.text(:not_transmitted)
+    assert response["recipients_outside"] == ["sync-dienst"]
+
+    assert Enum.sort(Map.keys(response)) ==
+             ~w(decision decision_id hinweis recipients_outside registry_id rule)
+
+    # The journal keeps the engine's full catalog, without a call GO.
+    [_emit, store] = TestHelpers.journal_records(env.journal_path)
+    assert "recipient_not_allowed" in Enum.map(store["remedies"], & &1["code"])
+    assert Go.offered(store["remedies"]) == nil
+  end
+
+  test "vertraulich ohne Sync: Schreiben fragt weiter nach einem GO", %{
+    env: env,
+    go_dir: go_dir
+  } do
+    env = TestHelpers.vertraulich(env)
+    vault(env, & &1["assigned_label"])
+    person(go_dir, true)
+
+    response = ConnectorGate.call(env, "vault_write_test", @params)
+
+    assert response["decision"] == "permit"
+    assert_received {:request, %{"blockers" => ["missing_operation_rule"]}}
+    assert_received {:written, "write_test", _context}
+  end
+
+  # Γ for these tests only: the vault environment gains an observer that
+  # reads every note, as a sync service would.
+  defp synced_vault(env) do
+    term =
+      env.gamma.term
+      |> Map.update!("observers", &Enum.sort(["sync-dienst" | &1]))
+      |> put_in(["environments", "vault-lokal@1", "observers"], [
+        "nutzende-person",
+        "pi-agent",
+        "sync-dienst"
+      ])
+
+    {:ok, compiled} = KomkiPolicy.Registry.compile(term)
+    %{env | gamma: %{env.gamma | term: term, compiled: compiled}}
   end
 end

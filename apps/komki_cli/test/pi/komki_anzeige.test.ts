@@ -105,6 +105,22 @@ test("GO: was aus der Freigabe wurde, ohne dass pi selbst fragt", () => {
 	assert.doesNotMatch(strip(render("vault_read_deny")), /^GO /m);
 });
 
+// Ticket #417: when storing, no GO replaces the recipient test. The person
+// reads who may not read along, in the same sentence in every room.
+test("Speichern außerhalb des Empfängerkreises: wer nicht mitlesen darf, kein GO-Angebot", () => {
+	const out = flat(render("vault_write_test_empfaenger"));
+	assert.match(out, /✗ abgelehnt Die Anfrage hat komki nicht verlassen\./);
+	assert.match(out, /Grund Inhalte dieses Arbeitsraums dürfen nicht an sync-dienst gehen\. Ein GO ändert daran nichts\./);
+	assert.doesNotMatch(out, /mit deinem GO|Nicht gefragt/);
+	// The reduced answer carries no catalog and no relaxation authorities.
+	assert.doesNotMatch(out, /Möglich|Lockern kann/);
+
+	// Where a GO is offered (transfer), the sentence stays as before.
+	const web = flat(render("web_search_deny"));
+	assert.match(web, /Grund Empfänger dieser Anfrage \(brave-search, nutzende-person, pi-agent\) sind in diesem Arbeitsraum nicht alle erlaubt\./);
+	assert.doesNotMatch(web, /Ein GO ändert daran nichts/);
+});
+
 test("nichts in der Anzeige sieht wie eine Frage aus, die man in pi beantwortet", () => {
 	for (const out of names.flatMap((n) => [strip(render(n)), strip(render(n, true))])) {
 		assert.doesNotMatch(out, /\[j\/N\]|\(j\/n\)|\?\s*$|GO für genau diesen Aufruf\?/m);
