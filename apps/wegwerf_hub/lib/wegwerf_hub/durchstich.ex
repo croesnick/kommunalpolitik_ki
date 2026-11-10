@@ -269,7 +269,7 @@ defmodule WegwerfHub.Durchstich do
 
       notiz(
         p,
-        "Regel steht, Durchsetzung fehlt bis B13 (#186): Der Verweis ist opak. " <>
+        "Regel steht, Durchsetzung fehlt bis B13 (#186): Der Verweis ist opaque. " <>
           "Die Prüfungen der Redaktion und nicht-verifiziert sind heute die einzige Grenze."
       )
     end)
@@ -858,7 +858,7 @@ defmodule WegwerfHub.Durchstich do
 
       notiz(
         p,
-        "Regel-Fund: Ein Vorschlag aus dem Projektraum braucht heute ZWEI GOs (emit " <>
+        "Fund: Ein Vorschlag aus dem Projektraum braucht heute ZWEI GOs (emit " <>
           "und store), weil ratsprojekte@1 nur admit trägt. Für „wie 11.0 mit GO“ braucht die " <>
           "Γ-Fassung von ratsprojekte@1 eine emit-Regel — Entscheidung für #419/#416."
       )
@@ -895,7 +895,7 @@ defmodule WegwerfHub.Durchstich do
 
       notiz(
         p,
-        "Regel-Fund: Das Fenster VOR dem Empfängertest gehört der fehlenden emit-Regel " <>
+        "Fund: Das Fenster VOR dem Empfängertest gehört der fehlenden emit-Regel " <>
           "von ratsprojekte@1, nicht dem Empfängertest. Erst mit emit-Regel gilt „abgelehnt ohne " <>
           "Fenster“ wörtlich (12.9). Die Invariante aus R.7.3.7 trägt: kein freier Weg in den Hub."
       )

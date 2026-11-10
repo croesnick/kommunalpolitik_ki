@@ -82,7 +82,7 @@ Katalog im Journal, auch wo die Antwort nur den Hinweis trägt.
 - **11.15** Unvollständige Umgebung fällt bereits beim Erzeugen um (indeterminate, `recipients_unproven`, nie ein GO).
 - **13.6** Der Hub entfernt unsichtbare Steuerzeichen aus jedem Freitextfeld.
 
-## Korrekturen und Funds (Entscheidungen fürs Bau-Ticket)
+## Korrekturen und Fundstellen (Entscheidungen fürs Bau-Ticket)
 
 1. **Teile brauchen einen Listentyp im Parameter-Schema.** `Sidecar.Params`
    kannte nur string/integer; „ein Ereignis mit Teilen“ braucht geschlossene
@@ -101,7 +101,7 @@ Katalog im Journal, auch wo die Antwort nur den Hinweis trägt.
 4. **`hub-gesperrt` fehlt im geschlossenen Fehlercode-Katalog** (Vertrag §3).
    Im Zweig als Vorschlag ergänzt; der ADR verlangt das Signal, der Katalog
    muss es festschreiben.
-5. **11.8 bleibt opak bis B13 (#186):** Erfundene oder fremde Quellen
+5. **11.8 bleibt opaque bis B13 (#186):** Erfundene oder fremde Quellen
    durchlaufen den Weg wie 11.0; Prüfungen der Redaktion und
    `nicht-verifiziert` sind heute die einzige Grenze. Der Vermittler ergänzt
    keine URL und kein Abrufdatum.
