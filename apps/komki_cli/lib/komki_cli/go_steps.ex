@@ -23,7 +23,16 @@ defmodule KomkiCli.GoSteps do
   # Beobachter, die zum Arbeitsraum selbst gehoeren (wie KomkiCli.Raumbild).
   @intern ["nutzende-person", "pi-agent"]
 
-  @names %{"brave-search" => "Brave (Websuche)", "ris-betreiber" => "Betreiber des RIS"}
+  # DURCHSTICH #409 (Wegwerf): Die Empfänger des Hub-Bestands mit
+  # sprechenden Namen im GO-Fenster (Szene 11).
+  @names %{
+    "brave-search" => "Brave (Websuche)",
+    "ris-betreiber" => "Betreiber des RIS",
+    "fraktion" => "Fraktion",
+    "vorstand" => "Vorstand",
+    "nextcloud-betreiber" => "Betreiber der Nextcloud (Ordner für den Stand)",
+    "sicherung" => "Sicherung (Time Machine)"
+  }
 
   @typedoc "Ein- und Ausgabe (in Tests ersetzbar)."
   @type ui() :: %{say: (String.t() -> term()), confirm: (String.t(), boolean() -> boolean())}

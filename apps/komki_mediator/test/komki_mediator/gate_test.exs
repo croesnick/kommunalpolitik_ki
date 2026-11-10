@@ -60,7 +60,7 @@ defmodule KomkiMediator.GateTest do
     assert pdr["payload_hash"] =~ "sha256:"
     assert pdr["intent_id"] =~ "intent-"
     assert pdr["snapshot_id"] =~ "snap-"
-    assert pdr["fassung_id"] == "komki-mediator/3"
+    assert pdr["fassung_id"] == "komki-mediator/4"
 
     {:ok, _, _} = DateTime.from_iso8601(pdr["abrufdatum"])
   end

@@ -106,15 +106,23 @@ defmodule KomkiMediator.TemplatesTest do
            }
   end
 
-  # Γ-Konventionen des Connector-Vertrags §7.
+  # Γ-Konventionen des Connector-Vertrags §7. DURCHSTICH #409 (Wegwerf):
+  # Die Beobachterliste traegt zusaetzlich Fraktion, Vorstand, die
+  # Nextcloud-Betreiber und die Sicherung (ADR 0004, Szene 11); die
+  # oeffentlichen Bindungen modellieren `alle` (Szene 14, #418), ihre
+  # Leser sind deshalb alle Beobachter.
   test "Registry traegt Beobachter, Umgebungen und Connector-Bindungen nach §7" do
     registry = Templates.registry()
 
     assert registry["observers"] == [
              "brave-search",
+             "fraktion",
+             "nextcloud-betreiber",
              "nutzende-person",
              "pi-agent",
-             "ris-betreiber"
+             "ris-betreiber",
+             "sicherung",
+             "vorstand"
            ]
 
     assert registry["fact_fields"]["output_content_digest"] == "string"
@@ -129,6 +137,27 @@ defmodule KomkiMediator.TemplatesTest do
              "nutzende-person",
              "pi-agent",
              "ris-betreiber"
+           ]
+
+    # Umgebung des Hub-Bestands (Szene 11): genau der Empfaengerkreis
+    # seiner Bindung `ratsprojekte@1`.
+    hub_observers = [
+      "fraktion",
+      "nextcloud-betreiber",
+      "nutzende-person",
+      "pi-agent",
+      "sicherung",
+      "vorstand"
+    ]
+
+    assert registry["environments"]["ratsprojekte-bestand@1"]["observers"] == hub_observers
+    assert registry["bindings"]["ratsprojekte@1"]["readers"] == hub_observers
+    assert registry["bindings"]["ratsprojekte@1"]["operations"] == %{"admit" => true}
+
+    # Fraktionsraum (Szene 13): der Vorstand liest hier nicht mit.
+    assert registry["bindings"]["fraktion-intern@1"]["readers"] == [
+             "nutzende-person",
+             "pi-agent"
            ]
 
     for binding <- [

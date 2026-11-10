@@ -28,11 +28,14 @@ defmodule KomkiCli.ConnectorProfileTest do
           "ris" => "/opt/komki/bin/komki-connector-ris",
           "web" => "/opt/komki/bin/komki-connector-web",
           "vault" => "/opt/komki/bin/komki-connector-vault",
-          "documents" => "/opt/komki/bin/komki-connector-documents"
+          "documents" => "/opt/komki/bin/komki-connector-documents",
+          # DURCHSTICH #409 (Wegwerf)
+          "ratsprojekte" => "/opt/komki/bin/komki-connector-ratsprojekte"
         },
         egress_ports: %{"ris" => 49_531, "web" => 49_532},
         ris_mock_port: nil,
-        vault_dir: @base <> "/vault"
+        vault_dir: @base <> "/vault",
+        ratsprojekte_socket: @base <> "/hub/hub.sock"
     }
 
     struct!(base, overrides)
@@ -194,7 +197,7 @@ defmodule KomkiCli.ConnectorProfileTest do
       outbound = rules_with(text, "(allow network-outbound")
 
       assert outbound ==
-               Enum.map(["documents", "ris", "vault", "web"], fn id ->
+               Enum.map(["documents", "ratsprojekte", "ris", "vault", "web"], fn id ->
                  "(allow network-outbound (remote unix-socket (path-literal \"/opt/komki-golden/run/connectors/" <>
                    id <> ".sock\")))"
                end)

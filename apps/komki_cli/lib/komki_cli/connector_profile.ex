@@ -33,6 +33,7 @@ defmodule KomkiCli.ConnectorProfile do
     socket = Manifest.socket_path(cfg.base_dir, manifest.id)
     log = Connectors.log_path(cfg, manifest.id)
     fs = fs_paths(cfg, manifest)
+    hub = hub_rules(cfg, manifest)
 
     EscriptProfile.render(
       EscriptProfile.header([
@@ -43,14 +44,39 @@ defmodule KomkiCli.ConnectorProfile do
         EscriptProfile.log_rules(log) ++
         socket_bind_rules(socket) ++
         connector_net_rules(Connectors.upstream(cfg, manifest)) ++
+        hub ++
         fs_rules(fs) ++
-        EscriptProfile.meta_ancestors([root, binary, socket, log] ++ Enum.map(fs, &elem(&1, 0))) ++
+        EscriptProfile.meta_ancestors(
+          [root, binary, socket, log] ++ hub_paths(cfg, manifest) ++ Enum.map(fs, &elem(&1, 0))
+        ) ++
         [
           "; Bewusst NICHT erlaubt: Netz ausser dem einen Loopback-Port, DNS, Home-Verzeichnis,",
           "; Schreiben ausserhalb von Socket, Log und den fs-Pfaden des Manifests."
         ]
     )
   end
+
+  # DURCHSTICH #409 (Wegwerf): Der ratsprojekte-Connector ist der einzige
+  # Connector, der statt eines TCP-Wegs den EIGENEN Unix-Socket des Hubs
+  # nach draussen ruft (#415) — erlaubt ist genau dieser eine Pfad, nichts
+  # sonst. Der Agent (pi) hat diesen Pfad nicht in seinem Profil: Umgeht
+  # jemand komki, blockiert ihn erst die Sandbox und dann das Token
+  # (Szene 11: connector-bypass).
+  defp hub_rules(%Config{ratsprojekte_socket: hub} = _cfg, %{id: "ratsprojekte"})
+       when is_binary(hub) and hub != "" do
+    [
+      "; Hub-Socket des ratsprojekte-Connectors (DURCHSTICH #409): nur dieser Pfad",
+      "(allow network-outbound (remote unix-socket (path-literal " <> SBPL.quote!(hub) <> ")))"
+    ]
+  end
+
+  defp hub_rules(_cfg, _manifest), do: []
+
+  defp hub_paths(%Config{ratsprojekte_socket: hub} = _cfg, %{id: "ratsprojekte"})
+       when is_binary(hub) and hub != "",
+       do: [hub]
+
+  defp hub_paths(_cfg, _manifest), do: []
 
   @doc "Profiltext des Egress-Proxys."
   @spec egress(Config.t()) :: String.t()

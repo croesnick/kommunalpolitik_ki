@@ -59,12 +59,17 @@ defmodule KomkiCli.Raum do
           restart: (Config.t() -> {:ok, term()} | {:error, String.t()})
         }
 
-  @doc "Namen und B_W der Referenzräume."
+  @doc """
+  Namen und B_W der Referenzräume. `fraktion` ist DURCHSTICH #409 (Wegwerf):
+  Der Fraktionsraum kann nicht in den Hub liefern — der Vorstand liegt
+  nicht im Empfängerkreis fraktionsinterner Inhalte (Szene 13, 11.2).
+  """
   @spec rooms() :: %{String.t() => [String.t()]}
   def rooms do
     %{
       "recherche" => Templates.recherche_bindings(),
-      "vertraulich" => Templates.vertraulich_bindings()
+      "vertraulich" => Templates.vertraulich_bindings(),
+      "fraktion" => Templates.fraktion_bindings()
     }
   end
 

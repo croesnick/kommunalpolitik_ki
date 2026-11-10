@@ -22,6 +22,13 @@ defmodule KomkiConnector.Text do
   def describe("forbidden-path"), do: "Pfad nicht erlaubt"
   def describe("too-large"), do: "Antwort oder Anfrage zu groß"
   def describe("unauthorized"), do: "Aufruf nicht berechtigt"
+
+  # DURCHSTICH #409 (Wegwerf): Der ADR verlangt, dass der Connector bei
+  # gesperrtem Hub „Hub gesperrt“ erfaehrt. Der geschlossene Katalog
+  # kennt dafuer keinen Code — hier als Vorschlag fuer den Vertrag v2;
+  # das Bau-Ticket entscheidet.
+  def describe("hub-gesperrt"), do: "Hub gesperrt"
+
   def describe(_code), do: "interner Fehler"
 
   @impl true
@@ -62,4 +69,15 @@ defmodule KomkiConnector.Text do
     do: "#{name}: ausserhalb #{min}..#{max}"
 
   def params_error(:wrong_type, %{name: name, type: type}), do: "#{name}: erwartet #{type}"
+
+  def params_error(:too_many_items, %{name: name, max: max}),
+    do: "#{name}: mehr als #{max} Eintraege"
+
+  def params_error(:too_few_items, %{name: name, min: min}),
+    do: "#{name}: weniger als #{min} Eintraege"
+
+  def params_error(:item_not_object, %{name: name}), do: "#{name}: Eintrag muss ein Objekt sein"
+
+  def params_error(:item_unknown_fields, %{name: name, names: names}),
+    do: "#{name}: unbekannte Felder: #{Enum.join(Enum.sort(names), ", ")}"
 end

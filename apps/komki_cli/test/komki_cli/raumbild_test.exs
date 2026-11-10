@@ -20,9 +20,18 @@ defmodule KomkiCli.RaumbildTest do
     assert Enum.all?(bild["labels"], &(&1["intern"] == false))
     assert hd(bild["labels"])["bezeichnung"] == "Bezeichnung doc-oeffentlich@2"
 
+    # DURCHSTICH #409 (Wegwerf): Die oeffentlichen Bindungen des
+    # Referenzszenarios modellieren `alle` (Szene 14) — deshalb ist der
+    # Weg fuer jeden externen Beobachter offen, auch fuer die
+    # Hub-Empfaenger Fraktion, Vorstand, Nextcloud-Betreiber und
+    # Sicherung.
     assert bild["nach_draussen"] == [
              %{"empfaenger" => "brave-search", "offen" => true},
-             %{"empfaenger" => "ris-betreiber", "offen" => true}
+             %{"empfaenger" => "fraktion", "offen" => true},
+             %{"empfaenger" => "nextcloud-betreiber", "offen" => true},
+             %{"empfaenger" => "ris-betreiber", "offen" => true},
+             %{"empfaenger" => "sicherung", "offen" => true},
+             %{"empfaenger" => "vorstand", "offen" => true}
            ]
   end
 

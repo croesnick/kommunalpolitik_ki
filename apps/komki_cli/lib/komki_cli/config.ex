@@ -73,6 +73,9 @@ defmodule KomkiCli.Config do
                 # Brave-Mock (Ticket #340): Web-Connector direkt auf Loopback
                 :web_mock_port,
                 :vault_dir,
+                # DURCHSTICH #409 (Wegwerf): Socket des ratsprojekte-Hubs;
+                # nil heisst: ratsprojekte-Connector startet nicht.
+                :ratsprojekte_socket,
                 connector_bins: %{},
                 egress_ports: %{},
                 # Programm-Pins (KomkiCli.Pins): Name -> %{"path", "sha256"}
@@ -111,6 +114,7 @@ defmodule KomkiCli.Config do
           ris_mock_port: pos_integer() | nil,
           web_mock_port: pos_integer() | nil,
           vault_dir: String.t() | nil,
+          ratsprojekte_socket: String.t() | nil,
           pins: %{String.t() => %{String.t() => String.t()}}
         }
 
@@ -515,7 +519,10 @@ defmodule KomkiCli.Config do
       ris_mock_port: opts[:ris_mock_port],
       web_mock_port: opts[:web_mock_port],
       # Default: synthetischer Test-Vault unter der Basis (init legt ihn an)
-      vault_dir: vault_dir_opt(opts[:vault_dir], base)
+      vault_dir: vault_dir_opt(opts[:vault_dir], base),
+      # DURCHSTICH #409 (Wegwerf): Socket des ratsprojekte-Hubs, nur gesetzt,
+      # wenn die Instanz einen kennt.
+      ratsprojekte_socket: blank_to_nil(opts[:ratsprojekte_socket])
     }
   end
 
@@ -623,6 +630,8 @@ defmodule KomkiCli.Config do
     :ris_mock_port,
     :web_mock_port,
     :vault_dir,
+    # DURCHSTICH #409 (Wegwerf)
+    :ratsprojekte_socket,
     :pins
   ]
 
@@ -679,6 +688,7 @@ defmodule KomkiCli.Config do
       ris_mock_port: optional_pos(:ris_mock_port, Map.get(map, "ris_mock_port")),
       web_mock_port: optional_pos(:web_mock_port, Map.get(map, "web_mock_port")),
       vault_dir: blank_to_nil(Map.get(map, "vault_dir")),
+      ratsprojekte_socket: blank_to_nil(Map.get(map, "ratsprojekte_socket")),
       pins: Map.get(map, "pins") || %{}
     }
   end

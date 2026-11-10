@@ -23,6 +23,13 @@ defmodule KomkiMediator.ResultShape do
   def check("vault", "search", result), do: list_result(result, [], @vault_hit)
   def check("vault", "read", result), do: object(result, ~w(content labels note_id title))
   def check("vault", "write_test", result), do: object(result, ~w(labels note_id))
+
+  # DURCHSTICH #409 (Wegwerf): Die Quittung des ratsprojekte-Connectors
+  # ist bewusst leer — kein Schlüssel, keine Kennung, keine Fortnummer,
+  # nichts aus dem Hub (Szene 11: enumeration). Nur der feste Status und
+  # die Labels, die der Vermittler selbst per context.assigned_label
+  # verglichen hat.
+  def check("ratsprojekte", "fakt_vorschlagen", result), do: object(result, ~w(labels status))
   def check(id, op, _result), do: {:error, "keine Ergebnisform fuer #{id}.#{op}"}
 
   # Objekt mit Trefferliste unter "results" plus weiteren Feldern.

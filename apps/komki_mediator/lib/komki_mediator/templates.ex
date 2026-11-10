@@ -31,11 +31,16 @@ defmodule KomkiMediator.Templates do
   # (#106 und #107 fuer die Registry, beide mit demselben Raum; #134 nur
   # fuer den Raum; 8dc75f9 vor #213 fuer beide).
   @current %{
-    "registry.json" => "9d06e591083615071f4386298ddb1e62e9d6f2fc20388a21741fc9bab07d55e0",
+    # DURCHSTICH #409 (Wegwerf): Hub-Beobachter, Umgebung
+    # ratsprojekte-bestand@1, Bindungen ratsprojekte@1 und fraktion-intern@1,
+    # oeffentliche Bindungen mit ausgeweiteten Lesern (Modell von `alle`,
+    # Szene 14, #418).
+    "registry.json" => "e0dda096afba60b22907e2bd443c05da7b4b5850f8088c31c3dbb5161ac4658e",
     "room.json" => "8bb7a156134d43ebd4cc0027fc66ec27c26e00ae696d0d65f83b8ad8c9d57469"
   }
   @outdated %{
     "registry.json" => [
+      "9d06e591083615071f4386298ddb1e62e9d6f2fc20388a21741fc9bab07d55e0",
       "fed48d30194094c6e84be239ef40bf74be88457b1aaec09cb3dce8b5bb090e4f",
       "d2b6a4e987036711a517a31dc40368dea82f7136b4213fbf9614cf290ba6d22f",
       # bis #208: Lockerungsbefugnis von doc-pending-freigabe in Engine-Form
@@ -54,16 +59,45 @@ defmodule KomkiMediator.Templates do
     ]
   }
 
-  @observers ["brave-search", "nutzende-person", "pi-agent", "ris-betreiber"]
+  # DURCHSTICH #409 (Wegwerf): Die Beobachter des Hubs (ADR 0004, Szene 11):
+  # Fraktion und Vorstand als Empfänger des Stands, die Nextcloud-Betreiber
+  # als Weg des Stands, die Sicherung (Time Machine, #415) als Beobachter
+  # des Bestands. Γ ändert sich nur nach GO — dieser Seed modelliert die
+  # geplante Fassung zum Durchstich.
+  @observers [
+    "brave-search",
+    "fraktion",
+    "nextcloud-betreiber",
+    "nutzende-person",
+    "pi-agent",
+    "ris-betreiber",
+    "sicherung",
+    "vorstand"
+  ]
 
   # Beobachtertypen (Label-Store, R.2.5): nur eine Person darf
   # klassifizieren; Agent und Empfaenger sind Verarbeitungsdomaenen.
   @observer_types %{
     "brave-search" => "processing_domain",
+    "fraktion" => "processing_domain",
+    "nextcloud-betreiber" => "processing_domain",
     "nutzende-person" => "person",
     "pi-agent" => "processing_domain",
-    "ris-betreiber" => "processing_domain"
+    "ris-betreiber" => "processing_domain",
+    "sicherung" => "processing_domain",
+    "vorstand" => "processing_domain"
   }
+
+  # Empfängerkreis des Hub-Bestands `ratsprojekte@1` (Szene 11): genau die
+  # Beobachter der Umgebung `ratsprojekte-bestand@1`.
+  @hub_observers [
+    "fraktion",
+    "nextcloud-betreiber",
+    "nutzende-person",
+    "pi-agent",
+    "sicherung",
+    "vorstand"
+  ]
 
   @doc """
   Vorlage des Arbeitsraums in Store-Form `komki-label-store/2` (Ticket
@@ -86,6 +120,8 @@ defmodule KomkiMediator.Templates do
       },
       "environments" => %{
         "lokaler-arbeitsraum@1" => %{"observers" => ["nutzende-person", "pi-agent"]},
+        # DURCHSTICH #409 (Wegwerf): Umgebung des Hub-Bestands (Szene 11).
+        "ratsprojekte-bestand@1" => %{"observers" => @hub_observers},
         "ris-abruf@1" => %{"observers" => ["nutzende-person", "pi-agent", "ris-betreiber"]},
         "vault-lokal@1" => %{"observers" => ["nutzende-person", "pi-agent"]},
         "web-suche@1" => %{"observers" => ["brave-search", "nutzende-person", "pi-agent"]}
@@ -126,7 +162,22 @@ defmodule KomkiMediator.Templates do
                 "restriction" => "operations",
                 "output" => "freigabe-notiz"
               }
-            ])
+            ]),
+          # DURCHSTICH #409 (Wegwerf): Der Bestand des Hubs trägt genau ein
+          # Label (K2, Szene 11); admit für die Stand-Datei in einem
+          # Projektraum (Szene 12, #419). Kein store: Schreiben in den Hub
+          # braucht immer ein GO.
+          "ratsprojekte@1" =>
+            binding("Bestand des ratsprojekte-Hubs", @hub_observers, %{"admit" => true}),
+          # DURCHSTICH #409 (Wegwerf): Fraktionsraum-Bindung (Szene 13);
+          # der Vorstand liegt nicht in deren Empfängerkreis, also kann
+          # ein Fraktionsraum nicht in den Hub liefern (11.2).
+          "fraktion-intern@1" =>
+            binding("Fraktionsinterne Inhalte", ["nutzende-person", "pi-agent"], %{
+              "admit" => true,
+              "emit" => true,
+              "transfer" => true
+            })
         })
     }
   end
@@ -173,6 +224,16 @@ defmodule KomkiMediator.Templates do
   # recipient_inclusion at the handover (transfer, #298). The @1 versions
   # carry transfer only since #298; an older label store rejects them
   # (R.2.1) and has to be set aside.
+  #
+  # DURCHSTICH #409 (Wegwerf): Die oeffentlichen Bindungen tragen hier schon
+  # die ausgeweitete Beobachterliste — das modelliert `alle` aus Szene 14
+  # (#418): Der Label-Store speichert `alle` und setzt beim Export die
+  # aktuelle Beobachterliste ein; die Engine sieht aufgezählte Listen. Nur
+  # so besteht der Empfaengertest des Stores in den Hub (11.0): Der Hub
+  # nennt fraktion, vorstand, nextcloud-betreiber und sicherung als
+  # Beobachter, und die muessen im Empfaengerkreis des Ausgabelabels
+  # liegen. Ohne `alle` waere jeder Fakt aus oeffentlicher Recherche
+  # unzulaessig fuer den Hub.
   defp connector_bindings do
     open = %{"admit" => true, "emit" => true, "transfer" => true}
 
@@ -198,6 +259,20 @@ defmodule KomkiMediator.Templates do
       "ris-oeffentlich@1",
       "vault-oeffentlich@1",
       "vault-vertraulich@1",
+      "web-oeffentlich@1"
+    ]
+
+  # DURCHSTICH #409 (Wegwerf): B_W des Fraktionsraums (Szene 13). Ein
+  # Fakt-Vorschlag aus diesem Raum scheitert am Empfaengertest des Hub-
+  # Bestands: Der Vorstand liest keine fraktionsinternen Inhalte (11.2).
+  @doc "B_W des Referenzraums fraktion (Durchstich #409)."
+  @spec fraktion_bindings() :: [String.t()]
+  def fraktion_bindings,
+    do: [
+      "doc-oeffentlich@2",
+      "fraktion-intern@1",
+      "ris-oeffentlich@1",
+      "vault-oeffentlich@1",
       "web-oeffentlich@1"
     ]
 

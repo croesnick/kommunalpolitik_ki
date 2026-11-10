@@ -36,7 +36,7 @@ defmodule KomkiCli.RaumTest do
   test "anzeigen: der Default-Raum ist recherche", %{cfg: cfg} do
     assert {:raum, text} = Raum.show(cfg)
     assert text =~ "Raum        recherche"
-    assert text =~ "komki raum recherche | vertraulich"
+    assert text =~ "komki raum fraktion | recherche | vertraulich"
   end
 
   test "verschärfen geht auch mit laufender Session und startet den Vermittler neu", %{cfg: cfg} do
@@ -84,7 +84,7 @@ defmodule KomkiCli.RaumTest do
 
   test "unbekannter Raum und gleicher Raum", %{cfg: cfg} do
     assert {:error, reason, 2} = Raum.switch(cfg, "offen", deps([]))
-    assert reason =~ "Es gibt: recherche, vertraulich"
+    assert reason =~ "Es gibt: fraktion, recherche, vertraulich"
     assert {:error, "Der Raum ist schon recherche.", 2} = Raum.switch(cfg, "recherche", deps([]))
   end
 

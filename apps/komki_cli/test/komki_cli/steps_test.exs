@@ -525,6 +525,7 @@ defmodule KomkiCli.StepsTest do
                  "connector-web",
                  "connector-vault",
                  "connector-ris",
+                 "connector-ratsprojekte",
                  "connector-documents",
                  "egress",
                  "llama"
@@ -575,6 +576,7 @@ defmodule KomkiCli.StepsTest do
                  "connector-web",
                  "connector-vault",
                  "connector-ris",
+                 "connector-ratsprojekte",
                  "connector-documents",
                  "egress"
                ]
@@ -583,6 +585,7 @@ defmodule KomkiCli.StepsTest do
                {"connector-web", :ok},
                {"connector-vault", {:stale, _}},
                {"connector-ris", :ok},
+               {"connector-ratsprojekte", :already},
                {"connector-documents", :already},
                {"egress", :ok}
              ] =
