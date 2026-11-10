@@ -1,0 +1,63 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null
+    },
+    {
+      "binding": "buergerfall-4711@1",
+      "code": "missing_operation_rule",
+      "condition": null
+    }
+  ],
+  "checked_label": [
+    "buergerfall-4711@1"
+  ],
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "decision": "deny",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-case-store-recipient",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-ausgabe-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "nutzende-person",
+            "webdienst-x"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    },
+    {
+      "binding": "buergerfall-4711@1",
+      "code": "missing_operation_rule",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "nutzende-person",
+            "webdienst-x"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
+  "rule": "store",
+  "snapshot_ref": "snap-store-4711-recipient",
+  "workspace": "ws-fall-4711"
+}

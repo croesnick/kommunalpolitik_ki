@@ -253,6 +253,7 @@ defmodule KomkiPolicy.Derive do
       |> shared_premises(registry, auth.operation)
       |> premise_workspace_valid()
       |> release_label_preservation(auth.operation)
+      |> release_recipient_inclusion(auth.operation)
       |> release_check_call_hash(release, call_hash)
       |> release_check_window(release, stand)
       |> release_check_nonce(release, stand)
@@ -268,6 +269,12 @@ defmodule KomkiPolicy.Derive do
     do: premise_label_preservation(state)
 
   defp release_label_preservation(state, _emit), do: state
+
+  # No GO replaces the recipient test when storing (§ 4.6, R.5.7, #417): a
+  # GO cannot decide who may read the store. For emit and transfer a GO
+  # still bridges an inadmissible recipient (#354).
+  defp release_recipient_inclusion(state, "store"), do: premise_recipient_inclusion(state)
+  defp release_recipient_inclusion(state, _emit_or_transfer), do: state
 
   # Release-Prüfungen in fester Ordnung (§ 4.6 Schritt 3); jede Verletzung
   # ein Blocker (binding: null, condition: null, § 2.4).

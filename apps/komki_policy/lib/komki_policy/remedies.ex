@@ -16,11 +16,13 @@ defmodule KomkiPolicy.Remedies do
 
   Applicability (deny, § 2.8): the admit base table without a call GO;
   `emit`, `store` and `transfer` additionally get `aktionsfreigabe` scope
-  `call` for the five soft blockers. `workspace_invalid` and
+  `call` for the soft blockers. `workspace_invalid` and
   `label_not_preserved` (`store`, `transfer`) are unbridgeable and get
   `neuer_raum` only — a GO neither revives an invalid contract nor
-  restores a dropped binding. If one of them is among the findings, no
-  finding of that decision offers a call GO, since the release branch
+  restores a dropped binding. For `store`, `recipient_not_allowed` is
+  unbridgeable as well: a GO does not decide who may read the store
+  (R.5.7, ticket #417). If an unbridgeable blocker is among the findings,
+  no finding of that decision offers a call GO, since the release branch
   would deny it again. For `indeterminate` only `fakt_nachreichen` +
   `neuer_raum` — a GO cannot produce evidence. Release branch (§ 4.6):
   exactly one call-GO entry per release blocker with the **recomputed**
@@ -37,6 +39,11 @@ defmodule KomkiPolicy.Remedies do
   @output_kinds [:emit, :store, :transfer]
 
   @unbridgeable ["workspace_invalid", "label_not_preserved"]
+
+  # store (§ 4.7) and the release branch, which re-checks the recipient test
+  # only for store (§ 4.6): no GO replaces it (#417). For emit and transfer
+  # a GO still bridges an inadmissible recipient (#354).
+  @unbridgeable_recipient [:store, :release]
 
   @transition_order [
     "fakt_nachreichen",
@@ -91,7 +98,7 @@ defmodule KomkiPolicy.Remedies do
   # A finding left without transitions gets `neuer_raum`, so every
   # catalog entry stays non-empty.
   defp withhold_call_go(entries, ctx) do
-    if Enum.any?(entries, &(&1["code"] in @unbridgeable)) do
+    if Enum.any?(entries, &unbridgeable?(ctx.rule, &1["code"])) do
       Enum.map(entries, fn entry ->
         Map.update!(entry, "transitions", &drop_call_go(&1, ctx))
       end)
@@ -99,6 +106,9 @@ defmodule KomkiPolicy.Remedies do
       entries
     end
   end
+
+  defp unbridgeable?(rule, "recipient_not_allowed"), do: rule in @unbridgeable_recipient
+  defp unbridgeable?(_rule, code), do: code in @unbridgeable
 
   defp drop_call_go(transitions, ctx) do
     case Enum.reject(transitions, &(&1["type"] == "aktionsfreigabe" and &1["scope"] == "call")) do

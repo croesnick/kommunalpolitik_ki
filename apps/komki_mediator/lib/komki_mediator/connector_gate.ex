@@ -50,13 +50,16 @@ defmodule KomkiMediator.ConnectorGate do
   released`) records the GO right away, both before any effect. That PDR
   is the decision of the release branch, so no `permitted` PDR follows
   for the same gate. No, no answer or an invalid release leave the deny in
-  place.
+  place. If the catalog offers no GO because a recipient lies outside the
+  recipient circle (store, ticket #417), nobody is asked: the answer
+  carries `hinweis` for the model and `empfaenger_ausserhalb` for the
+  person.
   """
 
   alias KomkiConnector.{Manifest, Text}
   alias KomkiMediator.{Gamma, Gate, Go, GoStand, Hash, Hinweis, PDR, ResultShape, Room}
   alias KomkiMediator.Room.Object
-  alias KomkiPolicy.{Derive, JSON, Verify}
+  alias KomkiPolicy.{Calculus, Derive, JSON, Verify}
   alias Sidecar.{Client, Params}
 
   @doc "Mediates a call of the connector tool `tool` (e.g. `\"ris_search\"`)."
@@ -529,14 +532,17 @@ defmodule KomkiMediator.ConnectorGate do
 
     {pdr_decision, response} =
       case outcome do
-        {:ok, %{"decision" => kind, "remedies" => remedies}} ->
+        {:ok, %{"decision" => kind, "remedies" => remedies} = decision} ->
           {kind,
-           %{
-             "decision" => kind,
-             "remedies" => remedies,
-             "relaxation_authorities" => Gamma.relaxation_authorities_for(env.gamma, remedies),
-             "hinweis" => Hinweis.text(:deny)
-           }}
+           Map.merge(
+             %{
+               "decision" => kind,
+               "remedies" => remedies,
+               "relaxation_authorities" => Gamma.relaxation_authorities_for(env.gamma, remedies),
+               "hinweis" => Hinweis.text(:deny)
+             },
+             without_go(env, rule, snapshot, decision)
+           )}
 
         {:unsupported, info} ->
           {"unsupported", %{"decision" => "error", "detail" => info}}
@@ -572,6 +578,29 @@ defmodule KomkiMediator.ConnectorGate do
     })
 
     response
+  end
+
+  # A recipient outside the recipient circle that no GO can bridge (store,
+  # #417): the model learns only that nothing was transmitted, the person
+  # sees who lies outside. Both rest on the engine: its catalog offers no
+  # call GO, and its calculus names the recipients of the target that the
+  # checked label does not admit.
+  defp without_go(env, rule, snapshot, decision) do
+    remedies = decision["remedies"]
+
+    if rule in ["emit", "transfer", "store"] and Go.offered(remedies) == nil and
+         Enum.any?(remedies, &(&1["code"] == "recipient_not_allowed")) do
+      registry = env.gamma.compiled
+
+      %{
+        "hinweis" => Hinweis.text(:not_transmitted),
+        "empfaenger_ausserhalb" =>
+          Calculus.actual_recipients(registry, snapshot["workspace"]["environment"]) --
+            Calculus.allowed_recipients(registry, decision["checked_label"])
+      }
+    else
+      %{}
+    end
   end
 
   defp redact(env, call, call_id, reason, details) do
