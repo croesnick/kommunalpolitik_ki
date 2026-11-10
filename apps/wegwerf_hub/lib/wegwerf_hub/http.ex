@@ -42,9 +42,7 @@ defmodule WegwerfHub.HTTP do
          :ok <- validate(term) do
       {:ok, _id} = Store.annehmen(hub_dir(conn), term)
 
-      conn
-      |> put_resp_content_type("application/json")
-      |> send_resp(201, "{\"status\":\"vorgeschlagen\"}")
+      log_and_respond(conn, 201, "{\"status\":\"vorgeschlagen\"}", "application/json")
     else
       {:error, :bad_json} ->
         conn |> bad_request("ungültiges JSON") |> halt()
@@ -69,7 +67,12 @@ defmodule WegwerfHub.HTTP do
   end
 
   @doc false
-  def guard_caller(conn, dir) do
+  # Plug ruft Funktions-Plugs mit ihrem Optionswert auf (hier []) — das
+  # Hub-Verzeichnis reist deshalb über conn.private (gesetzt in call/2),
+  # nicht über den zweiten Parameter.
+  def guard_caller(conn, _opts) do
+    dir = hub_dir(conn)
+
     with :ok <- authorized?(conn, dir),
          :ok <- not_locked?(dir) do
       conn
@@ -95,7 +98,9 @@ defmodule WegwerfHub.HTTP do
          {:ok, expected} when is_binary(expected) <- File.read(hash_file),
          true <- expected != "" do
       presented_hash =
-        presented |> String.trim() |> :crypto.hash(:sha256) |> Base.encode16(case: :lower)
+        presented
+        |> String.trim()
+        |> then(&Base.encode16(:crypto.hash(:sha256, &1), case: :lower))
 
       if Plug.Crypto.secure_compare(presented_hash, String.trim_trailing(expected, "\n")),
         do: :ok,

@@ -65,27 +65,32 @@ defmodule WegwerfHub.Store do
   freie Kennung, alle Teile „offen“ und „nicht-verifiziert“, Status
   „offen“. Gibt die Kennung zurück (sie verlässt den Hub nie Richtung
   komki — die Quittung ist fix).
+
+  Unsichtbare Steuerzeichen entfallen aus jedem Freitextfeld (Szene 13.6,
+  „gilt schon im ersten Wurf“): Was die Redaktion sieht, ist alles, was
+  gespeichert ist — verdeckte Anweisungen in der unsichtbaren Wortwahl
+  bleiben möglich (G2), unsichtbare Anweisungen nicht.
   """
   @spec annehmen(Path.t(), map()) :: {:ok, String.t()} | {:error, term()}
   def annehmen(dir, incoming) do
     with {:ok, id} <-
-           write_atomic(dir, @vorschlaege, fn proposals ->
+           write_atomic(dir, @vorschlaege, %{}, fn proposals ->
              id = next_id(map_size(proposals) + 1, proposals)
 
              proposal =
                %{
                  "id" => id,
-                 "titel" => incoming["titel"],
-                 "projekt_hinweis" => incoming["projekt_hinweis"],
+                 "titel" => sauber(incoming["titel"]),
+                 "projekt_hinweis" => sauber(incoming["projekt_hinweis"]),
                  "labels" => incoming["labels"],
                  "status" => "offen",
                  "eingegangen" => DateTime.to_iso8601(DateTime.utc_now()),
                  "teile" =>
                    Enum.map(incoming["teile"], fn teil ->
                      %{
-                       "aussage" => teil["aussage"],
-                       "quelle" => teil["quelle"],
-                       "fundstelle" => teil["fundstelle"],
+                       "aussage" => sauber(teil["aussage"]),
+                       "quelle" => sauber(teil["quelle"]),
+                       "fundstelle" => sauber(teil["fundstelle"]),
                        "pruefstatus" => "nicht-verifiziert"
                      }
                    end)
@@ -93,10 +98,19 @@ defmodule WegwerfHub.Store do
 
              {Map.put(proposals, id, proposal), id}
            end) do
-      verlauf_eintrag(dir, "Vorschlag aus komki eingegangen: " <> incoming["titel"])
+      verlauf_eintrag(dir, "Vorschlag aus komki eingegangen: " <> sauber(incoming["titel"]))
       {:ok, id}
     end
   end
+
+  @unsichtbar ~r/[\x{200B}\x{200C}\x{200D}\x{2060}\x{FEFF}\x{00AD}\x{202A}-\x{202E}\x{2066}-\x{2069}]|\p{Cc}/u
+
+  @doc "Entfernt unsichtbare Steuerzeichen (Szene 13.6); nil bleibt nil."
+  @spec sauber(String.t() | nil) :: String.t() | nil
+  def sauber(nil), do: nil
+
+  def sauber(text) when is_binary(text),
+    do: String.replace(text, @unsichtbar, "", global: true)
 
   @doc """
   Entscheidung der Redaktion (11.12): `teile` sind die 1-basierten Nummern
@@ -197,7 +211,7 @@ defmodule WegwerfHub.Store do
   end
 
   defp verlauf_eintrag(dir, text) do
-    write_atomic(dir, @verlauf, fn verlauf ->
+    write_atomic(dir, @verlauf, [], fn verlauf ->
       entry = %{
         "text" => text,
         "datum" => DateTime.to_iso8601(DateTime.utc_now())
@@ -209,13 +223,14 @@ defmodule WegwerfHub.Store do
     :ok
   end
 
-  # Atomar schreiben mit Vorher-Nachher-Wert: liest die Datei, wendet fun
-  # an, schreibt tmp + rename. Nebenläufigkeit mit dem Server ist über die
-  # einzelne Datei grob serialisiert — für den Wegwerf-Hub genügt das.
-  defp write_atomic(dir, file, fun) do
+  # Atomar schreiben mit Vorher-Nachher-Wert: liest die Datei (Default bei
+  # Fehlen), wendet fun an, schreibt tmp + rename. Nebenläufigkeit mit dem
+  # Server ist über die einzelne Datei grob serialisiert — für den
+  # Wegwerf-Hub genügt das.
+  defp write_atomic(dir, file, default, fun) do
     File.mkdir_p!(dir)
     path = Path.join(dir, file)
-    current = read_map(dir, file)
+    current = read_oder(dir, file, default)
 
     case fun.(current) do
       {new, result} ->
@@ -230,7 +245,7 @@ defmodule WegwerfHub.Store do
   end
 
   defp update!(dir, id, fun) do
-    write_atomic(dir, @vorschlaege, fn proposals ->
+    write_atomic(dir, @vorschlaege, %{}, fn proposals ->
       proposal = Map.fetch!(proposals, id)
       {Map.put(proposals, id, fun.(proposal)), :ok}
     end)
@@ -244,6 +259,19 @@ defmodule WegwerfHub.Store do
     tmp = path <> ".tmp"
     File.write!(tmp, JSON.canonical(map))
     File.rename!(tmp, path)
+  end
+
+  defp read_oder(dir, file, default) do
+    case File.read(Path.join(dir, file)) do
+      {:ok, content} when content != "" ->
+        case JSON.parse(content) do
+          {:ok, term} -> term
+          _ -> default
+        end
+
+      _ ->
+        default
+    end
   end
 
   defp read_map(dir, file) do
