@@ -96,8 +96,48 @@ Katalog im Journal, auch wo die Antwort nur den Hinweis trägt.
    Ein Vorschlag aus dem Projektraum braucht heute ein emit-GO UND ein
    store-GO. Für „wie 11.0 mit GO“ (Szene 12.8) braucht die Γ-Fassung von
    `ratsprojekte@1` eine `emit`-Regel — bis dahin gilt „abgelehnt ohne
-   Fenster“ (12.9) auch erst nach dem emit-Fenster. Γ-Entscheidung für
-   #416/#419.
+   Fenster“ (12.9) auch erst nach dem emit-Fenster.
+
+   Adversariell geprüft (vier Linsen, jede Aussage von drei unabhängigen
+   Skeptikern bestätigt, keine widerlegt): **Die Regel schwächt den Kalkül
+   nicht.** Sie ändert keinen Empfängerkreis, fügt keine store-Regel hinzu
+   (Γ bleibt ohne jede store-Regel — jedes Schreiben in den Hub braucht
+   weiter zwingend ein GO) und lässt `ratsprojekte@1` ohne transfer-Regel.
+   Das entfallende emit-GO trägt keine eigenständige Sicherheitsentscheidung:
+   Bei emit überbrückte ein GO einen unzulässigen Empfänger ohnehin (offen
+   bis #354), die unüberbrückbare Schranke steht allein im store (#417) und
+   bleibt unberührt; die gemessenen emit-Ablehnungen trugen ausschließlich
+   `missing_operation_rule`, nie `recipient_not_allowed`. Beide heutigen GOs
+   binden dieselben Bytes (`content_digest` geht in beide `call_hashes`
+   ein) — das verbleibende store-GO zeigt dieselben Parameter plus
+   „Aktion: speichern“ und ist informativ strikt über dem emit-GO. Und der
+   RFC fordert am Erzeugen keine Aktionsfreigabe: R.5.5 trägt — anders als
+   R.5.4 und R.5.6 — keine Erlaubt_Γ-Prämisse; R.4.2 zieht die Linie exakt
+   hier („Ein privater Entwurf darf automatisch entstehen.“). Alle
+   bestehenden Bindungen tragen `emit: true`, admit-only ist der Ausreißer.
+
+   Mit der Regel erfüllen drei Szenen erstmals ihren Buchstaben: **12.8**
+   genau ein GO wie 11.0 (exakter Inhalt, wahre Empfänger; Journal-Kette wie
+   11.0), **12.9** wörtlich „Abgelehnt ohne Fenster“ (kein müdes emit-
+   Vorfenster mehr, dessen GO wirkungslos bliebe; Connector wird nie
+   angerufen — mechanisch wie 11.1), **12.2** ein Fenster am transfer mit
+   dem genauen Suchtext statt des abstrakten Erzeugens (12.10: ein GO statt
+   zwei; 11.4: ein GO pro Versuch). Mit-Regel-Ketten sind Herleitung aus
+   dem Engine-Code, nicht Messung — die Regel steht noch nicht im Zweig-Seed.
+
+   Zwei ausdrückliche Abtrennungen für die Γ-Entscheidung: **(a) Leseweg
+   (#419):** Das Lesen läuft als Connector-Lese-Operation über Gate 1b
+   (transfer) und braucht dort auch mit emit-Regel ein GO (fehlende
+   transfer-Regel auf `ratsprojekte@1`). Die Invariante „ratsprojekte@1
+   bekommt nie transfer“ bleibt haltbar und tragend — `transfer: true`
+   nähme auch vault_search/vault_read im Projektraum ihr einziges GO. #419
+   braucht also eine eigene Entscheidung, keine stillschweigende
+   Mitentscheidung. **(b) 12.11:** Im Bestand ungetragen (kein Werkzeug,
+   Ortsverband/Mail-Provider keine Beobachter); die Schranke der Szene wäre
+   der Empfängertest, nicht die Operationsregel — welche Operation/Umgebung
+   12.11 trägt (store: hart fensterlos; transfer: bis #354 ablenkbar),
+   gehört vor dem GO zum Bau-Ticket festgezurrt. Γ-Entscheidung für #416,
+   getrennt von #419.
 4. **`hub-gesperrt` fehlt im geschlossenen Fehlercode-Katalog** (Vertrag §3).
    Im Zweig als Vorschlag ergänzt; der ADR verlangt das Signal, der Katalog
    muss es festschreiben.
