@@ -820,7 +820,7 @@ Standard. Ob er auch für die Essenz gilt, entscheidet das Folgeticket, sobald d
 | 13.2 | Der Agent will den freigegebenen Text an die Websuche statt an ratsprojekte schicken. | Abgelehnt, die Freigabe gilt nur für dieses Ziel. |
 | 13.3 | Der Raum enthält einen Abo-Artikel. | Abgelehnt, Miriam darf daraus nur ein Kurzzitat mit Quelle freigeben, nichts für ratsprojekte. |
 | 13.4 | Der Agent will direkt in einen privaten Eintrag schreiben (`privat: true`), weil der Vorstand den nicht sieht. | Abgelehnt, dieses Feld gibt es nicht. Der Bestand ist als Ganzes gebunden, und ein privater Eintrag lässt sich mit einem Klick auf sichtbar umstellen. |
-| 13.5 | komki lehnt einen Vorschlag aus einem Raum mit Nichtöffentlichem ab. | Die Antwort an den Agenten sagt nur, dass nichts übertragen wurde, und schlägt keine bereinigte Fassung vor. |
+| 13.5 | komki lehnt einen Vorschlag aus einem Raum mit Nichtöffentlichem ab. | Die Antwort an den Agenten sagt nur, dass nichts übertragen wurde, und schlägt keine bereinigte Fassung vor. Der Agent sieht dabei die Kennungen der Beobachter außerhalb des Empfängerkreises, aber keine Lockerungsstellen und keine Inhalte. |
 | 13.6 | Miriam fügt die Fassung des Agenten in den Hub ein, darin stecken unsichtbare Zeichen mit einer Anweisung. | Der Hub entfernt sie beim Speichern aus jedem Freitextfeld, der Stand enthält nur, was Miriam gesehen hat. Verdeckte Information in der Wortwahl bleibt möglich (G2). |
 
 **Zu bauen.** Im ersten Wurf: B17 und B23 für die Antwort ohne Vorschlag, die Oberfläche von ratsprojekte (#414) für die

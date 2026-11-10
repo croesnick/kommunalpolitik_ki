@@ -164,8 +164,6 @@ defmodule KomkiMediator.GoStoreTest do
 
     assert response["decision"] == "deny"
     assert response["rule"] == "store"
-    assert "recipient_not_allowed" in Enum.map(response["remedies"], & &1["code"])
-    assert Go.offered(response["remedies"]) == nil
 
     # Nobody was asked: with a listener, an offered GO would have waited and
     # set "go".
@@ -174,14 +172,18 @@ defmodule KomkiMediator.GoStoreTest do
     refute_received {:written, _, _}
     assert journal(env) == [{"emit", "permitted"}, {"store", "not_admitted"}]
 
-    # The note tells the model only that nothing was transmitted
-    # (Gegenprobe 13.5); the engine names who lies outside the circle.
+    # The model sees only that nothing was transmitted and who lies outside
+    # the circle (Gegenprobe 13.5): no catalog, no relaxation authorities.
     assert response["hinweis"] == Hinweis.text(:not_transmitted)
+    assert response["recipients_outside"] == ["sync-dienst"]
 
-    assert [%{"code" => "recipient_not_allowed", "recipients_outside" => ["sync-dienst"]} | _] =
-             response["remedies"]
+    assert Enum.sort(Map.keys(response)) ==
+             ~w(decision decision_id hinweis recipients_outside registry_id rule)
 
-    refute Map.has_key?(response, "empfaenger_ausserhalb")
+    # The journal keeps the engine's full catalog, without a call GO.
+    [_emit, store] = TestHelpers.journal_records(env.journal_path)
+    assert "recipient_not_allowed" in Enum.map(store["remedies"], & &1["code"])
+    assert Go.offered(store["remedies"]) == nil
   end
 
   test "vertraulich ohne Sync: Schreiben fragt weiter nach einem GO", %{

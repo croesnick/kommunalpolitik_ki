@@ -1,6 +1,6 @@
 defmodule KomkiMediator.HinweisTest do
-  # Ticket #417: which note a denial carries for the model. Only store gets
-  # :not_transmitted; emit and transfer keep the note from before (#354).
+  # Ticket #417: which denial is "nothing transmitted". Only store without a
+  # GO way qualifies; emit and transfer keep their form from before (#354).
   use ExUnit.Case, async: true
 
   alias KomkiMediator.Hinweis
@@ -10,37 +10,34 @@ defmodule KomkiMediator.HinweisTest do
   @room %{"type" => "neuer_raum", "required_bindings" => [], "required_recipients" => ["x"]}
   @call_go %{"type" => "aktionsfreigabe", "scope" => "call", "call_hash" => "abc"}
 
-  test "store, Empfänger außerhalb, kein GO im Katalog: nur „nicht übertragen“" do
+  test "store, Empfänger außerhalb, kein GO im Katalog: nicht übertragen" do
     remedies = [
       remedy("recipient_not_allowed", [@room]),
       remedy("missing_operation_rule", [@room])
     ]
 
-    assert Hinweis.for_denial("store", remedies) == Hinweis.text(:not_transmitted)
+    assert Hinweis.not_transmitted?("store", remedies)
   end
 
-  test "store ohne Empfängerbefund: der bisherige Hinweis" do
-    remedies = [remedy("missing_operation_rule", [@room, @call_go])]
-
-    assert Hinweis.for_denial("store", remedies) == Hinweis.text(:deny)
+  test "store ohne Empfängerbefund: bisherige Form" do
+    refute Hinweis.not_transmitted?("store", [remedy("missing_operation_rule", [@room, @call_go])])
   end
 
   # Neither path reaches workspace_invalid through ConnectorGate (the
   # mediator's snapshot is always valid), so the engine-shaped remedies are
   # given here: no call GO, recipient_not_allowed among the findings.
   for rule <- ["emit", "transfer"] do
-    test "#{rule} mit recipient_not_allowed und workspace_invalid: wie bisher" do
+    test "#{rule} mit recipient_not_allowed und workspace_invalid: bisherige Form" do
       remedies = [
         remedy("workspace_invalid", [@room]),
         remedy("recipient_not_allowed", [@room])
       ]
 
-      assert Hinweis.for_denial(unquote(rule), remedies) == Hinweis.text(:deny)
+      refute Hinweis.not_transmitted?(unquote(rule), remedies)
     end
   end
 
-  test "admit (Gate 2): wie bisher" do
-    assert Hinweis.for_denial("admit", [remedy("recipient_not_allowed", [@room])]) ==
-             Hinweis.text(:deny)
+  test "admit (Gate 2): bisherige Form" do
+    refute Hinweis.not_transmitted?("admit", [remedy("recipient_not_allowed", [@room])])
   end
 end

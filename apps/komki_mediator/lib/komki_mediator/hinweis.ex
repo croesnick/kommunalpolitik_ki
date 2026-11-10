@@ -17,22 +17,18 @@ defmodule KomkiMediator.Hinweis do
   alias KomkiMediator.Go
 
   @doc """
-  Note for an engine denial of `rule` with its `remedies`.
-
-  Storing with a recipient outside the recipient circle gets
-  `:not_transmitted` when the catalog offers no GO (ticket #417). Every
-  other denial keeps `:deny`; for emit and transfer a GO still bridges the
-  recipient test (#354).
+  Is an engine denial of `rule` with its `remedies` a "nothing
+  transmitted" case? True only for a store whose target lies outside the
+  recipient circle while the catalog offers no GO (ticket #417). For emit
+  and transfer a GO still bridges the recipient test (#354).
   """
-  @spec for_denial(String.t(), [map()]) :: String.t()
-  def for_denial("store", remedies) do
-    if Go.offered(remedies) == nil and
-         Enum.any?(remedies, &(&1["code"] == "recipient_not_allowed")),
-       do: text(:not_transmitted),
-       else: text(:deny)
+  @spec not_transmitted?(String.t(), [map()]) :: boolean()
+  def not_transmitted?("store", remedies) do
+    Go.offered(remedies) == nil and
+      Enum.any?(remedies, &(&1["code"] == "recipient_not_allowed"))
   end
 
-  def for_denial(_rule, _remedies), do: text(:deny)
+  def not_transmitted?(_rule, _remedies), do: false
 
   @doc """
   Note for an answer without a result: `:deny`, `:not_transmitted`,

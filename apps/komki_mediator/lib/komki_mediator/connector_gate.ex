@@ -51,9 +51,9 @@ defmodule KomkiMediator.ConnectorGate do
   is the decision of the release branch, so no `permitted` PDR follows
   for the same gate. No, no answer or an invalid release leave the deny in
   place. If storing fails the recipient test, the catalog offers no GO
-  (ticket #417) and nobody is asked: the `hinweis` tells the model only
-  that nothing was transmitted, and the engine's blocker names the
-  recipients outside the circle (`recipients_outside`).
+  (ticket #417) and nobody is asked. The answer then carries only the
+  `hinweis` that nothing was transmitted and `recipients_outside` from the
+  engine's blocker; the journal keeps the full catalog.
   """
 
   alias KomkiConnector.{Manifest, Text}
@@ -524,22 +524,16 @@ defmodule KomkiMediator.ConnectorGate do
   defp not_permitted(env, call, rule, executed, intent, snapshot, outcome) do
     decision_id = PDR.new_id()
 
-    checked_label =
+    {checked_label, remedies} =
       case outcome do
-        {:ok, decision} -> decision["checked_label"]
-        _ -> nil
+        {:ok, decision} -> {decision["checked_label"], decision["remedies"]}
+        _ -> {nil, nil}
       end
 
     {pdr_decision, response} =
       case outcome do
-        {:ok, %{"decision" => kind, "remedies" => remedies}} ->
-          {kind,
-           %{
-             "decision" => kind,
-             "remedies" => remedies,
-             "relaxation_authorities" => Gamma.relaxation_authorities_for(env.gamma, remedies),
-             "hinweis" => Hinweis.for_denial(rule, remedies)
-           }}
+        {:ok, %{"decision" => kind}} ->
+          {kind, denial(env, rule, kind, remedies)}
 
         {:unsupported, info} ->
           {"unsupported", %{"decision" => "error", "detail" => info}}
@@ -571,10 +565,37 @@ defmodule KomkiMediator.ConnectorGate do
       "intent_id" => intent["intent_id"],
       "snapshot_id" => snapshot["snapshot_id"],
       "checked_label" => checked_label,
-      "remedies" => response["remedies"]
+      # The journal keeps the engine's full catalog, also where the answer
+      # leaves it out.
+      "remedies" => remedies
     })
 
     response
+  end
+
+  # A store whose target lies outside the recipient circle has no GO way
+  # (#417): the model gets only the note and who lies outside, which the
+  # pi display needs for its sentence; no catalog and no relaxation
+  # authorities (Gegenprobe 13.5). Every other denial keeps its form.
+  defp denial(env, rule, kind, remedies) do
+    if Hinweis.not_transmitted?(rule, remedies) do
+      %{
+        "decision" => kind,
+        "hinweis" => Hinweis.text(:not_transmitted),
+        "recipients_outside" =>
+          Enum.find_value(
+            remedies,
+            &(&1["code"] == "recipient_not_allowed" && &1["recipients_outside"])
+          )
+      }
+    else
+      %{
+        "decision" => kind,
+        "remedies" => remedies,
+        "relaxation_authorities" => Gamma.relaxation_authorities_for(env.gamma, remedies),
+        "hinweis" => Hinweis.text(:deny)
+      }
+    end
   end
 
   defp redact(env, call, call_id, reason, details) do

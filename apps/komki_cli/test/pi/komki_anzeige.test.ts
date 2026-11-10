@@ -112,6 +112,8 @@ test("Speichern außerhalb des Empfängerkreises: wer nicht mitlesen darf, kein 
 	assert.match(out, /✗ abgelehnt Die Anfrage hat komki nicht verlassen\./);
 	assert.match(out, /Grund Inhalte dieses Arbeitsraums dürfen nicht an sync-dienst gehen\. Ein GO ändert daran nichts\./);
 	assert.doesNotMatch(out, /mit deinem GO|Nicht gefragt/);
+	// The reduced answer carries no catalog and no relaxation authorities.
+	assert.doesNotMatch(out, /Möglich|Lockern kann/);
 
 	// Where a GO is offered (transfer), the sentence stays as before.
 	const web = flat(render("web_search_deny"));

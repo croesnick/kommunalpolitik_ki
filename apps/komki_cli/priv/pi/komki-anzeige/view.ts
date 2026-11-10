@@ -199,17 +199,19 @@ function goRow(r: Json, p: Paint): Row | undefined {
 }
 
 function callGoOffered(r: Json): boolean {
-	return (Array.isArray(r.remedies) ? r.remedies : []).some(offersCallGo);
-}
-
-function offersCallGo(remedy: Json): boolean {
-	return (Array.isArray(remedy?.transitions) ? remedy.transitions : []).some(
-		(t: Json) => t?.type === "aktionsfreigabe" && t.scope === "call",
+	return (Array.isArray(r.remedies) ? r.remedies : []).some((remedy: Json) =>
+		(Array.isArray(remedy?.transitions) ? remedy.transitions : []).some(
+			(t: Json) => t?.type === "aktionsfreigabe" && t.scope === "call",
+		),
 	);
 }
 
 function remedyRows(r: Json, p: Paint): Row[] {
 	const rows: Row[] = [];
+	// Store outside the recipient circle (#417): the mediator sends only who lies outside, no catalog.
+	const outside = (Array.isArray(r.recipients_outside) ? r.recipients_outside : []).map((name: unknown) => clean(String(name)));
+	if (outside.length > 0)
+		rows.push(labelled("Grund", `Inhalte dieses Arbeitsraums dürfen nicht an ${outside.join(", ")} gehen. Ein GO ändert daran nichts.`, p));
 	for (const remedy of Array.isArray(r.remedies) ? r.remedies : []) {
 		rows.push(labelled("Grund", blocker(remedy), p));
 		const ways = (Array.isArray(remedy.transitions) ? remedy.transitions : []).map(transition);
@@ -222,10 +224,6 @@ function remedyRows(r: Json, p: Paint): Row[] {
 
 function blocker(remedy: Json): string {
 	if (remedy.code === "recipient_not_allowed") {
-		// No GO for this finding (store, #417): the engine names who may not read along.
-		const outside = (Array.isArray(remedy.recipients_outside) ? remedy.recipients_outside : []).map((name: unknown) => clean(String(name)));
-		if (outside.length > 0 && !offersCallGo(remedy))
-			return `Inhalte dieses Arbeitsraums dürfen nicht an ${outside.join(", ")} gehen. Ein GO ändert daran nichts.`;
 		const room = (remedy.transitions ?? []).find((t: Json) => t?.type === "neuer_raum");
 		const who = (room?.required_recipients ?? []).map((r: unknown) => clean(String(r)));
 		if (who.length > 0) return `Empfänger dieser Anfrage (${who.join(", ")}) sind in diesem Arbeitsraum nicht alle erlaubt.`;

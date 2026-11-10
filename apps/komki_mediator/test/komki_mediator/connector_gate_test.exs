@@ -391,4 +391,39 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert env.room.workspace_bindings == Templates.recherche_bindings()
     assert Templates.recherche_bindings() == @recherche
   end
+
+  # -----------------------------------------------------------------------
+  # Ticket #417: only a store without a GO way is reduced to the note and
+  # recipients_outside (KomkiMediator.GoStoreTest). Every other denial keeps
+  # its form: catalog, relaxation authorities, the usual note.
+  # -----------------------------------------------------------------------
+
+  @denial_keys ~w(decision decision_id hinweis registry_id relaxation_authorities remedies rule)
+
+  test "Ablehnungen mit GO-Weg oder ohne Empfaengerbefund behalten ihre Form", %{env: env} do
+    fake(env, "vault", ok(note(["vault-vertraulich@1"])))
+
+    cases = [
+      # emit: doc-vertraulich@1 has no emit rule.
+      {"emit", put_in(env.room.workspace_bindings, ["doc-vertraulich@1", "web-oeffentlich@1"]),
+       "web_search", %{"query" => "Radweg"}, @denial_keys},
+      # transfer: brave-search is outside the circle of vault-vertraulich@1,
+      # a GO still bridges it (#354).
+      {"transfer", TestHelpers.vertraulich(env), "web_search", %{"query" => "Radweg"},
+       @denial_keys},
+      # store with a GO way: missing_operation_rule only.
+      {"store", env, "vault_write_test", %{"title" => "T", "body" => "B"}, @denial_keys},
+      # admit: the note's label lies outside B_W (Gate 2, after execution).
+      {"admit", env, "vault_read", %{"note_id" => "a.md"},
+       Enum.sort(["emit_decision_id" | @denial_keys])}
+    ]
+
+    for {rule, env, tool, params, keys} <- cases do
+      response = ConnectorGate.call(env, tool, params)
+
+      assert {response["decision"], response["rule"]} == {"deny", rule}
+      assert Enum.sort(Map.keys(response)) == keys, rule
+      assert response["hinweis"] == KomkiMediator.Hinweis.text(:deny), rule
+    end
+  end
 end
