@@ -272,9 +272,13 @@ defmodule KomkiPolicy.Derive do
 
   # No GO replaces the recipient test when storing (§ 4.6, R.5.7, #417): a
   # GO cannot decide who may read the store. For emit and transfer a GO
-  # still bridges an inadmissible recipient (#354).
-  defp release_recipient_inclusion(state, "store"), do: premise_recipient_inclusion(state)
-  defp release_recipient_inclusion(state, _emit_or_transfer), do: state
+  # still bridges an inadmissible recipient (#354). The catalog withholds
+  # the GO for the same operations (Remedies).
+  defp release_recipient_inclusion(state, operation) do
+    if operation in Remedies.unbridgeable_recipient_operations(),
+      do: premise_recipient_inclusion(state),
+      else: state
+  end
 
   # Release-Prüfungen in fester Ordnung (§ 4.6 Schritt 3); jede Verletzung
   # ein Blocker (binding: null, condition: null, § 2.4).
@@ -569,14 +573,17 @@ defmodule KomkiPolicy.Derive do
 
   # P8: ρ_Γ(c) ⊆ R_Γ(B_W); bei B_W = ∅ ist R_Γ(∅) = 𝒪. Ist der Mengentest
   # bekannt falsch, vereitelt dies - unabhaengig vom env-Flag - den Zugriff.
+  # The blocker names the observers outside the circle (§ 2.4, #417).
   defp premise_recipient_inclusion(ctx) do
-    rho = MapSet.new(ctx.rho)
-    allowed = MapSet.new(ctx.allowed)
+    case ctx.rho -- ctx.allowed do
+      [] ->
+        ctx
 
-    if MapSet.subset?(rho, allowed) do
-      ctx
-    else
-      add_blocker(ctx, binder("recipient_not_allowed", nil, nil))
+      outside ->
+        blocker =
+          Map.put(binder("recipient_not_allowed", nil, nil), "recipients_outside", outside)
+
+        add_blocker(ctx, blocker)
     end
   end
 

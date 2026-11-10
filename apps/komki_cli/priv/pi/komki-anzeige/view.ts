@@ -199,17 +199,19 @@ function goRow(r: Json, p: Paint): Row | undefined {
 }
 
 function callGoOffered(r: Json): boolean {
-	return (Array.isArray(r.remedies) ? r.remedies : []).some((remedy: Json) =>
-		(Array.isArray(remedy?.transitions) ? remedy.transitions : []).some(
-			(t: Json) => t?.type === "aktionsfreigabe" && t.scope === "call",
-		),
+	return (Array.isArray(r.remedies) ? r.remedies : []).some(offersCallGo);
+}
+
+function offersCallGo(remedy: Json): boolean {
+	return (Array.isArray(remedy?.transitions) ? remedy.transitions : []).some(
+		(t: Json) => t?.type === "aktionsfreigabe" && t.scope === "call",
 	);
 }
 
 function remedyRows(r: Json, p: Paint): Row[] {
 	const rows: Row[] = [];
 	for (const remedy of Array.isArray(r.remedies) ? r.remedies : []) {
-		rows.push(labelled("Grund", blocker(remedy, r), p));
+		rows.push(labelled("Grund", blocker(remedy), p));
 		const ways = (Array.isArray(remedy.transitions) ? remedy.transitions : []).map(transition);
 		if (ways.length > 0) rows.push(labelled("Möglich", ways.join(" – oder – "), p));
 	}
@@ -218,11 +220,12 @@ function remedyRows(r: Json, p: Paint): Row[] {
 	return rows;
 }
 
-function blocker(remedy: Json, r: Json): string {
+function blocker(remedy: Json): string {
 	if (remedy.code === "recipient_not_allowed") {
-		// No GO possible (store, #417): the mediator names who may not read along.
-		const outside = (Array.isArray(r.empfaenger_ausserhalb) ? r.empfaenger_ausserhalb : []).map((e: unknown) => clean(String(e)));
-		if (outside.length > 0) return `Inhalte dieses Arbeitsraums dürfen nicht zu ${outside.join(", ")}. Ein GO ändert daran nichts.`;
+		// No GO for this finding (store, #417): the engine names who may not read along.
+		const outside = (Array.isArray(remedy.recipients_outside) ? remedy.recipients_outside : []).map((name: unknown) => clean(String(name)));
+		if (outside.length > 0 && !offersCallGo(remedy))
+			return `Inhalte dieses Arbeitsraums dürfen nicht an ${outside.join(", ")} gehen. Ein GO ändert daran nichts.`;
 		const room = (remedy.transitions ?? []).find((t: Json) => t?.type === "neuer_raum");
 		const who = (room?.required_recipients ?? []).map((r: unknown) => clean(String(r)));
 		if (who.length > 0) return `Empfänger dieser Anfrage (${who.join(", ")}) sind in diesem Arbeitsraum nicht alle erlaubt.`;

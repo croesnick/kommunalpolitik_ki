@@ -174,10 +174,14 @@ defmodule KomkiMediator.GoStoreTest do
     refute_received {:written, _, _}
     assert journal(env) == [{"emit", "permitted"}, {"store", "not_admitted"}]
 
-    # The model learns only that nothing was transmitted (Gegenprobe 13.5);
-    # the person sees who is outside the recipient circle.
+    # The note tells the model only that nothing was transmitted
+    # (Gegenprobe 13.5); the engine names who lies outside the circle.
     assert response["hinweis"] == Hinweis.text(:not_transmitted)
-    assert response["empfaenger_ausserhalb"] == ["sync-dienst"]
+
+    assert [%{"code" => "recipient_not_allowed", "recipients_outside" => ["sync-dienst"]} | _] =
+             response["remedies"]
+
+    refute Map.has_key?(response, "empfaenger_ausserhalb")
   end
 
   test "vertraulich ohne Sync: Schreiben fragt weiter nach einem GO", %{

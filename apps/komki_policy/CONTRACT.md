@@ -146,14 +146,14 @@ Regeln:
 - `checked_label` ist für `admit` und `emit` **immer** B_W = `workspace.bindings`, nie λ(x) (RFC 5.4) und nie λ(y) (RFC 5.5). Für `store` und `transfer` ist es λ(y) = `object.labels` (sortiert): gespeichert oder übergeben wird ein schon erzeugtes Objekt unter seinem Ausgabelabel (RFC 5.6, § 4.7, § 4.8).
 - `remedies`: bei `deny`/`indeterminate` nicht-leer, `permit`: `null` (§ 2.8).
 - `emit`-Entscheidungen tragen zusätzlich die Felder `content_digest` (immer; Echo des technischen Fakts `output_content_digest`, § 4.5), `assigned_label` (bei `permit`: B_W, die vom Vermittler zugeordnete Ausgabe-Menge λ(y); sonst `null`) und — nur bei Permit durch Aktionsfreigabe — `release` (Form § 4.6). `admit`-Entscheidungen bleiben unverändert. `store`- und `transfer`-Entscheidungen tragen `content_digest` (immer) und — nur bei Permit durch Aktionsfreigabe — `release`; kein `assigned_label` (Speichern und Übergeben ordnen kein Label zu).
-- `blockers`: nur bei `deny`, nicht-leer. Jedes Element ist ein geschlossenes Objekt mit **genau** den Schlüsseln `code` (string), `binding` (string|null), `condition` (string|null). `binding` benennt die betroffene Bindung (oder `null`), `condition` das betroffene Fakt-Feld (oder `null`).
+- `blockers`: nur bei `deny`, nicht-leer. Jedes Element ist ein geschlossenes Objekt mit **genau** den Schlüsseln `code` (string), `binding` (string|null), `condition` (string|null); einzige Ausnahme ist `recipient_not_allowed` (unten). `binding` benennt die betroffene Bindung (oder `null`), `condition` das betroffene Fakt-Feld (oder `null`).
 - Blocker-Codes (vollständig, feste Bedeutung):
   - `object_quarantine` — Prämisse 1 verletzt (`binding: null`, `condition: null`)
   - `workspace_invalid` — Prämisse 2 verletzt
   - `basis_right_false` — `has_operation_right` oder `has_object_access_right` ist `false` (`condition` = Faktname)
   - `audit_path_not_ready` — `audit_path_ready` ist `false` (`condition: "audit_path_ready"`)
   - `label_not_included` — λ(x) ⊄ B_W (`binding: null`, `condition: null`)
-  - `recipient_not_allowed` — ρ_Γ(c) ⊄ R_Γ(`checked_label`) (`binding: null`, `condition: null`)
+  - `recipient_not_allowed` — ρ_Γ(c) ⊄ R_Γ(`checked_label`) (`binding: null`, `condition: null`). Trägt zusätzlich `recipients_outside`: die fehlenden Empfänger aus der Prüfung, ρ_Γ(c) \ R_Γ(`checked_label`), sortiert und nicht leer (Ticket #417)
   - `label_not_preserved` — nur `store` und `transfer`: B_W ⊄ λ(y), das Objekt hätte eine Raumbindung verloren (`binding: null`, `condition: null`)
   - `missing_operation_rule` — Bindung hat keinen Eintrag für die geprüfte Operation (`binding` = Bindung, `condition: null`)
   - `binding_condition_false` — Bedingung als `false` bewertet (`binding` = Bindung, `condition` = erstes falsch bewertetes Feld des Ausdrucks in Auswertungsordnung, sonst `null`)
@@ -244,7 +244,7 @@ Regeln (R.6.2 — autorisiert wird ein Ereignis, nicht nur ein Text):
 
 APPA Theorem 5 umgesetzt: zu jedem Blocker und jedem fehlenden Beleg ein begrenzter, aufzählbarer Katalog legaler Fortsetzungen aus **genau vier Übergangstypen**. Der Katalog ist reine Ausgabe („der Katalog erzeugt keine Autorität“): keine Eingabe akzeptiert ihn, keine Fortsetzung wird ausgeführt.
 
-- `remedies`-Eintrag bei `deny` (spiegelt das Blocker-Element in `blockers`-Ordnung): `{"code": ..., "binding": ..., "condition": ..., "transitions": [...]}`.
+- `remedies`-Eintrag bei `deny` (spiegelt das Blocker-Element in `blockers`-Ordnung): `{"code": ..., "binding": ..., "condition": ..., "transitions": [...]}`, bei `recipient_not_allowed` zusätzlich `recipients_outside` wie im Blocker.
 - `remedies`-Eintrag bei `indeterminate` (spiegelt das `missing_evidence`-Element in dessen Ordnung): `{"code": ..., "fact": ..., "binding": ..., "transitions": [...]}`.
 
 Übergangstypen (geschlossene Menge, feste Payload-Schlüssel):
@@ -471,7 +471,7 @@ Alle Fälle nutzen `priv/fixtures/registry.json` (Bürgerfall-Bindung `buergerfa
 | `case_quarantine` | Objekt `classification: quarantine`, λ=`[]` — Quarantäne ist kein leeres Label (RFC 2.5, D.4) | **deny**, Blocker `object_quarantine` |
 | `case_deny_no_basis` | Öffentlicher Raum B_W=∅, öffentliche Datei, `has_operation_right: false` (D.4 `leeres-label`: ohne Basisrechte erlaubt nichts) | **deny**, Blocker `basis_right_false` |
 | `case_unsupported` | Intent `operation: start` | **unsupported** (keine Decision, Exit 3) |
-| `case_deny_recipient` | B_W=`[buergerfall-4711@1, lizenz-namensnennung@1]`, λ=`[lizenz-namensnennung@1]` (eigene Regel `true` erfüllt), Umgebung `recherche-webdienst@1` mit `webdienst-x` ∉ R_Γ(B_W) (D.4 `empfaengergrenze`: objektbezogenes `true` schaltet keinen unzulässigen Empfänger frei) | **deny**, Blocker `recipient_not_allowed`, `checked_label` = beide Bindungen |
+| `case_deny_recipient` | B_W=`[buergerfall-4711@1, lizenz-namensnennung@1]`, λ=`[lizenz-namensnennung@1]` (eigene Regel `true` erfüllt), Umgebung `recherche-webdienst@1` mit `webdienst-x` ∉ R_Γ(B_W) (D.4 `empfaengergrenze`: objektbezogenes `true` schaltet keinen unzulässigen Empfänger frei) | **deny**, Blocker `recipient_not_allowed` (`recipients_outside: [webdienst-x]`), `checked_label` = beide Bindungen |
 | `case_deny_missing_rule` | B_W=`[nur-start-test@1]` (Bindung ohne `admit`-Eintrag), alle Fakten `true` (B.4: fehlende Operationsregel ≠ leere Konjunktion `true`) | **deny**, Blocker `missing_operation_rule` (nur-start-test@1) |
 | `case_indeterminate_env_false` | Wie permit, aber `environment_observers_complete: false` (D.4 `unvollstaendige-umgebung`) | **indeterminate**, `missing_evidence` → `recipients_unproven` / `environment_observers_complete` |
 | `case_indeterminate_env_missing` | Wie permit, aber Fakt `environment_observers_complete` fehlt (kein Leer-Default, §2.2) | **indeterminate**, `missing_evidence` → `recipients_unproven` / `environment_observers_complete` |
@@ -564,7 +564,7 @@ Die Fixture-Registry trägt dafür bei `lizenz-namensnennung@1` die Regel `store
 | `case_store_wider_label` | B_W = `[lizenz-namensnennung@1]`, λ(y) = `[buergerfall-4711@1, lizenz-namensnennung@1]` | **deny**, Blocker `missing_operation_rule` (buergerfall-4711@1): entschieden wird unter λ(y), nicht unter B_W |
 | `case_store_label_not_preserved` | B_W = `[lizenz-namensnennung@1]`, λ(y) = `[]` | **deny**, Blocker `label_not_preserved`; Remedies nur `neuer_raum` |
 | `case_release_store_permit` | Kontext von `case_store_no_rule`, gültiges GO mit `operation: store` | **permit**, `rule: store`, `proof: null`, `release`-Objekt; ein GO mit dem `emit`-Hash desselben Objekts ergibt `release_call_mismatch` |
-| `case_store_recipient` | B_W = λ(y) = `[buergerfall-4711@1]` (keine `store`-Regel), Speicher `recherche-webdienst@1`: `webdienst-x` ∉ R_Γ(λ(y)) | **deny**, Blocker `recipient_not_allowed` und `missing_operation_rule` (buergerfall-4711@1); Remedies für beide nur `neuer_raum`, kein call-GO (#417) |
+| `case_store_recipient` | B_W = λ(y) = `[buergerfall-4711@1]` (keine `store`-Regel), Speicher `recherche-webdienst@1`: `webdienst-x` ∉ R_Γ(λ(y)) | **deny**, Blocker `recipient_not_allowed` (`recipients_outside: [webdienst-x]`) und `missing_operation_rule` (buergerfall-4711@1); Remedies für beide nur `neuer_raum`, kein call-GO (#417) |
 | `case_release_store_recipient` | Kontext von `case_store_recipient`, dasselbe gültige GO wie `case_release_store_permit` | **deny**, Blocker `recipient_not_allowed`, `release: null`; Remedies nur `neuer_raum` — kein GO ersetzt den Empfängertest |
 
 ### 8.5 `transfer`-Fälle (Übergabe, § 4.8)

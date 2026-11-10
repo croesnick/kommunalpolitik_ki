@@ -40,10 +40,15 @@ defmodule KomkiPolicy.Remedies do
 
   @unbridgeable ["workspace_invalid", "label_not_preserved"]
 
-  # store (§ 4.7) and the release branch, which re-checks the recipient test
-  # only for store (§ 4.6): no GO replaces it (#417). For emit and transfer
-  # a GO still bridges an inadmissible recipient (#354).
-  @unbridgeable_recipient [:store, :release]
+  # Operations whose recipient test no GO replaces (§ 4.7, R.5.7, #417). The
+  # release branch re-checks the test for exactly these (Derive), so there
+  # recipient_not_allowed is unbridgeable as well. For emit and transfer a
+  # GO still bridges an inadmissible recipient (#354).
+  @unbridgeable_recipient_operations ["store"]
+
+  @doc "Operations for which no GO replaces the recipient test (§ 4.6, § 4.7, #417)."
+  @spec unbridgeable_recipient_operations() :: [String.t()]
+  def unbridgeable_recipient_operations, do: @unbridgeable_recipient_operations
 
   @transition_order [
     "fakt_nachreichen",
@@ -107,7 +112,13 @@ defmodule KomkiPolicy.Remedies do
     end
   end
 
-  defp unbridgeable?(rule, "recipient_not_allowed"), do: rule in @unbridgeable_recipient
+  # In the release branch, recipient_not_allowed only arises for the
+  # operations above.
+  defp unbridgeable?(:release, "recipient_not_allowed"), do: true
+
+  defp unbridgeable?(rule, "recipient_not_allowed"),
+    do: Atom.to_string(rule) in @unbridgeable_recipient_operations
+
   defp unbridgeable?(_rule, code), do: code in @unbridgeable
 
   defp drop_call_go(transitions, ctx) do

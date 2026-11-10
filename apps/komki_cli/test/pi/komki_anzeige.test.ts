@@ -110,8 +110,13 @@ test("GO: was aus der Freigabe wurde, ohne dass pi selbst fragt", () => {
 test("Speichern außerhalb des Empfängerkreises: wer nicht mitlesen darf, kein GO-Angebot", () => {
 	const out = flat(render("vault_write_test_empfaenger"));
 	assert.match(out, /✗ abgelehnt Die Anfrage hat komki nicht verlassen\./);
-	assert.match(out, /Grund Inhalte dieses Arbeitsraums dürfen nicht zu sync-dienst\. Ein GO ändert daran nichts\./);
+	assert.match(out, /Grund Inhalte dieses Arbeitsraums dürfen nicht an sync-dienst gehen\. Ein GO ändert daran nichts\./);
 	assert.doesNotMatch(out, /mit deinem GO|Nicht gefragt/);
+
+	// Where a GO is offered (transfer), the sentence stays as before.
+	const web = flat(render("web_search_deny"));
+	assert.match(web, /Grund Empfänger dieser Anfrage \(brave-search, nutzende-person, pi-agent\) sind in diesem Arbeitsraum nicht alle erlaubt\./);
+	assert.doesNotMatch(web, /Ein GO ändert daran nichts/);
 });
 
 test("nichts in der Anzeige sieht wie eine Frage aus, die man in pi beantwortet", () => {

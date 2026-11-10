@@ -3,7 +3,10 @@
     {
       "binding": null,
       "code": "recipient_not_allowed",
-      "condition": null
+      "condition": null,
+      "recipients_outside": [
+        "webdienst-x"
+      ]
     }
   ],
   "checked_label": [
@@ -25,6 +28,9 @@
       "binding": null,
       "code": "recipient_not_allowed",
       "condition": null,
+      "recipients_outside": [
+        "webdienst-x"
+      ],
       "transitions": [
         {
           "required_bindings": [],

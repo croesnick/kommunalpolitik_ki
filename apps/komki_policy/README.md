@@ -122,7 +122,8 @@ bei `emit`, `store` und `transfer` zusätzlich das call-GO für die weichen Bloc
 außer die Entscheidung enthält einen unüberbrückbaren Blocker (`workspace_invalid`,
 `label_not_preserved`, bei `store` auch `recipient_not_allowed`: kein GO ersetzt
 dort den Empfängertest, #417). Für `indeterminate` nie ein GO — ein GO kann keine
-Belege herstellen.
+Belege herstellen. Der Blocker `recipient_not_allowed` und sein Katalog-Eintrag
+nennen in `recipients_outside` die Empfänger außerhalb des Empfängerkreises.
 
 ### Aktionsfreigabe trennt Urteil und Vollzug (§ 4.6)
 

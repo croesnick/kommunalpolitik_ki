@@ -648,8 +648,11 @@ defmodule KomkiPolicy.PropertyTest do
                  if(recipients_ok? and preserved?, do: "permit", else: "deny")
 
         unless recipients_ok? do
+          outside = rho -- Calculus.allowed_recipients(reg, labels)
+
           for decision <- [normal, released] do
-            assert "recipient_not_allowed" in Enum.map(decision["blockers"], & &1["code"])
+            blocker = Enum.find(decision["blockers"], &(&1["code"] == "recipient_not_allowed"))
+            assert blocker["recipients_outside"] == outside
             refute call_go_offered?(decision["remedies"])
           end
         end

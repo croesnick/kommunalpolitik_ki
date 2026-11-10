@@ -26,9 +26,9 @@ GO) tragen neben dem Remedy-Katalog das Feld `hinweis`: ein fester Satz an
 das Modell, dass Umwege nicht zum Ziel fuehren (Ticket #166,
 `KomkiMediator.Hinweis`). Liegt beim Speichern ein Empfaenger ausserhalb
 des Empfaengerkreises, bietet die Engine kein GO an (Ticket #417): Dann
-sagt der `hinweis` dem Modell nur, dass nichts uebertragen wurde, und das
-Feld `empfaenger_ausserhalb` nennt der nutzenden Person, wer nicht
-mitlesen darf.
+sagt der `hinweis` dem Modell nur, dass nichts uebertragen wurde. Wer
+nicht mitlesen darf, nennt der Blocker der Engine (`recipients_outside`);
+die pi-Anzeige zeigt es der nutzenden Person.
 
 ## Architektur im komki-Lauf
 
