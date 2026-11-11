@@ -41,6 +41,12 @@ jobs:
           version=$(grep -m1 'version:' apps/komki_cli/mix.exs | sed 's/.*"\(.*\)".*/\1/')
           test "komki-v${version}" = "${GITHUB_REF_NAME}" || { echo "Tag ${GITHUB_REF_NAME} passt nicht zu Version ${version}"; exit 1; }
 
+      # Seit #435 kompiliert der Workspace exqlite gegen die SQLCipher-
+      # Systembibliothek (config :exqlite in apps/komki_cli/config/config.exs);
+      # ohne sie scheitert make komki-formel beim exqlite-Bau.
+      - name: SQLCipher installieren
+        run: brew install sqlcipher
+
       - name: Paket und Formel bauen
         run: |
           mix deps.get

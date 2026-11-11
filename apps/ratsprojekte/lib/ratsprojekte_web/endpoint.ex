@@ -7,7 +7,7 @@ defmodule RatsprojekteWeb.Endpoint do
   @session_options [
     store: :cookie,
     key: "_ratsprojekte_key",
-    signing_salt: "zFIuiDFo",
+    signing_salt: "vnwYJIHU",
     same_site: "Lax"
   ]
 
@@ -29,6 +29,9 @@ defmodule RatsprojekteWeb.Endpoint do
     raise_on_missing_only: code_reloading?
   )
 
+  # Tidewave für Dev-Debugging (AGENTS.md „Debugging‟): nur im Dev-Modus am
+  # Endpoint — der Hub läuft mit echten Daten nie im Dev-Modus (ADR 0004),
+  # im Release hängt dieses Plug nicht mit im Baum.
   if Mix.env() == :dev do
     plug(Tidewave)
   end

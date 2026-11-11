@@ -65,8 +65,9 @@ vault_suche-workspace/
 # Internes Threat-Modell (private Infrastruktur-Topologie, bleibt lokal)
 /docs/rfcs/0000-sandbox-threat-modell.md
 
-# Interne Seed-Datensätze (echte Ratsprojekte, bleiben lokal)
-/apps/ratsprojekte/priv/repo/seeds.exs
+# Seeds der ratsprojekte-App sind getrackt und zeigen ausschließlich erfundene
+# Gartenstadt-Projekte (Ticket #435). Echte Bestände gehören in den Hub
+# (ADR 0004: „Der Hub startet leer‟), nie in Seed-Dateien.
 
 # Deepwork orchestrator state (local progress files)
 .slim/deepwork/

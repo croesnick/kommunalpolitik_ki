@@ -488,6 +488,69 @@ als `custom_erts` ein (Variable `KOMKI_CUSTOM_ERTS` in `apps/komki_cli/mix.exs`)
 
 ---
 
+## `sqlcipher` (Verschlüsselung für die SQLite-NIF)
+
+**Zweck:** Der Workspace baut exqlite gegen die SQLCipher-Systembibliothek
+(ADR 0004 „Betrieb‟, Ticket #435). Betroffen sind alle drei exqlite-Apps:
+`ratsprojekte` (Hub, eigene Datenbankdatei), `ratsinfo` (Volltextsuche) und
+`komki_cli` (Label-Registry). Ohne Schlüssel verhält sich SQLCipher wie
+normales SQLite — nichts ändert sich für Bestandsdatenbanken, erst mit
+Schlüssel wird verschlüsselt (Schreibweg im Release: Ticket #440).
+
+**Install (macOS):**
+
+```bash
+brew install sqlcipher
+```
+
+**Wie der Build greift:** In `config/config.exs` der drei Apps steht
+
+```elixir
+config :exqlite,
+  force_build: true,
+  make_env: %{
+    "EXQLITE_USE_SYSTEM" => "1",
+    "EXQLITE_SYSTEM_CFLAGS" => "-I#{prefix}/include/sqlcipher",
+    "EXQLITE_SYSTEM_LDFLAGS" => "-L#{prefix}/lib -lsqlcipher"
+  }
+```
+
+`force_build` verhindert die vorcompilierten cc_precompiler-Artefakte (sie
+enthalten ein ungepatchtes SQLite), `make_env` reicht die Variablen an den
+make-Prozess durch. `SQLCIPHER_PREFIX` überschreibt den pro OS ermittelten
+Präfix (macOS: Homebrew, Linux: `/usr`). Ändern sich die Flags, muss exqlite
+erneut kompiliert werden:
+
+```bash
+cd apps/<app> && mix deps.compile exqlite --force
+```
+
+**Prüfung:** `Ratsprojekte.SqlcipherTest` schlägt fehl, wenn exqlite doch
+ungepatcht gebaut wurde (`PRAGMA cipher_version` liefert dann keine Zeile);
+`otool -L _build/<env>/lib/exqlite/priv/sqlite3_nif.so` (macOS) zeigt die
+Verlinkung gegen `libsqlcipher.dylib`.
+
+**CI:** GitHub Actions (ubuntu-latest, 24.04) baut SQLCipher v4.20.0 aus der
+Quelle mit den Configure-Flags der Homebrew-Formel (das apt-Paket 4.5.6
+dort hätte kein FTS5 — ratsinfos Volltextsuche bräche). Der Schritt steht
+in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+
+**Konsequenz für komki:** Die gepackte exqlite-NIF im Homebrew-Paket verlinkt
+`libsqlcipher.dylib` — die Formel
+([`packaging/homebrew/komki.rb.in`](../packaging/homebrew/komki.rb.in)) hängt
+`sqlcipher` als Abhängigkeit ein.
+
+**Lizenz:** SQLCipher steht unter BSD 3-Clause (ZETETIC); die Homebrew-Formel
+deklariert zusätzlich das SQLite-Blessing für die enthaltene SQLite-Basis.
+
+**Fallback:** Keiner, und das ist beabsichtigt — ohne die Systembibliothek
+bricht der exqlite-Bau beim Kompilieren ab (force_build schaltet die
+vorcompilierten Artefakte bewusst ab) und `Ratsprojekte.SqlcipherTest` schlägt
+fehl. Wer die Datenbank der drei Apps ohne Verschlüsselungsbau weiter nutzen
+will, bleibt auf einem Stand vor #435.
+
+---
+
 ## Hinzufügen einer neuen Abhängigkeit
 
 1. Abhängigkeit in diesem Dokument eintragen (Zweck, Install, Konfiguration,

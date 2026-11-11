@@ -10,6 +10,12 @@ description: >
   oder "Gibt es einen Plan B für…?" verwenden.
 ---
 
+> **Wartet auf Neubau (#375):** Das Backend dieses Skills — der Dev-MCP-Endpoint
+> von ratsprojekte mit seinen Tools — ist mit dem Gerüstwechsel (#435, ADR 0004)
+> entfallen. Der Hub bekommt schreibend nur den Connector-Schreibweg (#277), lesend
+> die Fassung Stand als Datei (#438). Bis zur Neuarbeit der ratsprojekt-Skills
+> nach der pi-Vorlagen-Entscheidung (#375) führt dieser Skill nicht mehr zum Ziel.
+
 # Projekt-Tracker Skill
 
 ## Wann dieser Skill greift

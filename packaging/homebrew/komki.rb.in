@@ -15,6 +15,9 @@ class Komki < Formula
   depends_on "llama.cpp"
   depends_on :macos
   depends_on "node"
+  # Seit #435 baut der Workspace exqlite gegen die SQLCipher-Systembibliothek
+  # (BSD); die gepackte NIF unter lib/exqlite verlinkt libsqlcipher.dylib.
+  depends_on "sqlcipher"
   depends_on "tmux"
 
   def install
