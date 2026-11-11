@@ -1,0 +1,132 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null,
+      "recipients_outside": [
+        "fraktion",
+        "nextcloud-betreiber",
+        "sicherung",
+        "vorstand"
+      ]
+    },
+    {
+      "binding": "fraktion-intern@1",
+      "code": "missing_operation_rule",
+      "condition": null
+    },
+    {
+      "binding": "ratsarbeit@1",
+      "code": "missing_operation_rule",
+      "condition": null
+    },
+    {
+      "binding": "web-oeffentlich-fall@1",
+      "code": "missing_operation_rule",
+      "condition": null
+    }
+  ],
+  "checked_label": [
+    "fraktion-intern@1",
+    "ratsarbeit@1",
+    "web-oeffentlich-fall@1"
+  ],
+  "content_digest": "5a3f9f5da4d9d2a0eacbd56c1d1b1cbaf74e2fbd0cb0a28f61f5f45cb71f1b3c",
+  "decision": "deny",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-offenlegung",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-essenz-a",
+    "version": "v1"
+  },
+  "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null,
+      "recipients_outside": [
+        "fraktion",
+        "nextcloud-betreiber",
+        "sicherung",
+        "vorstand"
+      ],
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "fraktion",
+            "nextcloud-betreiber",
+            "nutzende-person",
+            "pi-agent",
+            "sicherung",
+            "vorstand"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    },
+    {
+      "binding": "fraktion-intern@1",
+      "code": "missing_operation_rule",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "fraktion",
+            "nextcloud-betreiber",
+            "nutzende-person",
+            "pi-agent",
+            "sicherung",
+            "vorstand"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    },
+    {
+      "binding": "ratsarbeit@1",
+      "code": "missing_operation_rule",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "fraktion",
+            "nextcloud-betreiber",
+            "nutzende-person",
+            "pi-agent",
+            "sicherung",
+            "vorstand"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    },
+    {
+      "binding": "web-oeffentlich-fall@1",
+      "code": "missing_operation_rule",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "fraktion",
+            "nextcloud-betreiber",
+            "nutzende-person",
+            "pi-agent",
+            "sicherung",
+            "vorstand"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
+  "rule": "store",
+  "snapshot_ref": "snap-offenlegung",
+  "workspace": "ws-fraktionsraum"
+}

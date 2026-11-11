@@ -146,6 +146,8 @@ defmodule KomkiCli.MixProject do
       {:komki_connector_web, path: "../komki_connector_web"},
       {:komki_connector_vault, path: "../komki_connector_vault"},
       {:komki_connector_documents, path: "../komki_connector_documents"},
+      # DURCHSTICH #409 (Wegwerf): ratsprojekte-Connector als Rolle.
+      {:komki_connector_ratsprojekte, path: "../komki_connector_ratsprojekte"},
       # Seatbelt-Kern (Ticket #226): Profil-Emitter, Presets, Escript-Schicht,
       # Boot-Gate-Sonde, Pins — komki-unabhaengige Library, Path-Dep auf die
       # Workspace-Schwester ohne Hex-Lock-Eintrag (wie komki_policy).

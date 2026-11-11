@@ -1,0 +1,7 @@
+{
+  "intent_id": "intent-offenlegung",
+  "object": "obj-essenz-a@v1",
+  "operation": "store",
+  "schema": "komki-intent/1",
+  "workspace": "ws-fraktionsraum"
+}

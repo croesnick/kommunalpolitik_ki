@@ -61,8 +61,13 @@ defmodule KomkiPolicy.RegistryTest do
 
       assert compiled.observers == [
                "eigene-rz-analyse",
+               "fraktion",
                "lokale-fallverarbeitung",
+               "nextcloud-betreiber",
                "nutzende-person",
+               "pi-agent",
+               "sicherung",
+               "vorstand",
                "webdienst-x"
              ]
 
@@ -70,14 +75,131 @@ defmodule KomkiPolicy.RegistryTest do
 
       assert Map.keys(compiled.environments) == [
                "lokale-fallverarbeitung@1",
+               "ratsprojekte-bestand@1",
                "recherche-webdienst@1"
              ]
 
       assert Map.keys(compiled.bindings) == [
                "buergerfall-4711@1",
+               "fraktion-intern@1",
                "lizenz-namensnennung@1",
-               "nur-start-test@1"
+               "nur-start-test@1",
+               "ratsarbeit@1",
+               "ratsprojekte@1",
+               "web-oeffentlich-fall@1"
              ]
+    end
+
+    test "strukturierte Lockerungsbefugnisse kompilieren mit (R.2.2, #423)" do
+      compiled = compile_term!(fixture("registry.json"))
+      binding = Map.fetch!(compiled.bindings, "fraktion-intern@1")
+
+      assert binding.relaxation_authorities == [
+               %{
+                 authority: "nutzende-person",
+                 restriction: "readers",
+                 output: "ratsprojekte-essenz"
+               }
+             ]
+
+      assert Map.fetch!(compiled.bindings, "ratsarbeit@1").relaxation_authorities == []
+    end
+
+    test "Befugnis-Eintraege sind geschlossen: Felder, Vokabular, Beobachter" do
+      base = Map.put(base_registry(), "schema", "komki-registry/2")
+
+      binding = fn authorities ->
+        put_in(
+          base["bindings"]["test@1"]["relaxation_authorities"],
+          authorities
+        )
+      end
+
+      assert %{code: :unknown_field} =
+               compile_term_error(
+                 binding.([
+                   %{
+                     "authority" => "nutzende-person",
+                     "restriction" => "readers",
+                     "output" => "ratsprojekte-essenz",
+                     "bedingung" => "nie"
+                   }
+                 ])
+               )
+
+      assert %{code: :invalid_restriction_kind} =
+               compile_term_error(binding.([%{"authority" => "nutzende-person"}]))
+
+      assert %{code: :invalid_reference_id} =
+               compile_term_error(
+                 binding.([
+                   %{
+                     "authority" => "Nutzende",
+                     "restriction" => "readers",
+                     "output" => "ratsprojekte-essenz"
+                   }
+                 ])
+               )
+
+      assert %{code: :unknown_observer} =
+               compile_term_error(
+                 binding.([
+                   %{
+                     "authority" => "fremde-stelle",
+                     "restriction" => "readers",
+                     "output" => "ratsprojekte-essenz"
+                   }
+                 ])
+               )
+
+      assert %{code: :invalid_restriction_kind} =
+               compile_term_error(
+                 binding.([
+                   %{
+                     "authority" => "nutzende-person",
+                     "restriction" => "geheimnisse",
+                     "output" => "ratsprojekte-essenz"
+                   }
+                 ])
+               )
+
+      assert %{code: :invalid_output_kind} =
+               compile_term_error(
+                 binding.([
+                   %{
+                     "authority" => "nutzende-person",
+                     "restriction" => "readers",
+                     "output" => "neue-ausgabe"
+                   }
+                 ])
+               )
+
+      assert %{code: :duplicate_relaxation_authority} =
+               compile_term_error(
+                 binding.([
+                   %{
+                     "authority" => "nutzende-person",
+                     "restriction" => "readers",
+                     "output" => "ratsprojekte-essenz"
+                   },
+                   %{
+                     "authority" => "nutzende-person",
+                     "restriction" => "readers",
+                     "output" => "ratsprojekte-essenz"
+                   }
+                 ])
+               )
+
+      assert {:ok, _} =
+               Registry.compile(
+                 binding.([
+                   %{
+                     "authority" => "nutzende-person",
+                     "restriction" => "auflagen",
+                     "output" => "sitzungsmappe"
+                   }
+                 ])
+               )
     end
 
     test "invalid/registry_unknown_field.json -> unknown_field (Bindungsebene)" do

@@ -74,6 +74,8 @@
 ; Connector-Sockets (Frame-Protokoll, CONTRACT.md §3) — einziges Outbound, Token nur lesen
 (allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/documents.sock")))
 (allow file-read* (literal "/opt/komki-golden/run/connectors/documents.token"))
+(allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/ratsprojekte.sock")))
+(allow file-read* (literal "/opt/komki-golden/run/connectors/ratsprojekte.token"))
 (allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/ris.sock")))
 (allow file-read* (literal "/opt/komki-golden/run/connectors/ris.token"))
 (allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/run/connectors/vault.sock")))

@@ -713,7 +713,8 @@ defmodule KomkiCli.CLI do
     do:
       KomkiCli.GoSteps.run(KomkiCli.Config.default_base(), %{
         say: &IO.puts/1,
-        confirm: &KomkiCli.Prompt.confirm/2
+        confirm: &KomkiCli.Prompt.confirm/2,
+        select: &KomkiCli.Prompt.select/1
       })
 
   defp dispatch_command(:setup, result),

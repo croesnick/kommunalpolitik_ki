@@ -30,7 +30,7 @@ defmodule KomkiConnector.Manifest do
           import_labels: [String.t()]
         }
 
-  @ids ["documents", "ris", "vault", "web"]
+  @ids ["documents", "ratsprojekte", "ris", "vault", "web"]
 
   @doc "Alle Connector-IDs, sortiert."
   @spec ids() :: [String.t()]
@@ -115,6 +115,58 @@ defmodule KomkiConnector.Manifest do
       credentials: %{},
       environment: "ris-abruf@1",
       import_labels: ["ris-oeffentlich@1"]
+    }
+  end
+
+  # Weg "Fakt vorschlagen" (Durchstich #409, Bau-Ticket #277): Der
+  # ratsprojekte-Connector traegt Szene 11 — EIN Ereignis mit Teilen,
+  # ein GO in komki, die Entscheidung im Hub. Schreibend, Umgebung ist
+  # der Bestand des Hubs (`ratsprojekte-bestand@1`, Γ-GO vom 2026-11-10).
+  # Die Ausgabeart `ratsprojekte-essenz` (Arbeitstitel, Szene 13, #423)
+  # benennt das Ziel der Lockerungsbefugnisse: Der Vermittler traegt sie
+  # in die GO-Anfrage, die Engine rechnet sie gegen die Zielumgebung nach
+  # (§ 4.9). Der Hub-Socket-Pfad kommt aus der config
+  # (`ratsprojekte_socket`), das Hub-Token aus dem Schluesselbund-Service
+  # unten (der Hub kennt nur den Hash, #415).
+  def fetch!("ratsprojekte") do
+    %{
+      id: "ratsprojekte",
+      fassung: "komki-ratsprojekte/1",
+      binary: "komki-connector-ratsprojekte",
+      ops: %{
+        "fakt_vorschlagen" => %{
+          tool: "rp_fakt_vorschlagen",
+          kind: :write,
+          ausgabeart: "ratsprojekte-essenz",
+          description:
+            "Dem ratsprojekte-Hub einen Vorschlag machen: EIN Ereignis mit Teilen, ein GO deckt alle Teile, " <>
+              "die Redaktion waehlt im Hub ab, was zum Stand gehoert. Jeder Teil braucht eine Aussage und " <>
+              "einen Verweis auf eine Antwort aus diesem Raum; der Vorschlag erscheint dort als nicht verifiziert. " <>
+              "Die Projektangabe ist nur ein Hinweis. Aus oeffentlicher Recherche entscheidet die nutzende Person " <>
+              "per GO fuer genau diesen Aufruf; aus einem vertraulichen Raum (etwa dem Fraktionsraum) wird der Text " <>
+              "dem Vorstand offengelegt — dann entscheidet ein eigenes Freigabefenster, und ein Teil, den sie abwaehlt, " <>
+              "verlaesst den Raum nicht.",
+          params: %{
+            "titel" => %{type: :string, max: 120, required: true},
+            "teile" => %{
+              type: :list,
+              min_items: 1,
+              max_items: 8,
+              items: %{
+                "aussage" => %{type: :string, max: 1000, required: true},
+                "quelle" => %{type: :string, max: 400, required: true},
+                "fundstelle" => %{type: :string, max: 200, required: false}
+              }
+            },
+            "projekt_hinweis" => %{type: :string, max: 120, required: false}
+          }
+        }
+      },
+      egress_hosts: [],
+      fs: [],
+      credentials: %{"KOMKI_HUB_TOKEN" => "ratsprojekte-hub-token"},
+      environment: "ratsprojekte-bestand@1",
+      import_labels: []
     }
   end
 

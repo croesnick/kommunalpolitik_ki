@@ -28,6 +28,17 @@ defmodule KomkiPolicy.Registry do
   @fact_types ["string", "boolean", "integer", "string_set"]
   @known_operations ["start", "admit", "emit", "transfer", "store"]
 
+  # Strukturierte Lockerungsbefugnisse (R.2.2, Ticket #109/#423): wer
+  # welche Einschraenkung fuer welche Ausgabe lockern darf. Geschlossene
+  # Vokabulare fuer Einschaenkung und Ausgabe — die Engine ist die
+  # Schemainstanz, kein Konsumierender schreibt eigene Checks. Nur die
+  # Kombination `readers` x `ratsprojekte-essenz` ist entscheidbar
+  # (Offenlegungsfreigabe-Zweig, § 4.9); alles andere ist strukturiert
+  # verwaltet, aber undecidable (fail-closed).
+  @authority_fields ["authority", "restriction", "output"]
+  @restriction_kinds ["readers", "operations", "auflagen"]
+  @output_kinds ["ratsprojekte-essenz", "freigabe-notiz", "sitzungsmappe", "kurzzitat-mit-quelle"]
+
   @kebab_re ~r/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/
   @ref_re ~r/\A[a-z0-9]+(?:-[a-z0-9]+)*@(0|[1-9][0-9]*)\z/
 
@@ -36,7 +47,13 @@ defmodule KomkiPolicy.Registry do
           required(:observers) => [String.t()],
           required(:fact_fields) => %{String.t() => String.t()},
           required(:environments) => %{String.t() => %{observers: [String.t()]}},
-          required(:bindings) => %{String.t() => %{readers: [String.t()], operations: %{}}},
+          required(:bindings) => %{
+            String.t() => %{
+              readers: [String.t()],
+              operations: %{},
+              relaxation_authorities: [map()]
+            }
+          },
           required(:transformations) => %{
             String.t() => %{
               input_labels: [String.t()],
@@ -70,6 +87,16 @@ defmodule KomkiPolicy.Registry do
 
   @spec reference_id?(term()) :: boolean()
   def reference_id?(value), do: is_binary(value) and Regex.match?(@ref_re, value)
+
+  @doc """
+  Geschlossenes Vokabular der Ausgabearten (§ 2.1, § 2.6): die Ausgabe
+  einer Lockerungsbefugnis und einer Offenlegungsfreigabe. Decidierbar
+  ist in dieser Lieferung nur `ratsprojekte-essenz` (Offenlegungsfreigabe-
+  Zweig, § 4.9); die uebrigen sind strukturiert verwaltet, aber
+  undecidable (fail-closed).
+  """
+  @spec output_kinds() :: [String.t()]
+  def output_kinds, do: @output_kinds
 
   # ---------------------------------------------------------------------
   # Kernvalidierung
@@ -246,22 +273,104 @@ defmodule KomkiPolicy.Registry do
     with {:ok, _} <- Validations.require_map(spec, path),
          :ok <- Validations.closed_fields(spec, @binding_fields, path),
          :ok <- subset_observers(spec["readers"], observers, path <> ".readers"),
-         :ok <- relaxations_list?(spec["relaxation_authorities"], path),
+         {:ok, authorities} <-
+           validate_relaxation_authorities(
+             spec["relaxation_authorities"],
+             observers,
+             path <> ".relaxation_authorities"
+           ),
          {:ok, operations} <- validate_operations(spec["operations"], fact_fields, path) do
-      {:ok, %{readers: Enum.sort(spec["readers"]), operations: operations}}
+      {:ok,
+       %{
+         readers: Enum.sort(spec["readers"]),
+         operations: operations,
+         relaxation_authorities: authorities
+       }}
     else
       {:error, reason} -> reject_reason(reason)
     end
   end
 
-  defp relaxations_list?(value, path) do
-    if is_list(value) do
+  # Strukturierte Lockerungsbefugnisse (§ 2.1, R.2.2): jede Befugnis ein
+  # Objekt mit exakt {authority, restriction, output}; die Autoritaet muss
+  # Beobachter der Registry sein, Einschaenkung und Ausgabe aus den
+  # geschlossenen Vokabularen; keine Duplikate. Die leere Liste bleibt
+  # gueltig (ohne Eintrag ist keine Lockerung zulaessig, R.2.2).
+  defp validate_relaxation_authorities(entries, observers, path) when is_list(entries) do
+    entries
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, []}, fn {entry, index}, {:ok, acc} ->
+      case authority_entry(entry, observers, path <> ".[" <> Integer.to_string(index) <> "]") do
+        {:ok, built} -> {:cont, {:ok, acc ++ [built]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, built} ->
+        if length(built) ==
+             length(Enum.uniq_by(built, &{&1[:authority], &1[:restriction], &1[:output]})) do
+          {:ok, built}
+        else
+          fail(:duplicate_relaxation_authority, path, "duplicate authority entry")
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp validate_relaxation_authorities(_other, _observers, path),
+    do: fail(:invalid_relaxation_authorities, path, "expected an array")
+
+  defp authority_entry(entry, observers, path) do
+    with {:ok, _} <- Validations.require_map(entry, path),
+         :ok <- Validations.closed_fields(entry, @authority_fields, path),
+         :ok <- Validations.require_kebab(entry["authority"], path <> ".authority"),
+         :ok <- require_authority_observer(entry["authority"], observers, path),
+         :ok <- require_restriction_kind(entry["restriction"], path),
+         :ok <- Validations.require_kebab(entry["output"], path <> ".output"),
+         :ok <- require_output_kind(entry["output"], path) do
+      {:ok,
+       %{
+         authority: entry["authority"],
+         restriction: entry["restriction"],
+         output: entry["output"]
+       }}
+    end
+  end
+
+  defp require_authority_observer(authority, observers, path) do
+    if authority in observers do
       :ok
     else
       fail(
-        :invalid_relaxation_authorities,
-        path <> ".relaxation_authorities",
-        "expected an array"
+        :unknown_observer,
+        path <> ".authority",
+        "authority not in the registry observer set: " <> authority
+      )
+    end
+  end
+
+  defp require_restriction_kind(value, path) do
+    if value in @restriction_kinds do
+      :ok
+    else
+      fail(
+        :invalid_restriction_kind,
+        path <> ".restriction",
+        "expected one of " <> inspect(@restriction_kinds) <> ", got " <> inspect(value)
+      )
+    end
+  end
+
+  defp require_output_kind(value, path) do
+    if value in @output_kinds do
+      :ok
+    else
+      fail(
+        :invalid_output_kind,
+        path <> ".output",
+        "expected one of " <> inspect(@output_kinds) <> ", got " <> inspect(value)
       )
     end
   end

@@ -34,6 +34,8 @@ defmodule KomkiMediator.Server do
   component(KomkiMediator.Tools.VaultSearch)
   component(KomkiMediator.Tools.VaultWriteTest)
   component(KomkiMediator.Tools.WebSearch)
+  # Durchstich #409, belegt im Wegwerf-Lauf
+  component(KomkiMediator.Tools.RpFaktVorschlagen)
 
   # Ticket #165: Die Vorpruefung sieht die rohen Argumente - inklusive
   # unbekannter Felder und falscher Typen, welche die anubis-Schicht

@@ -96,11 +96,20 @@ defmodule KomkiCli.Connectors do
   # Auswahl und Argumente (rein)
   # ===========================================================================
 
-  @doc "Aktive Connectoren: alle Manifeste, Vault nur mit gesetztem vault_dir."
+  @doc """
+  Aktive Connectoren: alle Manifeste, Vault nur mit gesetztem vault_dir,
+  ratsprojekte (DURCHSTICH #409, Wegwerf) nur mit gesetztem
+  ratsprojekte_socket — der Socket des Hubs ist seine eigene Schnittstelle
+  (#415), nicht Teil der komki-Basis.
+  """
   @spec enabled(Config.t()) :: [Manifest.t()]
   def enabled(%Config{} = cfg) do
     Enum.filter(Manifest.all(), fn manifest ->
-      manifest.id != "vault" or is_binary(cfg.vault_dir)
+      cond do
+        manifest.id == "vault" -> is_binary(cfg.vault_dir)
+        manifest.id == "ratsprojekte" -> is_binary(cfg.ratsprojekte_socket)
+        true -> true
+      end
     end)
   end
 
@@ -186,6 +195,11 @@ defmodule KomkiCli.Connectors do
 
   defp fs_args(cfg, %{id: "vault"}), do: ["--vault-dir", cfg.vault_dir]
   defp fs_args(cfg, %{id: "documents"}), do: ["--documents-dir", documents_dir(cfg)]
+
+  # Durchstich #409, belegt im Wegwerf-Lauf: Der Connector erreicht den Hub ueber dessen
+  # eigenen Unix-Socket (Pfad in argv ist keine Wegabee — nur Credentials
+  # reisen ueber stdin, CONTRACT.md §4).
+  defp fs_args(cfg, %{id: "ratsprojekte"}), do: ["--hub-socket", cfg.ratsprojekte_socket]
   defp fs_args(_cfg, _manifest), do: []
 
   @doc """

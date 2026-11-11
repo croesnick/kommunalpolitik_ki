@@ -56,14 +56,46 @@ defmodule KomkiPolicy.ReleaseTest do
                )
     end
 
-    test "nicht implementiertes kind ist KEIN Eingabefehler: offenlegungsfreigabe validiert" do
-      assert {:ok, %{kind: "offenlegungsfreigabe"}} =
+    test "offenlegungsfreigabe braucht komki-release/2 mit ausgabeart und ziellabel (#423)" do
+      base = fixture("case_release_permit/release.json")
+
+      # Nur die Art zu drehen bleibt ein Eingabefehler: die Schema-Kennung
+      # passt nicht zur Art (§ 2.6: offenlegungsfreigabe ist komki-release/2).
+      assert {:error, %{code: :invalid_schema}} =
+               Release.validate(Map.put(base, "kind", "offenlegungsfreigabe"))
+
+      assert {:error, %{code: :missing_field, path: "$.ausgabeart"}} =
                Release.validate(
-                 Map.put(
-                   fixture("case_release_permit/release.json"),
-                   "kind",
-                   "offenlegungsfreigabe"
-                 )
+                 base
+                 |> Map.put("kind", "offenlegungsfreigabe")
+                 |> Map.put("schema", "komki-release/2")
+               )
+
+      offenlegung =
+        base
+        |> Map.put("kind", "offenlegungsfreigabe")
+        |> Map.put("schema", "komki-release/2")
+        |> Map.put("ausgabeart", "ratsprojekte-essenz")
+        |> Map.put("ziellabel", ["ratsprojekte@1"])
+
+      assert {:ok, %{kind: "offenlegungsfreigabe", ausgabeart: "ratsprojekte-essenz"}} =
+               Release.validate(offenlegung)
+
+      # Eine unbekannte Ausgabeart ist ein Eingabefehler (geschlossenes
+      # Vokabular, § 2.1), ein unsortiertes Ziellabel ebenfalls.
+      assert {:error, %{code: :invalid_output_kind}} =
+               Release.validate(Map.put(offenlegung, "ausgabeart", "neue-ausgabe"))
+
+      assert {:error, %{code: :invalid_ziellabel}} =
+               Release.validate(Map.put(offenlegung, "ziellabel", ["ratsprojekte@1", "abo-az@1"]))
+
+      # Eine Aktionsfreigabe trägt die Felder der Lockerung nicht (§ 2.6):
+      # unter komki-release/1 bleiben sie verboten.
+      assert {:error, %{code: :unknown_field}} =
+               Release.validate(
+                 base
+                 |> Map.put("ausgabeart", "ratsprojekte-essenz")
+                 |> Map.put("ziellabel", ["ratsprojekte@1"])
                )
     end
 

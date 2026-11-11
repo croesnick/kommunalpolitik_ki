@@ -18,7 +18,9 @@ defmodule KomkiCli.Roles do
     "komki-connector-documents" => KomkiConnectorDocuments.CLI,
     "komki-connector-ris" => KomkiConnectorRis.CLI,
     "komki-connector-web" => KomkiConnectorWeb.CLI,
-    "komki-connector-vault" => KomkiConnectorVault.CLI
+    "komki-connector-vault" => KomkiConnectorVault.CLI,
+    # Durchstich #409, belegt im Wegwerf-Lauf
+    "komki-connector-ratsprojekte" => KomkiConnectorRatsprojekte.CLI
   }
 
   @doc "Alle Rollennamen, sortiert."

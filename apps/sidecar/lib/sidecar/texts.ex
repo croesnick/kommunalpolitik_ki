@@ -33,9 +33,10 @@ defmodule Sidecar.Texts do
   @doc """
   Detail for a parameter-schema violation. `kind` is one of
   `:unknown_fields | :not_object | :missing_required | :invalid_utf8 |
-  :too_long | :blank | :bad_format | :out_of_range | :wrong_type`;
-  `info` carries the pieces of the message (`name`, `names`, `max`,
-  `min`, `type` as applicable).
+  :too_long | :blank | :bad_format | :out_of_range | :wrong_type |
+  :too_many_items | :too_few_items | :item_not_object |
+  :item_unknown_fields`; `info` carries the pieces of the message
+  (`name`, `names`, `max`, `min`, `type` as applicable).
   """
   @callback params_error(kind :: atom(), info :: map()) :: String.t()
 
@@ -99,4 +100,15 @@ defmodule Sidecar.Texts do
 
   def params_error(:wrong_type, %{name: name, type: type}),
     do: "#{name}: expected #{type}"
+
+  def params_error(:too_many_items, %{name: name, max: max}),
+    do: "#{name}: more than #{max} entries"
+
+  def params_error(:too_few_items, %{name: name, min: min}),
+    do: "#{name}: fewer than #{min} entries"
+
+  def params_error(:item_not_object, %{name: name}), do: "#{name}: entry must be an object"
+
+  def params_error(:item_unknown_fields, %{name: name, names: names}),
+    do: "#{name}: unknown fields: #{Enum.join(Enum.sort(names), ", ")}"
 end

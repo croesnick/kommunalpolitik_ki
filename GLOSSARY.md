@@ -849,9 +849,32 @@ Einschränkung für welche Ausgabe lockern darf. Ohne Eintrag ist keine
 Lockerung zulässig.
 
 **Abgrenzung:** Original und laufender Arbeitsraum behalten ihr Label. Ein
-GO ersetzt keine fehlende Lockerungsbefugnis.
+GO ersetzt keine fehlende Lockerungsbefugnis. Befugnisse sind strukturierte
+Einträge `{authority, restriction, output}` im Γ (CONTRACT.md § 2.1); eine
+Bindung, deren Empfängerkreis das Ziel ohnehin abdeckt, lockert nichts
+und braucht keine Befugnis.
 
-**Siehe:** RFC 0003 R.2.2, R.5.7; [Aktionsfreigabe und Offenlegungsfreigabe](#aktionsfreigabe-und-offenlegungsfreigabe).
+**Siehe:** RFC 0003 R.2.2, R.5.7; [Aktionsfreigabe und Offenlegungsfreigabe](#aktionsfreigabe-und-offenlegungsfreigabe), [Ausgabeart](#ausgabeart).
+
+---
+
+### Ausgabeart
+
+**Definition:** Das `output` einer Lockerungsbefugnis und einer
+Offenlegungsfreigabe: wofür eine Bindung gelockert werden darf — im
+ersten gebauten Fall `ratsprojekte-essenz` (Arbeitstitel) für gegengelesene
+Essenz aus dem Fraktionsraum in den ratsprojekte-Hub (Szene 13, #423).
+Das Vokabular ist geschlossen (CONTRACT.md § 2.1), die Engine ordnet die
+Ausgabeart der Zielumgebung zu und rechnet sie gegen die Freigabe nach;
+der Agent benennt keine Ausgabeart.
+
+**Abgrenzung:** Die Ausgabeart benennt den Zweck der Lockerung, nicht das
+Ziellabel: `ratsprojekte-essenz` lockert auf `ratsprojekte@1`, aber das
+Ziellabel steht in der Freigabe und wird separat geprüft (R.6.2).
+
+_Vermeiden:_ Ausgabeform, Exportart.
+
+**Siehe:** [Lockerung und Lockerungsbefugnis](#lockerung-und-lockerungsbefugnis), [Aktionsfreigabe und Offenlegungsfreigabe](#aktionsfreigabe-und-offenlegungsfreigabe).
 
 ---
 
@@ -937,10 +960,14 @@ bei einer weiteren Entscheidung gemeinsam zu berücksichtigen sind.
 Wirkung (R.6.1) — eine Transaktion, nicht nur einen Text; sie wird an
 den exakten call hash gebunden, mit Frische-Fenster und einmalig
 verbrauchter Nonce (R.6.3). Eine Offenlegungsfreigabe erlaubt zusätzlich das
-Lockern von Bindungen (Herabstufungsbefugnis); sie ist in
-`komki_policy` bewusst nicht implementiert (`unsupported`).
+Lockern von Bindungen (Herabstufungsbefugnis): Sie nennt Ausgabeart und
+Ziellabel der Lockerung und wirkt nur, wenn jede lockerungsbedürftige
+Bindung die Befugnis trägt (R.5.7). Seit #423 entscheidet die Engine
+sie für `store` (`komki-release/2`, CONTRACT.md § 4.9), zuerst für
+gegegengelesene Essenz aus dem Fraktionsraum in den ratsprojekte-Hub
+(Szene 13).
 
-**Siehe:** RFC 0003 R.6.1–R.6.3; [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.6, § 4.6.
+**Siehe:** RFC 0003 R.6.1–R.6.3; [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.6, § 4.6, § 4.9.
 
 ---
 
@@ -958,6 +985,27 @@ Ausführung des freigegebenen Texts, nicht die Abwesenheit verdeckter
 Kodierung. Die begrenzte Faktenfreigabe gibt die stärkere Zusage.
 
 **Siehe:** RFC 0003 R.6.4, R.7.2.
+
+---
+
+### Essenz
+
+**Definition:** Die gekürzte, gegengelesene Fassung eines vertraulichen
+Texts für den ratsprojekte-Hub — etwa der Antragsentwurf aus dem
+Fraktionsraum (Szene 13). Sie ist der einzige Inhalt, der aus
+vertraulichen Räumen in den Hub gelangt: von Hand eingetragen oder,
+seit #423, über komki als Lockerung mit Offenlegungsfreigabe und
+Teileauswahl vor dem GO.
+
+**Abgrenzung:** Die Essenz ist kein Zitat und kein Fakt mit Quelle, sie
+trägt die eigene Substanz des Raums in der Wortwahl der nutzenden Person.
+Nichtöffentliches gehört nie in die Essenz, auch nicht von Hand. Der
+Faktenweg (G2) wäre die stärkere Form und ist für die Essenz noch
+offen (#363).
+
+_Vermeiden:_ Kurzfassung, Auszug, Zusammenfassung.
+
+**Siehe:** [Manuelle Inhaltsfreigabe und begrenzte Faktenfreigabe](#manuelle-inhaltsfreigabe-und-begrenzte-faktenfreigabe), [Ausgabeart](#ausgabeart), [Gemeinsam gebundener Speicher](#gemeinsam-gebundener-speicher).
 
 ---
 

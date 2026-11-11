@@ -416,8 +416,7 @@ defmodule KomkiPolicy.DeriveTest do
       assert ["lokale-fallverarbeitung", "nutzende-person"] =
                Calculus.allowed_recipients(reg, ["buergerfall-4711@1"])
 
-      assert ["eigene-rz-analyse", "lokale-fallverarbeitung", "nutzende-person", "webdienst-x"] =
-               Calculus.allowed_recipients(reg, [])
+      assert reg.observers == Calculus.allowed_recipients(reg, [])
     end
 
     test "actual_recipients und labels_subset?" do

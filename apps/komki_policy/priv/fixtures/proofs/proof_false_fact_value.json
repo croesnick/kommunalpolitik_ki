@@ -63,8 +63,13 @@
       ],
       "allowed_recipients": [
         "eigene-rz-analyse",
+        "fraktion",
         "lokale-fallverarbeitung",
+        "nextcloud-betreiber",
         "nutzende-person",
+        "pi-agent",
+        "sicherung",
+        "vorstand",
         "webdienst-x"
       ],
       "kind": "computed",

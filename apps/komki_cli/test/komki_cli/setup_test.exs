@@ -192,9 +192,15 @@ defmodule KomkiCli.SetupTest do
   end
 
   describe "Secrets" do
-    test "der Brave-Key kommt aus dem Web-Manifest und heisst kurz 'brave'" do
-      assert [%{name: "brave", service: "brave-search-api", connector: "web"}] = Secrets.all()
+    test "die Geheimnisse kommen aus den Manifesten (Brave kurz 'brave'; DURCHSTICH #409: Hub-Token)" do
+      assert [
+               %{name: "brave", service: "brave-search-api", connector: "web"},
+               %{name: "ratsprojekte-hub"}
+             ] =
+               Secrets.all()
+
       assert {:ok, %{name: "brave"}} = Secrets.fetch("brave-search-api")
+      assert {:ok, %{name: "ratsprojekte-hub"}} = Secrets.fetch("ratsprojekte-hub-token")
       assert :error = Secrets.fetch("unbekannt")
     end
   end

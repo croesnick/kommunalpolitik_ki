@@ -117,25 +117,32 @@ Einzige Quelle für Fassung, Operationen, Netz, Dateisystem, Credentials und Imp
 
 | Feld | Bedeutung |
 |---|---|
-| `id` | `documents`, `ris`, `web`, `vault` |
-| `fassung` | `komki-documents/1`, `komki-ris/2`, `komki-web/1`, `komki-vault/1` |
+| `id` | `documents`, `ratsprojekte`, `ris`, `web`, `vault` |
+| `fassung` | `komki-documents/1`, `komki-ratsprojekte/1`, `komki-ris/2`, `komki-web/1`, `komki-vault/1` |
 | `binary` | Name des Escripts |
-| `ops` | Operation → Parameter-Schema (geschlossen, siehe unten) und `kind` (`read` oder `write`) |
+| `ops` | Operation → Parameter-Schema (geschlossen, siehe unten), `kind` (`read` oder `write`) und optional `ausgabeart` (nur schreibend, siehe unten) |
 | `egress_hosts` | Host-Allowlist für den Egress-Proxy (`host:port`). Leer heißt: kein Netz, kein Proxy-Port |
 | `fs` | Platzhalter-Pfade (`{vault_dir}`, `{documents_dir}` = `<base>/mediator/documents`) mit Modus `read` oder `write` |
 | `credentials` | Name → Keychain-Service. Der Eintrag enthält nur das Siegel (`ktv2.…`); `komki up` öffnet es mit der Schlüsselvereinbarung von `komki-tresor` über die Secure Enclave (Touch ID oder Passwort) und schreibt den Klartext nur in die stdin-Zeile. Ein Klartext-Eintrag oder ein Siegel im alten Format `ktv1` wird nicht benutzt |
 | `environment` | Umgebung für `transfer` und `store` (modellierte Empfänger der Anfrage), z. B. `web-suche@1` |
 | `import_labels` | erlaubte Labels für Antworten. Bei RIS und Web genau eines. Bei Vault leer: die Notiz trägt ihre Labels im Frontmatter, und der Vermittler lässt jede Bindung aus Γ zu (Ticket #211); der Connector prüft nur die Form einer Bindungs-ID. Geschriebene Notizen tragen λ(y) = B_W (§6.3) |
 
-Parameter-Schemas sind geschlossen: Typ `string` (mit `max` Zeichen und optional `pattern`) oder `integer`
-(mit `min`/`max`). Unbekannte Felder sind ein Fehler. Kein Parameter nimmt eine URL, einen absoluten Pfad
-oder einen Host an.
+Parameter-Schemas sind geschlossen: Typ `string` (mit `max` Zeichen und optional `pattern`), `integer`
+(mit `min`/`max`) oder `list` (mit `min_items`/`max_items` und `items`, einem geschlossenen Schema von
+string/integer-Feldern je Element; unbekannte Felder je Element sind ein Fehler). Unbekannte Felder sind ein
+Fehler. Kein Parameter nimmt eine URL, einen absoluten Pfad oder einen Host an.
+
+`ausgabeart` (schreibende Operationen, #423): benennt das Ziel der Lockerungsbefugnisse dieser Operation —
+`ratsprojekte-essenz` für den ratsprojekte-Hub. Der Vermittler trägt sie in die GO-Anfrage; die Engine leitet
+die Ausgabeart aus der Zielumgebung ab und rechnet sie gegen die Offenlegungsfreigabe nach (komki_policy,
+CONTRACT.md § 4.9). Der Agent benennt keine Ausgabeart; das Manifest ist die einzige Quelle.
 
 ### 5.1 Fassungen
 
 | Connector | MCP-Tool (Vermittler) | Operation | Parameter | Art |
 |---|---|---|---|---|
 | documents | `admit_document` | `read` | `document_id` (string, max 64, pattern `^[a-z0-9-]+$`) | read |
+| ratsprojekte | `rp_fakt_vorschlagen` | `fakt_vorschlagen` | `titel` (string, max 120), `teile` (list, 1..8, je `aussage` string max 1000 Pflicht, `quelle` string max 400 Pflicht, `fundstelle` string max 200), `projekt_hinweis` (string, max 120, optional) | write |
 | ris | `ris_search` | `search` | `text` (string, max 200), `limit` (integer 1..20, optional, Default 10) | read |
 | ris | `ris_show` | `show` | `top_id` (string, max 64, pattern `^[A-Za-z0-9_-]+$`) | read |
 | web | `web_search` | `search` | `query` (string, max 400), `count` (integer 1..10, optional, Default 5) | read |
@@ -143,12 +150,12 @@ oder einen Host an.
 | vault | `vault_read` | `read` | `note_id` (string, max 200, pattern `^[A-Za-z0-9äöüÄÖÜß _./-]+\.md$`) | read |
 | vault | `vault_write_test` | `write_test` | `title` (string, max 120), `body` (string, max 20000) | write |
 
-Der Vermittler bietet damit `ping`, `list_documents` und diese sieben Tools an. `admit_document` ist ein
+Der Vermittler bietet damit `ping`, `list_documents` und diese acht Tools an. `admit_document` ist ein
 Sonderfall (Ticket #169): Der Vermittler entscheidet es über die Objekt-Labels aus `room.json` gegen das B_W
 des Raums (Regelzweig `admit`, `KomkiMediator.Gate`, R.5.4, #213), bevor er den Connector ruft. Der Connector
 führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Manifest gelten dafür nicht. `ping` und
 `list_documents` (#218) beantwortet der Vermittler selbst, ohne Connector. Das ist Fassung
-`komki-mediator/3`, und der D.9-Pin bricht absichtlich.
+`komki-mediator/4`, und der D.9-Pin bricht absichtlich.
 
 ### 5.2 Ergebnisformen (Connector → Vermittler)
 
@@ -201,7 +208,7 @@ dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bz
    Journal. Seine `decision_id` ist die `call_id` im Frame, `authorized_by` nennt die `decision_id`s der
    beiden Entscheidungen, auf die er sich stützt (emit und transfer bzw. store samt Empfängerprüfung,
    jeweils `permitted` oder `released`), sein `payload_hash` bindet die ausgehende Anfrage. Das Antwortfeld `emit_decision_id` (Name aus Kompatibilität) verweist
-   auf ihn. PDR-Schema `komki-pdr/4`.
+   auf ihn. PDR-Schema `komki-pdr/5`.
 7. Die `call_id` entsteht nach der Vorprüfung (Schema, B_W). Jeder PDR des Aufrufs trägt sie:
    Entscheidungen, Ablehnungen, GO-Belege (`released`, `go_refused`, `go_timeout`, ein gescheiterter
    Commit), Vorbeleg und admit-PDR. Nur eine Ablehnung in der Vorprüfung hat keine, weil es noch keinen

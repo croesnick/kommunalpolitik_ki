@@ -157,8 +157,8 @@ Ein Beobachter ist jede Stelle, die Inhalte oder geschützte Metadaten potenziel
 | `ris-oeffentlich@1`, `web-oeffentlich@1`, `vault-oeffentlich@1` | öffentliche Inhalte | alle | keine | nicht nötig |
 | `ratsarbeit@1` | nichtöffentliche Ratsunterlagen und Wissen daraus | Miriam, pi-agent | Zweck `mandat` | **nicht Miriam.** Aufheben kann nur der Stadtrat. Miriam darf einzig Tatsachen freigeben, die eine öffentliche Quelle belegt |
 | `auftrag-sitzung-2026-11-17@1` | Vertraulichkeit des Arbeitsauftrags, schon die Themenwahl | Miriam, pi-agent | keine | Miriam |
-| `fraktion-intern@1` | interne Fraktionsarbeit | Miriam, pi-agent, fraktion, nextcloud-betreiber | keine | Miriam, für konkrete Rechercheaufträge und für gegengelesene Essenz an ratsprojekte |
-| `fraktionsprojekt-radweg@1` | die Projektidee selbst | Miriam, pi-agent, fraktion, nextcloud-betreiber | keine | Miriam, für Rechercheaufträge, die öffentliche Fassung und gegengelesene Essenz an ratsprojekte |
+| `fraktion-intern@1` | interne Fraktionsarbeit | Miriam, pi-agent, fraktion, nextcloud-betreiber | keine | Miriam, für konkrete Rechercheaufträge und für gegengelesene Essenz an ratsprojekte (Ausgabeart `ratsprojekte-essenz`) |
+| `fraktionsprojekt-radweg@1` | die Projektidee selbst | Miriam, pi-agent, fraktion, nextcloud-betreiber | keine | Miriam, für Rechercheaufträge, die öffentliche Fassung und gegengelesene Essenz an ratsprojekte (Ausgabeart `ratsprojekte-essenz`) |
 | `ratsprojekte@1` | der gemeinsam gebundene Bestand von ratsprojekte | Miriam, pi-agent, fraktion, vorstand, nextcloud-betreiber (Weg des Stands), dazu die Sicherung, sobald sie feststeht | keine | Miriam, für konkrete Rechercheaufträge |
 | `abo-az@1` | Volltext aus dem Zeitungsabo | Miriam, pi-agent | Auflage: Quellenangabe mit Urhebername, keine Weitergabe des Volltexts | Miriam, nur für ein Kurzzitat mit Quellenangabe (§ 51, § 63 UrhG) |
 | `buergerfall-031@1` | personenbezogenes Bürgeranliegen | Miriam, pi-agent, absenderin-031, mail-provider | Zweck `antwort-fall-031`, Eingang nur im Fallumfang | Miriam, nur für die Antwort an die Absenderin |
@@ -779,9 +779,10 @@ Neuschreiben zu verlangen, brächte nichts, weil sich abtippen immer lässt.
 #### Szene 13: Vertrauliche Essenz aus dem Fraktionsraum
 
 Entschieden am 2026-11-09 im Ticket
-[Essenz aus vertraulichen Räumen](https://github.com/croesnick/kommunalpolitik_ki/issues/410). Im ersten Wurf gilt der
-Weg von Hand. Der Weg über komki ist als Regel festgelegt, wird aber erst bei echtem Bedarf gebaut
-([Essenz über komki](https://github.com/croesnick/kommunalpolitik_ki/issues/423)).
+[Essenz aus vertraulichen Räumen](https://github.com/croesnick/kommunalpolitik_ki/issues/410). Der Weg von Hand gilt
+weiter, der Weg über komki ist seit dem 2026-11-11 gebaut
+([Essenz über komki](https://github.com/croesnick/kommunalpolitik_ki/issues/423)); beide stehen nebeneinander, solange
+das Eintragen von Hand nicht stört.
 
 **So soll es sein: von Hand.** Im Fraktionsraum ist ein Antragsentwurf fertig. Der Agent will ihn an ratsprojekte geben,
 und komki lehnt ohne Fenster ab (11.2). Miriam bittet den Agenten um eine kurze Fassung für den Hub, liest sie gegen und
@@ -794,24 +795,25 @@ dass nichts übertragen wurde. Er bekommt keinen Vorschlag für eine bereinigte 
 Sitzungsmappe an, wo er den Grunderwerb kennt und der in der Wortwahl durchscheinen könnte. Den Weg von Hand erklärt
 komki nur Miriam, in jedem Raum mit demselben Text und dem Zusatz, dass Nichtöffentliches nie in den Hub gehört.
 
-**So soll es später sein: über komki.** Miriam gibt genau den Text in ratsprojekte, den sie gegengelesen hat. Das GO
+**So soll es sein: über komki.** Miriam gibt genau den Text in ratsprojekte, den sie gegengelesen hat. Das GO
 heißt hier: „Ich lege das bewusst gegenüber dem Vorstand offen.“ Teile wählt sie davor in komki aus, denn das Häkchen in
 ratsprojekte schützt nichts. Eine Abwahl ergibt ein neues Ereignis mit neuem Hash. Das Fenster zeigt den genauen Text,
-alle Empfänger und den Hinweis auf die Offenlegung, seine Gestalt legen „Aktions- oder Offenlegungsfreigabe“ (#354) und
-das Freigabefenster (#360) fest.
+alle Empfänger und den Hinweis auf die Offenlegung; seine heutige Gestalt ist das Terminal (`komki go`), die native
+Form entscheidet das Freigabefenster (#360).
 
 **Im Kalkül: über komki.** Aus dem Bestand gelesen trüge der Inhalt nur noch `ratsprojekte@1`. Das Ersetzen einer Bindung
 gilt als ihre Entfernung (R.5.7). Deshalb ist der Weg eine Lockerung von B_W auf {`ratsprojekte@1`} mit einer
-Offenlegungsfreigabe (R.6.1) und einer Befugnis für jede Bindung des Raums, Ausgabeart `ratsprojekte-essenz`. Eine eigene
-Freigabeart gibt es nicht. `ratsarbeit@1` bekommt diese Befugnis nie. `fraktion-intern@1` bleibt unverändert: Eine
+Offenlegungsfreigabe (R.6.1) und einer Befugnis für jede Bindung, deren Empfängerkreis das Ziel nicht ohnehin abdeckt,
+Ausgabeart `ratsprojekte-essenz` (Arbeitstitel). Eine eigene Freigabeart gibt es nicht. `ratsarbeit@1` bekommt diese
+Befugnis nie. `fraktion-intern@1` bleibt unverändert: Eine
 Fassung mit Vorstand hieße, dass der Vorstand alles Fraktionsinterne lesen dürfte und nicht nur das, was Miriam auswählt.
 Auch Sicherung und die Nextcloud-Betreiber als Weg des Stands müssten dort hinein. Eine weitere Bindung für den engeren Kreis braucht es nicht, das ist
 `ratsprojekte@1`. Der Hub ist ein Speicher und kein Zielraum, also betrifft das die Übergabe zwischen Räumen (K4) nicht.
 
-Vorerst ist das eine manuelle Inhaltsfreigabe (R.6.4), freigegeben wird genau ein Text. G2 will den Faktenweg als
+Vorerst ist das eine manuelle Inhaltsfreigabe (R.6.4), freigegeben wird genau der ausgewählte Text. G2 will den Faktenweg als
 Standard. Ob er auch für die Essenz gilt, entscheidet das Folgeticket, sobald die Faktenfreigabe (#363) steht.
 
-**Gegenproben.** 13.0 bis 13.3 gelten für den späteren Weg über komki, 13.4 bis 13.6 schon im ersten Wurf.
+**Gegenproben.** 13.0 bis 13.6 gelten für beide Wege.
 
 | # | Was passiert | Was komki tut |
 |---|---|---|
@@ -824,9 +826,13 @@ Standard. Ob er auch für die Essenz gilt, entscheidet das Folgeticket, sobald d
 | 13.6 | Miriam fügt die Fassung des Agenten in den Hub ein, darin stecken unsichtbare Zeichen mit einer Anweisung. | Der Hub entfernt sie beim Speichern aus jedem Freitextfeld, der Stand enthält nur, was Miriam gesehen hat. Verdeckte Information in der Wortwahl bleibt möglich (G2). |
 
 **Zu bauen.** Im ersten Wurf: B17 und B23 für die Antwort ohne Vorschlag, die Oberfläche von ratsprojekte (#414) für die
-unsichtbaren Zeichen. Später: B1, B2, B17 ([#423](https://github.com/croesnick/kommunalpolitik_ki/issues/423)).
+unsichtbaren Zeichen. Gebaut: B1, B2, B17 ([#423](https://github.com/croesnick/kommunalpolitik_ki/issues/423)) — die
+Engine entscheidet die Offenlegungsfreigabe für `store` (CONTRACT.md § 4.9), strukturierte Lockerungsbefugnisse stehen im
+Γ-Export, das Freigabefenster bietet die Teileauswahl vor dem GO.
 
-**Tests.** `freigabe-zustaendigkeit`, `freigabe-inhalt`, `label-erhaltung`, `empfaengergrenze`.
+**Tests.** `freigabe-zustaendigkeit`, `freigabe-inhalt`, `label-erhaltung`, `empfaengergrenze`. Die Gegenproben 13.0 bis
+13.4 laufen als Tests (`go_essenz_test` und die Erwartungsfälle
+`case_offenlegung_*` in `apps/komki_policy`), 13.4 bis 13.6 wie im ersten Wurf.
 
 #### Szene 14: Enge Grenzen für `alle`
 

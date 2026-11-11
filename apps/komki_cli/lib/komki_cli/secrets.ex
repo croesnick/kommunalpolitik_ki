@@ -21,7 +21,13 @@ defmodule KomkiCli.Secrets do
 
   # Kurzname und Beschreibung je Keychain-Service. Ein Service ohne Eintrag
   # heisst wie sein Service-Name.
-  @names %{"brave-search-api" => {"brave", "Brave-Search-API-Key für die Websuche"}}
+  @names %{
+    "brave-search-api" => {"brave", "Brave-Search-API-Key für die Websuche"},
+    # Durchstich #409, belegt im Wegwerf-Lauf: Token für den Unix-Socket des
+    # ratsprojekte-Hubs (#415: versiegelt im Schlüsselbund, der Hub kennt
+    # nur den Hash).
+    "ratsprojekte-hub-token" => {"ratsprojekte-hub", "Token des ratsprojekte-Hubs (Unix-Socket)"}
+  }
 
   @doc "Alle erwarteten Geheimnisse, sortiert nach Kurzname."
   @spec all() :: [t()]

@@ -11,7 +11,7 @@ im Journal; ein Permit schreibt zusaetzlich einen Vorbeleg, bevor
 irgendetwas vollzogen wird (Audit vor Wirkung). Ein Connector-Aufruf
 ergibt so mehrere Datensaetze mit derselben `call_id`.
 
-Fassung `komki-mediator/3` (Tickets #144, #218): neben `ping`,
+Fassung `komki-mediator/4` (Tickets #144, #218): neben `ping`,
 `list_documents` und `admit_document` bietet der Vermittler die sechs
 Connector-Tools `ris_search`, `ris_show`, `web_search`, `vault_search`,
 `vault_read` und `vault_write_test` an. Jeder Connector-Aufruf laeuft als
@@ -269,9 +269,9 @@ Aufruf hier ist Entwicklung und Debugging vorbehalten.
 | Route | Zweck |
 |---|---|
 | `GET /healthz` | Status + Fassung (`fassung_id`, `tools`, `registry_id`, `gamma_hash`) |
-| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/3` (siehe unten) |
+| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/4` (siehe unten) |
 
-## Tools (Fassung `komki-mediator/3`)
+## Tools (Fassung `komki-mediator/4`)
 
 | Tool | Ablauf | Parameter |
 |---|---|---|
@@ -284,6 +284,7 @@ Aufruf hier ist Entwicklung und Debugging vorbehalten.
 | `vault_search` | ConnectorGate, Connector `vault` | `text` (max 200) |
 | `vault_write_test` | ConnectorGate, Connector `vault` (schreibend) | `title` (max 120), `body` (max 20000) |
 | `web_search` | ConnectorGate, Connector `web` | `query` (max 400), `count` (1..10, Default 5) |
+| `rp_fakt_vorschlagen` | ConnectorGate, Connector `ratsprojekte` (schreibend, `store`): ein Ereignis mit Teilen an den Hub; aus dem Fraktionsraum ist die Übergabe eine Lockerung mit Offenlegungsfreigabe, die Teile wählt die nutzende Person vor dem GO ab (#423) | `titel` (max 120), `teile` (1..8, je `aussage` max 1000 Pflicht, `quelle` max 400 Pflicht, `fundstelle` max 200), `projekt_hinweis` (max 120) |
 
 Schemas und Beschreibungen der Connector-Tools entstehen zur Compile-Zeit aus
 `KomkiConnector.Manifest` (`KomkiMediator.Tools.Connector`); ein Test
@@ -419,12 +420,19 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
     `output_content_digest = intent_hash`; die Engine ordnet λ(y) = B_W zu.
   * Gate 1b `transfer` (lesend, #298) bzw. `store` (schreibend, #205):
     nach dem emit-Permit, unter λ(y) = `assigned_label` in der
-    Manifest-Umgebung (`ris-abruf@1`, `web-suche@1`, `vault-lokal@1`). Hier
+    Manifest-Umgebung (`ris-abruf@1`, `web-suche@1`, `vault-lokal@1`,
+    `ratsprojekte-bestand@1`). Hier
     faellt der Empfaengertest. Γ hat keine `store`-Regel, also ist jedes
     Schreiben ein deny mit Aktionsfreigabe fuer den exakten Call; mit
     Zuhoerer fragt der Vermittler (GO-Anfrage mit `operation: store`
     bzw. `transfer`), sonst bleibt es beim deny. Faellt beim Speichern der
-    Empfaengertest, gibt es kein GO und kein Fenster (#417).
+    Empfaengertest, gibt es kein GO und kein Fenster (#417) — es sei denn,
+    der Katalog bietet eine Offenlegungsfreigabe an (#423, Szene 13):
+    Jede Bindung, deren Empfaengerkreis das Ziel nicht abdeckt, braucht
+    dann eine Befugnis fuer die Ausgabeart des Ziels. Die Anfrage zeigt
+    den genauen Text, alle Empfaenger und den Hinweis auf die Offenlegung
+    und bietet die Teile zur Abwahl an — eine Abwahl leitet den Call neu
+    ab und die Freigabe bindet den neuen Hash (R.6.2).
   * Journal: jede Entscheidung kommt sofort ins Journal (`permitted`,
     Ablehnung oder `released`), auch wenn danach nichts vollzogen wird.
     Bei permit folgt der Vorbeleg (`rule: emit`, `outcome: emitted`),
@@ -450,7 +458,7 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   (separater Writer-Prozess; stirbt er, stirbt die Vermittlung — die
   Auditkette dunkelt nie still ab) und bettet die `decision_id` in die
   Antwort ein. `payload_hash` ist der SHA-256 der kanonischen Antwortbasis
-  (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/4` (seit #298:
+  (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/5` (seit #423: Offenlegung; #298:
   jede Entscheidung als eigener PDR, Vorbeleg mit `decision: null` und
   `authorized_by`, den `decision_id`s der emit- und der transfer- bzw.
   store-Entscheidung); seit `komki-pdr/3`
@@ -471,7 +479,7 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
 | `KomkiMediator.Go` | GO-Anfragen und -Antworten unter `mediator/go` (Ticket #98) |
 | `KomkiMediator.GoStand` | Offenlegungsstand der GO-Noncen, commit vor Wirkung |
 | `KomkiMediator.ResultShape` | Ergebnisformen der Connectoren (§5.2) |
-| `KomkiMediator.PDR` | Form der PDR-Datensaetze (`komki-pdr/4`) |
+| `KomkiMediator.PDR` | Form der PDR-Datensaetze (`komki-pdr/5`) |
 | `KomkiMediator.Tools.Connector` | Tool-Baustein aus dem Manifest |
 | `KomkiMediator.Gamma` | Registry-Snapshot + Stand-Hash |
 | `KomkiMediator.Room` | Raum-Zustand, Objekt-/Snapshot-Bildung |

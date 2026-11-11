@@ -49,7 +49,7 @@ defmodule KomkiMediator.GateTest do
     # Der Eintrag ist selbst byte-kanonisch.
     assert JSON.canonical(pdr) == chunk
 
-    assert pdr["schema"] == "komki-pdr/4"
+    assert pdr["schema"] == "komki-pdr/5"
     assert pdr["decision"] == "permit"
     assert pdr["outcome"] == "admitted"
     assert pdr["admitted"] == true
@@ -60,7 +60,7 @@ defmodule KomkiMediator.GateTest do
     assert pdr["payload_hash"] =~ "sha256:"
     assert pdr["intent_id"] =~ "intent-"
     assert pdr["snapshot_id"] =~ "snap-"
-    assert pdr["fassung_id"] == "komki-mediator/3"
+    assert pdr["fassung_id"] == "komki-mediator/4"
 
     {:ok, _, _} = DateTime.from_iso8601(pdr["abrufdatum"])
   end
@@ -262,10 +262,12 @@ defmodule KomkiMediator.GateTest do
              }
            ]
 
-    # Γ-L1 (R.2.2): die Lockerungsbefugnis der benannten Bindung bleibt
-    # Teil der Antwort, aus dem rohen Registry-Term. Der Store exportiert sie
-    # bis #109 als [] (fail-closed, #208).
-    assert response["relaxation_authorities"] == []
+    # Γ (R.2.2): die Autoritaeten der Lockerungsbefugnisse der benannten
+    # Bindung bleiben Teil der Antwort, aus dem rohen Registry-Term. Der
+    # Store exportiert sie seit #423 strukturiert (vorher [] fail-closed,
+    # #208/#109); doc-pending-freigabe traegt die Freigabe-Notiz-Befugnis
+    # der nutzenden Person.
+    assert response["relaxation_authorities"] == ["nutzende-person"]
 
     assert [pdr] = TestHelpers.journal_records(journal_path)
     assert pdr["decision"] == "indeterminate"
