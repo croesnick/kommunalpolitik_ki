@@ -237,6 +237,34 @@ defmodule KomkiMediator.GoEssenzTest do
   end
 
   @tag :szenario_13
+  test "niemand hoert zu: Katalog bleibt sichtbar (kein stiller Fallback), kein Fenster", %{
+    env: env,
+    go_dir: go_dir
+  } do
+    File.rm(Go.listener_path(go_dir))
+
+    response = ConnectorGate.call(fraktion(env), "rp_fakt_vorschlagen", @params)
+
+    # Kein Fenster: niemand wurde gefragt. Die Ablehnung nennt die
+    # Offenlegungsfreigabe als Fortsetzung — sie kann niemand vom Agenten
+    # erteilt werden, aber der Weg steht im Katalog wie bei jeder
+    # Aktionsfreigabe auch.
+    assert response["decision"] == "deny"
+    assert Go.pending(go_dir) == []
+    refute_received {:connector_called, _, _, _, _, _}
+
+    transition =
+      response["remedies"]
+      |> Enum.flat_map(& &1["transitions"])
+      |> Enum.find(&(&1["type"] == "offenlegungsfreigabe"))
+
+    assert transition["ausgabeart"] == "ratsprojekte-essenz"
+    assert transition["ziellabel"] == ["ratsprojekte@1"]
+    # Der Weg von Hand bleibt die Grenz-Aussage, nicht die Offenlegung:
+    assert response["hinweis"] == Hinweis.text(:deny)
+  end
+
+  @tag :szenario_13
   test "13.1 eine Bindung ohne Befugnis (ratsarbeit): kein Offenlegungsfenster, nichts uebertragen",
        %{
          env: env,
