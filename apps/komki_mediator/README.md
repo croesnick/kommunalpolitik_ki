@@ -284,6 +284,7 @@ Aufruf hier ist Entwicklung und Debugging vorbehalten.
 | `vault_search` | ConnectorGate, Connector `vault` | `text` (max 200) |
 | `vault_write_test` | ConnectorGate, Connector `vault` (schreibend) | `title` (max 120), `body` (max 20000) |
 | `web_search` | ConnectorGate, Connector `web` | `query` (max 400), `count` (1..10, Default 5) |
+| `rp_fakt_vorschlagen` | ConnectorGate, Connector `ratsprojekte` (schreibend, `store`): ein Ereignis mit Teilen an den Hub; aus dem Fraktionsraum ist die Übergabe eine Lockerung mit Offenlegungsfreigabe, die Teile wählt die nutzende Person vor dem GO ab (#423) | `titel` (max 120), `teile` (1..8, je `aussage` max 1000 Pflicht, `quelle` max 400 Pflicht, `fundstelle` max 200), `projekt_hinweis` (max 120) |
 
 Schemas und Beschreibungen der Connector-Tools entstehen zur Compile-Zeit aus
 `KomkiConnector.Manifest` (`KomkiMediator.Tools.Connector`); ein Test
@@ -419,12 +420,19 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
     `output_content_digest = intent_hash`; die Engine ordnet λ(y) = B_W zu.
   * Gate 1b `transfer` (lesend, #298) bzw. `store` (schreibend, #205):
     nach dem emit-Permit, unter λ(y) = `assigned_label` in der
-    Manifest-Umgebung (`ris-abruf@1`, `web-suche@1`, `vault-lokal@1`). Hier
+    Manifest-Umgebung (`ris-abruf@1`, `web-suche@1`, `vault-lokal@1`,
+    `ratsprojekte-bestand@1`). Hier
     faellt der Empfaengertest. Γ hat keine `store`-Regel, also ist jedes
     Schreiben ein deny mit Aktionsfreigabe fuer den exakten Call; mit
     Zuhoerer fragt der Vermittler (GO-Anfrage mit `operation: store`
     bzw. `transfer`), sonst bleibt es beim deny. Faellt beim Speichern der
-    Empfaengertest, gibt es kein GO und kein Fenster (#417).
+    Empfaengertest, gibt es kein GO und kein Fenster (#417) — es sei denn,
+    der Katalog bietet eine Offenlegungsfreigabe an (#423, Szene 13):
+    Jede Bindung, deren Empfaengerkreis das Ziel nicht abdeckt, braucht
+    dann eine Befugnis fuer die Ausgabeart des Ziels. Die Anfrage zeigt
+    den genauen Text, alle Empfaenger und den Hinweis auf die Offenlegung
+    und bietet die Teile zur Abwahl an — eine Abwahl leitet den Call neu
+    ab und die Freigabe bindet den neuen Hash (R.6.2).
   * Journal: jede Entscheidung kommt sofort ins Journal (`permitted`,
     Ablehnung oder `released`), auch wenn danach nichts vollzogen wird.
     Bei permit folgt der Vorbeleg (`rule: emit`, `outcome: emitted`),
