@@ -51,9 +51,11 @@ defmodule KomkiCli.LabelStore do
       store-seitig als strukturierte Eintraege mit genau den Schluesseln
       {authority, restriction, output} — restriction benennt eine der drei
       R.2.2-Einschraenkungskomponenten (readers, operations, auflagen),
-      output eine als Kebab-ID benannte Ausgabe. Der Γ-Export emittiert
-      dafuer [] (fail-closed, Ticket #109). Einmal registrierte Inhalte
-      sind unveraenderlich (identischer Re-Import = No-op).
+      output eine als Kebab-ID benannte Ausgabe. Seit #423 geht der
+      Γ-Export mit den strukturierten Eintraegen, und die Engine validiert
+      sie gegen das geschlossene Vokabular (CONTRACT § 2.1) — vorher
+      emittierte er [] (fail-closed, Ticket #109). Einmal registrierte
+      Inhalte sind unveraenderlich (identischer Re-Import = No-op).
     * R.2.5 — Quarantäne: unklassifiziertes Material traegt KEIN reguläres
       Label und wird nicht als leere Bindungsmenge behandelt; die
       Erstklassifikation ist ein menschlicher Akt (decided_by, basis) —
@@ -275,9 +277,16 @@ defmodule KomkiCli.LabelStore do
   defp validate_import(term) when is_map(term) do
     with :ok <- require_label_store_schema(term),
          :ok <- closed_top_fields(term),
-         {:ok, _compiled} <- validate_engine_projection(term),
-         :ok <- validate_observer_types(term) do
-      validate_store_bindings(term, term["observers"])
+         # Zuerst die Store-Schicht (R.2.2-Metadaten, deutsche Meldungen
+         # fuer die Eintraege der Lockerungsbefugnisse), danach die
+         # Engine-Projektion: Sie sieht dieselben Eintraege strukturiert
+         # (seit #423) und validiert sie gegen das geschlossene Vokabular
+         # (CONTRACT § 2.1) — doppelt haelt besser, aber die fasslichere
+         # Meldung steht vorne.
+         :ok <- validate_store_bindings(term, term["observers"]),
+         :ok <- validate_observer_types(term),
+         {:ok, _compiled} <- validate_engine_projection(term) do
+      :ok
     end
   end
 
@@ -326,9 +335,11 @@ defmodule KomkiCli.LabelStore do
   defp labeled_engine_error(prefix, code, path, detail),
     do: prefix <> ": " <> Kernel.inspect(code) <> " at " <> path <> ": " <> detail
 
-  # Strukturierte Lockerungsbefugnisse sind Store-Schicht; die Engine-Schicht
-  # sieht nur [] (fail-closed R.2.2, Granularitaet kann das Γ-Format noch
-  # nicht ausdruecken, Ticket #109).
+  # Strukturierte Lockerungsbefugnisse sind seit #423 Engine-Schicht: Der
+  # Γ-Export traegt sie, die Engine validiert sie beim Kompilieren gegen
+  # das geschlossene Vokabular (CONTRACT § 2.1) und entscheidet die
+  # Essenz-Befugnis im Offenlegungsfreigabe-Zweig (§ 4.9). Bis #109 sah
+  # die Engine-Schicht nur [] (fail-closed).
   defp engine_projection(term) do
     %{
       "schema" => "komki-registry/2",
@@ -342,7 +353,7 @@ defmodule KomkiCli.LabelStore do
            %{
              "readers" => binding["readers"],
              "operations" => binding["operations"],
-             "relaxation_authorities" => []
+             "relaxation_authorities" => binding["relaxation_authorities"]
            }}
         end)
     }
@@ -1181,7 +1192,7 @@ WHERE object_id = ? AND version = ? ORDER BY id",
          {:ok, fact_rows} <- select(conn, "SELECT name, type FROM fact_fields"),
          {:ok, env_rows} <- select(conn, "SELECT id, observers FROM environments"),
          {:ok, binding_rows} <-
-           select(conn, "SELECT id, readers, operations FROM bindings") do
+           select(conn, "SELECT id, readers, operations, relaxation_authorities FROM bindings") do
       term = %{
         "schema" => "komki-registry/2",
         "registry_id" => registry_id,
@@ -1192,12 +1203,15 @@ WHERE object_id = ? AND version = ? ORDER BY id",
             {id, %{"observers" => JSON.decode!(json)}}
           end),
         "bindings" =>
-          Map.new(binding_rows, fn [id, readers, operations] ->
+          Map.new(binding_rows, fn [id, readers, operations, authorities] ->
             {id,
              %{
                "readers" => Enum.sort(JSON.decode!(readers)),
                "operations" => JSON.decode!(operations),
-               "relaxation_authorities" => []
+               # Strukturierte Lockerungsbefugnisse (R.2.2) gehen seit #423
+               # in den Γ-Export; die Engine validiert sie beim Kompilieren
+               # (CONTRACT § 2.1) und verweigert unbekannte Einträge.
+               "relaxation_authorities" => JSON.decode!(authorities)
              }}
           end)
       }

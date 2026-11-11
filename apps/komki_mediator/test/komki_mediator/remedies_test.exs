@@ -146,16 +146,22 @@ defmodule KomkiMediator.RemediesTest do
     env: env,
     gamma: gamma
   } do
-    # Seit #208 kommt Γ aus dem Label-Store, der Lockerungsbefugnisse bis
-    # #109 als [] exportiert (fail-closed).
-    assert gamma.term["bindings"]["doc-pending-freigabe@1"]["relaxation_authorities"] == []
+    # Seit #423 exportiert der Label-Store die strukturierten Befugnisse
+    # (vorher [] fail-closed bis #109): doc-pending-freigabe traegt die
+    # Freigabe-Notiz-Befugnis aus der Vorlage.
+    assert gamma.term["bindings"]["doc-pending-freigabe@1"]["relaxation_authorities"] == [
+             %{
+               "authority" => "nutzende-person",
+               "restriction" => "operations",
+               "output" => "freigabe-notiz"
+             }
+           ]
 
-    # Die kompilierte Form traegt sie bewusst nicht — der Katalog der
-    # Engine kann sie folglich auch nicht tragen.
-    refute Map.has_key?(
-             gamma.compiled.bindings["doc-pending-freigabe@1"],
-             "relaxation_authorities"
-           )
+    # Die kompilierte Form traegt sie als Engine-Feld — sie ist Teil des
+    # Schemas komki-registry/2 (CONTRACT § 2.1), ohne Remedy-Semantik.
+    assert gamma.compiled.bindings["doc-pending-freigabe@1"].relaxation_authorities == [
+             %{authority: "nutzende-person", restriction: "operations", output: "freigabe-notiz"}
+           ]
 
     pending =
       Gate.call(
@@ -173,7 +179,9 @@ defmodule KomkiMediator.RemediesTest do
         fn -> {:ok, %{"content" => "egal"}} end
       )
 
-    assert pending["relaxation_authorities"] == []
+    # admit-Ablehnungen nennen nur die Autoritaeten (WER lockern darf),
+    # keine Ausgabearten und keine Ziele.
+    assert pending["relaxation_authorities"] == ["nutzende-person"]
     assert vertraulich["relaxation_authorities"] == []
   end
 

@@ -8,6 +8,8 @@ defmodule KomkiMediator.FassungTest do
              "admit_document",
              "ris_search",
              "ris_show",
+             # DURCHSTICH #409 (Wegwerf)
+             "rp_fakt_vorschlagen",
              "vault_read",
              "vault_search",
              "vault_write_test",
@@ -27,7 +29,8 @@ defmodule KomkiMediator.FassungTest do
   end
 
   test "fassung_id ist die versionierte Kennung" do
-    assert KomkiMediator.Fassung.fassung_id() == "komki-mediator/3"
+    # DURCHSTICH #409 (Wegwerf): + rp_fakt_vorschlagen, D.9-Pin bricht absichtlich
+    assert KomkiMediator.Fassung.fassung_id() == "komki-mediator/4"
   end
 
   # D.9: Die vom anubis-Server advertised Tool-Namen muessen exakt der
@@ -55,14 +58,21 @@ defmodule KomkiMediator.FassungTest do
 
       for {name, field} <- spec.params do
         property = schema["properties"][name]
-        assert property["type"] == Atom.to_string(field.type)
 
         case field.type do
+          # DURCHSTICH #409 (Wegwerf): geschlossene Teile-Liste — im
+          # JSON-Schema ein array mit Objekt-Items je Item-Feld.
+          :list ->
+            assert property["type"] == "array"
+            assert Map.keys(property["items"]["properties"]) == Map.keys(field.items)
+
           :string ->
+            assert property["type"] == "string"
             assert property["maxLength"] == field.max
             assert property["pattern"] == (field[:pattern] && Regex.source(field.pattern))
 
           :integer ->
+            assert property["type"] == "integer"
             assert {property["minimum"], property["maximum"]} == {field.min, field.max}
         end
       end

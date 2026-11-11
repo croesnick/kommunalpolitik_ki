@@ -33,9 +33,7 @@ defmodule KomkiMediator.Tools.Connector do
 
     fields =
       for {name, field} <- Enum.sort(spec.params) do
-        quote do
-          field(unquote(String.to_atom(name)), unquote(field.type), unquote(field_opts(field)))
-        end
+        field_ast(name, field)
       end
 
     quote do
@@ -71,5 +69,48 @@ defmodule KomkiMediator.Tools.Connector do
   def field_opts(%{type: :integer} = field) do
     [required: Map.get(field, :required, true), min: field.min, max: field.max] ++
       if(Map.has_key?(field, :default), do: [default: field.default], else: [])
+  end
+
+  # Durchstich #409, belegt im Wegwerf-Lauf: Optionen des anubis-embeds_many-Makros; die
+  # Item-Grenzen heissen dort min/max (Peri), nicht min_items/max_items.
+  @spec list_opts(map()) :: keyword()
+  def list_opts(field) do
+    [
+      required: Map.get(field, :required, true),
+      min: Map.get(field, :min_items, 1),
+      max: Map.get(field, :max_items, 8)
+    ]
+  end
+
+  @doc false
+  # AST eines Manifest-Feldes (String/Integer wie bisher); ein :list-Feld
+  # (DURCHSTICH #409, Wegwerf: ein Ereignis mit Teilen — die Teile sind
+  # eine geschlossene Liste von Objekten, Sidecar.Params prüft sie vor
+  # der Engine; hier nur die Werbung ans Modell als zweite Schicht) wird
+  # zu anubis embeds_many.
+  @spec field_ast(String.t(), map()) :: Macro.t()
+  def field_ast(name, %{type: :list} = field) do
+    item_fields =
+      for {item_name, item_spec} <- Enum.sort(Map.get(field, :items, %{})) do
+        quote do
+          field(
+            unquote(String.to_atom(item_name)),
+            unquote(item_spec.type),
+            unquote(field_opts(item_spec))
+          )
+        end
+      end
+
+    quote do
+      embeds_many unquote(String.to_atom(name)), unquote(list_opts(field)) do
+        (unquote_splicing(item_fields))
+      end
+    end
+  end
+
+  def field_ast(name, field) do
+    quote do
+      field(unquote(String.to_atom(name)), unquote(field.type), unquote(field_opts(field)))
+    end
   end
 end

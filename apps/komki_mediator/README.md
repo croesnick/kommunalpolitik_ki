@@ -11,7 +11,7 @@ im Journal; ein Permit schreibt zusaetzlich einen Vorbeleg, bevor
 irgendetwas vollzogen wird (Audit vor Wirkung). Ein Connector-Aufruf
 ergibt so mehrere Datensaetze mit derselben `call_id`.
 
-Fassung `komki-mediator/3` (Tickets #144, #218): neben `ping`,
+Fassung `komki-mediator/4` (Tickets #144, #218): neben `ping`,
 `list_documents` und `admit_document` bietet der Vermittler die sechs
 Connector-Tools `ris_search`, `ris_show`, `web_search`, `vault_search`,
 `vault_read` und `vault_write_test` an. Jeder Connector-Aufruf laeuft als
@@ -269,9 +269,9 @@ Aufruf hier ist Entwicklung und Debugging vorbehalten.
 | Route | Zweck |
 |---|---|
 | `GET /healthz` | Status + Fassung (`fassung_id`, `tools`, `registry_id`, `gamma_hash`) |
-| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/3` (siehe unten) |
+| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/4` (siehe unten) |
 
-## Tools (Fassung `komki-mediator/3`)
+## Tools (Fassung `komki-mediator/4`)
 
 | Tool | Ablauf | Parameter |
 |---|---|---|
@@ -450,7 +450,7 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   (separater Writer-Prozess; stirbt er, stirbt die Vermittlung — die
   Auditkette dunkelt nie still ab) und bettet die `decision_id` in die
   Antwort ein. `payload_hash` ist der SHA-256 der kanonischen Antwortbasis
-  (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/4` (seit #298:
+  (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/5` (seit #423: Offenlegung; #298:
   jede Entscheidung als eigener PDR, Vorbeleg mit `decision: null` und
   `authorized_by`, den `decision_id`s der emit- und der transfer- bzw.
   store-Entscheidung); seit `komki-pdr/3`
@@ -471,7 +471,7 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
 | `KomkiMediator.Go` | GO-Anfragen und -Antworten unter `mediator/go` (Ticket #98) |
 | `KomkiMediator.GoStand` | Offenlegungsstand der GO-Noncen, commit vor Wirkung |
 | `KomkiMediator.ResultShape` | Ergebnisformen der Connectoren (§5.2) |
-| `KomkiMediator.PDR` | Form der PDR-Datensaetze (`komki-pdr/4`) |
+| `KomkiMediator.PDR` | Form der PDR-Datensaetze (`komki-pdr/5`) |
 | `KomkiMediator.Tools.Connector` | Tool-Baustein aus dem Manifest |
 | `KomkiMediator.Gamma` | Registry-Snapshot + Stand-Hash |
 | `KomkiMediator.Room` | Raum-Zustand, Objekt-/Snapshot-Bildung |

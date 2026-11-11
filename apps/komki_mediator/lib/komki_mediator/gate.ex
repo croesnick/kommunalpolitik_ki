@@ -477,14 +477,22 @@ defmodule KomkiMediator.Gate do
   # Structs (die vom MCP-Schema gerenderten Parameter) werden entpackt,
   # Atom-Schluessel werden String-Schluessel (der Vertrag zwischen
   # MCP-Schicht und Gate), String-Schluessel bleiben unveraendert.
+  # Durchstich #409, belegt im Wegwerf-Lauf: TIEF, nicht nur oben — anubis rendert
+  # eingebettete Listen (embeds_many, die Teile eines Vorschlags) mit
+  # Atom-Schluesseln; oben entpacken reicht nicht, sonst crasht die
+  # Kanonisierung des Aufrufs.
   @doc false
   @spec rendered_params(term()) :: %{String.t() => term()}
   def rendered_params(params) when is_struct(params),
     do: rendered_params(Map.from_struct(params))
 
   def rendered_params(params) when is_map(params) do
-    Map.new(params, fn {key, value} -> {render_key(key), value} end)
+    Map.new(params, fn {key, value} -> {render_key(key), rendered_params(value)} end)
   end
+
+  def rendered_params(values) when is_list(values), do: Enum.map(values, &rendered_params/1)
+
+  def rendered_params(value), do: value
 
   defp render_key(key) when is_atom(key), do: Atom.to_string(key)
   defp render_key(key) when is_binary(key), do: key

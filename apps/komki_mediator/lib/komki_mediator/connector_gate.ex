@@ -186,25 +186,33 @@ defmodule KomkiMediator.ConnectorGate do
 
   # A permit, journaled when it is made: `permitted` from the normal branch
   # (payload: the decision) or `released` from the release branch (payload:
-  # the consumption proposal). For emit it carries the assigned λ(y).
-  # Returns the decision_id, which the record before effect refers to.
-  defp decision_pdr(env, call, {snapshot, intent}, decision, outcome, payload) do
+  # the consumption proposal). For emit it carries the assigned λ(y). An
+  # Offenlegungsfreigabe (#423) haelt im zusaetzlichen Feld `offenlegung`
+  # fest, gegenueber wem offengelegt wurde: Ausgabeart, Ziellabel und alle
+  # Empfaenger des Ziels (Szene 13).
+  defp decision_pdr(env, call, {snapshot, intent}, decision, outcome, payload, extra \\ %{}) do
     decision_id = PDR.new_id()
 
-    PDR.append(env, %{
-      "decision_id" => decision_id,
-      "call_id" => call.call_id,
-      "tool" => call.tool,
-      "rule" => intent["operation"],
-      "decision" => "permit",
-      "outcome" => outcome,
-      "intent_hash" => call.intent_hash,
-      "payload_hash" => PDR.payload_hash(payload),
-      "intent_id" => intent["intent_id"],
-      "snapshot_id" => snapshot["snapshot_id"],
-      "checked_label" => decision["checked_label"],
-      "assigned_label" => decision["assigned_label"]
-    })
+    PDR.append(
+      env,
+      Map.merge(
+        %{
+          "decision_id" => decision_id,
+          "call_id" => call.call_id,
+          "tool" => call.tool,
+          "rule" => intent["operation"],
+          "decision" => "permit",
+          "outcome" => outcome,
+          "intent_hash" => call.intent_hash,
+          "payload_hash" => PDR.payload_hash(payload),
+          "intent_id" => intent["intent_id"],
+          "snapshot_id" => snapshot["snapshot_id"],
+          "checked_label" => decision["checked_label"],
+          "assigned_label" => decision["assigned_label"]
+        },
+        extra
+      )
+    )
 
     decision_id
   end
@@ -216,18 +224,32 @@ defmodule KomkiMediator.ConnectorGate do
 
   # `then` continues after a permit of the release branch with the decision
   # and the decision_id of the released record: after emit like a normal
-  # emit permit, after transfer or store with the execution.
+  # emit permit, after transfer or store with the execution. The
+  # Offenlegungsfreigabe (#423) is the second offer a store denial can
+  # carry: the window asks for the disclosure decision, the person
+  # deselects parts before the GO, and the release is bound to the
+  # (possibly reduced) event.
   defp maybe_go(%{go: %{} = go} = env, call, snapshot, intent, response, then) do
     case {Go.offered(response["remedies"]), Go.listening?(go.dir)} do
       {call_hash, true} when is_binary(call_hash) ->
         ask_go(env, go, call, {snapshot, intent, then}, response, call_hash)
 
-      _no_offer_or_nobody_listening ->
-        response
+      _no_aktion_offer ->
+        offenlegung_or_response(env, call, snapshot, intent, response, then)
     end
   end
 
   defp maybe_go(_env, _call, _snapshot, _intent, response, _then), do: response
+
+  defp offenlegung_or_response(%{go: %{} = go} = env, call, snapshot, intent, response, then) do
+    case {Go.offered_offenlegung(response["remedies"]), Go.listening?(go.dir)} do
+      {offer, true} when is_map(offer) ->
+        ask_go_offenlegung(env, go, call, {snapshot, intent, then}, response, offer)
+
+      _no_offer_or_nobody_listening ->
+        response
+    end
+  end
 
   defp ask_go(env, go, call, {snapshot, intent, then}, response, call_hash) do
     request = %{
@@ -252,6 +274,364 @@ defmodule KomkiMediator.ConnectorGate do
       {:release, release} -> released(env, call, {snapshot, intent, then}, release)
       :refused -> go_not_given(env, call, {snapshot, intent}, response, "go_refused")
       :timeout -> go_not_given(env, call, {snapshot, intent}, response, "go_timeout")
+    end
+  end
+
+  # -------------------------------------------------------------------------
+  # GO: Offenlegungsfreigabe fuer den Store in den Hub (§ 4.9, Szene 13,
+  # #423). Die Anfrage zeigt den genauen Text (Parameter), alle Empfaenger
+  # des Ziels und den Hinweis auf die Offenlegung; die Teile waehlt die
+  # nutzende Person hier ab, nicht erst im Hub. Eine Abwahl ergibt ein
+  # neues Ereignis mit neuem Hash (R.6.2): Der Vermittler leitet den
+  # reduzierten Call neu ab und baut die Freigabe darueber.
+  # -------------------------------------------------------------------------
+
+  defp ask_go_offenlegung(env, go, call, {snapshot, intent, then}, response, offer) do
+    request =
+      %{
+        "schema" => "komki-go-request/1",
+        "kind" => "offenlegungsfreigabe",
+        "call_hash" => offer.call_hash,
+        "decision_id" => response["decision_id"],
+        "operation" => intent["operation"],
+        "tool" => call.tool,
+        "params" => call.params,
+        "blockers" => response["remedies"] |> Enum.map(& &1["code"]) |> Enum.uniq(),
+        "object" => intent["object"],
+        "workspace" => intent["workspace"],
+        "content_digest" => String.replace_prefix(call.intent_hash, "sha256:", ""),
+        "scope" => GoStand.current()["scope"],
+        "authority" => Go.authority(),
+        "ausgabeart" => offer.ausgabeart,
+        "ziellabel" => offer.ziellabel,
+        "empfaenger" => ziel_empfaenger(env, call),
+        "teile" => teile_choices(call)
+      }
+
+    case Go.await(go, request) do
+      {:selection, ids} ->
+        offenlegung_answered(env, call, {snapshot, intent, then}, request, ids)
+
+      :refused ->
+        go_not_given(env, call, {snapshot, intent}, response, "go_refused")
+
+      :timeout ->
+        go_not_given(env, call, {snapshot, intent}, response, "go_timeout")
+    end
+  end
+
+  # Alle Empfaenger des Ziels (Szene 13: das Fenster zeigt alle Empfaenger):
+  # die Beobachter der Zielumgebung des Manifests, sortiert.
+  defp ziel_empfaenger(env, call) do
+    case env.gamma.compiled.environments[call.manifest.environment] do
+      %{observers: observers} -> observers
+      _ -> []
+    end
+  end
+
+  # Die Teile der Anfrage mit Kennung und Nummer; der genaue Text jedes
+  # Teils steht in `params` (die Vorschau rendert ihn vollständig).
+  defp teile_choices(call) do
+    call.params
+    |> Map.get("teile", [])
+    |> List.wrap()
+    |> Enum.with_index(1)
+    |> Enum.map(fn {_teil, nummer} ->
+      %{"id" => "teil-" <> Integer.to_string(nummer), "nummer" => nummer}
+    end)
+  end
+
+  # Die Auswahl: Alle Teile bleiben — die Freigabe bindet den originalen
+  # Call. Eine Abwahl leitet den reduzierten Call neu ab (emit und store
+  # werden erneut entschieden und journalt), dann bindet die Freigabe
+  # genau dieses neue Ereignis.
+  defp offenlegung_answered(env, call, {snapshot, intent, then}, request, ids) do
+    alle = Enum.map(request["teile"], & &1["id"])
+
+    if Enum.sort(ids) == Enum.sort(alle) do
+      offenlegung_commit(env, call, {snapshot, intent, then}, request)
+    else
+      offenlegung_reduced(env, call, request, ids)
+    end
+  end
+
+  # Eine Abwahl ergibt ein neues Ereignis mit neuem Hash (R.6.2): Der
+  # reduzierte Call durchlaeuft emit und store erneut — beide
+  # Entscheidungen journalt der Vermittler wie jeden anderen Call — und
+  # die Freigabe bindet genau dieses neue Ereignis. Fraglich wird hier
+  # niemand mehr: Die nutzende Person hat im selben Fenster gewaehlt und
+  # das GO gegeben.
+  defp offenlegung_reduced(env, call, request, ids) do
+    reduced_params = reduce_teile(call.params, request["teile"], ids)
+
+    reduced_call = %{
+      call
+      | params: reduced_params,
+        intent_hash: intent_hash(call.tool, reduced_params)
+    }
+
+    d12 = Hash.digest12(reduced_call.intent_hash)
+    emit_object = %Object{object_id: "out-" <> d12, version: "v1", labels: []}
+
+    emit_snapshot =
+      Room.connector_snapshot(env.room, env.gamma, %{
+        snapshot_id: "snap-emit-" <> d12,
+        environment: env.room.environment,
+        object: emit_object,
+        facts: Map.put(env.room.facts, "output_content_digest", digest_fact(reduced_call))
+      })
+
+    emit_intent = intent(env.room, "emit", "intent-emit-" <> d12, emit_object)
+
+    case Derive.decide(env.gamma.compiled, emit_snapshot, emit_intent) do
+      {:ok, %{"decision" => "permit"} = emit_decision} ->
+        emit_decided =
+          decision_pdr(
+            env,
+            reduced_call,
+            {emit_snapshot, emit_intent},
+            emit_decision,
+            "permitted",
+            emit_decision
+          )
+
+        emit = %{
+          decision: emit_decision,
+          snapshot: emit_snapshot,
+          intent: emit_intent,
+          decided: emit_decided
+        }
+
+        store_reduced(env, reduced_call, emit, request)
+
+      other ->
+        not_permitted(env, reduced_call, "emit", nil, emit_intent, emit_snapshot, other)
+    end
+  end
+
+  defp store_reduced(env, reduced_call, emit, request) do
+    d12 = Hash.digest12(reduced_call.intent_hash)
+
+    object = %Object{
+      object_id: "out-" <> d12,
+      version: "v1",
+      labels: emit.decision["assigned_label"]
+    }
+
+    store_snapshot =
+      Room.connector_snapshot(env.room, env.gamma, %{
+        snapshot_id: "snap-store-" <> d12,
+        environment: reduced_call.manifest.environment,
+        object: object,
+        facts: Map.put(env.room.facts, "output_content_digest", digest_fact(reduced_call))
+      })
+
+    store_intent = intent(env.room, "store", "intent-store-" <> d12, object)
+
+    case Derive.decide(env.gamma.compiled, store_snapshot, store_intent) do
+      {:ok, %{"decision" => "permit"} = store_decision} ->
+        # Unerwarteter Fall: Der reduzierte Call bestünde den
+        # Empfaengertest von selbst — dann brauchte es keine Offenlegung.
+        # Fail-closed: weiter wie ein normales permit (journalt), ohne GO.
+        decided =
+          decision_pdr(
+            env,
+            reduced_call,
+            {store_snapshot, store_intent},
+            store_decision,
+            "permitted",
+            store_decision
+          )
+
+        execute(env, reduced_call, emit, decided)
+
+      other ->
+        reduced_store_denied(
+          env,
+          reduced_call,
+          emit,
+          {store_snapshot, store_intent},
+          request,
+          other
+        )
+    end
+  end
+
+  # Der reduzierte Call scheitert erwartbar am Empfaengertest: Die Auswahl
+  # aus dem Fenster gilt — die Freigabe wird ueber den neuen Hash gebaut
+  # und der Freigabe-Zweig entscheidet. Ohne Angebot bleibt die Ablehnung.
+  defp reduced_store_denied(
+         env,
+         reduced_call,
+         emit,
+         {store_snapshot, store_intent},
+         request,
+         other
+       ) do
+    response = not_permitted(env, reduced_call, "store", nil, store_intent, store_snapshot, other)
+
+    case Go.offered_offenlegung(response["remedies"]) do
+      %{call_hash: call_hash} = offer ->
+        reduced_store_release(
+          env,
+          reduced_call,
+          emit,
+          {store_snapshot, store_intent},
+          request,
+          offer,
+          call_hash
+        )
+
+      _no_offer ->
+        response
+    end
+  end
+
+  defp reduced_store_release(
+         env,
+         reduced_call,
+         emit,
+         {store_snapshot, store_intent},
+         request,
+         offer,
+         call_hash
+       ) do
+    release =
+      Go.offenlegung_release_for(
+        Map.merge(request, %{
+          "call_hash" => call_hash,
+          "ausgabeart" => offer.ausgabeart,
+          "ziellabel" => offer.ziellabel
+        }),
+        %{
+          call_hash: call_hash,
+          content_digest: String.replace_prefix(reduced_call.intent_hash, "sha256:", "")
+        },
+        System.os_time(:second)
+      )
+
+    case Derive.decide_with_release(
+           env.gamma.compiled,
+           store_snapshot,
+           store_intent,
+           release,
+           GoStand.current()
+         ) do
+      {:ok, %{"decision" => "permit", "release" => proposal} = decision} ->
+        offenlegung_reduced_commit(
+          env,
+          reduced_call,
+          emit,
+          {store_snapshot, store_intent},
+          decision,
+          proposal,
+          request
+        )
+
+      other_release ->
+        not_permitted(
+          env,
+          reduced_call,
+          "store",
+          nil,
+          store_intent,
+          store_snapshot,
+          other_release
+        )
+    end
+  end
+
+  defp offenlegung_reduced_commit(
+         env,
+         reduced_call,
+         emit,
+         {store_snapshot, store_intent},
+         decision,
+         proposal,
+         request
+       ) do
+    case GoStand.advance(proposal) do
+      {:ok, _stand} ->
+        offenlegung = %{
+          "offenlegung" => %{
+            "ausgabeart" => request["ausgabeart"],
+            "ziellabel" => request["ziellabel"],
+            "empfaenger" => request["empfaenger"]
+          }
+        }
+
+        decided =
+          decision_pdr(
+            env,
+            reduced_call,
+            {store_snapshot, store_intent},
+            decision,
+            "released",
+            proposal,
+            offenlegung
+          )
+
+        execute(env, reduced_call, emit, decided)
+
+      {_refused_or_error, reason} ->
+        go_not_committed(env, reduced_call, store_intent, store_snapshot, reason)
+    end
+  end
+
+  # Die ausgewaehlten Teile behalten ihre Reihenfolge aus der Anfrage; alle
+  # uebrigen Parameter bleiben unberuehrt.
+  defp reduce_teile(params, choices, ids) do
+    selected = choices |> Enum.filter(&(&1["id"] in ids)) |> Enum.map(& &1["nummer"])
+    teile = params |> Map.get("teile", []) |> List.wrap()
+    gewaehlte = for {teil, nummer} <- Enum.with_index(teile, 1), nummer in selected, do: teil
+    Map.put(params, "teile", gewaehlte)
+  end
+
+  defp offenlegung_commit(env, call, {snapshot, intent, then}, request) do
+    release =
+      Go.offenlegung_release_for(
+        request,
+        %{call_hash: request["call_hash"], content_digest: request["content_digest"]},
+        System.os_time(:second)
+      )
+
+    case Derive.decide_with_release(
+           env.gamma.compiled,
+           snapshot,
+           intent,
+           release,
+           GoStand.current()
+         ) do
+      {:ok, %{"decision" => "permit", "release" => proposal} = decision} ->
+        commit_offenlegung(env, call, {snapshot, intent, then}, decision, proposal, request)
+
+      other ->
+        not_permitted(env, call, intent["operation"], nil, intent, snapshot, other)
+    end
+  end
+
+  # Commit vor Wirkung wie bei der Aktionsfreigabe (§ 4.6, B.8): erst den
+  # Nonce committen, dann den PDR — er haelt die Offenlegung gegenueber
+  # dem Vorstand fest (Szene 13: Ausgabeart, Ziellabel und alle Empfaenger)
+  # —, dann erst die Ausfuehrung.
+  defp commit_offenlegung(env, call, {snapshot, intent, then}, decision, proposal, request) do
+    case GoStand.advance(proposal) do
+      {:ok, _stand} ->
+        offenlegung = %{
+          "offenlegung" => %{
+            "ausgabeart" => request["ausgabeart"],
+            "ziellabel" => request["ziellabel"],
+            "empfaenger" => request["empfaenger"]
+          }
+        }
+
+        decided =
+          decision_pdr(env, call, {snapshot, intent}, decision, "released", proposal, offenlegung)
+
+        then.(decision, decided)
+
+      {_refused_or_error, reason} ->
+        go_not_committed(env, call, intent, snapshot, reason)
     end
   end
 

@@ -13,6 +13,9 @@ defmodule KomkiPolicy.Calculus do
   * `actual_recipients/2` — r_G(c): sortierte `observers`-Liste der
     Verarbeitungsumgebung (CONTRACT.md § 2.2).
   * `labels_subset?/2` — l(x) Teilmenge B_W (Praemisse 7).
+  * `lockerungsbeduerftige_bindungen/3` und `lockerungsbefugte/4` — die
+    Mengenseite der Lockerung (R.5.7, § 4.9, Ticket #423): welche
+    Bindungen das Ziel nicht abdecken und wer sie alle lockern darf.
   """
 
   alias KomkiPolicy.Registry
@@ -49,5 +52,61 @@ defmodule KomkiPolicy.Calculus do
   defp readers_of(registry, binding_id) do
     binding = Map.fetch!(registry.bindings, binding_id)
     MapSet.new(binding.readers)
+  end
+
+  @doc """
+  Bindungen, deren Empfängerkreis `rho` nicht abdeckt (§ 4.9, R.5.7):
+  nur für diese braucht eine Lockerung auf ein weiteres Ziel eine
+  Befugnis — das Entfernen einer Bindung, die das Ziel ohnehin lesen
+  durfte, lockert nichts. Ohne Eintrag ist keine Lockerung zulässig
+  (R.2.2), deshalb entscheidet diese Menge, ob ein Fenster erscheint
+  (Gegenprobe 13.1).
+  """
+  @spec lockerungsbeduerftige_bindungen(Registry.compiled(), checked_label(), [String.t()]) :: [
+          String.t()
+        ]
+  def lockerungsbeduerftige_bindungen(registry, checked, rho) do
+    Enum.filter(checked, fn binding_id ->
+      case Map.get(registry.bindings, binding_id) do
+        nil -> true
+        binding -> rho -- binding.readers != []
+      end
+    end)
+  end
+
+  @doc """
+  Autoritäten, die alle lockerungsbedürftigen Bindungen für die Ausgabeart
+  `ausgabeart` lockern dürfen (§ 2.8, § 4.9): Schnittmenge der Befugnisse
+  je Bindung. Nur wenn sie nicht leer ist, bietet der Katalog einer
+  `store`-Ablehnung eine Offenlegungsfreigabe an — sonst würde das Fenster
+  ein GO verlangen, das niemand erteilen kann.
+  """
+  @spec lockerungsbefugte(Registry.compiled(), checked_label(), [String.t()], String.t()) :: [
+          String.t()
+        ]
+  def lockerungsbefugte(registry, checked, rho, ausgabeart) do
+    registry
+    |> lockerungsbeduerftige_bindungen(checked, rho)
+    |> Enum.map(fn binding_id ->
+      registry.bindings
+      |> Map.get(binding_id)
+      |> Map.get(:relaxation_authorities)
+      |> Kernel.||([])
+      |> Enum.filter(&(&1.restriction == "readers" and &1.output == ausgabeart))
+      |> Enum.map(& &1.authority)
+      |> MapSet.new()
+    end)
+    |> case do
+      [] ->
+        # Fail-closed: ohne lockerungsbedürftige Bindung gibt es keine
+        # Lockerung, die eine Offenlegungsfreigabe decken könnte.
+        []
+
+      authorities ->
+        authorities
+        |> Enum.reduce(&MapSet.intersection/2)
+        |> MapSet.to_list()
+        |> Enum.sort()
+    end
   end
 end

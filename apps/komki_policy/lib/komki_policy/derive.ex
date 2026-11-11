@@ -81,6 +81,14 @@ defmodule KomkiPolicy.Derive do
   @unsupported_operations ["start"]
   @unsupported_detail "rule branch not implemented"
 
+  # Die geschlossene Zuordnung Zielumgebung → Ausgabeart → Ziellabel
+  # (§ 4.9): die Engine entscheidet in dieser Lieferung genau die
+  # Lockerung von B_W auf den Bestand des ratsprojekte-Hubs. Andere
+  # Ziele und Ausgabearten sind strukturiert verwaltet, aber undecidable
+  # (fail-closed).
+  @offenlegung_ziellabel %{"ratsprojekte-essenz" => ["ratsprojekte@1"]}
+  @ziel_ausgabearten %{"ratsprojekte-bestand@1" => "ratsprojekte-essenz"}
+
   @doc "Rule branches that let a produced object leave the room under λ(y) (§ 4.7, § 4.8)."
   @spec handover_operations() :: [String.t()]
   def handover_operations, do: @handover_operations
@@ -142,11 +150,12 @@ defmodule KomkiPolicy.Derive do
   end
 
   @doc """
-  Aktionsfreigabe-Zweig (§ 4.6, B.5 Schritt 6): eigener Regelzweig mit
-  vorgelegter Aktionsfreigabe und Offenlegungsstand — nie ein stiller
-  Fallback der normalen Entscheidung. Nur `kind: aktionsfreigabe` mit
-  Operation `emit`, `store` oder `transfer` ist entscheidbar; `offenlegungsfreigabe`
-  und andere Operationen ergeben `unsupported` (Exit 3).
+  Freigabe-Zweige (§ 4.6, § 4.9): eigener Regelzweig mit vorgelegter
+  Freigabe und Offenlegungsstand — nie ein stiller Fallback der normalen
+  Entscheidung. `kind: aktionsfreigabe` mit Operation `emit`, `store`
+  oder `transfer` entscheidet nach § 4.6; `kind: offenlegungsfreigabe`
+  mit Operation `store` nach § 4.9 (Lockerung, Ticket #423) — alles
+  andere ergibt `unsupported` (Exit 3).
   """
   @spec decide_with_release(Registry.compiled(), term(), term(), term(), term()) ::
           {:ok, decision()}
@@ -224,24 +233,156 @@ defmodule KomkiPolicy.Derive do
       # unsupported (Exit 3), auch wenn der Snapshot bereits den Digest
       # vermissen lassen würde.
       case require_emit_input(ctx) do
-        :ok -> run_release_branch(ctx, registry, auth, release, stand)
-        {:error, reason} -> {:error, reason}
+        :ok ->
+          release_branch(release.kind, ctx, registry, auth, release, stand)
+
+        {:error, reason} ->
+          {:error, reason}
       end
     end
   end
 
-  # § 4.6: nur `aktionsfreigabe` ist entscheidbar; `offenlegungsfreigabe`
-  # und Operationen ohne Ausgabeobjekt ergeben `unsupported` (Exit 3) — kein deny.
+  # § 4.6 (Aktionsfreigabe) oder § 4.9 (Offenlegungsfreigabe): getrennte
+  # Regelzweige, kein stiller Fallback.
+  defp release_branch("offenlegungsfreigabe", ctx, registry, auth, release, stand),
+    do: run_offenlegung_branch(ctx, registry, auth, release, stand)
+
+  defp release_branch(_aktionsfreigabe, ctx, registry, auth, release, stand),
+    do: run_release_branch(ctx, registry, auth, release, stand)
+
+  # =========================================================================
+  # Offenlegungsfreigabe-Zweig (§ 4.9, R.5.7, R.6.1, Ticket #423)
+  # =========================================================================
+
+  @doc """
+  Ausgabeart einer Zielumgebung (§ 4.9): geschlossen und fail-closed —
+  eine unbekannte Umgebung hat keine Ausgabeart, für sie bietet der
+  Katalog keine Offenlegungsfreigabe an.
+  """
+  @spec ziel_ausgabeart(String.t() | nil) :: String.t() | nil
+  def ziel_ausgabeart(environment), do: Map.get(@ziel_ausgabearten, environment)
+
+  defp run_offenlegung_branch(ctx, registry, auth, release, stand) do
+    call_hash = output_call_hash(ctx, auth.operation)
+
+    state =
+      ctx
+      |> shared_premises(registry, auth.operation)
+      |> premise_workspace_valid()
+      |> premise_label_preservation()
+      |> release_check_call_hash(release, call_hash)
+      |> release_check_window(release, stand)
+      |> release_check_nonce(release, stand)
+      |> release_check_scope(release, stand)
+      |> release_check_authority(registry, release)
+      |> release_env_observers()
+      |> offenlegung_check_ziellabel(registry, release)
+      |> offenlegung_check_befugnisse(registry, release)
+      |> offenlegung_check_recipients(registry, release)
+
+    conclude_release(state, ctx, registry, auth, release, stand, call_hash)
+  end
+
+  # Ein GO kann nicht belegen, wer mitliest (Gegenprobe 11.15, Ticket
+  # #432): die Offenlegungsfreigabe speichert wie die Aktionsfreigabe nur
+  # bei belegter Beobachterliste.
+  defp release_env_observers(state) do
+    if fact_state(state.facts, "environment_observers_complete") != true do
+      add_blocker(state, binder("recipients_unproven", nil, nil))
+    else
+      state
+    end
+  end
+
+  # Ziellabel der Lockerung: sortiert, eindeutig, in der Registry
+  # vorhanden und die geschlossene Zuordnung zur Ausgabeart (§ 4.9). Die
+  # Ausgabeart muss zur Zielumgebung des Snapshots passen — die Engine
+  # rechnet sie nach, der Freigabe wird nichts geglaubt. Die Lockerung
+  # ersetzt die Bindungen der Ausgabe — das Ersetzen gilt als Entfernen
+  # (R.5.7), deshalb prüft die Engine das Ziel genauso streng wie jeden
+  # Empfängerkreis.
+  defp offenlegung_check_ziellabel(state, registry, release) do
+    cond do
+      ziel_ausgabeart(state.workspace["environment"]) != release.ausgabeart ->
+        add_blocker(state, binder("ausgabeart_unpassend", nil, nil))
+
+      Enum.any?(release.ziellabel, &(&1 not in Map.keys(registry.bindings))) ->
+        add_blocker(state, binder("ziellabel_unknown", nil, nil))
+
+      Map.get(@offenlegung_ziellabel, release.ausgabeart) != release.ziellabel ->
+        add_blocker(state, binder("ziellabel_unpassend", nil, nil))
+
+      true ->
+        state
+    end
+  end
+
+  # BerechtigtZurLockerung (R.5.7): für jede Bindung der Ausgabe, deren
+  # Empfängerkreis das Ziel nicht abdeckt, braucht die Freigabe eine
+  # Befugnis dieser Autorität für genau diese Ausgabeart (§ 4.9). Eine
+  # fehlende Befugnis überbrückt kein GO — auch keine Offenlegungsfreigabe.
+  defp offenlegung_check_befugnisse(state, registry, release) do
+    registry
+    |> Calculus.lockerungsbeduerftige_bindungen(state.checked, state.rho)
+    |> Enum.reduce(state, fn binding_id, acc ->
+      if befugnis?(registry, binding_id, release) do
+        acc
+      else
+        add_blocker(acc, binder("lockerungsbefugnis_fehlt", binding_id, nil))
+      end
+    end)
+  end
+
+  # Empfängertest unter dem Ziellabel (R.5.7: Zulässigkeit der Übergabe
+  # unter L'): ein GO ersetzt ihn auch hier nicht (§ 4.6, #417).
+  defp offenlegung_check_recipients(state, registry, release) do
+    allowed = Calculus.allowed_recipients(registry, release.ziellabel)
+
+    case state.rho -- allowed do
+      [] ->
+        state
+
+      outside ->
+        blocker =
+          Map.put(binder("recipient_not_allowed", nil, nil), "recipients_outside", outside)
+
+        add_blocker(state, blocker)
+    end
+  end
+
+  # Passt eine Befugnis der Bindung zu Autoritaet und Ausgabeart der
+  # Freigabe (§ 4.9)? Die Einschaerkung ist immer `readers`: nur der
+  # Empfaengerkreis wird durch die Lockerung auf das Ziellabel ersetzt.
+  defp befugnis?(registry, binding_id, release) do
+    binding = Map.get(registry.bindings, binding_id)
+
+    if binding do
+      Enum.any?(binding.relaxation_authorities, fn entry ->
+        entry.authority == release.authority and entry.restriction == "readers" and
+          entry.output == release.ausgabeart
+      end)
+    else
+      false
+    end
+  end
+
+  # § 4.6 und § 4.9: die Aktionsfreigabe entscheidet emit, store und
+  # transfer; die Offenlegungsfreigabe entscheidet in dieser Lieferung
+  # genau store (Lockerung auf ein Ziellabel, Ticket #423). Alles andere
+  # ergibt `unsupported` (Exit 3) — kein deny.
   defp require_supportable(auth, release) do
     cond do
       auth.operation not in @output_operations ->
         {:unsupported, unsupported_info(auth.operation)}
 
-      release.kind != "aktionsfreigabe" ->
-        {:unsupported, unsupported_info(release.kind)}
+      release.kind == "aktionsfreigabe" ->
+        :ok
+
+      release.kind == "offenlegungsfreigabe" and auth.operation == "store" ->
+        :ok
 
       true ->
-        :ok
+        {:unsupported, unsupported_info(release.kind)}
     end
   end
 
@@ -337,16 +478,10 @@ defmodule KomkiPolicy.Derive do
          "proof" => nil,
          "remedies" => nil,
          "content_digest" => digest_value(ctx),
-         "release" => %{
-           "release_id" => release.release_id,
-           "nonce" => release.nonce,
-           "stand_ref" => stand.stand_id <> "@" <> Integer.to_string(stand.version),
-           "stand_version_after" => stand.version + 1,
-           "call_hash" => call_hash
-         }
+         "release" => release_proposal(release, stand, call_hash)
        })}
     else
-      remedy_ctx = release_remedies_context(state, registry, call_hash)
+      remedy_ctx = release_remedies_context(state, registry, call_hash, release)
       findings = Remedies.catalog(registry, remedy_ctx, state.blockers)
 
       {:ok,
@@ -362,6 +497,28 @@ defmodule KomkiPolicy.Derive do
     end
   end
 
+  # Verbrauchsvorschlag (§ 4.6, § 4.9): die Aktionsfreigabe bleibt beim
+  # geschlossenen Fünffeld-Satz; die Offenlegungsfreigabe nennt zusätzlich
+  # Ausgabeart und Ziellabel der Lockerung — der Vermittler bindet beides
+  # über den payload_hash ins Journal (R.6.2).
+  defp release_proposal(release, stand, call_hash) do
+    base = %{
+      "release_id" => release.release_id,
+      "nonce" => release.nonce,
+      "stand_ref" => stand.stand_id <> "@" <> Integer.to_string(stand.version),
+      "stand_version_after" => stand.version + 1,
+      "call_hash" => call_hash
+    }
+
+    case release do
+      %{kind: "offenlegungsfreigabe"} ->
+        Map.merge(base, %{"ausgabeart" => release.ausgabeart, "ziellabel" => release.ziellabel})
+
+      _aktionsfreigabe ->
+        base
+    end
+  end
+
   # Only `emit` assigns a label; `store` and `transfer` keep λ(y) and carry
   # no `assigned_label`.
   defp release_label_fields("emit", label), do: %{"assigned_label" => label}
@@ -374,11 +531,14 @@ defmodule KomkiPolicy.Derive do
     |> Map.merge(release_label_fields(auth.operation, label))
   end
 
-  defp release_remedies_context(ctx, _registry, call_hash) do
+  defp release_remedies_context(ctx, _registry, call_hash, release) do
     %{
       rule: :release,
+      release_kind: release.kind,
+      ausgabeart: Map.get(release, :ausgabeart),
+      ziellabel: Map.get(release, :ziellabel, []),
       object_labels: [],
-      checked: ctx.workspace["bindings"],
+      checked: ctx.checked,
       rho: ctx.rho,
       object_ref: ctx.object["object_id"] <> "@" <> ctx.object["version"],
       call_hash: call_hash
@@ -652,6 +812,14 @@ defmodule KomkiPolicy.Derive do
   defp remedies_context(ctx, rule_kind) do
     object_labels = if rule_kind == "admit", do: ctx.object["labels"], else: []
 
+    # Ausgabeart des Ziels (§ 2.8, § 4.9): die Engine leitet sie geschlossen
+    # aus der Zielumgebung des Snapshots ab — der Katalog kann eine
+    # Offenlegungsfreigabe nur für bekannte Ziele anbieten. Der Agent
+    # nennt keine Ausgabeart; das Manifest des Connectors bestimmt die
+    # Umgebung, die Snapshot-Umgebung die Ausgabeart. Das Ziellabel
+    # gehört zur Ausgabeart (§ 4.9), es nennt der Katalog mit.
+    ausgabeart = ziel_ausgabeart(ctx.workspace["environment"])
+
     %{
       rule: string_to_kind(rule_kind),
       object_labels: object_labels,
@@ -659,7 +827,9 @@ defmodule KomkiPolicy.Derive do
       rho: ctx.rho,
       object_ref: ctx.object["object_id"] <> "@" <> ctx.object["version"],
       call_hash:
-        if(rule_kind in @output_operations, do: output_call_hash(ctx, rule_kind), else: nil)
+        if(rule_kind in @output_operations, do: output_call_hash(ctx, rule_kind), else: nil),
+      ausgabeart: ausgabeart,
+      ziellabel: Map.get(@offenlegung_ziellabel, ausgabeart, [])
     }
   end
 

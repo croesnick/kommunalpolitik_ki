@@ -19,12 +19,13 @@ defmodule KomkiMediator.Hinweis do
   @doc """
   Is an engine denial of `rule` with its `remedies` a "nothing
   transmitted" case? True only for a store whose target lies outside the
-  recipient circle while the catalog offers no GO (ticket #417). For emit
-  and transfer a GO still bridges the recipient test (#354).
+  recipient circle while the catalog offers no GO (ticket #417) — neither
+  an Aktionsfreigabe nor the Offenlegungsfreigabe of § 4.9 (#423). For
+  emit and transfer a GO still bridges the recipient test (#354).
   """
   @spec not_transmitted?(String.t(), [map()]) :: boolean()
   def not_transmitted?("store", remedies) do
-    Go.offered(remedies) == nil and
+    Go.offered(remedies) == nil and Go.offered_offenlegung(remedies) == nil and
       Enum.any?(remedies, &(&1["code"] == "recipient_not_allowed"))
   end
 

@@ -1,10 +1,16 @@
 defmodule KomkiMediator.PDR do
   @moduledoc """
-  PDR audit records (schema `"komki-pdr/4"`): one shared shape for
+  PDR audit records (schema `"komki-pdr/5"`): one shared shape for
   `KomkiMediator.Gate` (ping, admit_document) and
   `KomkiMediator.ConnectorGate` (connector tools).
 
   Every record carries the same keys; unused fields are `null`.
+
+  New in `komki-pdr/5` (ticket #423): a `store` record released by an
+  Offenlegungsfreigabe carries `offenlegung` — `{ausgabeart, ziellabel,
+  empfaenger}` — und haelt so fest, gegenueber wem offengelegt wurde
+  (Szene 13: die Offenlegung gegenueber dem Vorstand, alle Empfaenger des
+  Ziels). Auf allen anderen Records bleibt das Feld `null`.
 
   New in `komki-pdr/4` (ticket #298): every engine decision of a connector
   call is journaled when it is made (`outcome: permitted` for a permit).
@@ -47,7 +53,7 @@ defmodule KomkiMediator.PDR do
   alias KomkiMediator.{Fassung, Hash, Journal}
   alias KomkiPolicy.JSON
 
-  @schema "komki-pdr/4"
+  @schema "komki-pdr/5"
 
   @doc "Schema-Kennung der Datensaetze."
   @spec schema() :: String.t()
@@ -85,6 +91,7 @@ defmodule KomkiMediator.PDR do
       "assigned_label" => nil,
       "authorized_by" => nil,
       "remedies" => nil,
+      "offenlegung" => nil,
       "abrufdatum" => DateTime.to_iso8601(DateTime.utc_now()),
       "fassung_id" => Fassung.fassung_id()
     }

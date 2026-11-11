@@ -201,7 +201,7 @@ dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bz
    Journal. Seine `decision_id` ist die `call_id` im Frame, `authorized_by` nennt die `decision_id`s der
    beiden Entscheidungen, auf die er sich stützt (emit und transfer bzw. store samt Empfängerprüfung,
    jeweils `permitted` oder `released`), sein `payload_hash` bindet die ausgehende Anfrage. Das Antwortfeld `emit_decision_id` (Name aus Kompatibilität) verweist
-   auf ihn. PDR-Schema `komki-pdr/4`.
+   auf ihn. PDR-Schema `komki-pdr/5`.
 7. Die `call_id` entsteht nach der Vorprüfung (Schema, B_W). Jeder PDR des Aufrufs trägt sie:
    Entscheidungen, Ablehnungen, GO-Belege (`released`, `go_refused`, `go_timeout`, ein gescheiterter
    Commit), Vorbeleg und admit-PDR. Nur eine Ablehnung in der Vorprüfung hat keine, weil es noch keinen

@@ -55,6 +55,22 @@ defmodule KomkiCli.Prompt do
     end
   end
 
+  @doc """
+  Auswahl-Frage (#423): Die Eingabe ist eine freie Zeile, die Vorgabe bei
+  Enter oder Dateiende. Ohne Terminal ist die Antwort die Vorgabe — was
+  ein GO veraendert, entscheidet nur eine Person am Terminal, nie ein
+  Skript.
+  """
+  @spec select(String.t(), String.t(), (-> boolean())) :: String.t()
+  def select(question, default \\ "", terminal? \\ &terminal?/0) do
+    if terminal?.() do
+      ask(question, default)
+    else
+      IO.puts(question <> " (kein Terminal: die Auswahl bleibt bei der Vorgabe)")
+      default
+    end
+  end
+
   defp answer(prompt, default_yes?) do
     case IO.gets(prompt) do
       text when is_binary(text) ->

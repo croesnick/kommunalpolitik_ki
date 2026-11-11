@@ -31,7 +31,7 @@ defmodule KomkiMediator.Templates do
   # (#106 und #107 fuer die Registry, beide mit demselben Raum; #134 nur
   # fuer den Raum; 8dc75f9 vor #213 fuer beide).
   @current %{
-    "registry.json" => "9d06e591083615071f4386298ddb1e62e9d6f2fc20388a21741fc9bab07d55e0",
+    "registry.json" => "7524cca748ac4f580d5385c4ff68cb182bd6b4a92915382244bfbe597c37c140",
     "room.json" => "8bb7a156134d43ebd4cc0027fc66ec27c26e00ae696d0d65f83b8ad8c9d57469"
   }
   @outdated %{
@@ -43,7 +43,9 @@ defmodule KomkiMediator.Templates do
       # 8dc75f9: vor #213 (ohne doc-oeffentlich@2)
       "2c7391d3c63e5e06a1910372cb8632026f35f288f750cd3d87b2195db575d835",
       # before #298: bindings without a transfer rule
-      "038a1756f2be26e6a13b844e802d15afbb6b9d65fc5b05a19ffb168066ffcc62"
+      "038a1756f2be26e6a13b844e802d15afbb6b9d65fc5b05a19ffb168066ffcc62",
+      # vor #423: ohne Fraktionsraum-Welt, Lockerungsbefugnisse exportiert als []
+      "9d06e591083615071f4386298ddb1e62e9d6f2fc20388a21741fc9bab07d55e0"
     ],
     "room.json" => [
       "127831a737e7f5565d8def234c260ca270056b8954b346725f03ef638ef0b51f",
@@ -54,16 +56,57 @@ defmodule KomkiMediator.Templates do
     ]
   }
 
-  @observers ["brave-search", "nutzende-person", "pi-agent", "ris-betreiber"]
+  @observers [
+    "brave-search",
+    "fraktion",
+    "nextcloud-betreiber",
+    "nutzende-person",
+    "pi-agent",
+    "ris-betreiber",
+    "sicherung",
+    "vorstand"
+  ]
 
   # Beobachtertypen (Label-Store, R.2.5): nur eine Person darf
   # klassifizieren; Agent und Empfaenger sind Verarbeitungsdomaenen.
+  # Fraktion und Vorstand sind Personengruppen (Szenario, Beobachtertabelle);
+  # der Bestand des Hubs liest sie mit (ADR 0004, Szene 11). Die Sicherung
+  # ist Time Machine (ADR 0004, lokaler Betrieb), der nextcloud-betreiber
+  # ist der Weg des Stands.
   @observer_types %{
     "brave-search" => "processing_domain",
+    "fraktion" => "person",
+    "nextcloud-betreiber" => "processing_domain",
     "nutzende-person" => "person",
     "pi-agent" => "processing_domain",
-    "ris-betreiber" => "processing_domain"
+    "ris-betreiber" => "processing_domain",
+    "sicherung" => "processing_domain",
+    "vorstand" => "person"
   }
+
+  # Beobachter der Umgebung ratsprojekte-bestand@1: der gemeinsam gebundene
+  # Bestand des Hubs (ADR 0004, Szene 11) — die nutzende Person, der Agent,
+  # Fraktion und Vorstand, der Betreiber der Nextcloud als Weg des Stands
+  # und die Sicherung (Time Machine).
+  @hub_observers [
+    "fraktion",
+    "nextcloud-betreiber",
+    "nutzende-person",
+    "pi-agent",
+    "sicherung",
+    "vorstand"
+  ]
+
+  # Befugnis fuer gegengelesene Essenz an ratsprojekte (Szene 13, #423):
+  # Miriam darf den Empfaengerkreis dieser Bindungen fuer genau diese
+  # Ausgabeart lockern (R.2.2, R.5.7).
+  @essenz_befugnis [
+    %{
+      "authority" => "nutzende-person",
+      "restriction" => "readers",
+      "output" => "ratsprojekte-essenz"
+    }
+  ]
 
   @doc """
   Vorlage des Arbeitsraums in Store-Form `komki-label-store/2` (Ticket
@@ -86,6 +129,7 @@ defmodule KomkiMediator.Templates do
       },
       "environments" => %{
         "lokaler-arbeitsraum@1" => %{"observers" => ["nutzende-person", "pi-agent"]},
+        "ratsprojekte-bestand@1" => %{"observers" => @hub_observers},
         "ris-abruf@1" => %{"observers" => ["nutzende-person", "pi-agent", "ris-betreiber"]},
         "vault-lokal@1" => %{"observers" => ["nutzende-person", "pi-agent"]},
         "web-suche@1" => %{"observers" => ["brave-search", "nutzende-person", "pi-agent"]}
@@ -126,7 +170,70 @@ defmodule KomkiMediator.Templates do
                 "restriction" => "operations",
                 "output" => "freigabe-notiz"
               }
-            ])
+            ]),
+          # Fraktionsraum (Szenario, Bindungstabelle): interne
+          # Fraktionsarbeit. Miriam, pi-agent, Fraktion und der
+          # nextcloud-betreiber (Fraktionsordner) lesen mit — der Vorstand
+          # fehlt bewusst (ADR 0004, verworfene Option fraktion-intern@2).
+          # Die Befugnis erlaubt Miriam die gegengelesene Essenz an
+          # ratsprojekte (Szene 13, #423); fuer konkrete Rechercheauftraege
+          # entscheidet #354.
+          "fraktion-intern@1" =>
+            binding(
+              "Interne Fraktionsarbeit",
+              ["fraktion", "nextcloud-betreiber", "nutzende-person", "pi-agent"],
+              %{"admit" => true, "emit" => true, "transfer" => true},
+              %{"relaxation_authorities" => @essenz_befugnis}
+            ),
+          "fraktionsprojekt-radweg@1" =>
+            binding(
+              "Die Projektidee selbst",
+              ["fraktion", "nextcloud-betreiber", "nutzende-person", "pi-agent"],
+              %{"admit" => true, "emit" => true, "transfer" => true},
+              %{"relaxation_authorities" => @essenz_befugnis}
+            ),
+          # Nichtoeffentliche Ratsunterlagen (Szenario, Bindungstabelle):
+          # Aufheben kann nur der Stadtrat — Miriam bekommt die
+          # Essenz-Befugnis bewusst nie (Szene 13, Gegenprobe 13.1).
+          "ratsarbeit@1" =>
+            binding("Nichtöffentliche Ratsunterlagen", ["nutzende-person", "pi-agent"], %{
+              "admit" => %{"eq" => ["purpose", "mandat"]}
+            }),
+          # Volltext aus dem Zeitungsabo (Szenario, Bindungstabelle): die
+          # Auflage verlangt Quellenangabe, erlaubt Miriam nur ein
+          # Kurzzitat mit Quelle (§ 51, § 63 UrhG) — nichts fuer
+          # ratsprojekte (Gegenprobe 13.3).
+          "abo-az@1" =>
+            binding(
+              "Volltext aus dem Zeitungsabo",
+              ["nutzende-person", "pi-agent"],
+              %{"admit" => true},
+              %{
+                "auflagen" => [
+                  %{
+                    "art" => "quellenangabe",
+                    "beschreibung" => "Quellenangabe mit Urhebername bei jeder Verwendung",
+                    "nachweisart" => "dokumentation"
+                  }
+                ],
+                "relaxation_authorities" => [
+                  %{
+                    "authority" => "nutzende-person",
+                    "restriction" => "auflagen",
+                    "output" => "kurzzitat-mit-quelle"
+                  }
+                ]
+              }
+            ),
+          # Bestand des ratsprojekte-Hubs (ADR 0004, Szene 11): gemeinsam
+          # gebunden, admit+emit nach dem Γ-GO vom 2026-11-10, keine
+          # transfer-Regel — jede Übergabe und jede Speicherung bleibt
+          # GO-pflichtig.
+          "ratsprojekte@1" =>
+            binding("Bestand des ratsprojekte-Hubs", @hub_observers, %{
+              "admit" => true,
+              "emit" => true
+            })
         })
     }
   end
@@ -134,8 +241,10 @@ defmodule KomkiMediator.Templates do
   @doc """
   Registry-Term des Default-Arbeitsraums (`komki-registry/2`): die
   Projektion von `label_store_seed/0` auf die Engine-Form, so wie der
-  Label-Store exportiert. Lockerungsbefugnisse exportiert der Store bis
-  #109 als `[]` (fail-closed).
+  Label-Store exportiert. Lockerungsbefugnisse traegt der Export seit
+  #423 strukturiert (komki-registry/2, R.2.2): die Engine validiert die
+  Einträge gegen das geschlossene Vokabular und entscheidet die
+  Essenz-Befugnis im Offenlegungsfreigabe-Zweig (§ 4.9).
   """
   def registry do
     seed = label_store_seed()
@@ -146,24 +255,24 @@ defmodule KomkiMediator.Templates do
     |> Map.put(
       "bindings",
       Map.new(seed["bindings"], fn {id, b} ->
-        {id,
-         b
-         |> Map.take(["readers", "operations"])
-         |> Map.put("relaxation_authorities", [])}
+        {id, Map.take(b, ["readers", "operations", "relaxation_authorities"])}
       end)
     )
   end
 
-  defp binding(bezeichnung, readers, operations) do
-    %{
-      "bezeichnung" => bezeichnung,
-      "geltungsbereich" => "komki-Arbeitsraum (Vorlage)",
-      "verantwortliche_stelle" => "nutzende-person",
-      "readers" => readers,
-      "operations" => operations,
-      "auflagen" => [],
-      "relaxation_authorities" => []
-    }
+  defp binding(bezeichnung, readers, operations, extras \\ %{}) do
+    Map.merge(
+      %{
+        "bezeichnung" => bezeichnung,
+        "geltungsbereich" => "komki-Arbeitsraum (Vorlage)",
+        "verantwortliche_stelle" => "nutzende-person",
+        "readers" => readers,
+        "operations" => operations,
+        "auflagen" => [],
+        "relaxation_authorities" => []
+      },
+      extras
+    )
   end
 
   # Connector bindings (connector contract §7): admit, emit and transfer
@@ -173,6 +282,13 @@ defmodule KomkiMediator.Templates do
   # recipient_inclusion at the handover (transfer, #298). The @1 versions
   # carry transfer only since #298; an older label store rejects them
   # (R.2.1) and has to be set aside.
+  #
+  # Oeffentliche Bindungen tragen die volle Beobachterliste (Modell `alle`,
+  # #418): oeffentliche Inhalte darf jeder Beobachter lesen — auch Fraktion,
+  # Vorstand und die Sicherung des Hubs. Ohne das bestuende der
+  # Empfaengertest des Hubs (ratsprojekte-bestand@1) fuer keinen Raum,
+  # Szene 11 waere unerfuellbar. `alle` als Platzhalter ist erst #418;
+  # bis dahin steht die Liste ausgeschrieben.
   defp connector_bindings do
     open = %{"admit" => true, "emit" => true, "transfer" => true}
 
@@ -198,6 +314,24 @@ defmodule KomkiMediator.Templates do
       "ris-oeffentlich@1",
       "vault-oeffentlich@1",
       "vault-vertraulich@1",
+      "web-oeffentlich@1"
+    ]
+
+  @doc """
+  B_W des Referenzraums fraktion (Szenario, Raumtabelle: antrag-radweg):
+  interne Fraktionsarbeit und die Projektidee, dazu die oeffentlichen
+  Bindungen jedes Raums. Ratsprojekte ist kein Weg dieses Raums — die
+  Essenz dorthin ist die Lockerung mit Offenlegungsfreigabe (Szene 13,
+  #423), der Fraktionsordner liegt bei der Nextcloud.
+  """
+  @spec fraktion_bindings() :: [String.t()]
+  def fraktion_bindings,
+    do: [
+      "doc-oeffentlich@2",
+      "fraktion-intern@1",
+      "fraktionsprojekt-radweg@1",
+      "ris-oeffentlich@1",
+      "vault-oeffentlich@1",
       "web-oeffentlich@1"
     ]
 

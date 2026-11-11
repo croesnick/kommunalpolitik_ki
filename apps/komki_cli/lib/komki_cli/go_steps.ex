@@ -15,6 +15,14 @@ defmodule KomkiCli.GoSteps do
   Aufruf selbst zeigt ihnen, dass und wann aus diesem Arbeitsraum gefragt
   wird, auch wenn die Parameter harmlos aussehen. Die Empfaenger stammen
   aus Γ (`registry.json`, Beobachter der Umgebung des Connectors).
+
+  Eine Offenlegungsfreigabe (#423, Szene 13) ist kein gewoehnliches GO:
+  Der Text verlaesst einen vertraulichen Raum und wird dem Vorstand
+  offengelegt. Die Vorschau sagt das in einem eigenen Satz, nennt alle
+  Empfaenger des Ziels und zeigt die Teile einzeln — abgewaehlte Teile
+  verlassen den Raum nicht. Die Auswahl geschieht VOR dem GO (ein
+  abgewaehltes Teil ist ein neues Ereignis mit neuem Hash, R.6.2); das
+  Haeckchen im Hub kaeme zu spaet.
   """
 
   alias KomkiConnector.Manifest
@@ -23,10 +31,23 @@ defmodule KomkiCli.GoSteps do
   # Beobachter, die zum Arbeitsraum selbst gehoeren (wie KomkiCli.Raumbild).
   @intern ["nutzende-person", "pi-agent"]
 
-  @names %{"brave-search" => "Brave (Websuche)", "ris-betreiber" => "Betreiber des RIS"}
+  # Die Empfänger des Hub-Bestands mit sprechenden Namen im Freigabefenster
+  # (Szene 11, Szene 13).
+  @names %{
+    "brave-search" => "Brave (Websuche)",
+    "ris-betreiber" => "Betreiber des RIS",
+    "fraktion" => "Fraktion",
+    "vorstand" => "Vorstand",
+    "nextcloud-betreiber" => "Betreiber der Nextcloud (Ordner für den Stand)",
+    "sicherung" => "Sicherung (Time Machine)"
+  }
 
   @typedoc "Ein- und Ausgabe (in Tests ersetzbar)."
-  @type ui() :: %{say: (String.t() -> term()), confirm: (String.t(), boolean() -> boolean())}
+  @type ui() :: %{
+          say: (String.t() -> term()),
+          confirm: (String.t(), boolean() -> boolean()),
+          select: (String.t() -> String.t())
+        }
 
   @doc "Beantwortet alle offenen Anfragen unter `<base>/mediator/go`."
   @spec run(Path.t(), ui()) :: {String.t(), 0}
@@ -47,6 +68,15 @@ defmodule KomkiCli.GoSteps do
 
   defp answer(dir, request, ui, environments) do
     ui.say.(describe(request, recipients(request["tool"], environments)))
+
+    if offenlegung?(request) do
+      answer_offenlegung(dir, request, ui)
+    else
+      answer_simple(dir, request, ui)
+    end
+  end
+
+  defp answer_simple(dir, request, ui) do
     go? = ui.confirm.("GO für genau diesen Aufruf?", false)
 
     case Go.answer(dir, request, go?) do
@@ -62,27 +92,116 @@ defmodule KomkiCli.GoSteps do
     end
   end
 
+  # Teileauswahl vor dem GO (#423): Die Auswahl nennt Nummern der Teile,
+  # die den Raum verlassen duerfen; Enter uebernimmt alle. Erst danach
+  # fragt das GO — die Antwort gilt genau fuer die ausgewaehlten Teile.
+  defp answer_offenlegung(dir, request, ui) do
+    selection = ui.select.("Teile, die den Raum verlassen dürfen (z. B. 1,3 — Enter = alle):")
+    ids = ids_for_selection(request, selection)
+
+    go? =
+      if ids == nil do
+        false
+      else
+        ui.confirm.(
+          "GO: Ich lege die ausgewählten Teile bewusst gegenüber dem Vorstand offen.",
+          false
+        )
+      end
+
+    case Go.answer_selection(dir, request, ids || []) do
+      :ok when go? ->
+        ui.say.("Offenlegung erteilt — sie gilt nur für diesen Aufruf, einmal.")
+        :go
+
+      :ok ->
+        :no
+
+      :expired ->
+        ui.say.("abgelaufen, der Vermittler hat schon abgelehnt")
+        :expired
+    end
+  end
+
+  # Auswahl "1, 3" (oder "1,3") zu Teil-Kennungen; unbekannte Nummern
+  # machen die Auswahl ungueltig (nil -> Nein), Enter wählt alle.
+  defp ids_for_selection(request, selection) do
+    choices = request["teile"]
+
+    case String.trim(selection || "") do
+      "" ->
+        Enum.map(choices, & &1["id"])
+
+      typed ->
+        typed_ids(choices, typed)
+    end
+  end
+
+  # Auswahl "1, 3" (oder "1,3") zu Teil-Kennungen; jede unbekannte oder
+  # doppelte Nummer macht die Auswahl ungueltig (nil -> Nein).
+  defp typed_ids(choices, typed) do
+    numbers =
+      typed
+      |> String.split(~r{[\s,]+}, trim: true)
+      |> Enum.map(fn number -> Integer.parse(number) end)
+
+    if Enum.all?(numbers, &match?({n, ""} when is_integer(n), &1)) do
+      picked = Enum.map(numbers, fn {n, ""} -> n end)
+      valid_nummern = Enum.map(choices, fn choice -> choice["nummer"] end)
+
+      if Enum.all?(picked, &(&1 in valid_nummern)) and picked == Enum.uniq(picked) do
+        choices |> Enum.filter(&(&1["nummer"] in picked)) |> Enum.map(& &1["id"])
+      else
+        nil
+      end
+    else
+      nil
+    end
+  end
+
+  defp offenlegung?(%{"kind" => "offenlegungsfreigabe"}), do: true
+  defp offenlegung?(_request), do: false
+
   @doc """
   Vorschau einer Anfrage (mehrzeilig). `recipients` sind die Empfaenger
   ausserhalb des Rechners; sind es welche, steht die Warnung zum
-  Existenz-Leck dabei.
+  Existenz-Leck dabei. Eine Offenlegungsfreigabe zeigt zusaetzlich den
+  Hinweis auf die Offenlegung, alle Empfaenger des Ziels und die Teile
+  einzeln.
   """
   @spec describe(map(), [String.t()]) :: String.t()
   def describe(request, recipients \\ []) do
     params =
       request["params"]
       |> Enum.sort()
-      |> Enum.map_join("\n", fn {key, value} -> "    " <> key <> ": " <> inspect(value) end)
+      |> Enum.map_join("\n", fn {key, value} ->
+        "    " <> key <> ": " <> inspect(value)
+      end)
 
+    kopf(request, params, recipients) <>
+      "  Ein GO gilt nur für genau diesen Aufruf, einmal, fünf Minuten lang."
+  end
+
+  defp kopf(%{"kind" => "offenlegungsfreigabe"} = request, params, _recipients) do
     """
+    Gesperrter Aufruf (Beleg #{request["decision_id"]})
+      Werkzeug:  #{request["tool"]}
+    #{action(request)}#{offenlegung(request)}  Parameter:
+    #{params}
+    #{teile(request)}  Gesperrt:  #{Enum.join(request["blockers"], ", ")}
+    """
+  end
 
+  defp kopf(request, params, recipients) do
+    basis = """
     Gesperrter Aufruf (Beleg #{request["decision_id"]})
       Werkzeug:  #{request["tool"]}
     #{action(request)}  Parameter:
     #{params}
       Gesperrt:  #{Enum.join(request["blockers"], ", ")}
-    #{leak(recipients)}  Ein GO gilt nur für genau diesen Aufruf, einmal, fünf Minuten lang.\
     """
+
+    basis <> leak(recipients)
   end
 
   # Speichern braucht immer ein GO (Ticket #205): keine Bindung erlaubt
@@ -91,6 +210,39 @@ defmodule KomkiCli.GoSteps do
     do: "  Aktion:    speichern — jedes Schreiben braucht dein GO\n"
 
   defp action(_request), do: ""
+
+  # Der Hinweis auf die Offenlegung (Szene 13): Ziel, alle Empfaenger und
+  # was dieses GO bedeutet — mit den Namen aus @names.
+  defp offenlegung(request) do
+    empfaenger =
+      request
+      |> Map.get("empfaenger", [])
+      |> Enum.map_join(", ", &Map.get(@names, &1, &1))
+
+    """
+      Ausgabe:   #{request["ausgabeart"]} (Lockerung auf #{Enum.join(request["ziellabel"], ", ")})
+      Offenlegung: Ich lege den ausgewählten Text bewusst gegenüber dem Vorstand offen.
+      Alle Empfänger: #{empfaenger}
+    """
+  end
+
+  # Der genaue Text, Teil fuer Teil: die Vorschau zeigt jedes Teil mit
+  # Nummer und vollstaendigem Inhalt — nichts wird gekuerzt (Szene 13).
+  defp teile(request) do
+    teile =
+      request["params"]
+      |> Map.get("teile", [])
+      |> List.wrap()
+      |> Enum.with_index(1)
+      |> Enum.map_join("\n", fn {teil, nummer} ->
+        "    #{nummer}. " <> String.replace(inspect(teil), "\\n", " ")
+      end)
+
+    """
+      Teile:
+    #{teile}
+    """
+  end
 
   defp leak([]), do: ""
 

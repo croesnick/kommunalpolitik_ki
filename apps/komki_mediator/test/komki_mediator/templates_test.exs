@@ -106,15 +106,20 @@ defmodule KomkiMediator.TemplatesTest do
            }
   end
 
-  # Γ-Konventionen des Connector-Vertrags §7.
+  # Γ-Konventionen des Connector-Vertrags §7, dazu seit #423 die
+  # Fraktionsraum-Welt (Beobachter, Hub-Umgebung, Essenz-Befugnisse).
   test "Registry traegt Beobachter, Umgebungen und Connector-Bindungen nach §7" do
     registry = Templates.registry()
 
     assert registry["observers"] == [
              "brave-search",
+             "fraktion",
+             "nextcloud-betreiber",
              "nutzende-person",
              "pi-agent",
-             "ris-betreiber"
+             "ris-betreiber",
+             "sicherung",
+             "vorstand"
            ]
 
     assert registry["fact_fields"]["output_content_digest"] == "string"
@@ -151,6 +156,55 @@ defmodule KomkiMediator.TemplatesTest do
              "pi-agent"
            ]
 
+    assert {:ok, _} = KomkiPolicy.Registry.compile(registry)
+  end
+
+  # Szene 13, #423: die Hub-Umgebung, die Bindungen des Fraktionsraums
+  # mit der Essenz-Befugnis und der gemeinsam gebundene Bestand.
+  test "Fraktionsraum-Welt: Hub-Umgebung, Befugnisse, ratsprojekte-Bestand" do
+    registry = Templates.registry()
+
+    hub = [
+      "fraktion",
+      "nextcloud-betreiber",
+      "nutzende-person",
+      "pi-agent",
+      "sicherung",
+      "vorstand"
+    ]
+
+    assert registry["environments"]["ratsprojekte-bestand@1"]["observers"] == hub
+
+    # ratsprojekte@1: admit+emit nach dem Γ-GO vom 2026-11-10, keine
+    # transfer-Regel — jede Speicherung bleibt GO-pflichtig.
+    assert registry["bindings"]["ratsprojekte@1"]["readers"] == hub
+
+    assert registry["bindings"]["ratsprojekte@1"]["operations"] == %{
+             "admit" => true,
+             "emit" => true
+           }
+
+    for binding <- ["fraktion-intern@1", "fraktionsprojekt-radweg@1"] do
+      assert registry["bindings"][binding]["readers"] == [
+               "fraktion",
+               "nextcloud-betreiber",
+               "nutzende-person",
+               "pi-agent"
+             ]
+
+      # Der Vorstand fehlt bewusst (ADR 0004); die Befugnis erlaubt Miriam
+      # die Lockerung fuer genau die Ausgabeart ratsprojekte-essenz.
+      assert registry["bindings"][binding]["relaxation_authorities"] == [
+               %{
+                 "authority" => "nutzende-person",
+                 "restriction" => "readers",
+                 "output" => "ratsprojekte-essenz"
+               }
+             ]
+    end
+
+    # ratsarbeit@1 bekommt die Befugnis nie (Szene 13, Gegenprobe 13.1).
+    assert registry["bindings"]["ratsarbeit@1"]["relaxation_authorities"] == []
     assert {:ok, _} = KomkiPolicy.Registry.compile(registry)
   end
 

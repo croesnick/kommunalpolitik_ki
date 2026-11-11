@@ -1,37 +1,6 @@
 {
-  "schema": "komki-registry/2",
-  "registry_id": "reg-fall-4711-test",
-  "observers": [
-    "nutzende-person",
-    "eigene-rz-analyse",
-    "lokale-fallverarbeitung",
-    "webdienst-x"
-  ],
-  "fact_fields": {
-    "input_in_approved_case_scope": "boolean",
-    "output_content_digest": "string",
-    "purpose": "string"
-  },
-  "environments": {
-    "lokale-fallverarbeitung@1": {
-      "observers": [
-        "nutzende-person",
-        "lokale-fallverarbeitung"
-      ]
-    },
-    "recherche-webdienst@1": {
-      "observers": [
-        "nutzende-person",
-        "webdienst-x"
-      ]
-    }
-  },
   "bindings": {
     "buergerfall-4711@1": {
-      "readers": [
-        "nutzende-person",
-        "lokale-fallverarbeitung"
-      ],
       "operations": {
         "admit": {
           "all": [
@@ -82,34 +51,153 @@
           ]
         }
       },
-      "relaxation_authorities": []
-    },
-    "lizenz-namensnennung@1": {
       "readers": [
         "nutzende-person",
-        "eigene-rz-analyse",
-        "lokale-fallverarbeitung",
-        "webdienst-x"
+        "lokale-fallverarbeitung"
       ],
+      "relaxation_authorities": []
+    },
+    "fraktion-intern@1": {
+      "operations": {
+        "admit": true,
+        "emit": true,
+        "transfer": true
+      },
+      "readers": [
+        "fraktion",
+        "nextcloud-betreiber",
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": [
+        {
+          "authority": "nutzende-person",
+          "output": "ratsprojekte-essenz",
+          "restriction": "readers"
+        }
+      ]
+    },
+    "lizenz-namensnennung@1": {
       "operations": {
         "admit": true,
         "emit": true,
         "store": true,
         "transfer": true
       },
+      "readers": [
+        "nutzende-person",
+        "eigene-rz-analyse",
+        "lokale-fallverarbeitung",
+        "webdienst-x"
+      ],
       "relaxation_authorities": []
     },
     "nur-start-test@1": {
+      "operations": {
+        "start": true
+      },
       "readers": [
         "nutzende-person",
         "lokale-fallverarbeitung"
       ],
+      "relaxation_authorities": []
+    },
+    "ratsarbeit@1": {
       "operations": {
-        "start": true
+        "admit": {
+          "all": [
+            {
+              "eq": [
+                "purpose",
+                "mandat"
+              ]
+            }
+          ]
+        }
       },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": []
+    },
+    "ratsprojekte@1": {
+      "operations": {
+        "admit": true,
+        "emit": true
+      },
+      "readers": [
+        "fraktion",
+        "nextcloud-betreiber",
+        "nutzende-person",
+        "pi-agent",
+        "sicherung",
+        "vorstand"
+      ],
+      "relaxation_authorities": []
+    },
+    "web-oeffentlich-fall@1": {
+      "operations": {
+        "admit": true,
+        "emit": true,
+        "transfer": true
+      },
+      "readers": [
+        "eigene-rz-analyse",
+        "fraktion",
+        "lokale-fallverarbeitung",
+        "nextcloud-betreiber",
+        "nutzende-person",
+        "pi-agent",
+        "sicherung",
+        "vorstand",
+        "webdienst-x"
+      ],
       "relaxation_authorities": []
     }
   },
+  "environments": {
+    "lokale-fallverarbeitung@1": {
+      "observers": [
+        "nutzende-person",
+        "lokale-fallverarbeitung"
+      ]
+    },
+    "ratsprojekte-bestand@1": {
+      "observers": [
+        "fraktion",
+        "nextcloud-betreiber",
+        "nutzende-person",
+        "pi-agent",
+        "sicherung",
+        "vorstand"
+      ]
+    },
+    "recherche-webdienst@1": {
+      "observers": [
+        "nutzende-person",
+        "webdienst-x"
+      ]
+    }
+  },
+  "fact_fields": {
+    "input_in_approved_case_scope": "boolean",
+    "output_content_digest": "string",
+    "purpose": "string"
+  },
+  "observers": [
+    "eigene-rz-analyse",
+    "fraktion",
+    "lokale-fallverarbeitung",
+    "nextcloud-betreiber",
+    "nutzende-person",
+    "pi-agent",
+    "sicherung",
+    "vorstand",
+    "webdienst-x"
+  ],
+  "registry_id": "reg-fall-4711-test",
+  "schema": "komki-registry/2",
   "transformations": {
     "presse-auszug@1": {
       "input_labels": [

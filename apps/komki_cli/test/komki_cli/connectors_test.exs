@@ -31,7 +31,7 @@ defmodule KomkiCli.ConnectorsTest do
   end
 
   describe "Auswahl" do
-    test "Default: alle vier aktiv, Egress mit ris- und web-Port" do
+    test "Default: alle aktiven (ohne ratsprojekte ohne Socket), Egress mit ris- und web-Port" do
       cfg = cfg()
       assert Enum.map(Connectors.enabled(cfg), & &1.id) == ["documents", "ris", "vault", "web"]
 
@@ -39,6 +39,26 @@ defmodule KomkiCli.ConnectorsTest do
                {49_531, "ris", ["risapi1.komuna.net:443"]},
                {49_532, "web", ["api.search.brave.com:443"]}
              ]
+    end
+
+    test "DURCHSTICH #409: ratsprojekte nur mit gesetztem Socket aktiv" do
+      cfg = cfg(ratsprojekte_socket: "/tmp/hub.sock")
+
+      assert Enum.map(Connectors.enabled(cfg), & &1.id) == [
+               "documents",
+               "ratsprojekte",
+               "ris",
+               "vault",
+               "web"
+             ]
+
+      assert Connectors.connector_args(cfg, Manifest.fetch!("ratsprojekte")) ==
+               [
+                 "--socket",
+                 Path.join([cfg.base_dir, "run", "connectors", "ratsprojekte.sock"]),
+                 "--hub-socket",
+                 "/tmp/hub.sock"
+               ]
     end
 
     test "vault_dir nil: Vault-Connector startet nicht" do
@@ -205,7 +225,8 @@ defmodule KomkiCli.ConnectorsTest do
       assert :ok = Connectors.socket_length("/tmp/komki")
       long = "/tmp/" <> String.duplicate("x", 80)
       assert {:error, reason} = Connectors.socket_length(long)
-      assert reason =~ "documents.sock"
+      # DURCHSTICH #409: ratsprojekte ist der laengste Connector-Name
+      assert reason =~ "ratsprojekte.sock"
     end
   end
 
@@ -246,6 +267,7 @@ defmodule KomkiCli.ConnectorsTest do
                "connector-web",
                "connector-vault",
                "connector-ris",
+               "connector-ratsprojekte",
                "connector-documents",
                "egress"
              ]

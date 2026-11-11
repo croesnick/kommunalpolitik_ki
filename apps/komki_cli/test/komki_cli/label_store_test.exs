@@ -280,7 +280,13 @@ defmodule KomkiCli.LabelStoreTest do
                 ]
               }
             },
-            "relaxation_authorities" => []
+            "relaxation_authorities" => [
+              %{
+                "authority" => "nutzende-person",
+                "restriction" => "auflagen",
+                "output" => "sitzungsmappe"
+              }
+            ]
           },
           "lizenz-namensnennung@1" => %{
             "readers" => ["fraktionskollege", "lokale-verarbeitung", "nutzende-person"],
@@ -314,7 +320,7 @@ defmodule KomkiCli.LabelStoreTest do
   end
 
   # ========================================================================
-  # Lockerungsbefugnisse (R.2.2, strukturiert; Γ emittiert [], Ticket #109)
+  # Lockerungsbefugnisse (R.2.2, strukturiert; Γ-Export seit #423)
   # ========================================================================
 
   describe "Strukturierte Lockerungsbefugnisse (R.2.2)" do
@@ -376,15 +382,38 @@ defmodule KomkiCli.LabelStoreTest do
       assert reason =~ "doppelte Lockerungsbefugnis"
     end
 
-    test "Γ-Export emittiert [], obwohl der Store Einträge hält (Ticket #109)", %{
+    test "Γ-Export traegt die strukturierten Eintraege (seit #423; vorher [] bis #109)", %{
       db: db
     } do
       {:ok, _} = import_seed(db)
 
       assert {:ok, json} = LabelStore.export(db)
       decoded = JSON.decode!(json)
-      assert decoded["bindings"]["ratsarbeit@1"]["relaxation_authorities"] == []
+
+      assert decoded["bindings"]["ratsarbeit@1"]["relaxation_authorities"] == [
+               %{
+                 "authority" => "nutzende-person",
+                 "restriction" => "auflagen",
+                 "output" => "sitzungsmappe"
+               }
+             ]
+
+      # Der exportierte Γ kompiliert: Die Engine validiert die Eintraege
+      # gegen das geschlossene Vokabular (CONTRACT § 2.1).
       assert {:ok, _compiled} = Registry.compile(decoded)
+    end
+
+    test "Eintrag mit unbekannter Ausgabeart ueberlebt den Store, aber nicht die Engine-Projektion",
+         %{
+           db: db,
+           seed: seed
+         } do
+      entry = Map.put(@seed_entry, "output", "unbekannte-ausgabe")
+      seed2 = deep_put(seed, ["bindings", "ratsarbeit@1", "relaxation_authorities"], [entry])
+
+      assert {:error, reason} = LabelStore.import_registry(db, seed2)
+      assert reason =~ "invalid_output_kind"
+      assert reason =~ "unbekannte-ausgabe"
     end
   end
 

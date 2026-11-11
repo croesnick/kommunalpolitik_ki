@@ -48,7 +48,10 @@ defmodule KomkiCli.Raum do
   @descriptions %{
     "recherche" => "RIS, Websuche und öffentliche Notizen. Vertrauliche Notizen sind unsichtbar.",
     "vertraulich" =>
-      "Auch vertrauliche Notizen. Nach draußen geht nichts ohne dein GO für den einzelnen Aufruf."
+      "Auch vertrauliche Notizen. Nach draußen geht nichts ohne dein GO für den einzelnen Aufruf.",
+    "fraktion" =>
+      "Interne Fraktionsarbeit und die Projektidee. In den ratsprojekte-Hub geht nur gegengelesene " <>
+        "Essenz — mit Offenlegung gegenüber dem Vorstand, Teile wählst du vorher ab."
   }
 
   @typedoc "Abhängigkeiten, in Tests ersetzbar."
@@ -59,12 +62,18 @@ defmodule KomkiCli.Raum do
           restart: (Config.t() -> {:ok, term()} | {:error, String.t()})
         }
 
-  @doc "Namen und B_W der Referenzräume."
+  @doc """
+  Namen und B_W der Referenzräume. Der Fraktionsraum liefert seit #423
+  gegengelesene Essenz in den ratsprojekte-Hub — als Lockerung mit
+  Offenlegungsfreigabe über genau diesen Aufruf (Szene 13); der Vorstand
+  fehlt im Empfängerkreis fraktionsinterner Bindungen.
+  """
   @spec rooms() :: %{String.t() => [String.t()]}
   def rooms do
     %{
       "recherche" => Templates.recherche_bindings(),
-      "vertraulich" => Templates.vertraulich_bindings()
+      "vertraulich" => Templates.vertraulich_bindings(),
+      "fraktion" => Templates.fraktion_bindings()
     }
   end
 
