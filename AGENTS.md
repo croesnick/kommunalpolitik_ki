@@ -165,7 +165,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | Tool | Sprache | Zweck | AI-Schnittstelle | Status |
 |---|---|---|---|---|
 | `apps/ratsinfo` | Elixir | RIS-Scraper + CLI + lokale Volltextsuche | CLI (`ratsinfo sync/search/show`) | Funktionsfähig |
-| `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard | LiveView + MCP (`/mcp`) | Funktionsfähig |
+| `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Lokaler Hub: Weg von der Idee zum Antrag (ADR 0004) | Oberfläche LiveView; Maschinenweg: Stand-Datei (#438) und Connector-Schreibweg (#277) | Gerüst (#435), Bau-Reihe #436–#440 läuft |
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | Funktionsfähig |
 | `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi), ein Programm, das Vermittler, Egress-Proxy und Connectoren als Rollen mitbringt, + lokale Label-Registry mit Export an den Regel-Prüfkern (RFC 0003); Schlüssel liegen nur versiegelt im Schlüsselbund (Secure Enclave, Freigabe per Touch ID über das kleine Swift-Programm `komki-tresor`), gestartete Programme werden per Prüfsumme festgehalten | CLI (`komki setup/init/doctor/up/down/status/raum/go/run/session/secret/journal/label`) | Funktionsfähig |
 | `apps/komki_policy` | Elixir | Regel-Prüfkern: rechnet aus, ob eine Absicht nach den Regeln zulässig ist, und verifiziert die Begründung unabhängig nach; rein, führt selbst nichts aus | CLI (`komki-policy validate/decide/verify/advance`) | Funktionsfähig |
@@ -190,9 +190,9 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `tools/ratsinfo_mcp` | Python | MCP-Wrapper um `ratsinfo`-CLI (search, show, sessions, sync, stats) | MCP | Funktionsfähig |
 | Nextcloud-MCP (`cbcoutinho/nextcloud-mcp-server`) | Python (extern) | Nextcloud: Files/WebDAV, CalDAV, Notes, Deck, Talk | MCP (`opencode.json`, `uvx`) | Eingebunden |
 | `skills/foerdermittel_recherche` | Markdown-Skill | Fördermittel-Recherche orchestrieren | Agent Skill | Funktionsfähig |
-| `skills/ratsprojekt_delta` | Markdown-Skill | Neue Infos gegen Projektstand halten, Delta produzieren | Agent Skill | Funktionsfähig |
-| `skills/ratsprojekt_stand` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Funktionsfähig |
-| `skills/ratsprojekt_proposal` | Markdown-Skill | Proposal-Workflow: sammeln → Vault → Gates → Proposal | Agent Skill | Funktionsfähig |
+| `skills/ratsprojekt_delta` | Markdown-Skill | Neue Infos gegen Projektstand halten, Delta produzieren | Agent Skill | Wartet: Backend mit #435 entfallen, Neubau folgt #375 |
+| `skills/ratsprojekt_stand` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Wartet: Backend mit #435 entfallen, Neubau folgt #375 |
+| `skills/ratsprojekt_proposal` | Markdown-Skill | Proposal-Workflow: sammeln → Vault → Gates → Proposal | Agent Skill | Wartet: Backend mit #435 entfallen, Neubau folgt #375 |
 | `skills/sitzungsvorbereitung` | Markdown-Skill | Sitzungsmappe erstellen (WF 1: sync → TOPs → AZ → Vault → Mappe) | Agent Skill | Funktionsfähig |
 | `skills/bericht_aus_dem_stadtrat` | Markdown-Skill | Bericht aus dem Stadtrat: Sitzungen seit letztem Bericht sammeln und verdichten | Agent Skill | Funktionsfähig |
 | `skills/vault_suche` | Markdown-Skill | Obsidian-Vault durchsuchen | Agent Skill | Funktionsfähig |
@@ -226,26 +226,15 @@ Skills, die fraktionsneutral bleiben (wie `antrag_generieren`), verweisen auf fr
 ## ratsprojekte — Planungsstand
 
 ### Konzept
-Rechtlich-inhaltliche Standortbestimmung für Stadtratsprojekte. Kein Task-Tracker, keine Todo-Liste. Sondern: welche Realisierungsstränge gibt es, welche rechtlichen Vorbedingungen stehen, welcher Weg kann gegangen werden — und welcher nicht. Die KI kann lesen und Vorschläge machen (GO-Prinzip). Langfristig: Antragsvorlagen aus Projektdaten generieren.
+Lokaler Hub für den Weg von der Idee zum Antrag ([ADR 0004](docs/adr/0004-ratsprojekte-als-lokaler-hub.md)): Der Hub führt den gemeinsamen Stand, Menschen schreiben direkt, die KI schlägt vor (GO-Prinzip). Die Redaktion führt, alle anderen bekommen eine bewusst ausgegebene Fassung.
 
 ### Architektur
-- Phoenix LiveView für Dashboard
-- `anubis_mcp` (LGPL-3.0) für AI-Zugriff — MCP-Endpoint unter `http://localhost:4000/mcp` (dev-only, read-only Tools)
-- Ecto + SQLite3 (geteilte DB mit ratsinfo)
+- Phoenix LiveView (Gerüst: Phoenix 1.8.16, LiveView 1.2.13, Bandit, Tailwind v4, esbuild — Ticket #435)
+- Kein MCP-Endpoint am Hub (ADR 0004): Schreibendes geht nur über den Connector-Socket mit Token (#277, baut auf #440), der Stand geht als Datei für Maschinen hinaus (#438)
+- Ecto + SQLite3 über exqlite, das im Workspace gegen die SQLCipher-Systembibliothek gebaut wird (BSD-Lizenz; gilt auch für ratsinfo und komki_cli). Eigene Datei unter `~/Library/Application Support/ratsprojekte/` statt der geteilten mit ratsinfo; ohne Schlüssel verhält sich SQLCipher wie normales SQLite.
 
 ### Datenmodell
-```
-Projekt (titel, slug, beschreibung, status, prioritaet, beschlussvorschlag, adressat)
-  status: idee | aktiv | abgeschlossen | verworfen  (siehe docs/ratsprojekte-lifecycle.md)
-├── Realisierungsstrang (label A/B/C, titel, beschreibung, rechtliche_grundlage, bedingung, bedingung_erfuellt)
-│   ├── Vorbedingung (text, erfuellt, rechtliche_grundlage, typ)
-│   └── Schritt (text, frist) — geordnete Liste, keine Checkboxen
-└── Quelle (typ, titel, url, paragraf, abrufdatum)
-
-PendingProposal (projekt_id, typ, status)  — AI-Vorschläge, GO-Gate vor Mutation
-  typ:    add_projekt | add_realisierungsstrang | change_status
-  status: pending | approved | rejected
-```
+Das alte Modell (Projekt/Realisierungsstrang/PendingProposal) ist mit dem Gerüstwechsel (#435) gefallen. Das kleine Modell (Ratsprojekt, Verlauf, Meinungsbild, Befragung, Fakt, Variante, Antrag) steht in [ADR 0004](docs/adr/0004-ratsprojekte-als-lokaler-hub.md) und wird als Schema und Kontext in #436 gebaut; die kanonischen Dokumente zieht #434 nach.
 
 ### Slug-Konvention
 
@@ -254,13 +243,13 @@ Projekte werden über Slugs identifiziert, nicht über DB-IDs. Der Slug ist der 
 - **Format**: kebab-case, lowercase, ASCII only (`^[a-z0-9]+(?:-[a-z0-9]+)*$`). Umlaute als ae/oe/ue/ss.
 - **ratsprojekte URL**: `/projekte/marktplatz-umgestalten` (Slug in der URL, nicht die ID)
 - **Vault-Tag**: `#ratsprojekt/marktplatz-umgestalten` (gleicher Slug als Obsidian-Tag)
-- **MCP-Tools**: alle projektbezogenen Tools nehmen `slug` als Parameter, nie `id`
-- **Intern**: DB-IDs bleiben als Primary Keys und Foreign Keys in `pending_proposals.projekt_id`. Slug→ID-Auflösung passiert an der Grenze (LiveView mount, MCP tool execute).
+- **Schnittstellen**: alle projektbezogenen Wege nehmen `slug` als Parameter, nie `id` (Umsetzung mit der Oberfläche, #437)
+- **Intern**: DB-IDs bleiben als Primary Keys und Foreign Keys. Slug→ID-Auflösung passiert an der Grenze.
 - **Copy-Button**: auf der Projekt-Detailseite kopiert ein Button den Vault-Tag `#ratsprojekt/{slug}` in die Zwischenablage
 
 ### Roadmap
 
-Die Punkte 1 bis 4, 7 und 8 der ursprünglichen Roadmap sind abgeschlossen; der bisher hier stehende Detailstatus ist als veraltetes Duplikat des Boards weggefallen. Offen: Antragsvorlagen als Markdown-Render aus Projektdaten (Issue #15). Die Ratsinfo-Integration (Quellen verlinken mit Sitzung und TOP, #32) und Value Proposition + Success Metrics als harte Gates in `check_antragsreife` (#37) sind gebaut. Status und laufende Arbeit stehen auf dem GitHub-Board (Feld „Status"), der Projektlebenszyklus in [docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md).
+Das Gerüst steht (#435), die Bau-Reihe aus ADR 0004 läuft über die Tickets #434 (kanonische Dokumente), #436 (Schema und Kontext), #437 (Oberfläche, Main Flow „Was ist passiert?‟), #438 (Stand ausgeben), #439 (Befragung), #440 (lokaler Betrieb) und #277 (Connector-Schreibweg „Fakt vorschlagen‟). Status und laufende Arbeit stehen auf dem GitHub-Board (Feld „Status"); der Projektlebenszyklus in [docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md) beschreibt noch das alte Modell, bis #434 es auf den Hub umzieht.
 
 ## Tooling-Vorgaben
 
@@ -270,7 +259,7 @@ Achtung: `mix credo` und `mix dialyzer` sind **App-Tasks** — am Repo-Root exis
 
 | Werkzeug | Rolle | Befehl |
 |---|---|---|
-| Credo | Linter | Root: `mix workspace.run -t credo --exclude ratsprojekte -- --strict`; App-lokal: `cd apps/<app> && mix credo --strict` |
+| Credo | Linter | Root: `mix workspace.run -t credo -- --strict` (alle Apps; der Ausschluss von ratsprojekte ist mit dem Gerüstwechsel #435 entfallen); App-lokal: `cd apps/<app> && mix credo --strict` |
 | Dialyzer | Static Type Checker | App-lokal: `cd apps/<app> && mix dialyzer` (Root-Dispatch crasht mit dialyxir im Workspace-Pattern) |
 | mix format | Formatter | `mix format --check-formatted` (Root, deckt alle Apps ab) |
 | mix test | Test-Runner | `mix workspace.run -t test --affected --base origin/main` |
@@ -305,7 +294,7 @@ Ebenso Erlang und Elixir: `.tool-versions` pinnt sie für asdf, und die CI liest
 mix deps.get && mix workspace.run -t deps.get
 mix format --check-formatted
 mix workspace.run -t compile -- --warnings-as-errors
-mix workspace.run -t credo --exclude ratsprojekte -- --strict
+mix workspace.run -t credo -- --strict
 mix workspace.run -t test --affected --base origin/main   # PR; lokal ohne --base
 
 # Python (pro Tool unter tools/)
@@ -332,7 +321,7 @@ kommunalpolitik_ki/
 ├── GLOSSARY.md             # kanonische Nomenklatur aller Domänen
 ├── apps/                   # Elixir-Apps (workspace-Pattern)
 │   ├── ratsinfo/           # RIS-Scraper + CLI (AI: CLI)
-│   ├── ratsprojekte/       # Projekt-Dashboard (AI: LiveView + MCP)
+│   ├── ratsprojekte/       # Lokaler Hub von der Idee zum Antrag (AI: LiveView)
 │   ├── shared/             # Geteilte Domain-Models
 │   ├── komki_policy/       # Regel-Prüfkern für Zulässigkeits-Entscheidungen (AI: CLI)
 │   ├── komki_mediator/     # Vermittler: MCP-Gates + PDR-Journal für pis Tool-Aufrufe (AI: MCP)

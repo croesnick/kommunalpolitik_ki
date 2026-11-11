@@ -23,23 +23,44 @@ end
 config :ratsprojekte, RatsprojekteWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+if config_env() == :dev do
+  # Reload browser tabs when matching files change.
+  config :ratsprojekte, RatsprojekteWeb.Endpoint,
+    live_reload: [
+      web_console_logger: true,
+      patterns: [
+        # Static assets, except user uploads
+        ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$"E,
+        # Router, Controllers, LiveViews and LiveComponents
+        ~r"lib/ratsprojekte_web/router\.ex$"E,
+        ~r"lib/ratsprojekte_web/(controllers|live|components)/.*\.(ex|heex)$"E
+      ]
+    ]
+end
+
 if config_env() == :prod do
-  database_url =
-    System.get_env("DATABASE_URL") ||
-      raise """
-      environment variable DATABASE_URL is missing.
-      For example: ecto://USER:PASS@HOST/DATABASE
-      """
+  # Eigene Datei unter ~/Library/Application Support/ratsprojekte/ (ADR 0004),
+  # DATABASE_PATH überschreibt. Der SQLCipher-Schlüssel kommt über
+  # RATSPROJEKTE_DB_KEY — der lokale Betrieb (#440) versiegelt ihn mit
+  # sealed_envelope hinter Touch ID (komki-tresor). Ohne Schlüssel verhält
+  # sich SQLCipher wie normales SQLite; der Hub mit echten Daten läuft nur
+  # im Release (ADR 0004: „mit echten Daten nie im Dev-Modus‟).
+  database_path =
+    System.get_env("DATABASE_PATH") ||
+      Path.join(System.user_home!(), "Library/Application Support/ratsprojekte/ratsprojekte.db")
 
-  maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
+  repo_config = [
+    database: database_path,
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "5")
+  ]
 
-  config :ratsprojekte, Ratsprojekte.Repo,
-    # ssl: true,
-    url: database_url,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    # For machines with several cores, consider starting multiple pools of `pool_size`
-    # pool_count: 4,
-    socket_options: maybe_ipv6
+  repo_config =
+    case System.get_env("RATSPROJEKTE_DB_KEY") do
+      nil -> repo_config
+      key -> Keyword.put(repo_config, :key, key)
+    end
+
+  config :ratsprojekte, Ratsprojekte.Repo, repo_config
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
@@ -62,8 +83,12 @@ if config_env() == :prod do
     http: [
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
-      # See the documentation on https://hexdocs.pm/bandit/Bandit.html#t:options/0
+      # See the documentation on https://bandit.hexdocs.pm/Bandit.html#t:options/0
       # for details about using IPv6 vs IPv4 and loopback vs public addresses.
+      #
+      # TODO #440: Der lokale Hub gehört auf {127, 0, 0, 1} und Port 4100 —
+      # das setzt der lokale Betrieb mit LaunchAgent und Socket (ADR 0004:
+      # „Die Oberfläche liegt auf 127.0.0.1:4100‟). Bis dahin phx.new-Stand.
       ip: {0, 0, 0, 0, 0, 0, 0, 0}
     ],
     secret_key_base: secret_key_base
@@ -90,7 +115,7 @@ if config_env() == :prod do
   # `:keyfile` and `:certfile` expect an absolute path to the key
   # and cert in disk or a relative path inside priv, for example
   # "priv/ssl/server.key". For all supported SSL configuration
-  # options, see https://hexdocs.pm/plug/Plug.SSL.html#configure/1
+  # options, see https://plug.hexdocs.pm/Plug.SSL.html#configure/1
   #
   # We also recommend setting `force_ssl` in your config/prod.exs,
   # ensuring no data is ever sent via http, always redirecting to https:

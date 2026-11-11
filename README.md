@@ -66,7 +66,7 @@ Vollständig stehen Prinzipien, Guardrails und Tooling-Vorgaben in [AGENTS.md](A
 | `apps/komki_egress` | einzige Tür ins Internet, je Connector nur zu freigegebenen Adressen | CLI |
 | `apps/komki_connector*` | Connectoren für RIS, Websuche, Vault und Sitzungsdokumente, plus gemeinsamer Vertrag | Connector-Socket |
 | `apps/ratsinfo` | RIS synchronisieren und volltextdurchsuchbar machen | CLI |
-| `apps/ratsprojekte` | Projekt-Dashboard: Realisierungsstränge, Vorbedingungen, Quellen, Antragsreife | LiveView und MCP |
+| `apps/ratsprojekte` | lokaler Hub für den Weg von der Idee zum Antrag (ADR 0004); Gerüst aus #435, Bau-Reihe #436–#440 läuft | LiveView |
 | `apps/shared` | gemeinsame Domain-Models der Elixir-Apps | Bibliothek |
 | `tools/allgaeuer_zeitung_mcp` | Allgäuer Zeitung durchsuchen und Artikel lesen | MCP |
 | `tools/pdf_ingest` | PDF-Text und Markierungen extrahieren, OCR für gescannte PDFs | MCP |
@@ -90,7 +90,7 @@ pre-commit install
 mix deps.get
 cd apps/ratsprojekte
 mix ecto.migrate
-mix phx.server   # Dashboard unter http://localhost:4000, MCP-Endpoint /mcp
+mix phx.server   # Hub-Oberfläche unter http://localhost:4000
 
 # ratsinfo systemweit (braucht ggf. sudo, Alternativen siehe Makefile)
 make install

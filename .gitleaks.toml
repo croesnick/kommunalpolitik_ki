@@ -108,7 +108,14 @@ paths = [
 # Regex-Patterns, die auch in anderen Dateien als false positives auftreten:
 # 1. Leere Werte nach `=` (mit oder ohne Whitespace, bis Zeilenende) — nie echte Secrets.
 # 2. Doku-Hinweise wie `openssl rand -hex 32`.
+# 3. Die exakten dev/test-secret_key_base der Phoenix-App ratsprojekte
+#    (Phx.new-Standard: nur für Dev/Test, prod liest SECRET_KEY_BASE aus der
+#    Env und runtime.exs bricht ohne ab). Nur die exakten Werte sind erlaubt —
+#    nach einer Neugenerierung schlägt der Hook bewusst wieder an und die
+#    Werte werden hier nachgezogen (#435).
 regexes = [
   '''(?i)(RIS_PASSWORD|AZ_PASSWORD|NEXTCLOUD_PASSWORD|GRIBS_PASSWORD|OPENAI_API_KEY|ANTHROPIC_API_KEY)[ \t]*=[ \t]*["']?[ \t]*$''',
   '''(?i)openssl\s+rand''',
+  '''Rte9POOIsNTCf/sQdCkCTtvFWH65Q0XbhqiNXudPmLltXxJu2awa3nOGlHek4uaC''',
+  '''VMKQbboS66oRlywJ4LxGIAd/GHYPZg8XPUDF5IQd29LMdwGh6NG4JconPJp0jMO8''',
 ]

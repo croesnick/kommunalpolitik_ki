@@ -21,10 +21,10 @@ Soll dein Coding-Agent die Einrichtung übernehmen, gib ihm den Auftrag von [Mit
 
 1. ### Werkzeuge installieren
 
-   llama.cpp rechnet das Modell, tmux trägt die interaktive Session, pi ist der Agent. Erlang und Elixir kommen über asdf in genau den Versionen, die das Repo in `.tool-versions` festlegt.
+   llama.cpp rechnet das Modell, tmux trägt die interaktive Session, pi ist der Agent. Erlang und Elixir kommen über asdf in genau den Versionen, die das Repo in `.tool-versions` festlegt. sqlcipher ist die Verschlüsselung der SQLite-Datenbanken: Der Bau aus dem Checkout kompiliert die exqlite-Bibliothek des Workspace dagegen (Details: `docs/prerequisites.md`).
 
    ```sh
-   brew install llama.cpp tmux asdf pnpm
+   brew install llama.cpp tmux asdf pnpm sqlcipher
    git clone https://github.com/croesnick/kommunalpolitik_ki.git ~/projects/kommunalpolitik_ki
    cd ~/projects/kommunalpolitik_ki
    asdf plugin add erlang && asdf plugin add elixir && asdf plugin add nodejs
