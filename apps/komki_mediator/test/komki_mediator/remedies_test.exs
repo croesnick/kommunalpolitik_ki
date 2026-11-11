@@ -213,7 +213,8 @@ defmodule KomkiMediator.RemediesTest do
       checked: room.workspace_bindings,
       rho: Calculus.actual_recipients(gamma.compiled, room.environment),
       object_ref: object.object_id <> "@" <> object.version,
-      call_hash: nil
+      call_hash: nil,
+      observers_proven: true
     }
   end
 

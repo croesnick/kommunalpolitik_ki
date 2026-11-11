@@ -1058,8 +1058,13 @@ deny-/indeterminate-Kataloge (§ 2.8); zwei bewusste Ausnahmen: Bei
 `object_quarantine` ist das Objekt-Level-GO der Erstklassifikation der
 einzige Katalog-Eintrag — es gibt für ein Quarantäne-Objekt keine
 nicht-verletzende Fortsetzung —, und der Aktionsfreigabe-Zweig (§ 4.6) nennt
-je Release-Blocker genau den neu berechneten call-GO (nur `workspace_invalid`
-behält `neuer_raum`). Im Code als Remedy-Katalog (`KomkiPolicy.Remedies`,
+je Release-Blocker genau den neu berechneten call-GO, während die
+unüberbrückbaren Blocker (`workspace_invalid`, `label_not_preserved`, bei
+`store` auch `recipient_not_allowed` und `recipients_unproven`) ihren
+`neuer_raum`-Eintrag behalten — kein Befund einer solchen Entscheidung
+bietet ein call-GO an. Dasselbe gilt im direkten Zweig bei `store` mit
+unbelegter Beobachterliste (#432): Ein GO kann nicht belegen, wer mitliest.
+Im Code als Remedy-Katalog (`KomkiPolicy.Remedies`,
 CONTRACT § 2.8).
 
 **Siehe:** [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.8; RFC 0003 R.6;

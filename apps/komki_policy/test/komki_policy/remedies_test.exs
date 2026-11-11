@@ -26,7 +26,8 @@ defmodule KomkiPolicy.RemediesTest do
       checked: bindings,
       rho: Calculus.actual_recipients(reg, env_id),
       object_ref: "obj-x@v1",
-      call_hash: nil
+      call_hash: nil,
+      observers_proven: false
     }
   end
 
@@ -243,5 +244,76 @@ defmodule KomkiPolicy.RemediesTest do
            ]
 
     refute Enum.any?(emit_remedy["transitions"], &(&1["type"] == "fakt_nachreichen"))
+  end
+
+  # Ticket #432: kein GO überbrückt beim Speichern eine unbelegte
+  # Beobachterliste — der Freigabe-Zweig prüft das Flag erneut und lehnt
+  # ab. Ein Kontext ohne den Schlüssel observers_proven gilt als unbelegt:
+  # Der Katalog fragt nie nach einem GO, das der Freigabe-Zweig sogleich
+  # wieder verweigern würde.
+  test "store mit unbelegter Beobachterliste: kein call-GO für irgendeinen Befund" do
+    reg = registry()
+
+    ctx =
+      %{
+        test_ctx(["buergerfall-4711@1"], [], "lokale-fallverarbeitung@1")
+        | rule: :store,
+          call_hash: "beef",
+          observers_proven: false
+      }
+
+    [remedy] = Remedies.catalog(reg, ctx, [finding("missing_operation_rule")])
+    assert transition_type(remedy) == ["neuer_raum"]
+
+    [proven_remedy] =
+      Remedies.catalog(reg, %{ctx | observers_proven: true}, [finding("missing_operation_rule")])
+
+    assert transition_type(proven_remedy) == ["neuer_raum", "aktionsfreigabe"]
+
+    [without_flag] =
+      Remedies.catalog(reg, Map.delete(ctx, :observers_proven), [
+        finding("missing_operation_rule")
+      ])
+
+    assert transition_type(without_flag) == ["neuer_raum"]
+  end
+
+  test "emit und transfer behalten das call-GO bei unbelegter Beobachterliste (#354)" do
+    reg = registry()
+
+    Enum.each([:emit, :transfer], fn rule ->
+      ctx =
+        %{
+          test_ctx(["buergerfall-4711@1"], [], "lokale-fallverarbeitung@1")
+          | rule: rule,
+            call_hash: "beef",
+            observers_proven: false
+        }
+
+      [remedy] = Remedies.catalog(reg, ctx, [finding("missing_operation_rule")])
+
+      assert transition_type(remedy) == ["neuer_raum", "aktionsfreigabe"]
+    end)
+  end
+
+  test "Freigabe-Zweig: recipients_unproven ist unüberbrückbar, auch neben Release-Blockern" do
+    reg = registry()
+
+    ctx = %{
+      rule: :release,
+      object_labels: [],
+      checked: ["buergerfall-4711@1"],
+      rho: ["nutzende-person"],
+      object_ref: "obj-a@v1",
+      call_hash: "korrekt-berechnet",
+      observers_proven: false
+    }
+
+    remedies =
+      Remedies.catalog(reg, ctx, [finding("recipients_unproven"), finding("release_expired")])
+
+    assert Enum.map(remedies, & &1["code"]) == ["recipients_unproven", "release_expired"]
+
+    for r <- remedies, do: assert([%{"type" => "neuer_raum"}] = r["transitions"])
   end
 end

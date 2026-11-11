@@ -201,7 +201,9 @@ dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bz
 6. Lehnt Schritt 3 **oder** Schritt 4 ab und kommt kein GO: Antwort mit Remedies, **kein Vollzug**. Ausnahme:
    Fällt bei `store` der Empfängertest, gibt es keinen GO-Weg (komki_policy CONTRACT §4.7, Ticket #417). Dann
    trägt die Antwort nur den `hinweis`, dass nichts übertragen wurde, und `recipients_outside` aus dem Blocker
-   der Engine, ohne Remedies und Lockerungsbefugnisse; den vollen Katalog hält der PDR fest. Die
+   der Engine, ohne Remedies und Lockerungsbefugnisse; den vollen Katalog hält der PDR fest. Bei `store` mit
+   unbelegter Beobachterliste bietet die Engine ebenfalls kein GO an (komki_policy CONTRACT §4.7, Ticket #432) —
+   die Antwort behält dort die normale Form mit dem GO-losen Katalog, die GO-Runde entfällt. Die
    Antwort nennt keinen Vorbeleg (`emit_decision_id`), weil es keinen gibt. Nur wenn beide Schritte erlaubt
    sind (per Permit oder GO): der **Vorbeleg vor Wirkung** (`rule: emit`, `outcome: emitted`, `decision:
    null`, R.11), bevor der Connector aufgerufen wird. Er ist keine Entscheidung, die stehen schon im
@@ -237,7 +239,9 @@ dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bz
 `emit` in der Raumumgebung, danach `store` (komki_policy CONTRACT §4.7, Ticket #205) unter
 λ(y) = `assigned_label` mit `environment = vault-lokal@1`. Γ hat keine `store`-Regel: Jedes Schreiben ist ohne
 Aktionsfreigabe für genau diesen Call ein deny, der Vermittler fragt die nutzende Person wie beim GO für
-gesperrte Aufrufe (#98), ohne Zuhörer bleibt es beim deny. Erst nach store-Permit (oder Freigabe) schickt der
+gesperrte Aufrufe (#98), ohne Zuhörer bleibt es beim deny — sofern die Beobachterliste des Speichers belegt
+ist; sonst (Fakt `environment_observers_complete` nicht bekannt-`true`) bleibt es ohne GO-Runde beim deny
+(Ticket #432). Erst nach store-Permit (oder Freigabe) schickt der
 Vermittler `context.assigned_label = decision.assigned_label` (= B_W, aus der emit-Entscheidung) mit. Der Connector schreibt genau diese Labels als `komki_labels` in das
 Frontmatter (λ(y) = B_W, R.5.5) und gibt `note_id` und `labels` zurück. Gate 2 prüft, dass die
 zurückgemeldeten Labels gleich `assigned_label` sind.

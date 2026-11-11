@@ -22,13 +22,17 @@ defmodule KomkiPolicy.Remedies do
   `neuer_raum` only — a GO neither revives an invalid contract nor
   restores a dropped binding. For `store`, `recipient_not_allowed` is
   unbridgeable as well: a GO does not decide who may read the store
-  (R.5.7, ticket #417). If an unbridgeable blocker is among the findings,
-  no finding of that decision offers a call GO, since the release branch
-  would deny it again. For `indeterminate` only `fakt_nachreichen` +
-  `neuer_raum` — a GO cannot produce evidence. Release branch (§ 4.6):
-  exactly one call-GO entry per release blocker with the **recomputed**
-  correct call_hash; the unbridgeable blockers keep their `neuer_raum`
-  entry.
+  (R.5.7, ticket #417). The same holds for `store` into an environment
+  whose observer list is not proven: a GO cannot prove who reads along
+  (ticket #432), so no finding of that decision offers a call GO either.
+  If an unbridgeable blocker is among the findings, no finding of that
+  decision offers a call GO, since the release branch would deny it
+  again. For `indeterminate` only `fakt_nachreichen` + `neuer_raum` — a
+  GO cannot produce evidence. Release branch (§ 4.6): exactly one
+  call-GO entry per release blocker with the **recomputed** correct
+  call_hash; the unbridgeable blockers keep their `neuer_raum` entry —
+  `recipients_unproven` (store only, ticket #432) among them, since both
+  release kinds re-check the flag and deny again.
 
   Offenlegungsfreigabe (§ 4.9, R.5.7, R.6.1, ticket #423): a `store`
   denial whose target lies outside the recipient circle gets exactly one
@@ -38,7 +42,10 @@ defmodule KomkiPolicy.Remedies do
   the Aktionsfreigabe on the GO-fähigen findings of that decision: a
   plain Aktionsfreigabe could never bridge the recipient test (#417).
   Without the Befugnisse the catalog offers no GO at all (Gegenprobe
-  13.1) — a window would ask for a GO that cannot take effect.
+  13.1) — a window would ask for a GO that cannot take effect. Dasselbe
+  gilt bei unbelegter Beobachterliste (#432): die Offenlegungsfreigabe
+  speichert wie die Aktionsfreigabe nur bei belegter Liste, also bietet
+  der Katalog dann kein GO irgendeiner Art an.
   """
 
   alias KomkiPolicy.Calculus
@@ -68,6 +75,14 @@ defmodule KomkiPolicy.Remedies do
   # GO still bridges an inadmissible recipient (#354).
   @unbridgeable_recipient_operations ["store"]
 
+  # Operations for which no GO bridges an unproven observer list (§ 4.7,
+  # #432): a GO cannot prove who reads along. The release branch re-checks
+  # the flag for exactly these (Derive) and denies with
+  # `recipients_unproven`, so the catalog withholds the call GO under the
+  # same condition — it would ask the person for a GO that cannot take
+  # effect. Emit and transfer keep the GO (#354).
+  @unbridgeable_observers_operations ["store"]
+
   @doc "Operations for which no GO replaces the recipient test (§ 4.6, § 4.7, #417)."
   @spec unbridgeable_recipient_operations() :: [String.t()]
   def unbridgeable_recipient_operations, do: @unbridgeable_recipient_operations
@@ -82,6 +97,10 @@ defmodule KomkiPolicy.Remedies do
     "recipient_not_allowed",
     "missing_operation_rule"
   ]
+
+  @doc "Operations for which no GO bridges an unproven observer list (§ 4.6, § 4.7, § 4.9, #432)."
+  @spec unbridgeable_observers_operations() :: [String.t()]
+  def unbridgeable_observers_operations, do: @unbridgeable_observers_operations
 
   @transition_order [
     "fakt_nachreichen",
@@ -98,6 +117,7 @@ defmodule KomkiPolicy.Remedies do
           required(:rho) => [String.t()],
           required(:object_ref) => String.t(),
           required(:call_hash) => String.t() | nil,
+          required(:observers_proven) => boolean(),
           optional(:ausgabeart) => String.t() | nil,
           optional(:ziellabel) => [String.t()],
           optional(:release_kind) => String.t() | nil
@@ -137,11 +157,13 @@ defmodule KomkiPolicy.Remedies do
   # A GO never bridges the unbridgeable blockers; the release branch denies
   # them again. So no finding of such a decision may offer a call GO: the
   # person would be asked for a GO that cannot take effect (#298 review).
-  # A finding left without transitions gets `neuer_raum`, so every
-  # catalog entry stays non-empty. The one working GO on a `store`
-  # denial with matching Befugnisse is the Offenlegungsfreigabe: sie
-  # ersetzt dort die Aktionsfreigabe auf den GO-fähigen Befunden
-  # (§ 2.8, § 4.9, Ticket #423).
+  # The same rationale withholds every GO of a store decision into an
+  # environment whose observer list is not proven (#432): both release
+  # kinds re-check the flag and deny again. A finding left without
+  # transitions gets `neuer_raum`, so every catalog entry stays non-empty.
+  # The one working GO on a `store` denial with matching Befugnisse is the
+  # Offenlegungsfreigabe: sie ersetzt dort die Aktionsfreigabe auf den
+  # GO-fähigen Befunden (§ 2.8, § 4.9, Ticket #423).
   defp withhold_call_go(entries, registry, ctx) do
     codes = Enum.map(entries, & &1["code"])
     plan = go_plan(codes, registry, ctx)
@@ -155,9 +177,12 @@ defmodule KomkiPolicy.Remedies do
 
   # Entscheidungsweite Planung (reine Funktion der Befunde): Was wird
   # gestrichen, was ersetzt? `:keep` laesst alles, wie es die
-  # regular_transitions gebaut haben.
+  # regular_transitions gebaut haben. Eine unbelegte Beobachterliste
+  # (#432) streicht Aktions- wie Offenlegungsfreigabe entscheidungsweit:
+  # Beide Freigabe-Zweige pruefen das Flag erneut und wuerden jedes GO
+  # sogleich wieder verweigern.
   defp go_plan(codes, registry, ctx) do
-    strip_aktion? = Enum.any?(codes, &unbridgeable?(ctx.rule, &1))
+    strip_aktion? = Enum.any?(codes, &unbridgeable?(ctx.rule, &1)) or observers_unproven?(ctx)
 
     strip_offenlegung? = strip_offenlegung?(codes, ctx)
 
@@ -182,7 +207,8 @@ defmodule KomkiPolicy.Remedies do
   defp strip_offenlegung?(codes, ctx) do
     Enum.any?(codes, &(&1 in @unbridgeable)) or
       Enum.any?(codes, &(&1 in @offenlegung_unbridgeable)) or
-      (ctx.rule == :release and "recipient_not_allowed" in codes)
+      (ctx.rule == :release and "recipient_not_allowed" in codes) or
+      observers_unproven?(ctx)
   end
 
   defp normalize_transitions(entry, ctx, plan) do
@@ -226,9 +252,20 @@ defmodule KomkiPolicy.Remedies do
       Calculus.lockerungsbefugte(registry, ctx.checked, ctx.rho, ctx.ausgabeart) != []
   end
 
+  # Store into an environment whose observer list is not proven: no GO can
+  # prove who reads along (#432). A context that does not carry the flag
+  # counts as unproven — the catalog never asks for a GO the release branch
+  # would deny again. Emit and transfer keep the GO (#354).
+  defp observers_unproven?(%{rule: :store} = ctx),
+    do: Map.get(ctx, :observers_proven) != true
+
+  defp observers_unproven?(_ctx), do: false
+
   # In the release branch, recipient_not_allowed only arises for the
-  # operations above.
+  # operations above; recipients_unproven only for store, since the flag
+  # re-check runs for store alone (#432).
   defp unbridgeable?(:release, "recipient_not_allowed"), do: true
+  defp unbridgeable?(:release, "recipients_unproven"), do: true
 
   defp unbridgeable?(rule, "recipient_not_allowed"),
     do: Atom.to_string(rule) in @unbridgeable_recipient_operations

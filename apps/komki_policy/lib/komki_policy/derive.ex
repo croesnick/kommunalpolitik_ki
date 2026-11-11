@@ -275,23 +275,12 @@ defmodule KomkiPolicy.Derive do
       |> release_check_nonce(release, stand)
       |> release_check_scope(release, stand)
       |> release_check_authority(registry, release)
-      |> release_env_observers()
+      |> release_env_observers(auth.operation)
       |> offenlegung_check_ziellabel(registry, release)
       |> offenlegung_check_befugnisse(registry, release)
       |> offenlegung_check_recipients(registry, release)
 
     conclude_release(state, ctx, registry, auth, release, stand, call_hash)
-  end
-
-  # Ein GO kann nicht belegen, wer mitliest (Gegenprobe 11.15, Ticket
-  # #432): die Offenlegungsfreigabe speichert wie die Aktionsfreigabe nur
-  # bei belegter Beobachterliste.
-  defp release_env_observers(state) do
-    if fact_state(state.facts, "environment_observers_complete") != true do
-      add_blocker(state, binder("recipients_unproven", nil, nil))
-    else
-      state
-    end
   end
 
   # Ziellabel der Lockerung: sortiert, eindeutig, in der Registry
@@ -393,6 +382,7 @@ defmodule KomkiPolicy.Derive do
       ctx
       |> shared_premises(registry, auth.operation)
       |> premise_workspace_valid()
+      |> release_env_observers(auth.operation)
       |> release_label_preservation(auth.operation)
       |> release_recipient_inclusion(auth.operation)
       |> release_check_call_hash(release, call_hash)
@@ -402,6 +392,23 @@ defmodule KomkiPolicy.Derive do
       |> release_check_authority(registry, release)
 
     conclude_release(state, ctx, registry, auth, release, stand, call_hash)
+  end
+
+  # No GO bridges an unproven observer list when storing (§ 4.6, § 4.7,
+  # § 4.9, #432, Gegenprobe 11.15): a GO cannot prove who reads along.
+  # Both release kinds re-check the flag for exactly the operations whose
+  # GO the catalog withholds on the same condition (Remedies) — the
+  # Offenlegungsfreigabe decides store alone (§ 4.9). What is missing
+  # evidence in the normal branch (`recipients_unproven`) becomes a
+  # blocker here: a release branch decides permit or deny — a GO produces
+  # no evidence.
+  defp release_env_observers(state, operation) do
+    if operation in Remedies.unbridgeable_observers_operations() and
+         fact_state(state.facts, "environment_observers_complete") != true do
+      add_blocker(state, binder("recipients_unproven", nil, nil))
+    else
+      state
+    end
   end
 
   # A GO never restores a dropped binding (§ 2.8): B_W ⊆ λ(y) holds for
@@ -541,7 +548,8 @@ defmodule KomkiPolicy.Derive do
       checked: ctx.checked,
       rho: ctx.rho,
       object_ref: ctx.object["object_id"] <> "@" <> ctx.object["version"],
-      call_hash: call_hash
+      call_hash: call_hash,
+      observers_proven: observers_proven?(ctx)
     }
   end
 
@@ -809,6 +817,11 @@ defmodule KomkiPolicy.Derive do
   # Remedy-Kontext (§ 2.8): reine Funktion der Entscheidungslage
   # =========================================================================
 
+  # § 4.7, #432: known-true is the only proven state — `false` and a
+  # missing fact both count as an unproven observer list.
+  defp observers_proven?(ctx),
+    do: fact_state(ctx.facts, "environment_observers_complete") == true
+
   defp remedies_context(ctx, rule_kind) do
     object_labels = if rule_kind == "admit", do: ctx.object["labels"], else: []
 
@@ -829,7 +842,11 @@ defmodule KomkiPolicy.Derive do
       call_hash:
         if(rule_kind in @output_operations, do: output_call_hash(ctx, rule_kind), else: nil),
       ausgabeart: ausgabeart,
-      ziellabel: Map.get(@offenlegung_ziellabel, ausgabeart, [])
+      ziellabel: Map.get(@offenlegung_ziellabel, ausgabeart, []),
+      # § 4.7, #432: a store into an environment with an unproven
+      # observer list loses its call GO (Remedies) — the release branch
+      # would deny the same call again.
+      observers_proven: observers_proven?(ctx)
     }
   end
 

@@ -29,7 +29,12 @@ des Empfaengerkreises, bietet die Engine kein GO an (Ticket #417): Dann
 traegt die Antwort nur den `hinweis`, dass nichts uebertragen wurde, und
 `recipients_outside` aus dem Blocker der Engine, aus dem die pi-Anzeige
 ihren Satz fuer die nutzende Person baut. Remedies und
-Lockerungsbefugnisse stehen dann nur im Journal.
+Lockerungsbefugnisse stehen dann nur im Journal. Bei unbelegter
+Beobachterliste gibt es ebenfalls kein GO und kein Fenster (Ticket #432):
+Der Katalog haelt das call-GO dann fuer jeden Befund der Entscheidung
+zurueck, es entsteht keine GO-Anfrage — die Antwort behaelt die normale
+Form mit dem GO-losen Katalog, denn ein GO kann nicht belegen, wer
+mitliest.
 
 ## Architektur im komki-Lauf
 
@@ -221,7 +226,11 @@ Freigabe-Zweigs; fuer dasselbe Gate folgt kein `permitted`-PDR. Ein Nein
 ergibt `go_refused`, keine Antwort `go_timeout`,
 jeweils mit PDR. Die Antwort bleibt das deny samt Katalog, ergaenzt um
 `"go"`. Eine ungueltige Freigabe (falscher Call, abgelaufen, Nonce
-verbraucht) ist ein neues deny des Freigabe-Zweigs.
+verbraucht) ist ein neues deny des Freigabe-Zweigs. Bei `store` mit
+unbelegter Beobachterliste waere auch eine gueltige Freigabe ein deny
+(`recipients_unproven`, Ticket #432) — so weit kommt es ueber den
+Vermittler aber nie: Der Katalog haelt das GO unter derselben Bedingung
+zurueck, eine Anfrage entsteht nicht.
 
 ### Bewusste Grenzen
 
@@ -432,7 +441,10 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
     dann eine Befugnis fuer die Ausgabeart des Ziels. Die Anfrage zeigt
     den genauen Text, alle Empfaenger und den Hinweis auf die Offenlegung
     und bietet die Teile zur Abwahl an — eine Abwahl leitet den Call neu
-    ab und die Freigabe bindet den neuen Hash (R.6.2).
+    ab und die Freigabe bindet den neuen Hash (R.6.2). Bei unbelegter
+    Beobachterliste (`environment_observers_complete` nicht bekannt-`true`)
+    gilt die Ausnahme nicht: kein GO irgendeiner Art, kein Fenster
+    (Ticket #432).
   * Journal: jede Entscheidung kommt sofort ins Journal (`permitted`,
     Ablehnung oder `released`), auch wenn danach nichts vollzogen wird.
     Bei permit folgt der Vorbeleg (`rule: emit`, `outcome: emitted`),
