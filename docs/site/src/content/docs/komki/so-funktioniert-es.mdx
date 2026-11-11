@@ -105,7 +105,7 @@ Mit `j` läuft genau diese Anfrage, einmal. Fragt pi danach etwas anderes oder d
 
 Ohne angedocktes Terminal, also bei `komki run` oder einer Session im Hintergrund, fragt komki nicht und lehnt sofort ab. Offene Anfragen kannst du auch in einem zweiten Terminal mit `komki go` beantworten.
 
-Beim Speichern gibt es eine Grenze, die auch dein GO nicht verschiebt: Würde jemand mitlesen, der Inhalte dieses Arbeitsraums nicht sehen darf, öffnet komki gar kein Fenster. In pi steht dann, wer das ist. Ein GO legt fest, *ob* etwas geschieht, aber nicht, *wer* es liest. Mit den Regeln, die komki mitbringt, kommt das nicht vor: Dort lesen im Vault nur du und pi mit.
+Beim Speichern gibt es eine Grenze, die auch dein GO nicht verschiebt: Würde jemand mitlesen, der Inhalte dieses Arbeitsraums nicht sehen darf, öffnet komki gar kein Fenster. In pi steht dann, wer das ist. Die Grenze greift auch ohne bekannten Mitleser: Gilt die Beobachterliste des Speichers als unvollständig, lehnt komki ab und fragt nach keinem GO — ein GO kann nicht belegen, wer mitliest. Ein GO legt fest, *ob* etwas geschieht, aber nicht, *wer* es liest. Mit den Regeln, die komki mitbringt, kommt das nicht vor: Dort lesen im Vault nur du und pi mit.
 
 In pi steht danach unter der Sperre, was aus der Freigabe wurde: abgelehnt, ohne Antwort geblieben oder gar nicht gefragt, weil kein Fenster bereit war. Eine Frage zum Beantworten zeigt pi nie. Das GO kommt nur aus dem Freigabefenster von komki, damit ein gekaperter Agent keinen Freigabe-Dialog vortäuschen kann. Das Bild zeigt beide Fälle aus einer echten Session: Erst war kein Fenster angedockt, beim zweiten Versuch lautete die Antwort Nein.
 

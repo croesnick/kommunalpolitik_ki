@@ -1006,6 +1006,7 @@ Die Bauliste ergibt sich aus den Szenen. Ein Ticket steht dabei, wenn es schon e
 | B10 | Bindungsvorlagen und parametrisierte Bindungen (`buergerfall-<n>`, `auftrag-sitzung-<datum>`, `abo-<quelle>`) | 0, 2, 3 | #38, neu |
 | B23 | Bei `store` ersetzt kein GO den Empfängertest | 11, 12, 13 | #417 |
 | B24 | `alle` im Label-Store, nur für wirklich öffentliche Bindungen | 14 | #418 |
+| B25 | Bei `store` überbrückt kein GO eine unbelegte Beobachterliste (Gegenprobe 11.15) | 11 | #432 |
 
 ### Räume und Vermittler
 
