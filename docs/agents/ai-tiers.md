@@ -40,8 +40,8 @@ Ein `ai:a-tier`- oder `ai:b-tier`-Ticket hat ein Zielbild. Es beschreibt das Zie
 
 ## Prüfung vor dem Merge
 
-- `ai:s-tier`: Self-Review, dann ein Review durch die nutzende Person. Bei Änderungen an der Grenze zusätzlich ein unabhängiger Review.
-- `ai:a-tier`: Self-Review und echter Lauf laut Lane-Protokoll ([lane-protocol.md](lane-protocol.md)).
+- `ai:s-tier`: Self-Review und ein unabhängiges Review wie bei `ai:a-tier`, dann ein Review durch die nutzende Person.
+- `ai:a-tier`: Self-Review, echter Lauf und ein unabhängiges Review mit frischem Kontext, bevor der PR als fertig gilt. Das Review macht eine frische Session, etwa der Skill `code-review` oder die Review-Rolle des Dev-Loops. Es prüft den Diff gegen das Zielbild, die [Prüfpunkte des Bereichs](pruefpunkte.md) und die Entscheidungen, die die Umsetzung im Prüfbericht nennt. Jeder Befund wird behoben oder als Entscheidung an die nutzende Person übergeben. Ablauf in interaktiven Sessions: [Lane-Protokoll](lane-protocol.md#independent-review-before-the-pr-is-done).
 - `ai:b-tier`: Ein Modell der Stufe S oder A oder die nutzende Person liest den Diff, bevor er gemergt wird. Günstige Modelle übersehen eher Nebenwirkungen als offensichtliche Fehler.
 
 Der Dev-Loop ([dev-loop.md](dev-loop.md)) setzt diese Regeln im Code durch. Er mergt nur `ai:b-tier`, und nur nach einem Review durch ein S-Modell. Bei `ai:a-tier` endet er bei „In Review“ und wartet auf das GO. `ai:s-tier` und Diffs, die geschützte Pfade berühren, übergibt er an die nutzende Person.

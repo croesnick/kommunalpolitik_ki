@@ -44,10 +44,19 @@ A ticket ends with a Prüfbericht. The human reads the result and this report in
 ```
 
 - **Who grades.** Not the session that built. In the dev loop the review session grades, and the script renders the table into its comment on the PR. In an interactive session, give a fresh subagent that has not seen the conversation the ticket, the base ref, and your claims, and let it write the report. Nothing enforces this in an interactive session yet (#462). Until then it is a request.
-- **Rows.** One per point the ticket agrees on (`Fertig, wenn` or `Zu messen / Zu verifizieren`), plus the checkpoints of the area the diff touches, once the area defines them (#461).
+- **Rows.** One per point the ticket agrees on (`Fertig, wenn` or `Zu messen / Zu verifizieren`), plus one per checkpoint of every area the diff touches, as listed in [pruefpunkte.md](pruefpunkte.md).
 - **Results.** `bestanden` needs evidence the grader has seen itself: a test name, a command with the line of output that decides, a screenshot, a real run. Measure against the ticket and against how the rest of the product behaves, not against what the builder intended. `nicht geprüft` is a valid result, with the reason. It never counts as `bestanden`.
 - **What the builder supplies.** Per point, the test or command that checks it. And the decisions it took on its own: everything that neither the ticket, the canonical documents, nor the existing code prescribe. A deviation from how the existing product behaves is always a decision, even when a source backs it. Ask before you build one in an interactive session, and escalate in the dev loop if it belongs to the human. The grader looks for decisions in the diff before it reads the builder's list, and marks what the list leaves out.
 - **Where it goes.** In the dev loop, the review comment on the PR. In an interactive session, under `Evidence` in the PR body and as the closing message to the human.
+- **What slipped through.** When a review or the human finds something that no checkpoint caught, propose a new checkpoint, ideally as an automatic check ([pruefpunkte.md](pruefpunkte.md#neue-prüfpunkte)). The human decides whether it goes in.
+
+## Independent review before the PR is done
+
+For `ai:s-tier` and `ai:a-tier` tickets, an interactive session runs an independent review before it reports the PR as done ([ai-tiers.md](ai-tiers.md#prüfung-vor-dem-merge)). The reviewer is a fresh subagent that has not seen the conversation, for example the skill `code-review` against `origin/main`. It may be the same subagent that writes the Prüfbericht. It gets the ticket, the base ref, the checkpoints of the touched areas, and the builder's list of decisions, and it checks the diff against all of them. It looks for decisions in the diff before it reads the list.
+
+- Append the result to the Prüfbericht: one line with the reviewed commit, then the findings.
+- Fix each finding, or hand it to the human as a decision with your proposal. Never drop a finding silently.
+- A fix after the review is not reviewed. Say so in the report and name the commit, or run the review again.
 
 ## Traps that cost failed attempts
 

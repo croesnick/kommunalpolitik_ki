@@ -48,7 +48,7 @@ Schreib in die Datei, was du gefunden hast, und deinen Vorschlag, auf Deutsch un
 Schreib zum Abschluss zwei Dateien (sie sind gitignored, committe sie nicht):
 
 1. `.dev-loop/pr.md`: In der ersten Zeile steht der PR-Titel auf Deutsch. Darunter folgt der PR-Text mit den Abschnitten `## Gebaut`, `## Bewusst offen`, `## Nachweise` und `## Entscheidungen, die ich selbst getroffen habe` (wörtlich als Überschrift) und einer Zeile `Closes #{{number}}`. Deckt der PR das Ticket bewusst nur teilweise ab, schreib stattdessen `Refs #{{number}}` und einen Satz, was fehlt.
-   - `Nachweise`: je Punkt aus „Fertig, wenn“ bzw. „Zu messen“ der Test, Befehl oder Lauf, mit dem er sich prüfen lässt. Ein Ergebnis vergibst du nicht, das macht das Review.
+   - `Nachweise`: je Punkt aus „Fertig, wenn“ bzw. „Zu messen“ und je Prüfpunkt der berührten Bereiche aus `docs/agents/pruefpunkte.md` der Test, Befehl oder Lauf, mit dem er sich prüfen lässt. Ein Ergebnis vergibst du nicht, das macht das Review.
    - `Entscheidungen, die ich selbst getroffen habe`: alles, was du festgelegt hast, ohne dass Ticket, Doku oder vorhandener Code es vorgeben, je mit Grund und Quelle. Weicht etwas davon ab, wie sich der Bestand verhält, sag das dazu. Ohne solche Entscheidungen steht dort `Keine.` Fehlt der Abschnitt, gilt die Umsetzung als gescheitert.
 2. `.dev-loop/brief.md`: drei Zeilen für die nutzende Person, die entscheiden soll. Was ist anders, wie wurde es geprüft, was bleibt offen?
 
