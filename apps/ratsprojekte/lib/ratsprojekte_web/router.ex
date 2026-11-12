@@ -57,6 +57,8 @@ defmodule RatsprojekteWeb.Router do
     live_session :hub, on_mount: RatsprojekteWeb.Zugang do
       live("/", OverviewLive)
       live("/projekte/:slug", ProjectLive)
+      live("/stand", BriefingLive)
+      live("/stand/:id", BriefingLive)
     end
   end
 end
