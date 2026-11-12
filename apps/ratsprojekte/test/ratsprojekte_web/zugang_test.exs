@@ -74,6 +74,24 @@ defmodule RatsprojekteWeb.ZugangTest do
       assert Sperre.status() == :gesperrt
     end
 
+    # Like a browser: CSRF check on (ConnTest skips it), page reloaded
+    # before the click. Regression: the gate cleared the session including
+    # the CSRF token, and the click ended in 403.
+    test "mit echter CSRF-Prüfung, auch nach Neuladen der Sperrseite", %{conn: conn} do
+      conn = get(conn, ~p"/")
+      conn = conn |> recycle() |> get(~p"/")
+      [_, token] = Regex.run(~r/name="_csrf_token"[^>]*value="([^"]+)"/, html_response(conn, 401))
+
+      conn =
+        conn
+        |> recycle()
+        |> Plug.Conn.put_private(:plug_skip_csrf_protection, false)
+        |> post(~p"/entsperren", %{"_csrf_token" => token})
+
+      assert redirected_to(conn) == ~p"/"
+      assert Sperre.status() == :offen
+    end
+
     test "zweiter Browser bei offenem Hub: neue Abfrage, gleiche Sitzung", %{conn: conn} do
       {:ok, token} = Sperre.oeffnen()
       {:ok, marker} = Sperre.einloesen(token)

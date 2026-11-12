@@ -38,7 +38,9 @@ defmodule RatsprojekteWeb.Zugang do
         conn
 
       true ->
-        conn |> clear_session() |> gesperrt() |> halt()
+        # Only the stale marker goes; clearing the whole session would drop
+        # the CSRF token the lock page's form still carries (403 on click).
+        conn |> delete_session(:zugang) |> gesperrt() |> halt()
     end
   end
 
