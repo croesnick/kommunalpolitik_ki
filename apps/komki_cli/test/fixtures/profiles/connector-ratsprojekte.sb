@@ -1,4 +1,4 @@
-; Connector-Profil ratsprojekte (komki-ratsprojekte/1, Ticket #146).
+; Connector-Profil ratsprojekte (komki-ratsprojekte/2, Ticket #146).
 ; Generiert aus KomkiConnector.Manifest und config.json; feste Eingaben -> byte-identischer Text.
 (version 1)
 (deny default)
@@ -59,6 +59,8 @@
 ; kein Netz (Manifest ohne egress_hosts)
 ; Hub-Socket des ratsprojekte-Connectors (DURCHSTICH #409): nur dieser Pfad
 (allow network-outbound (remote unix-socket (path-literal "/opt/komki-golden/hub/hub.sock")))
+; Dateisystem nach Manifest (fs)
+(allow file-read* (subpath "/opt/komki-golden/hub/stand.json"))
 (allow file-read-metadata (literal "/"))
 (allow file-read-metadata (literal "/opt"))
 (allow file-read-metadata (literal "/opt/erl"))
@@ -66,6 +68,7 @@
 (allow file-read-metadata (literal "/opt/komki-golden"))
 (allow file-read-metadata (literal "/opt/komki-golden/hub"))
 (allow file-read-metadata (literal "/opt/komki-golden/hub/hub.sock"))
+(allow file-read-metadata (literal "/opt/komki-golden/hub/stand.json"))
 (allow file-read-metadata (literal "/opt/komki-golden/run"))
 (allow file-read-metadata (literal "/opt/komki-golden/run/connectors"))
 (allow file-read-metadata (literal "/opt/komki-golden/run/connectors/ratsprojekte.sock"))

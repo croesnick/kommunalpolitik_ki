@@ -61,6 +61,30 @@ defmodule KomkiCli.ConnectorsTest do
                ]
     end
 
+    test "#419: ratsprojekte mit Stand-Datei allein aktiv, nur --stand" do
+      cfg = cfg(ratsprojekte_stand: "/tmp/hub/stand.json")
+
+      assert "ratsprojekte" in Enum.map(Connectors.enabled(cfg), & &1.id)
+
+      assert Connectors.connector_args(cfg, Manifest.fetch!("ratsprojekte")) ==
+               [
+                 "--socket",
+                 Path.join([cfg.base_dir, "run", "connectors", "ratsprojekte.sock"]),
+                 "--stand",
+                 "/tmp/hub/stand.json"
+               ]
+    end
+
+    test "#419: nur Stand lesen braucht kein Hub-Token" do
+      manifest = Manifest.fetch!("ratsprojekte")
+
+      assert Connectors.needed_credentials(cfg(ratsprojekte_stand: "/x"), manifest).credentials ==
+               %{}
+
+      assert Connectors.needed_credentials(cfg(ratsprojekte_socket: "/tmp/hub.sock"), manifest).credentials ==
+               %{"KOMKI_HUB_TOKEN" => "ratsprojekte-hub-token"}
+    end
+
     test "vault_dir nil: Vault-Connector startet nicht" do
       assert Enum.map(Connectors.enabled(cfg(vault_dir: nil)), & &1.id) == [
                "documents",

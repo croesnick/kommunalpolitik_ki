@@ -9,7 +9,8 @@ defmodule KomkiMediator.Fassung do
 
   # Schreibweg "Fakt vorschlagen" (Durchstich #409, Bau-Ticket #277): +
   # rp_fakt_vorschlagen, D.9-Pin bricht absichtlich (wie bei #218).
-  @fassung_id "komki-mediator/4"
+  # Stand lesen (#419): + rp_stand_lesen, Fassung 5.
+  @fassung_id "komki-mediator/5"
 
   # Feste Ordnung: die Tools des Vermittlers selbst (ping, seit #218
   # list_documents), dann die Connector-Tools sortiert
@@ -23,6 +24,7 @@ defmodule KomkiMediator.Fassung do
              "ris_search",
              "ris_show",
              "rp_fakt_vorschlagen",
+             "rp_stand_lesen",
              "vault_read",
              "vault_search",
              "vault_write_test",

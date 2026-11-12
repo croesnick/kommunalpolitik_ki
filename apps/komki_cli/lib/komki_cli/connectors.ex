@@ -99,16 +99,21 @@ defmodule KomkiCli.Connectors do
   @doc """
   Aktive Connectoren: alle Manifeste, Vault nur mit gesetztem vault_dir,
   ratsprojekte (DURCHSTICH #409, Wegwerf) nur mit gesetztem
-  ratsprojekte_socket — der Socket des Hubs ist seine eigene Schnittstelle
-  (#415), nicht Teil der komki-Basis.
+  ratsprojekte_socket oder ratsprojekte_stand (#419) — Socket und
+  Stand-Datei gehören dem Hub (#415), nicht der komki-Basis.
   """
   @spec enabled(Config.t()) :: [Manifest.t()]
   def enabled(%Config{} = cfg) do
     Enum.filter(Manifest.all(), fn manifest ->
       cond do
-        manifest.id == "vault" -> is_binary(cfg.vault_dir)
-        manifest.id == "ratsprojekte" -> is_binary(cfg.ratsprojekte_socket)
-        true -> true
+        manifest.id == "vault" ->
+          is_binary(cfg.vault_dir)
+
+        manifest.id == "ratsprojekte" ->
+          is_binary(cfg.ratsprojekte_socket) or is_binary(cfg.ratsprojekte_stand)
+
+        true ->
+          true
       end
     end)
   end
@@ -199,8 +204,16 @@ defmodule KomkiCli.Connectors do
   # Durchstich #409, belegt im Wegwerf-Lauf: Der Connector erreicht den Hub ueber dessen
   # eigenen Unix-Socket (Pfad in argv ist keine Wegabee — nur Credentials
   # reisen ueber stdin, CONTRACT.md §4).
-  defp fs_args(cfg, %{id: "ratsprojekte"}), do: ["--hub-socket", cfg.ratsprojekte_socket]
+  # Stand lesen (#419): die Stand-Datei als Pfad; je nur, was gesetzt ist.
+  defp fs_args(cfg, %{id: "ratsprojekte"}) do
+    optional_arg("--hub-socket", cfg.ratsprojekte_socket) ++
+      optional_arg("--stand", cfg.ratsprojekte_stand)
+  end
+
   defp fs_args(_cfg, _manifest), do: []
+
+  defp optional_arg(flag, value) when is_binary(value), do: [flag, value]
+  defp optional_arg(_flag, nil), do: []
 
   @doc """
   Credentials-Zeile fuer stdin: das Connector-Token unter
@@ -377,7 +390,7 @@ defmodule KomkiCli.Connectors do
     # Capability-Token je Start (Sidecar.Token): Datei fuer den
     # Vermittler, derselbe Wert in der stdin-Zeile fuer den Connector.
     token = Token.provision!(comp.socket)
-    {line, missing} = credentials_line(manifest, token, fetch)
+    {line, missing} = credentials_line(needed_credentials(cfg, manifest), token, fetch)
 
     cfg
     |> launch(
@@ -390,6 +403,17 @@ defmodule KomkiCli.Connectors do
     )
     |> with_warnings(credential_warnings(manifest, missing))
   end
+
+  @doc """
+  Das Manifest mit den Credentials, die dieser Start braucht: ohne
+  Hub-Socket kein Hub-Token (#419) — nur den Stand zu lesen, öffnet
+  kein Siegel und fragt nicht nach Touch ID.
+  """
+  @spec needed_credentials(Config.t(), Manifest.t()) :: Manifest.t()
+  def needed_credentials(%Config{ratsprojekte_socket: nil}, %{id: "ratsprojekte"} = manifest),
+    do: %{manifest | credentials: Map.delete(manifest.credentials, "KOMKI_HUB_TOKEN")}
+
+  def needed_credentials(_cfg, manifest), do: manifest
 
   # Ein nicht gesetzter Schluessel ist eine Wahl (der Doctor meldet ihn);
   # ein verweigertes oder unversiegeltes Geheimnis meldet `up` sichtbar.

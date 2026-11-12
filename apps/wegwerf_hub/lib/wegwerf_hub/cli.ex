@@ -8,6 +8,7 @@ defmodule WegwerfHub.CLI do
       wegwerf-hub --dir <pfad> ablehnen v-1
       wegwerf-hub --dir <pfad> gesperrt on|off
       wegwerf-hub --dir <pfad> leeren                 # für den Zwei-Welten-Vergleich
+      wegwerf-hub --dir <pfad> stand-ausgeben         # <pfad>/stand.json (#419)
 
   `serve` verlangt die Datei `token-hash` im Hub-Verzeichnis (der
   Klartext liegt nur beim Connector; der Hub kennt den Hash, #415) und
@@ -39,6 +40,9 @@ defmodule WegwerfHub.CLI do
       {:ok, %{dir: dir, befehl: "leeren"}} ->
         leeren(dir)
 
+      {:ok, %{dir: dir, befehl: "stand-ausgeben"}} ->
+        stand_ausgeben(dir)
+
       {:error, usage} ->
         fail(usage)
     end
@@ -56,6 +60,9 @@ defmodule WegwerfHub.CLI do
 
       {opts, ["leeren" | _rest], []} ->
         with_dir(opts, %{befehl: "leeren"})
+
+      {opts, ["stand-ausgeben" | _rest], []} ->
+        with_dir(opts, %{befehl: "stand-ausgeben"})
 
       {opts, ["entscheiden", id | _rest], []} ->
         with_dir(opts, %{befehl: "entscheiden", id: id, teile: teile(opts)})
@@ -184,6 +191,11 @@ defmodule WegwerfHub.CLI do
     IO.puts("Vorschläge geleert")
   end
 
+  defp stand_ausgeben(dir) do
+    {:ok, path} = Store.stand_ausgeben(dir)
+    IO.puts("Stand ausgegeben: #{path}")
+  end
+
   defp usage do
     """
     wegwerf-hub --dir <pfad> serve
@@ -192,6 +204,7 @@ defmodule WegwerfHub.CLI do
     wegwerf-hub --dir <pfad> ablehnen <id>
     wegwerf-hub --dir <pfad> gesperrt on|off
     wegwerf-hub --dir <pfad> leeren
+    wegwerf-hub --dir <pfad> stand-ausgeben
     """
   end
 

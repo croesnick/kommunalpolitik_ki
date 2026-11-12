@@ -772,9 +772,16 @@ Neuschreiben zu verlangen, brächte nichts, weil sich abtippen immer lässt.
 | 12.10 | Der Agent will aus dem Projektraum etwas in den Fraktionsordner legen. | Nur mit GO: Fraktion und Nextcloud-Betreiber sehen den Stand ohnehin, weil er als Druck in einem Nextcloud-Ordner liegt. Der Empfängertest besteht, das Schreiben braucht trotzdem ein GO. |
 | 12.11 | Der Agent soll aus dem Projektraum einen Bericht für den Ortsverband entwerfen. | Abgelehnt, weil `ortsverband` und `mail-provider` nicht im Empfängerkreis von `ratsprojekte@1` liegen. Miriam schreibt den Bericht selbst, als Vorbereitung dient ihr der Rückblick im Hub. |
 
-**Zu bauen.** B17 (Lesen, [#419](https://github.com/croesnick/kommunalpolitik_ki/issues/419)).
+**Zu bauen.** B17 (Lesen, [#419](https://github.com/croesnick/kommunalpolitik_ki/issues/419)). Gebaut am 2026-11-12:
+`rp_stand_lesen` ist eine Nur-Aufnahme-Operation (Connector-Vertrag §6.4). Die Anfrage hat keine Parameter, und ihre
+Umgebung `lokaler-arbeitsraum@1` zeigt sie niemandem außerhalb des Raums. Der Vermittler entscheidet deshalb nur die
+Aufnahme gegen B_W, vor dem Lesen und ohne GO-Weg. `ratsprojekte@1` bekommt keine `transfer`-Regel. Der Referenzraum
+heißt `projektraum`. Die Datei aus erlaubten Feldern baut der Hub in „Stand ausgeben“ (#438), bis dahin gibt sie der
+Wegwerf-Hub aus.
 
-**Tests.** `aufnahme-raumbindung`, `verweigerungszaehler`, `metadaten`, `empfaengergrenze`, `freigabe-inhalt`.
+**Tests.** `aufnahme-raumbindung`, `verweigerungszaehler`, `metadaten`, `empfaengergrenze`, `freigabe-inhalt`. Die
+Gegenproben 12.0 bis 12.2, 12.8 und 12.9 laufen als Szenen, 12.10 und 12.11 als Erwartungsfälle der Engine mit einem
+um die Zielumgebung erweiterten Γ (`stand_lesen_test` in `apps/komki_mediator`). 12.3 bis 12.7 gehören zum Hub (#438).
 
 #### Szene 13: Vertrauliche Essenz aus dem Fraktionsraum
 

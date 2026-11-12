@@ -11,7 +11,8 @@ defmodule KomkiCli.ConnectorProfile do
     * Netz nur `localhost:<egress-port>` (bzw. `localhost:<mock-port>` im
       RIS-Mock-Betrieb), und nur, wenn das Manifest `egress_hosts` hat,
     * Dateisystem nur nach `fs` des Manifests (`{vault_dir}` lesen,
-      `{vault_dir}/komki-test` schreiben, `{documents_dir}` lesen).
+      `{vault_dir}/komki-test` schreiben, `{documents_dir}` lesen,
+      `{ratsprojekte_stand}` lesen, #419).
 
   Kein Home, kein `~/.ssh`, kein DNS: Ein Connector kennt nur Loopback.
 
@@ -132,16 +133,28 @@ defmodule KomkiCli.ConnectorProfile do
     ]
   end
 
+  # Placeholders of the manifest's fs paths. The stand file (#419) is
+  # optional: without ratsprojekte_stand the rule is left out, the
+  # connector then cannot read anything outside its socket.
   defp fs_paths(cfg, manifest) do
-    Enum.map(manifest.fs, fn {pattern, mode} ->
-      path =
-        if String.contains?(pattern, "{vault_dir}"),
-          do: String.replace(pattern, "{vault_dir}", vault_dir!(cfg)),
-          else: String.replace(pattern, "{documents_dir}", KomkiCli.Connectors.documents_dir(cfg))
+    Enum.flat_map(manifest.fs, fn {pattern, mode} ->
+      cond do
+        String.contains?(pattern, "{vault_dir}") ->
+          [{String.replace(pattern, "{vault_dir}", vault_dir!(cfg)), mode}]
 
-      {path, mode}
+        String.contains?(pattern, "{ratsprojekte_stand}") ->
+          stand_path(cfg, pattern, mode)
+
+        true ->
+          [{String.replace(pattern, "{documents_dir}", Connectors.documents_dir(cfg)), mode}]
+      end
     end)
   end
+
+  defp stand_path(%Config{ratsprojekte_stand: stand}, pattern, mode) when is_binary(stand),
+    do: [{String.replace(pattern, "{ratsprojekte_stand}", stand), mode}]
+
+  defp stand_path(_cfg, _pattern, _mode), do: []
 
   defp fs_rules([]), do: []
 
