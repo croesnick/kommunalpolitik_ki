@@ -2,21 +2,25 @@
 
 Stand: 2026-11-12. Diese Prüfpunkte gelten bei jeder Änderung im jeweiligen Bereich, auch wenn das Ticket sie nicht eigens nennt (#461). Im Prüfbericht ([Lane-Protokoll](lane-protocol.md#prüfbericht-the-verification-report)) bekommt jeder Punkt eines Bereichs, den der Diff berührt, eine eigene Zeile. Die Prüfpunkte eines Tickets unter „Fertig, wenn“ bleiben im Ticket.
 
-Welche Punkte hier stehen, entscheidet die nutzende Person. Jeder Punkt hat ihr GO. Eine Session schlägt neue Punkte vor und trägt sie nicht selbst ein.
+Ein Punkt gilt für den Diff: Er fragt, was die Änderung einbringt, nicht ob das ganze Repo ihn schon erfüllt. Altbestand, der einen Punkt verletzt, steht beim Punkt mit seinem Folgeticket.
+
+Welche Punkte hier stehen, entscheidet die nutzende Person. Jeder Punkt hat ihr GO, ebenso jede Ausnahme in einem automatischen Check. Eine Session schlägt neue Punkte und Ausnahmen vor und trägt sie nicht selbst ein.
 
 ## Hub-Oberfläche
 
-**Gilt für:** `apps/ratsprojekte/assets/`, `apps/ratsprojekte/lib/ratsprojekte_web/`
+**Gilt für:** `apps/ratsprojekte/assets/`, `apps/ratsprojekte/lib/ratsprojekte_web/`, `apps/ratsprojekte/test/ratsprojekte_web/theme_css_test.exs`
 
-- **Light und Dark, ab Handybreite.** Jede Seite folgt dem Theme und funktioniert ab Handybreite. Feste Farben stehen nur in den beiden Theme-Blöcken und in `@media print`. Ausnahmen gelten für Farben, die in beiden Themes gleich sind und nicht als Fläche oder Text dienen, und sie stehen im Test.
-  *Nachweis:* Screenshot jeder geänderten Seite hell und dunkel, eine davon in Handybreite. Automatisch: `apps/ratsprojekte/test/ratsprojekte_web/theme_css_test.exs` (feste Farben in `app.css` und feste Tailwind-Farbklassen in Templates).
+- **Light und Dark, ab Handybreite.** Jede geänderte Seite folgt dem Theme und funktioniert ab Handybreite. Der Diff bringt feste Farben nur in die beiden Theme-Blöcke und in `@media print` ein. Ausnahmen mit GO: die Datenfarben der Meinungsbalken (`--stufe-1` bis `--stufe-5` auf `:root`, in beiden Themes gleich) und durchscheinende Schatten.
+  *Nachweis:* Screenshot jeder geänderten Seite hell und dunkel, eine davon in Handybreite. Automatisch: `apps/ratsprojekte/test/ratsprojekte_web/theme_css_test.exs` (feste Farben in `app.css`, feste Farbklassen und Inline-Farben in Templates).
+  *Altbestand:* Der Ladebalken in `assets/js/app.js` hat feste Farben, der Test sieht `assets/js` noch nicht (#471).
 
 ## Ratsinhalte
 
 **Gilt für:** das ganze Repo
 
-- **Keine echten Daten.** Tests, Fixtures, Seeds, Kassetten im Repo und Transkripte enthalten keine echten Ratsinhalte und keine echten Personen (AGENTS.md §8). Erfundenes Material spielt in der erfundenen Gartenstadt.
+- **Keine echten Daten.** Der Diff bringt keine echten Ratsinhalte in Tests, Fixtures, Seeds oder Transkripte ein (AGENTS.md §8).
   *Nachweis:* Review
+  *Altbestand:* Einige Fixtures nennen noch Buchloe, etwa in `apps/komki_cli/test/pi/fixtures/`. Die Umstellung auf die Gartenstadt ist Stufe B19 im [Szenario](../szenarien/radweg-bahnhofstrasse.md).
 
 ## komki, für Nutzende sichtbar
 

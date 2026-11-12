@@ -32,6 +32,8 @@ A ticket ends with a Prüfbericht. The human reads the result and this report in
 ```markdown
 ## Prüfbericht
 
+Gilt für `<commit>`.
+
 | Prüfpunkt | Ergebnis | Nachweis |
 |---|---|---|
 | Punkt aus „Fertig, wenn“ | bestanden | `mix test test/pfad_test.exs:42` |
@@ -41,6 +43,10 @@ A ticket ends with a Prüfbericht. The human reads the result and this report in
 ### Entscheidungen, die die Umsetzung selbst getroffen hat
 
 - Was festgelegt wurde, mit Grund und Quelle. Weicht vom Bestand ab: ja oder nein.
+
+### Befunde
+
+- `datei:zeile`: was nicht stimmt, und die erwartete Korrektur. Behoben in `<commit>`, oder als Entscheidung an die nutzende Person.
 ```
 
 - **Who grades.** Not the session that built. In the dev loop the review session grades, and the script renders the table into its comment on the PR. In an interactive session, give a fresh subagent that has not seen the conversation the ticket, the base ref, and your claims, and let it write the report. Nothing enforces this in an interactive session yet (#462). Until then it is a request.
@@ -54,7 +60,7 @@ A ticket ends with a Prüfbericht. The human reads the result and this report in
 
 For `ai:s-tier` and `ai:a-tier` tickets, an interactive session runs an independent review before it reports the PR as done ([ai-tiers.md](ai-tiers.md#prüfung-vor-dem-merge)). The reviewer is a fresh subagent that has not seen the conversation, for example the skill `code-review` against `origin/main`. It may be the same subagent that writes the Prüfbericht. It gets the ticket, the base ref, the checkpoints of the touched areas, and the builder's list of decisions, and it checks the diff against all of them. It looks for decisions in the diff before it reads the list.
 
-- Append the result to the Prüfbericht: one line with the reviewed commit, then the findings.
+- The result goes into the Prüfbericht: the reviewed commit in its first line, the findings under `### Befunde`.
 - Fix each finding, or hand it to the human as a decision with your proposal. Never drop a finding silently.
 - A fix after the review is not reviewed. Say so in the report and name the commit, or run the review again.
 
