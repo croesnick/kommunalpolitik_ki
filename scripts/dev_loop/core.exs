@@ -342,20 +342,124 @@ defmodule DevLoop.Core do
     {title, body}
   end
 
-  @doc "Validates `.dev-loop/review.json`."
-  def parse_review(json) do
+  @results ["bestanden", "nicht bestanden", "nicht geprüft"]
+
+  @doc """
+  True if a PR text has the section for the decisions the session took on
+  its own. The review needs that list to hold it against the diff; whether
+  it is complete is the review's job.
+  """
+  def decisions?(text),
+    do:
+      Regex.match?(
+        ~r/^\#+\s*\**Entscheidungen, die ich selbst getroffen habe:?\**:?\s*$/mu,
+        text
+      )
+
+  @doc """
+  How many checkpoints the ticket agrees on: the top-level checkboxes of the
+  Zielbild field „Fertig, wenn“. The same sources count as for a confirmed
+  Zielbild: the body only on the owner's own ticket, else the first comment
+  that has them, and never a PO draft.
+  """
+  def checkpoints(issue) do
+    body = if Map.get(issue, :owner?, false), do: [issue.body], else: []
+
+    (body ++ Enum.reject(issue.comments, &po_comment?/1))
+    |> Enum.map(&count_checkpoints/1)
+    |> Enum.find(0, &(&1 > 0))
+  end
+
+  # From the line that opens the field (a heading or a label ending in a
+  # colon, also as a list item) to the next field or heading. The boxes sit
+  # one level below the opening line; a „Nachweis“ line belongs to its box.
+  defp count_checkpoints(text) do
+    lines = String.split(text, ~r/\r?\n/)
+
+    case Enum.drop_while(
+           lines,
+           &(not Regex.match?(~r/^\s*([-*] )?[\#*\s]*Fertig,? wenn\W*$/u, &1))
+         ) do
+      [open | rest] ->
+        indent = if Regex.match?(~r/^\s*[-*] /, open), do: "\\s+", else: ""
+
+        rest
+        |> Enum.take_while(
+          &(not Regex.match?(~r/^(\#|[-*] \*\*|\*\*(?!Nachweis)[^*]+\*\*)/u, &1))
+        )
+        |> Enum.count(&Regex.match?(~r/^#{indent}[-*] \[[ xX]\]/, &1))
+
+      [] ->
+        0
+    end
+  end
+
+  @doc """
+  Validates `.dev-loop/review.json`. The review grades the checkpoints, not
+  the session that built: `checks` has a row per checkpoint the ticket
+  agrees on (`min_checks`, at least one), each with one of three results
+  and its evidence, and `decisions` says what the implementation fixed on
+  its own. A `human` verdict may stop before either is complete. An
+  `approve` needs every checkpoint `bestanden`: a point nobody checked
+  never counts as passed.
+  """
+  def parse_review(json, min_checks) do
     with {:ok, %{"verdict" => v} = r} when v in ["approve", "rework", "human"] <-
-           JSON.decode(json) do
+           JSON.decode(json),
+         checks = Map.get(r, "checks", []),
+         decisions = Map.get(r, "decisions", if(v == "human", do: [])),
+         :ok <- valid_checks(checks, v, max(min_checks, 1)),
+         :ok <- valid_decisions(decisions) do
       {:ok,
        %{
          verdict: v,
          summary: Map.get(r, "summary", ""),
          brief: Map.get(r, "brief", ""),
-         findings: Map.get(r, "findings", [])
+         findings: Map.get(r, "findings", []),
+         checks: checks,
+         decisions: decisions
        }}
     else
-      _ -> {:error, :invalid_review}
+      {:error, why} when is_binary(why) -> {:error, why}
+      _ -> {:error, "review.json ist kein JSON mit einem Verdikt approve, rework oder human."}
     end
+  end
+
+  defp valid_checks(checks, verdict, min) do
+    cond do
+      not (is_list(checks) and Enum.all?(checks, &check?/1)) ->
+        {:error,
+         "checks: Jede Zeile braucht point, evidence und als result eines von: #{Enum.join(@results, ", ")}."}
+
+      verdict != "human" and length(checks) < min ->
+        {:error,
+         "checks hat #{length(checks)} Zeilen, das Ticket vereinbart #{min} Prüfpunkte. Jeder braucht eine Zeile."}
+
+      verdict == "approve" and Enum.any?(checks, &(&1["result"] != "bestanden")) ->
+        {:error,
+         "Verdikt approve, aber nicht jeder Prüfpunkt ist „bestanden“. Das Verdikt ist dann rework oder human."}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp check?(%{"point" => point, "result" => result, "evidence" => evidence})
+       when is_binary(point) and is_binary(evidence),
+       do: result in @results and String.trim(point) != "" and String.trim(evidence) != ""
+
+  defp check?(_), do: false
+
+  defp valid_decisions(decisions) do
+    if is_list(decisions) and
+         Enum.all?(
+           decisions,
+           &match?(%{"text" => t, "declared" => d} when is_binary(t) and is_boolean(d), &1)
+         ),
+       do: :ok,
+       else:
+         {:error,
+          "decisions fehlt oder ist ungültig: eine Liste, leer oder mit text und declared (true oder false) je Eintrag."}
   end
 
   @doc "The review a red gate on the reviewed head stands for: one rework round."
@@ -364,7 +468,9 @@ defmodule DevLoop.Core do
       verdict: "rework",
       summary: "Die Gates des Skripts sind auf diesem Head rot.\n\n```\n#{gate_text}\n```",
       brief: "",
-      findings: []
+      findings: [],
+      checks: [],
+      decisions: []
     }
   end
 
@@ -409,10 +515,10 @@ defmodule DevLoop.Core do
 
   def exhausted?(text), do: Regex.match?(@exhausted_re, text)
 
+  @doc "Fills `{{key}}` in one pass, so inserted text is never filled again."
   def render(template, assigns) do
-    Enum.reduce(assigns, template, fn {k, v}, acc ->
-      String.replace(acc, "{{#{k}}}", to_string(v))
-    end)
+    values = Map.new(assigns, fn {k, v} -> {to_string(k), to_string(v)} end)
+    Regex.replace(~r/\{\{(\w+)\}\}/, template, fn whole, key -> Map.get(values, key, whole) end)
   end
 
   @doc """
@@ -476,10 +582,53 @@ defmodule DevLoop.Core do
     **Review (dev-loop): #{review.verdict}**
 
     #{review.summary}
-    #{if findings != "", do: "\n**Befunde:**\n" <> findings, else: ""}
+    #{report_text(review)}#{if findings != "", do: "\n**Befunde:**\n" <> findings, else: ""}
     """
     |> String.trim()
   end
+
+  @doc """
+  The Prüfbericht of the lane protocol, rendered from the review's grades:
+  one row per checkpoint, then the decisions the implementation took on its
+  own. A decision the review found in the diff but the implementation did
+  not name is marked.
+  """
+  def report_text(%{checks: [_ | _] = checks} = review) do
+    rows =
+      Enum.map_join(checks, "\n", fn c ->
+        "| #{cell(c["point"])} | #{c["result"]} | #{cell(c["evidence"])} |"
+      end)
+
+    decisions =
+      case review.decisions do
+        [] ->
+          "Keine."
+
+        list ->
+          Enum.map_join(list, "\n", fn d ->
+            "- #{String.trim(d["text"])}" <>
+              if(d["declared"], do: "", else: " **(von der Umsetzung nicht genannt)**")
+          end)
+      end
+
+    """
+
+    ## Prüfbericht
+
+    | Prüfpunkt | Ergebnis | Nachweis |
+    |---|---|---|
+    #{rows}
+
+    ### Entscheidungen, die die Umsetzung selbst getroffen hat
+
+    #{decisions}
+    """
+  end
+
+  def report_text(_), do: ""
+
+  defp cell(text),
+    do: text |> String.trim() |> String.replace("|", "\\|") |> String.replace(~r/\s*\n\s*/, " ")
 
   # Multi-line briefs stay inside their list item.
   defp bullet(text), do: "- " <> (text |> String.trim() |> String.replace("\n", "\n  "))

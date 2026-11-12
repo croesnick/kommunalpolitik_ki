@@ -127,6 +127,15 @@ defmodule DevLoop.GitHub do
     |> Core.trusted_comment_bodies(@owner)
   end
 
+  @doc "The PR text: what the implementation claims, for the review to check."
+  def pr_body(%{dry_run: true}, 0), do: ""
+
+  def pr_body(ctx, pr) do
+    gh!(ctx, ~w(pr view #{pr} --repo #{@repo} --json body))
+    |> JSON.decode!()
+    |> Map.fetch!("body")
+  end
+
   @doc "`:pending`, `:green` or `{:red, names}` for all workflow runs of a commit."
   def ci_state(ctx, sha),
     do:
@@ -220,6 +229,14 @@ defmodule DevLoop.GitHub do
 
       {:error, out} ->
         raise "PR für #{branch} nicht angelegt: #{out}"
+    end
+  end
+
+  @doc "Replaces the PR text: a rework round brings new evidence and decisions."
+  def update_pr(ctx, pr, body) do
+    case write(ctx, ~w(pr edit #{pr} --repo #{@repo} --body-file -), body) do
+      {:error, out} -> raise "PR-Text von ##{pr} nicht ersetzt: #{out}"
+      ok -> ok
     end
   end
 

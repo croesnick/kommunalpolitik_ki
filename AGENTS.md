@@ -38,7 +38,7 @@ Tickets und Specs leben als GitHub Issues in `croesnick/kommunalpolitik_ki` (`gh
 
 ### Lane-Protokoll
 
-Wie eine Session ein Wayfinder-Ticket bearbeitet, verifiziert und abschließt (Abnahmekriterien im Ticket statt im Dispatch-Prompt): [docs/agents/lane-protocol.md](docs/agents/lane-protocol.md).
+Wie eine Session ein Wayfinder-Ticket bearbeitet, verifiziert und abschließt (Abnahmekriterien im Ticket statt im Dispatch-Prompt). Am Ende steht ein Prüfbericht: Ergebnis und Nachweis je vereinbartem Prüfpunkt, dazu die Entscheidungen, die die Umsetzung selbst getroffen hat. Die Ergebnisse vergibt eine Session, die nicht gebaut hat: [docs/agents/lane-protocol.md](docs/agents/lane-protocol.md).
 
 ### Triage labels
 

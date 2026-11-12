@@ -226,15 +226,148 @@ defmodule DevLoop.CoreTest do
     end
   end
 
-  describe "parse_review/1 and parse_po/2" do
+  describe "the Prüfbericht" do
+    @check ~s({"point":"Feld steht in der Doku","result":"bestanden","evidence":"lychee docs/x.md"})
+
+    @none ~s(,"decisions":[])
+
+    defp review_json(verdict, checks, rest \\ ""),
+      do: ~s({"verdict":"#{verdict}","checks":[#{Enum.join(checks, ",")}]#{rest}})
+
+    test "the builder's PR text needs the section for its own decisions" do
+      assert Core.decisions?(
+               "## Nachweise\n\nx\n\n## Entscheidungen, die ich selbst getroffen habe\n\nKeine."
+             )
+
+      refute Core.decisions?(
+               "## Verifiziert\n\nEntscheidungen, die ich selbst getroffen habe: keine"
+             )
+    end
+
+    test "checkpoints/1 counts the top-level boxes of „Fertig, wenn“" do
+      body = """
+      Das Ticket ist fertig, wenn alles stimmt.
+      - [ ] Prosa davor zählt nicht
+
+      ## Zielbild
+      **Fertig, wenn:**
+      - [ ] eins
+        - [ ] Unterpunkt
+      **Nachweis:** eine Zeile dazwischen
+      * [x] zwei
+      **Nicht anfassen:**
+      - [ ] zählt nicht
+      """
+
+      po = "PO " <> Core.po_marker() <> body
+
+      assert Core.checkpoints(%{owner?: true, body: body, comments: []}) == 2
+      assert Core.checkpoints(%{owner?: true, body: "ohne", comments: [po, body]}) == 2
+      assert Core.checkpoints(%{owner?: true, body: "ohne", comments: [po]}) == 0
+
+      assert Core.checkpoints(%{
+               owner?: true,
+               body: String.replace(body, "\n", "\r\n"),
+               comments: []
+             }) == 2
+
+      assert Core.checkpoints(%{
+               owner?: true,
+               body: "**Fertig, wenn:**\n- [ ] eins\n**Offene Fragen:**\n- [ ] keine",
+               comments: []
+             }) == 1
+
+      assert Core.checkpoints(%{
+               owner?: true,
+               body: "- **Fertig, wenn:**\n  - [ ] eins\n  - [ ] zwei\n- **Kontext:** x",
+               comments: []
+             }) == 2
+
+      # A third party's body confirms nothing, as for the Zielbild.
+      assert Core.checkpoints(%{owner?: false, body: body, comments: []}) == 0
+    end
+
+    test "the review grades every checkpoint the ticket agrees on" do
+      assert {:ok, %{checks: [_, _], decisions: []}} =
+               Core.parse_review(review_json("approve", [@check, @check], @none), 2)
+
+      assert {:error, why} = Core.parse_review(review_json("approve", [@check], @none), 2)
+      assert why =~ "2 Prüfpunkte"
+      assert {:error, _} = Core.parse_review(~s({"verdict":"approve","decisions":[]}), 0)
+      assert {:ok, %{decisions: []}} = Core.parse_review(review_json("human", []), 2)
+    end
+
+    test "a review that names no decisions at all is refused" do
+      assert {:error, why} = Core.parse_review(review_json("approve", [@check]), 1)
+      assert why =~ "decisions"
+    end
+
+    test "a result is one of the three words and has evidence" do
+      for bad <- [
+            String.replace(@check, "bestanden", "ok"),
+            String.replace(@check, "lychee docs/x.md", " "),
+            ~s({"point":"x","result":"bestanden"})
+          ] do
+        assert {:error, why} = Core.parse_review(review_json("rework", [bad], @none), 1)
+        assert why =~ "checks"
+      end
+    end
+
+    test "approve needs every checkpoint passed, rework does not" do
+      for result <- ["nicht bestanden", "nicht geprüft"] do
+        other = String.replace(@check, "bestanden", result)
+
+        assert {:error, why} =
+                 Core.parse_review(review_json("approve", [@check, other], @none), 2)
+
+        assert why =~ "approve"
+        assert {:ok, _} = Core.parse_review(review_json("rework", [@check, other], @none), 2)
+      end
+    end
+
+    test "the builder's heading may be bold or end in a colon" do
+      assert Core.decisions?("### **Entscheidungen, die ich selbst getroffen habe:**")
+      assert Core.decisions?("## Entscheidungen, die ich selbst getroffen habe:")
+    end
+
+    test "render/2 fills in one pass and leaves inserted placeholders alone" do
+      assert Core.render("{{a}} {{b}} {{c}}", %{a: "{{b}}", b: 2}) == "{{b}} 2 {{c}}"
+    end
+
+    test "the comment carries the table and marks decisions the builder left out" do
+      decisions =
+        ~s(,"decisions":[{"text":"Blatt immer weiß","declared":false},{"text":"A | B","declared":true}])
+
+      {:ok, review} = Core.parse_review(review_json("rework", [@check], decisions), 1)
+      comment = Core.review_comment(review, "abc")
+
+      assert comment =~ "| Feld steht in der Doku | bestanden | lychee docs/x.md |"
+      assert comment =~ "- Blatt immer weiß **(von der Umsetzung nicht genannt)**"
+      assert String.ends_with?(comment, "- A | B")
+
+      piped = String.replace(@check, "lychee docs/x.md", "a | b\\nc")
+      {:ok, review} = Core.parse_review(review_json("rework", [piped], @none), 1)
+      assert Core.report_text(review) =~ "| bestanden | a \\| b c |"
+
+      assert {:error, why} =
+               Core.parse_review(review_json("rework", [@check], ~s(,"decisions":["x"])), 1)
+
+      assert why =~ "decisions"
+    end
+  end
+
+  describe "parse_review/2 and parse_po/2" do
     test "accepts the three verdicts only" do
+      check = ~s({"point":"p","result":"bestanden","evidence":"e"})
+
       assert {:ok, %{verdict: "rework", findings: [_]}} =
                Core.parse_review(
-                 ~s({"verdict":"rework","findings":[{"file":"a","line":1,"text":"x"}]})
+                 ~s({"verdict":"rework","checks":[#{check}],"decisions":[],"findings":[{"file":"a","line":1,"text":"x"}]}),
+                 1
                )
 
-      assert {:error, :invalid_review} = Core.parse_review(~s({"verdict":"merge"}))
-      assert {:error, :invalid_review} = Core.parse_review("kein json")
+      assert {:error, _} = Core.parse_review(~s({"verdict":"merge"}), 1)
+      assert {:error, _} = Core.parse_review("kein json", 1)
     end
 
     test "red gates stand for a rework round that carries the gate output" do
