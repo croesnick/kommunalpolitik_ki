@@ -3,9 +3,10 @@ defmodule RatsprojekteWeb.Zugang do
   The gate in front of the interface (ADR 0004). With the lock switched on
   (`config :ratsprojekte, :sperre, true`, the release) a request passes
   only with the session marker of the current unlock, which
-  `ZugangController.einloesen/2` sets from a one-time link. Everything else
-  sees only „Bitte über ratsprojekte öffnen“. Every passing request is an
-  action and postpones the lock.
+  `ZugangController` sets: from the one-time link of `ratsprojekte open`
+  or from the „Entsperren“ button on the lock page (Touch ID). Everything
+  else sees only the lock page. Every passing request is an action and
+  postpones the lock.
 
   `on_mount/4` does the same for LiveViews (`live_session ...,
   on_mount: RatsprojekteWeb.Zugang`): events count as actions, and a lock
@@ -15,7 +16,7 @@ defmodule RatsprojekteWeb.Zugang do
   @behaviour Plug
 
   import Plug.Conn
-  import Phoenix.Controller, only: [put_view: 2, render: 2]
+  import Phoenix.Controller, only: [put_view: 2, render: 3]
 
   alias Ratsprojekte.Sperre
 
@@ -37,17 +38,17 @@ defmodule RatsprojekteWeb.Zugang do
         conn
 
       true ->
-        conn |> clear_session() |> bitte_oeffnen() |> halt()
+        conn |> clear_session() |> gesperrt() |> halt()
     end
   end
 
-  @doc "The page for everyone without access."
-  @spec bitte_oeffnen(Plug.Conn.t()) :: Plug.Conn.t()
-  def bitte_oeffnen(conn) do
+  @doc "The lock page for everyone without access; `fehler` says why an unlock failed."
+  @spec gesperrt(Plug.Conn.t(), String.t() | nil) :: Plug.Conn.t()
+  def gesperrt(conn, fehler \\ nil) do
     conn
     |> put_status(401)
     |> put_view(RatsprojekteWeb.ZugangHTML)
-    |> render(:bitte_oeffnen)
+    |> render(:gesperrt, fehler: fehler)
   end
 
   @spec on_mount(atom(), map(), map(), Phoenix.LiveView.Socket.t()) ::

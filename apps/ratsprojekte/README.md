@@ -49,21 +49,25 @@ Konten“). Er startet bei der Anmeldung **gesperrt**: ohne Schlüssel, ohne
 offene Datenbank.
 
 ```bash
-make ratsprojekte                # Release, komki-tresor daneben, Link ~/.local/bin/ratsprojekte
-ratsprojekte einrichten          # Schlüssel versiegeln, Wiederherstellungscode EINMAL zeigen
-ratsprojekte launchagent an      # Start bei der Anmeldung, gesperrt
+make ratsprojekte                # Release nach ~/.local/opt/ratsprojekte, Befehl ~/.local/bin/ratsprojekte
+ratsprojekte einrichten          # Schlüssel versiegeln, Wiederherstellungscode EINMAL zeigen, LaunchAgent starten
 komki secret erzeugen ratsprojekte-hub | ratsprojekte connector-token
-ratsprojekte open                # Touch ID, dann Browser mit einmaligem Link
 ```
+
+Im Alltag: `http://localhost:4100` als Lesezeichen öffnen, „Entsperren“
+klicken, Touch ID. Das Terminal braucht es dafür nicht. Ein späteres
+`make ratsprojekte` (aus jedem Checkout) ersetzt die installierte Kopie und
+startet den Hub gesperrt neu; Daten und Siegel bleiben, wo sie sind.
 
 | Befehl | Was passiert |
 |---|---|
-| `einrichten` | Erzeugt den SQLCipher-Schlüssel, versiegelt ihn mit einem eigenen Schlüssel in der Secure Enclave (`komki-tresor`) und zeigt ihn einmal als Wiederherstellungscode. Der gehört in den Passwortmanager. |
-| `open` | Der Hub fragt per Touch ID den Schlüssel ab, öffnet die Datenbank und gibt einen Link, der zwei Minuten und genau einmal gilt. Daraus setzt der Hub ein Session-Cookie. Jedes weitere `open` fragt wieder nach Touch ID. |
+| `einrichten` | Erzeugt den SQLCipher-Schlüssel, versiegelt ihn mit einem eigenen Schlüssel in der Secure Enclave (`komki-tresor`) und zeigt ihn einmal als Wiederherstellungscode. Der gehört in den Passwortmanager. Danach richtet es den LaunchAgent ein und wartet, bis der Hub antwortet. |
+| Sperrseite „Entsperren“ | Im Browser: Der Hub fragt per Touch ID den Schlüssel ab, öffnet die Datenbank und setzt das Session-Cookie im selben Tab. Jeder weitere Klick fragt wieder nach Touch ID. |
+| `open` | Dasselbe aus dem Terminal: Der Browser öffnet sich mit einem Link, der zwei Minuten und genau einmal gilt. |
 | `sperren`, `status` | Sofort sperren, Zustand abfragen. Nach 30 Minuten ohne Handlung in der Oberfläche sperrt der Hub von selbst (`config :ratsprojekte, sperre_nach`). Aufrufe des Connectors zählen nicht. |
 | `connector-token` | Liest den SHA-256 des Tokens von stdin. Den Token erzeugt komki und legt ihn versiegelt im Schlüsselbund ab, der Hub kennt nur den Hash. |
 | `recover` | Versiegelt den Schlüssel aus dem Wiederherstellungscode neu, etwa nach einer Wiederherstellung aus Time Machine auf einem anderen Mac. Danach braucht der Connector einen neuen Token (Zeile oben). |
-| `launchagent an\|aus` | Legt `~/Library/LaunchAgents/ratsprojekte.hub.plist` an und lädt ihn, oder entfernt ihn. Nach einem Absturz startet launchd den Hub neu, wieder gesperrt. |
+| `launchagent an\|aus` | Lädt `~/Library/LaunchAgents/ratsprojekte.hub.plist` neu (macht `einrichten` schon) oder entfernt ihn. Nach einem Absturz startet launchd den Hub neu, wieder gesperrt. |
 
 **Was wo liegt.** Alles in `~/Library/Application Support/ratsprojekte/`
 (Rechte 0700; `RATSPROJEKTE_HOME` setzt für Wegwerf-Instanzen ein anderes
@@ -75,7 +79,9 @@ Connector-Operationen), beide 0600. Log: `~/Library/Logs/ratsprojekte/hub.log`.
 
 **Grenzen, die der Hub selbst zieht.** Die Oberfläche liegt auf
 `127.0.0.1:4100` und nimmt nur Host `localhost` oder `127.0.0.1` an (andere
-bekommen 421). Ohne Cookie zeigt sie nur „Bitte über ratsprojekte öffnen“.
+bekommen 421). Ohne Cookie zeigt sie nur die Sperrseite; „Entsperren“ ist
+ein Formular mit CSRF-Token, eine fremde Website kann keine Touch-ID-Abfrage
+auslösen (ohne Token 403).
 Der Connector-Socket prüft zuerst den Token, dann die Sperre: gesperrt heißt
 503 „gesperrt“, gepuffert wird nichts. Die BEAM läuft ohne Distribution
 (kein Port, kein Cookie) und ohne Crash-Dump, mit `+sbwt none` auch für

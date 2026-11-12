@@ -38,7 +38,7 @@ defmodule RatsprojekteWeb.Router do
   end
 
   # The gate (#440, ADR 0004): without the session marker of the current
-  # unlock only „Bitte über ratsprojekte öffnen“. LiveViews of #437 go into a
+  # unlock only the lock page with „Entsperren“. LiveViews of #437 go into a
   # live_session with `on_mount: RatsprojekteWeb.Zugang`.
   pipeline :zugang do
     plug(RatsprojekteWeb.Zugang)
@@ -48,6 +48,7 @@ defmodule RatsprojekteWeb.Router do
     pipe_through(:browser)
 
     get("/zugang/:token", ZugangController, :einloesen)
+    post("/entsperren", ZugangController, :entsperren)
   end
 
   scope "/", RatsprojekteWeb do

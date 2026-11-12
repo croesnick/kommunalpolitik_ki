@@ -26,18 +26,28 @@ komki: komki-tresor
 
 # ratsprojekte-Hub als Release aus dem Checkout (Ticket #440, ADR 0004): Assets,
 # Release, komki-tresor nach bin/ (der Hub versiegelt seinen Datenbank-Schlüssel
-# damit) und der Befehl `ratsprojekte` im PATH. Danach einmalig
-# `ratsprojekte einrichten` und `ratsprojekte launchagent an`.
+# damit). Installiert wird eine Kopie nach RATSPROJEKTE_OPT, damit der Hub nicht
+# an einem Checkout oder Worktree hängt; der Befehl `ratsprojekte` zeigt dorthin.
+# Läuft der Hub schon (LaunchAgent eingerichtet), wird er angehalten, ersetzt und
+# gesperrt neu gestartet. Beim ersten Mal danach: ratsprojekte einrichten.
 RATSPROJEKTE_REL = $(PWD)/apps/ratsprojekte/_build/prod/rel/ratsprojekte
+RATSPROJEKTE_OPT ?= $(HOME)/.local/opt/ratsprojekte
+RATSPROJEKTE_PLIST = $(HOME)/Library/LaunchAgents/ratsprojekte.hub.plist
 ratsprojekte: komki-tresor
 	@cd apps/ratsprojekte && MIX_ENV=prod mix deps.get >/dev/null && MIX_ENV=prod mix compile \
 	  && MIX_ENV=prod mix assets.setup >/dev/null && MIX_ENV=prod mix assets.deploy >/dev/null \
 	  && MIX_ENV=prod mix release --overwrite --quiet
 	@cp apps/komki_cli/priv/komki-tresor "$(RATSPROJEKTE_REL)/bin/komki-tresor"
-	@mkdir -p "$(KOMKI_LINK_DIR)"
-	@ln -sf "$(RATSPROJEKTE_REL)/bin/ratsprojekte-befehl" "$(KOMKI_LINK_DIR)/ratsprojekte"
-	@echo "ratsprojekte gebaut: $(KOMKI_LINK_DIR)/ratsprojekte"
-	@echo "Läuft der Hub schon: ratsprojekte launchagent an (startet ihn neu)"
+	@if [ -f "$(RATSPROJEKTE_PLIST)" ]; then \
+	  launchctl bootout gui/$$(id -u)/ratsprojekte.hub 2>/dev/null || true; \
+	  while launchctl print gui/$$(id -u)/ratsprojekte.hub >/dev/null 2>&1; do sleep 0.2; done; \
+	fi
+	@mkdir -p "$(RATSPROJEKTE_OPT)" "$(KOMKI_LINK_DIR)"
+	@rsync -a --delete "$(RATSPROJEKTE_REL)/" "$(RATSPROJEKTE_OPT)/"
+	@ln -sf "$(RATSPROJEKTE_OPT)/bin/ratsprojekte-befehl" "$(KOMKI_LINK_DIR)/ratsprojekte"
+	@echo "ratsprojekte installiert: $(RATSPROJEKTE_OPT), Befehl $(KOMKI_LINK_DIR)/ratsprojekte"
+	@if [ -f "$(RATSPROJEKTE_PLIST)" ]; then "$(RATSPROJEKTE_OPT)/bin/ratsprojekte-befehl" launchagent an; \
+	  else echo "Weiter mit: ratsprojekte einrichten"; fi
 
 # komki-tresor: versiegelt Geheimnisse mit der Secure Enclave (Swift, weil
 # Erlang die Enclave nicht erreicht; Quelle apps/komki_cli/native). komki

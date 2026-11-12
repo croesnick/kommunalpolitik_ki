@@ -6,21 +6,44 @@ defmodule Ratsprojekte.CLITest do
 
   alias Ratsprojekte.{CLI, Ort, Schluessel, Sperre}
 
+  # einrichten loads the LaunchAgent; tests replace launchctl.
+  defp ohne_launchd, do: [launchagent: fn _home -> :ok end]
+
   describe "einrichten" do
-    test "versiegelt einen Schlüssel und zeigt den Wiederherstellungscode einmal" do
+    test "versiegelt einen Schlüssel, zeigt den Code einmal und startet den Hub" do
       home = home!()
-      assert {text, 0} = CLI.run(["einrichten"], home, provider(home))
+      test = self()
+
+      io = [
+        launchagent: fn ^home ->
+          send(test, :launchagent)
+          :ok
+        end
+      ]
+
+      assert {text, 0} = CLI.run(["einrichten"], home, provider(home), io)
+      assert_received :launchagent
+      assert text =~ "komki secret erzeugen ratsprojekte-hub | ratsprojekte connector-token"
+      assert text =~ "http://localhost:4100"
       [code] = Regex.run(~r/([A-Z2-7]{4}-){12}[A-Z2-7]{4}/, text, capture: :first)
 
       assert {:ok, key} = Schluessel.oeffnen(home, provider(home))
       assert {:ok, ^key} = Schluessel.aus_code(code)
-      assert {_, 1} = CLI.run(["einrichten"], home, provider(home))
+      assert {_, 1} = CLI.run(["einrichten"], home, provider(home), ohne_launchd())
+    end
+
+    test "scheitert der LaunchAgent, bleibt der Code trotzdem sichtbar" do
+      home = home!()
+      io = [launchagent: fn _ -> {:error, "launchctl bootstrap (exit 5)"} end]
+      assert {text, 1} = CLI.run(["einrichten"], home, provider(home), io)
+      assert text =~ ~r/([A-Z2-7]{4}-){12}[A-Z2-7]{4}/
+      assert text =~ "exit 5"
     end
 
     test "verweigert, wenn schon eine Datenbank da ist" do
       home = home!()
       File.write!(Ort.datenbank(home), "")
-      assert {text, 1} = CLI.run(["einrichten"], home, provider(home))
+      assert {text, 1} = CLI.run(["einrichten"], home, provider(home), ohne_launchd())
       assert text =~ "recover"
     end
   end
@@ -87,7 +110,7 @@ defmodule Ratsprojekte.CLITest do
 
   test "recover versiegelt den Schlüssel aus dem Code neu (neuer Mac)" do
     home = home!()
-    {text, 0} = CLI.run(["einrichten"], home, provider(home))
+    {text, 0} = CLI.run(["einrichten"], home, provider(home), ohne_launchd())
     [code] = Regex.run(~r/([A-Z2-7]{4}-){12}[A-Z2-7]{4}/, text, capture: :first)
     sperre = sperre!(home)
     {:ok, _} = Sperre.oeffnen(sperre)

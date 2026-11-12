@@ -1,16 +1,24 @@
 defmodule RatsprojekteWeb.ZugangHTML do
-  @moduledoc "The page for everyone without access to the hub."
+  @moduledoc "The lock page: everyone without access sees only this."
 
   use RatsprojekteWeb, :html
 
-  def bitte_oeffnen(assigns) do
+  attr(:fehler, :string, default: nil)
+
+  def gesperrt(assigns) do
     ~H"""
-    <main id="bitte-oeffnen" class="mx-auto max-w-md px-6 py-24 text-center">
-      <h1 class="text-xl font-semibold">Bitte über ratsprojekte öffnen</h1>
-      <p class="mt-4 opacity-70">
-        Der Hub ist gesperrt oder dieser Tab hat keinen Zugang. Im Terminal
-        <code>ratsprojekte open</code> eingeben.
-      </p>
+    <main id="gesperrt" class="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 text-center">
+      <.icon name="hero-lock-closed" class="mx-auto size-10 opacity-60" />
+      <h1 class="mt-4 text-xl font-semibold">Der Hub ist gesperrt</h1>
+      <p class="mt-2 opacity-70">Nach dem Klick fragt macOS nach Touch ID oder dem Passwort.</p>
+
+      <.form for={%{}} action={~p"/entsperren"} id="entsperren-form" class="mt-8">
+        <button id="entsperren" type="submit" class="btn btn-primary w-full">Entsperren</button>
+      </.form>
+
+      <p :if={@fehler} id="entsperren-fehler" class="mt-4 text-error">{@fehler}</p>
+
+      <p class="mt-8 text-sm opacity-50">Im Terminal geht es auch: <code>ratsprojekte open</code></p>
     </main>
     """
   end
