@@ -59,8 +59,24 @@ defmodule Ratsprojekte.LaunchAgent do
     File.mkdir_p!(Path.dirname(logdatei()))
     File.mkdir_p!(Path.dirname(pfad()))
     _ = launchctl(["bootout", domain() <> "/" <> @label])
+    weg(40)
     File.write!(pfad(), plist(root, env))
     launchctl(["bootstrap", domain(), pfad()])
+  end
+
+  # bootout returns before launchd has removed the service; a bootstrap in
+  # that window fails with "Bootstrap failed: 5". Wait until it is gone.
+  defp weg(0), do: :ok
+
+  defp weg(n) do
+    case launchctl(["print", domain() <> "/" <> @label]) do
+      :ok ->
+        Process.sleep(250)
+        weg(n - 1)
+
+      {:error, _} ->
+        :ok
+    end
   end
 
   @doc "Unload and remove the plist."

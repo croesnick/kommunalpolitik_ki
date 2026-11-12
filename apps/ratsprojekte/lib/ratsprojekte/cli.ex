@@ -80,16 +80,29 @@ defmodule Ratsprojekte.CLI do
   end
 
   def run(["connector-token"], home, _provider, io) do
-    line = io |> Keyword.get(:gets, &IO.gets/1) |> then(& &1.("")) |> to_string() |> String.trim()
+    line =
+      case io |> Keyword.get(:gets, &IO.gets/1) |> then(& &1.("")) do
+        text when is_binary(text) -> String.trim(text)
+        _eof -> ""
+      end
 
-    if line =~ ~r/\A[0-9a-f]{64}\z/ do
-      Ort.anlegen!(home)
-      Ort.schreiben!(Ort.token_hash(home), line <> "\n")
-      {"Connector-Token hinterlegt (nur sein Hash).\n", 0}
-    else
-      fehler(
-        "erwartet eine Zeile mit dem SHA-256 (hex), etwa: komki secret erzeugen ratsprojekte-hub | ratsprojekte connector-token"
-      )
+    cond do
+      line =~ ~r/\A[0-9a-f]{64}\z/ ->
+        Ort.anlegen!(home)
+        Ort.schreiben!(Ort.token_hash(home), line <> "\n")
+        {"Connector-Token hinterlegt (nur sein Hash).\n", 0}
+
+      # The usual cause: the komki in PATH does not know `secret erzeugen` yet
+      # and wrote its error to stderr only.
+      line == "" ->
+        fehler(
+          "nichts auf stdin erhalten; lief komki secret erzeugen ratsprojekte-hub ohne Fehler? (komki --version, eine ältere Version kennt den Befehl nicht)"
+        )
+
+      true ->
+        fehler(
+          "erwartet eine Zeile mit dem SHA-256 (hex), etwa: komki secret erzeugen ratsprojekte-hub | ratsprojekte connector-token"
+        )
     end
   end
 
@@ -117,13 +130,12 @@ defmodule Ratsprojekte.CLI do
     root = Keyword.get(io, :root, System.get_env("RELEASE_ROOT"))
     env = [{"PHX_SERVER", "true"}, {"HOME", System.user_home!()}, {"RATSPROJEKTE_HOME", home}]
 
-    case LaunchAgent.an(root, env) do
-      :ok ->
-        {"LaunchAgent geladen: Der Hub startet bei der Anmeldung gesperrt. Öffnen mit: ratsprojekte open\n",
-         0}
-
-      {:error, text} ->
-        fehler(text)
+    with :ok <- LaunchAgent.an(root, env),
+         :ok <- warten(home, Keyword.get(io, :warten_ms, 20_000)) do
+      {"LaunchAgent geladen, der Hub läuft gesperrt und startet bei jeder Anmeldung. Öffnen mit: ratsprojekte open\n",
+       0}
+    else
+      {:error, text} -> fehler(text)
     end
   end
 
@@ -131,6 +143,30 @@ defmodule Ratsprojekte.CLI do
     do: einfach(LaunchAgent.aus(), "LaunchAgent entfernt.")
 
   def run(_argv, _home, _provider, _io), do: {@usage, 2}
+
+  # launchd returns before the BEAM is up; wait until the hub answers, so
+  # `ratsprojekte open` right after this command finds it.
+  defp warten(home, ms) when ms <= 0 do
+    case verwaltung(home, "status") do
+      {:ok, _} ->
+        :ok
+
+      {:error, _} ->
+        {:error,
+         "LaunchAgent geladen, aber der Hub antwortet nicht (Log: ~/Library/Logs/ratsprojekte/hub.log)"}
+    end
+  end
+
+  defp warten(home, ms) do
+    case verwaltung(home, "status") do
+      {:ok, _} ->
+        :ok
+
+      {:error, _} ->
+        Process.sleep(250)
+        warten(home, ms - 250)
+    end
+  end
 
   defp eingerichtet(key) do
     """

@@ -122,6 +122,10 @@ defmodule Ratsprojekte.CLITest do
              )
 
     assert File.read!(Ort.token_hash(home)) == hash <> "\n"
+
+    # Empty stdin: the komki in PATH failed (older version without `erzeugen`).
+    assert {text, 1} = CLI.run(["connector-token"], home, provider(home), gets: fn _ -> :eof end)
+    assert text =~ "nichts auf stdin"
   end
 
   test "zu langes Home: verständlicher Fehler statt Absturz" do
