@@ -15,9 +15,13 @@ defmodule Ratsprojekte.LaunchAgentTest do
     assert plist =~ "<key>RATSPROJEKTE_HOME</key>\n    <string>/a&lt;b&gt;</string>"
     assert plist =~ "<key>SuccessfulExit</key>\n    <false/>"
     assert plist =~ LaunchAgent.logdatei()
+  end
 
+  # plutil exists only on macOS; the CI runs on Linux.
+  @tag :macos
+  test "plist ist gültig für launchd (plutil)" do
     path = Path.join(System.tmp_dir!(), "rp-plist-#{System.unique_integer([:positive])}.plist")
-    File.write!(path, plist)
+    File.write!(path, LaunchAgent.plist("/opt/rel", [{"PHX_SERVER", "true"}]))
     assert {_, 0} = System.cmd("/usr/bin/plutil", ["-lint", path])
     File.rm!(path)
   end
