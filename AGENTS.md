@@ -103,7 +103,7 @@ Jede Aussage, die ein Tool produziert und politisch relevant ist, braucht eine Q
 
 ### 7. GO-Prinzip: KI berät, Mensch entscheidet
 
-Die KI entscheidet nichts ohne GO. Keine Triage-Änderung, kein Vault-Eintrag, kein Task-Update ohne Bestätigung. Das ist nicht nur eine Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt beim Menschen. Tools sind read-only by design, wo immer möglich.
+Die KI entscheidet nichts ohne GO. Keine Triage-Änderung, kein Vault-Eintrag, kein Task-Update ohne Bestätigung. Das ist nicht nur eine Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt beim Menschen. Tools sind read-only by design, wo immer möglich. Die Regel gilt für die Arbeit an Ratsinhalten; die Pflege des GitHub-Boards in Dev-Sessions (Tickets anlegen, kommentieren, Status setzen) braucht kein GO.
 
 GO kann in der AI-Session (Chat) erteilt werden. Entscheidend ist das explizite GO durch den Menschen, nicht der Kanal. Im ratsprojekte-Hub führt keine KI eine Entscheidung aus: Die KI schlägt über den Connector-Schreibweg vor, der Mensch entscheidet im Hub (ADR 0004).
 
@@ -121,7 +121,7 @@ Der Obsidian-Vault ist das Gedächtnis — roh, unstrukturiert, alles. ratsproje
 
 - **Vault** ist Source of Truth, nicht ratsprojekte.
 - **ratsprojekte** bekommt nur Destillate, nie Rohmaterial.
-- **Pflicht**: Alles, was in der OpenCode-Session entsteht, fließt als konsolidierte Notiz zurück in den Vault, *bevor* es als Proposal in ratsprojekte eingereicht wird.
+- **Pflicht**: Alles, was in einer AI-Session entsteht, fließt als konsolidierte Notiz zurück in den Vault, *bevor* es als Proposal in ratsprojekte eingereicht wird.
 - **Kein Rückfluss**: ratsprojekte schreibt nie zurück in den Vault. ratsprojekte ist das Endprodukt, nicht der Input.
 
 Der `ratsprojekt_proposal`-Skill orchestriert diesen Workflow: sammeln → konsolidieren (in den Vault) → Gates prüfen → Proposal einbringen.
@@ -130,7 +130,7 @@ Der `ratsprojekt_proposal`-Skill orchestriert diesen Workflow: sammeln → konso
 
 Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Abschluss/Archivierung ist in [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) als Mermaid-Chart dokumentiert. Dieses Dokument ist der **Single Source of Truth für den Projektlebenszyklus** — alle Skills, MCP-Tools und AI-Workflows richten sich nach ihm.
 
-**Pflicht**: Bei Änderungen am Lifecycle (neue States, Übergänge, Gates) wird zuerst das Lifecycle-Dokument aktualisiert, *bevor* Code oder Skills angepasst werden. Jede OpenCode-Sitzung, die Workflow-Änderungen vornimmt, prüft und aktualisiert das Dokument.
+**Pflicht**: Bei Änderungen am Lifecycle (neue States, Übergänge, Gates) wird zuerst das Lifecycle-Dokument aktualisiert, *bevor* Code oder Skills angepasst werden. Jede AI-Session, die Workflow-Änderungen vornimmt, prüft und aktualisiert das Dokument.
 
 ### Kanonische Dokumentation unter `docs/`
 
