@@ -4,25 +4,17 @@ This is a web application written using the Phoenix web framework.
 > root](../../AGENTS.md) and lead — this file only carries the
 > Phoenix-specific usage rules that `mix phx.new` generates for this
 > scaffold (German domain, workspace pattern, gates see repo root).
->
-> The rules below still tell you to avoid daisyUI — outdated boilerplate:
-> phx.new 1.8.16 ships daisyUI in this scaffold (`assets/css/app.css` loads
-> its themes, `mix.exs` binds it as asset source), and #437 builds the Hub
-> surface on it. Trust the scaffold over that paragraph.
 
 ## Project guidelines
 
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues
-- Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
+- This app has no HTTP client dependency yet. If it needs one, use `Req`, not `:httpoison`, `:tesla`, or `:httpc`
 
 ### Phoenix v1.8 guidelines
 
 - **Always** begin your LiveView templates with `<Layouts.app flash={@flash} ...>` which wraps all inner content
 - The `MyAppWeb.Layouts` module is aliased in the `my_app_web.ex` file, so you can use it without needing to alias it again
-- Anytime you run into errors with no `current_scope` assign:
-  - You failed to follow the Authenticated Routes guidelines, or you failed to pass `current_scope` to `<Layouts.app>`
-  - **Always** fix the `current_scope` error by moving your routes to the proper `live_session` and ensure you pass `current_scope` as needed
-- Phoenix v1.8 moved the `<.flash_group>` component to the `Layouts` module. You are **forbidden** from calling `<.flash_group>` outside of the `layouts.ex` module
+- Phoenix v1.8 moved the `<.flash_group>` component to the `Layouts` module; call it only from `layouts.ex`
 - Out of the box, `core_components.ex` imports an `<.icon name="hero-x-mark" class="w-5 h-5"/>` component for hero icons. **Always** use the `<.icon>` component for icons, **never** use `Heroicons` modules or similar
 - **Always** use the imported `<.input>` component for form inputs from `core_components.ex` when available. `<.input>` is imported and using it will save steps and prevent errors
 - If you override the default input classes (`<.input class="myclass px-2 py-1 rounded-lg">)`) class with your own values, no default classes are inherited, so your
@@ -30,7 +22,7 @@ custom classes must fully style the input
 
 ### JS and CSS guidelines
 
-- **Use Tailwind CSS classes and custom CSS rules** to create polished, responsive, and visually stunning interfaces.
+- Use Tailwind CSS classes and custom CSS rules for styling; layouts must work from phone width up.
 - Tailwindcss v4 **no longer needs a tailwind.config.js** and uses a new import syntax in `app.css`:
 
       @import "tailwindcss" source(none);
@@ -40,7 +32,7 @@ custom classes must fully style the input
 
 - **Always use and maintain this import syntax** in the app.css file for projects generated with `phx.new`
 - **Never** use `@apply` when writing raw css
-- **Always** manually write your own tailwind-based components instead of using daisyUI for a unique, world-class design
+- Build on the daisyUI components and themes the phx.new 1.8 scaffold ships (`assets/css/app.css`); add your own Tailwind components only where daisyUI has none
 - Out of the box **only the app.js and app.css bundles are supported**
   - You cannot reference an external vendor'd script `src` or link `href` in the layouts
   - You must import the vendor deps into app.js and app.css to use them
@@ -48,10 +40,8 @@ custom classes must fully style the input
 
 ### UI/UX & design guidelines
 
-- **Produce world-class UI designs** with a focus on usability, aesthetics, and modern design principles
-- Implement **subtle micro-interactions** (e.g., button hover effects, and smooth transitions)
-- Ensure **clean typography, spacing, and layout balance** for a refined, premium look
-- Focus on **delightful details** like hover effects, loading states, and smooth page transitions
+- The Hub is a working tool for council members: calm, readable, serious but friendly. Favor clear typography, generous spacing, and visible focus, loading, and empty states over decorative effects.
+- Avoid the generic default look: no cream backgrounds, no italic accent words in headlines, no numbered "01/02/03" section labels, no monospace labels, no pill-shaped buttons, no marker-style highlights.
 
 
 <!-- usage-rules-start -->
@@ -215,7 +205,7 @@ custom classes must fully style the input
 
   and **Never** do this – the program will terminate with a syntax error:
 
-      <%!-- THIS IS INVALID NEVER EVER DO THIS --%>
+      <%!-- invalid --%>
       <div id="<%= @invalid_interpolation %>">
         {if @invalid_block_construct do}
         {end}
@@ -329,7 +319,7 @@ when writing scripts inside the template**:
     </script>
 
 - colocated hooks are automatically integrated into the app.js bundle
-- colocated hooks names **MUST ALWAYS** start with a `.` prefix, i.e. `.PhoneNumber`
+- colocated hook names start with a `.` prefix, i.e. `.PhoneNumber`
 
 #### External phx-hook
 
@@ -452,7 +442,7 @@ And **never** do this:
       <.input field={@changeset[:field]} type="text" />
     </.form>
 
-- You are FORBIDDEN from accessing the changeset in the template as it will cause errors
+- Don't access the changeset in the template; it causes errors
 - **Never** use `<.form let={f} ...>` in the template, instead **always use `<.form for={@form} ...>`**, then drive all form references from the form assign as in `@form[:field]`. The UI should **always** be driven by a `to_form/2` assigned in the LiveView module that is derived from a changeset
 <!-- phoenix:liveview-end -->
 

@@ -105,7 +105,7 @@ Jede Aussage, die ein Tool produziert und politisch relevant ist, braucht eine Q
 
 Die KI entscheidet nichts ohne GO. Keine Triage-Änderung, kein Vault-Eintrag, kein Task-Update ohne Bestätigung. Das ist nicht nur eine Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt beim Menschen. Tools sind read-only by design, wo immer möglich.
 
-GO kann in der AI-Session (Chat) erteilt werden — die KI führt die Entscheidung dann über das `decide_proposal`-MCP-Tool aus. Der Browser-Weg über die LiveView bleibt als Alternative, ist aber nicht der einzige Weg. Entscheidend ist das explizite GO durch den Menschen, nicht der Kanal.
+GO kann in der AI-Session (Chat) erteilt werden. Entscheidend ist das explizite GO durch den Menschen, nicht der Kanal. Im ratsprojekte-Hub führt keine KI eine Entscheidung aus: Die KI schlägt über den Connector-Schreibweg vor, der Mensch entscheidet im Hub (ADR 0004).
 
 ### 8. Datenschutz-Grenze
 
@@ -259,7 +259,7 @@ Achtung: `mix credo` und `mix dialyzer` sind **App-Tasks** — am Repo-Root exis
 
 | Werkzeug | Rolle | Befehl |
 |---|---|---|
-| Credo | Linter | Root: `mix workspace.run -t credo -- --strict` (alle Apps; der Ausschluss von ratsprojekte ist mit dem Gerüstwechsel #435 entfallen); App-lokal: `cd apps/<app> && mix credo --strict` |
+| Credo | Linter | Root: `mix workspace.run -t credo -- --strict` (alle Apps); App-lokal: `cd apps/<app> && mix credo --strict` |
 | Dialyzer | Static Type Checker | App-lokal: `cd apps/<app> && mix dialyzer` (Root-Dispatch crasht mit dialyxir im Workspace-Pattern) |
 | mix format | Formatter | `mix format --check-formatted` (Root, deckt alle Apps ab) |
 | mix test | Test-Runner | `mix workspace.run -t test --affected --base origin/main` |
@@ -353,6 +353,9 @@ kommunalpolitik_ki/
 │   ├── sitzungsvorbereitung/   # Sitzungsmappe erstellen (AI: Agent Skill)
 │   ├── bericht_aus_dem_stadtrat/ # Rückblick als Vault-Notiz (AI: Agent Skill)
 │   ├── antrag_generieren/      # Stadtratsantrag entwerfen (AI: Agent Skill)
+│   ├── sprachinventur/         # Fachbegriffe inventieren und vereinheitlichen (AI: Agent Skill)
+│   ├── terminal_screenshot/    # Terminal-Screenshots für READMEs (AI: Agent Skill)
+│   ├── mermaid_vision_loop/    # Mermaid-Diagramme rendern und verbessern (AI: Agent Skill)
 │   └── vault_suche/        # Vault-Volltextsuche (AI: Agent Skill)
 ├── docs/                   # Kanonische Dokumentation
 │   ├── ratsprojekte-lifecycle.md  # Projektlebenszyklus (Mermaid-Chart)
