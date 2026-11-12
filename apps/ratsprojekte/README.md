@@ -7,8 +7,9 @@ anderen bekommen eine bewusst ausgegebene Fassung.
 **Zustand: lokaler Betrieb, Schema, Kontext und Oberfläche.** Phoenix 1.8.16,
 LiveView 1.2.13, Bandit, Tailwind v4, esbuild (Gerüst #435). Schema und Kontext
 stehen (#436), die Oberfläche mit dem Main Flow „Was ist passiert?“ auch (#437),
-beides unten beschrieben. Es folgen der Stand als Druck (#438), die Befragung
-(#439) und der Connector-Schreibweg „Fakt vorschlagen“ (#277). Der lokale
+beides unten beschrieben. Der Stand als Druck steht (#438), es folgen die
+Datei für Maschinen (#438), die Befragung (#439) und der Connector-Schreibweg
+„Fakt vorschlagen“ (#277). Der lokale
 Betrieb (#440) steht, siehe unten. Das Storyboard
 [`storyboard/hub-desktop.html`](storyboard/hub-desktop.html) ist die
 Durchklick-Referenz der Ziel-Oberfläche.
@@ -140,6 +141,9 @@ ruft die Kontexte und kennt die Tabellen nicht:
   Gegenprobe 13.6).
 - `Ratsprojekte.Labels`: die deutschen Namen der Atome (`:drafting` heißt
   „Ausarbeitung“).
+- `Ratsprojekte.Briefings`: der Stand (Fassung für Fraktion und Vorstand,
+  „Neu seit“, Rückblick) und die ausgegebenen Stände; `Ratsprojekte.Settings`
+  hält den Namen der Redaktion.
 
 `mix ecto.setup` trägt über dieselben Kontextfunktionen vier erfundene
 Gartenstadt-Projekte ein (nur Dev; der Hub im Release startet leer).
@@ -162,6 +166,16 @@ Dialog zusätzlich nach Status und Ergebnis.
   braucht), nächster Schritt, Meinungsbild, Fakten, Varianten, Anträge,
   Nutzen und Erfolg, Antragsreife als Checkliste, Verlauf, Querverweise
   mit kopierbarem Vault-Tag, Ablegen und Wieder aufnehmen.
+
+- **Stand** (`/stand`): links das A4-Blatt, das Fraktion und Vorstand
+  bekommen, rechts, was im Hub bleibt (Notizen „Nur ich“, Querverweise,
+  Herkunft), ein Hinweis auf abgelaufene Fristen (im Blatt steht nur das
+  Datum) und „Stand ausgeben“. Das speichert genau dieses Dokument mit
+  Uhrzeit (`/stand/<nr>`, ändert sich nicht mehr), ab dann zählt „Neu seit“.
+  „Drucken“ öffnet den Druckdialog des Browsers, der Hub erzeugt kein PDF.
+  „Rückblick ab“ zeigt dieselbe Fassung ab einem Tag, ohne zu speichern.
+  Den Namen für „Wer ist dran“ und den Fuß des Blatts trägt die Redaktion
+  dort einmal ein, ohne ihn steht dort „Redaktion“.
 
 Die Oberfläche ruft nur die Kontextfunktionen auf. Eine Route, über die eine
 KI im Hub über einen Vorschlag entscheidet (`decide_proposal`), gibt es nicht

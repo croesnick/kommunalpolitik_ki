@@ -9,9 +9,10 @@ defmodule RatsprojekteWeb.HubComponents do
   alias Ratsprojekte.Labels
   alias RatsprojekteWeb.Hub
 
-  @doc "Page frame: header with the hub's name, today and „Neue Idee“."
+  @doc "Page frame: header with the hub's name, the areas, today and „Neue Idee“."
   attr(:flash, :map, required: true)
   attr(:today, Date, required: true)
+  attr(:current, :atom, default: :overview, values: [:overview, :briefing])
   slot(:inner_block, required: true)
 
   def hub(assigns) do
@@ -19,7 +20,8 @@ defmodule RatsprojekteWeb.HubComponents do
     <header class="hub-kopf">
       <.link navigate={~p"/"} class="hub-marke">Ratsprojekte</.link>
       <nav class="hub-nav" aria-label="Bereiche">
-        <.link navigate={~p"/"}>Übersicht</.link>
+        <.link navigate={~p"/"} aria-current={@current == :overview && "page"}>Übersicht</.link>
+        <.link navigate={~p"/stand"} aria-current={@current == :briefing && "page"}>Stand</.link>
       </nav>
       <div class="ml-auto flex items-center gap-3">
         <span class="text-sm text-base-content/60">{Calendar.strftime(@today, "%d.%m.%Y")}</span>

@@ -119,8 +119,10 @@ body { font-family: var(--hub-body); background: var(--color-base-100); line-hei
   padding: 0.65rem max(16px, 1.25rem); border-bottom: 1px solid var(--color-base-300);
 }
 .hub-marke { font-size: 1.15rem; }
-.hub-nav a { padding: 0.25rem 0.65rem; border-radius: 0.4rem; color: var(--color-primary); font-weight: 600;
-  background: color-mix(in oklab, var(--color-primary) 12%, transparent); }
+.hub-nav { display: flex; gap: 0.25rem; }
+.hub-nav a { padding: 0.25rem 0.65rem; border-radius: 0.4rem; color: var(--color-primary); font-weight: 600; }
+.hub-nav a:hover { background: color-mix(in oklab, var(--color-primary) 8%, transparent); }
+.hub-nav a[aria-current="page"] { background: color-mix(in oklab, var(--color-primary) 12%, transparent); }
 .hub-main { max-width: 84rem; margin: 0 auto; padding: 1rem max(16px, 1.25rem) 3rem; }
 .hub-leer { margin-top: 2rem; color: color-mix(in oklab, var(--color-base-content) 70%, transparent); }
 
@@ -183,3 +185,56 @@ body { font-family: var(--hub-body); background: var(--color-base-100); line-hei
   color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
 .hub-mehr > summary { cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--color-primary); margin: 0.4rem 0; }
 :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* The briefing (#438): follows the theme on screen; printed it is always dark ink on white. */
+.hub-buehne { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 64rem) { .hub-buehne { grid-template-columns: minmax(0, 1fr) 20rem; } }
+.hub-panel { padding: 0.9rem 1rem; border: 1px solid var(--color-base-300); border-radius: 0.5rem; font-size: 0.875rem; }
+.hub-hinweis { margin-top: 0.75rem; padding: 0.55rem 0.7rem; border-radius: 0.4rem;
+  background: color-mix(in oklab, var(--color-warning) 14%, transparent); }
+.hub-papier { --paper-ink: var(--color-base-content); --paper-line: var(--color-base-300);
+  --paper-soft: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+  background: var(--color-base-100); color: var(--paper-ink); padding: 1.75rem 2rem; border: 1px solid var(--color-base-300);
+  border-radius: 0.25rem; box-shadow: 0 1px 3px rgb(0 0 0 / 0.08); font-size: 0.9375rem; min-width: 0; max-width: 52rem; }
+@media (max-width: 40rem) { .hub-papier { padding: 1rem; } }
+.hub-papier h1 { font-size: 1.5rem; }
+.hub-papier h2 { font-weight: 700; font-size: 0.8125rem; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--paper-soft); margin-top: 1.1rem; border-bottom: 1px solid var(--paper-line); padding-bottom: 0.2rem; }
+.hub-papier-kopf { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--paper-soft); }
+.hub-papier-leise { color: var(--paper-soft); }
+.hub-papier-zeile { padding: 0.2rem 0; font-size: 0.875rem; }
+.hub-papier-projekt { padding: 0.5rem 0; border-bottom: 1px solid var(--paper-line); }
+.hub-papier-projekt:last-child { border-bottom: 0; }
+.hub-papier-projekt > b { font-size: 1rem; }
+.hub-papier-projekt > p { font-size: 0.875rem; margin-top: 0.1rem; }
+.hub-papier-fuss { margin-top: 1rem; font-size: 0.75rem; color: var(--paper-soft); }
+.hub-ueberblick { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.9rem; }
+.hub-ueberblick div { flex: 1 1 5.5rem; padding: 0.4rem 0.6rem; border: 1px solid var(--paper-line); border-radius: 0.35rem;
+  font-size: 0.75rem; color: var(--paper-soft); }
+.hub-ueberblick b { display: block; font-size: 1.25rem; line-height: 1.2; color: var(--paper-ink); }
+.hub-sgrid { display: grid; grid-template-columns: minmax(7rem, 10.5rem) minmax(0, 1fr); gap: 0.3rem 1rem;
+  margin-top: 0.4rem; font-size: 0.875rem; }
+.hub-sgrid > dt { color: var(--paper-soft); font-weight: 600; }
+.hub-sgrid > dt small { display: block; font-weight: 400; font-size: 0.75rem; }
+.hub-sgrid > dd { margin: 0; min-width: 0; }
+.hub-dran, .hub-ergebnis { width: 100%; border-collapse: collapse; margin-top: 0.3rem; font-size: 0.875rem; }
+.hub-dran th { padding: 0.55rem 0 0.15rem; text-align: left; }
+.hub-dran td, .hub-ergebnis td { padding: 0.2rem 0.8rem 0.2rem 0; border-top: 1px solid var(--paper-line); vertical-align: top; }
+.hub-dran td:first-child { width: 38%; font-weight: 600; }
+.hub-dran td:last-child { padding-right: 0; white-space: nowrap; text-align: right; color: var(--paper-soft); }
+.hub-ergebnis-vert { min-width: 12rem; }
+.hub-papier .hub-vert + div { color: var(--paper-soft); }
+.hub-argumente { margin-top: 0.3rem; padding-left: 1rem; list-style: disc; font-size: 0.8125rem; }
+
+@media print {
+  @page { size: A4; margin: 16mm 15mm; }
+  .hub-kopf, .hub-panel, #flash-group { display: none !important; }
+  body { background: #fff; }
+  .hub-main { max-width: none; padding: 0; }
+  .hub-buehne { display: block; }
+  .hub-papier { --paper-ink: #1c2330; --paper-soft: #5b6574; --paper-line: #dde3ec; background: #fff;
+    max-width: none; padding: 0; border: 0; border-radius: 0; box-shadow: none; font-size: 10.5pt; }
+  .hub-papier h2 { break-after: avoid; }
+  .hub-papier-projekt, .hub-dran tr, .hub-ergebnis tr, .hub-ueberblick { break-inside: avoid; }
+  .hub-vert i { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}

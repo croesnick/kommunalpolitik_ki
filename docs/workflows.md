@@ -181,11 +181,11 @@ alle aktiven Projekte zum Nachschlagen.
 
 | Schritt | Wer, womit | Status |
 |---|---|---|
-| Stand prüfen (Vorschau, abgelaufene Fristen) | Redaktion im Hub | ⚠️ #438 |
-| Stand ausgeben (gespeichert mit Uhrzeit, ab dann zählt „Neu seit“) | Redaktion im Hub | ⚠️ #438 |
-| Als PDF drucken und in den Ordner legen | Redaktion, Druckdialog des Browsers, von Hand | ⚠️ #438 |
+| Stand prüfen (Vorschau, abgelaufene Fristen) | Redaktion im Hub, `/stand` | ✅ |
+| Stand ausgeben (gespeichert mit Uhrzeit, ab dann zählt „Neu seit“) | Redaktion im Hub | ✅ |
+| Als PDF drucken und in den Ordner legen | Redaktion, Druckdialog des Browsers, von Hand | ✅ |
 | Hinweis in den Chat („Neuer Stand vom … liegt im Ordner“) | Redaktion, von Hand, ohne Inhalt | ✅ |
-| Rückblick ab einem Tag als Vorbereitung eines Berichts | Redaktion im Hub, ohne Speichern | ⚠️ #438 |
+| Rückblick ab einem Tag als Vorbereitung eines Berichts | Redaktion im Hub, ohne Speichern | ✅ |
 | Stand in einem komki-Raum nutzen | komki im Projektraum, liest die Datei nach [`schnittstellen/stand.md`](./schnittstellen/stand.md) | ⚠️ #419, Datei mit #438 |
 
 > Der Stand löst das Sheet der Fraktion ab. Es wird am Tag des ersten
