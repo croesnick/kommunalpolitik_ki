@@ -9,7 +9,10 @@ import Config
 
 config :ratsprojekte,
   ecto_repos: [Ratsprojekte.Repo],
-  generators: [timestamp_type: :utc_datetime]
+  generators: [timestamp_type: :utc_datetime],
+  # Lock after 30 minutes without an action in the interface (#440, ADR 0004).
+  # Only in effect where the lock is on (`sperre: true`, the release).
+  sperre_nach: :timer.minutes(30)
 
 # Configure the endpoint
 config :ratsprojekte, RatsprojekteWeb.Endpoint,

@@ -15,8 +15,18 @@ defmodule Ratsprojekte.MixProject do
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      # Fixture migrations of the local-operation tests are no test files.
+      test_ignore_filters: [&String.starts_with?(&1, "test/fixtures/")],
+      releases: releases()
     ]
+  end
+
+  # Local operation (#440, ADR 0004): a release from the checkout, built with
+  # `make ratsprojekte`. rel/ carries vm.args (idle), env.sh (no distribution,
+  # no crash dump) and the `ratsprojekte` command as an overlay.
+  defp releases do
+    [ratsprojekte: [include_executables_for: [:unix]]]
   end
 
   # Configuration for the OTP application.
@@ -71,8 +81,9 @@ defmodule Ratsprojekte.MixProject do
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
-      {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
+      # Seals the database key to the Secure Enclave (#440)
+      {:sealed_envelope, path: "../sealed_envelope"},
       # Zurückgetragen aus dem alten Bestand (#435): Tidewave für Dev-Debugging
       # (AGENTS.md „Debugging‟), Sobelow als Security-Audit mit CI-Gate,
       # Credo als Linter. Der Dev-MCP-Endpoint (anubis_mcp) entfällt laut

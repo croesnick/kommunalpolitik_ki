@@ -1,4 +1,4 @@
-.PHONY: test lint format ci deps elixir-test python-test install komki komki-tresor komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview
+.PHONY: test lint format ci deps elixir-test python-test install ratsprojekte komki komki-tresor komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview
 
 # Escript bauen und nach /usr/local/bin symlinken.
 # Workspace-Pattern: mix.exs der ratsinfo-App referenziert ../artifacts/deps
@@ -23,6 +23,21 @@ komki: komki-tresor
 	@echo ""
 	@echo "komki gebaut: $(KOMKI_LINK_DIR)/komki"
 	@echo "Weiter mit: komki setup"
+
+# ratsprojekte-Hub als Release aus dem Checkout (Ticket #440, ADR 0004): Assets,
+# Release, komki-tresor nach bin/ (der Hub versiegelt seinen Datenbank-Schlüssel
+# damit) und der Befehl `ratsprojekte` im PATH. Danach einmalig
+# `ratsprojekte einrichten` und `ratsprojekte launchagent an`.
+RATSPROJEKTE_REL = $(PWD)/apps/ratsprojekte/_build/prod/rel/ratsprojekte
+ratsprojekte: komki-tresor
+	@cd apps/ratsprojekte && MIX_ENV=prod mix deps.get >/dev/null && MIX_ENV=prod mix compile \
+	  && MIX_ENV=prod mix assets.setup >/dev/null && MIX_ENV=prod mix assets.deploy >/dev/null \
+	  && MIX_ENV=prod mix release --overwrite --quiet
+	@cp apps/komki_cli/priv/komki-tresor "$(RATSPROJEKTE_REL)/bin/komki-tresor"
+	@mkdir -p "$(KOMKI_LINK_DIR)"
+	@ln -sf "$(RATSPROJEKTE_REL)/bin/ratsprojekte-befehl" "$(KOMKI_LINK_DIR)/ratsprojekte"
+	@echo "ratsprojekte gebaut: $(KOMKI_LINK_DIR)/ratsprojekte"
+	@echo "Läuft der Hub schon: ratsprojekte launchagent an (startet ihn neu)"
 
 # komki-tresor: versiegelt Geheimnisse mit der Secure Enclave (Swift, weil
 # Erlang die Enclave nicht erreicht; Quelle apps/komki_cli/native). komki

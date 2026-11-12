@@ -10,7 +10,7 @@ defmodule KomkiCli.CLI do
 
       komki version
       komki setup [--demo] [--vault-dir PATH] [--gguf-from PATH] [--drafter-from PATH] [--port N]
-      komki secret set NAME | komki secret list
+      komki secret set NAME | komki secret list | komki secret erzeugen NAME
       komki journal verify
       komki init  [--gguf-from PATH] [--drafter-from PATH] [--port N] [--ctx N]
                   [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--web-mock-port N] [--force]
@@ -230,7 +230,20 @@ defmodule KomkiCli.CLI do
               ]
             ]
           ],
-          list: [name: "list", description: "erwartete Schlüssel und ob sie vorhanden sind"]
+          list: [name: "list", description: "erwartete Schlüssel und ob sie vorhanden sind"],
+          erzeugen: [
+            name: "erzeugen",
+            description:
+              "Token neu erzeugen, versiegelt ablegen und nur seinen SHA-256 ausgeben " <>
+                "(z.B. 'komki secret erzeugen ratsprojekte-hub | ratsprojekte connector-token')",
+            args: [
+              name: [
+                value_name: "NAME",
+                required: true,
+                help: "Kurzname eines Tokens, den komki selbst erzeugt"
+              ]
+            ]
+          ]
         ]
       ],
       journal: [
@@ -656,6 +669,7 @@ defmodule KomkiCli.CLI do
   defp dispatch_group(:label, tail, result), do: dispatch_label_tail(tail, result)
   defp dispatch_group(:secret, [:set], result), do: secret_set(result.args.name)
   defp dispatch_group(:secret, [:list], _result), do: secret_list()
+  defp dispatch_group(:secret, [:erzeugen], result), do: secret_erzeugen(result.args.name)
   defp dispatch_group(:journal, [:verify], _result), do: render(KomkiCli.Steps.journal_verify())
 
   defp dispatch_label_tail([sub], result) do
@@ -776,6 +790,40 @@ defmodule KomkiCli.CLI do
         names = Enum.map_join(KomkiCli.Secrets.all(), ", ", & &1.name)
         {"unbekannter Schlüssel '" <> name <> "'; bekannt: " <> names <> "\n", 2}
     end
+  end
+
+  # Only the hash goes to stdout, so it can be piped into the hub; notes go
+  # to stderr (#440).
+  defp secret_erzeugen(name) do
+    case KomkiCli.Secrets.fetch(name) do
+      {:ok, entry} -> secret_erzeugen(entry, KomkiCli.Secrets.erzeugen(entry))
+      :error -> {erzeugbar_hinweis("unbekannter Schlüssel '" <> name <> "'"), 2}
+    end
+  end
+
+  defp secret_erzeugen(entry, {:ok, hash}) do
+    IO.puts(
+      :stderr,
+      "Neuer Token versiegelt im Schlüsselbund ('" <>
+        entry.service <> "'); ausgegeben wird nur sein SHA-256"
+    )
+
+    {hash <> "\n", 0}
+  end
+
+  defp secret_erzeugen(entry, {:error, :not_generable}),
+    do: {erzeugbar_hinweis("'" <> entry.name <> "' erzeugt komki nicht selbst"), 2}
+
+  defp secret_erzeugen(entry, {:error, error}),
+    do: {KomkiCli.Secrets.describe(entry.service, error) <> "\n", 2}
+
+  defp erzeugbar_hinweis(text) do
+    names =
+      KomkiCli.Secrets.all()
+      |> Enum.filter(&(&1.service in KomkiCli.Secrets.erzeugbar()))
+      |> Enum.map_join(", ", & &1.name)
+
+    text <> "; erzeugen lassen sich: " <> names <> "\n"
   end
 
   defp secret_list do

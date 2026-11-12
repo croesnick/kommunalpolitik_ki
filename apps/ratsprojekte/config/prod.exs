@@ -8,20 +8,11 @@ import Config
 config :ratsprojekte, RatsprojekteWeb.Endpoint,
   cache_static_manifest: "priv/static/cache_manifest.json"
 
-# Force using SSL in production. This also sets the "strict-security-transport" header,
-# known as HSTS. If you have a health check endpoint, you may want to exclude it below.
-# Note `:force_ssl` is required to be set at compile-time.
-config :ratsprojekte, RatsprojekteWeb.Endpoint,
-  force_ssl: [
-    rewrite_on: [:x_forwarded_proto],
-    exclude: [
-      # paths: ["/health"],
-      hosts: ["localhost", "127.0.0.1"]
-    ]
-  ]
-
-# Do not print debug messages in production
-config :logger, level: :info
+# The hub serves plain HTTP on 127.0.0.1:4100 only (#440, ADR 0004); there
+# is no TLS to force. Logs carry no contents: level :warning, and
+# Ratsprojekte.Logfilter strips the message of everything not declared
+# content-free.
+config :logger, level: :warning
 
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

@@ -7,28 +7,49 @@ defmodule Ratsprojekte.Application do
 
   @impl true
   def start(_type, _args) do
-    # Die Datenbankdatei liegt außerhalb des Projekts (ADR 0004), und SQLite
-    # legt keine Parent-Verzeichnisse an. In Dev sorgt config/dev.exs dafür,
-    # hier ist es der Weg für den Release-Boot (#440).
-    ensure_database_dir()
-
-    children = [
-      RatsprojekteWeb.Telemetry,
-      Ratsprojekte.Repo,
-      {Ecto.Migrator,
-       repos: Application.fetch_env!(:ratsprojekte, :ecto_repos), skip: skip_migrations?()},
-      {DNSCluster, query: Application.get_env(:ratsprojekte, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: Ratsprojekte.PubSub},
-      # Start a worker by calling: Ratsprojekte.Worker.start_link(arg)
-      # {Ratsprojekte.Worker, arg},
-      # Start to serve requests, typically the last entry
-      RatsprojekteWeb.Endpoint
-    ]
+    children =
+      [
+        RatsprojekteWeb.Telemetry,
+        {Phoenix.PubSub, name: Ratsprojekte.PubSub}
+      ] ++
+        datenbank(Application.get_env(:ratsprojekte, :sperre, false)) ++
+        [RatsprojekteWeb.Endpoint]
 
     # See https://elixir.hexdocs.pm/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Ratsprojekte.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  # Release (#440, ADR 0004): start locked. The repo starts only with the key,
+  # under Ratsprojekte.RepoSupervisor, when `ratsprojekte open` unlocks.
+  defp datenbank(true) do
+    home = Ratsprojekte.Ort.home()
+    Ratsprojekte.Ort.anlegen!(home)
+
+    if Application.get_env(:ratsprojekte, :inhaltsfreie_logs, false),
+      do: Ratsprojekte.Logfilter.installieren()
+
+    [
+      {DynamicSupervisor, name: Ratsprojekte.RepoSupervisor, strategy: :one_for_one},
+      {Ratsprojekte.Sperre,
+       home: home,
+       provider: Ratsprojekte.CLI.provider(),
+       sperre_nach: Application.fetch_env!(:ratsprojekte, :sperre_nach)},
+      {Ratsprojekte.Verwaltung, pfad: Ratsprojekte.Ort.verwaltung(home)},
+      {RatsprojekteWeb.Connector, home: home}
+    ]
+  end
+
+  # Dev and test: no real data, the repo runs without a key from the start.
+  # SQLite creates no parent directories.
+  defp datenbank(false) do
+    case Ratsprojekte.Repo.config()[:database] do
+      nil -> :ok
+      path -> path |> Path.dirname() |> File.mkdir_p!()
+    end
+
+    [Ratsprojekte.Repo]
   end
 
   # Tell Phoenix to update the endpoint configuration
@@ -37,17 +58,5 @@ defmodule Ratsprojekte.Application do
   def config_change(changed, _new, removed) do
     RatsprojekteWeb.Endpoint.config_change(changed, removed)
     :ok
-  end
-
-  defp skip_migrations? do
-    # By default, sqlite migrations are run when using a release
-    System.get_env("RELEASE_NAME") == nil
-  end
-
-  defp ensure_database_dir do
-    case Ratsprojekte.Repo.config()[:database] do
-      nil -> :ok
-      path -> path |> Path.dirname() |> File.mkdir_p!()
-    end
   end
 end
