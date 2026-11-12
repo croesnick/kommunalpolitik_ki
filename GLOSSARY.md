@@ -31,55 +31,141 @@ nicht priorisiert).
 
 ### Ratsprojekt
 
-**Definition:** Ein politisches Projekt, das im ratsprojekte-Dashboard
-erfasst ist: mit Realisierungssträngen, Vorbedingungen, Quellen, Status und
-Beschlussvorschlag. Ein Ratsprojekt ist das strukturierte Distillat, nicht
-das Rohmaterial.
+**Definition:** Ein politisches Vorhaben auf dem Weg von der Idee zum Antrag
+und weiter bis zur Umsetzung, geführt im ratsprojekte-Hub. Es hat eine
+[Phase](#phase), einen nächsten Schritt, einen Verlauf und kann in einer
+[Ablage](#phase) liegen. Dazu kommen Meinungsbilder, [Fakten](#fakt),
+[Varianten](#variante), Anträge und Querverweise.
 
-**Wo:** In ratsprojekte (Datenbank + LiveView + MCP).
+**Wo:** Im Hub (`apps/ratsprojekte`, Kontext `Ratsprojekte.Projects`). Eine
+Idee darf dort entstehen, ohne dass es eine Vault-Notiz gibt.
 
 **Slug:** Jedes Ratsprojekt hat einen Slug (`/projekte/{slug}`), der
 gleichzeitig Vault-Tag ist (`#ratsprojekt/{slug}`). Siehe AGENTS.md §
 Slug-Konvention.
 
-**Vault-Notiz:** Jedes Ratsprojekt hat eine eigene Notiz im Vault. Dort
-werden Recherchen, Emails, Fördermittel-Reports etc. angehängt. Der
-Datenfluss ist einseitig: Vault → ratsprojekte.
+**Lebenszyklus:** [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md).
 
-**Verwandt:** Realisierungsstrang, Vorbedingung, Proposal, Antragsreife.
+**Siehe:** [ADR 0004](docs/adr/0004-ratsprojekte-als-lokaler-hub.md).
+
+---
+
+### Phase
+
+**Definition:** Wo ein Ratsprojekt auf dem Weg zum Antrag steht: Idee,
+Meinungsbildung, Ausarbeitung, Im Rat, Umsetzung. Phasen sind frei
+wechselbar, weil der echte Ablauf Schleifen hat; den Grund hält der Verlauf
+fest, nicht eine Sperre im Code.
+
+**Ablage:** Daneben kann ein Ratsprojekt in einer Ablage liegen: Ruht,
+Verworfen oder Abgeschlossen. Dann ist es nicht mehr aktiv und behält seine
+Phase. Ablegen und Wiederaufnehmen brauchen einen Grund.
+
+**Nicht:** Status (so hieß es im alten Modell mit `idee`/`aktiv`). „Ablage“
+heißt im Hub auch der Ort, an dem ein Antragstext liegt (Querverweis).
+
+**Siehe:** ADR 0004, „Das Modell ist klein“;
+[`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md).
+
+---
+
+### Kreis
+
+**Definition:** Eine Gruppe von Menschen, die der Hub unterscheidet. Für die
+Fassungen ist ein Kreis, wer eine bestimmte Fassung zu sehen bekommt:
+[Redaktion](#redaktion) (Arbeitsansicht), [Engerer Kreis](#engerer-kreis)
+(Stand), Basis (Befragungstexte), Öffentlichkeit (eingereichter Antrag und
+Beschluss). Bei Meinungsbildern sagt der Kreis, wessen Meinung es ist:
+Fraktion, Vorstand, Basis oder Externe.
+
+**Nicht:** Persona (ein Mensch mit einem Ziel), Entscheidungsrecht (gehört
+einem Gremium, etwa der Fraktion). Rechte je Eintrag gibt es nicht, nur feste
+Fassungen.
+
+**Siehe:** ADR 0004, „Personas, Kreise und Entscheidungsrechte sind getrennt“.
+
+---
+
+### Redaktion
+
+**Definition:** Die Person, die den Hub führt. Sie sieht die Arbeitsansicht
+mit allem, auch privaten Einträgen und Querverweisen, trägt ein, übernimmt
+Vorschläge aus komki oder lehnt sie ab und entscheidet bei jeder Ausgabe, ob
+ein Stand weitergeht.
+
+**Nicht:** Ein Gremium. Die Redaktion trägt Entscheidungen von Fraktion und
+Vorstand ein, trifft sie aber nicht.
+
+**Siehe:** ADR 0004, Tabellen der Kreise und Entscheidungsrechte.
+
+---
+
+### Engerer Kreis
+
+**Definition:** Fraktion und Vorstand. Sie bekommen den
+[Stand](#stand): was neu ist, wer dran ist, Entscheidungen, Meinungsbilder,
+Fakten und Anträge.
+
+**Nicht:** Basis (bekommt nur die Texte einer Befragung), Externe wie
+Elternbeirat, Vereine oder andere Fraktionen (bekommen nichts aus dem Hub).
+
+**Siehe:** ADR 0004, „Personas, Kreise und Entscheidungsrechte sind getrennt“.
+
+---
+
+### Fakt
+
+**Definition:** Eine Aussage zu einem Ratsprojekt mit Beleg (Fundstelle und
+Quelle), Abrufdatum und Prüfstatus. Was die KI findet, gilt als nicht
+verifiziert, bis ein Mensch die Fundstelle nachgeschlagen hat. URL und
+Abrufdatum eines Fakts aus komki setzt der Vermittler aus dem Journal ein,
+nicht der Agent.
+
+**Nicht:** Quelle (die Herkunft, auf die sich ein Fakt stützt).
+
+**Siehe:** ADR 0004, „Das Modell ist klein“; Schreibweg
+[`docs/schnittstellen/connector-socket.md`](docs/schnittstellen/connector-socket.md).
+
+---
+
+### Variante
+
+**Definition:** Eine Alternative zum selben Ziel eines Ratsprojekts, mit
+Kennbuchstabe, Vorbedingungen und dem Status offen, gewählt oder verworfen
+samt Grund.
+
+**Nicht:** Realisierungsstrang (so hieß sie im alten Modell).
+
+**Siehe:** ADR 0004, „Das Modell ist klein“.
 
 ---
 
 ### Realisierungsstrang
 
-**Definition:** Ein möglicher Weg, ein Ratsprojekt umzusetzen. Jedes
-Ratsprojekt hat mindestens einen, oft mehrere (A/B/C), die parallel
-verfolgt oder gegeneinander abgewogen werden. Jeder Strang hat eine
-rechtliche Grundlage, eine Bedingung und geordnete Schritte.
-
-**Wo:** In ratsprojekte, verknüpft mit einem Ratsprojekt.
+**Definition:** Der frühere Name der [Variante](#variante), aus dem Modell vor
+dem Hub. Neue Texte sagen Variante.
 
 ---
 
 ### Vorbedingung
 
 **Definition:** Eine rechtliche oder sachliche Voraussetzung, die erfüllt
-sein muss, bevor ein Realisierungsstrang weiterverfolgt werden kann.
-Vorbedingungen können erfüllt oder offen sein. Der Status wird manuell
-gesetzt (GO-Prinzip).
+sein muss, bevor eine [Variante](#variante) weiterverfolgt werden kann:
+Rechtsgrundlage oder Voraussetzung, erfüllt oder offen. Ein Mensch setzt den
+Status im Hub.
 
-**Wo:** In ratsprojekte, verknüpft mit einem Realisierungsstrang.
+**Wo:** Im Hub, an einer Variante.
 
 ---
 
 ### Vault
 
-**Definition:** Der Obsidian-Vault des Stadtrats. Source of Truth — roh,
-unstrukturiert, alles. Notizen, Emails, Recherchen, Bürgeranliegen,
+**Definition:** Der Obsidian-Vault des Stadtrats. Quelle für Material — roh,
+unstrukturiert, alles: Notizen, Emails, Recherchen, Bürgeranliegen,
 Sitzungsmappen. Der Vault ist das Gedächtnis.
 
-**Datenfluss:** Vault → ratsprojekte (einseitig). Nie umgekehrt. Siehe
-AGENTS.md §10.
+**Verhältnis zum Hub:** Der Vault ist Quelle für das Material, der Hub für den
+Stand. Der Hub schreibt nie in den Vault. Siehe AGENTS.md §10.
 
 **Vault-Tag:** `#ratsprojekt/{slug}` verknüpft Vault-Notizen mit
 Ratsprojekten.
@@ -88,13 +174,9 @@ Ratsprojekten.
 
 ### Destillat
 
-**Definition:** Das konsolidierte, strukturierte Ergebnis, das aus dem
-rohen Vault-Material destilliert wurde und in ratsprojekte einfließt. Ein
-Destillat ist quellenbelegt, antragsreif (oder explizit nicht) und auf
-einen Realisierungsstrang bezogen.
-
-**Beziehung:** Vault = Source of Truth (roh), ratsprojekte = Destillat
-(strukturiert).
+**Definition:** Im Modell vor dem Hub das konsolidierte Ergebnis, das aus dem
+Vault in ratsprojekte floss. Seit ADR 0004 abgelöst: Der Hub führt den
+[Stand](#stand), kein Destillat, und Menschen schreiben direkt hinein.
 
 **Sprache:** Kanonisch „Destillat“ (Duden/DWDS); die frühere Schreibweise
 „Distillat“ ist eine Fehlform und wurde am 2026-10-14 im Korpus ersetzt.
@@ -109,42 +191,49 @@ Nextcloud-Kollaborationsplattform („Projekt-Kondensat“), das
 
 **Abgrenzung:** Kondensat ≠ Destillat. Das Kondensat ist ein Zwischenstand
 aus geteilten Tabellen (Input für den Delta-Abgleich); das Destillat ist
-das konsolidierte Ergebnis, das aus dem Vault in ratsprojekte fließt. Das
+das konsolidierte Ergebnis, das im alten Modell aus dem Vault in ratsprojekte floss. Das
 Kondensat liefert Vergleichsdaten, keine Projekte.
+
+**Stand:** Entfällt mit dem Hub. Das Sheet der Fraktion wird am Tag des ersten
+ausgegebenen Stands eingefroren (ADR 0004, #54).
+
+---
+
+### Vorschlag
+
+**Definition:** Was komki dem Hub über den Connector anbietet: genau ein
+Ereignis mit Teilen, nach einem GO in komki. Im Hub entscheidet die
+[Redaktion](#redaktion), welche Teile zum Stand passen. Abgewählte Teile
+werden gelöscht, der Verlauf hält nur fest, dass einer nicht übernommen wurde.
+
+**Nicht:** Antrag (der Stadtratsantrag ins RIS). Ein offener Vorschlag ist für
+komki unsichtbar, auch als Anzahl.
+
+**Siehe:** ADR 0004, „Menschen schreiben direkt, die KI schlägt vor“;
+[`docs/schnittstellen/connector-socket.md`](docs/schnittstellen/connector-socket.md).
 
 ---
 
 ### Proposal
 
-**Definition:** Ein Vorschlag der KI, der in der
-`pending_proposals`-Tabelle von ratsprojekte liegt und auf GO
-(Genehmigung) durch den Stadtrat wartet. Die KI schlägt vor, der Mensch
-entscheidet (GO-Prinzip).
+**Definition:** Im Modell vor dem Hub ein Vorschlag der KI in der Tabelle
+`pending_proposals`, über den im Chat per `decide_proposal` entschieden wurde.
+Beides ist mit ADR 0004 entfallen; an seine Stelle tritt der
+[Vorschlag](#vorschlag), über den die Redaktion im Hub entscheidet.
 
-**Typen:** `add_projekt` | `add_realisierungsstrang` | `change_status` |
-`projekt_update` | `strang_update`.
-
-**Status:** `pending` → `approved` | `rejected` (einmalig, irreversibel).
-
-**Abgrenzung:** Proposal ≠ Antrag. Das Proposal ist der interne
-ratsprojekte-Vorschlag mit GO-Gate (Tabelle `pending_proposals`); der
-Antrag ist der Stadtratsantrag ins Ratsinformationssystem. „Antragsreife“
-bewertet ein Ratsprojekt bzw. sein Proposal — nie den Stadtratsantrag.
-
-**Sprache:** Proposal bleibt der Repo-Term (Code-Vokabular: `PendingProposal`,
-`decide_proposal`). Der Nachbarbegriff der deutschen ITIL-Terminologie lautet
-„Change-Vorschlag“, ist aber ITIL-methodisch vorgeprägt. „Änderungsantrag“ ist
-tabu — kollidiert mit dem Stadtrats-Änderungsantrag.
+**Sprache:** „Änderungsantrag“ ist tabu — kollidiert mit dem
+Stadtrats-Änderungsantrag.
 
 ---
 
 ### GO
 
-**Definition:** Das explizite Go (Genehmigung) des Stadtrats, ohne das die
-KI keine schreibenden oder entscheidenden Aktionen ausführt. GO kann im
-Chat erteilt werden — die KI führt es dann über das `decide_proposal`-MCP-
-Tool aus. GO ist nicht nur Arbeitsregel, sondern ethische Architektur:
-demokratische Verantwortung bleibt beim Menschen.
+**Definition:** Das explizite Go (Genehmigung) des Menschen, ohne das die
+KI keine schreibenden oder entscheidenden Aktionen ausführt. GO ist nicht nur
+Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt
+beim Menschen. In komki erteilt die nutzende Person das GO im Freigabefenster;
+im Hub entscheidet die Redaktion selbst, eine KI führt dort keine
+Entscheidung aus.
 
 **Siehe:** AGENTS.md §7.
 
@@ -152,25 +241,25 @@ demokratische Verantwortung bleibt beim Menschen.
 
 ### Antragsreife
 
-**Definition:** Der Reifegrad eines Ratsprojekts oder Proposals. Wird über
-Hard Gates (quellen_vorhanden, adressat_gesetzt, beschlussvorschlag_konkret,
-realisierungsstrang_vorhanden, vorbedingungen_erfuellt,
-value_proposition_vorhanden, success_metrics_vorhanden) deterministisch
-geprüft. Drei Stufen: `nicht_antragsreif` / `antragsreif` /
-`antragsreif_mit_vorbehalten`.
+**Definition:** Eine Checkliste im Hub, die zeigt, wie weit ein Ratsprojekt
+für einen Antrag ist: Nutzen, Erfolgsmaß, Beschlussvorschlag, Adressat,
+verifizierte Fakten, gewählte Variante und erfüllte Vorbedingungen, Festlegung
+der Fraktion. Sie sperrt nichts; ob ein Antrag eingereicht wird, entscheidet
+die Fraktion.
 
-**Siehe:** `ratsprojekt_proposal`-Skill, `check_antragsreife`-MCP-Tool.
+**Siehe:** [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md),
+Abschnitt „Antragsreife“.
 
 ---
 
 ### Beschlussvorschlag
 
 **Definition:** Der konkrete Text, der als Beschlussvorschlag in eine
-Sitzung eingebracht wird. Muss > 20 Zeichen haben, sachlich formuliert
-sein und einen klaren Adressaten haben (Stadtrat, Bürgermeister,
-Vergabeausschuss).
+Sitzung eingebracht wird. Sachlich formuliert, mit klarem Adressaten
+(Stadtrat, Bürgermeister, Vergabeausschuss).
 
-**Wo:** In ratsprojekte als Feld am Ratsprojekt.
+**Wo:** Im Hub als Feld am Antrag (`motion_text`). Der Antragstext selbst
+liegt nicht im Hub.
 
 ---
 
@@ -362,8 +451,10 @@ Eigenständig und austauschbar; der Hub kennt weder Namen noch Adresse.
 
 ### Befragung
 
-**Definition:** Eine Frage an einen Kreis zu mehreren Themen. Sie ist der
-Übergabepunkt zwischen Hub und Beteiligungsplattform.
+**Definition:** Eine Frage an einen Kreis zu mehreren Themen. Im Hub bündelt
+sie mehrere Ratsprojekte, mit Frist. Sie ist der Übergabepunkt zwischen Hub und
+Beteiligungsplattform und läuft erst, wenn die Redaktion das Hochladen bestätigt
+hat. Danach bleibt sie als Ergebnisseite stehen, in der Reihenfolge der Ideen.
 
 **Nicht:** Umfrage, Abstimmung, Runde.
 
@@ -659,9 +750,12 @@ Vorbereitung, nicht weitergegeben).
 
 **Definition:** Die Fassung des Stands, die komki lesen darf. Sie enthält nur
 ausdrücklich erlaubte Felder, also weder private Einträge noch Querverweise,
-offene Vorschläge oder fremden Text.
+offene Vorschläge oder fremden Text. Der Hub schreibt sie beim Ausgeben eines
+Stands als Datei, versiegelt für komki; öffnen kann sie nur komki mit Touch ID.
 
 **Nicht:** Stand (die Fassung für Fraktion und Vorstand, sie zeigt auch Argumente).
+
+**Siehe:** [`docs/schnittstellen/stand.md`](docs/schnittstellen/stand.md).
 
 ---
 
