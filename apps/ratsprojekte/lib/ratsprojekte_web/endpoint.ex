@@ -11,6 +11,9 @@ defmodule RatsprojekteWeb.Endpoint do
     same_site: "Lax"
   ]
 
+  # Only `localhost` and `127.0.0.1` (#440, ADR 0004), before anything else.
+  plug(RatsprojekteWeb.HostPruefung)
+
   socket("/live", Phoenix.LiveView.Socket,
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]

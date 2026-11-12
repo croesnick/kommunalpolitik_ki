@@ -4,12 +4,12 @@ Der lokale Hub für den Weg von der Idee zum Antrag ([ADR 0004](../../docs/adr/0
 Phoenix LiveView, läuft lokal für eine Person — die Redaktion führt, alle
 anderen bekommen eine bewusst ausgegebene Fassung.
 
-**Zustand: Gerüst.** Dieses App ist das frische Phoenix-Grundgerüst
+**Zustand: Gerüst mit lokalem Betrieb.** Dieses App ist das frische Phoenix-Grundgerüst
 (Phoenix 1.8.16, LiveView 1.2.13, Bandit, Tailwind v4, esbuild — der von
 `mix phx.new` gesetzte Stand, Ticket #435). Schema und Kontext baut #436,
 die Oberfläche mit dem Main Flow „Was ist passiert?“ baut #437, der Stand
-als Druck #438, die Befragung #439, der lokale Betrieb (LaunchAgent, Touch
-ID, Unix-Socket) #440 und der Connector-Schreibweg „Fakt vorschlagen“ #277.
+als Druck #438, die Befragung #439 und der Connector-Schreibweg „Fakt
+vorschlagen“ #277. Der lokale Betrieb (#440) steht: siehe unten.
 Das Storyboard [`storyboard/hub-desktop.html`](storyboard/hub-desktop.html)
 ist die Durchklick-Referenz der Ziel-Oberfläche.
 
@@ -30,7 +30,7 @@ statt der mit ratsinfo geteilten (ADR 0004):
 |---|---|---|
 | Dev | `dev.db` | keiner — SQLCipher verhält sich ohne Schlüssel wie normales SQLite |
 | Test | `ratsprojekte_test.db` (app-lokal) | keiner |
-| Release | `ratsprojekte.db` (oder `DATABASE_PATH`) | `RATSPROJEKTE_DB_KEY` — verkabelt in #440 |
+| Release | `ratsprojekte.db` im Home (siehe Betrieb) | versiegelt mit der Secure Enclave, kommt erst mit `ratsprojekte open` |
 
 Dev trägt bewusst keine echten Daten: Mit echten Daten läuft der Hub nie im
 Dev-Modus (ADR 0004, dort hängt Tidewave am Endpoint).
@@ -41,6 +41,66 @@ ratsinfo und komki_cli. Voraussetzung und Nachbau:
 [docs/prerequisites.md](../../docs/prerequisites.md). Der Test
 `Ratsprojekte.SqlcipherTest` schlägt fehl, wenn exqlite ungepatcht gebaut
 wurde.
+
+## Betrieb (Release, #440)
+
+Mit echten Daten läuft der Hub nur als Release (ADR 0004 „Lokal, ohne
+Konten“). Er startet bei der Anmeldung **gesperrt**: ohne Schlüssel, ohne
+offene Datenbank.
+
+```bash
+make ratsprojekte                # Release nach ~/.local/opt/ratsprojekte, Befehl ~/.local/bin/ratsprojekte
+ratsprojekte einrichten          # Schlüssel versiegeln, Wiederherstellungscode EINMAL zeigen, LaunchAgent starten
+komki secret erzeugen ratsprojekte-hub | ratsprojekte connector-token
+```
+
+Im Alltag: `http://localhost:4100` als Lesezeichen öffnen, „Entsperren“
+klicken, Touch ID. Das Terminal braucht es dafür nicht. Ein späteres
+`make ratsprojekte` (aus jedem Checkout) ersetzt die installierte Kopie und
+startet den Hub gesperrt neu; Daten und Siegel bleiben, wo sie sind.
+
+| Befehl | Was passiert |
+|---|---|
+| `einrichten` | Erzeugt den SQLCipher-Schlüssel, versiegelt ihn mit einem eigenen Schlüssel in der Secure Enclave (`komki-tresor`) und zeigt ihn einmal als Wiederherstellungscode. Der gehört in den Passwortmanager. Danach richtet es den LaunchAgent ein und wartet, bis der Hub antwortet. |
+| Sperrseite „Entsperren“ | Im Browser: Der Hub fragt per Touch ID den Schlüssel ab, öffnet die Datenbank und setzt das Session-Cookie im selben Tab. Jeder weitere Klick fragt wieder nach Touch ID. |
+| `open` | Dasselbe aus dem Terminal: Der Browser öffnet sich mit einem Link, der zwei Minuten und genau einmal gilt. |
+| `sperren`, `status` | Sofort sperren, Zustand abfragen. Nach 30 Minuten ohne Handlung in der Oberfläche sperrt der Hub von selbst (`config :ratsprojekte, sperre_nach`). Aufrufe des Connectors zählen nicht. |
+| `connector-token` | Liest den SHA-256 des Tokens von stdin. Den Token erzeugt komki und legt ihn versiegelt im Schlüsselbund ab, der Hub kennt nur den Hash. |
+| `recover` | Versiegelt den Schlüssel aus dem Wiederherstellungscode neu, etwa nach einer Wiederherstellung aus Time Machine auf einem anderen Mac. Danach braucht der Connector einen neuen Token (Zeile oben). |
+| `launchagent an\|aus` | Lädt `~/Library/LaunchAgents/ratsprojekte.hub.plist` neu (macht `einrichten` schon) oder entfernt ihn. Nach einem Absturz startet launchd den Hub neu, wieder gesperrt. |
+
+**Was wo liegt.** Alles in `~/Library/Application Support/ratsprojekte/`
+(Rechte 0700; `RATSPROJEKTE_HOME` setzt für Wegwerf-Instanzen ein anderes
+Verzeichnis, der Pfad darf wegen der Sockets höchstens 87 Bytes lang sein): `ratsprojekte.db` (SQLCipher), `ratsprojekte.db.vor-migration` (die
+Kopie vor der letzten Schemaänderung, nur die letzte bleibt),
+`schluessel.ktv2` (das Siegel), `connector-token.sha256`, und die Sockets
+`verwaltung.sock` (für den Befehl) und `connector.sock` (nur
+Connector-Operationen), beide 0600. Log: `~/Library/Logs/ratsprojekte/hub.log`.
+
+**Grenzen, die der Hub selbst zieht.** Die Oberfläche liegt auf
+`127.0.0.1:4100` und nimmt nur Host `localhost` oder `127.0.0.1` an (andere
+bekommen 421). Ohne Cookie zeigt sie nur die Sperrseite; „Entsperren“ ist
+ein Formular mit CSRF-Token, eine fremde Website kann keine Touch-ID-Abfrage
+auslösen (ohne Token 403).
+Der Connector-Socket prüft zuerst den Token, dann die Sperre: gesperrt heißt
+503 „gesperrt“, gepuffert wird nichts. Die BEAM läuft ohne Distribution
+(kein Port, kein Cookie) und ohne Crash-Dump, mit `+sbwt none` auch für
+dirty CPU und IO. Logs nur ab `:warning`, und `Ratsprojekte.Logfilter`
+nimmt jedem Ereignis, das nicht ausdrücklich inhaltsfrei ist, die Meldung.
+Sobelow meldet deshalb „HTTPS Not Enabled“ — bewusst ignoriert
+(`.sobelow-conf`): Der Hub spricht nur HTTP auf Loopback.
+
+**Gemessen am Release (12.11.2026, gesperrt, Mac mit 10 Kernen):** Leerlauf
+rund 168 MB RSS (155 MB Physical Footprint), CPU im Mittel 0,08 % über eine
+Minute. Weniger Scheduler sparen nur rund 9 MB und bleiben deshalb aus.
+
+**Sicherung.** Time Machine auf einer verschlüsselten Platte sichert das
+Verzeichnis mit; sie sieht nur Chiffretext (Beobachter `sicherung` in Γ).
+Fällt der Rechner aus: aus Time Machine wiederherstellen,
+`ratsprojekte recover`, neuen Connector-Token erzeugen.
+
+Gegen Prozesse im eigenen Benutzerkonto schützt das nur begrenzt: Solange
+der Hub entsperrt ist, liegt der Schlüssel im Speicher (ADR 0004).
 
 ## Regeln, kein Ausrüstungsgegenstand
 
@@ -57,7 +117,7 @@ Zurückgetragen aus dem alten Bestand und verbindlich:
   Repo-Root). Umsetzung in den Routen mit #437.
 - **Vorschlagsweg**: komki schlägt vor, die Redaktion entscheidet. Der Hub
   nimmt von der KI nichts direkt entgegen — der Schreibweg läuft über den
-  Connector-Socket mit Token (#277, vorher #440). `decide_proposal` und der
+  Connector-Socket mit Token (Socket aus #440, Schreibweg #277). `decide_proposal` und der
   Dev-MCP-Endpoint sind entfallen (ADR 0004).
 
 ## Aufbau

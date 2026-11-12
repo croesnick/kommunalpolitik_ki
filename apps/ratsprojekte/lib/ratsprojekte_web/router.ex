@@ -37,18 +37,23 @@ defmodule RatsprojekteWeb.Router do
     plug(:put_secure_browser_headers, %{"content-security-policy" => @content_security_policy})
   end
 
-  pipeline :api do
-    plug(:accepts, ["json"])
+  # The gate (#440, ADR 0004): without the session marker of the current
+  # unlock only the lock page with „Entsperren“. LiveViews of #437 go into a
+  # live_session with `on_mount: RatsprojekteWeb.Zugang`.
+  pipeline :zugang do
+    plug(RatsprojekteWeb.Zugang)
   end
 
   scope "/", RatsprojekteWeb do
     pipe_through(:browser)
 
-    get("/", PageController, :home)
+    get("/zugang/:token", ZugangController, :einloesen)
+    post("/entsperren", ZugangController, :entsperren)
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", RatsprojekteWeb do
-  #   pipe_through :api
-  # end
+  scope "/", RatsprojekteWeb do
+    pipe_through([:browser, :zugang])
+
+    get("/", PageController, :home)
+  end
 end

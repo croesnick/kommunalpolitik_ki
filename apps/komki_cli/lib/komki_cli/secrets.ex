@@ -29,6 +29,10 @@ defmodule KomkiCli.Secrets do
     "ratsprojekte-hub-token" => {"ratsprojekte-hub", "Token des ratsprojekte-Hubs (Unix-Socket)"}
   }
 
+  # Tokens komki generates itself instead of asking for them (#440: komki
+  # creates the hub token, the hub only learns its hash).
+  @erzeugbar ["ratsprojekte-hub-token"]
+
   @doc "Alle erwarteten Geheimnisse, sortiert nach Kurzname."
   @spec all() :: [t()]
   def all do
@@ -104,6 +108,29 @@ defmodule KomkiCli.Secrets do
       Keychain.store(service, sealed, opts)
     end
   end
+
+  @doc "Services whose value komki generates itself (`komki secret erzeugen`)."
+  @spec erzeugbar() :: [String.t()]
+  def erzeugbar, do: @erzeugbar
+
+  @doc """
+  Neuen Token erzeugen, versiegelt ablegen (ersetzt den Eintrag) und den
+  SHA-256 des Klartexts als Hex liefern. Der Hub kennt nur diesen Hash
+  (ADR 0004); den Klartext sieht niemand, er liegt nur als Siegel im
+  Schluesselbund. Nur fuer Services aus `erzeugbar/0`.
+  """
+  @spec erzeugen(t(), keyword()) :: {:ok, String.t()} | {:error, error() | :not_generable}
+  def erzeugen(entry, opts \\ [])
+
+  def erzeugen(%{service: service} = entry, opts) when service in @erzeugbar do
+    token = 32 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
+
+    with :ok <- store(entry, token, opts) do
+      {:ok, Base.encode16(:crypto.hash(:sha256, token), case: :lower)}
+    end
+  end
+
+  def erzeugen(_entry, _opts), do: {:error, :not_generable}
 
   @doc """
   Einen Klartext-Eintrag in sein Siegel umwandeln. Der Eintrag wird in
