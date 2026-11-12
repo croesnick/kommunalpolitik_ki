@@ -186,14 +186,15 @@ body { font-family: var(--hub-body); background: var(--color-base-100); line-hei
 .hub-mehr > summary { cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--color-primary); margin: 0.4rem 0; }
 :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
-/* The briefing (#438): a white A4 sheet in every theme, because it is the paper that goes out. */
+/* The briefing (#438): follows the theme on screen; printed it is always dark ink on white. */
 .hub-buehne { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 64rem) { .hub-buehne { grid-template-columns: minmax(0, 1fr) 20rem; } }
 .hub-panel { padding: 0.9rem 1rem; border: 1px solid var(--color-base-300); border-radius: 0.5rem; font-size: 0.875rem; }
 .hub-hinweis { margin-top: 0.75rem; padding: 0.55rem 0.7rem; border-radius: 0.4rem;
   background: color-mix(in oklab, var(--color-warning) 14%, transparent); }
-.hub-papier { --paper-ink: #1c2330; --paper-soft: #5b6574; --paper-line: #dde3ec;
-  background: #fff; color: var(--paper-ink); padding: 1.75rem 2rem; border: 1px solid var(--color-base-300);
+.hub-papier { --paper-ink: var(--color-base-content); --paper-line: var(--color-base-300);
+  --paper-soft: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+  background: var(--color-base-100); color: var(--paper-ink); padding: 1.75rem 2rem; border: 1px solid var(--color-base-300);
   border-radius: 0.25rem; box-shadow: 0 1px 3px rgb(0 0 0 / 0.08); font-size: 0.9375rem; min-width: 0; max-width: 52rem; }
 @media (max-width: 40rem) { .hub-papier { padding: 1rem; } }
 .hub-papier h1 { font-size: 1.5rem; }
@@ -231,7 +232,8 @@ body { font-family: var(--hub-body); background: var(--color-base-100); line-hei
   body { background: #fff; }
   .hub-main { max-width: none; padding: 0; }
   .hub-buehne { display: block; }
-  .hub-papier { max-width: none; padding: 0; border: 0; border-radius: 0; box-shadow: none; font-size: 10.5pt; }
+  .hub-papier { --paper-ink: #1c2330; --paper-soft: #5b6574; --paper-line: #dde3ec; background: #fff;
+    max-width: none; padding: 0; border: 0; border-radius: 0; box-shadow: none; font-size: 10.5pt; }
   .hub-papier h2 { break-after: avoid; }
   .hub-papier-projekt, .hub-dran tr, .hub-ergebnis tr, .hub-ueberblick { break-inside: avoid; }
   .hub-vert i { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
