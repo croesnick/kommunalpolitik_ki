@@ -105,7 +105,7 @@ Jede Aussage, die ein Tool produziert und politisch relevant ist, braucht eine Q
 
 Die KI entscheidet nichts ohne GO. Keine Triage-Änderung, kein Vault-Eintrag, kein Task-Update ohne Bestätigung. Das ist nicht nur eine Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt beim Menschen. Tools sind read-only by design, wo immer möglich. Die Regel gilt für die Arbeit an Ratsinhalten; die Pflege des GitHub-Boards in Dev-Sessions (Tickets anlegen, kommentieren, Status setzen) braucht kein GO.
 
-GO kann in der AI-Session (Chat) erteilt werden. Entscheidend ist das explizite GO durch den Menschen, nicht der Kanal. Im ratsprojekte-Hub führt keine KI eine Entscheidung aus: Die KI schlägt über den Connector-Schreibweg vor, der Mensch entscheidet im Hub (ADR 0004).
+GO kann in der AI-Session (Chat) erteilt werden. Entscheidend ist das explizite GO durch den Menschen, nicht der Kanal. Für Entscheidungen im ratsprojekte-Hub reicht ein GO im Chat nicht: Dort führt keine KI eine Entscheidung aus. Die KI schlägt über den Connector-Schreibweg vor, der Mensch entscheidet im Hub (ADR 0004). `decide_proposal` gibt es nicht mehr.
 
 ### 8. Datenschutz-Grenze
 
@@ -115,22 +115,23 @@ Nur Zugriff auf das, was als Stadtrat bzw. öffentlich regulär abrufbar ist. Ni
 
 Technische Tools nicht als „AI-Zugriff" oder „ich will RAG bauen" framen, sondern als „strukturierte öffentliche Ratsinformationen", „digitale Arbeitsfähigkeit", „Transparenz".
 
-### 10. Vault = Source of Truth, ratsprojekte = Destillat
+### 10. Vault für Material, Hub für den Stand
 
-Der Obsidian-Vault ist das Gedächtnis — roh, unstrukturiert, alles. ratsprojekte ist das Destillat — konsolidiert, strukturiert, antragsreif, quellenbelegt. Der Datenfluss ist **strikt einseitig**: Vault → ratsprojekte. Nie umgekehrt.
+Vault und ratsprojekte-Hub stehen nebeneinander, jeder ist Quelle für eine eigene Art von Wahrheit (ADR 0004):
 
-- **Vault** ist Source of Truth, nicht ratsprojekte.
-- **ratsprojekte** bekommt nur Destillate, nie Rohmaterial.
-- **Pflicht**: Alles, was in einer AI-Session entsteht, fließt als konsolidierte Notiz zurück in den Vault, *bevor* es als Proposal in ratsprojekte eingereicht wird.
-- **Kein Rückfluss**: ratsprojekte schreibt nie zurück in den Vault. ratsprojekte ist das Endprodukt, nicht der Input.
+- **Vault** ist die Quelle für Material: roh, unstrukturiert, alles. Notizen, Mails, Recherchen, Gesprächsnotizen. Der Vault ist das Gedächtnis.
+- **Hub** ist die Quelle für den Stand: welche Ratsprojekte es gibt, in welcher Phase, wer dran ist, was entschieden ist. Fraktion und Vorstand bekommen ihn als ausgegebenen Stand.
+- **Menschen schreiben direkt in den Hub.** Eine Idee darf dort entstehen, ohne dass es eine Vault-Notiz gibt.
+- **Die KI schlägt nur vor**: aus einem komki-Raum über den Connector, nach GO, und die Redaktion entscheidet im Hub (§7). Material aus dem Vault erreicht den Hub nur auf diesem Weg oder von Hand.
+- **Kein Rückfluss**: Der Hub schreibt nie in den Vault und nie ins RIS.
 
-Der `ratsprojekt_proposal`-Skill orchestriert diesen Workflow: sammeln → konsolidieren (in den Vault) → Gates prüfen → Proposal einbringen.
+Der Slug verbindet beide: `/projekte/{slug}` im Hub, `#ratsprojekt/{slug}` als Vault-Tag.
 
 ### 11. Projektlebenszyklus (kanonisch)
 
-Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Abschluss/Archivierung ist in [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) als Mermaid-Chart dokumentiert. Dieses Dokument ist der **Single Source of Truth für den Projektlebenszyklus** — alle Skills, MCP-Tools und AI-Workflows richten sich nach ihm.
+Der Lebenszyklus eines Ratsprojekts im Hub (Phasen, Ablagen, wer entscheidet, wie Vorschläge aus komki hineinkommen) ist in [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) als Mermaid-Chart dokumentiert. Dieses Dokument ist der **Single Source of Truth für den Projektlebenszyklus** — alle Skills, Connectoren und AI-Workflows richten sich nach ihm. Die Grenzen zu komki stehen in [`docs/schnittstellen/stand.md`](docs/schnittstellen/stand.md) (Lesen) und [`docs/schnittstellen/connector-socket.md`](docs/schnittstellen/connector-socket.md) (Schreiben).
 
-**Pflicht**: Bei Änderungen am Lifecycle (neue States, Übergänge, Gates) wird zuerst das Lifecycle-Dokument aktualisiert, *bevor* Code oder Skills angepasst werden. Jede AI-Session, die Workflow-Änderungen vornimmt, prüft und aktualisiert das Dokument.
+**Pflicht**: Bei Änderungen am Lifecycle (neue Phasen, Ablagen, Regeln für Wechsel) wird zuerst das Lifecycle-Dokument aktualisiert, *bevor* Code oder Skills angepasst werden. Jede AI-Session, die Workflow-Änderungen vornimmt, prüft und aktualisiert das Dokument.
 
 ### Kanonische Dokumentation unter `docs/`
 
@@ -234,7 +235,7 @@ Lokaler Hub für den Weg von der Idee zum Antrag ([ADR 0004](docs/adr/0004-ratsp
 - Ecto + SQLite3 über exqlite, das im Workspace gegen die SQLCipher-Systembibliothek gebaut wird (BSD-Lizenz; gilt auch für ratsinfo und komki_cli). Eigene Datei unter `~/Library/Application Support/ratsprojekte/` statt der geteilten mit ratsinfo; ohne Schlüssel verhält sich SQLCipher wie normales SQLite.
 
 ### Datenmodell
-Das alte Modell (Projekt/Realisierungsstrang/PendingProposal) ist mit dem Gerüstwechsel (#435) gefallen. Das kleine Modell (Ratsprojekt, Verlauf, Meinungsbild, Befragung, Fakt, Variante, Antrag) steht in [ADR 0004](docs/adr/0004-ratsprojekte-als-lokaler-hub.md) und ist als Schema und Kontext gebaut (#436, `Ratsprojekte.Projects` und `Ratsprojekte.Surveys`, Überblick im [README der App](apps/ratsprojekte/README.md#modell)); die kanonischen Dokumente zieht #434 nach.
+Das alte Modell (Projekt/Realisierungsstrang/PendingProposal) ist mit dem Gerüstwechsel (#435) gefallen. Das kleine Modell (Ratsprojekt, Verlauf, Meinungsbild, Befragung, Fakt, Variante, Antrag) steht in [ADR 0004](docs/adr/0004-ratsprojekte-als-lokaler-hub.md) und ist als Schema und Kontext gebaut (#436, `Ratsprojekte.Projects` und `Ratsprojekte.Surveys`, Überblick im [README der App](apps/ratsprojekte/README.md#modell)); Lebenszyklus, Workflows und Glossar beschreiben es (#434).
 
 ### Slug-Konvention
 
@@ -249,7 +250,7 @@ Projekte werden über Slugs identifiziert, nicht über DB-IDs. Der Slug ist der 
 
 ### Roadmap
 
-Das Gerüst steht (#435), die Bau-Reihe aus ADR 0004 läuft über die Tickets #434 (kanonische Dokumente), #436 (Schema und Kontext), #437 (Oberfläche, Main Flow „Was ist passiert?‟), #438 (Stand ausgeben), #439 (Befragung), #440 (lokaler Betrieb) und #277 (Connector-Schreibweg „Fakt vorschlagen‟). Status und laufende Arbeit stehen auf dem GitHub-Board (Feld „Status"); der Projektlebenszyklus in [docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md) beschreibt noch das alte Modell, bis #434 es auf den Hub umzieht.
+Das Gerüst steht (#435), die Bau-Reihe aus ADR 0004 läuft über die Tickets #434 (kanonische Dokumente), #436 (Schema und Kontext), #437 (Oberfläche, Main Flow „Was ist passiert?‟), #438 (Stand ausgeben), #439 (Befragung), #440 (lokaler Betrieb) und #277 (Connector-Schreibweg „Fakt vorschlagen‟). Status und laufende Arbeit stehen auf dem GitHub-Board (Feld „Status"). #438 baut gegen [docs/schnittstellen/stand.md](docs/schnittstellen/stand.md), #277 gegen [docs/schnittstellen/connector-socket.md](docs/schnittstellen/connector-socket.md).
 
 ## Tooling-Vorgaben
 

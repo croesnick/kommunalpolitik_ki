@@ -16,7 +16,7 @@
 ## Begriffe
 
 Siehe [`GLOSSARY.md`](../GLOSSARY.md) für die Definition aller
-Fachbegriffe (Sitzungsmappe, Ratsprojekt, Realisierungsstrang, Vault, etc.).
+Fachbegriffe (Sitzungsmappe, Ratsprojekt, Phase, Variante, Vault, etc.).
 
 ---
 
@@ -33,14 +33,14 @@ bündelt. Die Sitzungsmappe ist ein Vault-Tool, nicht Teil von ratsprojekte.
 |---|---|---|
 | Agenda abrufen (Sitzungen + TOPs) | `ratsinfo sessions --remote` + `ratsinfo show <id>` | ✅ |
 | Vorlagen-PDFs lesen | `pdf_ingest ingest(path)` | ✅ |
-| Querverweis: hängt ein TOP an einem Ratsprojekt? | `ratsinfo search` + `ratsprojekte show_projekt` (Quelle mit RIS-Referenz) | ⚠️ Felder, Anzeige und lesende Tools (#32); automatischer Cross-Check → #33; Erfassung der Referenz nur über Seeds/direkte DB (kein UI-/Proposal-Weg) |
+| Querverweis: hängt ein TOP an einem Ratsprojekt? | `ratsinfo search` + Hub (RIS-Kennung am Antrag) | ⚠️ von Hand; automatischer Cross-Check → #33 |
 | AZ-Artikel zum Thema finden | `allgaeuer_zeitung_mcp search_articles` | ✅ |
 | Vault-Notizen zum Thema | `vault_suche` | ✅ |
 | Sitzungsmappe im Vault erstellen | `obsidian-cli` (externer Skill) | ✅ |
 
 ### Lücken
 
-- **Kein RIS↔Ratsprojekt-Link** — TOPs und Projekte sind isoliert. → #32
+- **Kein automatischer RIS↔Ratsprojekt-Abgleich** — die RIS-Kennung am Antrag trägt die Redaktion von Hand ein. → #33
 
 ### Datenfluss & Trust Boundaries
 
@@ -75,29 +75,35 @@ Vault-Write. Post-Write-Validierung via `pyyaml`. Siehe #53.
 
 ---
 
-## WF 2: Neues Projekt aus Idee entwickeln
+## WF 2: Von der Idee zum Antrag
 
-**Situation:** Bürgerbeschwerde, Zeitungsartikel oder politische Initiative →
-der Stadtrat denkt "das könnte ein Ratsprojekt werden".
+**Situation:** Bürgerbeschwerde, Zeitungsartikel, ein Gespräch am Stammtisch
+oder eine politische Initiative: Jemand denkt „das könnte ein Ratsprojekt
+werden“.
 
-**Ziel:** Eine konsolidierte Vault-Notiz und ein Proposal in ratsprojekte.
+**Ziel:** Die Idee steht im Hub und wandert dort durch die Phasen Idee,
+Meinungsbildung, Ausarbeitung, Im Rat und Umsetzung. Fraktion und Vorstand
+sehen vor jeder Sitzung im ausgegebenen Stand, wo sie steht und wer dran ist.
+Lebenszyklus und Entscheidungsrechte:
+[`ratsprojekte-lifecycle.md`](./ratsprojekte-lifecycle.md).
 
-| Schritt | Tool / Skill | Status |
+| Schritt | Wer, womit | Status |
 |---|---|---|
-| Vault durchsuchen (bestehendes Material) | `vault_suche` | ✅ |
-| Förderrecherche | `foerdermittel_recherche` | ✅ |
-| Lokalberichterstattung | `allgaeuer_zeitung_mcp` | ✅ |
-| RIS-Recherche | `ratsinfo search` | ✅ |
-| Web-Recherche | `web_search` / `web_fetch` | ✅ |
-| Konsolidierte Notiz in Vault schreiben | `obsidian-cli` (externer Skill) | ✅ |
-| Gates prüfen (Antragsreife) | `ratsprojekt_proposal` Skill | ✅ |
-| Proposal einbringen | `propose_projekt` MCP | ✅ |
-| GO erteilen | `decide_proposal` MCP | ✅ |
+| Idee eintragen | Redaktion im Hub („Neue Idee“) | ✅ |
+| Was passiert ist festhalten (Gespräch, Sitzung, Phasenwechsel, nächster Schritt) | Redaktion im Hub, Eintrag „Was ist passiert?“ | ✅ |
+| Meinungsbild eines Kreises eintragen | Redaktion im Hub | ✅ |
+| Basis befragen (Paket raus, Rücklauf rein) | Hub und Beteiligungsplattform über Dateien | ⚠️ Modell steht, Dateien folgen (#439) |
+| Material recherchieren (Vault, RIS, Web, Förderung) | komki im Rechercheraum | ✅ |
+| Fakt mit Quelle vorschlagen | komki über den Connector, nach GO | ⚠️ Socket steht, Schreibweg folgt (#277) |
+| Vorschlag übernehmen oder ablehnen | Redaktion im Hub | ⚠️ mit #277 |
+| Varianten, Vorbedingungen, Antragsreife | Redaktion im Hub, Checkliste sperrt nichts | ✅ |
+| Antrag anlegen und nachtragen (Status, Ergebnis) | Redaktion im Hub; der Antragstext liegt außerhalb | ✅ |
+| Antragstext entwerfen | `antrag_generieren` | ✅ (Neubau als pi-Vorlage: #375) |
 
-> **Hinweis:** Der `ratsprojekt_proposal`-Skill schreibt vor: "Pflicht:
-> konsolidierte Notiz zurück in den Vault". Der `obsidian-cli`-Skill ist als
-> Voraussetzung in [`docs/prerequisites.md`](./prerequisites.md)
-> dokumentiert.
+> **Ohne Proposal-Pipeline:** Menschen schreiben direkt in den Hub, die KI
+> schlägt nur vor. Ein Annehmen aus dem Chat (`decide_proposal`) gibt es nicht
+> mehr (ADR 0004). Der Vault bleibt die Quelle für Material. Eine Idee darf im
+> Hub entstehen, ohne dass es eine Vault-Notiz gibt.
 
 ---
 
@@ -106,14 +112,14 @@ der Stadtrat denkt "das könnte ein Ratsprojekt werden".
 **Situation:** Email vom Bauamt, AZ-Artikel, neue Förderrichtlinie → "was
 ändert das für Projekt X?"
 
-**Ziel:** Ein strukturiertes Delta, das zeigt, welche Vorbedingungen, Quellen
-und Realisierungsstränge sich ändern würden.
+**Ziel:** Ein strukturiertes Delta, das zeigt, welche Vorbedingungen, Fakten
+und Varianten sich ändern würden.
 
 | Schritt | Tool / Skill | Status |
 |---|---|---|
 | Neue Info aufnehmen (Email, Artikel, PDF) | Copy-Paste / `allgaeuer_zeitung_mcp` / `pdf_ingest` | ⚠️ Keine Email-Ingestion (#35) |
-| Projekt-Stand abrufen | `ratsprojekt_stand` / `show_projekt` MCP | ✅ |
-| Delta produzieren | `ratsprojekt_delta` Skill | ✅ |
+| Projekt-Stand abrufen | Hub; in komki der maschinenlesbare Stand | ⚠️ `ratsprojekt_stand` wartet auf #375, Lesen in komki: #419 |
+| Delta produzieren | `ratsprojekt_delta` Skill | ⚠️ wartet auf #375 |
 | AZ-Artikel lesen | `allgaeuer_zeitung_mcp` | ✅ |
 | PDF verarbeiten | `pdf_ingest` | ✅ |
 | RIS-Sitzung nachschlagen | `ratsinfo search` | ✅ |
@@ -140,8 +146,8 @@ RIS-Entwicklungen, die Ratsprojekte betreffen.
 | Schritt | Tool / Skill | Status |
 |---|---|---|
 | Beschluss in RIS finden | `ratsinfo search` | ✅ |
-| Projekt-Status checken | `ratsprojekte show_projekt` | ✅ |
-| Beschluss mit Projekt verlinken | Quelle vom Typ `sitzung` mit `ris_sitzung_id` / `ris_top` / `beschluss_nr` | ⚠️ Felder + Ausgabe in show_projekt/LiveView (#32); Erfassung nur über Seeds/direkte DB — UI-/Proposal-Weg offen |
+| Projekt-Status checken | Hub (Phase, Antragsstand) | ✅ |
+| Beschluss mit Projekt verlinken | Hub: RIS-Kennung und Ergebnis am Antrag | ✅ |
 | Frist-Tracking (Beschlussfrist abgelaufen?) | — | ❌ Keine Fristen-Tabelle, keine Alerts (#34) |
 | RIS-Sync → "was ist neu zu meinen Projekten?" | — | ❌ Kein Diff bei Sync (#33) |
 
@@ -162,14 +168,28 @@ RIS-Entwicklungen, die Ratsprojekte betreffen.
 
 ---
 
-## WF 5: Fraktionsvorbereitung
+## WF 5: Stand für Fraktion und Vorstand
 
-**Situation:** Vor der Fraktionssitzung: Projektübersicht, was steht an,
-Prioritäten setzen.
+**Situation:** Vor der Fraktions- oder Vorstandssitzung: Wo stehen wir, was
+ist neu, wer ist dran? Bisher beantwortet das ein ODS-Sheet und wer gerade
+den Überblick hat.
 
-> **Status:** Für eine kleine Fraktion in einer kleinen Kommune manuell
-> machbar. Nicht priorisiert. Falls die Fraktion wächst oder der Aufwand
-> steigt, kann hier ein Skill nachgelegt werden.
+**Ziel:** Ein ausgegebener Stand liegt im eigenen Nextcloud-Ordner, den
+Fraktion und Vorstand mit persönlichen Konten öffnen. Auf Seite 1 stehen der
+Überblick und „Wer ist dran“, danach „Neu seit“, das frische Meinungsbild und
+alle aktiven Projekte zum Nachschlagen.
+
+| Schritt | Wer, womit | Status |
+|---|---|---|
+| Stand prüfen (Vorschau, abgelaufene Fristen) | Redaktion im Hub | ⚠️ #438 |
+| Stand ausgeben (gespeichert mit Uhrzeit, ab dann zählt „Neu seit“) | Redaktion im Hub | ⚠️ #438 |
+| Als PDF drucken und in den Ordner legen | Redaktion, Druckdialog des Browsers, von Hand | ⚠️ #438 |
+| Hinweis in den Chat („Neuer Stand vom … liegt im Ordner“) | Redaktion, von Hand, ohne Inhalt | ✅ |
+| Rückblick ab einem Tag als Vorbereitung eines Berichts | Redaktion im Hub, ohne Speichern | ⚠️ #438 |
+| Stand in einem komki-Raum nutzen | komki im Projektraum, liest die Datei nach [`schnittstellen/stand.md`](./schnittstellen/stand.md) | ⚠️ #419, Datei mit #438 |
+
+> Der Stand löst das Sheet der Fraktion ab. Es wird am Tag des ersten
+> ausgegebenen Stands eingefroren (ADR 0004).
 
 ---
 
@@ -208,7 +228,7 @@ Vault-Notiz des jeweiligen Ratsprojekts gespeichert wird.
 |---|---|---|
 | PDF herunterladen | `ratsinfo show <id>` zeigt Dokumente, `ratsinfo open <id>` lädt herunter | ✅ |
 | PDF ingesten (Text + Annotationen) | `pdf_ingest ingest(path)` | ✅ |
-| Mit RIS-Sitzung verlinken | Quelle vom Typ `sitzung` mit `ris_sitzung_id` / `ris_top` / `beschluss_nr` | ⚠️ Felder vorhanden (#32); Erfassung nur über Seeds/direkte DB — UI-/Proposal-Weg offen |
+| Mit Ratsprojekt verlinken | Hub: RIS-Kennung am Antrag, Fakt mit Fundstelle | ✅ von Hand |
 | Highlights/Annotationen extrahieren | `pdf_ingest extract_annotations` | ✅ |
 
 ### Lücken
@@ -229,15 +249,15 @@ Vorstandssitzungen verlinkt, damit es dort besprochen wird.
 
 > **Abgrenzung:** Bürgeranliegen sind **nicht** Teil von ratsprojekte. Sie
 > leben im Vault und werden mit Fraktions- und Vorstandssitzungen verlinkt.
-> Falls ein Bürgeranliegen zu einem politischen Projekt reift, kann es über
-> den `ratsprojekt_proposal`-Workflow zum Ratsprojekt werden.
+> Falls ein Bürgeranliegen zu einem politischen Projekt reift, trägt die
+> Redaktion es im Hub als Idee ein (WF 2).
 
 | Schritt | Tool / Skill | Status |
 |---|---|---|
 | Recherche (RIS, AZ, Vault) | Einzelne Tools | ✅ |
 | Anliegen im Vault erfassen | `obsidian-cli` (extern) | ❌ Nicht integriert (#38) |
 | Mit Fraktionssitzung / Vorstandssitzung verlinken | Vault (Wikilinks) | ⚠️ Manuell (#38) |
-| Anliegen → Ratsprojekt eskalieren | `ratsprojekt_proposal` Skill | ✅ (über Umweg) |
+| Anliegen → Ratsprojekt eskalieren | Redaktion im Hub, Idee eintragen | ✅ |
 | Antwort formulieren (Brief/Email) | — | ❌ Kein Draft-Tool |
 
 ### Lücken
@@ -266,15 +286,14 @@ Sitzungsvorbereitung einbeziehen.
 | ODS/Excel-Sheet aus Nextcloud lesen | `nextcloud` (WebDAV) + `nextcloud_ods_mcp` (Parser) | ✅ |
 | Geteilte Dokumente lesen | `nextcloud` (`nc_webdav_read_file`) | ✅ |
 | Dateien hochladen (z.B. Sitzungsmappe) | `nextcloud` (`nc_webdav_write_file`) | ✅ |
-| Nextcloud-Kondensat gegen ratsprojekte halten | ad-hoc / `ratsprojekt_delta` | ⚠️ Keine Pipeline (#54) |
+| Nextcloud-Kondensat gegen ratsprojekte halten | — | entfällt: der Stand löst das Sheet ab (ADR 0004) |
 | Kalender-Termine abrufen | `nextcloud` (`nc_calendar_list_events`) | ✅ |
 
 ### Lücken
 
-- **Nextcloud-Kondensat gegen ratsprojekte:** Noch keine Pipeline. Workflow
-  wäre: ODS herunterladen via `nextcloud`, parsen via `nextcloud_ods_mcp`,
-  gegen `ratsprojekte`-Stand halten via `ratsprojekt_delta`. Bausteine da,
-  Pipeline fehlt. → #54
+- **Nextcloud-Kondensat gegen ratsprojekte:** entfällt. Der ausgegebene Stand
+  löst das ODS-Sheet ab, es wird am Tag des ersten Stands eingefroren
+  (ADR 0004).
 
 > **Parteiübergreifend:** Andere Parteien und Fraktionen nutzen ähnliche
 > Kollaborationsplattformen. Der Workflow ist nicht parteispezifisch —
@@ -400,4 +419,3 @@ https://github.com/croesnick/kommunalpolitik_ki/issues.
 | #38 | Bürgeranliegen-Tracking: Notiz-Template + Tag-Konvention | WF 8 |
 | #41 | Öffentlichkeitsarbeit: Vorbericht/Nachbericht aus Sitzungsdaten generieren | WF 10 |
 | #53 | YAML-Frontmatter-Validierung nach Vault-Write | WF 1, 2, 6, 8 |
-| #54 | Nextcloud-Kondensat-Pipeline: ODS gegen ratsprojekte halten | WF 9 |
