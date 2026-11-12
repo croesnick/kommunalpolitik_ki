@@ -24,17 +24,26 @@ defmodule KomkiCli.ResizeTest do
     mark = Path.join(TestSupport.tmp_area!("komki-resize"), "winch")
 
     port =
-      Port.open({:spawn_executable, "/usr/bin/perl"},
-        args: [
-          "-e",
-          ~S|$SIG{WINCH} = sub { system("echo x >> $ARGV[0]") }; sleep 1 while 1|,
-          mark
+      Port.open(
+        {:spawn_executable, "/usr/bin/perl"},
+        [
+          :binary,
+          args: [
+            "-e",
+            ~S|$SIG{WINCH} = sub { system("echo x >> $ARGV[0]") }; syswrite(STDOUT, "READY\n"); sleep 1 while 1|,
+            mark
+          ]
         ]
       )
 
     {:os_pid, pid} = Port.info(port, :os_pid)
     on_exit(fn -> System.cmd("/bin/kill", ["-KILL", "#{pid}"], stderr_to_stdout: true) end)
-    Process.sleep(200)
+
+    # Keine Startzeit raten: syswrite meldet "READY" erst nach der
+    # $SIG{WINCH}-Installation; vorher stirbt das Signal an perls
+    # Default-Disposition und die Markierung bleibt leer.
+    assert_receive {^port, {:data, ready}}, 5_000
+    assert ready =~ "READY"
 
     assert {:ok, ^pid} = Resize.handle_event(:sigwinch, pid)
     assert await_lines(mark, 1) == 1
