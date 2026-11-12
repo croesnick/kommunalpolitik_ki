@@ -2,14 +2,14 @@
 
 **Formatversion 1.0.0.** Diese Beschreibung ist der Vertrag zwischen dem Hub, der die Datei schreibt (#438), und komki, das sie liest (`rp_stand_lesen`, #419). Quelle ist [ADR 0004](../adr/0004-ratsprojekte-als-lokaler-hub.md), Abschnitte „Der Stand geht als Druck in einen eigenen Ordner“ und „Der Bestand des Hubs trägt genau ein Label“.
 
-Der **maschinenlesbare Stand** ist die Fassung des [Stands](../../GLOSSARY.md#stand), die komki lesen darf. Er enthält nur die Felder, die dieses Dokument erlaubt. Der Hub sieht dabei keine Anfrage: Er schreibt eine Datei, und der ratsprojekte-Connector liest sie.
+Der **maschinenlesbare Stand** ist die Fassung des [Stands](../../GLOSSARY.md#stand), die komki lesen darf. Er enthält nur die Felder, die dieses Dokument erlaubt. Der Hub sieht dabei keine Anfrage: Er schreibt eine versiegelte Datei, und komki öffnet sie.
 
 ```mermaid
 flowchart LR
   R([Redaktion]) -->|Stand ausgeben| H[Hub]
   H -->|Druckansicht| P[PDF im Ordner für Fraktion und Vorstand]
-  H -->|stand.json| D[(Datei)]
-  D -->|rp_stand_lesen, nur im Projektraum| K[komki]
+  H -->|für komki versiegelt| D[(stand.ktv2)]
+  D -->|rp_stand_lesen, nur im Projektraum, Touch ID| K[komki]
 ```
 
 Die Schlüsselwörter MUSS und DARF sind verbindlich gemeint.
@@ -25,22 +25,34 @@ Die Schlüsselwörter MUSS und DARF sind verbindlich gemeint.
    - fremder Text aus Befragungen: Argumente und noch nicht zugeordnete Vorschläge aus einem Rücklauf.
 4. Sichtbar ist, was ein Mensch im Hub selbst geschrieben oder gelesen und gespeichert hat, dazu die Zählungen aus Befragungen (Verteilungen).
 5. Die Datei trägt genau ein Label, `ratsprojekte@1`. Aufnehmen darf sie nur ein Raum mit dieser Bindung, der Projektraum aus #419.
+6. **Die Datei liegt nie im Klartext auf der Platte.** Der Hub versiegelt sie für komki, öffnen kann sie nur komki mit Freigabe per Touch ID. Ist der Hub gesperrt, liegt der Stand damit nirgends lesbar, und Sicherung, Spotlight oder Sync-Werkzeuge sehen nur Chiffretext.
 
 ## Datei
 
 | Eigenschaft | Wert |
 |---|---|
-| Ort | `stand.json` im Verzeichnis des Hubs, also `~/Library/Application Support/ratsprojekte/stand.json` (mit `RATSPROJEKTE_HOME` dort). In komki zeigt der Eintrag `ratsprojekte_stand` der config auf diese Datei. |
-| Inhalt | genau ein JSON-Dokument (RFC 8259), UTF-8 ohne BOM |
-| Größe | höchstens 1 MiB; der Connector weist größere Dateien ab (`too-large`) |
+| Ort | `stand.ktv2` im Verzeichnis des Hubs, also `~/Library/Application Support/ratsprojekte/stand.ktv2` (mit `RATSPROJEKTE_HOME` dort). In komki zeigt der Eintrag `ratsprojekte_stand` der config auf diese Datei. |
+| Inhalt | genau ein Siegel im Format `ktv2` von `sealed_envelope` (eine Zeile ASCII), versiegelt für den Schlüssel von komki in der Secure Enclave. Darin steht das JSON-Dokument aus diesem Vertrag, UTF-8 ohne BOM. |
+| Größe | höchstens 1 MiB für das Siegel; der Connector weist größere Dateien ab (`too-large`) |
 | Art | eine reguläre Datei, kein Symlink; der Connector weist alles andere ab (`forbidden-path`) |
 | Rechte | 0600 |
-| Schreiben | atomar: erst eine temporäre Datei im selben Verzeichnis, dann umbenennen. Jede Ausgabe ersetzt die vorige Datei vollständig. |
+| Schreiben | atomar: erst eine temporäre Datei im selben Verzeichnis, dann umbenennen. Jede Ausgabe ersetzt die vorige Datei vollständig. Klartext entsteht dabei nur im Speicher des Hubs. |
 | Fehlt die Datei | Es wurde noch kein Stand ausgegeben; der Connector antwortet `not-found`. |
 
-Die Datei liegt im Klartext, anders als die Datenbank. Das ist vertretbar, weil sie nichts enthält, was nicht auch im gedruckten Stand bei Fraktion und Vorstand liegt, und weniger als dieser.
-
 Freitext enthält keine unsichtbaren Steuerzeichen, weil der Hub sie schon beim Speichern entfernt. Zeilenumbrüche bleiben erhalten.
+
+### Versiegeln
+
+`ktv2` verschlüsselt mit AES-256-GCM unter einem Schlüssel aus ECDH (P-256) mit einem Wegwerf-Schlüssel und HKDF-SHA256. Die einzige Instanz des Formats ist `SealedEnvelope`; weder Hub noch komki bauen oder zerlegen ein Siegel selbst.
+
+| Schritt | Wer | Was |
+|---|---|---|
+| Empfänger einrichten | nutzende Person | `komki-tresor recipient` gibt Schlüsselreferenz und öffentlichen Schlüssel von komki aus; der Hub übernimmt beides beim Einrichten (Befehl baut #438). Ein Geheimnis ist das nicht. |
+| Empfänger aufbewahren | Hub | in seiner verschlüsselten Datenbank, nicht als Datei daneben. So kann ihn kein Prozess austauschen, solange der Hub gesperrt ist, und den nächsten Stand für einen fremden Schlüssel versiegeln lassen. |
+| Versiegeln | Hub | beim Ausgeben eines Stands mit `SealedEnvelope.seal/2`; dafür braucht er nur den öffentlichen Schlüssel, keine Freigabe |
+| Öffnen | komki | nur über `komki-tresor` mit Freigabe per Touch ID oder Passwort des Macs. Wer in komki öffnet und wie oft gefragt wird, regelt #419. |
+
+Fehlt der Empfänger, gibt der Hub keinen maschinenlesbaren Stand aus und sagt das in der Vorschau. Der gedruckte Stand geht trotzdem. Nach einem neuen Mac oder einem neuen Schlüssel von komki richtet die nutzende Person den Empfänger neu ein. Ältere Siegel lassen sich dann nicht mehr öffnen, der nächste ausgegebene Stand ersetzt sie.
 
 ## Beispiel
 
@@ -237,7 +249,7 @@ Eine falsche Aussage stellt die Redaktion mit einem Eintrag „Korrektur“ rich
 
 ## Lesen
 
-Wer die Datei liest, MUSS `format` prüfen und eine Datei mit anderer Major-Version abweisen. Unbekannte Felder MÜSSEN ignoriert werden. Der Connector selbst prüft nur Art, Größe und UTF-8 und reicht den Text unverändert weiter; die Prüfung des Inhalts liegt beim Modell und bei Werkzeugen, die die Datei auswerten.
+Wer die Datei liest, MUSS sie zuerst öffnen und ein Siegel, das sich nicht öffnen lässt, als Ganzes abweisen. Danach MUSS er `format` prüfen und eine Datei mit anderer Major-Version abweisen. Unbekannte Felder MÜSSEN ignoriert werden. Klartext entsteht nur im Speicher von komki und geht nur in einen Raum mit `ratsprojekte@1`; geschrieben wird er nirgends.
 
 ## Versionierung
 

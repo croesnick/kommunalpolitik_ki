@@ -751,7 +751,7 @@ Vorbereitung, nicht weitergegeben).
 **Definition:** Die Fassung des Stands, die komki lesen darf. Sie enthält nur
 ausdrücklich erlaubte Felder, also weder private Einträge noch Querverweise,
 offene Vorschläge oder fremden Text. Der Hub schreibt sie beim Ausgeben eines
-Stands als Datei.
+Stands als Datei, versiegelt für komki; öffnen kann sie nur komki mit Touch ID.
 
 **Nicht:** Stand (die Fassung für Fraktion und Vorstand, sie zeigt auch Argumente).
 
