@@ -35,8 +35,8 @@ defmodule RatsprojekteWeb.ThemeCssTest do
                     "i"
                   )
 
-  # A shadow may be a translucent tint, never an opaque surface.
-  @translucent ~r/\brgba?\([^()]*\/\s*0?\.\d+\s*\)/
+  # A shadow may be a faint tint, never a surface: alpha at most 0.3.
+  @max_shadow_alpha 0.3
 
   @palette "(?:white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|" <>
              "green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\\d{2,3})"
@@ -87,22 +87,52 @@ defmodule RatsprojekteWeb.ThemeCssTest do
 
     assert allowed?({":root", "--stufe-3", "#cfd5dd"})
     refute allowed?({".a", "--stufe-3", "#fff"})
+    refute allowed?({":root", "--stufe-9", "#fff"})
     assert allowed?({".a", "box-shadow", "0 1px 3px rgb(0 0 0 / 0.08)"})
+    assert allowed?({".a", "box-shadow", "0 1px 3px rgba(0, 0, 0, .3), 0 0 1px rgb(0 0 0 / 8%)"})
+    refute allowed?({".a", "box-shadow", "0 0 0 999px rgb(255 255 255 / .99)"})
     refute allowed?({".a", "box-shadow", "0 0 0 999px #fff"})
 
-    assert template_findings(~s(class="border-t-gray-200 text-[white] bg-[#fff]")) |> length() ==
-             3
+    assert [{"&:hover", "color", "red"}, {".a", "color", "#fff"}] =
+             declarations(".a { color: #fff; &:hover { color: red } }")
+
+    assert [{"&:hover", "color", "red"}, {".a", "color", "#fff"}] =
+             declarations(".a { &:hover { color: red } color: #fff; }")
+
+    assert length(template_findings(~s(class="border-t-gray-200 text-[white] bg-[#fff]"))) == 3
 
     assert template_findings(~s(<p style="color: #fff">)) == ["color: #fff"]
     assert template_findings(~s(<i style={"flex: \#{n}"}>)) == []
   end
 
-  defp allowed?({":root", "--stufe-" <> step, _value}), do: step =~ ~r/^\d$/
+  defp allowed?({":root", "--stufe-" <> step, _value}), do: step in ~w(1 2 3 4 5)
 
-  defp allowed?({_selector, "box-shadow", value}),
-    do: not (String.replace(value, @translucent, "") =~ @colour_literal)
+  defp allowed?({_selector, "box-shadow", value}) do
+    opaque =
+      Regex.replace(~r/\brgba?\(([^()]*)\)/, value, fn colour, args ->
+        if faint?(args), do: "", else: colour
+      end)
+
+    not (opaque =~ @colour_literal)
+  end
 
   defp allowed?(_declaration), do: false
+
+  # Alpha as `r g b / a` or `r, g, b, a`, either a number or a percentage.
+  defp faint?(args) do
+    alpha =
+      case {String.split(args, "/"), String.split(args, ",")} do
+        {[_, alpha], _} -> alpha
+        {_, [_, _, _, alpha]} -> alpha
+        _ -> nil
+      end
+
+    case alpha && Float.parse(String.replace_prefix(String.trim(alpha), ".", "0.")) do
+      {value, "%"} -> value / 100 <= @max_shadow_alpha
+      {value, ""} -> value <= @max_shadow_alpha
+      _ -> false
+    end
+  end
 
   defp template_findings(source) do
     classes = for [class] <- Regex.scan(@tailwind_palette, source), do: class
@@ -139,11 +169,25 @@ defmodule RatsprojekteWeb.ThemeCssTest do
   defp skip_to_close("}" <> rest, depth), do: skip_to_close(rest, depth - 1)
   defp skip_to_close(<<_, rest::binary>>, depth), do: skip_to_close(rest, depth)
 
-  # Innermost rules only: the selector is the text before a body without
-  # nested braces, so an @media wrapper never ends up as the selector.
-  defp declarations(css) do
-    for [_, selector, body] <- Regex.scan(~r/([^{}]*)\{([^{}]*)\}/, css),
-        [_, property, value] <- Regex.scan(~r/(?:^|;)\s*([-a-zA-Z0-9]+)\s*:\s*([^;]+)/, body),
-        do: {String.trim(selector), property, String.trim(value)}
+  # Reads the innermost rule, then replaces it with `;`, until no rule is left.
+  # A nested rule thus never hides the declarations of its parent, and an
+  # @media wrapper never ends up as a selector.
+  defp declarations(css, acc \\ []) do
+    case Regex.run(~r/([^{};]*)\{([^{}]*)\}/, css, return: :index) do
+      nil ->
+        acc
+
+      [{start, length}, selector, body] ->
+        found =
+          for [_, property, value] <-
+                Regex.scan(~r/(?:^|;)\s*([-a-zA-Z0-9]+)\s*:\s*([^;]+)/, slice(css, body)),
+              do: {String.trim(slice(css, selector)), property, String.trim(value)}
+
+        before = binary_part(css, 0, start)
+        rest = binary_part(css, start + length, byte_size(css) - start - length)
+        declarations(before <> ";" <> rest, acc ++ found)
+    end
   end
+
+  defp slice(css, {start, length}), do: binary_part(css, start, length)
 end

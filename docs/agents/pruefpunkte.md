@@ -10,7 +10,7 @@ Welche Punkte hier stehen, entscheidet die nutzende Person. Jeder Punkt hat ihr 
 
 **Gilt für:** `apps/ratsprojekte/assets/`, `apps/ratsprojekte/lib/ratsprojekte_web/`, `apps/ratsprojekte/test/ratsprojekte_web/theme_css_test.exs`
 
-- **Light und Dark, ab Handybreite.** Jede geänderte Seite folgt dem Theme und funktioniert ab Handybreite. Der Diff bringt feste Farben nur in die beiden Theme-Blöcke und in `@media print` ein. Ausnahmen mit GO: die Datenfarben der Meinungsbalken (`--stufe-1` bis `--stufe-5` auf `:root`, in beiden Themes gleich) und durchscheinende Schatten.
+- **Light und Dark, ab Handybreite.** Jede geänderte Seite folgt dem Theme und funktioniert ab Handybreite. Der Diff bringt feste Farben nur in die beiden Theme-Blöcke und in `@media print` ein. Ausnahmen mit GO: die Datenfarben der Meinungsbalken (`--stufe-1` bis `--stufe-5` auf `:root`, in beiden Themes gleich) und Schatten mit höchstens 30 % Deckkraft.
   *Nachweis:* Screenshot jeder geänderten Seite hell und dunkel, eine davon in Handybreite. Automatisch: `apps/ratsprojekte/test/ratsprojekte_web/theme_css_test.exs` (feste Farben in `app.css`, feste Farbklassen und Inline-Farben in Templates).
   *Altbestand:* Der Ladebalken in `assets/js/app.js` hat feste Farben, der Test sieht `assets/js` noch nicht (#471).
 
