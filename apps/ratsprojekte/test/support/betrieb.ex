@@ -11,9 +11,17 @@ defmodule Ratsprojekte.Betrieb do
 
   @migrationen Path.expand("../fixtures/migrationen", __DIR__)
 
-  @doc "A fresh home; short, because Unix socket paths are limited to 104 bytes."
+  @doc """
+  A fresh home; short, because Unix socket paths are limited to 104 bytes
+  (so no ExUnit `tmp_dir`). The name is random, not a counter: counters
+  restart with every VM and would meet a home a killed run left behind,
+  or one a parallel run in another worktree is using (#452). `mkdir!`
+  fails rather than reuse a directory that exists.
+  """
   def home! do
-    home = Path.join(System.tmp_dir!(), "rp#{System.unique_integer([:positive])}")
+    suffix = Base.hex_encode32(:crypto.strong_rand_bytes(10), case: :lower, padding: false)
+    home = Path.join(System.tmp_dir!(), "rp-" <> suffix)
+    File.mkdir!(home)
     Ratsprojekte.Ort.anlegen!(home)
     on_exit(fn -> File.rm_rf!(home) end)
     home

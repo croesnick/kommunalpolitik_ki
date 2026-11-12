@@ -10,6 +10,10 @@ defmodule Ratsprojekte.SqlcipherTest do
   # Exqlite.Connection intern nutzt.
   use Ratsprojekte.DataCase, async: true
 
+  # Each test gets its own directory, emptied before the test (#452): a
+  # probe database of an earlier run can never be opened again.
+  @moduletag :tmp_dir
+
   @plaintext_header "SQLite format 3"
   @key "gartenstadt-erst-wurf"
 
@@ -25,8 +29,8 @@ defmodule Ratsprojekte.SqlcipherTest do
            """
   end
 
-  test "ohne Schluessel verhaelt sich SQLCipher wie normales SQLite" do
-    path = tmp_db("unkeyed")
+  test "ohne Schluessel verhaelt sich SQLCipher wie normales SQLite", %{tmp_dir: dir} do
+    path = Path.join(dir, "unkeyed.db")
 
     assert {:ok, conn} = Exqlite.Sqlite3.open(path)
     assert :ok = Exqlite.Sqlite3.execute(conn, "CREATE TABLE probe (text TEXT)")
@@ -38,8 +42,10 @@ defmodule Ratsprojekte.SqlcipherTest do
     assert file_header(path) == @plaintext_header
   end
 
-  test "mit Schluessel ist die Datei Chiffretext und ohne Schluessel nicht lesbar" do
-    path = tmp_db("keyed")
+  test "mit Schluessel ist die Datei Chiffretext und ohne Schluessel nicht lesbar", %{
+    tmp_dir: dir
+  } do
+    path = Path.join(dir, "keyed.db")
 
     assert {:ok, conn} = Exqlite.Sqlite3.open(path)
     assert :ok = Exqlite.Sqlite3.execute(conn, "PRAGMA key = '#{@key}'")
@@ -67,13 +73,6 @@ defmodule Ratsprojekte.SqlcipherTest do
     assert :ok = Exqlite.Sqlite3.execute(conn, "PRAGMA key = '#{@key}'")
     assert select_first_probe(conn) == "Geheimtext"
     assert :ok = Exqlite.Sqlite3.close(conn)
-  end
-
-  defp tmp_db(name) do
-    Path.join(
-      System.tmp_dir!(),
-      "ratsprojekte_sqlcipher_#{name}_#{System.unique_integer([:positive])}.db"
-    )
   end
 
   defp insert_probe(conn, text) do

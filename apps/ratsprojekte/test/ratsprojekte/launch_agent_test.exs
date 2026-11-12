@@ -19,10 +19,10 @@ defmodule Ratsprojekte.LaunchAgentTest do
 
   # plutil exists only on macOS; the CI runs on Linux.
   @tag :macos
-  test "plist ist gültig für launchd (plutil)" do
-    path = Path.join(System.tmp_dir!(), "rp-plist-#{System.unique_integer([:positive])}.plist")
+  @tag :tmp_dir
+  test "plist ist gültig für launchd (plutil)", %{tmp_dir: dir} do
+    path = Path.join(dir, "ratsprojekte.plist")
     File.write!(path, LaunchAgent.plist("/opt/rel", [{"PHX_SERVER", "true"}]))
     assert {_, 0} = System.cmd("/usr/bin/plutil", ["-lint", path])
-    File.rm!(path)
   end
 end
