@@ -224,10 +224,19 @@ defmodule Ratsprojekte.Projects do
   defp step_line(step) do
     Enum.join(
       ["Als Nächstes: #{step.text}"] ++
-        if(blank?(step.assignee), do: [], else: [step.assignee]) ++
+        assignee_part(step.assignee) ++
         if(step.due_on, do: ["bis #{german_date(step.due_on)}"], else: []),
       ", "
     )
+  end
+
+  # The timeline speaks to the editor like the work view: „du“.
+  defp assignee_part(assignee) do
+    cond do
+      blank?(assignee) -> []
+      NextStep.editor?(assignee) -> ["du"]
+      true -> [assignee]
+    end
   end
 
   @doc "Changeset for the form of the next step."

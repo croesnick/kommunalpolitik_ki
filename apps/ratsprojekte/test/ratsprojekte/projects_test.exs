@@ -163,6 +163,19 @@ defmodule Ratsprojekte.ProjectsTest do
     end
   end
 
+  test "„du“ and „ich“ both mean the editor, the timeline says „du“" do
+    {:ok, project} = Projects.set_next_step(idea(), %{text: "Ortstermin", assignee: "Du"})
+    assert project.next_step.assignee == "ich"
+    assert {:next_step, "Als Nächstes: Ortstermin, du", true} in lines(project)
+
+    count = length(project.timeline)
+
+    {:ok, project} =
+      Projects.record_event(project, %{text: "x", step_text: "Ortstermin", step_assignee: "ich"})
+
+    assert length(project.timeline) == count + 1
+  end
+
   test "set_entry_visibility/3 switches notes only" do
     {:ok, project} = Projects.record_event(idea(), %{text: "privat", by: :editor})
     note = Enum.find(project.timeline, &(&1.kind == :note))

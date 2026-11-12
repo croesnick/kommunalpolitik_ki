@@ -16,6 +16,7 @@ defmodule Ratsprojekte.Projects.Event do
   import Ecto.Changeset
 
   alias Ratsprojekte.{Labels, Text}
+  alias Ratsprojekte.Projects.NextStep
 
   @type t :: %__MODULE__{}
 
@@ -45,6 +46,7 @@ defmodule Ratsprojekte.Projects.Event do
     event
     |> cast(attrs, [:text, :by, :in_briefing, :phase, :on] ++ @step_fields ++ @motion_fields)
     |> Text.clean_fields([:text, :step_text, :step_assignee, :ris])
+    |> update_change(:step_assignee, &NextStep.normalize_assignee/1)
     |> validate_required([:text])
     |> validate_length(:text, max: 5000)
     |> validate_length(:step_text, max: 300)
