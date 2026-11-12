@@ -4,9 +4,9 @@ Der lokale Hub für den Weg von der Idee zum Antrag ([ADR 0004](../../docs/adr/0
 Phoenix LiveView, läuft lokal für eine Person — die Redaktion führt, alle
 anderen bekommen eine bewusst ausgegebene Fassung.
 
-**Zustand: Gerüst mit lokalem Betrieb.** Dieses App ist das frische Phoenix-Grundgerüst
+**Zustand: Gerüst mit lokalem Betrieb, Schema und Kontext.** Dieses App ist das frische Phoenix-Grundgerüst
 (Phoenix 1.8.16, LiveView 1.2.13, Bandit, Tailwind v4, esbuild — der von
-`mix phx.new` gesetzte Stand, Ticket #435). Schema und Kontext baut #436,
+`mix phx.new` gesetzte Stand, Ticket #435). Schema und Kontext stehen (#436, siehe unten),
 die Oberfläche mit dem Main Flow „Was ist passiert?“ baut #437, der Stand
 als Druck #438, die Befragung #439 und der Connector-Schreibweg „Fakt
 vorschlagen“ #277. Der lokale Betrieb (#440) steht: siehe unten.
@@ -120,15 +120,39 @@ Zurückgetragen aus dem alten Bestand und verbindlich:
   Connector-Socket mit Token (Socket aus #440, Schreibweg #277). `decide_proposal` und der
   Dev-MCP-Endpoint sind entfallen (ADR 0004).
 
+## Modell
+
+Das kleine Modell aus ADR 0004, gebaut in #436. Die Domäne ist deutsch, der
+Code englisch (Übersetzungstabelle in #414). Wer etwas liest oder ändert,
+ruft die Kontexte und kennt die Tabellen nicht:
+
+- `Ratsprojekte.Projects`: Ratsprojekte (`Project`) mit Verlauf (`TimelineEntry`),
+  Meinungsbildern (`Opinion`), Fakten (`Fact`), Varianten (`Variant` mit
+  `Prerequisite`), Anträgen (`Motion`) und Querverweisen (`CrossReference`).
+  Der Main Flow „Was ist passiert?“ ist `record_event/2`, am Antrag
+  `record_motion_event/3`. Was die Redaktion im Hub tut, schreibt sich von
+  selbst in den Verlauf.
+- `Ratsprojekte.Surveys`: Befragungen (`Survey`) mit opaken Kennungen je
+  Thema (`SurveyTopic`), Hochladen bestätigen, Rücklauf zuordnen. Die
+  Dateien nach `docs/schnittstellen/befragung.md` liest und schreibt #439.
+- `Ratsprojekte.Text`: entfernt beim Speichern unsichtbare Steuerzeichen aus
+  allen Freitextfeldern, Emojis und Schriftzeichen bleiben heil (#410,
+  Gegenprobe 13.6).
+- `Ratsprojekte.Labels`: die deutschen Namen der Atome (`:drafting` heißt
+  „Ausarbeitung“).
+
+`mix ecto.setup` trägt über dieselben Kontextfunktionen vier erfundene
+Gartenstadt-Projekte ein (nur Dev; der Hub im Release startet leer).
+
 ## Aufbau
 
 ```
 apps/ratsprojekte
 ├── assets/                  # Tailwind v4 (CSS-first) + esbuild, Watcher in dev.exs
 ├── config/                  # Phoenix-Stand; DB-Pfade und exqlite-Build hier
-├── lib/ratsprojekte/        # Kontext-Schicht (baut #436)
+├── lib/ratsprojekte/        # Kontexte Projects und Surveys, Text, Labels; Betrieb (#440)
 ├── lib/ratsprojekte_web/    # Router mit CSP, Endpoint mit Tidewave (dev)
-├── priv/repo/               # Migrationen (baut #436) + Seeds (erfundene Gartenstadt-Projekte)
+├── priv/repo/               # Migrationen (#436) + Seeds (erfundene Gartenstadt-Projekte)
 ├── priv/static/            # gebaute Assets landen in priv/static/assets/ (gitignored)
 └── storyboard/             # Durchklick-Referenz für #437
 ```

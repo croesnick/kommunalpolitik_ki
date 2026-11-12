@@ -1,4 +1,4 @@
-# Seeds für den Hub.
+# Seeds für den Hub: `mix run priv/repo/seeds.exs` (Teil von `mix ecto.setup`).
 #
 # Regel aus #435: Seeds zeigen ausschließlich erfundene Gartenstadt-Projekte —
 # das Universum des Referenzszenarios (docs/szenarien/radweg-bahnhofstrasse.md,
@@ -6,119 +6,180 @@
 # Verhandlungen gibt es nicht“). Echte Ratsarbeit gehört nie in diese Datei
 # und nie in das Repo.
 #
-# Die Felder folgen dem kleinen Modell aus ADR 0004. Verbindlich benannt
-# aus #414 ist Antrag = `motion` (dazu proposal, briefing, filing, die
-# #436 setzt); dieser Schlüssel heißt hier entsprechend `motions`. Die
-# übrigen Schlüssel bleiben in der Domänensprache, bis #436 die Feldnamen
-# des Schemas festlegt. Das Eintragen gegen Schema und Kontext baut
-# Ticket #436 — bis dahin zeigt run/0 den Datensatz nur an und trägt
-# nichts in die Datenbank ein. Der Hub startet leer (ADR 0004: „Es gibt
-# keinen Import und keine geregelte Übernahme“).
+# Eingetragen wird nur über die Kontextfunktionen (#436), so wie die
+# Oberfläche es tut; der Verlauf schreibt sich dabei selbst. Nur für Dev
+# und Tests: Der Hub im Release startet leer (ADR 0004: „Es gibt keinen
+# Import und keine geregelte Übernahme“). Ein zweiter Lauf trägt nichts
+# doppelt ein.
 
 defmodule Ratsprojekte.Seeds do
-  @moduledoc """
-  Erfundene Gartenstadt-Projekte als Demo-Bestand. Nur lesen und anzeigen —
-  das Eintragen kommt mit dem Schema (Ticket #436).
-  """
+  @moduledoc false
 
-  @projects [
-    %{
-      titel: "Radweg Bahnhofstraße",
-      phase: :ausarbeitung,
-      naechster_schritt: "Antrag zur Sitzung am 17.11.2026 vorbereiten",
-      ablage: nil,
-      verlauf: [
-        %{datum: ~D[2026-09-18], kreis: :redaktion,
-          text: "Idee aus der Fraktionssitzung aufgenommen: Engstelle Bahnhofstraße angehen."},
-        %{datum: ~D[2026-10-05], kreis: :redaktion,
-          text: "Bauausschuss vertagt das Radverkehrskonzept für die Bahnhofstraße."},
-        %{datum: ~D[2026-11-03], kreis: :engerer_kreis,
-          text: "Zeitungsbericht eingeordnet: Händler wehren sich gegen den Wegfall der Parkplätze."}
-      ],
-      meinungsbilder: [
-        %{kreis: :basis, datum: ~D[2026-10-20],
-          satz: "Sicherer Schulweg entlang der Bahnhofstraße ist der Basis am wichtigsten.",
-          verteilung: %{dafür: 12, offen: 3, dagegen: 1}}
-      ],
-      fakten: [
-        %{aussage: "Die Sanierung der Bahnhofstraße läuft in zwei Bauabschnitten (Baukosten 1,2 Mio. Euro).",
-          beleg: "RIS, TOP 1001-1 „Sanierung der Bahnhofstraße“, September 2026",
-          datum: ~D[2026-11-02], pruefstatus: :verifiziert},
-        %{aussage: "Bayerische Kommunen bekommen Fördermittel für Radwege in Ortsdurchfahrten.",
-          beleg: "Öffentliche Recherche (komki-Raum), Fundstelle im Förderprogramm-Steckbrief",
-          datum: ~D[2026-11-09], pruefstatus: :nicht_verifiziert}
-      ],
-      varianten: [
-        %{titel: "Einbahnregelung mit Schutzstreifen", status: :offen},
-        %{titel: "Wegfall des Parkstreifens Nord", status: :offen},
-        %{titel: "Umleitung über die Gartenstraße", status: :offen}
-      ],
-      motions: []
-    },
-    %{
-      titel: "Sanierung Bahnhofstraße, 1. Bauabschnitt",
-      phase: :im_rat,
-      naechster_schritt: "Beschluss in der Sitzung am 17.11.2026",
-      ablage: nil,
-      verlauf: [
-        %{datum: ~D[2026-09-18], kreis: :redaktion,
-          text: "Stadtrat beschließt die Sanierung in zwei Bauabschnitten."},
-        %{datum: ~D[2026-11-10], kreis: :redaktion,
-          text: "Antrag der Fraktion eingereicht: Radverkehrsführung mit Förderung im 1. Bauabschnitt."}
-      ],
-      meinungsbilder: [],
-      fakten: [],
-      varianten: [],
-      motions: [
-        %{adressat: "Stadtrat",
-          beschlussvorschlag: "Ausführungsplanung des 1. Bauabschnitts zustimmen und die Radverkehrsführung festlegen",
-          status: :eingereicht, ergebnis: nil,
-          querverweis: "Ratsinformationssystem, Sitzung 1003, TOP 1"}
-      ]
-    },
-    %{
-      titel: "Radweg Nord",
-      phase: :idee,
-      naechster_schritt: "Idee im Vorstand vorstellen",
-      ablage: nil,
-      verlauf: [
-        %{datum: ~D[2026-11-08], kreis: :engerer_kreis,
-          text: "Vom Ortsverband als Projektidee eingebracht (Vault-Notiz „Projektidee Radweg Nord“)."}
-      ],
-      meinungsbilder: [],
-      fakten: [],
-      varianten: [],
-      motions: []
-    }
-  ]
-
-  def projects, do: @projects
+  alias Ratsprojekte.Projects
 
   def run do
-    IO.puts("Seeds: #{length(@projects)} erfundene Gartenstadt-Projekte.\n")
-
-    for project <- @projects do
-      IO.puts([
-        "- ", project.titel, " (", "Phase: ", phase_label(project.phase), ")\n",
-        "  Nächster Schritt: ", project.naechster_schritt, "\n",
-        "  Verlauf: ", Integer.to_string(length(project.verlauf)), " Einträge, ",
-        "Varianten: ", Integer.to_string(length(project.varianten)), ", ",
-        "Anträge: ", Integer.to_string(length(project.motions)), "\n"
-      ])
+    if Projects.list_projects() == [] do
+      radweg()
+      sanierung()
+      radweg_nord()
+      sitzbaenke()
+      IO.puts("Seeds: #{length(Projects.list_projects())} erfundene Gartenstadt-Projekte eingetragen.")
+    else
+      IO.puts("Seeds: Der Hub hat schon Projekte, nichts eingetragen.")
     end
-
-    IO.puts("""
-
-    Diese Datei zeigt den Demo-Bestand nur an. Das Eintragen in die Datenbank \
-    baut Ticket #436 (Schema und Kontext) — der Hub startet leer (ADR 0004).
-    """)
   end
 
-  defp phase_label(:idee), do: "Idee"
-  defp phase_label(:meinungsbildung), do: "Meinungsbildung"
-  defp phase_label(:ausarbeitung), do: "Ausarbeitung"
-  defp phase_label(:im_rat), do: "Im Rat"
-  defp phase_label(:umsetzung), do: "Umsetzung"
+  defp radweg do
+    p =
+      new(%{
+        title: "Radweg Bahnhofstraße",
+        short: "Sichere Radverkehrsführung im 1. Bauabschnitt, möglichst mit Förderung.",
+        origin: "Fraktion",
+        on: ~D[2026-09-18]
+      })
+
+    p =
+      ok(
+        Projects.record_event(p, %{
+          text: "Fraktion will die Engstelle Bahnhofstraße angehen.",
+          by: :fraction,
+          phase: :drafting,
+          on: ~D[2026-10-05]
+        })
+      )
+
+    p =
+      ok(
+        Projects.record_event(p, %{
+          text: "Sicherer Schulweg entlang der Bahnhofstraße ist der Basis am wichtigsten.",
+          by: :base,
+          on: ~D[2026-10-20]
+        })
+      )
+
+    p =
+      ok(
+        Projects.record_event(p, %{
+          text: "Händler wehren sich laut Zeitung gegen den Wegfall der Parkplätze.",
+          on: ~D[2026-11-03],
+          step_text: "Antrag zur Sitzung am 17.11.2026 vorbereiten",
+          step_assignee: "ich",
+          step_due_on: ~D[2026-11-13]
+        })
+      )
+
+    p =
+      ok(
+        Projects.add_fact(p, %{
+          statement:
+            "Die Sanierung der Bahnhofstraße läuft in zwei Bauabschnitten (Baukosten 1,2 Mio. Euro).",
+          citation: "RIS, TOP 1001-1 „Sanierung der Bahnhofstraße“, September 2026",
+          fetched_on: ~D[2026-11-02],
+          verified: true,
+          on: ~D[2026-11-02]
+        })
+      )
+
+    p =
+      ok(
+        Projects.add_fact(p, %{
+          statement: "Bayerische Kommunen bekommen Fördermittel für Radwege in Ortsdurchfahrten.",
+          citation: "Öffentliche Recherche (komki-Raum), Fundstelle im Förderprogramm-Steckbrief",
+          fetched_on: ~D[2026-11-09],
+          on: ~D[2026-11-09]
+        })
+      )
+
+    p =
+      Enum.reduce(
+        ["Einbahnregelung mit Schutzstreifen", "Wegfall des Parkstreifens Nord", "Umleitung über die Gartenstraße"],
+        p,
+        &ok(Projects.add_variant(&2, %{title: &1, on: ~D[2026-11-04]}))
+      )
+
+    ok(Projects.add_cross_reference(p, %{kind: :komki_room, target: "r-gartenstadt-7f3a"}))
+  end
+
+  defp sanierung do
+    p =
+      new(%{
+        title: "Sanierung Bahnhofstraße, 1. Bauabschnitt",
+        short: "Ausführungsplanung mit Radverkehrsführung.",
+        origin: "Stadtrat",
+        on: ~D[2026-09-18]
+      })
+
+    p =
+      ok(
+        Projects.record_event(p, %{
+          text: "Stadtrat beschließt die Sanierung in zwei Bauabschnitten.",
+          by: :council,
+          phase: :at_council,
+          on: ~D[2026-09-18]
+        })
+      )
+
+    p =
+      ok(
+        Projects.create_motion(p, %{
+          title: "Radverkehrsführung im 1. Bauabschnitt",
+          motion_text:
+            "Ausführungsplanung des 1. Bauabschnitts zustimmen und die Radverkehrsführung festlegen",
+          addressee: "Stadtrat",
+          document_ref: "Nextcloud, Ordner Anträge",
+          on: ~D[2026-11-05]
+        })
+      )
+
+    ok(
+      Projects.record_motion_event(p, hd(p.motions), %{
+        status: :submitted,
+        submitted_on: ~D[2026-11-10],
+        ris: "Sitzung 1003, TOP 1",
+        text: "Antrag der Fraktion eingereicht.",
+        by: :fraction,
+        step_text: "Beschluss in der Sitzung am 17.11.2026",
+        step_assignee: "Selin",
+        step_due_on: ~D[2026-11-17],
+        on: ~D[2026-11-10]
+      })
+    )
+  end
+
+  defp radweg_nord do
+    p =
+      new(%{
+        title: "Radweg Nord",
+        short: "Lückenschluss zwischen Gartenstadt-Nord und dem Bahnhof.",
+        origin: "Ortsverband",
+        on: ~D[2026-11-08]
+      })
+
+    ok(Projects.set_next_step(p, %{text: "Idee im Vorstand vorstellen", assignee: "ich", on: ~D[2026-11-08]}))
+  end
+
+  defp sitzbaenke do
+    p =
+      new(%{
+        title: "Sitzbänke am Stadtweiher",
+        short: "Rund um den Weiher fehlen Bänke für ältere Menschen.",
+        origin: "Seniorenbeirat",
+        on: ~D[2026-04-14]
+      })
+
+    ok(
+      Projects.dispose(p, %{
+        disposition: "resting",
+        reason: "Erst nach dem Haushalt 2027 wieder aufgreifen.",
+        by: "fraction",
+        on: ~D[2026-06-02]
+      })
+    )
+  end
+
+  defp new(attrs), do: ok(Projects.create_project(attrs))
+
+  defp ok({:ok, value}), do: value
 end
 
 Ratsprojekte.Seeds.run()
