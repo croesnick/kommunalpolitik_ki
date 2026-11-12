@@ -481,6 +481,10 @@ defmodule DevLoop do
           not File.exists?(Path.join(out, "pr.md")) ->
             {:failed, ".dev-loop/pr.md fehlt."}
 
+          not Core.decisions?(File.read!(Path.join(out, "pr.md"))) ->
+            {:failed,
+             ".dev-loop/pr.md fehlt der Abschnitt „Entscheidungen, die ich selbst getroffen habe“."}
+
           true ->
             gate(ctx, wt)
         end
@@ -513,7 +517,7 @@ defmodule DevLoop do
     pr =
       case Enum.find(GitHub.open_prs(ctx), &(&1.branch == branch)) do
         nil -> GitHub.create_pr(ctx, branch, title, body)
-        existing -> existing.number
+        existing -> tap(existing.number, &GitHub.update_pr(ctx, &1, body))
       end
 
     GitHub.set_status(ctx, n, "In Review")
@@ -525,6 +529,7 @@ defmodule DevLoop do
 
   defp review_cycle(ctx, issue, wt, pr, report) do
     sha = git!(wt, ~w(rev-parse HEAD))
+    pr = Map.delete(pr, :report_url)
 
     case review(ctx, issue, pr, sha) do
       {:error, why} ->
@@ -537,7 +542,14 @@ defmodule DevLoop do
         rounds = Core.rework_rounds(GitHub.pr_comments(ctx, pr.number))
         hits = Core.protected_hits(changed_files(wt, sha))
         weakened = Core.weakened_test_hits(changed_diff(wt, sha))
-        GitHub.pr_comment(ctx, pr.number, Core.review_comment(review, sha))
+
+        # The morning comment links the Prüfbericht: this head's review
+        # comment, if it carries one.
+        pr =
+          case GitHub.pr_comment(ctx, pr.number, Core.review_comment(review, sha)) do
+            {:ok, url} when review.checks != [] -> Map.put(pr, :report_url, String.trim(url))
+            _ -> Map.delete(pr, :report_url)
+          end
 
         ctx.log.(
           "##{issue.number}: Review #{review.verdict}, Runde #{rounds}, geschützte Pfade: " <>
@@ -590,13 +602,13 @@ defmodule DevLoop do
   # The script runs the gates on the reviewed head itself, outside the agent
   # sandbox, and hands the reviewer the result as evidence. Red gates need
   # no reviewer: they count as a rework round right away.
-  defp review(ctx, issue, pr, sha, attempt \\ 1) do
+  defp review(ctx, issue, pr, sha, attempt \\ 1, hint \\ "") do
     rwt = fresh_worktree(ctx, "loop-#{issue.number}-review", sha, true)
 
     result =
       case gate(ctx, rwt) do
         :ok ->
-          review_agent(ctx, issue, pr, sha, rwt)
+          review_agent(ctx, issue, pr, sha, rwt, hint)
 
         {:failed, text} ->
           ctx.log.(
@@ -611,14 +623,14 @@ defmodule DevLoop do
     case result do
       {:error, why} when attempt == 1 ->
         ctx.log.("##{issue.number}: Review gescheitert (#{first_line(why)}), zweiter Versuch")
-        review(ctx, issue, pr, sha, 2)
+        review(ctx, issue, pr, sha, 2, "Der vorige Versuch war ungültig: #{why}")
 
       other ->
         other
     end
   end
 
-  defp review_agent(ctx, issue, pr, sha, rwt) do
+  defp review_agent(ctx, issue, pr, sha, rwt, hint) do
     prompt =
       render("review", %{
         pr: pr.number,
@@ -626,6 +638,8 @@ defmodule DevLoop do
         tier: tier_label(issue),
         sha: sha,
         gates: Enum.map_join(@gates, "\n", &"   - `#{Enum.join(&1, " ")}`"),
+        claims: GitHub.pr_body(ctx, pr.number),
+        hint: hint,
         issue: Core.issue_text(issue)
       })
 
@@ -633,16 +647,14 @@ defmodule DevLoop do
       :exhausted -> throw(:exhausted)
       {:error, text} -> {:error, "Agent-Session gescheitert: " <> text}
       {:taken_over, _} = taken_over -> taken_over
-      {:ok, _} -> read_review(Path.join(rwt, ".dev-loop/review.json"))
+      {:ok, _} -> read_review(Path.join(rwt, ".dev-loop/review.json"), Core.checkpoints(issue))
     end
   end
 
-  defp read_review(file) do
-    with {:ok, json} <- File.read(file),
-         {:ok, review} <- Core.parse_review(json) do
-      {:ok, review}
-    else
-      _ -> {:error, "review.json fehlt oder ist ungültig."}
+  defp read_review(file, min_checks) do
+    case File.read(file) do
+      {:ok, json} -> Core.parse_review(json, min_checks)
+      _ -> {:error, "review.json fehlt."}
     end
   end
 
@@ -650,6 +662,9 @@ defmodule DevLoop do
     case implement_with_retry(ctx, issue, wt, findings) do
       :ok ->
         push!(ctx, wt, Core.loop_branch(issue.number))
+        # The PR text holds what this round claims, not the first one.
+        {_title, body} = Core.parse_pr(File.read!(Path.join(wt, ".dev-loop/pr.md")), issue.number)
+        GitHub.update_pr(ctx, pr.number, body)
         review_cycle(ctx, issue, wt, pr, report)
 
       {:blocked, text} ->
@@ -1065,6 +1080,10 @@ defmodule DevLoop do
     do: Map.update!(report, :stats, &Map.put(&1, key, Map.get(&1, key, 0) + 1))
 
   defp ref(issue, nil), do: "[##{issue.number} #{issue.title}](#{GitHub.issue_url(issue.number)})"
+
+  defp ref(issue, %{report_url: url} = pr),
+    do: "#{ref(issue, nil)}, PR ##{pr.number}, [Prüfbericht](#{url})"
+
   defp ref(issue, pr), do: "#{ref(issue, nil)}, PR ##{pr.number}"
 
   defp tier_label(issue),

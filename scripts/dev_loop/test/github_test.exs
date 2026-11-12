@@ -95,6 +95,11 @@ defmodule DevLoop.GitHubTest do
     assert GitHub.pr_comments(ctx, 401) == ["ok"]
   end
 
+  test "pr_body returns the PR text for the review", %{dir: dir, ctx: ctx} do
+    serve(dir, "pr", ~s({"body": "## Prüfbericht"}))
+    assert GitHub.pr_body(ctx, 401) == "## Prüfbericht"
+  end
+
   test "main_red? is nil on pending, green and gh failure, red otherwise", %{
     dir: dir,
     ctx: ctx
