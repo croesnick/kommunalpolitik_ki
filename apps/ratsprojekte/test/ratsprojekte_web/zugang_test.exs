@@ -31,7 +31,7 @@ defmodule RatsprojekteWeb.ZugangTest do
       assert redirected_to(conn) == ~p"/"
 
       conn = conn |> recycle() |> get(~p"/")
-      assert html_response(conn, 200) =~ "Der Hub ist im Aufbau."
+      assert html_response(conn, 200) =~ ~s(id="neue-idee")
 
       # The link is used up; another browser gets nothing with it.
       assert build_conn() |> get(~p"/zugang/#{token}") |> gesperrt?()
@@ -59,7 +59,7 @@ defmodule RatsprojekteWeb.ZugangTest do
       assert Sperre.status() == :offen
 
       conn = conn |> recycle() |> get(~p"/")
-      assert html_response(conn, 200) =~ "Der Hub ist im Aufbau."
+      assert html_response(conn, 200) =~ ~s(id="neue-idee")
     end
 
     test "Touch ID abgelehnt oder Schlüssel fehlt: bleibt gesperrt, sagt warum", %{

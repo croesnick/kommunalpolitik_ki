@@ -4,14 +4,14 @@ Der lokale Hub für den Weg von der Idee zum Antrag ([ADR 0004](../../docs/adr/0
 Phoenix LiveView, läuft lokal für eine Person — die Redaktion führt, alle
 anderen bekommen eine bewusst ausgegebene Fassung.
 
-**Zustand: Gerüst mit lokalem Betrieb.** Dieses App ist das frische Phoenix-Grundgerüst
-(Phoenix 1.8.16, LiveView 1.2.13, Bandit, Tailwind v4, esbuild — der von
-`mix phx.new` gesetzte Stand, Ticket #435). Schema und Kontext baut #436,
-die Oberfläche mit dem Main Flow „Was ist passiert?“ baut #437, der Stand
-als Druck #438, die Befragung #439 und der Connector-Schreibweg „Fakt
-vorschlagen“ #277. Der lokale Betrieb (#440) steht: siehe unten.
-Das Storyboard [`storyboard/hub-desktop.html`](storyboard/hub-desktop.html)
-ist die Durchklick-Referenz der Ziel-Oberfläche.
+**Zustand: lokaler Betrieb, Schema, Kontext und Oberfläche.** Phoenix 1.8.16,
+LiveView 1.2.13, Bandit, Tailwind v4, esbuild (Gerüst #435). Schema und Kontext
+stehen (#436), die Oberfläche mit dem Main Flow „Was ist passiert?“ auch (#437),
+beides unten beschrieben. Es folgen der Stand als Druck (#438), die Befragung
+(#439) und der Connector-Schreibweg „Fakt vorschlagen“ (#277). Der lokale
+Betrieb (#440) steht, siehe unten. Das Storyboard
+[`storyboard/hub-desktop.html`](storyboard/hub-desktop.html) ist die
+Durchklick-Referenz der Ziel-Oberfläche.
 
 ## Starten (Dev)
 
@@ -120,15 +120,63 @@ Zurückgetragen aus dem alten Bestand und verbindlich:
   Connector-Socket mit Token (Socket aus #440, Schreibweg #277). `decide_proposal` und der
   Dev-MCP-Endpoint sind entfallen (ADR 0004).
 
+## Modell
+
+Das kleine Modell aus ADR 0004, gebaut in #436. Die Domäne ist deutsch, der
+Code englisch (Übersetzungstabelle in #414). Wer etwas liest oder ändert,
+ruft die Kontexte und kennt die Tabellen nicht:
+
+- `Ratsprojekte.Projects`: Ratsprojekte (`Project`) mit Verlauf (`TimelineEntry`),
+  Meinungsbildern (`Opinion`), Fakten (`Fact`), Varianten (`Variant` mit
+  `Prerequisite`), Anträgen (`Motion`) und Querverweisen (`CrossReference`).
+  Der Main Flow „Was ist passiert?“ ist `record_event/2`, am Antrag
+  `record_motion_event/3`. Was die Redaktion im Hub tut, schreibt sich von
+  selbst in den Verlauf.
+- `Ratsprojekte.Surveys`: Befragungen (`Survey`) mit opaken Kennungen je
+  Thema (`SurveyTopic`), Hochladen bestätigen, Rücklauf zuordnen. Die
+  Dateien nach `docs/schnittstellen/befragung.md` liest und schreibt #439.
+- `Ratsprojekte.Text`: entfernt beim Speichern unsichtbare Steuerzeichen aus
+  allen Freitextfeldern, Emojis und Schriftzeichen bleiben heil (#410,
+  Gegenprobe 13.6).
+- `Ratsprojekte.Labels`: die deutschen Namen der Atome (`:drafting` heißt
+  „Ausarbeitung“).
+
+`mix ecto.setup` trägt über dieselben Kontextfunktionen vier erfundene
+Gartenstadt-Projekte ein (nur Dev; der Hub im Release startet leer).
+
+## Oberfläche
+
+Die Hauptaktion ist der neue Eintrag. Ein Dialog fragt „Was ist passiert?“,
+Pflicht ist nur der Text. Darunter steht immer die Wahl, wer ihn lesen darf.
+Phase, nächster Schritt und Datum sind eingeklappt. Am Antrag fragt derselbe
+Dialog zusätzlich nach Status und Ergebnis.
+
+- **Übersicht** (`/`): Karten in Spalten nach Phase, Filter „Du bist dran“
+  und „Braucht Aufmerksamkeit“ (Frist in den nächsten 7 Tagen oder
+  überfällig, oder seit vier Wochen nichts passiert und nichts vereinbart).
+  Jede Karte hat „Eintragen“, so sind sechs Projekte nach einer Sitzung
+  sechs Dialoge. „Neue Idee“ legt ein Projekt an, der Kurzname füllt sich
+  aus dem Titel.
+- **Projekt** (`/projekte/<kurzname>`): Phasen (ein Klick öffnet den
+  Eintrag mit dieser Phase, weil ein Wechsel einen Grund im Verlauf
+  braucht), nächster Schritt, Meinungsbild, Fakten, Varianten, Anträge,
+  Nutzen und Erfolg, Antragsreife als Checkliste, Verlauf, Querverweise
+  mit kopierbarem Vault-Tag, Ablegen und Wieder aufnehmen.
+
+Die Oberfläche ruft nur die Kontextfunktionen auf. Eine Route, über die eine
+KI im Hub über einen Vorschlag entscheidet (`decide_proposal`), gibt es nicht
+(ADR 0004), ein Test hält das fest. „du“ oder „ich“ als zuständige Person
+meint die Redaktion, die Arbeitsansicht zeigt dafür „Du“.
+
 ## Aufbau
 
 ```
 apps/ratsprojekte
 ├── assets/                  # Tailwind v4 (CSS-first) + esbuild, Watcher in dev.exs
 ├── config/                  # Phoenix-Stand; DB-Pfade und exqlite-Build hier
-├── lib/ratsprojekte/        # Kontext-Schicht (baut #436)
-├── lib/ratsprojekte_web/    # Router mit CSP, Endpoint mit Tidewave (dev)
-├── priv/repo/               # Migrationen (baut #436) + Seeds (erfundene Gartenstadt-Projekte)
+├── lib/ratsprojekte/        # Kontexte Projects und Surveys, Text, Labels; Betrieb (#440)
+├── lib/ratsprojekte_web/    # Router mit CSP, LiveViews (live/), Hub-Komponenten, Endpoint mit Tidewave (dev)
+├── priv/repo/               # Migrationen (#436) + Seeds (erfundene Gartenstadt-Projekte)
 ├── priv/static/            # gebaute Assets landen in priv/static/assets/ (gitignored)
-└── storyboard/             # Durchklick-Referenz für #437
+└── storyboard/             # Durchklick-Referenz der Oberfläche
 ```

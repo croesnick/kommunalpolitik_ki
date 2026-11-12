@@ -165,7 +165,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | Tool | Sprache | Zweck | AI-Schnittstelle | Status |
 |---|---|---|---|---|
 | `apps/ratsinfo` | Elixir | RIS-Scraper + CLI + lokale Volltextsuche | CLI (`ratsinfo sync/search/show`) | Funktionsfähig |
-| `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Lokaler Hub: Weg von der Idee zum Antrag (ADR 0004). Läuft als Release, startet bei der Anmeldung gesperrt, wird im Browser oder per `ratsprojekte open` mit Touch ID geöffnet; die Datenbank ist verschlüsselt | CLI (`ratsprojekte einrichten/open/sperren/status/recover/connector-token/launchagent`); Oberfläche LiveView; Maschinenweg: Stand-Datei (#438) und Connector-Schreibweg (#277) | Gerüst (#435) und lokaler Betrieb (#440), Bau-Reihe #436–#439 läuft |
+| `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Lokaler Hub: Weg von der Idee zum Antrag (ADR 0004). Läuft als Release, startet bei der Anmeldung gesperrt, wird im Browser oder per `ratsprojekte open` mit Touch ID geöffnet; die Datenbank ist verschlüsselt | CLI (`ratsprojekte einrichten/open/sperren/status/recover/connector-token/launchagent`); Oberfläche LiveView; Maschinenweg: Stand-Datei (#438) und Connector-Schreibweg (#277) | Gerüst (#435), lokaler Betrieb (#440), Schema und Kontext (#436), Oberfläche mit Main Flow (#437); Bau-Reihe #438, #439 läuft |
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | Funktionsfähig |
 | `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi), ein Programm, das Vermittler, Egress-Proxy und Connectoren als Rollen mitbringt, + lokale Label-Registry mit Export an den Regel-Prüfkern (RFC 0003); Schlüssel liegen nur versiegelt im Schlüsselbund (Secure Enclave, Freigabe per Touch ID über das kleine Swift-Programm `komki-tresor`), gestartete Programme werden per Prüfsumme festgehalten | CLI (`komki setup/init/doctor/up/down/status/raum/go/run/session/secret/journal/label`) | Funktionsfähig |
 | `apps/komki_policy` | Elixir | Regel-Prüfkern: rechnet aus, ob eine Absicht nach den Regeln zulässig ist, und verifiziert die Begründung unabhängig nach; rein, führt selbst nichts aus | CLI (`komki-policy validate/decide/verify/advance`) | Funktionsfähig |
@@ -234,7 +234,7 @@ Lokaler Hub für den Weg von der Idee zum Antrag ([ADR 0004](docs/adr/0004-ratsp
 - Ecto + SQLite3 über exqlite, das im Workspace gegen die SQLCipher-Systembibliothek gebaut wird (BSD-Lizenz; gilt auch für ratsinfo und komki_cli). Eigene Datei unter `~/Library/Application Support/ratsprojekte/` statt der geteilten mit ratsinfo; ohne Schlüssel verhält sich SQLCipher wie normales SQLite.
 
 ### Datenmodell
-Das alte Modell (Projekt/Realisierungsstrang/PendingProposal) ist mit dem Gerüstwechsel (#435) gefallen. Das kleine Modell (Ratsprojekt, Verlauf, Meinungsbild, Befragung, Fakt, Variante, Antrag) steht in [ADR 0004](docs/adr/0004-ratsprojekte-als-lokaler-hub.md) und wird als Schema und Kontext in #436 gebaut; die kanonischen Dokumente zieht #434 nach.
+Das alte Modell (Projekt/Realisierungsstrang/PendingProposal) ist mit dem Gerüstwechsel (#435) gefallen. Das kleine Modell (Ratsprojekt, Verlauf, Meinungsbild, Befragung, Fakt, Variante, Antrag) steht in [ADR 0004](docs/adr/0004-ratsprojekte-als-lokaler-hub.md) und ist als Schema und Kontext gebaut (#436, `Ratsprojekte.Projects` und `Ratsprojekte.Surveys`, Überblick im [README der App](apps/ratsprojekte/README.md#modell)); die kanonischen Dokumente zieht #434 nach.
 
 ### Slug-Konvention
 
