@@ -245,6 +245,31 @@ defmodule KomkiCli.TresorTest do
       refute stored =~ @kanarie
     end
 
+    test "erzeugen legt ein Siegel ab und liefert nur den SHA-256 des Tokens" do
+      {cmd, dir} = keychain!("alter-wert")
+      {:ok, hub} = Secrets.fetch("ratsprojekte-hub")
+
+      assert {:ok, hash} = Secrets.erzeugen(hub, command: cmd)
+      assert hash =~ ~r/\A[0-9a-f]{64}\z/
+
+      stored = File.read!(Path.join(dir, "stored"))
+      assert Tresor.well_formed?(stored)
+      assert {:ok, token} = Secrets.reveal("ratsprojekte-hub-token", command_kc(cmd))
+      assert {:ok, _} = Base.url_decode64(token, padding: false)
+      assert Base.encode16(:crypto.hash(:sha256, token), case: :lower) == hash
+      refute stored =~ token
+
+      # A second call replaces the entry with a fresh token.
+      assert {:ok, other} = Secrets.erzeugen(hub, command: cmd)
+      refute other == hash
+    end
+
+    test "erzeugen verweigert Geheimnisse, die von aussen kommen" do
+      {cmd, dir} = keychain!(@kanarie)
+      assert {:error, :not_generable} = Secrets.erzeugen(@entry, command: cmd)
+      refute File.exists?(Path.join(dir, "calls"))
+    end
+
     test "describe nennt nie einen Wert" do
       for error <- [:unsealed, :outdated, {:tresor, :refused}, {:tresor, :no_enclave}, :missing] do
         text = Secrets.describe("brave-search-api", error)

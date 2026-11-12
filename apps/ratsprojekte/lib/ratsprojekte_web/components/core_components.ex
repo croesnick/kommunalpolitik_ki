@@ -63,7 +63,7 @@ defmodule RatsprojekteWeb.CoreComponents do
       id={@id}
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
-      class="toast toast-top toast-end z-50"
+      class="toast toast-bottom toast-end z-50"
       {@rest}
     >
       <div class={[
@@ -483,14 +483,17 @@ defmodule RatsprojekteWeb.CoreComponents do
   Translates an error message using gettext.
   """
   def translate_error({msg, opts}) do
-    # You can make use of gettext to translate error messages by
-    # uncommenting and adjusting the following code:
-
-    # if count = opts[:count] do
-    #   Gettext.dngettext(RatsprojekteWeb.Gettext, "errors", msg, msg, count, opts)
-    # else
-    #   Gettext.dgettext(RatsprojekteWeb.Gettext, "errors", msg, opts)
-    # end
+    # No gettext: the hub speaks German only. Ecto's default messages get
+    # a German text by their validation; own messages are German already.
+    msg =
+      case {opts[:validation], opts[:kind]} do
+        {:required, _} -> "Bitte ausfüllen"
+        {:length, :max} -> "Höchstens %{count} Zeichen"
+        {:length, :min} -> "Mindestens %{count} Zeichen"
+        {:cast, _} -> "Das passt nicht, bitte prüfen"
+        {:inclusion, _} -> "Bitte aus der Liste wählen"
+        _ -> msg
+      end
 
     Enum.reduce(opts, msg, fn {key, value}, acc ->
       String.replace(acc, "%{#{key}}", fn _ -> to_string(value) end)
