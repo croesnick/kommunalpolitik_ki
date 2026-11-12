@@ -1,8 +1,0 @@
-defmodule RatsprojekteWeb.PageControllerTest do
-  use RatsprojekteWeb.ConnCase
-
-  test "GET /", %{conn: conn} do
-    conn = get(conn, ~p"/")
-    assert html_response(conn, 200) =~ "Der Hub ist im Aufbau."
-  end
-end

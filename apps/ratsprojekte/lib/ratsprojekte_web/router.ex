@@ -11,9 +11,8 @@ defmodule RatsprojekteWeb.Router do
   # - Der SHA-256-Hash erlaubt allein das Inline-Theme-Script im Root-Layout
   #   (FOUC-Vermeidung, vor dem CSS). Ändert sich das Script, muss der Hash
   #   hier und im CSP-Test mitgezogen werden — der Test erzwingt das.
-  # - `img-src 'self' data:`: aus dem alten Bestand übernommen; die eigene
-  #   Oberfläche nutzt heute keine data:-Bilder, gestrichen wird es, wenn
-  #   #437 die Hub-Oberfläche baut und nichts darauf angewiesen ist.
+  # - `img-src 'self' data:`: Die Icons (Heroicons, `.hero-*`) kommen als
+  #   data:-SVG-Masken aus app.css; ohne data: fehlen sie (geprüft mit #437).
   @content_security_policy Enum.join(
                              [
                                "default-src 'self'",
@@ -38,8 +37,9 @@ defmodule RatsprojekteWeb.Router do
   end
 
   # The gate (#440, ADR 0004): without the session marker of the current
-  # unlock only the lock page with „Entsperren“. LiveViews of #437 go into a
-  # live_session with `on_mount: RatsprojekteWeb.Zugang`.
+  # unlock only the lock page with „Entsperren“. The LiveViews check the
+  # same marker on mount (`on_mount: RatsprojekteWeb.Zugang`), and their
+  # events count as actions that postpone the lock.
   pipeline :zugang do
     plug(RatsprojekteWeb.Zugang)
   end
@@ -54,6 +54,9 @@ defmodule RatsprojekteWeb.Router do
   scope "/", RatsprojekteWeb do
     pipe_through([:browser, :zugang])
 
-    get("/", PageController, :home)
+    live_session :hub, on_mount: RatsprojekteWeb.Zugang do
+      live("/", OverviewLive)
+      live("/projekte/:slug", ProjectLive)
+    end
   end
 end
