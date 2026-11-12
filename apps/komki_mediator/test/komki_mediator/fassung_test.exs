@@ -10,6 +10,8 @@ defmodule KomkiMediator.FassungTest do
              "ris_show",
              # DURCHSTICH #409 (Wegwerf)
              "rp_fakt_vorschlagen",
+             # Stand lesen (#419)
+             "rp_stand_lesen",
              "vault_read",
              "vault_search",
              "vault_write_test",
@@ -29,8 +31,8 @@ defmodule KomkiMediator.FassungTest do
   end
 
   test "fassung_id ist die versionierte Kennung" do
-    # DURCHSTICH #409 (Wegwerf): + rp_fakt_vorschlagen, D.9-Pin bricht absichtlich
-    assert KomkiMediator.Fassung.fassung_id() == "komki-mediator/4"
+    # #419: + rp_stand_lesen, D.9-Pin bricht absichtlich
+    assert KomkiMediator.Fassung.fassung_id() == "komki-mediator/5"
   end
 
   # D.9: Die vom anubis-Server advertised Tool-Namen muessen exakt der

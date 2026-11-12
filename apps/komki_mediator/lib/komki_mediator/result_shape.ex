@@ -30,6 +30,10 @@ defmodule KomkiMediator.ResultShape do
   # die Labels, die der Vermittler selbst per context.assigned_label
   # verglichen hat.
   def check("ratsprojekte", "fakt_vorschlagen", result), do: object(result, ~w(labels status))
+
+  # #419: the stand file as text, nothing else. Its labels come from the
+  # manifest, the connector reports none.
+  def check("ratsprojekte", "stand_lesen", result), do: object(result, ["stand"])
   def check(id, op, _result), do: {:error, "keine Ergebnisform fuer #{id}.#{op}"}
 
   # Objekt mit Trefferliste unter "results" plus weiteren Feldern.

@@ -18,7 +18,7 @@ defmodule KomkiCli.CLI do
       komki up    [--ctx N]
       komki down
       komki status
-      komki raum [recherche|vertraulich]
+      komki raum [recherche|vertraulich|fraktion|projektraum]
       komki go
       komki run "PROMPT" [--mode text|json] [--scratch PATH] [--timeout SEKUNDEN] [--capture-denials]
       komki session [FILE ...] [--continue] [--detach] [--decided-by ID]
@@ -342,12 +342,12 @@ defmodule KomkiCli.CLI do
       raum: [
         name: "raum",
         description:
-          "zeigt den Raum oder wechselt zwischen recherche und vertraulich (lockern nur ohne laufende Session)",
+          "zeigt den Raum oder wechselt den Referenzraum (lockern nur ohne laufende Session)",
         args: [
           name: [
             value_name: "NAME",
             required: false,
-            help: "recherche oder vertraulich; ohne Angabe nur anzeigen"
+            help: "recherche, vertraulich, fraktion oder projektraum; ohne Angabe nur anzeigen"
           ]
         ]
       ],

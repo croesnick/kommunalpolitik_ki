@@ -11,15 +11,18 @@ im Journal; ein Permit schreibt zusaetzlich einen Vorbeleg, bevor
 irgendetwas vollzogen wird (Audit vor Wirkung). Ein Connector-Aufruf
 ergibt so mehrere Datensaetze mit derselben `call_id`.
 
-Fassung `komki-mediator/4` (Tickets #144, #218): neben `ping`,
-`list_documents` und `admit_document` bietet der Vermittler die sechs
+Fassung `komki-mediator/5` (Tickets #144, #218, #419): neben `ping`,
+`list_documents` und `admit_document` bietet der Vermittler die
 Connector-Tools `ris_search`, `ris_show`, `web_search`, `vault_search`,
-`vault_read` und `vault_write_test` an. Jeder Connector-Aufruf laeuft als
+`vault_read`, `vault_write_test`, `rp_fakt_vorschlagen` und
+`rp_stand_lesen` an. Jeder Connector-Aufruf laeuft als
 emit → transfer → Vollzug → admit; jede Entscheidung steht sofort im
 Journal, dazu der Vorbeleg vor dem Vollzug, im Permit-Fall also vier PDR
 (`apps/komki_connector/CONTRACT.md` §6, Ticket #298); ein schreibender
 mit `store` statt `transfer`, das ohne GO der nutzenden Person abgelehnt
-wird (Ticket #205).
+wird (Ticket #205). Ausnahme ist `rp_stand_lesen` (§6.4, #419): ohne
+Parameter und ohne neue Beobachter entscheidet der Vermittler nur die
+Aufnahme, vor dem Vollzug und ohne GO-Weg.
 
 Gesperrte Aufrufe (`deny`, `indeterminate`, abgelehntes oder ausgebliebenes
 GO) tragen neben dem Remedy-Katalog das Feld `hinweis`: ein fester Satz an
@@ -278,9 +281,9 @@ Aufruf hier ist Entwicklung und Debugging vorbehalten.
 | Route | Zweck |
 |---|---|
 | `GET /healthz` | Status + Fassung (`fassung_id`, `tools`, `registry_id`, `gamma_hash`) |
-| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/4` (siehe unten) |
+| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/5` (siehe unten) |
 
-## Tools (Fassung `komki-mediator/4`)
+## Tools (Fassung `komki-mediator/5`)
 
 | Tool | Ablauf | Parameter |
 |---|---|---|
@@ -294,6 +297,7 @@ Aufruf hier ist Entwicklung und Debugging vorbehalten.
 | `vault_write_test` | ConnectorGate, Connector `vault` (schreibend) | `title` (max 120), `body` (max 20000) |
 | `web_search` | ConnectorGate, Connector `web` | `query` (max 400), `count` (1..10, Default 5) |
 | `rp_fakt_vorschlagen` | ConnectorGate, Connector `ratsprojekte` (schreibend, `store`): ein Ereignis mit Teilen an den Hub; aus dem Fraktionsraum ist die Übergabe eine Lockerung mit Offenlegungsfreigabe, die Teile wählt die nutzende Person vor dem GO ab (#423) | `titel` (max 120), `teile` (1..8, je `aussage` max 1000 Pflicht, `quelle` max 400 Pflicht, `fundstelle` max 200), `projekt_hinweis` (max 120) |
+| `rp_stand_lesen` | ConnectorGate, Nur-Aufnahme (§6.4, #419): Gate (admit) des Objekts `ratsprojekte-stand` (Label `ratsprojekte@1` aus dem Manifest) gegen B_W, vor dem Vollzug, ohne GO; Vollzug im Connector `ratsprojekte` liest die Stand-Datei | — |
 
 Schemas und Beschreibungen der Connector-Tools entstehen zur Compile-Zeit aus
 `KomkiConnector.Manifest` (`KomkiMediator.Tools.Connector`); ein Test

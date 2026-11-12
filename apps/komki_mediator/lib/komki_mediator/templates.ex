@@ -318,6 +318,17 @@ defmodule KomkiMediator.Templates do
     ]
 
   @doc """
+  B_W des Projektraums (Szene 12, #419): der Rechercheraum plus
+  `ratsprojekte@1`. Nur hier darf der Stand des Hubs hinein. Weil
+  `ratsprojekte@1` keine `transfer`-Regel hat, brauchen Websuche, RIS und
+  Vault hier ein GO je Aufruf; Websuche und RIS liegen zudem ausserhalb
+  des Empfaengerkreises des Hubs.
+  """
+  @spec projektraum_bindings() :: [String.t()]
+  def projektraum_bindings,
+    do: Enum.sort(["ratsprojekte@1" | recherche_bindings()])
+
+  @doc """
   B_W des Referenzraums fraktion (Szenario, Raumtabelle: antrag-radweg):
   interne Fraktionsarbeit und die Projektidee, dazu die oeffentlichen
   Bindungen jedes Raums. Ratsprojekte ist kein Weg dieses Raums — die

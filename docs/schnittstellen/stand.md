@@ -24,7 +24,7 @@ Die Schlüsselwörter MUSS und DARF sind verbindlich gemeint.
    - offene und abgelehnte Vorschläge aus komki, auch die Verlaufszeilen über sie,
    - fremder Text aus Befragungen: Argumente und noch nicht zugeordnete Vorschläge aus einem Rücklauf.
 4. Sichtbar ist, was ein Mensch im Hub selbst geschrieben oder gelesen und gespeichert hat, dazu die Zählungen aus Befragungen (Verteilungen).
-5. Die Datei trägt genau ein Label, `ratsprojekte@1`. Aufnehmen darf sie nur ein Raum mit dieser Bindung, der Projektraum aus #419.
+5. Die Datei trägt genau ein Label, `ratsprojekte@1`. Aufnehmen darf sie nur ein Raum mit dieser Bindung, der [Projektraum](../../GLOSSARY.md#projektraum) aus #419.
 6. **Die Datei liegt nie im Klartext auf der Platte.** Der Hub versiegelt sie für komki, öffnen kann sie nur komki mit Freigabe per Touch ID. Ist der Hub gesperrt, liegt der Stand damit nirgends lesbar, und Sicherung, Spotlight oder Sync-Werkzeuge sehen nur Chiffretext.
 
 ## Datei

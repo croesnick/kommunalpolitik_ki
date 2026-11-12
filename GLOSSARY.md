@@ -752,6 +752,7 @@ Vorbereitung, nicht weitergegeben).
 ausdrücklich erlaubte Felder, also weder private Einträge noch Querverweise,
 offene Vorschläge oder fremden Text. Der Hub schreibt sie beim Ausgeben eines
 Stands als Datei, versiegelt für komki; öffnen kann sie nur komki mit Touch ID.
+Aufnehmen darf sie nur ein [Projektraum](#projektraum).
 
 **Nicht:** Stand (die Fassung für Fraktion und Vorstand, sie zeigt auch Argumente).
 
@@ -862,6 +863,20 @@ In komki steht der Startvertrag als `contract`-Block in
 
 ---
 
+### Projektraum
+
+**Definition:** Ein Arbeitsraum, der `ratsprojekte@1` trägt und damit als
+einziger den maschinenlesbaren Stand aufnehmen darf. Weil er den Stand
+kennt, braucht dort jede Anfrage nach draußen ein GO.
+
+**In komki:** Referenzraum `projektraum` (`komki raum projektraum`), der
+Rechercheraum plus `ratsprojekte@1`.
+
+**Siehe:** [Maschinenlesbarer Stand](#maschinenlesbarer-stand),
+[Referenzszenario](docs/szenarien/radweg-bahnhofstrasse.md), Szene 12.
+
+---
+
 ### Raumdokument
 
 **Definition:** Ein Dokument, das zum Arbeitsraum gehört: als Datei unter
@@ -915,7 +930,13 @@ Ergebnisse von Sub-Agenten sind ebenfalls Eingänge.
 **Abgrenzung:** Eine Leseberechtigung an der Quelle ersetzt die Aufnahme
 nicht. Im Vermittler heißt der Schritt `admit` (Gate 2).
 
-**Siehe:** RFC 0003 R.5.4.
+**Nur-Aufnahme-Operation:** Eine Connector-Operation, deren Anfrage keine
+Ausgabe ist: Sie hat keine Parameter, und ihre Umgebung zeigt sie niemandem
+außerhalb des Raums. Der Vermittler entscheidet dann nur die Aufnahme, vor
+dem Lesen und ohne GO-Weg. Einziges Beispiel ist das Lesen des
+maschinenlesbaren Stands (`rp_stand_lesen`).
+
+**Siehe:** RFC 0003 R.5.4, Connector-Vertrag §6.4 (`apps/komki_connector/CONTRACT.md`).
 
 ---
 

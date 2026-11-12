@@ -35,7 +35,9 @@ defmodule KomkiCli.ConnectorProfileTest do
         egress_ports: %{"ris" => 49_531, "web" => 49_532},
         ris_mock_port: nil,
         vault_dir: @base <> "/vault",
-        ratsprojekte_socket: @base <> "/hub/hub.sock"
+        ratsprojekte_socket: @base <> "/hub/hub.sock",
+        # Stand lesen (#419)
+        ratsprojekte_stand: @base <> "/hub/stand.json"
     }
 
     struct!(base, overrides)
@@ -162,6 +164,23 @@ defmodule KomkiCli.ConnectorProfileTest do
           Manifest.fetch!("vault")
         )
       end
+    end
+
+    # #419: The stand file is the only thing the ratsprojekte connector
+    # may read beyond its runtime; without ratsprojekte_stand the rule is
+    # gone, and the hub socket stays the only way out.
+    test "ratsprojekte: genau die Stand-Datei lesen, ohne Stand keine fs-Regel" do
+      text = ConnectorProfile.connector(cfg(), Manifest.fetch!("ratsprojekte"))
+
+      assert rules_with(text, "(subpath \"/opt/komki-golden") == [
+               "(allow file-read* (subpath \"/opt/komki-golden/hub/stand.json\"))"
+             ]
+
+      without =
+        ConnectorProfile.connector(cfg(ratsprojekte_stand: nil), Manifest.fetch!("ratsprojekte"))
+
+      assert rules_with(without, "(subpath \"/opt/komki-golden") == []
+      refute without =~ "stand.json"
     end
   end
 

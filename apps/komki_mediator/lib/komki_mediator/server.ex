@@ -36,6 +36,8 @@ defmodule KomkiMediator.Server do
   component(KomkiMediator.Tools.WebSearch)
   # Durchstich #409, belegt im Wegwerf-Lauf
   component(KomkiMediator.Tools.RpFaktVorschlagen)
+  # Stand lesen (#419): admit-only, contract §6.4
+  component(KomkiMediator.Tools.RpStandLesen)
 
   # Ticket #165: Die Vorpruefung sieht die rohen Argumente - inklusive
   # unbekannter Felder und falscher Typen, welche die anubis-Schicht

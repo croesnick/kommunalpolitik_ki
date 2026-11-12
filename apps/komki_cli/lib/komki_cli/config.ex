@@ -74,8 +74,12 @@ defmodule KomkiCli.Config do
                 :web_mock_port,
                 :vault_dir,
                 # Durchstich #409, belegt im Wegwerf-Lauf: Socket des ratsprojekte-Hubs;
-                # nil heisst: ratsprojekte-Connector startet nicht.
+                # nil heisst: kein Schreibweg in den Hub.
                 :ratsprojekte_socket,
+                # Stand-Datei des Hubs (#419, Szene 12), in Kernel-Form;
+                # nil heisst: kein Stand lesen. Ohne beide startet der
+                # ratsprojekte-Connector nicht.
+                :ratsprojekte_stand,
                 connector_bins: %{},
                 egress_ports: %{},
                 # Programm-Pins (KomkiCli.Pins): Name -> %{"path", "sha256"}
@@ -115,6 +119,7 @@ defmodule KomkiCli.Config do
           web_mock_port: pos_integer() | nil,
           vault_dir: String.t() | nil,
           ratsprojekte_socket: String.t() | nil,
+          ratsprojekte_stand: String.t() | nil,
           pins: %{String.t() => %{String.t() => String.t()}}
         }
 
@@ -522,7 +527,8 @@ defmodule KomkiCli.Config do
       vault_dir: vault_dir_opt(opts[:vault_dir], base),
       # Durchstich #409, belegt im Wegwerf-Lauf: Socket des ratsprojekte-Hubs, nur gesetzt,
       # wenn die Instanz einen kennt.
-      ratsprojekte_socket: blank_to_nil(opts[:ratsprojekte_socket])
+      ratsprojekte_socket: blank_to_nil(opts[:ratsprojekte_socket]),
+      ratsprojekte_stand: blank_to_nil(opts[:ratsprojekte_stand])
     }
   end
 
@@ -632,6 +638,8 @@ defmodule KomkiCli.Config do
     :vault_dir,
     # Durchstich #409, belegt im Wegwerf-Lauf
     :ratsprojekte_socket,
+    # Stand lesen (#419)
+    :ratsprojekte_stand,
     :pins
   ]
 
@@ -689,6 +697,7 @@ defmodule KomkiCli.Config do
       web_mock_port: optional_pos(:web_mock_port, Map.get(map, "web_mock_port")),
       vault_dir: blank_to_nil(Map.get(map, "vault_dir")),
       ratsprojekte_socket: blank_to_nil(Map.get(map, "ratsprojekte_socket")),
+      ratsprojekte_stand: blank_to_nil(Map.get(map, "ratsprojekte_stand")),
       pins: Map.get(map, "pins") || %{}
     }
   end

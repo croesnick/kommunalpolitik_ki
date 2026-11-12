@@ -64,7 +64,8 @@ defmodule KomkiMediator.Vorpruefung do
   # ihr Schema aus dem Manifest (einzige Quelle, Connector-Vertrag
   # #5). Der Regelzweig ist der Fluss, dem der Aufruf ohne Verstoss
   # folgen wuerde: Connector-Tools ueber das ConnectorGate (`emit`),
-  # admit_document und die eigenen Tools ueber das Gate (`admit`).
+  # admit_document, Nur-Aufnahme-Operationen (#419) und die eigenen Tools
+  # ueber das Gate (`admit`).
   defp schema_for(tool) do
     if tool in Fassung.own_tools() do
       {:ok, %{}, "admit"}
@@ -78,9 +79,14 @@ defmodule KomkiMediator.Vorpruefung do
       {:ok, manifest, op} ->
         # Das documents-Manifest dient nur dem Vollzug von admit_document;
         # die Entscheidung faellt im Gate (KomkiMediator.Gate, Ticket
-        # #169) - daher Regelzweig `admit` statt `emit`.
-        rule = if(manifest.id == "documents", do: "admit", else: "emit")
-        {:ok, Map.fetch!(manifest.ops, op).params, rule}
+        # #169) - daher Regelzweig `admit` statt `emit`. Ebenso
+        # Nur-Aufnahme-Operationen (#419).
+        spec = Map.fetch!(manifest.ops, op)
+
+        rule =
+          if manifest.id == "documents" or spec.kind == :admit_only, do: "admit", else: "emit"
+
+        {:ok, spec.params, rule}
 
       :error ->
         :unknown_tool

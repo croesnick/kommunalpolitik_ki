@@ -36,7 +36,20 @@ defmodule KomkiCli.RaumTest do
   test "anzeigen: der Default-Raum ist recherche", %{cfg: cfg} do
     assert {:raum, text} = Raum.show(cfg)
     assert text =~ "Raum        recherche"
-    assert text =~ "komki raum fraktion | recherche | vertraulich"
+    assert text =~ "komki raum fraktion | projektraum | recherche | vertraulich"
+  end
+
+  # #419, Szene 12: Der Projektraum ist recherche plus ratsprojekte@1. Der
+  # Wechsel dorthin verschärft und geht auch mit laufender Session; zurück
+  # nach recherche wäre eine Lockerung, der Stand käme sonst mit.
+  test "Projektraum: hin verschärft, zurück nur ohne Session", %{cfg: cfg} do
+    assert {:raum, text} = Raum.switch(cfg, "projektraum", deps(session: true))
+    assert text =~ "recherche → projektraum"
+    assert bindings(cfg) == Templates.projektraum_bindings()
+    assert "ratsprojekte@1" in bindings(cfg)
+
+    assert {:error, reason, 2} = Raum.switch(cfg, "recherche", deps(session: true))
+    assert reason =~ "Session läuft noch"
   end
 
   test "verschärfen geht auch mit laufender Session und startet den Vermittler neu", %{cfg: cfg} do
@@ -84,7 +97,7 @@ defmodule KomkiCli.RaumTest do
 
   test "unbekannter Raum und gleicher Raum", %{cfg: cfg} do
     assert {:error, reason, 2} = Raum.switch(cfg, "offen", deps([]))
-    assert reason =~ "Es gibt: fraktion, recherche, vertraulich"
+    assert reason =~ "Es gibt: fraktion, projektraum, recherche, vertraulich"
     assert {:error, "Der Raum ist schon recherche.", 2} = Raum.switch(cfg, "recherche", deps([]))
   end
 

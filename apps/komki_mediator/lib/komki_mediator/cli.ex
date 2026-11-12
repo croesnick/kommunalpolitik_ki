@@ -17,7 +17,7 @@ defmodule KomkiMediator.CLI do
     in argv.
   * `--connectors-dir` Verzeichnis der Connector-Sockets `<id>.sock`
     (Default: `<base>/run/connectors`, Connector-Vertrag §2)
-  * `--version` gibt die Fassung "komki-mediator/4" aus.
+  * `--version` gibt die Fassung "komki-mediator/5" aus.
 
   Bedient schon ein anderer Prozess den Socket, verweigert der Start; eine
   verwaiste Socket-Datei wird ersetzt.

@@ -3,11 +3,13 @@ defmodule KomkiConnectorRatsprojekte.CLI do
   Durchstich #409, belegt im Wegwerf-Lauf: Rollen-Einstieg `komki-connector-ratsprojekte`
   (Multicall, CONTRACT.md §4):
 
-      komki-connector-ratsprojekte --socket <pfad> --hub-socket <pfad>
+      komki-connector-ratsprojekte --socket <pfad> [--hub-socket <pfad>] [--stand <datei>]
 
-  Liest zuerst die Credentials von stdin (eine JSON-Zeile:
-  `KOMKI_CONNECTOR_TOKEN` und `KOMKI_HUB_TOKEN`), bindet dann den Socket
-  und bedient Anfragen bis SIGTERM. Log auf stderr, ohne Payloads.
+  Mindestens einer von `--hub-socket` (Schreibweg) und `--stand`
+  (Stand lesen, #419). Liest zuerst die Credentials von stdin (eine
+  JSON-Zeile: `KOMKI_CONNECTOR_TOKEN`, mit Hub-Socket auch
+  `KOMKI_HUB_TOKEN`), bindet dann den Socket und bedient Anfragen bis
+  SIGTERM. Log auf stderr, ohne Payloads.
   """
 
   alias KomkiConnector.Launch
@@ -22,6 +24,7 @@ defmodule KomkiConnectorRatsprojekte.CLI do
          {:ok, creds} <- Server.read_credentials(),
          init_arg = %{
            hub_socket: opts.hub_socket,
+           stand: opts.stand,
            credentials: Map.delete(creds, Launch.credential_key())
          },
          {:error, reason} <- Launch.run(KomkiConnectorRatsprojekte, opts.socket, init_arg, creds) do
@@ -33,15 +36,27 @@ defmodule KomkiConnectorRatsprojekte.CLI do
   end
 
   defp parse(argv) do
-    case OptionParser.parse(argv, strict: [socket: :string, hub_socket: :string]) do
+    case OptionParser.parse(argv, strict: [socket: :string, hub_socket: :string, stand: :string]) do
       {opts, [], []} ->
-        with {:ok, socket} <- required(opts, :socket, "--socket"),
-             {:ok, hub_socket} <- required(opts, :hub_socket, "--hub-socket") do
-          {:ok, %{socket: socket, hub_socket: hub_socket}}
+        with {:ok, socket} <- required(opts, :socket, "--socket") do
+          {:ok,
+           %{
+             socket: socket,
+             hub_socket: optional(opts, :hub_socket),
+             stand: optional(opts, :stand)
+           }}
         end
 
       _ ->
-        {:error, "Aufruf: komki-connector-ratsprojekte --socket <pfad> --hub-socket <pfad>"}
+        {:error,
+         "Aufruf: komki-connector-ratsprojekte --socket <pfad> [--hub-socket <pfad>] [--stand <datei>]"}
+    end
+  end
+
+  defp optional(opts, key) do
+    case Keyword.get(opts, key) do
+      value when is_binary(value) and value != "" -> value
+      _ -> nil
     end
   end
 

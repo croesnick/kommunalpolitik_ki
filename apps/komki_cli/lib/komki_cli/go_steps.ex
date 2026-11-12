@@ -263,9 +263,9 @@ defmodule KomkiCli.GoSteps do
   """
   @spec recipients(String.t() | nil, map()) :: [String.t()]
   def recipients(tool, environments) when is_binary(tool) do
-    with {:ok, manifest, _op} <- Manifest.by_tool(tool),
+    with {:ok, manifest, op} <- Manifest.by_tool(tool),
          %{"observers" => observers} when is_list(observers) <-
-           Map.get(environments, manifest.environment) do
+           Map.get(environments, Manifest.environment(manifest, op)) do
       observers |> Enum.reject(&(&1 in @intern)) |> Enum.sort()
     else
       _ -> []

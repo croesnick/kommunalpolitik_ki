@@ -171,6 +171,37 @@ defmodule WegwerfHub.Store do
     :ok
   end
 
+  # Stand lesen (#419, Szene 12): only these fields enter the stand file. A
+  # field the store gains later stays invisible until it is listed here
+  # (Gegenprobe 12.7). Open and rejected proposals never appear (12.3).
+  @stand_vorschlag ~w(titel)
+  @stand_teil ~w(aussage fundstelle pruefstatus quelle)
+
+  @doc """
+  Gibt den Stand als Datei aus (`<dir>/stand.json`, atomar): die
+  angenommenen Vorschläge mit genau den erlaubten Feldern. Der
+  ratsprojekte-Connector liest nur diese Datei, der Hub sieht dabei
+  keine Anfrage. Wegwerf-Ersatz für „Stand ausgeben“ (#438).
+  """
+  @spec stand_ausgeben(Path.t()) :: {:ok, Path.t()}
+  def stand_ausgeben(dir) do
+    vorschlaege =
+      for %{"status" => "angenommen"} = proposal <- vorschlaege(dir) do
+        proposal
+        |> Map.take(@stand_vorschlag)
+        |> Map.put("teile", Enum.map(proposal["teile"], &Map.take(&1, @stand_teil)))
+      end
+
+    stand = %{
+      "schema" => "wegwerf-stand/1",
+      "ausgegeben" => DateTime.to_iso8601(DateTime.utc_now()),
+      "vorschlaege" => vorschlaege
+    }
+
+    write_map(dir, "stand.json", stand)
+    {:ok, Path.join(dir, "stand.json")}
+  end
+
   @doc "Alle Vorschläge löschen (für den Zwei-Welten-Vergleich, 11.4)."
   @spec leeren(Path.t()) :: :ok
   def leeren(dir) do

@@ -42,6 +42,14 @@ defmodule KomkiMediator.ConnectorGate do
   The connector's self-report is never trusted beyond the manifest.
   Connector errors yield `admitted: false` with a PDR.
 
+  Admit-only operations (`kind: :admit_only`, contract §6.4, ticket #419)
+  skip Gate 1: their request has no parameters, and the observers of the
+  operation's environment lie within those of the room's, so the request
+  is no output. The mediator checks both on every call and then decides
+  only `admit` of the manifest's fixed object against B_W before the
+  connector runs (`KomkiMediator.Gate`, as for `admit_document`). There is
+  no GO on this path.
+
   GO (ticket #98): if the catalog of a Gate 1 denial offers an action
   release for the exact call and `env.go` is set, the mediator asks the
   person, provided a session is listening (`KomkiMediator.Go`). The
@@ -76,14 +84,15 @@ defmodule KomkiMediator.ConnectorGate do
         manifest: manifest,
         op: op,
         kind: spec.kind,
+        environment: Manifest.environment(manifest, op),
         params: checked,
         intent_hash: intent_hash(tool, checked),
         call_id: PDR.new_id()
       }
 
-      emit(env, call)
+      if spec.kind == :admit_only, do: admit_only(env, call), else: emit(env, call)
     else
-      {:error, detail} -> refused(env, tool, intent_hash(tool, rendered), detail)
+      {:error, detail} -> refused(env, spec, tool, intent_hash(tool, rendered), detail)
     end
   end
 
@@ -106,6 +115,72 @@ defmodule KomkiMediator.ConnectorGate do
 
   defp intent_hash(tool, params),
     do: Hash.sha256_hex(JSON.canonical(%{"tool" => tool, "params" => params}))
+
+  # -------------------------------------------------------------------------
+  # Admit only (connector contract §6.4, ticket #419)
+  # -------------------------------------------------------------------------
+
+  # The request is a constant and nobody outside the room sees it, so it is
+  # no output (the exception to R.4.3, decided in #419). The mediator checks
+  # that criterion on every call; then it decides only `admit` of the
+  # operation's fixed object against B_W, before the connector reads
+  # anything (KomkiMediator.Gate, as for admit_document). No GO: a denial
+  # stays a denial.
+  defp admit_only(env, call) do
+    case admit_only_criterion(env, call) do
+      :ok ->
+        Gate.call(env, call.tool, call.params, fn -> read_object(env, call) end)
+
+      {:error, detail} ->
+        error_out(env, call.tool, call.intent_hash, "admit", detail, %{})
+    end
+  end
+
+  defp admit_only_criterion(env, call) do
+    spec = Map.fetch!(call.manifest.ops, call.op)
+    environments = env.gamma.compiled.environments
+
+    with :ok <- no_params(spec),
+         {:ok, op_observers} <- observers(environments, call.environment),
+         {:ok, room_observers} <- observers(environments, env.room.environment) do
+      case op_observers -- room_observers do
+        [] ->
+          :ok
+
+        outside ->
+          {:error,
+           "Nur-Aufnahme-Operation mit Beobachtern ausserhalb des Raums: " <>
+             Enum.join(outside, ", ")}
+      end
+    end
+  end
+
+  defp no_params(%{params: params}) when map_size(params) == 0, do: :ok
+
+  defp no_params(_spec),
+    do: {:error, "Nur-Aufnahme-Operation mit Parametern: die Anfrage waere eine Ausgabe"}
+
+  defp observers(environments, id) do
+    case environments[id] do
+      %{observers: observers} -> {:ok, observers}
+      _ -> {:error, "Umgebung " <> inspect(id) <> " fehlt in Γ"}
+    end
+  end
+
+  # The executor runs only after the admit permit. The answer claims the
+  # fixed object (Gate 2 binding in KomkiMediator.Gate); its shape is
+  # closed like every connector answer (§5.2).
+  defp read_object(env, call) do
+    object_id = Map.fetch!(call.manifest.ops, call.op).object
+
+    with {:ok, result} <- connector_call(env, call, PDR.new_id(), %{}),
+         :ok <- ResultShape.check(call.manifest.id, call.op, result) do
+      {:ok, Map.put(result, "object_id", object_id)}
+    else
+      {:error, %{"code" => code}} -> {:error, code}
+      {:error, detail} -> {:error, "Antwort verletzt die Ergebnisform: " <> detail}
+    end
+  end
 
   # -------------------------------------------------------------------------
   # Gate 1a: emit inside the room
@@ -164,7 +239,7 @@ defmodule KomkiMediator.ConnectorGate do
     snapshot =
       Room.connector_snapshot(env.room, env.gamma, %{
         snapshot_id: "snap-" <> rule <> "-" <> d12,
-        environment: call.manifest.environment,
+        environment: call.environment,
         object: object,
         facts: Map.put(env.room.facts, "output_content_digest", digest_fact(call))
       })
@@ -323,7 +398,7 @@ defmodule KomkiMediator.ConnectorGate do
   # Alle Empfaenger des Ziels (Szene 13: das Fenster zeigt alle Empfaenger):
   # die Beobachter der Zielumgebung des Manifests, sortiert.
   defp ziel_empfaenger(env, call) do
-    case env.gamma.compiled.environments[call.manifest.environment] do
+    case env.gamma.compiled.environments[call.environment] do
       %{observers: observers} -> observers
       _ -> []
     end
@@ -421,7 +496,7 @@ defmodule KomkiMediator.ConnectorGate do
     store_snapshot =
       Room.connector_snapshot(env.room, env.gamma, %{
         snapshot_id: "snap-store-" <> d12,
-        environment: reduced_call.manifest.environment,
+        environment: reduced_call.environment,
         object: object,
         facts: Map.put(env.room.facts, "output_content_digest", digest_fact(reduced_call))
       })
@@ -1036,9 +1111,12 @@ defmodule KomkiMediator.ConnectorGate do
   end
 
   # Pre-check failed (schema, missing B_W): no call yet, no engine
-  # decision, no execution.
-  defp refused(env, tool, intent_hash, detail),
-    do: error_out(env, tool, intent_hash, "emit", detail, %{})
+  # decision, no execution. The rule is the branch the call would have
+  # taken: `admit` for admit-only operations (§6.4), else `emit`.
+  defp refused(env, spec, tool, intent_hash, detail) do
+    rule = if spec.kind == :admit_only, do: "admit", else: "emit"
+    error_out(env, tool, intent_hash, rule, detail, %{})
+  end
 
   # An error without an engine decision: error answer plus PDR. `link`
   # adds the call's identifiers once there is a call.

@@ -9,13 +9,22 @@ defmodule KomkiConnector.Manifest do
 
   Die Manifeste sind Funktionen statt Modulattribute, weil kompilierte
   Regexe unter OTP 28 nicht in Attributen gespeichert werden duerfen.
+
+  Eine Operation kann eine eigene Umgebung tragen (`environment`, #419);
+  sonst gilt die des Connectors (`environment/2`). Eine Operation der Art
+  `:admit_only` liest genau ein festes Objekt (`object`), dessen Labels
+  die `import_labels` des Manifests sind; der Vermittler entscheidet sie
+  nur ueber `admit` (Connector-Vertrag §6.4).
   """
 
   @type op_spec :: %{
-          tool: String.t(),
-          kind: :read | :write,
-          params: Sidecar.Params.schema(),
-          description: String.t()
+          required(:tool) => String.t(),
+          required(:kind) => :read | :write | :admit_only,
+          required(:params) => Sidecar.Params.schema(),
+          required(:description) => String.t(),
+          optional(:environment) => String.t(),
+          optional(:object) => String.t(),
+          optional(:ausgabeart) => String.t()
         }
 
   @type t :: %{
@@ -128,12 +137,30 @@ defmodule KomkiConnector.Manifest do
   # (§ 4.9). Der Hub-Socket-Pfad kommt aus der config
   # (`ratsprojekte_socket`), das Hub-Token aus dem Schluesselbund-Service
   # unten (der Hub kennt nur den Hash, #415).
+  #
+  # Weg "Stand lesen" (#419, Szene 12): Der Connector liest die Stand-Datei
+  # (`{ratsprojekte_stand}` aus der config), der Hub sieht keine Anfrage.
+  # Die Anfrage ist eine Konstante, ihre Umgebung hat nur nutzende Person
+  # und Agent als Beobachter: Der Vermittler entscheidet nur die Aufnahme
+  # gegen B_W, ohne emit und transfer (Connector-Vertrag §6.4). Das Label
+  # `ratsprojekte@1` steht hier und nirgends sonst.
   def fetch!("ratsprojekte") do
     %{
       id: "ratsprojekte",
-      fassung: "komki-ratsprojekte/1",
+      fassung: "komki-ratsprojekte/2",
       binary: "komki-connector-ratsprojekte",
       ops: %{
+        "stand_lesen" => %{
+          tool: "rp_stand_lesen",
+          kind: :admit_only,
+          object: "ratsprojekte-stand",
+          environment: "lokaler-arbeitsraum@1",
+          description:
+            "Den zuletzt ausgegebenen Stand des ratsprojekte-Hubs lesen: Projekte und Fakten, wie die Redaktion " <>
+              "sie freigegeben hat. Nur in einem Raum, der dafuer angelegt ist (Projektraum); der Hub erfaehrt " <>
+              "vom Lesen nichts.",
+          params: %{}
+        },
         "fakt_vorschlagen" => %{
           tool: "rp_fakt_vorschlagen",
           kind: :write,
@@ -163,10 +190,12 @@ defmodule KomkiConnector.Manifest do
         }
       },
       egress_hosts: [],
-      fs: [],
+      fs: [{"{ratsprojekte_stand}", :read}],
       credentials: %{"KOMKI_HUB_TOKEN" => "ratsprojekte-hub-token"},
       environment: "ratsprojekte-bestand@1",
-      import_labels: []
+      # Label der Stand-Datei (stand_lesen). Der Schreibweg nimmt seine
+      # Labels aus assigned_label, nicht von hier.
+      import_labels: ["ratsprojekte@1"]
     }
   end
 
@@ -252,6 +281,11 @@ defmodule KomkiConnector.Manifest do
       end)
     end)
   end
+
+  @doc "Umgebung einer Operation: ihre eigene, sonst die des Connectors."
+  @spec environment(t(), String.t()) :: String.t()
+  def environment(manifest, op),
+    do: Map.get(Map.fetch!(manifest.ops, op), :environment, manifest.environment)
 
   @doc "Alle MCP-Tool-Namen aller Connectoren, sortiert."
   @spec tools() :: [String.t()]
