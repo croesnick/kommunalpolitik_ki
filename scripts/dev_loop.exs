@@ -671,6 +671,7 @@ defmodule DevLoop do
   # in the review worktree; the returned text goes into the review prompt.
   defp screenshots(ctx, issue, wt, rwt) do
     file = Path.join(wt, ".dev-loop/screenshots.json")
+    checked = Path.join(rwt, ".dev-loop/screenshots.json")
 
     # A symlink could point the script, which reads outside any sandbox, at
     # a secret; the rejection would then quote it into the review prompt.
@@ -681,12 +682,11 @@ defmodule DevLoop do
          :ok <- real_dir(Path.join(rwt, ".dev-loop")),
          {:ok, text} <- File.read(file),
          {:json, {:ok, map}} <- {:json, JSON.decode(text)},
-         {:ok, _spec} <- Screenshot.Spec.parse(map) do
-      checked = Path.join(rwt, ".dev-loop/screenshots.json")
+         {:ok, _spec} <- Screenshot.Spec.parse(map),
+         # Replaces a committed symlink instead of writing through it.
+         _ = File.rm(checked),
+         {:write, :ok} <- {:write, File.write(checked, text, [:exclusive])} do
       out = Path.join(rwt, ".dev-loop/screenshots")
-      # Replaces a committed symlink instead of writing through it.
-      File.rm(checked)
-      File.write!(checked, text, [:exclusive])
       log = Path.join(ctx.logs, "#{ctx.stamp.()}-screenshots.log")
       args = [@screenshot_tool, "--spec", checked, "--worktree", rwt, "--out", out]
 
@@ -712,6 +712,9 @@ defmodule DevLoop do
     else
       {:error, :enoent} ->
         "Die Umsetzung hat keine Screenshots angefordert."
+
+      {:write, {:error, reason}} ->
+        "`.dev-loop/screenshots.json` im Review-Worktree nicht geschrieben: #{:file.format_error(reason)}"
 
       {:ok, %File.Stat{}} ->
         "`.dev-loop/screenshots.json` abgelehnt: keine Datei bis 64 KB in einem echten Ordner (etwa ein Symlink)."

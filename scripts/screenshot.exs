@@ -290,7 +290,8 @@ defmodule Screenshot do
       path = Seatbelt.canonical(file)
 
       cond do
-        not Enum.any?(roots(worktree), &inside?(path, &1)) ->
+        not Enum.any?(roots(worktree), &inside?(path, &1)) or
+            Enum.any?(@denied, &inside?(path, Seatbelt.canonical(&1))) ->
           fail("Die Liste der Aufnahmen muss im Worktree oder unter /tmp liegen: #{file}")
 
         not same_file?(info, File.stat(path)) ->
@@ -688,7 +689,7 @@ defmodule Screenshot do
     port = ctx.hub_port
     {cert, key} = certificate!(ctx.scratch)
     boot = Path.join(ctx.scratch, "boot.exs")
-    File.write!(boot, @boot)
+    File.write!(boot, @boot, [:exclusive])
     # The boot script removes the copied bundles, so only this run's build counts.
     static = Path.join(ctx.build, "lib/ratsprojekte/priv/static/assets")
     assets = Enum.map(~w(js/app.js css/app.css), &Path.join(static, &1))
