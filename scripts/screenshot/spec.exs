@@ -7,7 +7,7 @@ defmodule Screenshot.Spec do
   @moduledoc false
 
   # Local paths only: no scheme, host, query, fragment or `..` segment.
-  # Every route is appended to http://127.0.0.1:<port>, so a leading `//`
+  # Every route is appended to https://127.0.0.1:<port>, so a leading `//`
   # must not pass either.
   @route ~r{\A/(?:[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)?\z}
   @themes ~w(light dark)

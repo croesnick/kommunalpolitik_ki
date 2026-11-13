@@ -644,7 +644,10 @@ defmodule DevLoop do
   defp screenshots(ctx, issue, wt, rwt) do
     file = Path.join(wt, ".dev-loop/screenshots.json")
 
-    with {:ok, text} <- File.read(file),
+    # A symlink could point the script, which reads outside any sandbox, at
+    # a secret; the rejection would then quote it into the review prompt.
+    with {:ok, %File.Stat{type: :regular, size: size}} when size <= 65_536 <- File.lstat(file),
+         {:ok, text} <- File.read(file),
          {:json, {:ok, map}} <- {:json, JSON.decode(text)},
          {:ok, _spec} <- Screenshot.Spec.parse(map) do
       checked = Path.join(rwt, ".dev-loop/screenshots.json")
@@ -671,6 +674,9 @@ defmodule DevLoop do
     else
       {:error, :enoent} ->
         "Die Umsetzung hat keine Screenshots angefordert."
+
+      {:ok, %File.Stat{}} ->
+        "`.dev-loop/screenshots.json` abgelehnt: keine Datei bis 64 KB (etwa ein Symlink)."
 
       {:error, reason} when is_atom(reason) ->
         "`.dev-loop/screenshots.json` nicht lesbar: #{:file.format_error(reason)}"

@@ -22,12 +22,13 @@ defmodule Screenshot.ProfileTest do
     elixir_root: "/opt/elixir",
     mix_archives: "/Users/u/.mix/archives",
     worktree: "/Users/u/wt",
-    writable: ["/Users/u/wt/apps/ratsprojekte/_build", "/private/tmp/scratch"],
+    writable: ["/Users/u/wt/apps/ratsprojekte/_build/dev", "/private/tmp/scratch"],
     programs: ["/Users/u/.cache/komki-screenshot/esbuild-0.25.4"],
     browser: "/Users/u/Library/Caches/ms-playwright/shell",
     dylib_dirs: ["/opt/homebrew/opt/sqlcipher/lib"],
     logs: ["/Users/u/wt/.screenshots/server.log"],
-    denied: ["/Users/u/.ssh", "/Users/u/Library/Application Support/ratsprojekte"]
+    denied: ["/Users/u/.ssh", "/Users/u/Library/Application Support/ratsprojekte"],
+    hub_port: 54_321
   }
 
   setup_all do
@@ -40,13 +41,13 @@ defmodule Screenshot.ProfileTest do
     assert text == Profile.render(@paths)
   end
 
-  test "network only on loopback", %{lines: lines} do
+  test "network only on loopback, and there only on the hub port", %{lines: lines} do
     network = Enum.filter(lines, &String.starts_with?(&1, "(allow network"))
 
     assert network == [
-             ~s{(allow network-bind (local ip "localhost:*"))},
-             ~s{(allow network-inbound (local ip "localhost:*"))},
-             ~s{(allow network-outbound (remote ip "localhost:*"))}
+             ~s{(allow network-bind (local ip "localhost:54321"))},
+             ~s{(allow network-inbound (local ip "localhost:54321"))},
+             ~s{(allow network-outbound (remote ip "localhost:54321"))}
            ]
 
     # A (local ip …) filter on network-outbound also passes connects from

@@ -20,6 +20,7 @@ defmodule Screenshot.Profile do
     * `:dylib_dirs`: libraries the NIFs of the build link against
     * `:logs`: log files the launch shells redirect into
     * `:denied`: places that stay closed even if an allow above covered them
+    * `:hub_port`: the one loopback port server and browser may use
   """
   def render(paths), do: SBPL.render(rules(paths))
 
@@ -34,7 +35,7 @@ defmodule Screenshot.Profile do
       programs(p) ++
       browser(p) ++
       system() ++
-      network() ++
+      network(p.hub_port) ++
       Enum.flat_map(p.logs, &Escript.log_rules/1) ++
       denied(p.denied)
   end
@@ -107,12 +108,16 @@ defmodule Screenshot.Profile do
     ]
   end
 
-  defp network do
+  # Only the hub's port: loopback alone would also reach every other local
+  # service (a dev server with Tidewave, llama-server, proxies).
+  defp network(port) do
+    local = SBPL.quote!("localhost:#{port}")
+
     [
-      "; Network: loopback only (server listens, browser connects)",
-      ~s{(allow network-bind (local ip "localhost:*"))},
-      ~s{(allow network-inbound (local ip "localhost:*"))},
-      ~s{(allow network-outbound (remote ip "localhost:*"))}
+      "; Network: loopback, and there only the hub's port (server listens, browser connects)",
+      "(allow network-bind (local ip " <> local <> "))",
+      "(allow network-inbound (local ip " <> local <> "))",
+      "(allow network-outbound (remote ip " <> local <> "))"
     ]
   end
 

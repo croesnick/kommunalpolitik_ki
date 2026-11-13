@@ -37,6 +37,7 @@ defmodule Screenshot do
   @pins Path.expand("screenshot/pins.json", __DIR__)
   @cache Path.expand("~/.cache/komki-screenshot")
   @sandbox_exec "/usr/bin/sandbox-exec"
+  @marker ".komki-screenshot"
 
   # The read ban of interactive sessions (#462): closed in the profile even
   # if an allow covered them.
@@ -108,7 +109,7 @@ defmodule Screenshot do
 
     worktree = worktree!(opts[:worktree] || File.cwd!())
     out = out!(opts[:out] || Path.join(worktree, ".screenshots"), worktree)
-    spec = unless opts[:probe], do: spec!(opts)
+    spec = unless opts[:probe], do: spec!(opts, worktree)
     pins = JSON.decode!(File.read!(@pins))
     browser = browser!(pins["chrome-headless-shell"])
     esbuild = program!("esbuild", pins["esbuild"])
@@ -184,14 +185,26 @@ defmodule Screenshot do
   # worktree root itself.
   defp out!(path, worktree) do
     path = Seatbelt.canonical(path)
-    roots = Enum.uniq([worktree | Enum.map([System.tmp_dir!(), "/tmp"], &Seatbelt.canonical/1)])
 
-    unless path != worktree and Enum.any?(roots, &inside?(path, &1)) and
+    unless path not in roots(worktree) and Enum.any?(roots(worktree), &inside?(path, &1)) and
              not inside?(path, Path.join(worktree, ".git")) do
       fail("Ausgabe nur in einem Unterordner des Worktrees oder von /tmp: #{path}")
     end
 
-    File.mkdir_p!(path)
+    # Old results are removed before a run, but only in a folder this tool
+    # made: a marker file, or the folder is new or empty.
+    marker = Path.join(path, @marker)
+
+    case File.ls(path) do
+      {:ok, entries} when entries != [] ->
+        unless File.exists?(marker),
+          do: fail("#{path} ist nicht leer und stammt nicht von diesem Werkzeug.")
+
+      _ ->
+        File.mkdir_p!(path)
+    end
+
+    File.write!(marker, "")
 
     for old <-
           Path.wildcard(Path.join(path, "*.{png,log,sb}")) ++ [Path.join(path, "manifest.json")],
@@ -200,13 +213,34 @@ defmodule Screenshot do
     path
   end
 
-  defp spec!(opts) do
+  defp roots(worktree),
+    do: Enum.uniq([worktree | Enum.map([System.tmp_dir!(), "/tmp"], &Seatbelt.canonical/1)])
+
+  # The tool reads the shot list outside any sandbox, and its error messages
+  # quote what they reject: only small regular files inside the worktree or
+  # /tmp, symlinks resolved.
+  defp read_spec!(file, worktree) do
+    path = Seatbelt.canonical(file)
+
+    cond do
+      not Enum.any?(roots(worktree), &inside?(path, &1)) ->
+        fail("Die Liste der Aufnahmen muss im Worktree oder unter /tmp liegen: #{file}")
+
+      not match?(
+        {:ok, %File.Stat{type: :regular, size: size}} when size <= 65_536,
+        File.stat(path)
+      ) ->
+        fail("#{file} ist keine Datei bis 64 KB.")
+
+      true ->
+        decode!(File.read!(path), file)
+    end
+  end
+
+  defp spec!(opts, worktree) do
     map =
       if file = opts[:spec] do
-        case File.read(file) do
-          {:ok, text} -> decode!(text, file)
-          {:error, reason} -> fail("#{file}: #{:file.format_error(reason)}")
-        end
+        read_spec!(file, worktree)
       else
         navs =
           for nav <- Keyword.get_values(opts, :navigate) do
@@ -351,7 +385,9 @@ defmodule Screenshot do
       elixir_root: elixir_root,
       mix_archives: Seatbelt.canonical(Path.join(mix_home, "archives")),
       worktree: worktree,
-      writable: [Path.join(app, "_build"), Path.join(app, "priv/static"), scratch],
+      # Build output of the hub (gitignored, rebuilt anyway) and the scratch
+      # directory; nothing else in the worktree.
+      writable: [Path.join(app, "_build/dev"), Path.join(app, "priv/static/assets"), scratch],
       programs: [esbuild, tailwind],
       browser: browser.dir,
       dylib_dirs: nif_dylib_dirs(app, [erlang_root, worktree]),
@@ -497,6 +533,10 @@ defmodule Screenshot do
         {"MIX_HOME", ctx.mix_home},
         {"HEX_HOME", Path.join(ctx.scratch, "hex")},
         {"HEX_OFFLINE", "1"},
+        # Mix holds its compile lock over a loopback TCP socket, which the
+        # profile does not allow beyond the hub port. Only this server
+        # compiles here, so the lock is off.
+        {"MIX_OS_CONCURRENCY_LOCK", "false"},
         {"SCREENSHOT_PORT", to_string(port)},
         {"SCREENSHOT_CERT", cert},
         {"SCREENSHOT_KEY", key},
@@ -821,9 +861,9 @@ defmodule Screenshot do
   # BEAM and the browser try to read the hub folder and ~/.ssh and to reach
   # the network; one loopback connection is the positive control.
   @probe """
-  [hub, ssh, port, hub_port] = System.argv()
-  port = String.to_integer(port)
+  [hub, ssh, hub_port, other_port] = System.argv()
   hub_port = String.to_integer(hub_port)
+  other_port = String.to_integer(other_port)
 
   checks = [
     {"BEAM liest den Hub-Ordner", fn -> File.ls(hub) end},
@@ -832,7 +872,9 @@ defmodule Screenshot do
     {"BEAM verbindet vom Hub-Port aus zu 1.1.1.1:443",
      fn -> :gen_tcp.connect({1, 1, 1, 1}, 443, [port: hub_port, reuseaddr: true], 3000) end},
     {"BEAM löst example.com auf", fn -> :inet.getaddr(~c"example.com", :inet) end},
-    {"BEAM verbindet zu 127.0.0.1 (Positivkontrolle)", fn -> :gen_tcp.connect({127, 0, 0, 1}, port, [], 3000) end}
+    {"BEAM verbindet zu einem anderen Port auf 127.0.0.1",
+     fn -> :gen_tcp.connect({127, 0, 0, 1}, other_port, [], 3000) end},
+    {"BEAM verbindet zum Hub-Port auf 127.0.0.1 (Positivkontrolle)", fn -> :gen_tcp.connect({127, 0, 0, 1}, hub_port, [], 3000) end}
   ]
 
   for {name, fun} <- checks do
@@ -843,11 +885,13 @@ defmodule Screenshot do
   """
 
   defp probe(ctx) do
-    {:ok, listen} =
-      :gen_tcp.listen(0, [:binary, ip: {127, 0, 0, 1}, active: false, reuseaddr: true])
-
-    {:ok, port} = :inet.port(listen)
-    responder = spawn_link(fn -> respond(listen) end)
+    # The responder stands in for the hub on its port (positive control);
+    # a second one on another loopback port must stay out of reach.
+    opts = [:binary, ip: {127, 0, 0, 1}, active: false, reuseaddr: true]
+    {:ok, hub_listen} = :gen_tcp.listen(ctx.hub_port, opts)
+    {:ok, other_listen} = :gen_tcp.listen(0, opts)
+    {:ok, other_port} = :inet.port(other_listen)
+    responders = Enum.map([hub_listen, other_listen], &spawn_link(fn -> respond(&1) end))
     script = Path.join(ctx.scratch, "probe.exs")
     File.write!(script, @probe)
 
@@ -859,8 +903,8 @@ defmodule Screenshot do
         script,
         ctx.hub,
         ctx.ssh,
-        to_string(port),
-        to_string(ctx.hub_port)
+        to_string(ctx.hub_port),
+        to_string(other_port)
       ])
 
     receive do: ({^beam, {:exit_status, _}} -> :ok), after: (60_000 -> stop(beam))
@@ -880,15 +924,20 @@ defmodule Screenshot do
           {"Browser öffnet http://example.com/", "http://example.com/"},
           {"Browser öffnet den Hub-Ordner", "file://" <> ctx.hub <> "/"},
           {"Browser öffnet ~/.ssh", "file://" <> ctx.ssh <> "/"},
-          {"Browser öffnet 127.0.0.1 (Positivkontrolle)", "http://127.0.0.1:#{port}/"}
+          {"Browser öffnet einen anderen Port auf 127.0.0.1", "http://127.0.0.1:#{other_port}/"},
+          {"Browser öffnet den Hub-Port auf 127.0.0.1 (Positivkontrolle)",
+           "http://127.0.0.1:#{ctx.hub_port}/"}
         ],
         cdp,
         fn {name, url}, cdp -> browse(cdp, session, name, url) end
       )
 
     close_browser(cdp)
-    Process.unlink(responder)
-    Process.exit(responder, :kill)
+
+    for pid <- responders do
+      Process.unlink(pid)
+      Process.exit(pid, :kill)
+    end
 
     rows = beam_rows ++ browser_rows
 
@@ -901,7 +950,7 @@ defmodule Screenshot do
       IO.puts("#{mark} #{name}: #{verdict} (#{String.slice(detail, 0, 100)})")
     end
 
-    if length(beam_rows) != 6 or Enum.any?(rows, fn {n, v, _} -> v != expected.(n) end) do
+    if length(beam_rows) != 7 or Enum.any?(rows, fn {n, v, _} -> v != expected.(n) end) do
       fail("Probe nicht bestanden.\n" <> tail(log))
     end
 
