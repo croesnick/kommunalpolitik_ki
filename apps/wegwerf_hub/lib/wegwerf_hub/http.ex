@@ -15,7 +15,8 @@ defmodule WegwerfHub.HTTP do
   2. Gesperrt (Datei `gesperrt` vorhanden): 503 {"status":"gesperrt"} —
      „Hub gesperrt“, gepuffert wird nichts.
   3. Rumpf muss JSON in der erwarteten Form sein (Titel, Teile mit
-     Aussage und Quelle, Projekt-Hinweis, Labels), sonst 400.
+     Aussage und Quelle, Projekt-Hinweis, Labels) und höchstens 64 KiB
+     groß sein, sonst 400.
 
   Die Antwort ist bewusst immer dieselbe: kein Schlüssel, keine Kennung,
   keine Fortnummer, nichts aus dem Bestand (Szene 11: enumeration). Was
@@ -37,7 +38,11 @@ defmodule WegwerfHub.HTTP do
   plug(:dispatch)
 
   post "/connector/fakt_vorschlagen" do
-    with {:ok, raw, _conn} <- Plug.Conn.read_body(conn, length: @max_body),
+    # Das conn aus read_body weiterführen: Es trägt den Adapter-Zustand
+    # mit dem Lesefortschritt. F22 (#491) — ein Rumpf über @max_body
+    # liefert {:more, _partial, conn} und endet sonst als WithClauseError
+    # statt als 400 mit Zeile im Anfrage-Log.
+    with {:ok, raw, conn} <- Plug.Conn.read_body(conn, length: @max_body),
          {:ok, term} <- parse_json(raw),
          :ok <- validate(term) do
       {:ok, _id} = Store.annehmen(hub_dir(conn), term)
@@ -46,6 +51,9 @@ defmodule WegwerfHub.HTTP do
     else
       {:error, :bad_json} ->
         conn |> bad_request("ungültiges JSON") |> halt()
+
+      {:more, _partial, conn} ->
+        conn |> bad_request("Rumpf über 64 KiB") |> halt()
 
       {:error, detail} ->
         conn |> bad_request(detail) |> halt()
