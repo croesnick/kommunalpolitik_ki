@@ -14,7 +14,7 @@ defmodule Screenshot.Profile do
 
     * `:erlang_root`, `:elixir_root`, `:mix_archives`: runtime, read-only
     * `:worktree`: read-only
-    * `:writable`: build output of the worktree and the scratch directory
+    * `:writable`: the scratch directory, throwaway build included
     * `:programs`: pinned executables (esbuild, tailwind)
     * `:browser`: package directory of the pinned browser
     * `:dylib_dirs`: libraries the NIFs of the build link against
@@ -52,7 +52,7 @@ defmodule Screenshot.Profile do
   end
 
   defp worktree(p) do
-    ["; Worktree with its deps: read-only; build output and scratch: read-write"] ++
+    ["; Worktree with its deps: read-only; scratch with the throwaway build: read-write"] ++
       [SBPL.read_subpath(p.worktree)] ++
       Enum.map(
         p.writable,

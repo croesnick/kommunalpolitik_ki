@@ -14,10 +14,15 @@
 #     elixir scripts/screenshot.exs --probe [--worktree PATH] [--out DIR]
 #
 # Interactive sessions start the copy that `make screenshot-install` puts in
-# ~/.local/share/komki-tools/screenshot, outside every worktree, and only that
-# call outside the Claude sandbox (.claude/settings.json), so sandbox-exec can
+# ~/.local/share/komki-tools/screenshot, outside every worktree, through its
+# launcher bin/komki-screenshot (runtime fixed at install), and only that call
+# outside the Claude sandbox (.claude/settings.json), so sandbox-exec can
 # apply; the tool then confines server and browser itself. The dev loop runs
 # the copy of its own checkout after the gates.
+#
+# The tool itself runs unconfined, and the session may write the worktree,
+# the output folder and /tmp: it never writes through a path the session
+# could have planted as a symlink (see put!/3).
 # Docs: docs/agents/interaktive-sessions.md, docs/agents/dev-loop.md.
 
 Kernel.ParallelCompiler.require(
@@ -38,7 +43,9 @@ defmodule Screenshot do
 
   @app "apps/ratsprojekte"
   @pins Path.expand("screenshot/pins.json", __DIR__)
-  @cache Path.expand("~/.cache/komki-screenshot")
+  # Next to the installed copy: neither the Claude sandbox nor Edit/Write
+  # may change it (.claude/settings.json).
+  @cache Path.expand("~/.local/share/komki-tools/cache")
   @sandbox_exec "/usr/bin/sandbox-exec"
   @marker ".komki-screenshot"
   # Written by `make screenshot-install`: the installed copy has no Git
@@ -114,6 +121,7 @@ defmodule Screenshot do
       )
 
     if rest != [] or invalid != [], do: fail(@usage)
+    sandbox_exec!()
 
     worktree = worktree!(opts[:worktree] || File.cwd!())
     out = out!(opts[:out] || Path.join(worktree, ".screenshots"), worktree)
@@ -131,6 +139,22 @@ defmodule Screenshot do
     after
       File.rm_rf(scratch)
       denials(out, System.monotonic_time(:second) - started + 5)
+    end
+  end
+
+  # Inside the Claude sandbox, macOS refuses a second profile.
+  defp sandbox_exec! do
+    case System.cmd(@sandbox_exec, ["-p", "(version 1)(allow default)", "/usr/bin/true"],
+           stderr_to_stdout: true
+         ) do
+      {_, 0} ->
+        :ok
+
+      {out, _} ->
+        fail("""
+        sandbox-exec greift nicht (#{String.trim(out)}).
+        Das Werkzeug muss außerhalb der Claude-Sandbox laufen: nur als nackter Aufruf, ohne cd, Pipe oder &&.
+        """)
     end
   end
 
@@ -160,7 +184,7 @@ defmodule Screenshot do
           ["log show gescheitert: " <> String.trim(text)]
       end
 
-    File.write!(Path.join(out, "denials.log"), Enum.join(lines, "\n") <> "\n")
+    put!(out, "denials.log", Enum.join(lines, "\n") <> "\n")
   end
 
   # -- inputs --------------------------------------------------------------
@@ -212,14 +236,13 @@ defmodule Screenshot do
 
     case File.ls(path) do
       {:ok, entries} when entries != [] ->
-        unless File.exists?(marker),
+        unless match?({:ok, %File.Stat{type: :regular}}, File.lstat(marker)),
           do: fail("#{path} ist nicht leer und stammt nicht von diesem Werkzeug.")
 
       _ ->
         File.mkdir_p!(path)
+        File.write!(marker, "", [:exclusive])
     end
-
-    File.write!(marker, "")
 
     for old <-
           Path.wildcard(Path.join(path, "*.{png,log,sb}")) ++ [Path.join(path, "manifest.json")],
@@ -233,24 +256,47 @@ defmodule Screenshot do
 
   # The tool reads the shot list outside any sandbox, and its error messages
   # quote what they reject: only small regular files inside the worktree or
-  # /tmp, symlinks resolved.
+  # /tmp, symlinks resolved. The file read is tied to the checked path by its
+  # inode, so a symlink swapped in between does not pass.
   defp read_spec!(file, worktree) do
-    path = Seatbelt.canonical(file)
+    fd = open_spec!(file)
 
-    cond do
-      not Enum.any?(roots(worktree), &inside?(path, &1)) ->
-        fail("Die Liste der Aufnahmen muss im Worktree oder unter /tmp liegen: #{file}")
+    try do
+      {:ok, info} = :file.read_file_info(fd)
+      path = Seatbelt.canonical(file)
 
-      not match?(
-        {:ok, %File.Stat{type: :regular, size: size}} when size <= 65_536,
-        File.stat(path)
-      ) ->
-        fail("#{file} ist keine Datei bis 64 KB.")
+      cond do
+        not Enum.any?(roots(worktree), &inside?(path, &1)) ->
+          fail("Die Liste der Aufnahmen muss im Worktree oder unter /tmp liegen: #{file}")
 
-      true ->
-        decode!(File.read!(path), file)
+        not same_file?(info, File.stat(path)) ->
+          fail("#{file} hat sich beim Lesen geändert.")
+
+        elem(info, 2) != :regular or elem(info, 1) > 65_536 ->
+          fail("#{file} ist keine Datei bis 64 KB.")
+
+        true ->
+          {:ok, text} = :file.read(fd, 65_536)
+          decode!(text, file)
+      end
+    after
+      File.close(fd)
     end
   end
+
+  defp open_spec!(file) do
+    case File.open(file, [:read, :binary]) do
+      {:ok, fd} -> fd
+      {:error, reason} -> fail("#{file}: #{:file.format_error(reason)}")
+    end
+  end
+
+  # :file_info of the open handle (fstat): size at 1, type at 2,
+  # major_device at 9, inode at 11.
+  defp same_file?(info, {:ok, %File.Stat{inode: inode, major_device: dev}}),
+    do: elem(info, 11) == inode and elem(info, 9) == dev
+
+  defp same_file?(_, _), do: false
 
   defp spec!(opts, worktree) do
     map =
@@ -337,8 +383,8 @@ defmodule Screenshot do
         do: fail("#{name} #{version}: Prüfsumme des Downloads stimmt nicht (#{url}).")
 
       File.mkdir_p!(@cache)
-      tmp = path <> ".part"
-      File.write!(tmp, bin)
+      tmp = "#{path}.#{System.unique_integer([:positive])}.part"
+      File.write!(tmp, bin, [:exclusive])
       File.chmod!(tmp, 0o755)
       File.rename!(tmp, path)
     end
@@ -391,7 +437,7 @@ defmodule Screenshot do
 
   defp context(worktree, out, scratch, browser, esbuild, tailwind) do
     app = Path.join(worktree, @app)
-    build = seed_build!(app, Path.join(scratch, "build"))
+    build = seed_build!(worktree, app, Path.join(scratch, "build"))
     elixir_root = Seatbelt.canonical(Path.expand("../..", to_string(:code.lib_dir(:elixir))))
     erlang_root = Seatbelt.canonical(to_string(:code.root_dir()))
     mix_home = System.get_env("MIX_HOME") || Path.expand("~/.mix")
@@ -414,7 +460,7 @@ defmodule Screenshot do
 
     profile = Path.join(scratch, "profile.sb")
     File.write!(profile, Profile.render(paths))
-    File.cp!(profile, Path.join(out, "profile.sb"))
+    put!(out, "profile.sb", File.read!(profile))
 
     %{
       worktree: worktree,
@@ -445,16 +491,31 @@ defmodule Screenshot do
   # changed compiles in the sandbox. Mix links priv and include relatively;
   # the copy sits elsewhere, so those links point back to their absolute
   # targets.
-  defp seed_build!(app, build) do
+  # The copy runs outside any sandbox, so neither the build folder nor a
+  # link the copy re-points may lead out of the worktree.
+  defp seed_build!(worktree, app, build) do
     source = Path.join(app, "_build/dev")
-    {_, 0} = System.cmd("/bin/cp", ["-Rp", source <> "/", build])
+
+    unless Seatbelt.canonical(source) == source and
+             match?({:ok, %File.Stat{type: :directory}}, File.lstat(source)),
+           do: fail("#{source} ist kein Ordner im Worktree (Symlink?).")
+
+    case System.cmd("/bin/cp", ["-Rp", source <> "/", build], stderr_to_stdout: true) do
+      {_, 0} -> :ok
+      {out, _} -> fail("Build des Worktrees nicht kopiert:\n" <> out)
+    end
 
     for dep <- File.ls!(Path.join(build, "lib")), sub <- ~w(priv include) do
       link = Path.join([build, "lib", dep, sub])
 
       with {:ok, target} <- File.read_link(link) do
+        target = Path.expand(target, Path.join([source, "lib", dep]))
+
+        unless inside?(Seatbelt.canonical(target), worktree),
+          do: fail("#{link} zeigt aus dem Worktree heraus: #{target}")
+
         File.rm!(link)
-        File.ln_s!(Path.expand(target, Path.join([source, "lib", dep])), link)
+        File.ln_s!(target, link)
       end
     end
 
@@ -717,7 +778,7 @@ defmodule Screenshot do
           "shots" => records
         }
 
-        File.write!(Path.join(ctx.out, "manifest.json"), JSON.encode!(manifest))
+        put!(ctx.out, "manifest.json", JSON.encode!(manifest))
         close_browser(cdp)
         IO.puts("#{length(records)} Aufnahmen in #{ctx.out} (manifest.json)")
       rescue
@@ -766,7 +827,7 @@ defmodule Screenshot do
     file = Spec.name(shot) <> ".png"
 
     cdp =
-      capture!(cdp, session, Path.join(out, file), %{
+      capture!(cdp, session, out, file, %{
         "captureBeyondViewport" => true,
         "clip" => clip
       })
@@ -810,7 +871,7 @@ defmodule Screenshot do
     Process.sleep(900)
     {path_at_capture, cdp} = CDP.eval!(cdp, session, "location.pathname")
     file = Spec.name(shot) <> ".png"
-    cdp = capture!(cdp, session, Path.join(out, file), %{})
+    cdp = capture!(cdp, session, out, file, %{})
 
     {arrived, cdp} =
       wait_for(
@@ -885,11 +946,11 @@ defmodule Screenshot do
     Enum.join([state | Enum.take(messages, -10)], "\n")
   end
 
-  defp capture!(cdp, session, path, params) do
+  defp capture!(cdp, session, out, file, params) do
     {%{"data" => data}, cdp} =
       CDP.call!(cdp, "Page.captureScreenshot", Map.put(params, "format", "png"), session)
 
-    File.write!(path, Base.decode64!(data))
+    put!(out, file, Base.decode64!(data))
     cdp
   end
 
@@ -937,7 +998,9 @@ defmodule Screenshot do
     {"BEAM verbindet zum Hub-Port auf 127.0.0.1 (Positivkontrolle)", fn -> :gen_tcp.connect({127, 0, 0, 1}, hub_port, [], 3000) end},
     {"BEAM schreibt in den Worktree", fn -> File.write(Path.join(worktree, ".komki-probe"), "") end},
     {"BEAM schreibt in den Build-Ordner des Hubs im Worktree",
-     fn -> File.write(Path.join(app, "_build/.komki-probe"), "") end},
+     fn -> File.write(Path.join(app, "_build/dev/.komki-probe"), "") end},
+    {"BEAM schreibt in die Assets des Hubs im Worktree",
+     fn -> File.write(Path.join(app, "priv/static/assets/.komki-probe"), "") end},
     {"BEAM schreibt in den Wegwerf-Ordner (Positivkontrolle)",
      fn -> File.write(Path.join(System.fetch_env!("TMPDIR"), ".komki-probe"), "") end}
   ]
@@ -977,7 +1040,7 @@ defmodule Screenshot do
     receive do: ({^beam, {:exit_status, _}} -> :ok), after: (60_000 -> stop(beam))
     # Should a write have passed, it leaves nothing behind.
     Enum.each(
-      [ctx.worktree, Path.join(ctx.app, "_build")],
+      [ctx.worktree, Path.join(ctx.app, "_build/dev"), Path.join(ctx.app, "priv/static/assets")],
       &File.rm(Path.join(&1, ".komki-probe"))
     )
 
@@ -1018,7 +1081,7 @@ defmodule Screenshot do
       IO.puts("#{mark} #{name}: #{verdict} (#{String.slice(detail, 0, 100)})")
     end
 
-    if length(beam_rows) != 10 or Enum.any?(rows, fn {n, v, _} -> v != expected.(n) end) do
+    if length(beam_rows) != 11 or Enum.any?(rows, fn {n, v, _} -> v != expected.(n) end) do
       fail("Probe nicht bestanden.\n" <> tail(log))
     end
 
@@ -1105,6 +1168,16 @@ defmodule Screenshot do
       {:ok, path} -> Seatbelt.canonical(path)
       _ -> nil
     end
+  end
+
+  # The output folder is writable for the session, and the tool writes
+  # outside any sandbox: each file is created exclusively under a fresh name
+  # (O_EXCL never follows a symlink) and renamed into place, which replaces a
+  # planted symlink instead of writing through it.
+  defp put!(dir, name, data) do
+    tmp = Path.join(dir, ".#{name}.#{System.unique_integer([:positive])}")
+    File.write!(tmp, data, [:exclusive])
+    File.rename!(tmp, Path.join(dir, name))
   end
 
   defp inside?(path, root), do: path == root or String.starts_with?(path, root <> "/")

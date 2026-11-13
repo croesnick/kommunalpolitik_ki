@@ -636,6 +636,24 @@ defmodule DevLoop do
     end
   end
 
+  # The tool runs outside any sandbox, so it starts on this loop's own
+  # runtime: `elixir` from PATH is an asdf shim that would pick the version,
+  # or a `path:` of its choosing, from the .tool-versions of the worktree.
+  defp runtime_elixir,
+    do: Path.join(Path.expand("../..", to_string(:code.lib_dir(:elixir))), "bin/elixir")
+
+  defp runtime_path do
+    Enum.join(
+      [
+        Path.dirname(runtime_elixir()),
+        Path.join(to_string(:code.root_dir()), "bin"),
+        "/usr/bin",
+        "/bin"
+      ],
+      ":"
+    )
+  end
+
   # UI evidence (#510): the implementation lists routes in
   # .dev-loop/screenshots.json. The script checks the list against the
   # pattern of Screenshot.Spec and runs the screenshot tool of its own
@@ -657,7 +675,12 @@ defmodule DevLoop do
       log = Path.join(ctx.logs, "#{ctx.stamp.()}-screenshots.log")
       args = [@screenshot_tool, "--spec", checked, "--worktree", rwt, "--out", out]
 
-      case Proc.run("elixir", args, cd: rwt, timeout_ms: @screenshot_timeout_ms, log: log) do
+      case Proc.run(runtime_elixir(), args,
+             cd: Path.expand("..", __DIR__),
+             env: [{"PATH", runtime_path()}],
+             timeout_ms: @screenshot_timeout_ms,
+             log: log
+           ) do
         {:ok, _} ->
           ctx.log.("##{issue.number}: Screenshots erzeugt")
 

@@ -23,7 +23,7 @@ defmodule Screenshot.ProfileTest do
     mix_archives: "/Users/u/.mix/archives",
     worktree: "/Users/u/wt",
     writable: ["/private/tmp/scratch"],
-    programs: ["/Users/u/.cache/komki-screenshot/esbuild-0.25.4"],
+    programs: ["/Users/u/.local/share/komki-tools/cache/esbuild-0.25.4"],
     browser: "/Users/u/Library/Caches/ms-playwright/shell",
     dylib_dirs: ["/opt/homebrew/opt/sqlcipher/lib"],
     logs: ["/Users/u/wt/.screenshots/server.log"],

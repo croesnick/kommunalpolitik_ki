@@ -348,7 +348,7 @@ Eine neue Prüfsumme gilt dort erst nach Merge und neuer Installation.
 | `scripts/screenshot.exs` | interaktive Sessions und Dev-Loop (Review von UI-Tickets) |
 
 esbuild und tailwind für die Assets des Hubs lädt das Werkzeug selbst (gepinnt in
-derselben Datei, Cache `~/.cache/komki-screenshot/`).
+derselben Datei, Cache `~/.local/share/komki-tools/cache/`).
 
 **Fallback:** Ohne Browser keine Screenshots. Der Prüfpunkt „Light und Dark,
 ab Handybreite“ steht dann auf `nicht geprüft`.
