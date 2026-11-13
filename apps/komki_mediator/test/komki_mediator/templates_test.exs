@@ -51,6 +51,28 @@ defmodule KomkiMediator.TemplatesTest do
     end
   end
 
+  # Regression F30/#498: Der Store der Raumdokumente entstand unter
+  # Standard-umask (022) mit 0755, die Vorlagedokumente mit 0644 — auf einem
+  # Multi-User-Host mit durchquerbarer Basis las jedes lokale Konto die
+  # Fraktionsraum-Dokumente direkt. Vor dem Fix rot: write_templates rief nur
+  # mkdir_p! und write!/1 ohne chmod. Wie im CLI (run/, connectors/, Token,
+  # denials) haerten Store und Elternverzeichnis auf 0700, Dateien auf 0600.
+  test "Dokumenten-Store 0700, Vermittler-Verzeichnis 0700, Vorlagedokumente 0600" do
+    base = KomkiMediator.TestHelpers.tmp_base("kmtpl-modi-")
+    on_exit(fn -> File.rm_rf(base) end)
+
+    assert Templates.provision!(base) == :ok
+
+    documents_dir = Path.join([base, "mediator", "documents"])
+
+    assert mode(Path.dirname(documents_dir)) == 0o700
+    assert mode(documents_dir) == 0o700
+
+    for document_id <- ["doc-oeffentlich", "doc-vertraulich", "doc-pending-freigabe"] do
+      assert mode(Path.join(documents_dir, document_id <> ".md")) == 0o600
+    end
+  end
+
   test "registry.json und room.json sind kanonische JSON-Bytes", %{base: base} do
     mediator_dir = Path.join(base, "mediator")
 
@@ -235,5 +257,10 @@ defmodule KomkiMediator.TemplatesTest do
       {:ok, decision} = Derive.decide(gamma.compiled, snapshot, intent)
       {object_id, decision}
     end)
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
   end
 end

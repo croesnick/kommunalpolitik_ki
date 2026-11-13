@@ -59,6 +59,37 @@ defmodule KomkiCli.SessionIntakeTest do
            }
   end
 
+  # ========================================================================
+  # Dateimodi des Dokumenten-Stores (Ticket #498, Fund F30)
+  # ========================================================================
+
+  # Regression F30/#498: Unter Standard-umask (022) entstanden Store und
+  # Elternverzeichnis mit 0755 und das Raumdokument mit dem Quellmodus der
+  # File.cp-Kopie (0644) — jedes lokale Konto auf der Maschine las die
+  # Fraktionsraum-Dokumente direkt. Vor dem Fix rot: plan haertete nur mit
+  # mkdir_p!, stage liess File.cp den Quellmodus stehen.
+  test "plan haertet Verzeichnisse auf 0700, stage schreibt Dokumente mit 0600", %{
+    base: base,
+    db: db
+  } do
+    file = write_source!(base, "brief-modi.txt", "Ratsunterlage")
+    register_classified!(db, "brief-modi", file, ["ratsarbeit@1"])
+
+    contract =
+      contract_json(["ratsarbeit@1"], ["brief-modi@v1"], purpose: "sitzungsvorbereitung")
+
+    room = load_room!(base, contract)
+
+    assert {:ok, intake} = plan(db, base, room, [file])
+    documents = Path.join([base, "mediator", "documents"])
+
+    stage!(intake)
+
+    assert mode(documents) == 0o700
+    assert mode(Path.dirname(documents)) == 0o700
+    assert mode(Path.join(documents, "brief-modi.md")) == 0o600
+  end
+
   test "kein UTF-8-Text -> Fehler, nichts abgelegt", %{base: base, db: db} do
     file = write_source!(base, "scan.txt", <<0xFF, 0xFE, 0x00, 0x41>>)
     register_classified!(db, "scan", file, ["ratsarbeit@1"])
@@ -962,6 +993,11 @@ defmodule KomkiCli.SessionIntakeTest do
 
   defp stage!(intake) do
     assert :ok = SessionIntake.stage(intake)
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
   end
 
   # Steps-Testnaht: echte cfg, injizierter Doctor und tmux-Status.

@@ -22,7 +22,8 @@ defmodule KomkiCli.Connectors do
 
   pidfiles unter `<base>/tmp/` mit Identitaetscheck ueber die
   ps-Kommandozeile (`KomkiCli.Proc`), Logs unter `<base>/tmp/`.
-  `<base>/run` und `<base>/run/connectors` mit `0700`.
+  `<base>/run`, `<base>/run/connectors` und der Dokumentenordner des Raums
+  samt Elternverzeichnis mit `0700`.
   """
 
   alias KomkiCli.{Config, ConnectorProfile, Proc, Profile, Secrets}
@@ -331,18 +332,22 @@ defmodule KomkiCli.Connectors do
   end
 
   @doc """
-  `<base>/run` und `<base>/run/connectors` mit 0700 anlegen, dazu den
-  Dokumentordner des Raums: Der Dokument-Connector startet vor dem
-  Vermittler, der den Ordner sonst erst beim ersten Start befuellt.
+  `<base>/run`, `<base>/run/connectors` und den Dokumentordner des Raums
+  samt Elternverzeichnis mit 0700 anlegen: Der Dokument-Connector startet
+  vor dem Vermittler, der den Ordner sonst erst beim ersten Start
+  befuellt. Raumdokumente sind vertraulich — ohne chmod richtet sie die
+  umask, und die lokale Lesbarkeitsgrenze faellt mit dem Basispfad
+  (Ticket #498).
   """
   @spec ensure_run_dirs!(Config.t()) :: :ok
   def ensure_run_dirs!(cfg) do
-    for dir <- [run_dir(cfg), connectors_dir(cfg)] do
+    documents = documents_dir(cfg)
+
+    for dir <- [run_dir(cfg), connectors_dir(cfg), Path.dirname(documents), documents] do
       File.mkdir_p!(dir)
       File.chmod!(dir, 0o700)
     end
 
-    File.mkdir_p!(documents_dir(cfg))
     :ok
   end
 

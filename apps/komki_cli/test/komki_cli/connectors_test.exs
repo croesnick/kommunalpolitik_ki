@@ -349,4 +349,45 @@ defmodule KomkiCli.ConnectorsTest do
       end
     end
   end
+
+  describe "ensure_run_dirs!/1: Modus-Haertung des Dokumenten-Stores" do
+    # Regression F30/#498: Der Dokumenten-Store der Raumdokumente entstand
+    # mit umask-Default (0755 unter 022), waehrend run/ und connectors/ zwei
+    # Zeilen darueber auf 0700 forciert werden. Auf einem Multi-User-Host mit
+    # durchquerbarer Basis las jedes lokale Konto die Fraktionsraum-Dokumente
+    # direkt, ohne Gate und Connector. Der rote Lauf vor dem Fix unter
+    # Standard-umask zeigte 0755 statt 0700.
+    test "Store und Elternverzeichnis entstehen mit 0700 wie run/ und connectors/" do
+      cfg = cfg()
+      :ok = Connectors.ensure_run_dirs!(cfg)
+
+      documents = Connectors.documents_dir(cfg)
+
+      for dir <- [Connectors.run_dir(cfg), Connectors.connectors_dir(cfg)] do
+        assert mode(dir) == 0o700
+      end
+
+      assert mode(Path.dirname(documents)) == 0o700
+      assert mode(documents) == 0o700
+    end
+
+    test "zu offene Rechte vorhandener Verzeichnisse werden korrigiert" do
+      cfg = cfg()
+      documents = Connectors.documents_dir(cfg)
+
+      File.mkdir_p!(documents)
+      File.chmod!(Path.dirname(documents), 0o755)
+      File.chmod!(documents, 0o755)
+
+      :ok = Connectors.ensure_run_dirs!(cfg)
+
+      assert mode(Path.dirname(documents)) == 0o700
+      assert mode(documents) == 0o700
+    end
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
+  end
 end

@@ -494,9 +494,16 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
   end
 
   # Dokumente nur anlegen, wenn sie fehlen: vorhandene bleiben unberuehrt.
+  # Store und Elternverzeichnis haerten auf 0700 wie run/ und connectors/ im
+  # CLI, Vorlagedokumente auf 0600 (Ticket #498): Raumdokumente sind
+  # vertraulich, die umask darf die lokale Lesbarkeitsgrenze nicht aufloesen.
   defp write_templates(mediator_dir, files) do
     documents_dir = Path.join(mediator_dir, room()["documents_dir"])
-    File.mkdir_p!(documents_dir)
+
+    for dir <- [mediator_dir, documents_dir] do
+      File.mkdir_p!(dir)
+      File.chmod!(dir, 0o700)
+    end
 
     for file <- files do
       term = if file == "registry.json", do: registry(), else: room()
@@ -511,6 +518,7 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
         path = Path.join(documents_dir, document_id <> ".md"),
         not File.exists?(path) do
       File.write!(path, document_content(document_id))
+      File.chmod!(path, 0o600)
     end
 
     :ok
