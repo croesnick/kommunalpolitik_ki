@@ -40,6 +40,10 @@ Tickets und Specs leben als GitHub Issues in `croesnick/kommunalpolitik_ki` (`gh
 
 Wie eine Session ein Wayfinder-Ticket bearbeitet, verifiziert und abschließt (Abnahmekriterien im Ticket statt im Dispatch-Prompt). Am Ende steht ein Prüfbericht: Ergebnis und Nachweis je vereinbartem Prüfpunkt, dazu die Entscheidungen, die die Umsetzung selbst getroffen hat. Die Ergebnisse vergibt eine Session, die nicht gebaut hat: [docs/agents/lane-protocol.md](docs/agents/lane-protocol.md). Welche Prüfpunkte bei jeder Änderung eines Bereichs zusätzlich gelten, steht in [docs/agents/pruefpunkte.md](docs/agents/pruefpunkte.md).
 
+### Interaktive Sessions
+
+`.claude/settings.json` sperrt echte Daten (Hub, Vault, Schlüssel) für Read-Tool und Bash-Sandbox. Ein Stop-Hook lässt eine Session erst bei grünen Gates enden, und `gh pr create` braucht einen Prüfbericht. Was das garantiert und was nicht: [docs/agents/interaktive-sessions.md](docs/agents/interaktive-sessions.md).
+
 ### Triage labels
 
 Fünf kanonische Triage-Rollen als Labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Siehe `docs/agents/triage-labels.md`.
