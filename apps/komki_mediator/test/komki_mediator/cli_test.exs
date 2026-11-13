@@ -7,7 +7,6 @@ defmodule KomkiMediator.CLITest do
   setup do
     dir = TestHelpers.tmp_base("komki-mediator-cli-")
     File.mkdir_p!(dir)
-    on_exit(fn -> File.rm_rf!(dir) end)
     %{path: Path.join(dir, "mediator.token")}
   end
 

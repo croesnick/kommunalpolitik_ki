@@ -6,10 +6,21 @@ defmodule KomkiMediator.TestHelpers do
 
   alias KomkiMediator.{Gamma, Room, Templates}
 
-  @doc "Ein temporaeres Basisverzeichnis (hermetisch; Zufallssuffix gegen Restbestaende frueherer Laeufe)."
+  @doc """
+  Ein temporaeres Basisverzeichnis (hermetisch; Zufallssuffix gegen
+  Restbestaende frueherer Laeufe). Der Pfad raeumt sich nach dem Test
+  selbst ab; ruft nur der Testprozess auf (on_exit).
+  """
   def tmp_base(prefix \\ "komki-mediator-test-") do
     suffix = Base.encode16(:crypto.strong_rand_bytes(8), case: :lower)
-    Path.join(System.tmp_dir!(), prefix <> suffix)
+    base = Path.join(System.tmp_dir!(), prefix <> suffix)
+
+    # Ohne Bang: Aufraeumen darf einen gruenen Test nachtraeglich nicht
+    # rot machen (Reste waeren ein Hygiene-Problem, kein Testfehler).
+    # rm_rf entfernt auch Pfade, die der Test nie angelegt hat.
+    ExUnit.Callbacks.on_exit(fn -> File.rm_rf(base) end)
+
+    base
   end
 
   @doc """
@@ -19,11 +30,6 @@ defmodule KomkiMediator.TestHelpers do
   def provisioned_base do
     base = tmp_base()
     Templates.provision!(base)
-
-    # Ohne Bang: Aufraeumen darf einen gruenen Test nachtraeglich nicht
-    # rot machen (Reste waeren ein Hygiene-Problem, kein Testfehler).
-    ExUnit.Callbacks.on_exit(fn -> File.rm_rf(base) end)
-
     base
   end
 
