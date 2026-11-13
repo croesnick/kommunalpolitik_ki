@@ -53,5 +53,6 @@ claude -p --permission-mode auto --output-format json "$(cat .claude/sandbox-pro
 
 Letzte Probe am 2026-11-12, Claude Code 2.1.311:
 
-- **Abgelehnt:** `ls` und `wc -c` im Hub-Ordner, `ls` im iCloud-Ordner von Obsidian, `wc -c ~/.ssh/known_hosts`, `ls ~/Library/Keychains` (jeweils `Operation not permitted`). `security` (Deny-Regel). `curl` auf ein Ziel außerhalb der Liste (403 vom Proxy). `nc -U` auf den Connector-Socket des echten Hubs. Das Read-Tool auf `~/.ssh/id_ed25519.pub` und auf eine Datei im Hub-Ordner.
+- **Abgelehnt:** `ls` und `wc -c` im Hub-Ordner, `ls` im iCloud-Ordner von Obsidian, `wc -c ~/.ssh/known_hosts`, `ls ~/Library/Keychains` (jeweils `Operation not permitted`). `security` (Deny-Regel). `curl` auf ein Ziel außerhalb der Liste (403 vom Proxy). Das Read-Tool auf `~/.ssh/id_ed25519.pub` und auf eine Datei im Hub-Ordner.
+- **Nicht eindeutig:** `nc -U` auf den Connector-Socket des echten Hubs endet mit exit=1 ohne Meldung. Das trennt eine Sperre nicht von einem fehlenden Listener (Gegentest mit #503).
 - **Erlaubt:** `git status`, `wc -c` auf `dev.db`, Schreiben im Worktree, `mix hex.info` (hex.pm). `mix test` in jeder App einzeln, mit der Socket-Freigabe für `/tmp`: 14 von 16 Apps grün. In `komki_cli` und `seatbelt` scheitern nur die Tests mit `sandbox-exec`, wie oben beschrieben. Probeweise eingeengt auf `/tmp/claude-502` (2026-11-13) scheiterten zusätzlich `komki_mediator` und vier Connectoren mit `:eperm` (#503).
