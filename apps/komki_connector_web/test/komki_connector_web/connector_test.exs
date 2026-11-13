@@ -17,7 +17,7 @@ defmodule KomkiConnectorWeb.ConnectorTest do
 
   defp body(items), do: IO.iodata_to_binary(:json.encode(%{"web" => %{"results" => items}}))
 
-  # Startet Mock-API und Connector auf einem echten Unix-Socket unter /tmp.
+  # Startet Mock-API und Connector auf einem echten Unix-Socket (kurzer Pfad).
   # Ohne Proxy teilen sich die Tests das Default-httpc-Profil; der
   # Proxy-Test nutzt ein eigenes.
   defp start(responder, init_extra \\ %{}) do
@@ -36,8 +36,21 @@ defmodule KomkiConnectorWeb.ConnectorTest do
     socket_listen(init_arg, stop_mock)
   end
 
+  # macOS limits Unix socket paths to 103 bytes (#503): System.tmp_dir!/0 when
+  # short (/tmp/claude-<uid> in the Claude Code sandbox), else /tmp. Random
+  # names: all sessions of the account share that directory.
+  defp short_tmp_dir do
+    tmp = System.tmp_dir!()
+    if byte_size(tmp) <= 32, do: tmp, else: "/tmp"
+  end
+
   defp socket_listen(init_arg, stop_mock) do
-    path = "/tmp/kmw#{System.unique_integer([:positive])}.sock"
+    path =
+      Path.join(
+        short_tmp_dir(),
+        "kmw-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"
+      )
+
     {:ok, state} = Connector.init(init_arg)
     {:ok, listener} = Server.listen(path)
     token = Sidecar.Token.provision!(path)

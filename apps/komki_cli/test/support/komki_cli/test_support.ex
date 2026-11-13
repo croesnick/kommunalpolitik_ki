@@ -2,8 +2,8 @@ defmodule KomkiCli.TestSupport do
   @moduledoc """
   Test-Fixtures (nur in `:test` kompiliert; siehe `elixirc_paths` in mix.exs).
 
-  Hermetisch und umgebungsagnostisch: temporäre Bereiche unter `/tmp`
-  (sonst `System.tmp_dir!/`) mit Auto-Cleanup über `on_exit/1`, selbstgebaute
+  Hermetisch und umgebungsagnostisch: temporäre Bereiche unter einer kurzen
+  Wurzel (`short_tmp_dir/0`) mit Auto-Cleanup über `on_exit/1`, selbstgebaute
   Symlink-Paare und die Kernel-realpath-Referenz. Keine Annahmen über
   `/private` oder das Symlink-Layout des Hosts — die Invarianten gelten
   per Definition auf jedem Dateisystem.
@@ -18,7 +18,7 @@ defmodule KomkiCli.TestSupport do
   """
   @spec tmp_area!(String.t()) :: String.t()
   def tmp_area!(prefix) do
-    dir = Path.join(tmp_root(), prefix <> "-" <> unique_suffix())
+    dir = Path.join(short_tmp_dir(), prefix <> "-" <> unique_suffix())
 
     File.mkdir_p!(dir)
     on_exit(fn -> File.rm_rf!(dir) end)
@@ -26,10 +26,19 @@ defmodule KomkiCli.TestSupport do
     dir
   end
 
-  # Kurze Wurzel (Ticket #146): Socket-Pfade unter der Basis duerfen 103 Byte
-  # nicht ueberschreiten; das macOS-TMPDIR (/var/folders/...) ist dafuer zu
-  # lang. /tmp, wo vorhanden, sonst System.tmp_dir!/0.
-  defp tmp_root, do: if(File.dir?("/tmp"), do: "/tmp", else: System.tmp_dir!())
+  @short_tmp_bytes 32
+
+  @doc """
+  Short root for Unix socket paths, which macOS limits to 103 bytes
+  (#146, #503): `System.tmp_dir!/0` when it is short (`/tmp/claude-<uid>`
+  in the Claude Code sandbox, the only place it allows sockets), else `/tmp`
+  where present, because the macOS TMPDIR under `/var/folders` is too long.
+  """
+  @spec short_tmp_dir() :: String.t()
+  def short_tmp_dir do
+    tmp = System.tmp_dir!()
+    if byte_size(tmp) <= @short_tmp_bytes or not File.dir?("/tmp"), do: tmp, else: "/tmp"
+  end
 
   @doc "Symlink-Paar unter `dir`: `%{real: existierendes Verz., link: Symlink darauf}`."
   @spec symlink_pair!(String.t()) :: %{real: String.t(), link: String.t()}

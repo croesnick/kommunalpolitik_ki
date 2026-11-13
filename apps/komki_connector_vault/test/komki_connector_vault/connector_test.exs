@@ -9,9 +9,22 @@ defmodule KomkiConnectorVault.ConnectorTest do
   @oeff "vault-oeffentlich@1"
   @vertr "vault-vertraulich@1"
 
+  # macOS limits Unix socket paths to 103 bytes (#503): System.tmp_dir!/0 when
+  # short (/tmp/claude-<uid> in the Claude Code sandbox), else /tmp. Random
+  # names: all sessions of the account share that directory.
+  defp short_tmp_dir do
+    tmp = System.tmp_dir!()
+    if byte_size(tmp) <= 32, do: tmp, else: "/tmp"
+  end
+
   setup do
     # Kurzer Pfad: macOS begrenzt Unix-Socket-Pfade auf 103 Byte.
-    dir = "/tmp/kmX#{System.unique_integer([:positive])}"
+    dir =
+      Path.join(
+        short_tmp_dir(),
+        "kmv-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower)
+      )
+
     vault = Path.join(dir, "vault")
     outside = Path.join(dir, "aussen")
     File.mkdir_p!(outside)

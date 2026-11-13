@@ -11,12 +11,25 @@ defmodule KomkiConnectorRisTest do
   @search_keys ~w(datum nummer sitzung titel top_id url)
   @show_keys ~w(abrufdatum datum nummer sitzung text titel top_id url)
 
+  # macOS limits Unix socket paths to 103 bytes (#503): System.tmp_dir!/0 when
+  # short (/tmp/claude-<uid> in the Claude Code sandbox), else /tmp. Random
+  # names: all sessions of the account share that directory.
+  defp short_tmp_dir do
+    tmp = System.tmp_dir!()
+    if byte_size(tmp) <= 32, do: tmp, else: "/tmp"
+  end
+
   # Startet Mock (im gegebenen Modus) und Connector auf einem echten
-  # Unix-Socket unter /tmp (macOS: Pfad < 104 Byte).
+  # Unix-Socket in einem kurzen Pfad (macOS: Pfad < 104 Byte).
   defp start_stack(mode, overrides \\ %{}) do
     {mock, port} = RisMock.start(mode)
     base_url = "http://127.0.0.1:#{port}/"
-    path = "/tmp/kmX#{System.unique_integer([:positive])}.sock"
+
+    path =
+      Path.join(
+        short_tmp_dir(),
+        "kmr-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"
+      )
 
     {:ok, cfg} = KomkiConnectorRis.init(Map.merge(%{base_url: base_url}, overrides))
     {:ok, listener} = Server.listen(path)
