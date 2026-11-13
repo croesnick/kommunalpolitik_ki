@@ -1,0 +1,179 @@
+{
+  "generated_at": "2026-11-13T03:26:52+00:00",
+  "duration_s": 22912,
+  "scan_id": "04bc474d-2d19-4ef7-b145-26b92398719f",
+  "mode": "scan",
+  "scan_prefix": "",
+  "scope": [
+    "apps/komki_cli",
+    "apps/komki_policy",
+    "apps/komki_mediator",
+    "apps/komki_connector",
+    "apps/komki_connector_web",
+    "apps/komki_connector_ratsprojekte",
+    "apps/komki_connector_ris",
+    "apps/komki_connector_vault",
+    "apps/komki_connector_documents",
+    "apps/komki_egress",
+    "apps/seatbelt",
+    "apps/sealed_envelope",
+    "apps/sidecar",
+    "apps/komki_mock",
+    "apps/shared",
+    "apps/ratsprojekte",
+    "apps/wegwerf_hub"
+  ],
+  "revision": {
+    "versioned": true,
+    "commit": "e17274a033b20be0595895defe56185868c4bbd5",
+    "branch": "security",
+    "dirty": false
+  },
+  "revision_source": "self-reported",
+  "model": null,
+  "effort": "max",
+  "run_shape": {
+    "requested_effort": "max",
+    "collapsed": null,
+    "source": "coverage.json",
+    "diff_files": null,
+    "diff_lines": null,
+    "scope_files": 890,
+    "empty_diff": false,
+    "empty_scope": false,
+    "researchers_dispatched": 133,
+    "verification_runs": 1,
+    "skipped_components": [
+      {
+        "name": "elixir-test-suites",
+        "paths": [
+          "apps/komki_cli/test",
+          "apps/komki_mediator/test",
+          "apps/komki_policy/test",
+          "apps/komki_egress/test",
+          "apps/komki_connector/test",
+          "apps/komki_connector_web/test",
+          "apps/komki_connector_ris/test",
+          "apps/komki_connector_vault/test",
+          "apps/komki_connector_documents/test",
+          "apps/komki_connector_ratsprojekte/test",
+          "apps/seatbelt/test",
+          "apps/sealed_envelope/test",
+          "apps/sidecar/test",
+          "apps/komki_mock/test",
+          "apps/shared/test",
+          "apps/ratsprojekte/test",
+          "apps/wegwerf_hub/test"
+        ],
+        "reason": "ExUnit suites and their fixtures (recorded responses, fake connectors, probe escripts, migration probes) — background for understanding production code, not audited themselves."
+      },
+      {
+        "name": "policy-decision-fixtures",
+        "paths": [
+          "apps/komki_policy/priv/fixtures"
+        ],
+        "reason": "200+ canned derive/verify decision cases (intent/snapshot/expected-decision triples) used as regression fixtures."
+      },
+      {
+        "name": "ris-recorded-cassettes-dev-scripts",
+        "paths": [
+          "apps/komki_connector_ris/priv"
+        ],
+        "reason": "Recorded HTTP skeletons/structures (JSON cassettes) and the standalone ris_recorder/skeleton/ngramm script family for capturing RIS fixtures — offline dev tooling, not shipped connector code."
+      },
+      {
+        "name": "pi-experiment-harness",
+        "paths": [
+          "apps/komki_cli/experiments"
+        ],
+        "reason": "JavaScript experiment/smoke harness and canary run reports (mjs/ts/json) for benchmarking the pi agent — not part of the shipped komki runtime."
+      },
+      {
+        "name": "fixture-data-priv",
+        "paths": [
+          "apps/komki_connector_vault/priv/test-vault",
+          "apps/komki_mock/priv/seeds",
+          "apps/komki_cli/priv/fixtures"
+        ],
+        "reason": "Canned fixture content: fictional markdown test vault, mock-server seed responses, registry seed JSON."
+      },
+      {
+        "name": "hub-vendor-and-static",
+        "paths": [
+          "apps/ratsprojekte/assets/vendor",
+          "apps/ratsprojekte/priv/static"
+        ],
+        "reason": "Vendored third-party assets (heroicons.js, topbar.js) and static binary/image assets of the Phoenix app."
+      },
+      {
+        "name": "hub-storyboard",
+        "paths": [
+          "apps/ratsprojekte/storyboard"
+        ],
+        "reason": "Static HTML UI prototype of the hub desktop view, not served by production code."
+      },
+      {
+        "name": "cli-doc-assets",
+        "paths": [
+          "apps/komki_cli/assets"
+        ],
+        "reason": "Single documentation SVG (session example) with no executable role."
+      },
+      {
+        "name": "out-of-scope-app-ratsinfo",
+        "paths": [
+          "apps/ratsinfo"
+        ],
+        "reason": "Elixir ratsinfo app exists in the repository but is not among the 17 directories the dispatch scoped for this scan."
+      },
+      {
+        "name": "out-of-scope-repo-top-level",
+        "paths": [
+          "tools",
+          "skills",
+          "docs",
+          "scripts",
+          "packaging",
+          ".github"
+        ],
+        "reason": "Repository areas outside the dispatch scope: Python MCP tools, skill definitions, documentation, dev scripts, Homebrew/pi packaging, CI workflows."
+      }
+    ],
+    "completeness_check_outcome": "not-applicable",
+    "unaccounted_top_level_dirs": [],
+    "inventory_fallback": null,
+    "top_level_dir_count": null,
+    "target_files": 890,
+    "component_cap": 48,
+    "research_coverage": {
+      "files": 256,
+      "read": 255,
+      "not_reached": 1,
+      "unaccounted": 0,
+      "outside_components": 634,
+      "capped": false
+    }
+  },
+  "findings": {
+    "total": 34,
+    "critical": 0,
+    "high": 4,
+    "medium": 17,
+    "low": 13
+  },
+  "verification": {
+    "status": "verified",
+    "candidates": 88,
+    "candidates_deduped": 73,
+    "panel_votes": 301,
+    "panel_reviewed_findings": 34,
+    "panel_quorum_findings": 34,
+    "unreviewed_candidate_sites": 0,
+    "incomplete_panel_candidates": 0,
+    "attested_findings": 0,
+    "reason": null,
+    "reason_kind": null,
+    "researchers_dispatched": 133,
+    "researchers_returned": 133
+  }
+}
