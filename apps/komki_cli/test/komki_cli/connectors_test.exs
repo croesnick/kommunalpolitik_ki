@@ -36,7 +36,7 @@ defmodule KomkiCli.ConnectorsTest do
       assert Enum.map(Connectors.enabled(cfg), & &1.id) == ["documents", "ris", "vault", "web"]
 
       assert Connectors.egress_ports(cfg) == [
-               {49_531, "ris", ["risapi1.komuna.net:443"]},
+               {49_531, "ris", ["risapi3.komuna.net:443"]},
                {49_532, "web", ["api.search.brave.com:443"]}
              ]
     end
@@ -110,7 +110,7 @@ defmodule KomkiCli.ConnectorsTest do
     test "egress_stdin: Format von komki-egress" do
       assert JSON.decode!(Connectors.egress_stdin(cfg())) == %{
                "ports" => %{
-                 "49531" => %{"connector" => "ris", "allow" => ["risapi1.komuna.net:443"]},
+                 "49531" => %{"connector" => "ris", "allow" => ["risapi3.komuna.net:443"]},
                  "49532" => %{"connector" => "web", "allow" => ["api.search.brave.com:443"]}
                }
              }
@@ -127,7 +127,7 @@ defmodule KomkiCli.ConnectorsTest do
                "--proxy",
                "127.0.0.1:49531",
                "--base-url",
-               "https://risapi1.komuna.net/web/"
+               "https://risapi3.komuna.net/web/"
              ]
     end
 

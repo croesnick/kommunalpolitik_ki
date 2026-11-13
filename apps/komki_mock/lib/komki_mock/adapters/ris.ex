@@ -1,6 +1,6 @@
 defmodule KomkiMock.Adapters.Ris do
   @moduledoc """
-  The guest endpoints of the RIS API (`risapi1.komuna.net/web/`), the ones
+  The guest endpoints of the RIS API (`risapi3.komuna.net/web/`), the ones
   `apps/komki_connector_ris` speaks, rendered from the data:
 
       GET /guestmeetings                     {"items": [meeting, ...]}

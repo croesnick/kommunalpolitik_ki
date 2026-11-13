@@ -156,7 +156,10 @@ defmodule KomkiCli.Config do
   @default_egress_ports %{"ris" => @default_port + 7, "web" => @default_port + 8}
   # Echte RIS-API (dieselbe Basis wie apps/ratsinfo); der Host steht im
   # Manifest als egress_hosts-Eintrag.
-  @default_ris_base_url "https://risapi1.komuna.net/web/"
+  @default_ris_base_url "https://risapi3.komuna.net/web/"
+  # Earlier defaults of the RIS API (#515: moved to risapi3 in November
+  # 2026); an instance that still carries one loads the current default.
+  @retired_ris_base_urls ["https://risapi1.komuna.net/web/"]
   @pi_bundle_rel "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
 
   @spec expected_gguf_sha256 :: String.t()
@@ -550,6 +553,11 @@ defmodule KomkiCli.Config do
 
   def ris_url(%__MODULE__{ris_base_url: url}), do: url || @default_ris_base_url
 
+  # A missing or retired URL becomes the current default (in memory; the
+  # next save writes it); any other URL stays.
+  defp ris_base_url(url) when url in [nil | @retired_ris_base_urls], do: @default_ris_base_url
+  defp ris_base_url(url), do: url
+
   @doc """
   Web-Connector gegen einen Brave-Mock (Ticket #340)? Dann spricht er
   direkt mit `http://127.0.0.1:<web_mock_port>/` statt ueber den
@@ -692,7 +700,7 @@ defmodule KomkiCli.Config do
       egress_bin: Map.get(map, "egress_bin"),
       connector_bins: Map.get(map, "connector_bins") || %{},
       egress_ports: ports(Map.get(map, "egress_ports", @default_egress_ports)),
-      ris_base_url: Map.get(map, "ris_base_url") || @default_ris_base_url,
+      ris_base_url: ris_base_url(Map.get(map, "ris_base_url")),
       ris_mock_port: optional_pos(:ris_mock_port, Map.get(map, "ris_mock_port")),
       web_mock_port: optional_pos(:web_mock_port, Map.get(map, "web_mock_port")),
       vault_dir: blank_to_nil(Map.get(map, "vault_dir")),

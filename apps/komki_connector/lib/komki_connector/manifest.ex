@@ -119,7 +119,7 @@ defmodule KomkiConnector.Manifest do
           }
         }
       },
-      egress_hosts: ["risapi1.komuna.net:443"],
+      egress_hosts: ["risapi3.komuna.net:443"],
       fs: [],
       credentials: %{},
       environment: "ris-abruf@1",

@@ -6,8 +6,8 @@ defmodule Ratsinfo.Config do
   (RIS_EMAIL, RIS_PASSWORD). Die Datei liegt außerhalb des Repos.
   """
 
-  @base_url "https://risapi1.komuna.net/web/"
-  @org_key "RIS51"
+  @base_url "https://risapi3.komuna.net/web/"
+  @org_key "RIS52"
   @customname "vgbuchloe"
   @unique_id "ris.komuna.net/vgbuchloe"
 

@@ -203,6 +203,17 @@ defmodule KomkiConnectorRisTest do
     assert {:error, %{"code" => "upstream-error"}} = show(path, "1001-1")
   end
 
+  # Ticket #515: after the RIS moved, the old address answered every list
+  # request with 404 ("Tenant unknown"), and search reported "no hits".
+  test "404 auf die Sitzungsliste ist upstream-error, nicht leere Treffer" do
+    empty = Path.join(System.tmp_dir!(), "kmris-leer-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(empty)
+    on_exit(fn -> File.rm_rf(empty) end)
+
+    %{path: path} = start_stack({:replay, empty})
+    assert {:error, %{"code" => "upstream-error"}} = search(path, %{"text" => "x"})
+  end
+
   test "Zeitueberschreitung wird auf upstream-timeout abgebildet" do
     %{path: path} = start_stack(:slow, %{timeout_ms: 300})
     assert {:error, %{"code" => "upstream-timeout"}} = search(path, %{"text" => "x"})
