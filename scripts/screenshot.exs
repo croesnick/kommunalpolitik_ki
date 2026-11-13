@@ -24,8 +24,10 @@
 # the profile) may write the worktree, the output folder and the scratch
 # directory. The tool writes there only through put!/3 and reads its logs
 # there only through read_log/1, so a planted symlink or hard link neither
-# redirects a write nor leaks a file. Left open: swapping the output folder
-# itself for a symlink during a run (docs/agents/interaktive-sessions.md).
+# redirects one of its own writes nor leaks a file. Left open: swapping the
+# output folder itself for a symlink during a run, and a hard link planted
+# on a log during the run, whose target the shells under the profile would
+# then append to (docs/agents/interaktive-sessions.md).
 # Docs: docs/agents/interaktive-sessions.md, docs/agents/dev-loop.md.
 
 Kernel.ParallelCompiler.require(
@@ -51,6 +53,7 @@ defmodule Screenshot do
   @cache Path.expand("~/.local/share/komki-tools/cache")
   @sandbox_exec "/usr/bin/sandbox-exec"
   @marker ".komki-screenshot"
+  @logs ~w(server.log browser.log probe.log)
   # Written by `make screenshot-install`: the installed copy has no Git
   # checkout of its own, so it records the repository it came from.
   @origin Path.expand("screenshot/repo", __DIR__)
@@ -463,11 +466,14 @@ defmodule Screenshot do
       programs: [esbuild, tailwind],
       browser: browser.dir,
       dylib_dirs: nif_dylib_dirs(build, [erlang_root, worktree, scratch]),
-      logs: Enum.map(~w(server.log browser.log probe.log), &Path.join(out, &1)),
+      logs: Enum.map(@logs, &Path.join(out, &1)),
       denied: Enum.map(@denied, &Seatbelt.canonical/1),
       hub_port: free_port()
     }
 
+    # Fresh regular files with a single link: the shells under the profile
+    # append to them, so a link planted before the run must not stay.
+    Enum.each(@logs, &put!(out, &1, ""))
     profile = Path.join(scratch, "profile.sb")
     File.write!(profile, Profile.render(paths))
     put!(out, "profile.sb", File.read!(profile))
@@ -536,6 +542,10 @@ defmodule Screenshot do
     Path.join(build, "lib/*/priv/**/*.so")
     |> Path.wildcard()
     |> Enum.flat_map(&Seatbelt.MachODeps.dylib_dirs/1)
+    # The check below compares text, so `..` is expanded first. Both the
+    # linked path (dyld opens it, e.g. /opt/homebrew/opt/…) and its kernel
+    # target must pass it.
+    |> Enum.flat_map(&[Path.expand(&1), Seatbelt.canonical(&1)])
     |> Enum.reject(fn dir -> Enum.any?(own_roots, &inside?(dir, &1)) end)
     |> Enum.uniq()
     |> Enum.sort()

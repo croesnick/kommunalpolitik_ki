@@ -339,7 +339,9 @@ Update geprüft hat, trägt sie dort ein.
 Interaktive Sessions starten eine installierte Kopie des Werkzeugs
 (`make screenshot-install`, siehe
 [interaktive-sessions.md](agents/interaktive-sessions.md#screenshots-der-hub-oberfläche)).
-Eine neue Prüfsumme gilt dort erst nach Merge und neuer Installation.
+Eine neue Prüfsumme gilt dort erst nach Merge und neuer Installation. Die
+Installation holt den Stand über `gh api` von GitHub und braucht dafür ein
+angemeldetes `gh`.
 
 **Benötigt von:**
 
