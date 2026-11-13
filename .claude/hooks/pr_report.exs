@@ -13,6 +13,11 @@ defmodule PrReport do
      "Abschnitt „Entscheidungen, die die Umsetzung selbst getroffen hat“"}
   ]
 
+  # `gh pr create` or its alias `gh pr new`, with flags such as `-R <repo>`
+  # between the words; `gh pr list --search new` does not count.
+  @flags "(?:\\s+-{1,2}[\\w-]+(?:[=\\s]+[^-\\s]\\S*)?)*"
+  @create Regex.compile!("\\bgh#{@flags}\\s+pr#{@flags}\\s+(?:create|new)\\b")
+
   def main do
     input = :stdio |> IO.read(:eof) |> JSON.decode!()
     IO.write(run(input))
@@ -23,7 +28,7 @@ defmodule PrReport do
     command = get_in(input, ["tool_input", "command"]) || ""
     cwd = input["cwd"] || File.cwd!()
 
-    if command =~ ~r/\bgh\s+pr\s+create\b/ do
+    if command =~ @create do
       case missing(command <> "\n" <> body_file(command, cwd), head(cwd)) do
         [] -> ""
         gaps -> deny(gaps)

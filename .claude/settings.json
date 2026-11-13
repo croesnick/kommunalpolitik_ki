@@ -39,7 +39,7 @@
     },
     "network": {
       "allowLocalBinding": true,
-      "allowUnixSockets": ["/tmp", "/private/tmp"],
+      "allowUnixSockets": ["/tmp/claude-502", "/private/tmp/claude-502"],
       "allowedDomains": [
         "hex.pm",
         "repo.hex.pm",
@@ -82,7 +82,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "input=$(cat); case \"$input\" in *gh*pr*create*) printf '%s' \"$input\" | elixir \"${CLAUDE_PROJECT_DIR}/.claude/hooks/pr_report.exs\" run ;; esac"
+            "command": "input=$(cat); case \"$input\" in *gh*pr*) printf '%s' \"$input\" | elixir \"${CLAUDE_PROJECT_DIR}/.claude/hooks/pr_report.exs\" run || { echo 'PR-Hook gescheitert, gh pr gesperrt (.claude/hooks/pr_report.exs)' >&2; exit 2; } ;; esac"
           }
         ]
       }

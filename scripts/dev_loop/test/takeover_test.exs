@@ -185,7 +185,7 @@ defmodule DevLoop.TakeoverTest do
                ~s[ANTHROPIC_AUTH_TOKEN="$('#{Path.expand("~/.claude-tt/anthropic-token.sh")}')"]
 
       assert command =~
-               "--resume 's-1' '--permission-mode' 'auto' '--strict-mcp-config' '--settings'"
+               "--resume 's-1' '--permission-mode' 'auto' '--strict-mcp-config' '--setting-sources' 'user,local' '--settings'"
 
       assert command =~ "'--effort' 'max'"
     end

@@ -84,6 +84,42 @@ defmodule RepoHooksTest do
       refute excerpt =~ "Compiling dep 1\n"
     end
 
+    test "from a subdirectory the gates run at the repo root", %{dir: dir} do
+      File.mkdir_p!(Path.join(dir, "apps/x"))
+      File.write!(Path.join(dir, "apps/x/b.txt"), "neu\n")
+      test_pid = self()
+
+      gates = fn root ->
+        send(test_pid, {:root, root})
+        :ok
+      end
+
+      StopGates.run(%{"cwd" => Path.join(dir, "apps/x")}, gates)
+      assert_received {:root, root}
+      assert File.exists?(Path.join(root, "a.txt"))
+    end
+
+    test "outside a git repo or without origin/main the hook steps aside", %{dir: dir} do
+      {gates, calls} = counting_gates({:error, "Tests", "rot"})
+      assert StopGates.run(%{"cwd" => System.tmp_dir!()}, gates) == {0, "", ""}
+
+      File.write!(Path.join(dir, "b.txt"), "neu\n")
+      System.cmd("git", ~w(update-ref -d refs/remotes/origin/main), cd: dir)
+      assert StopGates.run(%{"cwd" => dir}, gates) == {0, "", ""}
+      assert calls.() == 0
+    end
+
+    test "when origin/main moves, a green state is checked again", %{dir: dir} do
+      File.write!(Path.join(dir, "b.txt"), "neu\n")
+      {gates, calls} = counting_gates(:ok)
+      StopGates.run(%{"cwd" => dir}, gates)
+
+      System.cmd("git", ~w(commit -q --allow-empty -m main-moves), cd: dir)
+      System.cmd("git", ~w(update-ref refs/remotes/origin/main HEAD), cd: dir)
+      StopGates.run(%{"cwd" => dir}, gates)
+      assert calls.() == 2
+    end
+
     test "the real index stays untouched", %{dir: dir} do
       File.write!(Path.join(dir, "b.txt"), "neu\n")
       {gates, _} = counting_gates(:ok)
@@ -119,7 +155,20 @@ defmodule RepoHooksTest do
 
     test "other commands pass without a decision", %{dir: dir} do
       assert pr(dir, "gh pr view 12") == ""
+      assert pr(dir, "gh pr list --search new") == ""
       assert pr(dir, "git status") == ""
+    end
+
+    test "aliases and flags between the words are caught", %{dir: dir} do
+      for command <- [
+            "gh pr new --title T",
+            "gh pr -R croesnick/kommunalpolitik_ki create --title T",
+            "gh -R croesnick/kommunalpolitik_ki pr create --title T",
+            "gh  pr  create -b x"
+          ] do
+        decision = dir |> pr(command) |> JSON.decode!()
+        assert decision["hookSpecificOutput"]["permissionDecision"] == "deny", command
+      end
     end
 
     test "a body file with the report for the current head passes", %{dir: dir} do

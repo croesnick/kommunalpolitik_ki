@@ -1,6 +1,8 @@
 # Stop hook (#462): a session in this repo reports done only while the fast
-# gates are green. Skips when the working state equals origin/main or the
-# last green state, so a turn without code changes costs one git call.
+# gates are green. Runs at the repo root, whatever directory the session is
+# in. Skips when the working state equals origin/main or the last green state,
+# and outside a git repo or without origin/main, so a turn without code
+# changes costs a few git calls.
 #
 #   elixir .claude/hooks/stop_gates.exs run   # reads the hook JSON on stdin
 
@@ -20,20 +22,27 @@ defmodule StopGates do
 
   @doc "Returns `{exit_code, stdout, stderr}` for the hook input."
   def run(input, gates \\ &run_gates/1) do
-    cwd = input["cwd"] || File.cwd!()
-    key = state_key(cwd)
-
-    if key in [nil, base_tree(cwd), last_green(cwd)] do
-      {0, "", ""}
-    else
-      case gates.(cwd) do
+    with {root, 0} <- git(input["cwd"] || File.cwd!(), ~w(rev-parse --show-toplevel)),
+         root = String.trim(root),
+         {base, 0} <- git(root, ~w(merge-base HEAD origin/main)),
+         base = String.trim(base),
+         {base_tree, 0} <- git(root, ["rev-parse", base <> "^{tree}"]),
+         tree when is_binary(tree) <- state_tree(root),
+         true <- tree != String.trim(base_tree),
+         # The base is part of the key: when origin/main moves, the set of
+         # affected apps may change.
+         key = base <> " " <> tree,
+         true <- key != last_green(root) do
+      case gates.(root) do
         :ok ->
-          File.write!(marker(cwd), key)
+          File.write!(marker(root), key)
           {0, "", ""}
 
         {:error, name, output} ->
           verdict(input["stop_hook_active"] == true, name, output)
       end
+    else
+      _ -> {0, "", ""}
     end
   end
 
@@ -63,7 +72,7 @@ defmodule StopGates do
 
   # The tree of everything git would see after `git add -A`, without touching
   # the real index: tracked changes and untracked files that are not ignored.
-  defp state_key(cwd) do
+  defp state_tree(cwd) do
     index = Path.join(System.tmp_dir!(), "stop-gates-#{System.unique_integer([:positive])}")
     env = [{"GIT_INDEX_FILE", index}]
 
@@ -77,15 +86,6 @@ defmodule StopGates do
       end
     after
       File.rm(index)
-    end
-  end
-
-  defp base_tree(cwd) do
-    with {base, 0} <- git(cwd, ~w(merge-base HEAD origin/main)),
-         {tree, 0} <- git(cwd, ["rev-parse", String.trim(base) <> "^{tree}"]) do
-      String.trim(tree)
-    else
-      _ -> :no_base
     end
   end
 
