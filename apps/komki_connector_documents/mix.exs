@@ -33,7 +33,7 @@ defmodule KomkiConnectorDocuments.MixProject do
     [
       {:komki_connector, path: "../komki_connector"},
       {:sidecar, path: "../sidecar"},
-      {:ex_pdfium, "~> 0.6.0"},
+      {:ex_pdfium, "~> 0.7.0"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]
