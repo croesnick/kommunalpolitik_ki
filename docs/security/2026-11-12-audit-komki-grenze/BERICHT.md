@@ -1,6 +1,6 @@
 # Sicherheits-Audit der komki-Grenze (Ticket #467)
 
-Erster KI-gestützter Sicherheits-Audit der komki-Grenze nach dem Bedrohungsmodell aus RFC 0003 (R.8), gelaufen am 12./13. November 2026. Werkzeug: das Claude-Security-Plugin (Scan-Pipeline mit Inventory, Threat-Modell, 133 Researchern, zwei Sweeps, Secrets-Pass, dreilinsigem adversarialem Panel und Red-Team-Phase), gefahren aus der Haupt-Session im frischen Worktree, effort `max`. Der englische Vollbericht mit allen 34 Funden liegt daneben: [CLAUDE-SECURITY-RESULTS.md](CLAUDE-SECURITY-RESULTS.md) (dazu JSONL und SARIF für Maschinen, plus Revision-Stamp). Die Fund-Tickets folgen einzeln; ihre Nummern stehen in der Tabelle unten, sobald sie stehen.
+Erster KI-gestützter Sicherheits-Audit der komki-Grenze nach dem Bedrohungsmodell aus RFC 0003 (R.8), gelaufen am 12./13. November 2026. Werkzeug: das Claude-Security-Plugin v0.11.0 (auf Commit `c447c3207a42` gepinnt; README und Job-Rezepte vor dem Lauf gelesen), Scan-Pipeline mit Inventory, Threat-Modell, 133 Researchern, zwei Sweeps, Secrets-Pass, dreilinsigem adversarialem Panel und Red-Team-Phase, gefahren aus der Haupt-Session im frischen Worktree, effort `max`. Der englische Vollbericht mit allen 34 Funden liegt daneben: [CLAUDE-SECURITY-RESULTS.md](CLAUDE-SECURITY-RESULTS.md) (dazu JSONL und SARIF für Maschinen, plus Revision-Stamp). Die Fund-Tickets folgen einzeln; ihre Nummern stehen in der Tabelle unten, sobald sie stehen.
 
 ## Auftrag und Einordnung
 
@@ -10,22 +10,24 @@ Auftrag war der Scanner-Entwurf aus dem Ticket: Agent-Code, Agent-Ausgaben und i
 
 | Messgröße | Wert |
 |---|---|
-| Laufzeit | Workflow 6 h 18 min (inkl. Fehlstart ~7,5 h Session) |
-| Kosten | ~33,2 Mio. Subagent-Tokens, 456 Agents, 15 131 Werkzeugaufrufe, 0 Agent-Fehler |
+| Laufzeit | Workflow-Job 6 h 22 min laut Stamp (`duration_s: 22912`; reine Workflow-Pipeline 6 h 18 min, inkl. Fehlstart ~7,5 h Session) |
+| Kosten | ~33,2 Mio. Subagent-Tokens, 456 Agents, 15 131 Werkzeugaufrufe, 0 Agent-Fehler (Token-/Agent-Zahlen aus dem Lauf, nicht im Stamp belegt; Stamp belegt 133/133 Researcher und 301 Panel-Stimmen) |
 | Abdeckung | 17/17 Grenz-Apps, 890 Dateien im Scope, 255/256 Produktionsdateien gelesen, 0 unabgerechnet; Tests/Fixtures/priv bewusst Hintergrund (Begründungen im Vollbericht) |
-| Funde | 88 Roh-Kandidaten → 73 dedupliziert → **34 bestätigt** (31 einstimmig, 3 mit 2/3 und Red-Team), **39 verworfen** (12 Red-Team, 5 Repanel, 22 Panel) |
+| Funde | 88 Roh-Kandidaten → 73 dedupliziert → **34 bestätigt** (31 einstimmig, 3 mit 2/3 und Red-Team — die drei bilden die „plausibel"-Klasse des Tickets ab), **39 verworfen** (12 Red-Team, 5 Repanel, 22 Panel) |
 | Verifikationsstatus | `verified` (aus der Stimmakte berechnet, im Revision-Stamp) |
 
 ## Fundübersicht (34 bestätigt: 4 HIGH, 17 MEDIUM, 13 LOW)
 
-| Fund | Severity | App / Senke | Verletzte Zusage (RFC 0003) | Ticket |
+Nicht jede Zeile trifft eine R.8.3-Zusage der RFC 0003: Die Zeilen mit „Datenschutz-Grenze (§8)" benennen AGENTS.md §8, F21 benennt die Hub-Zugangskontrolle aus ADR 0004, und Verfügbarkeits-Funde treffen keine Zusage, sondern R.8.4-Pflichten oder schlicht den Betrieb.
+
+| Fund | Severity | App / Senke | Verletzte Zusage / Grenze | Ticket |
 |---|---|---|---|---|
 | F1 | HIGH | komki_mediator: `JSON.canonical` Θ(depth²) auf rohen MCP-Argumenten → DoS | Auditierbare Vermittlung (Vermittler und Journal legbar; vollständige Vermittlung gefährdet) | #473 |
 | F2 | HIGH | seatbelt: Mach-O-Load-Commands werden ungeprüft zu `file-read*`-Grants | Vertrauensbasis Isolation (R.8.1); Nichtinterferenz ohne Lockerung kollabiert | #474 |
 | F3/F18/F20 | HIGH/MED/MED | komki-tresor: ECDH-Shared-Secret an jeden gleich-UID-Prozess, Prompt-Text vom Aufrufer | Vertrauensbasis Identitätsprüfung (R.8.1) — Touch-ID-Einwilligung ist fälschbar | #475 |
 | F4 | HIGH | komki_cli `go_steps.ex`: verweigerte Offenlegung wird als `go: true` geschrieben | Kein Autoritätsgewinn; Begrenzte Faktenfreigabe (Freigabe trotz „n") | #476 |
 | F5/F7/F8 | MED | komki_policy `verify.ex`: drei Schmiede-Lücken (geschmiedete Proof-Bäume validieren) | Kein Autoritätsgewinn; Auditierbare Vermittlung | #477, #479, #480 |
-| F6 | MED | komki_connector_vault `note.ex`: ReDoS in der Titel-Regex | R.8.4: Suchdienst-Determinismus (Suche für alle Räume legbar) | #478 |
+| F6 | MED | komki_connector_vault `note.ex`: ReDoS in der Titel-Regex | Verfügbarkeit des Vault-Suchdienstes (keine R.8.3-Zusage; R.8.4-Suchdienst-Pflicht berührt) | #478 |
 | F9 | MED | komki_mock: Kassetten-State mit 0644 statt 0600 | Datenschutz-Grenze (§8): nicht-öffentliche Ratsinhalte lokal lesbar | #481 |
 | F10/F14 | MED | komki_mediator `connector_gate.ex`: Γ-Rotation vor Silent-Filter → Existenz-Orakel | R.8.4: verweigerter Aufruf darf Existenz verborgener Notizen nicht verraten | #482 |
 | F11 | MED | komki_connector_web `text.ex`: ReDoS im Tag-Strip ferngesteuerter Treffer | Verfügbarkeit des Connectors (R.8.4 Suchdienst-Pflicht verwandt) | #483 |
@@ -60,4 +62,4 @@ Die Einrichtung des wöchentlichen Laufs ist ein eigenes Ticket: #501.
 
 ## Grenzen des Laufs
 
-Lektüre-Befund, kein Lauf: kein Fund wurde am laufenden komki demonstriert; Seatbelt- und Secure-Enclave-Aussagen gelten als Hypothese. Tests, Fixtures und `priv`-Kassetten waren bewusst Hintergrund (mit Secrets-Pass über die Fixtures). `apps/ratsinfo`, `tools/`, `skills/`, `docs/`, `scripts/`, `packaging/` lagen außerhalb des Scopes. Scans sind nichtdeterministisch — ein sauberer Bereich heißt „in diesem Lauf nicht gefunden", nicht „sicher".
+Lektüre-Befund, kein Lauf: kein Fund wurde am laufenden komki demonstriert; Seatbelt- und Secure-Enclave-Aussagen gelten als Hypothese. Tests, Fixtures und `priv`-Kassetten waren bewusst Hintergrund (mit Secrets-Pass über die Fixtures). `apps/ratsinfo`, `tools/`, `skills/`, `docs/`, `scripts/`, `packaging/` lagen außerhalb des Scopes. Scans sind nichtdeterministisch — ein sauberer Bereich heißt „in diesem Lauf nicht gefunden", nicht „sicher". Die Regressionstests je bestätigtem Fund entstehen mit den Fixes in den Einzeltickets #473–#500; zum Zeitpunkt dieses Berichts existieren sie noch nicht — der Prüfbericht im Abschluss-PR stuft den Prüfpunkt daher als nicht bestanden aus.
