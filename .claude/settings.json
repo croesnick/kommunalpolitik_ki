@@ -65,8 +65,7 @@
       "Read(~/Library/Keychains/**)",
       "Read(~/Library/Application Support/ratsprojekte/**)",
       "Read(~/Library/Mobile Documents/iCloud~md~obsidian/**)",
-      "Edit(~/.local/share/komki-tools/**)",
-      "Write(~/.local/share/komki-tools/**)"
+      "Edit(~/.local/share/komki-tools/**)"
     ]
   },
   "hooks": {
