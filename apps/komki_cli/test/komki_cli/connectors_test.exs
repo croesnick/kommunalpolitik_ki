@@ -220,6 +220,60 @@ defmodule KomkiCli.ConnectorsTest do
       assert JSON.decode!(line) == %{"KOMKI_CONNECTOR_TOKEN" => token}
     end
 
+    # Regression #496: Im Web-Mock spricht der Connector im Klartext mit
+    # http://127.0.0.1:<mock-port>/ — ein Port, den jeder lokale Prozess
+    # binden kann. Vor dem Fix stand in dieser stdin-Zeile der echte,
+    # per Touch ID entsiegelte Brave-Schluessel (Abruf ueber fetch); nach
+    # dem Fix provisioniert der Launcher den synthetischen Test-Key und
+    # oeffnet das Siegel gar nicht.
+    test "#496: Web-Mock provisioniert den synthetischen Test-Key, das Siegel bleibt zu" do
+      cfg = cfg(web_mock_port: 4020)
+      web = Manifest.fetch!("web")
+      token = Sidecar.Token.generate()
+
+      assert ["--base-url", "http://127.0.0.1:4020/"] ==
+               Enum.take(Connectors.connector_args(cfg, web), -2)
+
+      assert Connectors.synthetic_credentials(cfg, web) == %{
+               "BRAVE_API_KEY" => Connectors.mock_web_key()
+             }
+
+      {line, missing} =
+        Connectors.credentials_line(
+          web,
+          token,
+          fn _ -> flunk("kein Abruf des echten Schluessels") end,
+          Connectors.synthetic_credentials(cfg, web)
+        )
+
+      assert JSON.decode!(line) == %{
+               "BRAVE_API_KEY" => Connectors.mock_web_key(),
+               "KOMKI_CONNECTOR_TOKEN" => token
+             }
+
+      assert missing == []
+      refute line =~ "brave-search-api"
+    end
+
+    test "#496: ohne Web-Mock bleibt es beim echten Schluessel, andere Connector ohne Synthetik" do
+      web = Manifest.fetch!("web")
+
+      assert Connectors.synthetic_credentials(cfg(), web) == %{}
+
+      {line, []} =
+        Connectors.credentials_line(web, Sidecar.Token.generate(), fn
+          "brave-search-api" -> {:ok, @kanarie}
+        end)
+
+      assert JSON.decode!(line)["BRAVE_API_KEY"] == @kanarie
+
+      # Auch mit Mock-Ports: Nur der Web-Connector bekommt einen synthetischen Key.
+      assert Connectors.synthetic_credentials(
+               cfg(ris_mock_port: 4010, web_mock_port: 4020),
+               Manifest.fetch!("ris")
+             ) == %{}
+    end
+
     test "Spawn-Zeile: env -i, sandbox-exec mit Profil, escript, stdin durchgereicht" do
       cfg = cfg()
       profile = Connectors.profile_path(cfg, "ris")

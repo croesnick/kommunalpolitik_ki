@@ -16,6 +16,9 @@ defmodule KomkiCli.Connectors do
       stdin: genau eine JSON-Zeile mit den Credentials aus dem
       Schluesselbund (`{}` ohne Credentials oder wenn einer fehlt), danach
       schliesst komki stdin. Der Wert steht nie in argv, Umgebung oder Log.
+      Im Web-Mock steht dort statt des echten Brave-Schluessels ein
+      synthetischer Test-Key (#496): Der Mock laeuft auf Loopback im
+      Klartext, und dorthin darf der echte bezahlte Schluessel nie reisen.
     * Bereit ist ein Connector, wenn die reservierte Operation `ping` die
       Fassung des Manifests liefert; der Egress, wenn sein erster Port
       Verbindungen annimmt.
@@ -216,25 +219,52 @@ defmodule KomkiCli.Connectors do
   defp optional_arg(_flag, nil), do: []
 
   @doc """
+  Synthetischer Test-Key der Websuche (#496): kein Geheimnis, erkennbar
+  als komki-eigener Mock-Wert. Im Web-Mock schreibt der Launcher ihn in
+  die stdin-Zeile, statt das Siegel des echten Brave-Schluessels zu
+  oeffnen — im Klartext zum Loopback darf er reisen, der echte
+  bezahlte Schluessel nie.
+  """
+  @spec mock_web_key() :: String.t()
+  def mock_web_key, do: "komki-mock-brave-key"
+
+  @doc """
+  Synthetische Credentials je Connector fuer diesen Start (#496): Im
+  Web-Mock oeffnet der Launcher das Siegel des echten Brave-Schluessels
+  nicht, sondern gibt einen Test-Key mit. Der Mock laeuft auf Loopback
+  im Klartext, und jeder lokale Prozess koennte dessen Port binden —
+  dorthin darf der echte Schluessel nie gelangen.
+  """
+  @spec synthetic_credentials(Config.t(), Manifest.t()) :: %{String.t() => String.t()}
+  def synthetic_credentials(%Config{} = cfg, %{id: "web"}) do
+    if Config.web_mock?(cfg), do: %{"BRAVE_API_KEY" => mock_web_key()}, else: %{}
+  end
+
+  def synthetic_credentials(_cfg, _manifest), do: %{}
+
+  @doc """
   Credentials-Zeile fuer stdin: das Connector-Token unter
   `KomkiConnector.Launch.credential_key/0` und `{"<NAME>": "<wert>"}` aus `fetch`
   (Default `Secrets.reveal/1`: Siegel aus dem Schluesselbund, per Secure
-  Enclave geoeffnet). Fehlt ein Wert, bleibt er weg; Name und Fehlergrund
-  der fehlenden kommen als zweites Element zurueck (nie Werte).
+  Enclave geoeffnet). Eintrag in `synthetic` (Name auf Wert) steht statt
+  dessen in der Zeile, ohne dass `fetch` laeuft. Fehlt ein Wert, bleibt er
+  weg; Name und Fehlergrund der fehlenden kommen als zweites Element
+  zurueck (nie Werte).
   """
   @spec credentials_line(
           Manifest.t(),
           String.t(),
-          (String.t() -> {:ok, String.t()} | {:error, term()})
+          (String.t() -> {:ok, String.t()} | {:error, term()}),
+          %{String.t() => String.t()}
         ) ::
           {String.t(), [{String.t(), term()}]}
-  def credentials_line(manifest, token, fetch \\ &Secrets.reveal/1) do
+  def credentials_line(manifest, token, fetch \\ &Secrets.reveal/1, synthetic \\ %{}) do
     {found, missing} =
       manifest.credentials
       |> Enum.sort()
       |> Enum.reduce({%{Launch.credential_key() => token}, []}, fn {name, service},
                                                                    {found, missing} ->
-        case fetch.(service) do
+        case synthetic_value(name, synthetic, service, fetch) do
           {:ok, value} -> {Map.put(found, name, value), missing}
           {:error, error} -> {found, missing ++ [{name, error}]}
         end
@@ -242,6 +272,11 @@ defmodule KomkiCli.Connectors do
 
     {JSON.encode!(found) <> "\n", missing}
   end
+
+  defp synthetic_value(name, synthetic, _service, _fetch) when is_map_key(synthetic, name),
+    do: {:ok, Map.fetch!(synthetic, name)}
+
+  defp synthetic_value(_name, _synthetic, service, fetch), do: fetch.(service)
 
   @spec binary!(Config.t(), String.t()) :: String.t()
   def binary!(%Config{} = cfg, id) do
@@ -390,7 +425,14 @@ defmodule KomkiCli.Connectors do
     # Capability-Token je Start (Sidecar.Token): Datei fuer den
     # Vermittler, derselbe Wert in der stdin-Zeile fuer den Connector.
     token = Token.provision!(comp.socket)
-    {line, missing} = credentials_line(needed_credentials(cfg, manifest), token, fetch)
+
+    {line, missing} =
+      credentials_line(
+        needed_credentials(cfg, manifest),
+        token,
+        fetch,
+        synthetic_credentials(cfg, manifest)
+      )
 
     cfg
     |> launch(
