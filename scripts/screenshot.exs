@@ -565,6 +565,10 @@ defmodule Screenshot do
     Path.join(build, "lib/*/priv/**/*.so")
     |> Path.wildcard()
     |> Enum.flat_map(&Seatbelt.MachODeps.dylib_dirs/1)
+    # otool -L also lists a library's own install name; a precompiled NIF
+    # carries the one of its CI build (/Users/runner/work/…). A missing
+    # directory holds nothing dyld could load and needs no rule.
+    |> Enum.filter(&File.dir?/1)
     # The check below compares text, so `..` is expanded first. Both the
     # linked path (dyld opens it, e.g. /opt/homebrew/opt/…) and its kernel
     # target must pass it.
