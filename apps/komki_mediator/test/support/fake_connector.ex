@@ -2,7 +2,7 @@ defmodule KomkiMediator.FakeConnector do
   @moduledoc false
 
   # Fake-Connectoren fuer die Tests: echter Sidecar.Server auf einem
-  # Unix-Socket in einem kurzen /tmp-Pfad (macOS-Grenze 103 Byte). Jeder
+  # Unix-Socket in einem kurzen Pfad (macOS-Grenze 103 Byte). Jeder
   # Aufruf meldet sich beim Test-Prozess mit Operation, Parametern, Kontext
   # und der Anzahl der Journal-Datensaetze zum Aufrufzeitpunkt; die Antwort
   # liefert die im Test gesetzte Funktion `reply.(op, params, context)`.
@@ -10,9 +10,14 @@ defmodule KomkiMediator.FakeConnector do
   alias KomkiConnector.Manifest
   alias Sidecar.{Server, Token}
 
-  @doc "Kurzes, frisches Connector-Verzeichnis unter /tmp."
+  @doc "Short, fresh connector directory under `TestHelpers.short_tmp_dir/0`."
   def short_dir do
-    dir = "/tmp/km" <> Base.encode16(:crypto.strong_rand_bytes(4), case: :lower)
+    dir =
+      Path.join(
+        KomkiMediator.TestHelpers.short_tmp_dir(),
+        "km" <> Base.encode16(:crypto.strong_rand_bytes(4), case: :lower)
+      )
+
     File.mkdir_p!(dir)
     dir
   end

@@ -19,7 +19,7 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
     File.ln_s!(Path.join(root, "geheim.md"), Path.join(dir, "doc-link-pdf.pdf"))
 
     # Short socket path: macOS limits Unix socket paths to 103 bytes.
-    socket = "/tmp/kcd-" <> random_suffix() <> ".sock"
+    socket = Path.join(short_tmp_dir(), "kcd-" <> random_suffix() <> ".sock")
     {:ok, state} = KomkiConnectorDocuments.init(dir)
     {:ok, listener} = Server.listen(socket)
     token = Sidecar.Token.provision!(socket)
@@ -29,6 +29,7 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
     on_exit(fn ->
       Process.exit(pid, :kill)
       File.rm(socket)
+      File.rm(Sidecar.Token.for_socket(socket))
       File.rm_rf!(root)
     end)
 
@@ -38,6 +39,13 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
   # Random rather than unique_integer, which repeats across VM restarts and
   # collides with leftovers of crashed runs (as TestHelpers.tmp_base/1).
   defp random_suffix, do: Base.encode16(:crypto.strong_rand_bytes(8), case: :lower)
+
+  # macOS limits Unix socket paths to 103 bytes (#503): System.tmp_dir!/0 when
+  # short (/tmp/claude-<uid> in the Claude Code sandbox), else /tmp.
+  defp short_tmp_dir do
+    tmp = System.tmp_dir!()
+    if byte_size(tmp) <= 32, do: tmp, else: "/tmp"
+  end
 
   test "liest ein Raumdokument", %{socket: socket} do
     assert {:ok, %{"document_id" => "doc-oeffentlich", "content" => "# Oeffentliche Notiz\n"}} =

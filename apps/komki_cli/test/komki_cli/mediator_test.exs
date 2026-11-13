@@ -202,8 +202,11 @@ defmodule KomkiCli.MediatorTest do
     end
   end
 
-  # macOS begrenzt Unix-Socket-Pfade auf 103 Byte; System.tmp_dir!/0 ist dort tief.
+  # macOS limits Unix socket paths to 103 bytes (TestSupport.short_tmp_dir/0).
   defp short_socket do
-    "/tmp/kct-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"
+    Path.join(
+      TestSupport.short_tmp_dir(),
+      "kct-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"
+    )
   end
 end

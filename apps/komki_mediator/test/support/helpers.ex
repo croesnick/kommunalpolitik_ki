@@ -100,12 +100,23 @@ defmodule KomkiMediator.TestHelpers do
     put_in(env.room.workspace_bindings, KomkiMediator.Templates.vertraulich_bindings())
   end
 
-  @doc """
-  Kurzer Socket-Pfad unter /tmp: macOS begrenzt Unix-Socket-Pfade auf 103
-  Byte, System.tmp_dir!/0 liegt dort tief unter /var/folders.
-  """
+  @doc "Short socket path under `short_tmp_dir/0`."
   def tmp_socket do
-    "/tmp/kmt-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"
+    Path.join(
+      short_tmp_dir(),
+      "kmt-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"
+    )
+  end
+
+  @doc """
+  Short root for Unix socket paths, which macOS limits to 103 bytes (#503):
+  `System.tmp_dir!/0` when it is short (`/tmp/claude-<uid>` in the Claude Code
+  sandbox, the only place it allows sockets), else `/tmp`, because the macOS
+  TMPDIR under `/var/folders` is too long.
+  """
+  def short_tmp_dir do
+    tmp = System.tmp_dir!()
+    if byte_size(tmp) <= 32, do: tmp, else: "/tmp"
   end
 
   @doc "Zufaelliges Socket-Token (64 Hex-Zeichen, wie komki up es schreibt)."
