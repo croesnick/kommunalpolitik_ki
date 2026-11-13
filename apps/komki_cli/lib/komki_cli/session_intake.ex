@@ -250,7 +250,15 @@ defmodule KomkiCli.SessionIntake do
 
   defp do_plan(files, db, contract, compiled, base, opts) do
     documents = documents_dir(base)
-    File.mkdir_p!(documents)
+
+    # Raumdokumente sind vertraulich: Store und Elternverzeichnis wie run/
+    # und connectors/ auf 0700 haerten, sonst richtet sie die umask
+    # (Ticket #498).
+    for dir <- [Path.dirname(documents), documents] do
+      File.mkdir_p!(dir)
+      File.chmod!(dir, 0o700)
+    end
+
     decided_by = Map.get(opts, :decided_by) || contract.verantwortliche_person
 
     with {:ok, resolved} <- resolve_all(files, db, contract, decided_by) do
@@ -888,6 +896,9 @@ defmodule KomkiCli.SessionIntake do
   defp copy_file(source, temp) do
     case File.cp(source, temp) do
       :ok ->
+        # File.cp erbt den Quellmodus (meist 0644): Raumdokumente bekommen
+        # 0600 erzwungen (Ticket #498).
+        File.chmod!(temp, 0o600)
         :ok
 
       {:error, posix} ->
