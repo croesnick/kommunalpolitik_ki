@@ -24,6 +24,7 @@ Berührt ein `ai:a-tier`- oder `ai:b-tier`-Ticket einen dieser Pfade, hört die 
 - in `apps/komki_cli/lib/komki_cli/`: `profile.ex`, `connector_profile.ex`, `mediator_profile.ex`, `escript_profile.ex`, `pins.ex`, `channel.ex`, `keychain.ex`, `secrets.ex`, `tresor.ex`, `tresor/`, `go_steps.ex`, `go_watcher.ex`
 - die Filter der Connectoren: `apps/komki_connector_ris/lib/komki_connector_ris/top.ex` (öffentlich oder nicht), `apps/komki_connector_vault/lib/komki_connector_vault/paths.ex` und `note.ex` (Pfade und Labels)
 - `docs/rfcs/`
+- `.claude/`, die Regeln und Hooks interaktiver Sessions ([interaktive-sessions.md](interaktive-sessions.md))
 
 ## Zielbild für günstigere Modelle
 

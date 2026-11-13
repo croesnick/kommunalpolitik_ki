@@ -186,6 +186,10 @@ jobs:
       - name: Tests (Dev-Loop)
         run: for t in scripts/dev_loop/test/*_test.exs; do elixir "$t" || exit 1; done
 
+      # Hooks interaktiver Sessions (#462): Stop-Gates und Prüfbericht vor gh pr create.
+      - name: Tests (Hooks)
+        run: elixir .claude/hooks/test/hooks_test.exs
+
       # Coverage-Gate fuer komki_policy (Schwellwert: apps/komki_policy/
       # mix.exs). Zeilendeckung ist hier Sekundaermetrik; die Orakel-
       # und Property-Suiten tragen die Pruefung. Der Boden verhindert

@@ -11,7 +11,9 @@
         "~/.config/gh",
         "~/.dev-loop",
         "~/.claude-tt/anthropic-token.sh",
-        "~/Library/Keychains"
+        "~/Library/Keychains",
+        "~/Library/Application Support/ratsprojekte",
+        "~/Library/Mobile Documents/iCloud~md~obsidian"
       ],
       "allowWrite": ["~/.hex", "~/.mix", "~/.cache", "/tmp", "/private/tmp"]
     },
@@ -34,7 +36,9 @@
       "Read(~/.ssh/**)",
       "Read(~/.config/gh/**)",
       "Read(~/.dev-loop/**)",
-      "Read(~/Library/Keychains/**)"
+      "Read(~/Library/Keychains/**)",
+      "Read(~/Library/Application Support/ratsprojekte/**)",
+      "Read(~/Library/Mobile Documents/iCloud~md~obsidian/**)"
     ]
   }
 }

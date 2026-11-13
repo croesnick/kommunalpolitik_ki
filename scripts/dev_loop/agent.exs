@@ -113,8 +113,11 @@ defmodule DevLoop.Agent do
   end
 
   # The same rules for the headless session and for its interactive
-  # continuation after a takeover.
-  defp rules(extra), do: ~w(--strict-mcp-config --settings #{@settings}) ++ extra
+  # continuation after a takeover. The repo's .claude/settings.json is meant
+  # for interactive sessions (#462) and would loosen this sandbox when merged
+  # into it, so only user and local settings load besides @settings.
+  defp rules(extra),
+    do: ~w(--strict-mcp-config --setting-sources user,local --settings #{@settings}) ++ extra
 
   @doc """
   The shell command that continues `session` interactively: same account,

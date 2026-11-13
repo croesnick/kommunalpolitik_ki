@@ -44,7 +44,8 @@ defmodule DevLoop.Core do
     "apps/komki_connector_ris/lib/komki_connector_ris/top.ex",
     "apps/komki_connector_vault/lib/komki_connector_vault/paths.ex",
     "apps/komki_connector_vault/lib/komki_connector_vault/note.ex",
-    "docs/rfcs/"
+    "docs/rfcs/",
+    ".claude/"
   ]
 
   # The loop must never merge a change to its own rules: its code and
