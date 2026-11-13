@@ -337,6 +337,10 @@ Zwei Referenzräume für Tests:
 - Log je Verbindung: Connector-Port, Host, Entscheidung, Bytes hin und zurück, Dauer. Keine Inhalte.
 - Für Mock-Betrieb (RIS-Mock auf Loopback) geht der Connector **nicht** über den Proxy. Sein Profil erlaubt
   dann `localhost:<mock-port>`, und `komki_cli` setzt `--base-url http://127.0.0.1:<mock-port>/`.
+- Der Web-Mock läuft auf Loopback im Klartext, und jeder lokale Prozess kann dessen Port binden. Deshalb
+  provisioniert `komki up` im Web-Mock statt des echten Brave-Schlüssels einen synthetischen Test-Key (#496),
+  und der Web-Connector sendet den Subscription-Token nur über `https` oder `http` auf Loopback; zu jedem
+  anderen Klartext-Ziel verweigert er die Suche.
 
 ## 10. Nicht in v1 (bewusst offen)
 
