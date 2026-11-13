@@ -36,3 +36,7 @@ PATH='#{System.get_env("PATH")}' exec elixir #{Path.expand("support/fake_tresor.
 
 File.chmod!(fake_tresor, 0o755)
 Application.put_env(:komki_cli, :tresor, fake_tresor)
+
+# Ticket #509: Der Fake-Tresor ist eine Wegwerf-Datei im TMPDIR, das sich
+# alle Sessions des Kontos teilen; nach dem Lauf wird sie entfernt.
+ExUnit.after_suite(fn _suite -> File.rm_rf(fake_tresor) end)
