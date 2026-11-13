@@ -143,6 +143,18 @@ defmodule Screenshot.ProfileTest do
       assert Profile.dylib_dirs([link], [c.worktree], c.roots) == {:error, c.outside}
     end
 
+    test "a neighbour sharing a root's prefix is refused", c do
+      evil = Path.join(c.base, "homebrew-evil") |> tap(&File.mkdir_p!/1)
+      assert Profile.dylib_dirs([evil], [c.worktree], c.roots) == {:error, evil}
+    end
+
+    test "the linked path must pass as well, not only its target", c do
+      link = Path.join(c.outside, "lib")
+      File.ln_s!(c.cellar, link)
+
+      assert Profile.dylib_dirs([link], [c.worktree], c.roots) == {:error, link}
+    end
+
     test "directories inside the own roots need no rule", c do
       own = Path.join(c.worktree, "_build/dev/lib/exqlite/priv") |> tap(&File.mkdir_p!/1)
       assert Profile.dylib_dirs([own], [c.worktree], c.roots) == {:ok, []}
