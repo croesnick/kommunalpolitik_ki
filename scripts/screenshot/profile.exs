@@ -93,8 +93,9 @@ defmodule Screenshot.Profile do
   defp system do
     [
       "; System services the browser needs for fonts and rendering",
+      # No user-preference-read: the browser asks for it, but the PNGs come
+      # out byte-identical without it (measured, #510).
       "(allow sysctl-read)",
-      "(allow user-preference-read)",
       "(allow iokit-open (iokit-user-client-class \"IOSurfaceRootUserClient\"))",
       SBPL.read_subpath("/Library/Fonts"),
       SBPL.read_subpath("/System/Library"),

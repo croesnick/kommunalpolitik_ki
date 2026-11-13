@@ -4,17 +4,20 @@
 # writes PNGs for routes × themes × widths, plus navigations captured
 # mid-flight. Server and browser run together under one deny-default Seatbelt
 # profile (scripts/screenshot/profile.exs): read worktree, runtime and pinned
-# programs, write only the build output, the scratch directory and their logs,
-# network only on loopback. The caller gets the PNGs and a manifest.
+# programs, write only the scratch directory (throwaway build included) and
+# their logs, network only on the hub port on loopback. The caller gets the
+# PNGs and a manifest.
 #
 #     elixir scripts/screenshot.exs --route / --route /stand [--navigate /:/stand]
 #            [--theme light,dark] [--width 390,1280] [--worktree PATH] [--out DIR]
 #     elixir scripts/screenshot.exs --spec .dev-loop/screenshots.json [--worktree PATH] [--out DIR]
 #     elixir scripts/screenshot.exs --probe [--worktree PATH] [--out DIR]
 #
-# Interactive sessions start exactly this call outside the Claude sandbox
-# (.claude/settings.json), so sandbox-exec can apply; the tool then confines
-# server and browser itself. The dev loop runs it after the gates.
+# Interactive sessions start the copy that `make screenshot-install` puts in
+# ~/.local/share/komki-tools/screenshot, outside every worktree, and only that
+# call outside the Claude sandbox (.claude/settings.json), so sandbox-exec can
+# apply; the tool then confines server and browser itself. The dev loop runs
+# the copy of its own checkout after the gates.
 # Docs: docs/agents/interaktive-sessions.md, docs/agents/dev-loop.md.
 
 Kernel.ParallelCompiler.require(
@@ -38,6 +41,9 @@ defmodule Screenshot do
   @cache Path.expand("~/.cache/komki-screenshot")
   @sandbox_exec "/usr/bin/sandbox-exec"
   @marker ".komki-screenshot"
+  # Written by `make screenshot-install`: the installed copy has no Git
+  # checkout of its own, so it records the repository it came from.
+  @origin Path.expand("screenshot/repo", __DIR__)
 
   # The read ban of interactive sessions (#462): closed in the profile even
   # if an allow covered them.
@@ -48,6 +54,8 @@ defmodule Screenshot do
     "~/.config/gh",
     "~/Library/Keychains"
   ]
+
+  @resolver_rule "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"
 
   # Fixed here, never taken from the caller. --no-sandbox only switches off
   # Chromium's own sandbox: macOS allows no second Seatbelt profile inside
@@ -67,7 +75,7 @@ defmodule Screenshot do
     "--hide-scrollbars",
     "--force-color-profile=srgb",
     "--lang=de-DE",
-    "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1",
+    @resolver_rule,
     # The hub serves HTTPS with a throwaway certificate of this run (see start_hub/1).
     "--ignore-certificate-errors"
   ]
@@ -161,7 +169,7 @@ defmodule Screenshot do
   # the profile, so a path like $HOME must never pass.
   defp worktree!(path) do
     path = Seatbelt.canonical(path)
-    common = git_common_dir(Path.expand("..", __DIR__))
+    common = repo_common_dir()
 
     cond do
       git(path, ~w(rev-parse --show-toplevel)) != {:ok, path} ->
@@ -175,6 +183,13 @@ defmodule Screenshot do
 
       not File.dir?(Path.join(path, "apps/artifacts/deps")) ->
         fail("Im Worktree fehlen die Deps: erst `mix workspace.run -t deps.get` in #{path}.")
+
+      # Seeds the throwaway build (seed_build!/2); native code such as the
+      # SQLCipher NIF does not compile under the profile.
+      not File.dir?(Path.join([path, @app, "_build/dev"])) ->
+        fail(
+          "Im Worktree fehlt der Build des Hubs: erst `mix compile` in #{Path.join(path, @app)}."
+        )
 
       true ->
         path
@@ -376,6 +391,7 @@ defmodule Screenshot do
 
   defp context(worktree, out, scratch, browser, esbuild, tailwind) do
     app = Path.join(worktree, @app)
+    build = seed_build!(app, Path.join(scratch, "build"))
     elixir_root = Seatbelt.canonical(Path.expand("../..", to_string(:code.lib_dir(:elixir))))
     erlang_root = Seatbelt.canonical(to_string(:code.root_dir()))
     mix_home = System.get_env("MIX_HOME") || Path.expand("~/.mix")
@@ -385,12 +401,12 @@ defmodule Screenshot do
       elixir_root: elixir_root,
       mix_archives: Seatbelt.canonical(Path.join(mix_home, "archives")),
       worktree: worktree,
-      # Build output of the hub (gitignored, rebuilt anyway) and the scratch
-      # directory; nothing else in the worktree.
-      writable: [Path.join(app, "_build/dev"), Path.join(app, "priv/static/assets"), scratch],
+      # The scratch directory with the hub's throwaway build; nothing in
+      # the worktree.
+      writable: [scratch],
       programs: [esbuild, tailwind],
       browser: browser.dir,
-      dylib_dirs: nif_dylib_dirs(app, [erlang_root, worktree]),
+      dylib_dirs: nif_dylib_dirs(build, [erlang_root, worktree, scratch]),
       logs: Enum.map(~w(server.log browser.log probe.log), &Path.join(out, &1)),
       denied: Enum.map(@denied, &Seatbelt.canonical/1),
       hub_port: free_port()
@@ -403,6 +419,7 @@ defmodule Screenshot do
     %{
       worktree: worktree,
       app: app,
+      build: build,
       out: out,
       scratch: scratch,
       profile: profile,
@@ -423,8 +440,29 @@ defmodule Screenshot do
     }
   end
 
-  defp nif_dylib_dirs(app, own_roots) do
-    Path.join(app, "_build/dev/lib/*/priv/**/*.so")
+  # The hub builds into the scratch directory (MIX_BUILD_PATH), never into
+  # the worktree. A copy of the worktree's dev build seeds it, so only what
+  # changed compiles in the sandbox. Mix links priv and include relatively;
+  # the copy sits elsewhere, so those links point back to their absolute
+  # targets.
+  defp seed_build!(app, build) do
+    source = Path.join(app, "_build/dev")
+    {_, 0} = System.cmd("/bin/cp", ["-Rp", source <> "/", build])
+
+    for dep <- File.ls!(Path.join(build, "lib")), sub <- ~w(priv include) do
+      link = Path.join([build, "lib", dep, sub])
+
+      with {:ok, target} <- File.read_link(link) do
+        File.rm!(link)
+        File.ln_s!(Path.expand(target, Path.join([source, "lib", dep])), link)
+      end
+    end
+
+    build
+  end
+
+  defp nif_dylib_dirs(build, own_roots) do
+    Path.join(build, "lib/*/priv/**/*.so")
     |> Path.wildcard()
     |> Enum.flat_map(&Seatbelt.MachODeps.dylib_dirs/1)
     |> Enum.reject(fn dir -> Enum.any?(own_roots, &inside?(dir, &1)) end)
@@ -497,6 +535,28 @@ defmodule Screenshot do
   # Live reload would exec its FSEvents helper; polling nothing needs no program.
   Application.put_env(:phoenix_live_reload, :backend, :fs_poll)
   Application.put_env(:phoenix_live_reload, :dirs, [])
+  # Static files come from a copy of priv inside the throwaway build, and the
+  # asset builders write there: the worktree stays untouched.
+  priv = Path.join(Mix.Project.app_path(), "priv")
+  File.rm_rf!(priv)
+  File.cp_r!(Path.expand("priv"), priv)
+  assets = Path.join(priv, "static/assets")
+  File.rm_rf!(assets)
+  Enum.each(~w(js css), &File.mkdir_p!(Path.join(assets, &1)))
+
+  retarget = fn app, flag, path ->
+    config = Application.fetch_env!(app, :ratsprojekte)
+
+    args =
+      Enum.map(config[:args], fn arg ->
+        if String.starts_with?(arg, flag), do: flag <> path, else: arg
+      end)
+
+    Application.put_env(app, :ratsprojekte, Keyword.put(config, :args, args))
+  end
+
+  retarget.(:esbuild, "--outdir=", Path.join(assets, "js"))
+  retarget.(:tailwind, "--output=", Path.join(assets, "css/app.css"))
   # Asset watchers build once: watching needs FSEvents, the profile has none.
   endpoint = Application.fetch_env!(:ratsprojekte, RatsprojekteWeb.Endpoint)
 
@@ -521,15 +581,14 @@ defmodule Screenshot do
     {cert, key} = certificate!(ctx.scratch)
     boot = Path.join(ctx.scratch, "boot.exs")
     File.write!(boot, @boot)
-    # Generated and gitignored; removed so that only this run's build counts
-    # (an older bundle could belong to another branch, and the builders skip
-    # writing unchanged output).
-    assets = Enum.map(~w(js/app.js css/app.css), &Path.join([ctx.app, "priv/static/assets", &1]))
-    Enum.each(assets, &File.rm/1)
+    # The boot script removes the copied bundles, so only this run's build counts.
+    static = Path.join(ctx.build, "lib/ratsprojekte/priv/static/assets")
+    assets = Enum.map(~w(js/app.js css/app.css), &Path.join(static, &1))
 
     env =
       env(ctx, [
         {"MIX_ENV", "dev"},
+        {"MIX_BUILD_PATH", ctx.build},
         {"MIX_HOME", ctx.mix_home},
         {"HEX_HOME", Path.join(ctx.scratch, "hex")},
         {"HEX_OFFLINE", "1"},
@@ -609,9 +668,9 @@ defmodule Screenshot do
 
   # -- browser ---------------------------------------------------------------
 
-  defp start_browser(ctx) do
+  defp start_browser(ctx, flags \\ @browser_flags, profile_dir \\ "chrome") do
     log = Path.join(ctx.out, "browser.log")
-    argv = [ctx.browser, "--user-data-dir=" <> Path.join(ctx.scratch, "chrome") | @browser_flags]
+    argv = [ctx.browser, "--user-data-dir=" <> Path.join(ctx.scratch, profile_dir) | flags]
     port = launch(ctx, env(ctx, []), log, argv, pipe: true)
     cdp = CDP.new(port)
 
@@ -858,10 +917,11 @@ defmodule Screenshot do
   # -- probe -----------------------------------------------------------------
 
   # Negative controls with the very profile of a real run: from inside, the
-  # BEAM and the browser try to read the hub folder and ~/.ssh and to reach
-  # the network; one loopback connection is the positive control.
+  # BEAM and the browser try to read the hub folder and ~/.ssh, to write into
+  # the worktree and to reach the network; one loopback connection and one
+  # write into the scratch directory are the positive controls.
   @probe """
-  [hub, ssh, hub_port, other_port] = System.argv()
+  [hub, ssh, hub_port, other_port, worktree, app] = System.argv()
   hub_port = String.to_integer(hub_port)
   other_port = String.to_integer(other_port)
 
@@ -874,12 +934,17 @@ defmodule Screenshot do
     {"BEAM löst example.com auf", fn -> :inet.getaddr(~c"example.com", :inet) end},
     {"BEAM verbindet zu einem anderen Port auf 127.0.0.1",
      fn -> :gen_tcp.connect({127, 0, 0, 1}, other_port, [], 3000) end},
-    {"BEAM verbindet zum Hub-Port auf 127.0.0.1 (Positivkontrolle)", fn -> :gen_tcp.connect({127, 0, 0, 1}, hub_port, [], 3000) end}
+    {"BEAM verbindet zum Hub-Port auf 127.0.0.1 (Positivkontrolle)", fn -> :gen_tcp.connect({127, 0, 0, 1}, hub_port, [], 3000) end},
+    {"BEAM schreibt in den Worktree", fn -> File.write(Path.join(worktree, ".komki-probe"), "") end},
+    {"BEAM schreibt in den Build-Ordner des Hubs im Worktree",
+     fn -> File.write(Path.join(app, "_build/.komki-probe"), "") end},
+    {"BEAM schreibt in den Wegwerf-Ordner (Positivkontrolle)",
+     fn -> File.write(Path.join(System.fetch_env!("TMPDIR"), ".komki-probe"), "") end}
   ]
 
   for {name, fun} <- checks do
     result = try do: fun.(), rescue: (e -> {:error, Exception.message(e)})
-    verdict = if match?({:ok, _}, result), do: "erreicht", else: "verweigert"
+    verdict = if result == :ok or match?({:ok, _}, result), do: "erreicht", else: "verweigert"
     IO.puts("PROBE\\t\#{name}\\t\#{verdict}\\t\#{inspect(result, limit: 3)}")
   end
   """
@@ -904,10 +969,17 @@ defmodule Screenshot do
         ctx.hub,
         ctx.ssh,
         to_string(ctx.hub_port),
-        to_string(other_port)
+        to_string(other_port),
+        ctx.worktree,
+        ctx.app
       ])
 
     receive do: ({^beam, {:exit_status, _}} -> :ok), after: (60_000 -> stop(beam))
+    # Should a write have passed, it leaves nothing behind.
+    Enum.each(
+      [ctx.worktree, Path.join(ctx.app, "_build")],
+      &File.rm(Path.join(&1, ".komki-probe"))
+    )
 
     beam_rows =
       for "PROBE\t" <> row <- String.split(File.read!(log), "\n") do
@@ -915,24 +987,20 @@ defmodule Screenshot do
         {name, verdict, detail}
       end
 
-    {cdp, session} = start_browser(ctx)
-
-    {browser_rows, cdp} =
-      Enum.map_reduce(
-        [
-          {"Browser öffnet http://1.1.1.1/", "http://1.1.1.1/"},
-          {"Browser öffnet http://example.com/", "http://example.com/"},
-          {"Browser öffnet den Hub-Ordner", "file://" <> ctx.hub <> "/"},
-          {"Browser öffnet ~/.ssh", "file://" <> ctx.ssh <> "/"},
-          {"Browser öffnet einen anderen Port auf 127.0.0.1", "http://127.0.0.1:#{other_port}/"},
-          {"Browser öffnet den Hub-Port auf 127.0.0.1 (Positivkontrolle)",
-           "http://127.0.0.1:#{ctx.hub_port}/"}
-        ],
-        cdp,
-        fn {name, url}, cdp -> browse(cdp, session, name, url) end
-      )
-
-    close_browser(cdp)
+    browser_rows =
+      browse_all(ctx, @browser_flags, "chrome", [
+        {"Browser öffnet http://1.1.1.1/", "http://1.1.1.1/"},
+        {"Browser öffnet http://example.com/", "http://example.com/"},
+        {"Browser öffnet den Hub-Ordner", "file://" <> ctx.hub <> "/"},
+        {"Browser öffnet ~/.ssh", "file://" <> ctx.ssh <> "/"},
+        {"Browser öffnet einen anderen Port auf 127.0.0.1", "http://127.0.0.1:#{other_port}/"},
+        {"Browser öffnet den Hub-Port auf 127.0.0.1 (Positivkontrolle)",
+         "http://127.0.0.1:#{ctx.hub_port}/"}
+      ]) ++
+        browse_all(ctx, @browser_flags -- [@resolver_rule], "chrome-no-resolver", [
+          {"Browser ohne Resolver-Regel öffnet http://1.1.1.1/", "http://1.1.1.1/"},
+          {"Browser ohne Resolver-Regel öffnet http://example.com/", "http://example.com/"}
+        ])
 
     for pid <- responders do
       Process.unlink(pid)
@@ -950,11 +1018,23 @@ defmodule Screenshot do
       IO.puts("#{mark} #{name}: #{verdict} (#{String.slice(detail, 0, 100)})")
     end
 
-    if length(beam_rows) != 7 or Enum.any?(rows, fn {n, v, _} -> v != expected.(n) end) do
+    if length(beam_rows) != 10 or Enum.any?(rows, fn {n, v, _} -> v != expected.(n) end) do
       fail("Probe nicht bestanden.\n" <> tail(log))
     end
 
     IO.puts("Probe bestanden: #{length(rows)} Kontrollen.")
+  end
+
+  # The network controls once more without the resolver rule: then only the
+  # profile stands between the browser and the internet.
+  defp browse_all(ctx, flags, profile_dir, checks) do
+    {cdp, session} = start_browser(ctx, flags, profile_dir)
+
+    {rows, cdp} =
+      Enum.map_reduce(checks, cdp, fn {name, url}, cdp -> browse(cdp, session, name, url) end)
+
+    close_browser(cdp)
+    rows
   end
 
   # The browser counts as through only if the page carries the marker of our
@@ -1010,6 +1090,13 @@ defmodule Screenshot do
     case System.cmd("git", ["-C", dir | args], stderr_to_stdout: true) do
       {out, 0} -> {:ok, String.trim(out)}
       {out, _} -> {:error, out}
+    end
+  end
+
+  defp repo_common_dir do
+    case File.read(@origin) do
+      {:ok, path} -> Seatbelt.canonical(String.trim(path))
+      _ -> git_common_dir(Path.expand("..", __DIR__))
     end
   end
 

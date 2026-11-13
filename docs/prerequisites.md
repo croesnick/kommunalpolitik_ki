@@ -336,6 +336,11 @@ Der Browser landet unter `~/Library/Caches/ms-playwright/chromium_headless_shell
 andere Revision weist das Werkzeug ab und nennt die neue Prüfsumme. Wer das
 Update geprüft hat, trägt sie dort ein.
 
+Interaktive Sessions starten eine installierte Kopie des Werkzeugs
+(`make screenshot-install`, siehe
+[interaktive-sessions.md](agents/interaktive-sessions.md#screenshots-der-hub-oberfläche)).
+Eine neue Prüfsumme gilt dort erst nach Merge und neuer Installation.
+
 **Benötigt von:**
 
 | Skill / Workflow | Anmerkung |

@@ -22,7 +22,7 @@ defmodule Screenshot.ProfileTest do
     elixir_root: "/opt/elixir",
     mix_archives: "/Users/u/.mix/archives",
     worktree: "/Users/u/wt",
-    writable: ["/Users/u/wt/apps/ratsprojekte/_build/dev", "/private/tmp/scratch"],
+    writable: ["/private/tmp/scratch"],
     programs: ["/Users/u/.cache/komki-screenshot/esbuild-0.25.4"],
     browser: "/Users/u/Library/Caches/ms-playwright/shell",
     dylib_dirs: ["/opt/homebrew/opt/sqlcipher/lib"],

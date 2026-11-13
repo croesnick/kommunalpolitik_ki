@@ -1,4 +1,4 @@
-.PHONY: test lint format ci deps elixir-test python-test install ratsprojekte komki komki-tresor komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview
+.PHONY: test lint format ci deps elixir-test python-test install ratsprojekte komki komki-tresor komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview screenshot-install
 
 # Escript bauen und nach /usr/local/bin symlinken.
 # Workspace-Pattern: mix.exs der ratsinfo-App referenziert ../artifacts/deps
@@ -48,6 +48,24 @@ ratsprojekte: komki-tresor
 	@echo "ratsprojekte installiert: $(RATSPROJEKTE_OPT), Befehl $(KOMKI_LINK_DIR)/ratsprojekte"
 	@if [ -f "$(RATSPROJEKTE_PLIST)" ]; then "$(RATSPROJEKTE_OPT)/bin/ratsprojekte-befehl" launchagent an; \
 	  else echo "Weiter mit: ratsprojekte einrichten"; fi
+
+# Screenshot-Werkzeug (#510) an einen festen Ort außerhalb jedes Worktrees.
+# Interaktive Sessions starten nur diese Kopie außerhalb ihrer Sandbox
+# (.claude/settings.json); die Sandbox darf dort nicht schreiben, Edit und
+# Write sind dort gesperrt. Installiert wird der committete Stand von HEAD,
+# gedacht nach dem Merge auf main. Die Datei `repo` nennt das Repository,
+# dessen Worktrees das Werkzeug annimmt.
+SCREENSHOT_HOME ?= $(HOME)/.local/share/komki-tools/screenshot
+screenshot-install:
+	@test "$$(git branch --show-current)" = main \
+	  || echo "Hinweis: installiert wird $$(git branch --show-current), nicht main."
+	@if [ -d "$(SCREENSHOT_HOME)" ]; then chmod -R u+w "$(SCREENSHOT_HOME)" && rm -rf "$(SCREENSHOT_HOME)"; fi
+	@mkdir -p "$(SCREENSHOT_HOME)"
+	@git archive HEAD scripts/screenshot.exs scripts/screenshot apps/seatbelt/lib | tar -x -C "$(SCREENSHOT_HOME)"
+	@git rev-parse --path-format=absolute --git-common-dir > "$(SCREENSHOT_HOME)/scripts/screenshot/repo"
+	@git rev-parse HEAD > "$(SCREENSHOT_HOME)/COMMIT"
+	@chmod -R a-w "$(SCREENSHOT_HOME)"
+	@echo "Screenshot-Werkzeug installiert ($$(git rev-parse --short HEAD)): $(SCREENSHOT_HOME)/scripts/screenshot.exs"
 
 # komki-tresor: versiegelt Geheimnisse mit der Secure Enclave (Swift, weil
 # Erlang die Enclave nicht erreicht; Quelle apps/komki_cli/native). komki
