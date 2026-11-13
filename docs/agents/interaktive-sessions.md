@@ -23,6 +23,22 @@ Bash-Befehle laufen in der Sandbox von Claude Code (`sandbox.enabled`, `failIfUn
 - **Außerhalb der Sandbox** laufen `gh` und `git push`, `git fetch` und `git pull`. Sie brauchen Zugangsdaten aus den gesperrten Orten. Sie gehen weiter durch die Regeln und den Auto-Modus. Das gilt nur für den nackten Aufruf: Mit `cd`, Umleitung, Heredoc oder `&&` davor bleibt er in der Sandbox und findet dort keine Zugangsdaten.
 - **Seatbelt in der Sandbox:** Tests, die selbst `sandbox-exec` starten, scheitern in der Sandbox mit `sandbox_apply: Operation not permitted`. macOS lässt in einer laufenden Seatbelt-Sandbox kein zweites Profil zu. Das betrifft Teile von `apps/komki_cli` und `apps/seatbelt`. Der Stop-Hook läuft außerhalb der Sandbox und prüft sie trotzdem. Eine Session darf solche Befehle außerhalb der Sandbox wiederholen (Entscheidung der nutzenden Person vom 2026-11-12). Im Auto-Modus entscheidet der Klassifikator.
 
+## Screenshots der Hub-Oberfläche
+
+Prüfpunkte der Oberfläche belegt eine Session mit echten Screenshots, ohne dass die Sandbox dafür gelockert wird (#510). Das Werkzeug `scripts/screenshot.exs` startet den Hub aus einem Worktree auf einer Wegwerf-Datenbank mit den erfundenen Gartenstadt-Seeds, steuert einen Headless-Browser über das DevTools-Protokoll und schreibt PNGs samt `manifest.json` (URL, Theme, Breite, Commit):
+
+```bash
+elixir scripts/screenshot.exs --route /stand --navigate /:/stand --width 390,1280
+elixir scripts/screenshot.exs --probe
+```
+
+- **Genau dieser Aufruf** läuft außerhalb der Claude-Sandbox (`excludedCommands` und Allow-Regel in `.claude/settings.json`), denn in der Sandbox greift kein zweites `sandbox-exec`. Wie bei `gh` gilt das nur für den nackten Aufruf: Mit Pipe, `&&` oder `cd` davor bleibt er in der Sandbox und scheitert an `sandbox_apply`.
+- **Eigene Grenze:** Hub und Browser laufen gemeinsam unter einem deny-default-Profil aus `apps/seatbelt` (`scripts/screenshot/profile.exs`), in einer leeren Umgebung (`env -i`, `HOME` im Wegwerf-Ordner). Sie lesen den Worktree, die Laufzeit und die gepinnten Programme und schreiben nur die Build-Ausgabe des Hubs, den Wegwerf-Ordner und ihre Logs. Netz gibt es nur über Loopback. Die Lesesperre oben steht zusätzlich als Deny-Regel am Ende des Profils. Der Hub spricht dort HTTPS mit einem Wegwerf-Zertifikat: Über reines HTTP schickt er Dateien per `sendfile`, und das ließe sich nur mit einer Regel erlauben, die vom Hub-Port aus auch das Internet erreicht.
+- **Feste Eingaben:** Die Flags des Browsers stehen im Werkzeug. Routen nimmt es nur als lokale Pfade (`scripts/screenshot/spec.exs`), den Worktree nur als Worktree dieses Repos, die Ausgabe nur unterhalb des Worktrees oder von `/tmp`. Standard ist `.screenshots/` im Worktree.
+- **Gepinnte Programme:** Browser (Playwrights `chrome-headless-shell`, Prüfsumme über den ganzen Paketordner), esbuild und tailwind stehen mit SHA-256 in `scripts/screenshot/pins.json`. esbuild und tailwind lädt das Werkzeug selbst nach `~/.cache/komki-screenshot/` und prüft sie bei jedem Lauf, weil Agenten diesen Ordner schreiben dürfen.
+- **Nachweis:** `--probe` versucht mit genau diesem Profil aus BEAM und Browser heraus den Hub-Ordner und `~/.ssh` zu lesen und das Netz zu erreichen, auch vom Hub-Port aus. Eine Loopback-Verbindung ist die Positivkontrolle. Jeder Lauf legt außerdem `profile.sb` und die Verweigerungen des Laufs (`denials.log`) in die Ausgabe.
+- **Grenze:** Die Allow-Regel vertraut dem Skript im Worktree der Session. Eine Session kann `scripts/screenshot.exs` ändern und es dann ohne jede Sandbox starten. Der Dev-Loop startet deshalb seine eigene Kopie.
+
 ## Hooks
 
 - **Stop-Hook** (`.claude/hooks/stop_gates.exs`): Weicht der Stand des Worktrees von `origin/main` ab, endet ein Zug erst, wenn `mix format --check-formatted` und die Tests der betroffenen Apps grün sind (`mix workspace.run -t test --affected --base origin/main`). Bei Rot endet der Hook mit Exit-Code 2, und die Session arbeitet weiter, mit den fehlgeschlagenen Tests als Begründung. Ist sie schon wegen des Hooks weitergelaufen (`stop_hook_active`), blockiert er kein zweites Mal und meldet der nutzenden Person, dass die Gates rot bleiben. Ein grüner Stand wird gemerkt. Läuft der Hook wieder ohne Änderung, prüft er ihn nicht noch einmal. Wandert `origin/main` weiter, prüft er neu. Er läuft am Repo-Root, auch wenn die Session in einem App-Ordner steht. Ohne Git-Repo oder ohne `origin/main` tritt er zur Seite.

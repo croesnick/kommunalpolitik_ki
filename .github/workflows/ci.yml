@@ -186,6 +186,11 @@ jobs:
       - name: Tests (Dev-Loop)
         run: for t in scripts/dev_loop/test/*_test.exs; do elixir "$t" || exit 1; done
 
+      # Screenshot-Werkzeug (#510): Muster der Aufnahmen und Text des Seatbelt-Profils.
+      # Ob macOS das Profil durchsetzt, misst `elixir scripts/screenshot.exs --probe`.
+      - name: Tests (Screenshot-Werkzeug)
+        run: for t in scripts/screenshot/test/*_test.exs; do elixir "$t" || exit 1; done
+
       # Hooks interaktiver Sessions (#462): Stop-Gates und Prüfbericht vor gh pr create.
       - name: Tests (Hooks)
         run: elixir .claude/hooks/test/hooks_test.exs
