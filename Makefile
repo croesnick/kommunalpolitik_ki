@@ -1,4 +1,4 @@
-.PHONY: test lint format ci deps elixir-test python-test install ratsprojekte komki komki-tresor komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview
+.PHONY: test lint format ci deps elixir-test python-test install ratsprojekte komki komki-tresor komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview screenshot-install
 
 # Escript bauen und nach /usr/local/bin symlinken.
 # Workspace-Pattern: mix.exs der ratsinfo-App referenziert ../artifacts/deps
@@ -48,6 +48,18 @@ ratsprojekte: komki-tresor
 	@echo "ratsprojekte installiert: $(RATSPROJEKTE_OPT), Befehl $(KOMKI_LINK_DIR)/ratsprojekte"
 	@if [ -f "$(RATSPROJEKTE_PLIST)" ]; then "$(RATSPROJEKTE_OPT)/bin/ratsprojekte-befehl" launchagent an; \
 	  else echo "Weiter mit: ratsprojekte einrichten"; fi
+
+# Screenshot-Werkzeug (#510) an einen festen Ort außerhalb jedes Worktrees.
+# Interaktive Sessions starten nur den Starter bin/komki-screenshot außerhalb
+# ihrer Sandbox (.claude/settings.json); die Sandbox darf dort nicht schreiben,
+# Edit und Write sind dort gesperrt. Quelle ist der Stand von main auf GitHub
+# (gh api), nicht das lokale .git, das Sessions beschreiben dürfen; die
+# Laufzeit kommt aus dessen .tool-versions, ohne einen Interpreter zu starten.
+# Im Haupt-Checkout ausführen, nach dem Merge. Details: scripts/screenshot/install.sh.
+SCREENSHOT_HOME ?= $(HOME)/.local/share/komki-tools/screenshot
+SCREENSHOT_REF ?= main
+screenshot-install:
+	@sh scripts/screenshot/install.sh "$(SCREENSHOT_HOME)" "$(SCREENSHOT_REF)"
 
 # komki-tresor: versiegelt Geheimnisse mit der Secure Enclave (Swift, weil
 # Erlang die Enclave nicht erreicht; Quelle apps/komki_cli/native). komki

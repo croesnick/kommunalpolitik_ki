@@ -54,6 +54,10 @@ defmodule DevLoop.Core do
   @loop_protected [
     "scripts/dev_loop.exs",
     "scripts/dev_loop/",
+    # The screenshot tool runs outside every agent sandbox and confines
+    # itself (#510).
+    "scripts/screenshot.exs",
+    "scripts/screenshot/",
     ".github/",
     "docs/agents/",
     "AGENTS.md"

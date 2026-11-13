@@ -316,6 +316,47 @@ Commit nicht wieder knallt.
 
 ---
 
+## `chrome-headless-shell` (Screenshot-Werkzeug)
+
+**Zweck:** Headless-Browser für `scripts/screenshot.exs` (#510), das Prüfpunkte
+der Hub-Oberfläche mit Screenshots belegt. Das Werkzeug steuert ihn über das
+DevTools-Protokoll und startet ihn nur unter seinem eigenen Seatbelt-Profil.
+
+**Install:** über Playwright, mit pnpm (nie plain npm). `--only-shell` lädt für
+Chromium nur die Headless-Shell (https://playwright.dev/docs/browsers, Abschnitt
+„Chromium: headless shell“, abgerufen am 2026-11-13; dort mit `npx` und
+`--with-deps`, das nur unter Linux Systempakete nachzieht):
+
+```bash
+pnpm dlx playwright install --only-shell
+```
+
+Der Browser landet unter `~/Library/Caches/ms-playwright/chromium_headless_shell-<Revision>/`.
+`scripts/screenshot/pins.json` pinnt Pfad und Prüfsumme des Paketordners. Eine
+andere Revision weist das Werkzeug ab und nennt die neue Prüfsumme. Wer das
+Update geprüft hat, trägt sie dort ein.
+
+Interaktive Sessions starten eine installierte Kopie des Werkzeugs
+(`make screenshot-install`, siehe
+[interaktive-sessions.md](agents/interaktive-sessions.md#screenshots-der-hub-oberfläche)).
+Eine neue Prüfsumme gilt dort erst nach Merge und neuer Installation. Die
+Installation holt den Stand über `gh api` von GitHub und braucht dafür ein
+angemeldetes `gh`.
+
+**Benötigt von:**
+
+| Skill / Workflow | Anmerkung |
+|---|---|
+| `scripts/screenshot.exs` | interaktive Sessions und Dev-Loop (Review von UI-Tickets) |
+
+esbuild und tailwind für die Assets des Hubs lädt das Werkzeug selbst (gepinnt in
+derselben Datei, Cache `~/.local/share/komki-tools/cache/`).
+
+**Fallback:** Ohne Browser keine Screenshots. Der Prüfpunkt „Light und Dark,
+ab Handybreite“ steht dann auf `nicht geprüft`.
+
+---
+
 ## `lychee` CLI (Markdown-Link-Check)
 
 **Zweck:** Offline-Link-Check für Markdown-Dateien: verifiziert lokale

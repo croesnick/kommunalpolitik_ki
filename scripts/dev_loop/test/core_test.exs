@@ -57,6 +57,8 @@ defmodule DevLoop.CoreTest do
       for p <- [
             "scripts/dev_loop.exs",
             "scripts/dev_loop/prompts/review.md",
+            "scripts/screenshot.exs",
+            "scripts/screenshot/profile.exs",
             ".github/workflows/ci.yml",
             "AGENTS.md"
           ] do

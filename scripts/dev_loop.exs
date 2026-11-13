@@ -20,6 +20,8 @@
 for file <- ~w(core proc herdr agent github),
     do: Code.require_file("dev_loop/#{file}.exs", __DIR__)
 
+Code.require_file("screenshot/spec.exs", __DIR__)
+
 defmodule DevLoop do
   @moduledoc false
 
@@ -27,6 +29,9 @@ defmodule DevLoop do
 
   @home Path.expand("~/.dev-loop")
   @prompts Path.expand("dev_loop/prompts", __DIR__)
+  # The screenshot tool of this checkout, never the one in a loop worktree.
+  @screenshot_tool Path.expand("screenshot.exs", __DIR__)
+  @screenshot_timeout_ms 15 * 60 * 1000
   @keychain_service "dev-loop-gh-pat"
   @brief_issue 389
   @stage_timeout_ms 4 * 60 * 60 * 1000
@@ -531,7 +536,7 @@ defmodule DevLoop do
     sha = git!(wt, ~w(rev-parse HEAD))
     pr = Map.delete(pr, :report_url)
 
-    case review(ctx, issue, pr, sha) do
+    case review(ctx, issue, pr, sha, wt) do
       {:error, why} ->
         escalate(ctx, issue, pr, "Das Review ist zweimal gescheitert:\n\n" <> why, report)
 
@@ -602,13 +607,14 @@ defmodule DevLoop do
   # The script runs the gates on the reviewed head itself, outside the agent
   # sandbox, and hands the reviewer the result as evidence. Red gates need
   # no reviewer: they count as a rework round right away.
-  defp review(ctx, issue, pr, sha, attempt \\ 1, hint \\ "") do
+  defp review(ctx, issue, pr, sha, wt, attempt \\ 1, hint \\ "") do
     rwt = fresh_worktree(ctx, "loop-#{issue.number}-review", sha, true)
 
     result =
       case gate(ctx, rwt) do
         :ok ->
-          review_agent(ctx, issue, pr, sha, rwt, hint)
+          shots = screenshots(ctx, issue, wt, rwt)
+          review_agent(ctx, issue, pr, sha, rwt, hint, shots)
 
         {:failed, text} ->
           ctx.log.(
@@ -623,16 +629,111 @@ defmodule DevLoop do
     case result do
       {:error, why} when attempt == 1 ->
         ctx.log.("##{issue.number}: Review gescheitert (#{first_line(why)}), zweiter Versuch")
-        review(ctx, issue, pr, sha, 2, "Der vorige Versuch war ungültig: #{why}")
+        review(ctx, issue, pr, sha, wt, 2, "Der vorige Versuch war ungültig: #{why}")
 
       other ->
         other
     end
   end
 
-  defp review_agent(ctx, issue, pr, sha, rwt, hint) do
+  # The tool runs outside any sandbox, so it starts on this loop's own
+  # runtime: `elixir` from PATH is an asdf shim that would pick the version,
+  # or a `path:` of its choosing, from the .tool-versions of the worktree.
+  defp runtime_elixir,
+    do: Path.join(Path.expand("../..", to_string(:code.lib_dir(:elixir))), "bin/elixir")
+
+  defp runtime_path do
+    Enum.join(
+      [
+        Path.dirname(runtime_elixir()),
+        Path.join(to_string(:code.root_dir()), "bin"),
+        "/usr/bin",
+        "/bin"
+      ],
+      ":"
+    )
+  end
+
+  # A fresh review worktree may carry a committed `.dev-loop` symlink; the
+  # script writes there outside any sandbox.
+  defp real_dir(dir) do
+    case File.lstat(dir) do
+      {:ok, %File.Stat{type: :directory}} -> :ok
+      {:error, :enoent} -> File.mkdir(dir)
+      other -> other
+    end
+  end
+
+  # UI evidence (#510): the implementation lists routes in
+  # .dev-loop/screenshots.json. The script checks the list against the
+  # pattern of Screenshot.Spec and runs the screenshot tool of its own
+  # checkout on the reviewed head, outside the agent sandbox. The PNGs land
+  # in the review worktree; the returned text goes into the review prompt.
+  defp screenshots(ctx, issue, wt, rwt) do
+    file = Path.join(wt, ".dev-loop/screenshots.json")
+    checked = Path.join(rwt, ".dev-loop/screenshots.json")
+
+    # A symlink could point the script, which reads outside any sandbox, at
+    # a secret; the rejection would then quote it into the review prompt.
+    # `.dev-loop` itself can be a committed symlink (the gitignore entry
+    # `.dev-loop/` matches only a directory), so both levels are checked.
+    with {:ok, %File.Stat{type: :directory}} <- File.lstat(Path.dirname(file)),
+         {:ok, %File.Stat{type: :regular, size: size}} when size <= 65_536 <- File.lstat(file),
+         :ok <- real_dir(Path.join(rwt, ".dev-loop")),
+         {:ok, text} <- File.read(file),
+         {:json, {:ok, map}} <- {:json, JSON.decode(text)},
+         {:ok, _spec} <- Screenshot.Spec.parse(map),
+         # Replaces a committed symlink instead of writing through it.
+         _ = File.rm(checked),
+         {:write, :ok} <- {:write, File.write(checked, text, [:exclusive])} do
+      out = Path.join(rwt, ".dev-loop/screenshots")
+      log = Path.join(ctx.logs, "#{ctx.stamp.()}-screenshots.log")
+      args = [@screenshot_tool, "--spec", checked, "--worktree", rwt, "--out", out]
+
+      case Proc.run(runtime_elixir(), args,
+             cd: Path.expand("..", __DIR__),
+             env: [{"PATH", runtime_path()}],
+             timeout_ms: @screenshot_timeout_ms,
+             log: log
+           ) do
+        {:ok, _} ->
+          ctx.log.("##{issue.number}: Screenshots erzeugt")
+
+          "Das Skript hat die Screenshots aus `.dev-loop/screenshots.json` erzeugt: " <>
+            "PNGs unter `.dev-loop/screenshots/`, je Aufnahme URL, Theme und Breite in " <>
+            "`.dev-loop/screenshots/manifest.json`."
+
+        {_, _, lines} ->
+          "Die Screenshots sind gescheitert:\n\n```\n#{tail(lines)}\n```"
+
+        {:timeout, lines} ->
+          "Die Screenshots haben das Zeitlimit überschritten:\n\n```\n#{tail(lines)}\n```"
+      end
+    else
+      {:error, :enoent} ->
+        "Die Umsetzung hat keine Screenshots angefordert."
+
+      {:write, {:error, reason}} ->
+        "`.dev-loop/screenshots.json` im Review-Worktree nicht geschrieben: #{:file.format_error(reason)}"
+
+      {:ok, %File.Stat{}} ->
+        "`.dev-loop/screenshots.json` abgelehnt: keine Datei bis 64 KB in einem echten Ordner (etwa ein Symlink)."
+
+      {:error, reason} when is_atom(reason) ->
+        "`.dev-loop/screenshots.json` nicht lesbar: #{:file.format_error(reason)}"
+
+      {:error, message} when is_binary(message) ->
+        "`.dev-loop/screenshots.json` abgelehnt: #{message}"
+
+      _ ->
+        "`.dev-loop/screenshots.json` ist kein gültiges JSON."
+    end
+  end
+
+  defp review_agent(ctx, issue, pr, sha, rwt, hint, shots) do
     prompt =
       render("review", %{
+        screenshots: shots,
         pr: pr.number,
         number: issue.number,
         tier: tier_label(issue),

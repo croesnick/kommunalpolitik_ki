@@ -205,6 +205,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `skills/antrag_generieren` | Markdown-Skill | Stadtratsantrag entwerfen (fraktionsneutral; fraktionsspezifische Vorlage via Vault-Tag) | Agent Skill | Funktionsfähig |
 | `skills/terminal_screenshot` | Markdown-Skill + Python-Skripte | Terminal-Sitzung als Screenshot für READMEs (tmux-Capture → SVG, Browser-verifiziert) | Agent Skill | Funktionsfähig |
 | `skills/mermaid_vision_loop` | Markdown-Skill + Python-Skript | Mermaid-Diagramme rendern, vom Vision-Agenten bewerten lassen und refaktorieren, bis sie lesbar sind | Agent Skill | Funktionsfähig |
+| `scripts/screenshot.exs` | Elixir-Skript | Screenshots der Hub-Oberfläche als Beleg für Prüfpunkte: startet den Hub aus einem Worktree auf einer Wegwerf-Datenbank und einen Headless-Browser, beide gemeinsam in einer eigenen Sandbox ohne Netz und ohne Schreibrecht im Worktree, und liefert nur die Bilder. Regeln: `docs/agents/interaktive-sessions.md` | CLI (`elixir scripts/screenshot.exs --route/--navigate/--spec/--probe`); interaktive Sessions nutzen den Starter `komki-screenshot` aus `make screenshot-install` | Funktionsfähig |
 | `scripts/dev_loop.exs` | Elixir-Skript | Dev-Loop: arbeitet freie Tickets ab, auch wenn niemand am Rechner sitzt. Eine Session setzt um, eine zweite prüft. Einfache Tickets werden gemergt, alles andere wartet mit einer kurzen Zusammenfassung auf ein GO. Eine dritte Session verfeinert Tickets und macht nur Vorschläge. Regeln und Einrichtung: `docs/agents/dev-loop.md` | CLI (`elixir scripts/dev_loop.exs`) | Prototyp |
 
 ### Externe Abhängigkeiten (nicht im Repo)
@@ -216,6 +217,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `RENOVATE_TOKEN` (Fine-grained PAT) | Dependency-Updates via self-hosted Renovate (Rechte-Anforderungen: [`docs/prerequisites.md`](docs/prerequisites.md)) | `.github/workflows/renovate.yml` (CI, alle 6 h) |
 | `zig` 0.16.0 + `xz` | komki-Einzeldatei-Binary via Burrito (nur Release-Bau; Versionsprüfung auf Gleichheit) | `apps/komki_cli` (Ticket #75, Details: [`docs/prerequisites.md`](docs/prerequisites.md)) |
 | `nextcloud-mcp-server` (`uvx`) | Nextcloud-MCP (WebDAV/CalDAV/Notes/Deck/Talk) via Subprocess | WF 9 (Nextcloud-Kollaborationsplattform) |
+| `chrome-headless-shell` (Playwright) | Headless-Browser, gepinnt per Prüfsumme | `scripts/screenshot.exs` (Ticket #510, Details: [`docs/prerequisites.md`](docs/prerequisites.md)) |
 | `lychee` CLI | Markdown-Links offline prüfen (CI nutzt die lychee-Action mit eigener Binary) | `docs-links`-Check der CI-Kurzfassung, Pre-commit-Hook `lychee-markdown-links` |
 
 > **Hinweis:** Der `obsidian` CLI ist eine externe Abhängigkeit, die lokal installiert sein muss. Vollständige Dokumentation (Install, Konfiguration, Fallbacks, Limitierungen) siehe [`docs/prerequisites.md`](docs/prerequisites.md).
@@ -349,7 +351,7 @@ kommunalpolitik_ki/
 │   ├── obsidian_mcp/       # Vault nativ lesen/schreiben (AI: MCP)
 │   ├── pdf_ingest/         # PDF-Ingestion (AI: MCP)
 │   └── ratsinfo_mcp/       # MCP-Wrapper um ratsinfo-CLI (AI: MCP)
-├── scripts/                # Dev-Loop: Tickets unbeaufsichtigt umsetzen, reviewen, mergen (docs/agents/dev-loop.md)
+├── scripts/                # Dev-Loop (docs/agents/dev-loop.md), Screenshot-Werkzeug für UI-Prüfpunkte
 ├── skills/                 # AI-Harness-Skills
 │   ├── foerdermittel_recherche/  # Fördermittel-Recherche (AI: Agent Skill)
 │   ├── ratsprojekt_delta/      # Neue Infos gegen Projektstand halten (AI: Agent Skill)

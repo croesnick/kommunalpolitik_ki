@@ -78,3 +78,6 @@ packaging/pi/node_modules/
 
 # Dev loop (#389): agent hand-off files inside loop worktrees
 .dev-loop/
+
+# screenshot tool (#510): default output in a worktree
+.screenshots/

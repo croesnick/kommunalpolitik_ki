@@ -45,12 +45,17 @@ Schreib in die Datei, was du gefunden hast, und deinen Vorschlag, auf Deutsch un
 
 ## Ergebnis
 
-Schreib zum Abschluss zwei Dateien (sie sind gitignored, committe sie nicht):
+Schreib zum Abschluss diese Dateien (sie sind gitignored, committe sie nicht):
 
 1. `.dev-loop/pr.md`: In der ersten Zeile steht der PR-Titel auf Deutsch. Darunter folgt der PR-Text mit den Abschnitten `## Gebaut`, `## Bewusst offen`, `## Nachweise` und `## Entscheidungen, die ich selbst getroffen habe` (wörtlich als Überschrift) und einer Zeile `Closes #{{number}}`. Deckt der PR das Ticket bewusst nur teilweise ab, schreib stattdessen `Refs #{{number}}` und einen Satz, was fehlt.
    - `Nachweise`: je Punkt aus „Fertig, wenn“ bzw. „Zu messen“ und je Prüfpunkt der berührten Bereiche aus `docs/agents/pruefpunkte.md` der Test, Befehl oder Lauf, mit dem er sich prüfen lässt. Ein Ergebnis vergibst du nicht, das macht das Review.
    - `Entscheidungen, die ich selbst getroffen habe`: alles, was du festgelegt hast, ohne dass Ticket, Doku oder vorhandener Code es vorgeben, je mit Grund und Quelle. Weicht etwas davon ab, wie sich der Bestand verhält, sag das dazu. Ohne solche Entscheidungen steht dort `Keine.` Fehlt der Abschnitt, gilt die Umsetzung als gescheitert.
 2. `.dev-loop/brief.md`: drei Zeilen für die nutzende Person, die entscheiden soll. Was ist anders, wie wurde es geprüft, was bleibt offen?
+3. `.dev-loop/screenshots.json`, nur wenn der Diff die Hub-Oberfläche ändert (`apps/ratsprojekte/assets/` oder `apps/ratsprojekte/lib/ratsprojekte_web/`): die Seiten und Navigationen, die das Review sehen muss. Das Skript erzeugt daraus nach den Gates PNGs für das Review, du selbst kannst keine erzeugen. Nur lokale Pfade, höchstens 40 Aufnahmen (Routen × Themes × Breiten):
+
+   ```json
+   {"routes": ["/stand"], "navigations": [{"from": "/", "to": "/stand"}], "themes": ["light", "dark"], "widths": [390, 1280]}
+   ```
 
 ## Hinweise aus der vorigen Runde
 

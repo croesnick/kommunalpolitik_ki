@@ -1,6 +1,6 @@
 # Prüfpunkte je Bereich
 
-Stand: 2026-11-12. Diese Prüfpunkte gelten bei jeder Änderung im jeweiligen Bereich, auch wenn das Ticket sie nicht eigens nennt (#461). Im Prüfbericht ([Lane-Protokoll](lane-protocol.md#prüfbericht-the-verification-report)) bekommt jeder Punkt eines Bereichs, den der Diff berührt, eine eigene Zeile. Die Prüfpunkte eines Tickets unter „Fertig, wenn“ bleiben im Ticket.
+Stand: 2026-11-13. Diese Prüfpunkte gelten bei jeder Änderung im jeweiligen Bereich, auch wenn das Ticket sie nicht eigens nennt (#461). Im Prüfbericht ([Lane-Protokoll](lane-protocol.md#prüfbericht-the-verification-report)) bekommt jeder Punkt eines Bereichs, den der Diff berührt, eine eigene Zeile. Die Prüfpunkte eines Tickets unter „Fertig, wenn“ bleiben im Ticket.
 
 Ein Punkt gilt für den Diff: Er fragt, was die Änderung einbringt, nicht ob das ganze Repo ihn schon erfüllt. Altbestand, der einen Punkt verletzt, steht beim Punkt mit seinem Folgeticket.
 
@@ -11,7 +11,7 @@ Welche Punkte hier stehen, entscheidet die nutzende Person. Jeder Punkt hat ihr 
 **Gilt für:** `apps/ratsprojekte/assets/`, `apps/ratsprojekte/lib/ratsprojekte_web/`, `apps/ratsprojekte/test/ratsprojekte_web/theme_css_test.exs`
 
 - **Light und Dark, ab Handybreite.** Jede geänderte Seite folgt dem Theme und funktioniert ab Handybreite. Der Diff bringt feste Farben nur in die beiden Theme-Blöcke und in `@media print` ein. Ausnahmen mit GO: die Datenfarben der Meinungsbalken (`--stufe-1` bis `--stufe-5` auf `:root`, in beiden Themes gleich) und Schatten mit höchstens 30 % Deckkraft.
-  *Nachweis:* Screenshot jeder geänderten Seite hell und dunkel, eine davon in Handybreite. Automatisch: `apps/ratsprojekte/test/ratsprojekte_web/theme_css_test.exs` (feste Farben in `app.css` und `assets/js/app.js`, feste Farbklassen und Inline-Farben in Templates).
+  *Nachweis:* Screenshot jeder geänderten Seite hell und dunkel, eine davon in Handybreite, erzeugt mit dem Screenshot-Werkzeug aus `make screenshot-install` ([interaktive-sessions.md](interaktive-sessions.md#screenshots-der-hub-oberfläche)), im Dev-Loop über `.dev-loop/screenshots.json`. Zustände während einer Navigation nimmt `--navigate` auf. Automatisch: `apps/ratsprojekte/test/ratsprojekte_web/theme_css_test.exs` (feste Farben in `app.css` und `assets/js/app.js`, feste Farbklassen und Inline-Farben in Templates).
 
 ## Ratsinhalte
 
