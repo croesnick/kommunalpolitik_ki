@@ -73,7 +73,7 @@ defmodule Ratsprojekte.MixProject do
        depth: 1},
       {:daisyui,
        github: "saadeghi/daisyui",
-       tag: "v5.5.20",
+       tag: "v5.8.0",
        sparse: "packages/bundle",
        app: false,
        compile: false,
