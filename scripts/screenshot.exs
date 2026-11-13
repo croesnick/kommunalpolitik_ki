@@ -20,10 +20,11 @@
 # apply; the tool then confines server and browser itself. The dev loop runs
 # the copy of its own checkout after the gates.
 #
-# The tool itself runs unconfined, and the session (and the hub code under
-# the profile) may write the worktree, the output folder and the scratch
-# directory. The tool writes there only through put!/3 and reads its logs
-# there only through read_log/1, so a planted symlink or hard link neither
+# The tool itself runs unconfined. The session may write the worktree and
+# the output folder, the hub code under the profile its scratch directory
+# and logs; the scratch directory lies where the session cannot write
+# (scratch!/0). The tool writes into the output folder only through put!/3
+# and reads the logs there only through read_log/1, so a planted symlink or hard link neither
 # redirects one of its own writes nor leaks a file. Left open: swapping the
 # output folder itself for a symlink during a run, and a hard link planted
 # on a log during the run, whose target the shells under the profile would
@@ -51,6 +52,7 @@ defmodule Screenshot do
   # Next to the installed copy: neither the Claude sandbox nor Edit/Write
   # may change it (.claude/settings.json).
   @cache Path.expand("~/.local/share/komki-tools/cache")
+  @runs Path.expand("~/.local/share/komki-tools/run")
   @sandbox_exec "/usr/bin/sandbox-exec"
   @marker ".komki-screenshot"
   @logs ~w(server.log browser.log probe.log)
@@ -209,6 +211,14 @@ defmodule Screenshot do
     common = repo_common_dir()
 
     cond do
+      # The profile reads the whole worktree: no temp directory (other
+      # sessions' files) and nothing that holds a place of the read ban.
+      Enum.any?(tmp_roots(), &inside?(path, &1)) ->
+        fail("#{path} liegt unter einem Temp-Ordner; nur echte Worktrees.")
+
+      Enum.any?(@denied, &inside?(Seatbelt.canonical(&1), path)) ->
+        fail("#{path} enthält einen gesperrten Ort.")
+
       git(path, ~w(rev-parse --show-toplevel)) != {:ok, path} ->
         fail("#{path} ist nicht die Wurzel eines Git-Worktrees.")
 
@@ -264,8 +274,9 @@ defmodule Screenshot do
     path
   end
 
-  defp roots(worktree),
-    do: Enum.uniq([worktree | Enum.map([System.tmp_dir!(), "/tmp"], &Seatbelt.canonical/1)])
+  defp roots(worktree), do: Enum.uniq([worktree | tmp_roots()])
+
+  defp tmp_roots, do: Enum.uniq(Enum.map([System.tmp_dir!(), "/tmp"], &Seatbelt.canonical/1))
 
   # The tool reads the shot list outside any sandbox, and its error messages
   # quote what they reject: only small regular files inside the worktree or
@@ -442,9 +453,20 @@ defmodule Screenshot do
 
   # -- profile and launch ----------------------------------------------------
 
+  # Next to the installed copy, where neither the Claude sandbox nor
+  # Edit/Write reaches: the tool writes the build and boot script there
+  # unconfined, and the profile lets the hub write all of it. Under $TMPDIR a
+  # session could plant the name as a symlink or swap files in between.
   defp scratch! do
-    dir = Path.join(System.tmp_dir!(), "komki-screenshot-#{System.unique_integer([:positive])}")
-    for sub <- ~w(home tmp hex chrome), do: File.mkdir_p!(Path.join(dir, sub))
+    File.mkdir_p!(@runs)
+    dir = Path.join(@runs, hex(:crypto.strong_rand_bytes(8)))
+
+    case File.mkdir(dir) do
+      :ok -> :ok
+      {:error, reason} -> fail("Wegwerf-Ordner #{dir}: #{:file.format_error(reason)}")
+    end
+
+    for sub <- ~w(home tmp hex chrome), do: File.mkdir!(Path.join(dir, sub))
     Seatbelt.canonical(dir)
   end
 
@@ -474,9 +496,9 @@ defmodule Screenshot do
     # Fresh regular files with a single link: the shells under the profile
     # append to them, so a link planted before the run must not stay.
     Enum.each(@logs, &put!(out, &1, ""))
-    profile = Path.join(scratch, "profile.sb")
-    File.write!(profile, Profile.render(paths))
-    put!(out, "profile.sb", File.read!(profile))
+    # Handed to sandbox-exec as text: no file anyone could swap before launch.
+    profile = Profile.render(paths)
+    put!(out, "profile.sb", profile)
 
     %{
       worktree: worktree,
@@ -579,7 +601,7 @@ defmodule Screenshot do
 
     args =
       ["-i" | Enum.map([{"LOG", log} | env], fn {k, v} -> "#{k}=#{v}" end)] ++
-        [@sandbox_exec, "-f", ctx.profile, "/bin/sh", "-c", ~s{exec "$0" "$@" } <> redirect] ++
+        [@sandbox_exec, "-p", ctx.profile, "/bin/sh", "-c", ~s{exec "$0" "$@" } <> redirect] ++
         argv
 
     Port.open({:spawn_executable, "/usr/bin/env"}, [

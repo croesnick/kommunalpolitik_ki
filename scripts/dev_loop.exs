@@ -654,6 +654,16 @@ defmodule DevLoop do
     )
   end
 
+  # A fresh review worktree may carry a committed `.dev-loop` symlink; the
+  # script writes there outside any sandbox.
+  defp real_dir(dir) do
+    case File.lstat(dir) do
+      {:ok, %File.Stat{type: :directory}} -> :ok
+      {:error, :enoent} -> File.mkdir(dir)
+      other -> other
+    end
+  end
+
   # UI evidence (#510): the implementation lists routes in
   # .dev-loop/screenshots.json. The script checks the list against the
   # pattern of Screenshot.Spec and runs the screenshot tool of its own
@@ -664,14 +674,19 @@ defmodule DevLoop do
 
     # A symlink could point the script, which reads outside any sandbox, at
     # a secret; the rejection would then quote it into the review prompt.
-    with {:ok, %File.Stat{type: :regular, size: size}} when size <= 65_536 <- File.lstat(file),
+    # `.dev-loop` itself can be a committed symlink (the gitignore entry
+    # `.dev-loop/` matches only a directory), so both levels are checked.
+    with {:ok, %File.Stat{type: :directory}} <- File.lstat(Path.dirname(file)),
+         {:ok, %File.Stat{type: :regular, size: size}} when size <= 65_536 <- File.lstat(file),
+         :ok <- real_dir(Path.join(rwt, ".dev-loop")),
          {:ok, text} <- File.read(file),
          {:json, {:ok, map}} <- {:json, JSON.decode(text)},
          {:ok, _spec} <- Screenshot.Spec.parse(map) do
       checked = Path.join(rwt, ".dev-loop/screenshots.json")
       out = Path.join(rwt, ".dev-loop/screenshots")
-      File.mkdir_p!(Path.dirname(checked))
-      File.write!(checked, text)
+      # Replaces a committed symlink instead of writing through it.
+      File.rm(checked)
+      File.write!(checked, text, [:exclusive])
       log = Path.join(ctx.logs, "#{ctx.stamp.()}-screenshots.log")
       args = [@screenshot_tool, "--spec", checked, "--worktree", rwt, "--out", out]
 
@@ -699,7 +714,7 @@ defmodule DevLoop do
         "Die Umsetzung hat keine Screenshots angefordert."
 
       {:ok, %File.Stat{}} ->
-        "`.dev-loop/screenshots.json` abgelehnt: keine Datei bis 64 KB (etwa ein Symlink)."
+        "`.dev-loop/screenshots.json` abgelehnt: keine Datei bis 64 KB in einem echten Ordner (etwa ein Symlink)."
 
       {:error, reason} when is_atom(reason) ->
         "`.dev-loop/screenshots.json` nicht lesbar: #{:file.format_error(reason)}"
