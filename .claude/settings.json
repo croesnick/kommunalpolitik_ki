@@ -9,7 +9,9 @@
       "git fetch",
       "git fetch *",
       "git pull",
-      "git pull *"
+      "git pull *",
+      "/Users/crn/.local/share/komki-tools/screenshot/bin/komki-screenshot",
+      "/Users/crn/.local/share/komki-tools/screenshot/bin/komki-screenshot *"
     ],
     "filesystem": {
       "denyRead": [
@@ -53,6 +55,7 @@
     }
   },
   "permissions": {
+    "allow": ["Bash(/Users/crn/.local/share/komki-tools/screenshot/bin/komki-screenshot)", "Bash(/Users/crn/.local/share/komki-tools/screenshot/bin/komki-screenshot *)"],
     "deny": [
       "Bash(security *)",
       "Bash(ssh *)",
@@ -61,7 +64,9 @@
       "Read(~/.config/gh/**)",
       "Read(~/Library/Keychains/**)",
       "Read(~/Library/Application Support/ratsprojekte/**)",
-      "Read(~/Library/Mobile Documents/iCloud~md~obsidian/**)"
+      "Read(~/Library/Mobile Documents/iCloud~md~obsidian/**)",
+      "Edit(~/.local/share/komki-tools/**)",
+      "Write(~/.local/share/komki-tools/**)"
     ]
   },
   "hooks": {
