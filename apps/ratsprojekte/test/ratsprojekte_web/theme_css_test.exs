@@ -7,6 +7,7 @@ defmodule RatsprojekteWeb.ThemeCssTest do
 
   @css Path.expand("../../assets/css/app.css", __DIR__)
   @templates Path.expand("../../lib/ratsprojekte_web", __DIR__)
+  @app_js Path.expand("../../assets/js/app.js", __DIR__)
 
   # CSS named colours (CSS Color Module Level 4), without transparent and currentcolor.
   @named ~w(aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond
@@ -70,6 +71,17 @@ defmodule RatsprojekteWeb.ThemeCssTest do
           do: {Path.relative_to(path, @templates), finding}
 
     assert offenders == [], "Feste Farben in Templates: #{inspect(offenders)}"
+  end
+
+  test "app.js takes colours from the theme, not from literals" do
+    offenders =
+      @app_js
+      |> File.read!()
+      |> String.replace(~r{/\*.*?\*/}s, "")
+      |> String.replace(~r{//[^\n]*}, "")
+      |> then(&Regex.scan(@colour_literal, &1))
+
+    assert offenders == [], "Feste Farben in app.js: #{inspect(offenders)}"
   end
 
   test "the checks catch what they are meant to catch" do
