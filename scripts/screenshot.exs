@@ -20,9 +20,12 @@
 # apply; the tool then confines server and browser itself. The dev loop runs
 # the copy of its own checkout after the gates.
 #
-# The tool itself runs unconfined, and the session may write the worktree,
-# the output folder and /tmp: it never writes through a path the session
-# could have planted as a symlink (see put!/3).
+# The tool itself runs unconfined, and the session (and the hub code under
+# the profile) may write the worktree, the output folder and the scratch
+# directory. The tool writes there only through put!/3 and reads its logs
+# there only through read_log/1, so a planted symlink or hard link neither
+# redirects a write nor leaks a file. Left open: swapping the output folder
+# itself for a symlink during a run (docs/agents/interaktive-sessions.md).
 # Docs: docs/agents/interaktive-sessions.md, docs/agents/dev-loop.md.
 
 Kernel.ParallelCompiler.require(
@@ -59,8 +62,14 @@ defmodule Screenshot do
     "~/Library/Mobile Documents/iCloud~md~obsidian",
     "~/.ssh",
     "~/.config/gh",
-    "~/Library/Keychains"
+    "~/Library/Keychains",
+    "~/.claude"
   ]
+
+  # NIF libraries the profile may read: package managers and the system,
+  # never a home directory. The list comes from the build in the worktree,
+  # which the session writes.
+  @dylib_roots ~w(/opt/homebrew /usr/local /usr/lib /System/Library)
 
   @resolver_rule "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"
 
@@ -88,10 +97,11 @@ defmodule Screenshot do
   ]
 
   @usage """
-  Aufruf: elixir scripts/screenshot.exs --route /stand [--route …] [--navigate /:/stand]
+  Aufruf: komki-screenshot --route /stand [--route …] [--navigate /:/stand]
                  [--theme light,dark] [--width 390,1280] [--worktree PFAD] [--out ORDNER]
-          elixir scripts/screenshot.exs --spec DATEI.json [--worktree PFAD] [--out ORDNER]
-          elixir scripts/screenshot.exs --probe [--worktree PFAD] [--out ORDNER]
+          komki-screenshot --spec DATEI.json [--worktree PFAD] [--out ORDNER]
+          komki-screenshot --probe [--worktree PFAD] [--out ORDNER]
+  (komki-screenshot aus make screenshot-install; im Checkout: elixir scripts/screenshot.exs)
   """
 
   def main(argv) do
@@ -276,7 +286,7 @@ defmodule Screenshot do
           fail("#{file} ist keine Datei bis 64 KB.")
 
         true ->
-          {:ok, text} = :file.read(fd, 65_536)
+          text = with {:ok, text} <- :file.read(fd, 65_536), do: text, else: (_ -> "")
           decode!(text, file)
       end
     after
@@ -529,6 +539,11 @@ defmodule Screenshot do
     |> Enum.reject(fn dir -> Enum.any?(own_roots, &inside?(dir, &1)) end)
     |> Enum.uniq()
     |> Enum.sort()
+    |> tap(fn dirs ->
+      for dir <- dirs,
+          not Enum.any?(@dylib_roots, &inside?(dir, &1)),
+          do: fail("NIF-Bibliothek außerhalb von #{Enum.join(@dylib_roots, ", ")}: #{dir}")
+    end)
   end
 
   # Clean environment: nothing of the caller's (tokens, keys) reaches the
@@ -1045,7 +1060,7 @@ defmodule Screenshot do
     )
 
     beam_rows =
-      for "PROBE\t" <> row <- String.split(File.read!(log), "\n") do
+      for "PROBE\t" <> row <- String.split(read_log(log), "\n") do
         [name, verdict, detail] = String.split(row, "\t", parts: 3)
         {name, verdict, detail}
       end
@@ -1184,9 +1199,31 @@ defmodule Screenshot do
 
   defp deadline(ms), do: System.monotonic_time(:millisecond) + ms
 
-  defp tail(log) do
-    case File.read(log) do
-      {:ok, text} -> text |> String.split("\n") |> Enum.take(-30) |> Enum.join("\n")
+  defp tail(log), do: log |> read_log() |> String.split("\n") |> Enum.take(-30) |> Enum.join("\n")
+
+  # The logs lie where the session and the hub code under the profile can
+  # swap them, and the tool reads them unconfined and prints their tail. It
+  # reads only a regular file with a single link whose open handle (fstat)
+  # is the very file the path names without following a symlink (lstat):
+  # neither a symlink nor a hard link to a protected file passes.
+  defp read_log(log) do
+    # lstat first: opening a planted FIFO would block.
+    with {:ok, %File.Stat{type: :regular}} <- File.lstat(log),
+         {:ok, fd} <- File.open(log, [:read, :binary]) do
+      try do
+        with {:ok, info} <- :file.read_file_info(fd),
+             {:ok, %File.Stat{type: :regular} = stat} <- File.lstat(log),
+             true <- elem(info, 8) == 1 and same_file?(info, {:ok, stat}),
+             {:ok, text} <- :file.read(fd, max(elem(info, 1), 1)) do
+          text
+        else
+          :eof -> ""
+          _ -> "(Log nicht lesbar: keine eigene Datei)"
+        end
+      after
+        File.close(fd)
+      end
+    else
       _ -> "(kein Log)"
     end
   end
