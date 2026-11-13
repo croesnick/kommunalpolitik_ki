@@ -17,7 +17,7 @@ echo '{}' | ./komki-connector-ris --socket /tmp/kmris.sock [--base-url <url>] [-
 ```
 
 - `--socket`: Unix-Socket, den der Connector bindet (Rechte `0600`). macOS erlaubt höchstens 103 Byte Pfadlänge.
-- `--base-url`: Basis der RIS-API, Default `https://risapi1.komuna.net/web/`.
+- `--base-url`: Basis der RIS-API, Default `https://risapi3.komuna.net/web/`.
 - `--proxy`: HTTPS läuft dann per CONNECT über diesen Proxy (`komki-egress`). Klartext-HTTP (nur der
   Mock auf Loopback) geht direkt.
 - stdin: genau eine Credentials-Zeile. RIS braucht keine, also `{}`. Der Connector liest stdin bis
@@ -97,7 +97,7 @@ JSON- und Körper-Dekode, Flag-Parser): Wer ein neues Familienmitglied schreibt,
 
 ```bash
 elixir apps/komki_connector_ris/priv/ris_recorder.exs --port 4020 \
-  [--upstream https://risapi1.komuna.net/web/] [--out <verzeichnis>]
+  [--upstream https://risapi3.komuna.net/web/] [--out <verzeichnis>]
 ```
 
 Der Proxy reicht Anfragen 1:1 an das echte RIS weiter und schreibt jeden Austausch als Kassette

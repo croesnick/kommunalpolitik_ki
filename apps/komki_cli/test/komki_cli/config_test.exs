@@ -148,10 +148,10 @@ defmodule KomkiCli.ConfigTest do
     test "Defaults: Egress-Ports, echte RIS-URL, Test-Vault unter der Basis" do
       cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-conn"))
       assert cfg.egress_ports == %{"ris" => 49_531, "web" => 49_532}
-      assert cfg.ris_base_url == "https://risapi1.komuna.net/web/"
+      assert cfg.ris_base_url == "https://risapi3.komuna.net/web/"
       assert cfg.ris_mock_port == nil
       assert cfg.vault_dir == Path.join(cfg.base_dir, "vault")
-      assert Config.ris_url(cfg) == "https://risapi1.komuna.net/web/"
+      assert Config.ris_url(cfg) == "https://risapi3.komuna.net/web/"
       refute Config.ris_mock?(cfg)
       assert Map.keys(cfg.connector_bins) == ["documents", "ratsprojekte", "ris", "vault", "web"]
     end
@@ -218,6 +218,21 @@ defmodule KomkiCli.ConfigTest do
       assert loaded.vault_dir == nil
       assert loaded.web_mock_port == nil
       assert loaded.connector_bins == %{}
+    end
+
+    # Ticket #515: the RIS moved; the old default may not stay in place, or
+    # the egress (manifest allows only the new host) rejects every request.
+    test "alte RIS-Adresse wird beim Laden zur aktuellen, eine eigene bleibt" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-ris"))
+      map = cfg |> Config.encode() |> JSON.decode!()
+
+      assert {:ok, moved} =
+               Config.from_map(%{map | "ris_base_url" => "https://risapi1.komuna.net/web/"})
+
+      assert moved.ris_base_url == "https://risapi3.komuna.net/web/"
+
+      assert {:ok, own} = Config.from_map(%{map | "ris_base_url" => "https://ris.example/web/"})
+      assert own.ris_base_url == "https://ris.example/web/"
     end
 
     # Ticket #318 (Config-Migration): aeltere Instanzen kennen drafter_path/

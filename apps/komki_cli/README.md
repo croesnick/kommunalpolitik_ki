@@ -461,7 +461,7 @@ selbst alle Prozesse, und nur der Egress-Proxy darf nach außen:
   (`{"ris": 49531, "web": 49532}`; `init --port N` legt sie auf `N + 7` und
   `N + 8`, damit eine Wegwerf-Instanz neben der Hauptinstanz startet; eine
   bestehende `config.json` behält ihre Ports, Ticket #203), `ris_base_url`
-  (`https://risapi1.komuna.net/web/`), `ris_mock_port` (aus; gesetzt spricht der
+  (`https://risapi3.komuna.net/web/`), `ris_mock_port` (aus; gesetzt spricht der
   RIS-Connector direkt mit `http://127.0.0.1:<port>/`, ohne Proxy), `vault_dir`
   (`<base>/vault`, anfangs leer, Test-Vault siehe Schnellstart; leer gesetzt: Vault-Connector aus).
 * **Bereit** ist ein Connector, wenn die reservierte Operation `ping` die

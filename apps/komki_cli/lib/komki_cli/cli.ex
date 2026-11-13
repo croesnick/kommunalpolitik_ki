@@ -293,7 +293,7 @@ defmodule KomkiCli.CLI do
           ris_base_url: [
             value_name: "URL",
             long: "ris-base-url",
-            help: "RIS-API-Basis (default https://risapi1.komuna.net/web/)"
+            help: "RIS-API-Basis (default https://risapi3.komuna.net/web/)"
           ],
           ris_mock_port: [
             value_name: "N",

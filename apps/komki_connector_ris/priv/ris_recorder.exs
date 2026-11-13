@@ -1,7 +1,7 @@
-# Aufzeichnungs-Proxy fuer die RIS-API (risapi1.komuna.net/web/).
+# Aufzeichnungs-Proxy fuer die RIS-API (risapi3.komuna.net/web/).
 #
 #     elixir apps/komki_connector_ris/priv/ris_recorder.exs --port 4020 \
-#       [--upstream https://risapi1.komuna.net/web/] [--out <verzeichnis>]
+#       [--upstream https://risapi3.komuna.net/web/] [--out <verzeichnis>]
 #
 # Der Proxy nimmt Anfragen entgegen (komki-connector-ris mit --base-url
 # http://127.0.0.1:4020/ oder ratsinfo mit RIS_BASE_URL=http://127.0.0.1:4020/),
@@ -36,7 +36,7 @@ defmodule KomkiConnectorRis.RisRecorder do
   alias KomkiConnectorRis.RisHttp
 
   @redacted "<redacted>"
-  @default_upstream "https://risapi1.komuna.net/web/"
+  @default_upstream "https://risapi3.komuna.net/web/"
   @profile :ris_recorder
   @timeout_ms 60_000
 

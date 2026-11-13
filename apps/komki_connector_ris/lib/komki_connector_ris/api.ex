@@ -1,8 +1,11 @@
 defmodule KomkiConnectorRis.Api do
   @moduledoc """
-  Die drei Gast-Endpunkte der RIS-API (`risapi1.komuna.net/web/`), die
+  Die drei Gast-Endpunkte der RIS-API (`risapi3.komuna.net/web/`), die
   ohne Anmeldung erreichbar sind (geprueft 2026-10-23). Kopfzeilen und
-  Mandant wie in `apps/ratsinfo` (`Ratsinfo.Config`):
+  Mandant wie in `apps/ratsinfo` (`Ratsinfo.Config`). Adresse und
+  `x-orgkey` stammen aus `https://ris.komuna.net/52/webconfig.json`, der
+  Konfiguration der Weboberflaeche (`serviceUrl`, `org_key`, abgerufen
+  2026-11-13, #515; vorher `risapi1`/`RIS51`):
 
   - `GET guestmeetings?client=32&from=YYYY-MM-DD&until=YYYY-MM-DD`
     → `{"items": [{"id", "name", "meetingdate", "committeename", ...}]}`
@@ -16,9 +19,12 @@ defmodule KomkiConnectorRis.Api do
 
   Jeder Aufruf haelt die Frist des laufenden Connector-Aufrufs ein
   (`cfg.deadline`, monotone Millisekunden). Fehler werden auf die
-  geschlossenen Codes abgebildet; ein 404 bleibt `:not_found`, damit
-  der Aufrufer entscheidet, was das heisst. Fehlermeldungen enthalten
-  nie Upstream-Text.
+  geschlossenen Codes abgebildet; ein 404 auf eine Sitzung oder einen TOP
+  bleibt `:not_found`, damit der Aufrufer entscheidet, was das heisst.
+  Die Sitzungsliste dagegen gibt es immer: Ein 404 dort heisst, dass die
+  Gegenstelle den Mandanten nicht kennt (`Tenant unknown`, etwa nach einem
+  Umzug), und ist `upstream-error` statt „keine Sitzungen“ (#515).
+  Fehlermeldungen enthalten nie Upstream-Text.
   """
 
   alias KomkiConnectorRis.Http
@@ -26,7 +32,7 @@ defmodule KomkiConnectorRis.Api do
   # Wie Ratsinfo.Config: Mandant und Kopfzeilen der VG Buchloe.
   @client_id 32
   @headers [
-    {"x-orgkey", "RIS51"},
+    {"x-orgkey", "RIS52"},
     {"x-customname", "vgbuchloe"},
     {"x-uniqueid", "ris.komuna.net/vgbuchloe"},
     {"accept", "application/json"}
@@ -53,7 +59,7 @@ defmodule KomkiConnectorRis.Api do
     case get(cfg, "guestmeetings?" <> query) do
       {:ok, %{"items" => items}} when is_list(items) -> {:ok, items}
       {:ok, _} -> bad_response()
-      :not_found -> {:ok, []}
+      :not_found -> {:error, "upstream-error", "RIS kennt die Sitzungsliste nicht (HTTP 404)"}
       {:error, _, _} = e -> e
     end
   end

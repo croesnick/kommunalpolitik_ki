@@ -34,7 +34,7 @@ defmodule KomkiConnectorRis do
   alias KomkiConnectorRis.{Api, Http, Top}
 
   @defaults %{
-    base_url: "https://risapi1.komuna.net/web/",
+    base_url: "https://risapi3.komuna.net/web/",
     proxy: nil,
     # Einzelanfrage und Gesamtfrist bleiben unter den 15 s des Vermittlers.
     timeout_ms: 5_000,
