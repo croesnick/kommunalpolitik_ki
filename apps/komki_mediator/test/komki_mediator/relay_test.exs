@@ -146,7 +146,7 @@ defmodule KomkiMediator.RelayTest do
   end
 
   test "Vermittler nicht erreichbar: JSON-RPC-Fehler statt Absturz", %{token: token} do
-    relay = start_relay("/tmp/kmt-gibt-es-nicht.sock", token)
+    relay = start_relay(TestHelpers.tmp_socket(), token)
 
     send_line(relay, %{"jsonrpc" => "2.0", "id" => "a", "method" => "tools/list"})
     assert %{"id" => "a", "error" => %{"code" => -32_000}} = read_line(relay)

@@ -61,6 +61,7 @@ defmodule KomkiConnectorWeb.ConnectorTest do
       Process.exit(pid, :kill)
       stop_mock.()
       File.rm(path)
+      File.rm(Sidecar.Token.for_socket(path))
     end)
 
     path

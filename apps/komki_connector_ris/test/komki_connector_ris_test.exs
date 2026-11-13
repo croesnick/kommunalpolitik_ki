@@ -40,6 +40,7 @@ defmodule KomkiConnectorRisTest do
     on_exit(fn ->
       Process.exit(pid, :kill)
       File.rm(path)
+      File.rm(Sidecar.Token.for_socket(path))
     end)
 
     %{path: path, base_url: base_url, mock: mock}

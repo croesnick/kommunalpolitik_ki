@@ -29,6 +29,7 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
     on_exit(fn ->
       Process.exit(pid, :kill)
       File.rm(socket)
+      File.rm(Sidecar.Token.for_socket(socket))
       File.rm_rf!(root)
     end)
 
