@@ -50,6 +50,7 @@ defmodule DevLoop.CoreTest do
       assert Core.protected_hits(["apps/komki_cli/lib/komki_cli/tresor/core.ex"]) != []
       assert Core.protected_hits(["apps/komki_cli/lib/komki_cli/doctor.ex"]) == []
       assert Core.protected_hits(["apps/komki_mediator/lib/komki_mediator/gate_helper.ex"]) == []
+      assert Core.protected_hits([".claude/hooks/stop_gates.exs"]) != []
     end
 
     test "the loop's own rules are protected" do

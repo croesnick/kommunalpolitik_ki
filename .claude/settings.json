@@ -39,7 +39,7 @@
     },
     "network": {
       "allowLocalBinding": true,
-      "allowUnixSockets": ["/tmp/claude-502", "/private/tmp/claude-502"],
+      "allowUnixSockets": ["/tmp", "/private/tmp"],
       "allowedDomains": [
         "hex.pm",
         "repo.hex.pm",
