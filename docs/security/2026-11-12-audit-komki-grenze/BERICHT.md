@@ -20,32 +20,32 @@ Auftrag war der Scanner-Entwurf aus dem Ticket: Agent-Code, Agent-Ausgaben und i
 
 | Fund | Severity | App / Senke | Verletzte Zusage (RFC 0003) | Ticket |
 |---|---|---|---|---|
-| F1 | HIGH | komki_mediator: `JSON.canonical` Θ(depth²) auf rohen MCP-Argumenten → DoS | Auditierbare Vermittlung (Vermittler und Journal legbar; vollständige Vermittlung gefährdet) | folgt |
-| F2 | HIGH | seatbelt: Mach-O-Load-Commands werden ungeprüft zu `file-read*`-Grants | Vertrauensbasis Isolation (R.8.1); Nichtinterferenz ohne Lockerung kollabiert | folgt |
-| F3/F18/F20 | HIGH/MED/MED | komki-tresor: ECDH-Shared-Secret an jeden gleich-UID-Prozess, Prompt-Text vom Aufrufer | Vertrauensbasis Identitätsprüfung (R.8.1) — Touch-ID-Einwilligung ist fälschbar | folgt |
-| F4 | HIGH | komki_cli `go_steps.ex`: verweigerte Offenlegung wird als `go: true` geschrieben | Kein Autoritätsgewinn; Begrenzte Faktenfreigabe (Freigabe trotz „n") | folgt |
-| F5/F7/F8 | MED | komki_policy `verify.ex`: drei Schmiede-Lücken (geschmiedete Proof-Bäume validieren) | Kein Autoritätsgewinn; Auditierbare Vermittlung | folgt |
-| F6 | MED | komki_connector_vault `note.ex`: ReDoS in der Titel-Regex | R.8.4: Suchdienst-Determinismus (Suche für alle Räume legbar) | folgt |
-| F9 | MED | komki_mock: Kassetten-State mit 0644 statt 0600 | Datenschutz-Grenze (§8): nicht-öffentliche Ratsinhalte lokal lesbar | folgt |
-| F10/F14 | MED | komki_mediator `connector_gate.ex`: Γ-Rotation vor Silent-Filter → Existenz-Orakel | R.8.4: verweigerter Aufruf darf Existenz verborgener Notizen nicht verraten | folgt |
-| F11 | MED | komki_connector_web `text.ex`: ReDoS im Tag-Strip ferngesteuerter Treffer | Verfügbarkeit des Connectors (R.8.4 Suchdienst-Pflicht verwandt) | folgt |
-| F12 | MED | komki_mediator `gate.ex`: admit_document als Existenz-Orakel | R.8.4: Existenz vertraulicher Dokumente nicht verraten | folgt |
-| F13 | MED | komki_mediator: GO-/Journal-Verzeichnisse mit Default-Rechten | Begrenzte Faktenfreigabe (verweigerte Ausgaben lokal lesbar) | folgt |
-| F15 | MED | komki_connector_ris `top.ex`: quadratische Tag-Strip-Regex | Verfügbarkeit des RIS-Connectors | folgt |
-| F16 | MED | komki_connector_ris: RIS-Text ungefiltert in den Kontext (indirekte Prompt-Injection) | Kein Autoritätsgewinn (Steuerung im Raum); R.7.1.4 benennt den Fall | folgt |
-| F17 | MED | komki_connector_documents: PDF-Renderung im Connector-VM ohne Speichergrenze | Verfügbarkeit der Aufnahme (Gate-2-Weg) | folgt |
-| F19 | MED | komki_cli `tresor/core.ex`: komki-tresor ohne Pin-Prüfung ausgeführt | Vertrauensbasis: Neusealed Secrets gehen an ein gepflanztes Binary | folgt |
-| F21 | MED | ratsprojekte `verwaltung.ex`: Einweg-Link hinter nicht-zurechenbarem Touch-ID-Prompt | Hub-Zugangskontrolle (ADR 0004): Einwilligung fälschbar | folgt |
-| F22 | LOW | wegwerf_hub: `{:more,_}` unbehandelt → 500 statt 400 | Robustheit der Connector-Grenzstelle | folgt |
-| F23 | LOW | ratsprojekte: Recovery-Code (SQLCipher-Masterschlüssel) mit Terminal-Echo | Datenschutz-Grenze (§8): Schlüssel im Scrollback | folgt |
-| F24/F25 | LOW | komki_cli `steps.ex`: llama-API-Key in models.json mit 0644 | Datenschutz-Grenze: Schlüssel lokal lesbar | folgt |
-| F26/F31 | LOW | komki_cli: Terminal-Control-Sequenzen aus Denial-/Dateinamen | Entscheidungs-Oberfläche fälschbar (Kein-Autoritätsgewinn-Umfeld) | folgt |
-| F27 | LOW | komki_mediator `http.ex`: Session-Header unbelegt ins PDR-Journal | Auditierbare Vermittlung (Fehlzuschreibung) | folgt |
-| F28 | LOW | komki_connector_web `brave.ex`: echter API-Key über `http://` | Datenschutz-Grenze: bezahlter Schlüssel im Klartext | folgt |
-| F29 | LOW | komki_connector_ris `http.ex`: Antwortkörper ohne Größen-/Tiefengrenze | Verfügbarkeit | folgt |
-| F30 | LOW | komki_cli `connectors.ex`: Dokumenten-Store mit Default-Rechten | Datenschutz-Grenze: Raumdokumente lokal lesbar | folgt |
-| F32 | LOW | komki_cli `steps.ex`: `komki journal verify` ohne Pin-Gate | Auditierbare Vermittlung (gefälschtes Journal-Urteil) | folgt |
-| F33/F34 | LOW | komki_cli `label_store.ex`: registry.db mit Default-Rechten | Datenschutz-Grenze: Sicherheitsmodell lokal lesbar | folgt |
+| F1 | HIGH | komki_mediator: `JSON.canonical` Θ(depth²) auf rohen MCP-Argumenten → DoS | Auditierbare Vermittlung (Vermittler und Journal legbar; vollständige Vermittlung gefährdet) | #473 |
+| F2 | HIGH | seatbelt: Mach-O-Load-Commands werden ungeprüft zu `file-read*`-Grants | Vertrauensbasis Isolation (R.8.1); Nichtinterferenz ohne Lockerung kollabiert | #474 |
+| F3/F18/F20 | HIGH/MED/MED | komki-tresor: ECDH-Shared-Secret an jeden gleich-UID-Prozess, Prompt-Text vom Aufrufer | Vertrauensbasis Identitätsprüfung (R.8.1) — Touch-ID-Einwilligung ist fälschbar | #475 |
+| F4 | HIGH | komki_cli `go_steps.ex`: verweigerte Offenlegung wird als `go: true` geschrieben | Kein Autoritätsgewinn; Begrenzte Faktenfreigabe (Freigabe trotz „n") | #476 |
+| F5/F7/F8 | MED | komki_policy `verify.ex`: drei Schmiede-Lücken (geschmiedete Proof-Bäume validieren) | Kein Autoritätsgewinn; Auditierbare Vermittlung | #477, #479, #480 |
+| F6 | MED | komki_connector_vault `note.ex`: ReDoS in der Titel-Regex | R.8.4: Suchdienst-Determinismus (Suche für alle Räume legbar) | #478 |
+| F9 | MED | komki_mock: Kassetten-State mit 0644 statt 0600 | Datenschutz-Grenze (§8): nicht-öffentliche Ratsinhalte lokal lesbar | #481 |
+| F10/F14 | MED | komki_mediator `connector_gate.ex`: Γ-Rotation vor Silent-Filter → Existenz-Orakel | R.8.4: verweigerter Aufruf darf Existenz verborgener Notizen nicht verraten | #482 |
+| F11 | MED | komki_connector_web `text.ex`: ReDoS im Tag-Strip ferngesteuerter Treffer | Verfügbarkeit des Connectors (R.8.4 Suchdienst-Pflicht verwandt) | #483 |
+| F12 | MED | komki_mediator `gate.ex`: admit_document als Existenz-Orakel | R.8.4: Existenz vertraulicher Dokumente nicht verraten | #484 |
+| F13 | MED | komki_mediator: GO-/Journal-Verzeichnisse mit Default-Rechten | Begrenzte Faktenfreigabe (verweigerte Ausgaben lokal lesbar) | #485 |
+| F15 | MED | komki_connector_ris `top.ex`: quadratische Tag-Strip-Regex | Verfügbarkeit des RIS-Connectors | #486 |
+| F16 | MED | komki_connector_ris: RIS-Text ungefiltert in den Kontext (indirekte Prompt-Injection) | Kein Autoritätsgewinn (Steuerung im Raum); R.7.1.4 benennt den Fall | #487 |
+| F17 | MED | komki_connector_documents: PDF-Renderung im Connector-VM ohne Speichergrenze | Verfügbarkeit der Aufnahme (Gate-2-Weg) | #488 |
+| F19 | MED | komki_cli `tresor/core.ex`: komki-tresor ohne Pin-Prüfung ausgeführt | Vertrauensbasis: Neusealed Secrets gehen an ein gepflanztes Binary | #489 |
+| F21 | MED | ratsprojekte `verwaltung.ex`: Einweg-Link hinter nicht-zurechenbarem Touch-ID-Prompt | Hub-Zugangskontrolle (ADR 0004): Einwilligung fälschbar | #490 |
+| F22 | LOW | wegwerf_hub: `{:more,_}` unbehandelt → 500 statt 400 | Robustheit der Connector-Grenzstelle | #491 |
+| F23 | LOW | ratsprojekte: Recovery-Code (SQLCipher-Masterschlüssel) mit Terminal-Echo | Datenschutz-Grenze (§8): Schlüssel im Scrollback | #492 |
+| F24/F25 | LOW | komki_cli `steps.ex`: llama-API-Key in models.json mit 0644 | Datenschutz-Grenze: Schlüssel lokal lesbar | #493 |
+| F26/F31 | LOW | komki_cli: Terminal-Control-Sequenzen aus Denial-/Dateinamen | Entscheidungs-Oberfläche fälschbar (Kein-Autoritätsgewinn-Umfeld) | #494 |
+| F27 | LOW | komki_mediator `http.ex`: Session-Header unbelegt ins PDR-Journal | Auditierbare Vermittlung (Fehlzuschreibung) | #495 |
+| F28 | LOW | komki_connector_web `brave.ex`: echter API-Key über `http://` | Datenschutz-Grenze: bezahlter Schlüssel im Klartext | #496 |
+| F29 | LOW | komki_connector_ris `http.ex`: Antwortkörper ohne Größen-/Tiefengrenze | Verfügbarkeit | #497 |
+| F30 | LOW | komki_cli `connectors.ex`: Dokumenten-Store mit Default-Rechten | Datenschutz-Grenze: Raumdokumente lokal lesbar | #498 |
+| F32 | LOW | komki_cli `steps.ex`: `komki journal verify` ohne Pin-Gate | Auditierbare Vermittlung (gefälschtes Journal-Urteil) | #499 |
+| F33/F34 | LOW | komki_cli `label_store.ex`: registry.db mit Default-Rechten | Datenschutz-Grenze: Sicherheitsmodell lokal lesbar | #500 |
 
 Die Spalte „Ticket" wird mit den Einzeltickets befüllt (je Senke ein Ticket; die Paare/Triplets oben teilen sich je ein Ticket).
 
@@ -56,7 +56,7 @@ Der erste Lauf hat geliefert: 34 bestätigte Funde auf der Grenze, darunter vier
 - **Wöchentlich, headless**: ein `scan-changes`-Lauf auf dem Diff seit dem zuletzt geprüften Commit (billig, automatisch; das Plugin rechnet den Tally selbst).
 - **Auf Abruf**: ein Whole-Boundary-Lauf in `max` wie dieser nach großen Umbauten an der Grenze.
 
-Die Einrichtung des wöchentlichen Laufs ist ein eigenes Ticket.
+Die Einrichtung des wöchentlichen Laufs ist ein eigenes Ticket: #501.
 
 ## Grenzen des Laufs
 
