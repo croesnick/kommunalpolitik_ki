@@ -1,6 +1,6 @@
 # AI-Stufen: welches Modell welches Ticket bekommt
 
-Stand: 2026-10-29. Die Labels `ai:s-tier`, `ai:a-tier` und `ai:b-tier` sagen, **was ein Ticket verlangt**, nicht welches Modell es bekommt. Welche Modelle eine Stufe heute tragen, steht in der Tabelle unten. Diese Tabelle veraltet schnell, die Stufen nicht.
+Stand: 2026-11-12. Die Labels `ai:s-tier`, `ai:a-tier` und `ai:b-tier` sagen, **was ein Ticket verlangt**, nicht welches Modell es bekommt. Welche Modelle eine Stufe heute tragen, steht in der Tabelle unten. Diese Tabelle veraltet schnell, die Stufen nicht.
 
 Ein Ticket bekommt die Stufe seiner anspruchsvollsten Teilaufgabe. Im Zweifel gilt die höhere Stufe.
 
@@ -40,8 +40,8 @@ Ein `ai:a-tier`- oder `ai:b-tier`-Ticket hat ein Zielbild. Es beschreibt das Zie
 
 ## Prüfung vor dem Merge
 
-- `ai:s-tier`: Self-Review, dann ein Review durch die nutzende Person. Bei Änderungen an der Grenze zusätzlich ein unabhängiger Review.
-- `ai:a-tier`: Self-Review und echter Lauf laut Lane-Protokoll ([lane-protocol.md](lane-protocol.md)).
+- `ai:s-tier`: Self-Review, ein unabhängiges Review mit frischem Kontext wie bei `ai:a-tier` und, wo das Ticket es verlangt, ein echter Lauf. Danach reviewt die nutzende Person.
+- `ai:a-tier`: Self-Review, echter Lauf und ein unabhängiges Review mit frischem Kontext, bevor der PR als fertig gilt. Das Review macht eine frische Session, etwa der Skill `code-review` oder die Review-Rolle des Dev-Loops. Es prüft den Diff gegen das Zielbild, die [Prüfpunkte des Bereichs](pruefpunkte.md) und die Entscheidungen, die die Umsetzung angibt. Das Ergebnis steht im Prüfbericht. Jeder Befund wird behoben oder als Entscheidung an die nutzende Person übergeben. Ablauf in interaktiven Sessions: [Lane-Protokoll](lane-protocol.md#independent-review-before-the-pr-is-done).
 - `ai:b-tier`: Ein Modell der Stufe S oder A oder die nutzende Person liest den Diff, bevor er gemergt wird. Günstige Modelle übersehen eher Nebenwirkungen als offensichtliche Fehler.
 
 Der Dev-Loop ([dev-loop.md](dev-loop.md)) setzt diese Regeln im Code durch. Er mergt nur `ai:b-tier`, und nur nach einem Review durch ein S-Modell. Bei `ai:a-tier` endet er bei „In Review“ und wartet auf das GO. `ai:s-tier` und Diffs, die geschützte Pfade berühren, übergibt er an die nutzende Person.
