@@ -121,7 +121,9 @@ defmodule KomkiConnector.Manifest do
       },
       egress_hosts: ["risapi3.komuna.net:443"],
       fs: [],
-      credentials: %{},
+      # Sign-in (#148): JSON {"login", "password"}, optional. Without it the
+      # connector stays with the guest endpoints (mostly without texts).
+      credentials: %{"RIS_ZUGANG" => "ris-zugang"},
       environment: "ris-abruf@1",
       import_labels: ["ris-oeffentlich@1"]
     }

@@ -44,8 +44,9 @@ defmodule KomkiConnectorRis.RisRecorderTest do
   end
 
   test "zeichnet auch POST-Anfragen mit Body auf (Login)" do
-    # Upstream ist der synthetische Mock; der antwortet auf POST mit 405 —
-    # fuer den Austausch genuegt das: Methode, Body und Redaktion werden geprueft.
+    # Upstream ist der synthetische Mock; fremde Zugangsdaten lehnt er mit
+    # 401 ab — fuer den Austausch genuegt das: Methode, Body und Redaktion
+    # werden geprueft.
     {_upstream, upstream_port} = RisMock.start(:ok)
     out = tmp_out()
 
@@ -67,7 +68,7 @@ defmodule KomkiConnectorRis.RisRecorderTest do
         fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end
       )
 
-    {:ok, {{_, 405, _}, _, _}} =
+    {:ok, {{_, 401, _}, _, _}} =
       :httpc.request(
         :post,
         {"http://127.0.0.1:#{port}/auth", headers, ~c"application/json", body},
@@ -88,7 +89,7 @@ defmodule KomkiConnectorRis.RisRecorderTest do
     assert request["body_b64"] |> Base.decode64!() |> :json.decode() ==
              %{"login" => "<redacted>", "password" => "<redacted>"}
 
-    assert response["status"] == 405
+    assert response["status"] == 401
   end
 
   test "Nummerierung schliesst an vorhandene Kassetten an" do

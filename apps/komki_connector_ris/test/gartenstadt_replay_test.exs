@@ -13,10 +13,23 @@ defmodule KomkiConnectorRis.GartenstadtReplayTest do
   # phase and the text phase of the most recent meetings - which is why the
   # special cases sit there (see ris_gartenstadt.exs, sonderfall_updates).
 
-  defp stack do
+  defp stack(credentials \\ %{}) do
     {_mock, port} = RisMock.start({:replay, @fixtures})
-    {:ok, cfg} = KomkiConnectorRis.init(%{base_url: "http://127.0.0.1:#{port}/"})
+
+    {:ok, cfg} =
+      KomkiConnectorRis.init(%{base_url: "http://127.0.0.1:#{port}/", credentials: credentials})
+
     cfg
+  end
+
+  # The synthetic account of the Gartenstadt login cassette (0001-post-auth).
+  # Replay matches method and path only, so this proves the format of the
+  # signed-in endpoints, not the account check (that is the RIS mock's job).
+  defp signed_in_stack do
+    zugang =
+      JSON.encode!(%{"login" => "rathaus@gartenstadt.example", "password" => "gartenschluessel"})
+
+    stack(%{"RIS_ZUGANG" => zugang})
   end
 
   defp search(cfg, text) do
@@ -75,6 +88,23 @@ defmodule KomkiConnectorRis.GartenstadtReplayTest do
     assert length(ergebnisse) == 10
 
     assert {:ok, %{"results" => []}} = search(cfg, "qqxsichtbar")
+  end
+
+  # Ticket #148: the signed-in endpoints (meetings/{id}, agendaitems/{id})
+  # in the shape the recording profiled; the filter stays the same.
+  test "angemeldet: Zaehltest und Fail-closed ueber die angemeldeten Endpunkte" do
+    cfg = signed_in_stack()
+
+    assert {:ok, %{"results" => ergebnisse}} = search(cfg, "Lindenallee")
+    assert length(ergebnisse) == 2
+
+    Enum.each(ergebnisse, fn eintrag ->
+      assert {:ok, %{"text" => text}} = show(cfg, eintrag["top_id"])
+      assert text != ""
+    end)
+
+    assert {:error, "not-found", _} = show(cfg, top_id("Sperrung der Lindenallee"))
+    assert {:error, "not-found", _} = show(cfg, top_id("Bebauungsplan Lindenallee 12"))
   end
 
   # --- Reading fixtures --------------------------------------------------------

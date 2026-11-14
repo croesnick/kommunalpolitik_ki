@@ -15,7 +15,7 @@ defmodule KomkiConnectorWeb.CLI do
   """
 
   alias KomkiConnector.Launch
-  alias KomkiConnectorWeb.{Brave, Connector}
+  alias KomkiConnectorWeb.Connector
   alias Sidecar.Server
 
   @spec main([String.t()]) :: no_return()
@@ -79,7 +79,7 @@ defmodule KomkiConnectorWeb.CLI do
       when scheme in ["http", "https"] and host not in [nil, ""] ->
         # Klartext nur fuer den Loopback-Mock; sonst wuerde der Connector
         # den Subscription-Token im Klartext senden (Ticket #496).
-        if Brave.token_transport_ok?(url) do
+        if KomkiConnector.Transport.secret_ok?(url) do
           {:ok, url}
         else
           {:error, "--base-url erwartet https (http nur fuer Loopback-Mock)"}

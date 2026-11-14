@@ -230,6 +230,15 @@ defmodule KomkiCli.Connectors do
   def mock_web_key, do: "komki-mock-brave-key"
 
   @doc """
+  Synthetic RIS account (#148): the `account` of the RIS mock's `default`
+  seed (`apps/komki_mock/priv/seeds/ris/default.json`). Against the mock it
+  takes the place of the real credential in the stdin line.
+  """
+  @spec mock_ris_zugang() :: String.t()
+  def mock_ris_zugang,
+    do: JSON.encode!(%{"login" => "ratsmitglied@komki.example", "password" => "mock-passwort"})
+
+  @doc """
   Synthetische Credentials je Connector fuer diesen Start (#496): Im
   Web-Mock oeffnet der Launcher das Siegel des echten Brave-Schluessels
   nicht, sondern gibt einen Test-Key mit. Der Mock laeuft auf Loopback
@@ -239,6 +248,12 @@ defmodule KomkiCli.Connectors do
   @spec synthetic_credentials(Config.t(), Manifest.t()) :: %{String.t() => String.t()}
   def synthetic_credentials(%Config{} = cfg, %{id: "web"}) do
     if Config.web_mock?(cfg), do: %{"BRAVE_API_KEY" => mock_web_key()}, else: %{}
+  end
+
+  # #148, as #496: the RIS mock gets its own synthetic account, the real
+  # login never travels in the clear to a loopback port.
+  def synthetic_credentials(%Config{} = cfg, %{id: "ris"}) do
+    if Config.ris_mock?(cfg), do: %{"RIS_ZUGANG" => mock_ris_zugang()}, else: %{}
   end
 
   def synthetic_credentials(_cfg, _manifest), do: %{}
@@ -439,16 +454,39 @@ defmodule KomkiCli.Connectors do
         synthetic_credentials(cfg, manifest)
       )
 
-    cfg
-    |> launch(
-      comp,
-      binary!(cfg, manifest.id),
-      connector_args(cfg, manifest),
-      profile_path(cfg, manifest.id),
-      line,
-      fn -> ping(cfg, manifest) end
+    result =
+      launch(
+        cfg,
+        comp,
+        binary!(cfg, manifest.id),
+        connector_args(cfg, manifest),
+        profile_path(cfg, manifest.id),
+        line,
+        fn -> ping(cfg, manifest) end
+      )
+
+    with_warnings(
+      result,
+      credential_warnings(manifest, missing) ++ start_warnings(manifest, comp.log)
     )
-    |> with_warnings(credential_warnings(manifest, missing))
+  end
+
+  @doc """
+  Warnings a connector logged while starting (e.g. a failed RIS sign-in,
+  #148), so `komki up` shows them and not only the log. The log is rewritten
+  on every start and carries no payloads or secrets (CONTRACT.md §4).
+  """
+  @spec start_warnings(Manifest.t(), Path.t()) :: [String.t()]
+  def start_warnings(manifest, log) do
+    case File.read(log) do
+      {:ok, log} ->
+        for line <- String.split(log, "\n"),
+            [_, text] <- [Regex.run(~r/\[warning\]\s+(.*)$/, line)],
+            do: manifest.id <> ": " <> text
+
+      {:error, _} ->
+        []
+    end
   end
 
   @doc """

@@ -132,6 +132,31 @@ defmodule KomkiCli.SetupTest do
     test "leere Eingabe: nichts gespeichert" do
       assert Setup.store_secret(@entry, ui([{:error, :empty}])) =~ "leere Eingabe"
     end
+
+    @ris %{name: "ris", service: "ris-zugang", connector: "ris", label: "RIS-Zugang"}
+
+    test "#148: RIS-Zugang fragt Anmeldename und Passwort ab, ein Siegel fuer beides" do
+      {cmd, dir} = recording_fake!()
+      Application.put_env(:komki_cli, :security, cmd)
+
+      ui =
+        [{:ok, @kanarie}, {:ok, @kanarie}]
+        |> ui()
+        |> Map.put(:ask, fn _question, _default -> " rat@example.org \n" end)
+
+      message = Setup.store_secret(@ris, ui)
+
+      assert message =~ "versiegelt"
+      refute message =~ @kanarie
+      stored = File.read!(Path.join(dir, "value"))
+      assert {:ok, json} = KomkiCli.Tresor.open(stored, "Test")
+      assert JSON.decode!(json) == %{"login" => "rat@example.org", "password" => @kanarie}
+    end
+
+    test "#148: leerer Anmeldename speichert nichts und fragt kein Passwort" do
+      ui = Map.put(ui([]), :ask, fn _question, _default -> "  " end)
+      assert Setup.store_secret(@ris, ui) =~ "leere Eingabe"
+    end
   end
 
   describe "Setup.tool_report/2" do
@@ -195,7 +220,8 @@ defmodule KomkiCli.SetupTest do
     test "die Geheimnisse kommen aus den Manifesten (Brave kurz 'brave'; DURCHSTICH #409: Hub-Token)" do
       assert [
                %{name: "brave", service: "brave-search-api", connector: "web"},
-               %{name: "ratsprojekte-hub"}
+               %{name: "ratsprojekte-hub"},
+               %{name: "ris", service: "ris-zugang", connector: "ris"}
              ] =
                Secrets.all()
 
