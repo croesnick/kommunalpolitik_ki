@@ -1452,6 +1452,8 @@ aus dem Werkzeug Changesets; das Format liest hier knope.
 **Abgrenzung:** Nicht Ectos `Ecto.Changeset`. Kein Commit-Text: Ein
 Changeset ist für die Leser des Changelogs geschrieben.
 
+**Nicht:** „Change-Datei“ (Eigenprägung, im Ticket #538 noch verwendet).
+
 **Wo:** [`docs/agents/changesets.md`](docs/agents/changesets.md),
 [ADR 0005](docs/adr/0005-versionierung-mit-changesets-und-knope.md).
 

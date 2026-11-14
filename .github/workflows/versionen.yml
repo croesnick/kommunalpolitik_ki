@@ -1,9 +1,11 @@
 # Versionen (#538, ADR 0005, docs/agents/changesets.md). Zwei Jobs bei jedem
 # Push auf main:
 #
-# - tags: Hat der Push eine Version in apps/*/mix.exs geaendert (der Merge
-#   des Version-PR), setzt `knope release` die fehlenden Tags
-#   `<einheit>/v<version>`; dieser Job pusht sie. Keine GitHub-Releases:
+# - tags: Fehlt fuer die Version einer Einheit der Tag `<einheit>/v<version>`
+#   (nach dem Merge des Version-PR), setzt `knope release` die fehlenden Tags;
+#   dieser Job pusht sie. Verglichen wird mit den vorhandenen Tags, nicht mit
+#   dem vorigen Push: Die Concurrency-Gruppe verwirft wartende Laeufe, ein
+#   spaeterer Lauf holt fehlende Tags dann nach. Keine GitHub-Releases:
 #   knope.toml hat keinen Forge. Der Merge des Version-PR durch einen
 #   Menschen ist das GO dafuer.
 # - version-pr: Liegen Changesets unter .changeset/, baut
@@ -52,14 +54,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Nur ein Push, der eine Version aendert, setzt Tags. Die Baseline-Tags
+      - name: Erlang/Elixir einrichten
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      # Nur Einheiten, die schon einen Tag haben, zaehlen: Die Baseline-Tags
       # beim Einfuehren (#538) setzt die nutzende Person von Hand.
-      - name: Geaenderte Versionen erkennen
+      - name: Fehlende Tags erkennen
         id: diff
-        env:
-          BEFORE: ${{ github.event.before }}
         run: |
-          if git diff "${BEFORE}" HEAD -- 'apps/*/mix.exs' | grep -qE '^[-+][[:space:]]*version: "'; then
+          fehlend=$(elixir scripts/changesets.exs untagged)
+          if [ -n "${fehlend}" ]; then
+            echo "Ohne Tag: ${fehlend}"
             echo "changed=true" >> "${GITHUB_OUTPUT}"
           fi
 

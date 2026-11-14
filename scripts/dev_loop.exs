@@ -519,7 +519,9 @@ defmodule DevLoop do
     {title, body} = Core.parse_pr(File.read!(Path.join(wt, ".dev-loop/pr.md")), n)
     existing = Enum.find(GitHub.open_prs(ctx), &(&1.branch == branch))
     # The label goes on before the push, so no run of the changeset gate
-    # sees the new head without it (a red run would block the merge).
+    # sees the new head without it (a red run would block the merge). A new
+    # PR gets it with `pr create`; the gate reads labels at run time, since
+    # the `opened` event does not carry them yet.
     if existing, do: sync_changeset_label(ctx, wt, existing.number)
     push!(ctx, wt, branch)
 

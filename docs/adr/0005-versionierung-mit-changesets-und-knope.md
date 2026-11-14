@@ -6,7 +6,7 @@ status: accepted
 
 Wer komki oder ratsprojekte nutzt, soll sehen, welche Fassung läuft und was sich geändert hat. Bis November 2026 standen alle Apps auf `0.1.0`, ohne Tags und ohne Changelog. Entschieden in einer Grilling-Session am 13. und 14.11.2026, umgesetzt in #538.
 
-**Fünf Einheiten** bekommen eine eigene Version und ein eigenes Changelog: `komki` als eine Version für das ganze Programm (samt Vermittler, Policy, Connectoren, Egress), `ratsprojekte`, und die drei Bibliotheken `sidecar`, `seatbelt` und `sealed_envelope` mit Blick auf hex.pm (#224 bis #226). Alle anderen Apps und die Python-Tools bleiben ohne Version.
+**Fünf Einheiten** bekommen eine eigene Version und ein eigenes Changelog: `komki` als eine Version für das ganze Programm (samt Vermittler, Policy, Connectoren, Egress: alle Apps, die komki per Pfad-Abhängigkeit mitbringt), `ratsprojekte`, und die drei Bibliotheken `sidecar`, `seatbelt` und `sealed_envelope` mit Blick auf hex.pm (#224 bis #226). Alle anderen Apps und die Python-Tools bleiben ohne Version.
 
 **Jede spürbare Änderung bringt ein Changeset mit**, eine Markdown-Datei unter `.changeset/`. Ein Version-PR sammelt sie, erhöht die Versionen in den `mix.exs` und schreibt die Changelogs. Sein Merge durch einen Menschen setzt Git-Tags `<einheit>/v<semver>`. GitHub-Releases entstehen dabei nicht, veröffentlicht wird weiterhin erst nach dem Publish-GO ([release.md](../release.md)). Das Werkzeug ist **knope**, nur in CI. Regeln für Changesets: [docs/agents/changesets.md](../agents/changesets.md).
 

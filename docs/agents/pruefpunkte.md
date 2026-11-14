@@ -30,7 +30,7 @@ Welche Punkte hier stehen, entscheidet die nutzende Person. Jeder Punkt hat ihr 
 
 ## Einheiten mit Version
 
-**Gilt für:** `lib/` und `priv/` von `apps/komki_cli`, `apps/ratsprojekte`, `apps/sidecar`, `apps/seatbelt`, `apps/sealed_envelope` (die Einheiten aus `knope.toml`)
+**Gilt für:** `lib/` und `priv/` der Einheiten aus `knope.toml` (`apps/komki_cli`, `apps/ratsprojekte`, `apps/sidecar`, `apps/seatbelt`, `apps/sealed_envelope`) und der Apps, die sie mitbringen: zu komki gehören Vermittler, Policy, Connectoren und Egress ([changesets.md](changesets.md#einheiten))
 
 - **Changeset passt.** Merken Nutzende einer Einheit die Änderung, bringt der Diff ein Changeset unter `.changeset/` mit, das die Einheit nennt, aus Sicht ihrer Leser geschrieben ist (komki und ratsprojekte deutsch für Nutzende, die Bibliotheken englisch für Entwickler) und eine passende Stufe trägt ([changesets.md](changesets.md)). Sonst trägt der PR das Label `ohne-changeset`, und der Prüfbericht begründet, warum Nutzende nichts merken.
   *Nachweis:* Review des Changesets. Automatisch: Workflow `changesets` (`elixir scripts/changesets.exs check origin/main`) prüft, dass jede berührte Einheit genannt ist und knope das Changeset lesen kann. Ob der Text passt, prüft nur das Review.

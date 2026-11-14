@@ -3,14 +3,17 @@
 #     elixir scripts/changesets.exs check <base-ref>   # CI gate of a PR
 #     elixir scripts/changesets.exs cascade            # after knope prepare-release
 #     elixir scripts/changesets.exs bumped             # "unit version" per bumped unit
+#     elixir scripts/changesets.exs untagged           # units whose version has no tag yet
 #
-# check: fails when the PR changes lib/ or priv/ of a unit from knope.toml
-# and none of the changesets the PR adds names that unit. Also fails on a
+# check: fails when the PR changes lib/ or priv/ of a unit from knope.toml,
+# or of an app the unit ships (its bundle: komki includes the mediator, the
+# policy engine, the connectors, ...), and none of the changesets the PR adds
+# names that unit. Also fails on a
 # changeset that knope could not read (unknown unit, bad level). The label
 # `ohne-changeset` skips the gate in the workflow, not here.
 #
 # cascade: compares each unit's mix.exs version against HEAD. For every unit
-# that includes a bumped library as a path dependency and was not bumped
+# whose bundle includes a bumped library as a path dependency and was not bumped
 # itself, it writes `.changeset/kaskade-<unit>.md` with a patch. The
 # workflow then runs `knope prepare-release` a second time. Libraries do not
 # depend on each other today, so one pass reaches the fixpoint; the workflow
@@ -18,6 +21,10 @@
 #
 # bumped: the units whose version differs from HEAD, for the Version PR's
 # title.
+#
+# untagged: the units whose current version has no tag `<unit>/v<version>`,
+# among the units that have any tag at all. Before the baseline tags exist,
+# it prints nothing, so the tag job never sets them on its own.
 
 Code.require_file("changesets/core.exs", __DIR__)
 
@@ -31,9 +38,14 @@ defmodule Changesets do
   def main(["check", base]), do: check(base)
   def main(["cascade"]), do: cascade()
   def main(["bumped"]), do: Enum.each(bumped(units()), fn {u, v} -> IO.puts("#{u} #{v}") end)
+  def main(["untagged"]), do: Enum.each(untagged(units()), &IO.puts/1)
 
   def main(_) do
-    IO.puts(:stderr, "Aufruf: elixir scripts/changesets.exs check <base-ref> | cascade | bumped")
+    IO.puts(
+      :stderr,
+      "Aufruf: elixir scripts/changesets.exs check <base-ref> | cascade | bumped | untagged"
+    )
+
     System.halt(2)
   end
 
@@ -51,7 +63,7 @@ defmodule Changesets do
       end
 
     changesets = for {_file, {:ok, changeset}} <- parsed, do: changeset
-    missing = Core.missing(units, changed ++ deleted, changesets)
+    missing = Core.missing(Core.bundles(units, deps()), changed ++ deleted, changesets)
 
     errors =
       errors ++
@@ -93,7 +105,8 @@ defmodule Changesets do
 
   defp cascade do
     units = units()
-    plan = Core.cascade(Core.dependents(units, mix_sources(units)), bumped(units))
+    deps = deps()
+    plan = Core.cascade(Core.dependents(units, Core.bundles(units, deps), deps), bumped(units))
     File.mkdir_p!(@dir)
 
     for {unit, libs} <- plan do
@@ -113,6 +126,23 @@ defmodule Changesets do
 
   defp mix_sources(units),
     do: Map.new(units, fn {name, dir} -> {name, File.read!(Path.join(dir, "mix.exs"))} end)
+
+  # Runtime path dependencies of every app, as `%{app_dir => [app_dir]}`.
+  defp deps do
+    for file <- Path.wildcard("apps/*/mix.exs"),
+        into: %{},
+        do: {Path.dirname(file), Core.path_deps(File.read!(file))}
+  end
+
+  defp untagged(units) do
+    sources = mix_sources(units)
+
+    for {name, _dir} <- Enum.sort(units),
+        tags = lines(git!(["tag", "--list", name <> "/v*"])),
+        tags != [],
+        (name <> "/v" <> Core.version(sources[name])) not in tags,
+        do: name
+  end
 
   # Units whose mix.exs version in the working tree differs from HEAD, as
   # `%{unit => new_version}`.

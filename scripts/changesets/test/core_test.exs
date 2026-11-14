@@ -65,28 +65,83 @@ defmodule Changesets.CoreTest do
     end
   end
 
-  describe "missing/3" do
-    test "a change to lib/ or priv/ needs a changeset naming the unit" do
-      changed = ["apps/komki_cli/lib/komki_cli/cli.ex", "apps/seatbelt/priv/base.sb"]
-      assert Core.missing(@units, changed, []) == ["komki", "seatbelt"]
-      assert Core.missing(@units, changed, [%{"komki" => "minor"}]) == ["seatbelt"]
-      assert Core.missing(@units, changed, [%{"komki" => "minor", "seatbelt" => "patch"}]) == []
+  # komki ships the mediator, which brings the policy engine and seatbelt.
+  @deps %{
+    "apps/komki_cli" => ["apps/komki_mediator", "apps/sealed_envelope"],
+    "apps/komki_mediator" => ["apps/komki_policy", "apps/seatbelt"],
+    "apps/ratsprojekte" => ["apps/sealed_envelope"],
+    "apps/ratsinfo" => ["apps/shared"]
+  }
+
+  describe "path_deps/1 and bundles/2" do
+    test "runtime path dependencies; only: deps are tooling and do not ship" do
+      source =
+        ~s|{:sidecar, path: "../sidecar"}, {:komki_mock, path: "../komki_mock", only: :test}, {:jason, "~> 1.4"}|
+
+      assert Core.path_deps(source) == ["apps/sidecar"]
     end
 
-    test "tests, mix.exs, docs and other apps need none" do
+    test "a unit's bundle reaches through other apps and stops at units" do
+      assert Core.bundles(@units, @deps) == %{
+               "komki" => ["apps/komki_cli", "apps/komki_mediator", "apps/komki_policy"],
+               "ratsprojekte" => ["apps/ratsprojekte"],
+               "sealed_envelope" => ["apps/sealed_envelope"],
+               "seatbelt" => ["apps/seatbelt"]
+             }
+    end
+
+    test "komki's bundle in the repo holds mediator, policy, egress and connectors, no mocks" do
+      root = Path.expand("../../..", __DIR__)
+      units = Core.units(File.read!(Path.join(root, "knope.toml")))
+
+      deps =
+        for file <- Path.wildcard(Path.join(root, "apps/*/mix.exs")),
+            into: %{},
+            do: {"apps/" <> Path.basename(Path.dirname(file)), Core.path_deps(File.read!(file))}
+
+      komki = Core.bundles(units, deps)["komki"]
+
+      for app <-
+            ~w(komki_cli komki_mediator komki_policy komki_egress komki_connector komki_connector_ris),
+          do: assert("apps/#{app}" in komki)
+
+      for app <- ~w(komki_mock wegwerf_hub sidecar seatbelt sealed_envelope ratsprojekte),
+          do: refute("apps/#{app}" in komki)
+
+      assert Core.bundles(units, deps)["ratsprojekte"] == ["apps/ratsprojekte"]
+    end
+  end
+
+  describe "missing/3" do
+    setup do: %{bundles: Core.bundles(@units, @deps)}
+
+    test "a change to lib/ or priv/ needs a changeset naming the unit", %{bundles: b} do
+      changed = ["apps/komki_cli/lib/komki_cli/cli.ex", "apps/seatbelt/priv/base.sb"]
+      assert Core.missing(b, changed, []) == ["komki", "seatbelt"]
+      assert Core.missing(b, changed, [%{"komki" => "minor"}]) == ["seatbelt"]
+      assert Core.missing(b, changed, [%{"komki" => "minor", "seatbelt" => "patch"}]) == []
+    end
+
+    test "a change in an app of the bundle counts for the unit", %{bundles: b} do
+      assert Core.missing(b, ["apps/komki_mediator/lib/komki_mediator/gate.ex"], []) == ["komki"]
+      assert Core.missing(b, ["apps/komki_policy/priv/x.json"], [%{"komki" => "patch"}]) == []
+    end
+
+    test "tests, mix.exs, docs and apps outside every bundle need none", %{bundles: b} do
       changed = [
         "apps/komki_cli/test/cli_test.exs",
         "apps/komki_cli/mix.exs",
+        "apps/komki_mediator/test/gate_test.exs",
         "apps/komki_cli/README.md",
-        "apps/komki_mediator/lib/komki_mediator/gate.ex",
+        "apps/ratsinfo/lib/ratsinfo.ex",
         "docs/release.md"
       ]
 
-      assert Core.missing(@units, changed, []) == []
+      assert Core.missing(b, changed, []) == []
     end
 
-    test "a directory sharing a prefix is not the unit" do
-      assert Core.missing(@units, ["apps/komki_cli_extra/lib/x.ex"], []) == []
+    test "a directory sharing a prefix is not the unit", %{bundles: b} do
+      assert Core.missing(b, ["apps/komki_cli_extra/lib/x.ex"], []) == []
     end
   end
 
@@ -95,19 +150,10 @@ defmodule Changesets.CoreTest do
              "0.2.1"
   end
 
-  describe "dependents/2 and cascade/2" do
-    @sources %{
-      "komki" =>
-        ~s|{:seatbelt, path: "../seatbelt"}, {:sealed_envelope, path: "../sealed_envelope"}, {:shared, path: "../shared"}|,
-      "ratsprojekte" => ~s|{:sealed_envelope, path: "../sealed_envelope"}|,
-      "sealed_envelope" => "",
-      "seatbelt" => ""
-    }
-
-    test "path dependencies between units, other apps ignored" do
-      sorted =
-        Map.new(Core.dependents(@units, @sources), fn {lib, units} -> {lib, Enum.sort(units)} end)
-
+  describe "dependents/3 and cascade/2" do
+    test "units included anywhere in a bundle, transitively" do
+      dependents = Core.dependents(@units, Core.bundles(@units, @deps), @deps)
+      sorted = Map.new(dependents, fn {lib, units} -> {lib, Enum.sort(units)} end)
       assert sorted == %{"seatbelt" => ["komki"], "sealed_envelope" => ["komki", "ratsprojekte"]}
     end
 

@@ -12,13 +12,13 @@ Stand: 2026-11-14. Fünf Einheiten haben eine eigene Version und ein eigenes Cha
 | `seatbelt` | `apps/seatbelt/mix.exs` | `apps/seatbelt/CHANGELOG.md` | Englisch, für Entwickler |
 | `sealed_envelope` | `apps/sealed_envelope/mix.exs` | `apps/sealed_envelope/CHANGELOG.md` | Englisch, für Entwickler |
 
-`komki` ist eine Version für das ganze Programm, also auch für Vermittler, Policy, Connectoren und Egress. Die Liste der Einheiten steht nur in `knope.toml`. Alle anderen Apps und die Python-Tools unter `tools/` bleiben ohne Version und Changelog.
+Die Liste der Einheiten steht nur in `knope.toml`. Zu einer Einheit gehören auch die Apps, die sie per Pfad-Abhängigkeit mitbringt, bis zur nächsten Einheit. `komki` ist so eine Version für das ganze Programm: Vermittler, Policy, Connectoren und Egress zählen mit. Abhängigkeiten mit `only:` (etwa `komki_mock`) zählen nicht, sie werden nicht ausgeliefert. Alle übrigen Apps und die Python-Tools unter `tools/` bleiben ohne Version und Changelog.
 
 ## Wann ein Changeset nötig ist
 
 Ein Changeset braucht jede Änderung, die Nutzende einer Einheit merken: Verhalten, Befehle, Optionen, Ausgaben, Einrichtung, bei den Bibliotheken die öffentliche API. Refactoring, Tests, CI und reine Doku brauchen keins. Leere Changesets gibt es nicht.
 
-Der Workflow `changesets` prüft das an jedem PR: Ändert der PR `lib/` oder `priv/` einer Einheit und nennt kein Changeset des PRs diese Einheit, ist der Check rot. Ist die Änderung trotzdem nicht spürbar, bekommt der PR das Label `ohne-changeset`, und der Prüfbericht nennt den Grund. Lokal prüft dasselbe:
+Der Workflow `changesets` prüft das an jedem PR: Ändert der PR `lib/` oder `priv/` einer Einheit oder einer App, die sie mitbringt, und nennt kein Changeset des PRs diese Einheit, ist der Check rot. Eine Änderung in `apps/komki_mediator/lib/` braucht also ein Changeset für `komki`. Ist die Änderung trotzdem nicht spürbar, bekommt der PR das Label `ohne-changeset`, und der Prüfbericht nennt den Grund. Lokal prüft dasselbe:
 
 ```bash
 elixir scripts/changesets.exs check origin/main
@@ -71,8 +71,8 @@ flowchart LR
 ```
 
 1. Bei jedem Push auf `main` mit offenen Changesets baut der Workflow `versionen` den Version-PR neu: `knope prepare-release` erhöht die Versionen in den `mix.exs`, schreibt die Changelogs und löscht die verbrauchten Changesets.
-2. **Kaskade:** Erhöht der Version-PR eine Bibliothek, bekommen die Einheiten, die sie per Pfad-Abhängigkeit einbinden, einen Patch mit dem Eintrag „Enthält seatbelt 0.1.1“. Das gilt nur, wenn sie nicht schon eine eigene Erhöhung haben. Heute: `sealed_envelope` → `komki` und `ratsprojekte`, `sidecar` und `seatbelt` → `komki`. Die Abhängigkeiten liest `scripts/changesets.exs cascade` aus den `mix.exs`.
+2. **Kaskade:** Erhöht der Version-PR eine Bibliothek, bekommen die Einheiten, die sie per Pfad-Abhängigkeit einbinden, einen Patch mit dem Eintrag „Enthält seatbelt 0.1.1“. Das gilt nur, wenn sie nicht schon eine eigene Erhöhung haben. Heute: `sealed_envelope` → `komki` und `ratsprojekte`, `sidecar` und `seatbelt` → `komki`. Die Abhängigkeiten liest `scripts/changesets.exs cascade` aus den `mix.exs` aller Apps einer Einheit, auch über Vermittler und Connectoren hinweg.
 3. Den Version-PR mergt nur ein Mensch. Der Merge ist das GO für die Tags. Der Dev-Loop fasst ihn nie an.
-4. Nach dem Merge setzt `knope release` die Tags `<einheit>/v<version>`, etwa `komki/v0.2.0`, und der Workflow pusht sie. GitHub-Releases entstehen dabei nicht. Veröffentlicht wird erst nach dem Publish-GO ([release.md](../release.md)).
+4. Nach dem Merge setzt `knope release` die Tags `<einheit>/v<version>`, etwa `komki/v0.2.0`, und der Workflow pusht sie. Er vergleicht dafür die Versionen mit den vorhandenen Tags; fällt ein Lauf weg, holt der nächste Push auf `main` fehlende Tags nach. Einheiten ohne jeden Tag lässt er aus, die Baseline-Tags setzt ein Mensch. GitHub-Releases entstehen dabei nicht. Veröffentlicht wird erst nach dem Publish-GO ([release.md](../release.md)).
 
 Die Pflicht-Checks laufen am Version-PR, weil der Workflow die CI auf dem Branch `versionen` selbst startet. Pushes mit dem `GITHUB_TOKEN` starten sonst keine Workflows.

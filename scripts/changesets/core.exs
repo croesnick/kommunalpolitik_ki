@@ -6,7 +6,8 @@
 #
 # A unit is a package from knope.toml, named by its key and located at the
 # directory of its first versioned file (`apps/komki_cli/mix.exs` →
-# `apps/komki_cli`). knope.toml stays the only list of units.
+# `apps/komki_cli`). knope.toml stays the only list of units. A unit's
+# bundle adds the apps it ships via path dependencies (`bundles/2`).
 
 defmodule Changesets.Core do
   @moduledoc false
@@ -55,23 +56,55 @@ defmodule Changesets.Core do
   def unknown(units, changeset), do: Map.keys(changeset) -- Map.keys(units)
 
   @doc """
-  Units whose `lib/` or `priv/` the changed files touch. Everything else
-  (tests, mix.exs, docs) needs no changeset.
+  The apps of the workspace a unit consists of, as `%{unit => [app_dir]}`:
+  its own directory plus every app it includes via runtime path dependencies,
+  transitively, stopping at other units. komki is one version for the whole
+  program, so a change in the mediator or a connector is a change to komki.
+  `deps` maps app directories to their path dependencies (`path_deps/1`).
   """
-  def touched(units, changed_files) do
-    for {name, dir} <- units,
-        Enum.any?(
-          changed_files,
-          &(String.starts_with?(&1, dir <> "/lib/") or
-              String.starts_with?(&1, dir <> "/priv/"))
-        ),
+  def bundles(units, deps) do
+    unit_dirs = MapSet.new(Map.values(units))
+    Map.new(units, fn {name, dir} -> {name, Enum.sort(reach([dir], deps, unit_dirs, [dir]))} end)
+  end
+
+  defp reach([], _deps, _unit_dirs, seen), do: seen
+
+  defp reach([dir | rest], deps, unit_dirs, seen) do
+    next = for dep <- Map.get(deps, dir, []), dep not in seen, dep not in unit_dirs, do: dep
+    reach(rest ++ next, deps, unit_dirs, seen ++ next)
+  end
+
+  @doc """
+  The runtime path dependencies in a mix.exs source, as app directories
+  (`apps/<name>`). Dependencies with `only:` (test or dev tooling) are not
+  part of what ships.
+  """
+  def path_deps(mix_source) do
+    for [_, dir, rest] <- Regex.scan(~r/\{:\w+,\s*path:\s*"\.\.\/([^"\/]+)"([^}]*)\}/, mix_source),
+        not String.contains?(rest, "only:"),
+        do: "apps/" <> dir
+  end
+
+  @doc """
+  Units whose `lib/` or `priv/` the changed files touch, in any app of their
+  bundle. Everything else (tests, mix.exs, docs) needs no changeset.
+  """
+  def touched(bundles, changed_files) do
+    for {name, dirs} <- bundles,
+        Enum.any?(changed_files, fn file ->
+          Enum.any?(
+            dirs,
+            &(String.starts_with?(file, &1 <> "/lib/") or
+                String.starts_with?(file, &1 <> "/priv/"))
+          )
+        end),
         do: name
   end
 
   @doc "Touched units that none of the PR's changesets name, sorted."
-  def missing(units, changed_files, changesets) do
+  def missing(bundles, changed_files, changesets) do
     named = changesets |> Enum.flat_map(&Map.keys/1) |> MapSet.new()
-    units |> touched(changed_files) |> Enum.reject(&(&1 in named)) |> Enum.sort()
+    bundles |> touched(changed_files) |> Enum.reject(&(&1 in named)) |> Enum.sort()
   end
 
   @doc "The project version in a mix.exs source."
@@ -83,16 +116,16 @@ defmodule Changesets.Core do
   end
 
   @doc """
-  Which units include which unit as a path dependency, as
-  `%{library => [dependent]}`. `mix_sources` maps unit names to their
-  mix.exs source.
+  Which units include which other unit, from any app of their bundle, as
+  `%{library => [dependent]}`.
   """
-  def dependents(units, mix_sources) do
-    by_dir = Map.new(units, fn {name, dir} -> {Path.basename(dir), name} end)
+  def dependents(units, bundles, deps) do
+    unit_by_dir = Map.new(units, fn {name, dir} -> {dir, name} end)
 
-    for {unit, source} <- mix_sources,
-        [_, dir] <- Regex.scan(~r/path:\s*"\.\.\/([^"\/]+)"/, source),
-        lib = by_dir[dir],
+    for {unit, dirs} <- bundles,
+        dir <- dirs,
+        dep <- Map.get(deps, dir, []),
+        lib = unit_by_dir[dep],
         lib && lib != unit,
         reduce: %{} do
       acc -> Map.update(acc, lib, [unit], &Enum.uniq([unit | &1]))
