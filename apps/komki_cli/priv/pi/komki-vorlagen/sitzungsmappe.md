@@ -6,7 +6,7 @@ Erstelle eine Sitzungsmappe zur Vorbereitung auf: ${@:-die nächste Sitzung}.
 
 Arbeite die Schritte selbstständig ab. Frag nur nach, wenn Schritt 1 nicht eindeutig ist.
 
-1. **Sitzung finden** mit ris_sessions, ohne gremium.
+1. **Sitzung finden** mit ris_sessions, ohne gremium und mit limit 50.
    - Nenne ich ein Datum ohne Jahr, nimm das nächste Vorkommen ab heute (ist der Tag in diesem Jahr schon vorbei, das nächste Jahr). Nenne ich kein Datum, suche ab heute 60 Tage voraus.
    - Nenne ich ein Gremium, wähle die Sitzung selbst anhand des Gremiumsnamens aus der Liste. Ähnliche Namen zählen („Bauausschuss“ passt zu „Bau-, Umwelt- und Verkehrsausschuss“). Ohne Datum nimm die erste passende Sitzung.
    - Keine passende Sitzung: Sag genau das und frag, was ich vorbereiten will. Vermute keine Gründe.
