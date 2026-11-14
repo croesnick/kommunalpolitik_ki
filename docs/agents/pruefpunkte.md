@@ -1,6 +1,6 @@
 # Prüfpunkte je Bereich
 
-Stand: 2026-11-13. Diese Prüfpunkte gelten bei jeder Änderung im jeweiligen Bereich, auch wenn das Ticket sie nicht eigens nennt (#461). Im Prüfbericht ([Lane-Protokoll](lane-protocol.md#prüfbericht-the-verification-report)) bekommt jeder Punkt eines Bereichs, den der Diff berührt, eine eigene Zeile. Die Prüfpunkte eines Tickets unter „Fertig, wenn“ bleiben im Ticket.
+Stand: 2026-11-14. Diese Prüfpunkte gelten bei jeder Änderung im jeweiligen Bereich, auch wenn das Ticket sie nicht eigens nennt (#461). Im Prüfbericht ([Lane-Protokoll](lane-protocol.md#prüfbericht-the-verification-report)) bekommt jeder Punkt eines Bereichs, den der Diff berührt, eine eigene Zeile. Die Prüfpunkte eines Tickets unter „Fertig, wenn“ bleiben im Ticket.
 
 Ein Punkt gilt für den Diff: Er fragt, was die Änderung einbringt, nicht ob das ganze Repo ihn schon erfüllt. Altbestand, der einen Punkt verletzt, steht beim Punkt mit seinem Folgeticket.
 
@@ -27,6 +27,13 @@ Welche Punkte hier stehen, entscheidet die nutzende Person. Jeder Punkt hat ihr 
 
 - **Doku-Site angepasst.** Derselbe PR passt die betroffenen Seiten unter `docs/site/` an. Terminal-Ausgaben dort stammen aus echten Läufen.
   *Nachweis:* Doku-Diff
+
+## Einheiten mit Version
+
+**Gilt für:** `lib/` und `priv/` von `apps/komki_cli`, `apps/ratsprojekte`, `apps/sidecar`, `apps/seatbelt`, `apps/sealed_envelope` (die Einheiten aus `knope.toml`)
+
+- **Changeset passt.** Merken Nutzende einer Einheit die Änderung, bringt der Diff ein Changeset unter `.changeset/` mit, das die Einheit nennt, aus Sicht ihrer Leser geschrieben ist (komki und ratsprojekte deutsch für Nutzende, die Bibliotheken englisch für Entwickler) und eine passende Stufe trägt ([changesets.md](changesets.md)). Sonst trägt der PR das Label `ohne-changeset`, und der Prüfbericht begründet, warum Nutzende nichts merken.
+  *Nachweis:* Review des Changesets. Automatisch: Workflow `changesets` (`elixir scripts/changesets.exs check origin/main`) prüft, dass jede berührte Einheit genannt ist und knope das Changeset lesen kann. Ob der Text passt, prüft nur das Review.
 
 ## Quellenpflicht
 

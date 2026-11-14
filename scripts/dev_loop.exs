@@ -454,7 +454,7 @@ defmodule DevLoop do
 
   defp implement(ctx, issue, wt, findings) do
     out = Path.join(wt, ".dev-loop")
-    Enum.each(~w(pr.md brief.md blocked.md), &File.rm(Path.join(out, &1)))
+    Enum.each(~w(pr.md brief.md blocked.md ohne-changeset), &File.rm(Path.join(out, &1)))
 
     prompt =
       render("implement", %{
@@ -517,11 +517,15 @@ defmodule DevLoop do
     n = issue.number
     branch = Core.loop_branch(n)
     {title, body} = Core.parse_pr(File.read!(Path.join(wt, ".dev-loop/pr.md")), n)
+    existing = Enum.find(GitHub.open_prs(ctx), &(&1.branch == branch))
+    # The label goes on before the push, so no run of the changeset gate
+    # sees the new head without it (a red run would block the merge).
+    if existing, do: sync_changeset_label(ctx, wt, existing.number)
     push!(ctx, wt, branch)
 
     pr =
-      case Enum.find(GitHub.open_prs(ctx), &(&1.branch == branch)) do
-        nil -> GitHub.create_pr(ctx, branch, title, body)
+      case existing do
+        nil -> GitHub.create_pr(ctx, branch, title, body, changeset_labels(wt))
         existing -> tap(existing.number, &GitHub.update_pr(ctx, &1, body))
       end
 
@@ -529,6 +533,19 @@ defmodule DevLoop do
     ctx.log.("##{n}: PR ##{pr} offen")
     %{number: pr}
   end
+
+  # The implementing session writes .dev-loop/ohne-changeset when a change to
+  # a unit's lib/ or priv/ is not noticeable for its users (#538,
+  # docs/agents/changesets.md). The label lets the changeset gate pass.
+  defp changeset_labels(wt),
+    do:
+      if(File.exists?(Path.join(wt, ".dev-loop/ohne-changeset")),
+        do: ["ohne-changeset"],
+        else: []
+      )
+
+  defp sync_changeset_label(ctx, wt, pr),
+    do: GitHub.pr_label(ctx, pr, "ohne-changeset", changeset_labels(wt) != [])
 
   # -- review --------------------------------------------------------------
 
@@ -762,6 +779,7 @@ defmodule DevLoop do
   defp rework(ctx, issue, wt, pr, findings, report) do
     case implement_with_retry(ctx, issue, wt, findings) do
       :ok ->
+        sync_changeset_label(ctx, wt, pr.number)
         push!(ctx, wt, Core.loop_branch(issue.number))
         # The PR text holds what this round claims, not the first one.
         {_title, body} = Core.parse_pr(File.read!(Path.join(wt, ".dev-loop/pr.md")), issue.number)

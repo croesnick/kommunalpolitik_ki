@@ -126,7 +126,9 @@ defmodule DevLoop.CoreTest do
       %{number: 390, branch: "lane-383-tool-call-loops", closes: []},
       %{number: 391, branch: "ris-mock-339", closes: [339]},
       %{number: 384, branch: "sealed-envelope-335", closes: [224]},
-      %{number: 325, branch: "renovate/python-3.x", closes: []}
+      %{number: 325, branch: "renovate/python-3.x", closes: []},
+      # The Version PR (#538) names no ticket and is never the loop's.
+      %{number: 540, branch: "versionen", closes: []}
     ]
 
     worktrees = [

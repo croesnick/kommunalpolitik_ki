@@ -82,13 +82,15 @@ Version in `packaging/pi/package.json` ändern, `pnpm install` dort, Lockfile
 prüfen und committen (Renovate schlägt das auch vor). Erlang und Elixir des Repos (`.tool-versions`)
 folgen deshalb Homebrews aktueller `erlang`-Version.
 
-Ein Release in drei Schritten:
+Ein Release in drei Schritten (veröffentlicht wird noch nicht, siehe
+[docs/release.md](../../docs/release.md)):
 
-1. Version in `apps/komki_cli/mix.exs` erhöhen und mergen.
-2. Tag setzen: `git tag komki-v<version> && git push origin komki-v<version>`.
-   Der Workflow `komki-release` baut auf Apple Silicon das Paket
-   (`make komki-paket`) und die Formel (`make komki-formel`) und hängt
-   beides an das GitHub-Release.
+1. Version und Tag entstehen über ein Changeset und den Version-PR
+   ([docs/agents/changesets.md](../../docs/agents/changesets.md)): Nach dem
+   Merge trägt der Commit den Tag `komki/v<version>`.
+2. Workflow von Hand starten: `gh workflow run komki-release.yml -f tag=komki/v<version>`.
+   Er baut auf Apple Silicon das Paket (`make komki-paket`) und die Formel
+   (`make komki-formel`) und hängt beides an das GitHub-Release.
 3. `komki.rb` aus dem Release als `Formula/komki.rb` ins Tap-Repo
    `croesnick/homebrew-tap` legen.
 
