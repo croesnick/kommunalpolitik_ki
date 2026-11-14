@@ -328,20 +328,45 @@ defmodule KomkiCli.Steps do
       Path.join([cfg.base_dir, "models"]),
       Path.join([cfg.base_dir, "tmp"]),
       Path.join([cfg.base_dir, "runs"]),
-      Path.join([cfg.base_dir, "denials"]),
-      Path.join([cfg.pi_home, "tmp"]),
-      Path.join([cfg.pi_home, ".config"]),
-      Path.join([cfg.pi_home, ".local", "share"]),
-      Path.join([cfg.pi_home, ".cache", "node-compile"]),
-      Path.join([cfg.pi_home, ".pi", "agent"])
+      Path.join([cfg.base_dir, "denials"])
     ]
 
     Enum.each(dirs, &File.mkdir_p!/1)
+    create_pi_home!(cfg)
     # Synthetischer Test-Vault (Default) samt Schreibordner des Vault-Connectors
     if is_binary(cfg.vault_dir), do: File.mkdir_p!(Path.join(cfg.vault_dir, "komki-test"))
     # Der Bericht enthaelt Denial-Targets; das Verzeichnis bleibt privat.
     File.chmod!(Path.join([cfg.base_dir, "denials"]), 0o700)
     :ok
+  end
+
+  @doc """
+  Legt die pi-home-Kette mit 0700 an (Ticket #493, Audit #467 F24/F25):
+  pi-home samt seinen Stufen tmp, .config, .local/share, .cache/node-compile
+  und .pi/agent, inklusive der Zwischenglieder. In pi-home liegen mit
+  models.json eine Kopie des llama-API-Keys und die Transkripte der
+  pi-Sessions; die Kette bleibt damit fuer andere lokale Konten unlesbar,
+  auch wenn die Basis traversierbar liegt (KOMKI_HOME ausserhalb des
+  0700-Heims, etwa /private/tmp/...). Dieselbe Disziplin wie run/ und
+  connectors/ (0700) bzw. llama.key (0600). Public als Testnaht wie
+  `place_drafter/2`; `create_dirs/1` ruft sie bei init.
+  """
+  @spec create_pi_home!(Config.t()) :: :ok
+  def create_pi_home!(%Config{} = cfg) do
+    chain = [
+      cfg.pi_home,
+      Path.join([cfg.pi_home, "tmp"]),
+      Path.join([cfg.pi_home, ".config"]),
+      Path.join([cfg.pi_home, ".local"]),
+      Path.join([cfg.pi_home, ".local", "share"]),
+      Path.join([cfg.pi_home, ".cache"]),
+      Path.join([cfg.pi_home, ".cache", "node-compile"]),
+      Path.join([cfg.pi_home, ".pi"]),
+      Path.join([cfg.pi_home, ".pi", "agent"])
+    ]
+
+    Enum.each(chain, &File.mkdir_p!/1)
+    Enum.each(chain, &File.chmod!(&1, 0o700))
   end
 
   @doc """
@@ -529,6 +554,12 @@ defmodule KomkiCli.Steps do
   pis Provider-Konfiguration (`models.json`) mit dem llama-API-Key
   (Ticket #136). Ohne gestarteten llama steht ein Platzhalter darin;
   `up` schreibt die Datei nach jedem llama-Start neu.
+
+  Die Datei ist eine Kopie des llama-API-Keys und entsteht deshalb mit 0600
+  wie ihre Quelle `llama.key` (Ticket #493, Audit #467 F24/F25): leer
+  anlegen, Modus setzen, dann fuellen — Standard-umask schriebe sie mit
+  0644 lesbar fuer andere lokale Konten, sobald die Basiskette traversierbar
+  liegt. Jedes `up` haertet auch eine vor #493 mit 0644 entstandene Datei.
   """
   @spec write_models(Config.t()) :: :ok
   def write_models(cfg) do
@@ -552,6 +583,8 @@ defmodule KomkiCli.Steps do
 
     path = Path.join([cfg.pi_home, ".pi", "agent", "models.json"])
     File.mkdir_p!(Path.dirname(path))
+    File.write!(path, "")
+    File.chmod!(path, 0o600)
     File.write!(path, models <> "\n")
   end
 
