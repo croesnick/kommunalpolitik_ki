@@ -29,7 +29,7 @@ defmodule PrReport do
     cwd = input["cwd"] || File.cwd!()
 
     if command =~ @create do
-      case missing(command <> "\n" <> body_file(command, cwd), head(cwd)) do
+      case missing(command <> "\n" <> body_file(command, cwd), head(command, cwd)) do
         [] -> ""
         gaps -> deny(gaps)
       end
@@ -72,8 +72,28 @@ defmodule PrReport do
     end
   end
 
-  defp head(cwd) do
-    case System.cmd("git", ~w(rev-parse HEAD), cd: cwd, stderr_to_stdout: true) do
+  # The commit the PR is opened for: with `--head <branch>` (`-H`, also
+  # `owner:branch`) that branch, local or under origin/ (#532), otherwise
+  # HEAD of the session's directory. A branch that does not resolve yields
+  # nil, and the call is denied.
+  defp head(command, cwd) do
+    case Regex.run(~r/(?:--head|-H)[=\s]+("[^"]+"|'[^']+'|\S+)/, command) do
+      [_, branch] ->
+        branch =
+          branch |> String.trim("\"") |> String.trim("'") |> String.split(":") |> List.last()
+
+        Enum.find_value([branch, "refs/remotes/origin/#{branch}"], &commit(&1, cwd))
+
+      nil ->
+        commit("HEAD", cwd)
+    end
+  end
+
+  defp commit(ref, cwd) do
+    case System.cmd("git", ["rev-parse", "--verify", "--quiet", ref <> "^{commit}"],
+           cd: cwd,
+           stderr_to_stdout: true
+         ) do
       {sha, 0} -> String.trim(sha)
       _ -> nil
     end
