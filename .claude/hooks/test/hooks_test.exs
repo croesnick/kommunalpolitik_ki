@@ -293,6 +293,18 @@ defmodule RepoHooksTest do
             "gh pr create --head fix -F pr.md <<A 3<<B\nx\nA\n--head main\nB",
             "gh pr create --head fix -F pr.md <<'E.O'\n--head main\nE.O",
             "gh pr create --head fix -F pr.md &# --head main",
+            # Other ways to run gh, next to a call that never runs.
+            "gh() { command gh \"$@\" --head fix; }; gh pr create --head main -F pr.md",
+            "command gh pr create --head fix -F pr.md; false && gh pr create --head main",
+            "env gh pr create --head fix -F pr.md; false && gh pr create --head main",
+            "eval gh pr create --head fix -F pr.md; false && gh pr create --head main",
+            "bash -c 'gh pr create -Hfix -F pr.md'; false && gh pr create --head main",
+            "echo --head fix | xargs gh pr create -F pr.md; false && gh pr create --head main",
+            "command gh pr create -Hfix -F pr.md; f() { gh pr create --head main; }",
+            "command gh pr create -Hfix -F pr.md; gh -- pr create --head main",
+            # Words the shell splits or expands: the old reading applies.
+            "gh pr create --title \"x -H nope\" --head main -F pr.md {-H,fix}",
+            "gh pr create --title \"x -H nope\" --head main -F pr.md [-]Hfix",
             # Short flags as pflag reads them.
             "gh pr create -Hfix -F pr.md",
             "gh pr create -dH fix -F pr.md",

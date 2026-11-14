@@ -114,7 +114,7 @@ defmodule PrReport do
   @old_flag ~r/(?:--head|-H)[=\s]+("[^"]+"|'[^']+'|\S+)/
 
   defp heads(command, shfmt) do
-    case PrReport.GhArgs.heads(command, shfmt, &(&1 =~ @create and &1 =~ @old_flag)) do
+    case PrReport.GhArgs.heads(command, shfmt) do
       {:ok, values} ->
         values
 
@@ -141,26 +141,36 @@ defmodule PrReport.GhArgs do
   # Reads the `gh pr create` call the shell would run from the syntax tree
   # of shfmt (mvdan/sh, `--to-json`), so quotes, escapes, heredocs and
   # comments mean what they mean to the shell (#540). Flags follow pflag,
-  # as gh parses them. `:unsure` wherever the tree leaves room for doubt:
-  # no parse, not exactly one create call, a word that is not literal where
-  # a flag could stand, an unknown flag, or text that holds a call of its
-  # own (`bash -c "gh pr create --head …"`, `bash <<'EOF'`).
+  # as gh parses them.
+  #
+  # The reading holds only where the tree shows a single way gh runs:
+  # `gh` occurs in exactly one word of the whole command, text and heredocs
+  # included, and that word heads the call; no function is defined; no
+  # command name comes from an expansion; and no argument of the call is
+  # split or expanded by the shell. Anything else, such as `command gh`,
+  # `eval`, `bash -c '…'` or `{-H,fix}`, is `:unsure`, as are an unknown
+  # flag and a parse error. Commands that build "gh" from pieces inside
+  # another program stay out of sight, as they did before.
 
   # Flags of `gh pr create` and the persistent `--repo`.
-  @value_long ~w(assignee base body body-file head label milestone project recover repo reviewer template title)
+  @value_long ~w(assignee attach base body body-file head label milestone project recover repo reviewer template title)
   @bool_long ~w(draft dry-run editor fill fill-first fill-verbose help no-maintainer-edit web)
   @value_short ~w(B F H R T a b l m p r t)
   @bool_short ~w(d e f h w)
 
   @doc "`{:ok, values}` of `--head` in order, a value that is no literal as `{:unknown, source}`; or `:unsure`."
-  def heads(_command, nil, _hidden_call?), do: :unsure
+  @gh ~r/(?<![\w-])gh(?![\w-])/
 
-  def heads(command, shfmt, hidden_call?) do
+  def heads(_command, nil), do: :unsure
+
+  def heads(command, shfmt) do
     with {:ok, tree} <- parse(command, shfmt),
-         false <- tree |> nodes() |> Enum.any?(&(word?(&1) and hidden_call?.(text(&1)))),
-         results = for(args <- calls(tree), do: call(args, command)),
-         false <- :unsure in results,
-         [{:create, values}] <- Enum.filter(results, &match?({:create, _}, &1)) do
+         nodes = nodes(tree),
+         false <- Enum.any?(nodes, &opaque?/1),
+         [word] <- Enum.filter(nodes, &(word?(&1) and text(&1) =~ @gh)),
+         [args] <- for(%{"Type" => "CallExpr", "Args" => [^word | args]} <- nodes, do: args),
+         false <- Enum.any?(args, &expands?/1),
+         {:create, values} <- call(args, command) do
       {:ok, values}
     else
       _ -> :unsure
@@ -192,14 +202,20 @@ defmodule PrReport.GhArgs do
 
   defp word?(node), do: Map.has_key?(node, "Parts") and not Map.has_key?(node, "Type")
 
-  defp calls(tree) do
-    for %{"Type" => "CallExpr", "Args" => [first | args]} <- nodes(tree),
-        {:ok, cmd} <- [literal(first)],
-        Path.basename(cmd) == "gh",
-        do: args
+  # A function may stand in for gh; a command name from an expansion may be gh.
+  defp opaque?(%{"Type" => "FuncDecl"}), do: true
+  defp opaque?(%{"Type" => "CallExpr", "Args" => [first | _]}), do: literal(first) == :error
+  defp opaque?(_), do: false
+
+  # Unquoted expansions, braces and globs may turn one word into several.
+  defp expands?(%{"Parts" => parts}) do
+    Enum.any?(parts, fn
+      %{"Type" => "Lit"} = part -> literal_part(part) == :error
+      %{"Type" => type} -> type not in ["SglQuoted", "DblQuoted"]
+    end)
   end
 
-  # {:create, heads}, :other for gh calls that are no `pr create`, :unsure.
+  # {:create, heads}, :other for a gh call that is no `pr create`, :unsure.
   defp call(args, command) do
     case flags(args, command, [], []) do
       {["pr", sub | _], heads} when sub in ["create", "new"] -> {:create, heads}
@@ -216,7 +232,7 @@ defmodule PrReport.GhArgs do
         :unsure
 
       {:ok, "--"} ->
-        rest_positional(rest, positional, heads)
+        :unsure
 
       {:ok, "--" <> long} ->
         long(String.split(long, "=", parts: 2), rest, command, positional, heads)
@@ -227,15 +243,6 @@ defmodule PrReport.GhArgs do
       {:ok, arg} ->
         flags(rest, command, [arg | positional], heads)
     end
-  end
-
-  defp rest_positional(words, positional, heads) do
-    literals = Enum.map(words, &literal/1)
-
-    if :error in literals,
-      do: :unsure,
-      else:
-        {Enum.reverse(positional) ++ for({:ok, arg} <- literals, do: arg), Enum.reverse(heads)}
   end
 
   defp long([name, value], rest, command, positional, heads) when name in @value_long,
@@ -266,7 +273,7 @@ defmodule PrReport.GhArgs do
           rest,
           command,
           positional,
-          record(char == "H", String.trim_leading(inline, "="), heads)
+          record(char == "H", String.replace_prefix(inline, "=", ""), heads)
         )
     end
   end
@@ -297,8 +304,13 @@ defmodule PrReport.GhArgs do
     if :error in values, do: :error, else: {:ok, Enum.join(values)}
   end
 
-  defp literal_part(%{"Type" => "Lit", "Value" => value}),
-    do: Regex.replace(~r/\\(\n|.)/s, value, fn _, char -> if char == "\n", do: "", else: char end)
+  # Braces, globs and a tilde are expanded by the shell: no fixed text.
+  defp literal_part(%{"Type" => "Lit", "Value" => value}) do
+    if value =~ ~r/[{}*?\[\]~]/,
+      do: :error,
+      else:
+        Regex.replace(~r/\\(\n|.)/s, value, fn _, char -> if char == "\n", do: "", else: char end)
+  end
 
   defp literal_part(%{"Type" => "SglQuoted", "Dollar" => true, "Value" => value}),
     do: if(String.contains?(value, "\\"), do: :error, else: value)
