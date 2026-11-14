@@ -24,6 +24,42 @@ defmodule Screenshot.Profile do
   """
   def render(paths), do: SBPL.render(rules(paths))
 
+  # NIF libraries the profile may read: package managers and the system,
+  # never a home directory. The list comes from the build in the worktree,
+  # which the session writes.
+  @dylib_roots ~w(/opt/homebrew /usr/local /usr/lib /System/Library)
+
+  def dylib_roots, do: @dylib_roots
+
+  @doc """
+  The `:dylib_dirs` of the profile, from the directories the build's NIFs
+  name (`Seatbelt.MachODeps.dylib_dirs/1`): `{:ok, dirs}`, or
+  `{:error, dir}` for the first one outside `roots`.
+
+    * A missing directory is dropped: otool -L also lists a library's own
+      install name, and a precompiled NIF carries the one of its CI build
+      (/Users/runner/work/…). It holds nothing dyld could load.
+    * The check compares text, so `..` is expanded first. Both the linked
+      path (dyld opens it, e.g. /opt/homebrew/opt/…) and its kernel target
+      must pass it; directories inside `own_roots` need no rule.
+  """
+  def dylib_dirs(dirs, own_roots, roots \\ @dylib_roots) do
+    dirs =
+      dirs
+      |> Enum.filter(&File.dir?/1)
+      |> Enum.flat_map(&[Path.expand(&1), Seatbelt.canonical(&1)])
+      |> Enum.reject(fn dir -> Enum.any?(own_roots, &inside?(dir, &1)) end)
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    case Enum.reject(dirs, fn dir -> Enum.any?(roots, &inside?(dir, &1)) end) do
+      [] -> {:ok, dirs}
+      [outside | _] -> {:error, outside}
+    end
+  end
+
+  defp inside?(path, root), do: path == root or String.starts_with?(path, root <> "/")
+
   def rules(p) do
     SBPL.header([
       "komki screenshot tool (#510): hub dev server and headless browser",
