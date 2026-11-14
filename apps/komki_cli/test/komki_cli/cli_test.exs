@@ -221,4 +221,35 @@ defmodule KomkiCli.CLITest do
       refute stderr =~ System.user_home!()
     end
   end
+
+  describe "up-Ausgabe: Zeile zur Store-Migration (#513)" do
+    test "ersetzter Store nennt die Sicherung in einer Zeile" do
+      backup = "/base/registry.db.sicherung-20261114T000000Z"
+
+      assert {out, 0} =
+               CLI.render_result(
+                 {:up,
+                  %{
+                    llama: 12,
+                    connectors: [],
+                    mediator: {:started, 34, %{"tools" => ["ping"]}},
+                    store: backup
+                  }}
+               )
+
+      assert out =~ "Label-Store: frühere Vorlage ersetzt; Sicherung: " <> backup <> "\n"
+      assert out =~ "llama up: pid 12"
+    end
+
+    test "ohne Ersetzung bleibt es bei den Komponentenzeilen" do
+      assert {out, 0} =
+               CLI.render_result(
+                 {:up,
+                  %{llama: 12, connectors: [], mediator: {:started, 34, %{"tools" => ["ping"]}}}}
+               )
+
+      refute out =~ "Label-Store"
+      assert out =~ "llama up: pid 12"
+    end
+  end
 end

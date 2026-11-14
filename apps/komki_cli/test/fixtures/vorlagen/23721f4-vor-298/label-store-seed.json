@@ -1,0 +1,206 @@
+{
+  "bindings": {
+    "doc-oeffentlich@1": {
+      "auflagen": [],
+      "bezeichnung": "Öffentliches Raumdokument",
+      "geltungsbereich": "komki-Arbeitsraum (Vorlage)",
+      "operations": {
+        "admit": true
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": [],
+      "verantwortliche_stelle": "nutzende-person"
+    },
+    "doc-oeffentlich@2": {
+      "auflagen": [],
+      "bezeichnung": "Öffentliches Raumdokument",
+      "geltungsbereich": "komki-Arbeitsraum (Vorlage)",
+      "operations": {
+        "admit": true,
+        "emit": true
+      },
+      "readers": [
+        "brave-search",
+        "nutzende-person",
+        "pi-agent",
+        "ris-betreiber"
+      ],
+      "relaxation_authorities": [],
+      "verantwortliche_stelle": "nutzende-person"
+    },
+    "doc-pending-freigabe@1": {
+      "auflagen": [],
+      "bezeichnung": "Raumdokument in Freigabe-Pause",
+      "geltungsbereich": "komki-Arbeitsraum (Vorlage)",
+      "operations": {
+        "admit": {
+          "eq": [
+            "vertraulich_freigabe",
+            true
+          ]
+        }
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": [
+        {
+          "authority": "nutzende-person",
+          "output": "freigabe-notiz",
+          "restriction": "operations"
+        }
+      ],
+      "verantwortliche_stelle": "nutzende-person"
+    },
+    "doc-vertraulich@1": {
+      "auflagen": [],
+      "bezeichnung": "Vertrauliches Raumdokument",
+      "geltungsbereich": "komki-Arbeitsraum (Vorlage)",
+      "operations": {
+        "admit": {
+          "eq": [
+            "purpose",
+            "vertraulich"
+          ]
+        }
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": [],
+      "verantwortliche_stelle": "nutzende-person"
+    },
+    "mediator-ping@1": {
+      "auflagen": [],
+      "bezeichnung": "Liveness-Probe des Vermittlers",
+      "geltungsbereich": "komki-Arbeitsraum (Vorlage)",
+      "operations": {
+        "admit": true
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": [],
+      "verantwortliche_stelle": "nutzende-person"
+    },
+    "ris-oeffentlich@1": {
+      "auflagen": [],
+      "bezeichnung": "Öffentliche RIS-Inhalte",
+      "geltungsbereich": "komki-Arbeitsraum (Vorlage)",
+      "operations": {
+        "admit": true,
+        "emit": true
+      },
+      "readers": [
+        "brave-search",
+        "nutzende-person",
+        "pi-agent",
+        "ris-betreiber"
+      ],
+      "relaxation_authorities": [],
+      "verantwortliche_stelle": "nutzende-person"
+    },
+    "vault-oeffentlich@1": {
+      "auflagen": [],
+      "bezeichnung": "Öffentliche Vault-Notiz",
+      "geltungsbereich": "komki-Arbeitsraum (Vorlage)",
+      "operations": {
+        "admit": true,
+        "emit": true
+      },
+      "readers": [
+        "brave-search",
+        "nutzende-person",
+        "pi-agent",
+        "ris-betreiber"
+      ],
+      "relaxation_authorities": [],
+      "verantwortliche_stelle": "nutzende-person"
+    },
+    "vault-vertraulich@1": {
+      "auflagen": [],
+      "bezeichnung": "Vertrauliche Vault-Notiz",
+      "geltungsbereich": "komki-Arbeitsraum (Vorlage)",
+      "operations": {
+        "admit": true,
+        "emit": true
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": [],
+      "verantwortliche_stelle": "nutzende-person"
+    },
+    "web-oeffentlich@1": {
+      "auflagen": [],
+      "bezeichnung": "Öffentliche Web-Treffer",
+      "geltungsbereich": "komki-Arbeitsraum (Vorlage)",
+      "operations": {
+        "admit": true,
+        "emit": true
+      },
+      "readers": [
+        "brave-search",
+        "nutzende-person",
+        "pi-agent",
+        "ris-betreiber"
+      ],
+      "relaxation_authorities": [],
+      "verantwortliche_stelle": "nutzende-person"
+    }
+  },
+  "environments": {
+    "lokaler-arbeitsraum@1": {
+      "observers": [
+        "nutzende-person",
+        "pi-agent"
+      ]
+    },
+    "ris-abruf@1": {
+      "observers": [
+        "nutzende-person",
+        "pi-agent",
+        "ris-betreiber"
+      ]
+    },
+    "vault-lokal@1": {
+      "observers": [
+        "nutzende-person",
+        "pi-agent"
+      ]
+    },
+    "web-suche@1": {
+      "observers": [
+        "brave-search",
+        "nutzende-person",
+        "pi-agent"
+      ]
+    }
+  },
+  "fact_fields": {
+    "output_content_digest": "string",
+    "purpose": "string",
+    "vertraulich_freigabe": "boolean"
+  },
+  "observer_types": {
+    "brave-search": "processing_domain",
+    "nutzende-person": "person",
+    "pi-agent": "processing_domain",
+    "ris-betreiber": "processing_domain"
+  },
+  "observers": [
+    "brave-search",
+    "nutzende-person",
+    "pi-agent",
+    "ris-betreiber"
+  ],
+  "registry_id": "reg-komki-arbeitsraum",
+  "schema": "komki-label-store/2"
+}
