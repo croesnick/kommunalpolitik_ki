@@ -1,7 +1,7 @@
 # Geteiltes Geruest der RIS-Skriptfamilie: ris_recorder, ris_skeleton,
-# ris_struktur, ris_gartenstadt, ris_ngramm und ris_cassettes. Wer ein neues
-# Familienmitglied schreibt, findet hier die Bausteine und kopiert nichts mehr
-# vom Nachbarn.
+# ris_struktur, ris_gartenstadt, ris_ngramm, ris_cassettes und
+# ris_tagesordnung. Wer ein neues Familienmitglied schreibt, findet hier
+# die Bausteine und kopiert nichts mehr vom Nachbarn.
 #
 # Jedes Skript bleibt eigenstaendig startbar und laedt diese Datei per
 # Code.require_file — weiterhin nur OTP, keine Deps. Hier lebt, was sonst in
@@ -193,11 +193,13 @@ defmodule KomkiConnectorRis.RisHttp do
   Flag-Geruest der Aufrufzeile: `--flag wert`-Paare in beliebiger Reihenfolge.
   `kinds` nennt die erlaubten Flaggen (ohne `--`) und ihre Wertart: `:string`
   uebernimmt das naechste Token, `:integer` verlangt eine ganze Zahl. Ein
-  unbekanntes Flag, ein Flag ohne Wert oder ein Wert ohne Flag wird mit
-  `:error` abgewiesen — die Meldung dazu liefert die Aufrufstelle (Usage).
-  Keine Argumente sind gueltig; ob ein Flag fehlen darf, entscheidet die
-  Aufrufstelle. (ris_cassettes mischt Verb und Pfad dazu und behaelt deshalb
-  seinen eigenen Parser.)
+  Bindestrich in einem Flag steht fuer einen Unterstrich im Schluessel
+  (`--base-url` zum Schluessel `base_url`, wie es die Kommandozeile
+  gewoehnt ist). Ein unbekanntes Flag, ein Flag ohne Wert oder ein Wert ohne
+  Flag wird mit `:error` abgewiesen — die Meldung dazu liefert die
+  Aufrufstelle (Usage). Keine Argumente sind gueltig; ob ein Flag fehlen
+  darf, entscheidet die Aufrufstelle. (ris_cassettes mischt Verb und Pfad
+  dazu und behaelt deshalb seinen eigenen Parser.)
   """
   @spec parse_flags([String.t()], keyword(:string | :integer)) :: {:ok, keyword()} | :error
   def parse_flags(argv, kinds) do
@@ -208,7 +210,7 @@ defmodule KomkiConnectorRis.RisHttp do
   defp parse_flags([], _known, acc), do: {:ok, acc}
 
   defp parse_flags(["--" <> name, value | rest], known, acc) do
-    case Map.fetch(known, name) do
+    case Map.fetch(known, flag_name(name)) do
       {:ok, {key, :string}} -> parse_flags(rest, known, Keyword.put(acc, key, value))
       {:ok, {key, :integer}} -> parse_flags_integer(key, value, rest, known, acc)
       :error -> :error
@@ -216,6 +218,9 @@ defmodule KomkiConnectorRis.RisHttp do
   end
 
   defp parse_flags(_argv, _known, _acc), do: :error
+
+  # Bindestriche der Aufrufzeile sind Unterstriche der Schluessel.
+  defp flag_name(name), do: String.replace(name, "-", "_")
 
   defp parse_flags_integer(key, value, rest, known, acc) do
     case Integer.parse(value) do

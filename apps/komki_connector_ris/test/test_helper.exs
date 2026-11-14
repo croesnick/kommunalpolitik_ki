@@ -7,6 +7,7 @@ Code.require_file("../priv/ris_recorder.exs", __DIR__)
 Code.require_file("../priv/ris_gartenstadt.exs", __DIR__)
 Code.require_file("../priv/ris_skeleton.exs", __DIR__)
 Code.require_file("../priv/ris_struktur.exs", __DIR__)
+Code.require_file("../priv/ris_tagesordnung.exs", __DIR__)
 
 defmodule KomkiConnectorRis.RisMock do
   @moduledoc false

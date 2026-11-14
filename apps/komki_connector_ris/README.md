@@ -347,6 +347,32 @@ Grenzen, bewusst:
 Eine Migration gibt es bewusst nicht: Damit verschlüsselte Kassetten sind nicht mehr lesbar. Neu anfangen
 geht mit `security delete-generic-password -s ris-kassetten` und danach `init`.
 
+### Tagesordnung prüfen: ungelöste HTML-Entities
+
+`priv/ris_tagesordnung.exs` (#547) fährt die Tagesordnung eines Sitzungstags so ab, wie der Connector es
+tut — Sitzungsliste, Detail je Sitzung, Textblöcke je öffentlichem TOP — und zählt, was nach der
+Entity-Dekodierung noch wie eine HTML-Entity aussieht. Das ist der Prüflauf gegen das echte RIS, wenn
+Upstream-Texte neue Entities bringen:
+
+```bash
+cd apps/komki_connector_ris
+mix run priv/ris_tagesordnung.exs -- --datum 2026-11-17 --anmelden
+```
+
+Ohne `--anmelden` läuft das Skript als Gast; dann fehlen die Textblöcke meist und die Zählung sagt
+nichts über die Dekodierung (das Skript weist darauf hin). Mit `--anmelden` liest es das Zugangssiegel
+aus dem macOS-Schlüsselbund (Eintrag `ris-zugang`, wie komki ihn anlegt) und öffnet es über
+`komki-tresor`: genau eine Freigabe per Touch ID pro Lauf, wie bei jeder Anmeldung im laufenden komki.
+Schlüsselbund- und Tresor-Bausteine teilt es mit `ris_cassettes`. Meldungen nennen nie Zugangsdaten,
+Siegel oder Token. `--base-url` zeigt es auf einen Mock oder Recorder, `--tresor` auf ein anderes
+Programm (wie bei `ris_cassettes`). Ausgabe je Sitzung: Nummer, Titel und Zeichen je TOP, am Ende
+„Texte mit ungelösten HTML-Entities: N“ (gezählt werden die Inhalte der Textblöcke, nicht ihre
+Überschriften; Titel gibt das Skript unverändert aus, der Connector dekodiert sie nicht — Entities
+in Titeln bleiben so sichtbar). Was nicht lesbar war, steht je Sitzung und TOP als Lesefehler in
+eigenen Zeilen, summiert als „Lesefehler: N“, und geht in den Exit-Code mit ein: Ein Bericht „0“
+über ungelesene Texte wäre ein falsches Entlastungszeugnis. Exit-Codes: 0 sauber, 1 fachlicher
+Befund (keine Sitzung am Tag, Lesefehler, ungelöste Entities), 2 Aufruf falsch.
+
 ## Grenzen
 
 - **Texte für Gäste meist leer.** Die echte Gast-API liefert bei den geprüften TOPs
@@ -361,6 +387,12 @@ geht mit `security delete-generic-password -s ris-kassetten` und danach `init`.
 - **Unvollständige Treffer möglich.** Budget und Frist begrenzen die Suche. Ältere Sitzungen außerhalb
   des Zeitfensters werden nicht durchsucht.
 - **Kein Stemming, kein ß/ss-Ausgleich.** „Bahnhofstrasse“ findet „Bahnhofstraße“ nicht.
+- **Entity-Dekodierung begrenzt (#547).** Der Connector dekodiert die XML-Kern-Entities, den
+  Latin-1-Vorrat von HTML 4 und die Satz- und Währungszeichen deutscher Gremientexte
+  (Anführungszeichen, Gedankenstriche, Euro). Griechische, mathematische und seltene Entities
+  bleiben roh stehen; `priv/ris_tagesordnung.exs` zählt sie als ungelöst. Weiche Trennstellen
+  (`&shy;`, `&#173;`) sind Layout, kein Text, und entfallen in jeder Schreibweise. Dekodiert werden
+  nur die Inhalte der Textblöcke — Titel und Block-Überschriften bleiben, wie das RIS sie liefert.
 - **`url` zeigt auf die API-Ressource**, nicht auf eine Seite der RIS-Weboberfläche. Deren
   Link-Schema ist nicht dokumentiert.
 - Der Mock ignoriert das Zeitfenster (`from`/`until`) und liefert immer alle Sitzungen.

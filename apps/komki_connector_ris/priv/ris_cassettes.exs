@@ -1278,13 +1278,20 @@ defmodule KomkiConnectorRis.RisCassettes do
   end
 end
 
-KomkiConnectorRis.RisHttp.cli(System.argv(), fn argv ->
-  {code, messages} = KomkiConnectorRis.RisCassettes.run(argv)
+# Familienmitglieder koennen dieses Skript per Code.require_file laden
+# (ris_tagesordnung tut es fuer die Schluesselbund- und Tresor-Bausteine)
+# und markieren sich vorher per Process.put als Lader: Dann gehoert
+# System.argv() dem aufrufenden Skript und dieser Einschnitt ruht. Direkt
+# gestartet bleibt alles wie bisher.
+unless Process.get({KomkiConnectorRis.RisCassettes, :als_bibliothek}) do
+  KomkiConnectorRis.RisHttp.cli(System.argv(), fn argv ->
+    {code, messages} = KomkiConnectorRis.RisCassettes.run(argv)
 
-  Enum.each(messages, fn
-    {:out, text} -> IO.puts(text)
-    {:err, text} -> IO.puts(:stderr, text)
+    Enum.each(messages, fn
+      {:out, text} -> IO.puts(text)
+      {:err, text} -> IO.puts(:stderr, text)
+    end)
+
+    if code != 0, do: exit({:shutdown, code})
   end)
-
-  if code != 0, do: exit({:shutdown, code})
-end)
+end
