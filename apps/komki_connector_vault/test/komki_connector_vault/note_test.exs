@@ -59,6 +59,37 @@ defmodule KomkiConnectorVault.NoteTest do
     assert Note.parse("Text\n## Nur Ebene zwei\n", "datei").title == "datei"
   end
 
+  # #478 (Audit #467, Fund F6): Angriffsnotiz wie im Zielbild — Frontmatter-
+  # Titel, der nach Control-Zeichen-Reinigung durch den Writer leer
+  # decodiert, Body-Zeile "# a" + 19995 Leerzeichen + "x". Die alte Regex
+  # `^# +(.+?)[ \t]*$` lief darueber quadratisch heiss bis zum vollen
+  # Match-Budget und raiserte am Ende SystemLimitError durch jede Suche.
+  test "Angriffsnotiz (#478): linearer Lauf, kein Raise, Titel = Angriffszeile" do
+    spaces = String.duplicate(" ", 19_995)
+    line = "# a" <> spaces <> "x"
+    title = "a" <> spaces <> "x"
+    text = "---\nkomki_labels: [a]\ntitle: \" \"\n---\n" <> line <> "\n"
+
+    note = Note.parse(text, "datei")
+
+    assert note.title == title
+    assert note.labels == ["a"]
+    assert note.body == line <> "\n"
+  end
+
+  test "Ueberschrift-Semantik wie die alte Regex (#478)" do
+    # Mehrfach-Leerzeichen hinter # und Leerzeichen/Tab am Zeilenende:
+    # Titel vollstaendig getrimmt, CRLF inklusive.
+    assert Note.parse("#   Kopf mit Vorglanz\n", "datei").title == "Kopf mit Vorglanz"
+    assert Note.parse("# Kopf \t \nText\n", "datei").title == "Kopf"
+    assert Note.parse("---\nkomki_labels: [a]\n---\r\n# Kopf\r\nText", "datei").title == "Kopf"
+
+    # Erst matchende Zeile gewinnt, auch wenn ihr Titel leer wird.
+    assert Note.parse("#   \n# Zweite\n", "datei").title == "datei"
+    # "# " ohne weiteren Inhalt ist keine Ueberschrift, die naechste passt.
+    assert Note.parse("# \n# Zweite\n", "datei").title == "Zweite"
+  end
+
   test "Body beginnt nach dem Frontmatter, spaetere ---Bloecke bleiben Inhalt" do
     text = "---\nkomki_labels: [a]\n---\nA\n---\nkomki_labels: [b]\n---\n"
     note = Note.parse(text, "datei")
