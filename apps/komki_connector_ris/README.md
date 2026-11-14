@@ -366,9 +366,10 @@ aus dem macOS-Schlüsselbund (Eintrag `ris-zugang`, wie komki ihn anlegt) und ö
 Schlüsselbund- und Tresor-Bausteine teilt es mit `ris_cassettes`. Meldungen nennen nie Zugangsdaten,
 Siegel oder Token. `--base-url` zeigt es auf einen Mock oder Recorder, `--tresor` auf ein anderes
 Programm (wie bei `ris_cassettes`). Ausgabe je Sitzung: Nummer, Titel und Zeichen je TOP, am Ende
-„Texte mit ungelösten HTML-Entities: N“ (gezählt werden die Inhalte der Textblöcke, nicht ihre
-Überschriften; Titel gibt das Skript unverändert aus, der Connector dekodiert sie nicht — Entities
-in Titeln bleiben so sichtbar). Was nicht lesbar war, steht je Sitzung und TOP als Lesefehler in
+„Texte mit ungelösten HTML-Entities: N“ (gezählt wird der Klartext je TOP, wie ihn `ris show`
+liefert — Block-Überschriften eingeschlossen; nicht gezählt wird der TOP-Titel, den das Skript
+unverändert ausgibt und der Connector nicht dekodiert — Entities in Titeln bleiben so sichtbar).
+Was nicht lesbar war, steht je Sitzung und TOP als Lesefehler in
 eigenen Zeilen, summiert als „Lesefehler: N“, und geht in den Exit-Code mit ein: Ein Bericht „0“
 über ungelesene Texte wäre ein falsches Entlastungszeugnis. Exit-Codes: 0 sauber, 1 fachlicher
 Befund (keine Sitzung am Tag, Lesefehler, ungelöste Entities), 2 Aufruf falsch.
