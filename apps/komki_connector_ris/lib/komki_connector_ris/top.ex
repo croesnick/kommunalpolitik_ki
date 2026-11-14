@@ -7,10 +7,37 @@ defmodule KomkiConnectorRis.Top do
   `"restricted": false` am TOP und `"protectedpart": false` an seinem
   Sitzungsteil liefert. Fehlt ein Feld oder hat es einen anderen Wert,
   behandelt der Connector den TOP als nicht-oeffentlich.
+
+  **Budgets (#486/#487):** Textbloecke werden vor der Verarbeitung auf
+  Bytes begrenzt, einzeln und als Summe einer Antwort; ein Block ueber
+  dem Budget lehnt die ganze Antwort ab, statt still gekuerzt zu werden.
+  `text/2` fragt vor jedem Block die Restfrist ab, und alle
+  Upstream-Felder verlieren ihre C0/C1-Steuerzeichen und eine
+  ueberlange Laenge.
   """
 
   @id_pattern ~r/^[A-Za-z0-9_-]{1,64}$/
   @top_id_pattern ~r/^(\d{1,18})-\d{1,18}$/
+
+  # Byte-Budgets der Textverarbeitung (#486): je Block und je Antwort.
+  # Das Strukturprofil der Aufnahme 20261101T112819Z kennt hoechstens
+  # drei Textbloecke je TOP, echte Inhalte liegen Kilobyte-range; die
+  # ehemalige Tag-Regex entgleiste ab ~5 MiB pro Block. 64 KiB je Block
+  # und 192 KiB je Antwort liegen weit ueber dem Beobachteten.
+  @max_block_bytes 65_536
+  @max_text_bytes 196_608
+
+  # Kurzfelder (Nummer, Titel, Sitzung, Block-Ueberschrift): laenger als
+  # 1 000 Zeichen wurde kein oeffentlicher Titel beobachtet (Strukturprofil:
+  # hoechstens 472). Gekappt wird mit Marker, damit ein Zitat den Schnitt
+  # zeigt (#487).
+  @max_field_chars 1_000
+
+  # C0-Steuerzeichen ausser Tab/CR/LF, DEL und die C1-Gruppe — derselbe
+  # Vorrat wie KomkiCli.Terminal.sanitize/1 (#487): was eine
+  # Terminal-Ausgabe faelschen koennte, soll im Kontext gar nicht erst
+  # ankommen.
+  @controls ~r/[\x00-\x08\x0B-\x1F\x7F\x{80}-\x{9F}]/u
 
   # Entity-Syntax fuer decode_entities/1: die Zahl-Formen und Namen, die
   # Grossbuchstaben und Ziffern tragen duerfen (&Uuml;, &sup2;, &frac12;).
@@ -45,17 +72,48 @@ defmodule KomkiConnectorRis.Top do
     end
   end
 
-  @doc "Textbloecke als Klartext: Ueberschrift, Leerzeile, Inhalt."
-  @spec text(map()) :: String.t()
-  def text(detail) do
+  @typedoc "Restfrist in Millisekunden (`Api.remaining`), `:infinity` ohne Frist."
+  @type remaining :: (-> non_neg_integer() | :infinity)
+
+  @typep text_result :: {:ok, String.t()} | {:error, :budget} | {:error, :deadline}
+
+  @doc """
+  Textbloecke als Klartext: Ueberschrift, Leerzeile, Inhalt.
+
+  Vor jedem Block fragt `remaining` die Restfrist ab (`Api.remaining`,
+  #486): 0 bricht ab. Ein Block ueber dem Byte-Budget lehnt die ganze
+  Antwort ab — Kuerzen wuerde Zitate still schwaechen.
+  """
+  @spec text(map()) :: text_result()
+  @spec text(map(), remaining()) :: text_result()
+  def text(detail, remaining \\ fn -> :infinity end)
+
+  def text(detail, remaining) do
     detail["textblocks"]
     |> list()
     |> Enum.filter(&is_map/1)
-    |> Enum.map(fn block ->
-      [string(block["caption"]), plain(string(block["content"]))]
-      |> Enum.reject(&(&1 == ""))
-      |> Enum.join("\n\n")
+    |> Enum.reduce_while({:ok, 0, []}, fn block, {:ok, total, acc} ->
+      content = block["content"]
+      size = if is_binary(content), do: byte_size(content), else: 0
+
+      cond do
+        remaining.() == 0 -> {:halt, {:error, :deadline}}
+        size > @max_block_bytes -> {:halt, {:error, :budget}}
+        total + size > @max_text_bytes -> {:halt, {:error, :budget}}
+        true -> {:cont, {:ok, total + size, [block_text(block) | acc]}}
+      end
     end)
+    |> finish_text()
+  end
+
+  defp finish_text({:ok, _total, blocks}) do
+    {:ok, blocks |> Enum.reverse() |> Enum.reject(&(&1 == "")) |> Enum.join("\n\n")}
+  end
+
+  defp finish_text({:error, _} = error), do: error
+
+  defp block_text(block) do
+    [string(block["caption"]), plain(block["content"])]
     |> Enum.reject(&(&1 == ""))
     |> Enum.join("\n\n")
   end
@@ -68,27 +126,70 @@ defmodule KomkiConnectorRis.Top do
 
   def date(_), do: ""
 
-  @doc "String-Wert oder leer (Upstream-Felder koennen fehlen)."
+  @doc """
+  String-Wert oder leer (Upstream-Felder koennen fehlen); C0/C1-Steuerzeichen
+  entfallen und ueberlange Felder werden mit Marker gekappt (#487):
+  Upstream-Felder sind unbegrenzt und nicht neutralisiert.
+  """
   @spec string(term()) :: String.t()
-  def string(value) when is_binary(value), do: utf8(value)
+  def string(value) when is_binary(value), do: value |> utf8() |> strip_controls() |> cap()
   def string(_), do: ""
+
+  # Kappen erst nach dem Control-Strip, damit Steuerzeichen nicht als
+  # Feldlaenge zaehlen. Der Byte-Test ist der schnelle Pfad: bis 1 000
+  # Bytes ist die Zeichenzahl hoechstens 1 000.
+  defp cap(text) when byte_size(text) <= @max_field_chars, do: text
+  defp cap(text), do: if(String.length(text) <= @max_field_chars, do: text, else: cut(text))
+
+  defp cut(text), do: String.slice(text, 0, @max_field_chars) <> "…"
 
   # Inhalt kommt als Base64-kodiertes HTML (wie in Ratsinfo.Store); ist er
   # kein Base64 oder ergibt das Dekodat kein UTF-8, wird er als HTML genommen.
+  # Tags entfernt ein einziger linearer Lauf statt der Regex, die bei
+  # grossen Bloecken in PCRE entgleiste (#486).
   defp plain(""), do: ""
 
-  defp plain(content) do
-    html =
-      case Base.decode64(content) do
-        {:ok, decoded} -> if String.valid?(decoded), do: decoded, else: content
-        :error -> content
-      end
-
-    html
-    |> String.replace(~r/<[^>]*>/, " ")
+  defp plain(content) when is_binary(content) do
+    content
+    |> utf8()
+    |> decode64_or_raw()
+    |> strip_controls()
+    |> strip_tags()
     |> decode_entities()
     |> String.replace(~r/\s+/u, " ")
     |> String.trim()
+  end
+
+  defp plain(_), do: ""
+
+  defp decode64_or_raw(content) do
+    case Base.decode64(content) do
+      {:ok, decoded} -> if String.valid?(decoded), do: decoded, else: content
+      :error -> content
+    end
+  end
+
+  defp strip_controls(html), do: String.replace(html, @controls, "")
+
+  # Ein einziger linearer Lauf statt der Regex, die bei grossen Bloecken in
+  # PCRE entgleiste (#486): Ein '<' oeffnet ein Tag bis zum NAECHSTEN '>',
+  # auch ueber weitere '<' im Inneren — wie die alte Regex ~r/<[^>]*>/.
+  # Kommt nie ein '>', bleibt der Lauf wortgetreu stehen (auch wie bisher).
+  # Der Puffer ist Iodata: Anhängen kopiert nichts, der Lauf bleibt linear.
+  defp strip_tags(html) do
+    case String.split(html, "<") do
+      [text] -> text
+      [first | rest] -> first <> tags(rest, [])
+    end
+  end
+
+  defp tags([], offen), do: offen |> Enum.reverse() |> IO.iodata_to_binary()
+
+  defp tags([segment | rest], offen) do
+    case String.split(segment, ">", parts: 2) do
+      [_tag, text] -> " " <> text <> tags(rest, [])
+      [_] -> tags(rest, ["<" <> segment | offen])
+    end
   end
 
   # Benannte Entities der TOP-Texte. Der Vorrat ist absichtlich begrenzt und

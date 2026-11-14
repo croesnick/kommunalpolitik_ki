@@ -303,10 +303,17 @@ defmodule KomkiConnectorRis.RisTagesordnung do
   # entscheidet (restricted false), dann zaehlt der Text. Nicht-oeffentliche
   # Details bleiben ohne Fehler ausserhalb der Zaehlung — der Connector
   # wuerde sie ebenfalls nicht zeigen. Nicht lesbar dagegen ist ein
-  # Lesefehler: Der Bericht entlastet nur, was er auch gelesen hat.
+  # Lesefehler: Der Bericht entlastet nur, was er auch gelesen hat. Das
+  # gilt auch fuer Textbloecke ueber dem Byte-Budget (#486): Der Connector
+  # lehnt sie ab, der Bericht zaehlt sie als Lesefehler.
   defp top_text(top, cfg) do
     case Api.agendaitem(cfg, top["id"]) do
-      {:ok, %{"restricted" => false} = detail} -> {:ok, Top.text(detail)}
+      {:ok, %{"restricted" => false} = detail} ->
+        case Top.text(detail, fn -> Api.remaining(cfg) end) do
+          {:ok, text} -> {:ok, text}
+          {:error, _budget_oder_frist} -> :lesefehler
+        end
+
       {:ok, _detail} -> :skipped
       :not_found -> :lesefehler
       {:error, _code, _message} -> :lesefehler
