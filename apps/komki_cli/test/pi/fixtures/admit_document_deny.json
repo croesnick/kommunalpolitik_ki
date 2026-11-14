@@ -1,0 +1,7 @@
+{
+  "args": {
+    "document_id": "doc-vertraulich"
+  },
+  "text": "{\"decision\":\"deny\",\"decision_id\":\"pdr-5689cedf9e9e0d964c630d080fffa745\",\"registry_id\":\"reg-komki-arbeitsraum\",\"relaxation_authorities\":[],\"remedies\":[{\"binding\":\"doc-vertraulich@1\",\"code\":\"binding_condition_false\",\"condition\":\"purpose\",\"transitions\":[{\"facts\":[\"purpose\"],\"type\":\"fakt_nachreichen\"},{\"required_bindings\":[\"doc-vertraulich@1\"],\"required_recipients\":[\"nutzende-person\",\"pi-agent\"],\"type\":\"neuer_raum\"}]}]}",
+  "tool": "admit_document"
+}

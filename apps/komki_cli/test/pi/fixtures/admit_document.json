@@ -1,0 +1,7 @@
+{
+  "args": {
+    "document_id": "doc-oeffentlich"
+  },
+  "text": "{\"content\":\"# Offentliche Notiz\\nDiese Notiz ist allgemein zugaenglich.\\nSie ist fur jede offene Recherche im Arbeitsraum freigegeben.\\n\",\"decision\":\"permit\",\"decision_id\":\"pdr-53ece2c110e5c045db205bf51987773d\",\"document_id\":\"doc-oeffentlich\",\"labels\":[\"doc-oeffentlich@1\"],\"object_id\":\"doc-oeffentlich\",\"payload_hash\":\"sha256:ee0c51ee75ed43b181d943dc0ea8c93b18b6ba54a6db454ef61f9605fe24ba64\"}",
+  "tool": "admit_document"
+}

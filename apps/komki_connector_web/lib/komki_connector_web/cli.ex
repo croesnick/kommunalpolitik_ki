@@ -7,14 +7,16 @@ defmodule KomkiConnectorWeb.CLI do
   * `--socket`   Unix-Socket, den der Connector bindet (Pflicht).
   * `--proxy`    HTTP-CONNECT-Proxy `komki-egress` als `host:port`.
   * `--base-url` nur fuer Tests und Mock; Default `https://api.search.brave.com/`.
+                Klartext-HTTP nur fuer Loopback, sonst https (Ticket #496).
 
   Credentials kommen als eine JSON-Zeile ueber stdin
   (`{"BRAVE_API_KEY": "..."}`), nie ueber argv oder Umgebung. stdin wird
   vollstaendig gelesen, bevor der Socket bindet. Log geht nach stderr.
   """
 
-  alias KomkiConnector.Server
+  alias KomkiConnector.Launch
   alias KomkiConnectorWeb.Connector
+  alias Sidecar.Server
 
   @spec main([String.t()]) :: no_return()
   def main(argv) do
@@ -22,8 +24,9 @@ defmodule KomkiConnectorWeb.CLI do
 
     with {:ok, opts} <- parse(argv),
          {:ok, creds} <- Server.read_credentials(),
-         init_arg = Map.put(opts, :credentials, creds),
-         {:error, reason} <- Server.run(Connector, opts.socket, init_arg) do
+         # Das Token prueft der Server; der Connector sieht nur seinen API-Key.
+         init_arg = Map.put(opts, :credentials, Map.delete(creds, Launch.credential_key())),
+         {:error, reason} <- Launch.run(Connector, opts.socket, init_arg, creds) do
       fail("Start fehlgeschlagen: #{format_reason(reason)}")
     else
       {:error, message} when is_binary(message) -> fail(message)
@@ -74,7 +77,13 @@ defmodule KomkiConnectorWeb.CLI do
     case URI.new(url) do
       {:ok, %URI{scheme: scheme, host: host}}
       when scheme in ["http", "https"] and host not in [nil, ""] ->
-        {:ok, url}
+        # Klartext nur fuer den Loopback-Mock; sonst wuerde der Connector
+        # den Subscription-Token im Klartext senden (Ticket #496).
+        if KomkiConnector.Transport.secret_ok?(url) do
+          {:ok, url}
+        else
+          {:error, "--base-url erwartet https (http nur fuer Loopback-Mock)"}
+        end
 
       _ ->
         {:error, "--base-url erwartet eine http- oder https-URL"}

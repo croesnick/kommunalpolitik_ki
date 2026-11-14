@@ -1,24 +1,26 @@
 defmodule KomkiConnectorRis.CLI do
   @moduledoc """
-  Escript-Einstieg `komki-connector-ris` (CONTRACT.md §4):
+  Escript entry `komki-connector-ris` (CONTRACT.md §4):
 
-      komki-connector-ris --socket <pfad> [--base-url <url>] [--proxy 127.0.0.1:<port>]
+      komki-connector-ris --socket <path> [--base-url <url>] [--proxy 127.0.0.1:<port>]
 
-  Liest zuerst die Credentials-Zeile von stdin (RIS braucht keine, `{}`),
-  bindet dann den Socket und bedient Anfragen bis SIGTERM. Log auf
-  stderr, ohne Payload.
+  Reads the credentials line from stdin first (token, optionally
+  `RIS_ZUGANG`), signs in to the RIS with `RIS_ZUGANG`, then binds the
+  socket and serves requests until SIGTERM. Logs to stderr, without payload.
   """
 
-  alias KomkiConnector.Server
+  alias KomkiConnector.Launch
+  alias Sidecar.Server
 
   @spec main([String.t()]) :: no_return()
   def main(argv) do
     _ = :logger.update_handler_config(:default, :config, %{type: :standard_error})
 
     with {:ok, opts} <- parse(argv),
-         # RIS braucht keine Credentials; die Zeile wird gelesen und verworfen.
-         {:ok, _credentials} <- Server.read_credentials(),
-         {:error, reason} <- Server.run(KomkiConnectorRis, opts.socket, opts) do
+         {:ok, credentials} <- Server.read_credentials(),
+         init_arg =
+           Map.put(opts, :credentials, Map.delete(credentials, Launch.credential_key())),
+         {:error, reason} <- Launch.run(KomkiConnectorRis, opts.socket, init_arg, credentials) do
       fail(if is_binary(reason), do: reason, else: inspect(reason))
     else
       {:error, message} -> fail(message)

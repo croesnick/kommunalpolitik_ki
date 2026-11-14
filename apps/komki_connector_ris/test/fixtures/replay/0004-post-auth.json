@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/auth",
+    "query": null,
+    "headers": [["content-type", "application/json"], ["accept", "application/json"]]
+  },
+  "response": {
+    "status": 200,
+    "headers": [["content-type", "application/json"]],
+    "body": "{\"token\":\"beispiel-token\"}"
+  }
+}

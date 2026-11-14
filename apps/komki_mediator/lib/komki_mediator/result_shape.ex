@@ -8,7 +8,7 @@ defmodule KomkiMediator.ResultShape do
   den Modellkontext dann nicht.
   """
 
-  @ris_hit ~w(datum sitzung titel top_id url)
+  @ris_hit ~w(datum nummer sitzung titel top_id url)
   @web_hit ~w(snippet title url)
   @vault_hit ~w(labels note_id title)
 
@@ -17,12 +17,23 @@ defmodule KomkiMediator.ResultShape do
   def check("ris", "search", result), do: list_result(result, ["abrufdatum"], @ris_hit)
 
   def check("ris", "show", result),
-    do: object(result, ~w(abrufdatum datum sitzung text titel top_id url))
+    do: object(result, ~w(abrufdatum datum nummer sitzung text titel top_id url))
 
   def check("web", "search", result), do: list_result(result, ["abrufdatum"], @web_hit)
   def check("vault", "search", result), do: list_result(result, [], @vault_hit)
   def check("vault", "read", result), do: object(result, ~w(content labels note_id title))
   def check("vault", "write_test", result), do: object(result, ~w(labels note_id))
+
+  # Durchstich #409, belegt im Wegwerf-Lauf: Die Quittung des ratsprojekte-Connectors
+  # ist bewusst leer — kein Schlüssel, keine Kennung, keine Fortnummer,
+  # nichts aus dem Hub (Szene 11: enumeration). Nur der feste Status und
+  # die Labels, die der Vermittler selbst per context.assigned_label
+  # verglichen hat.
+  def check("ratsprojekte", "fakt_vorschlagen", result), do: object(result, ~w(labels status))
+
+  # #419: the stand file as text, nothing else. Its labels come from the
+  # manifest, the connector reports none.
+  def check("ratsprojekte", "stand_lesen", result), do: object(result, ["stand"])
   def check(id, op, _result), do: {:error, "keine Ergebnisform fuer #{id}.#{op}"}
 
   # Objekt mit Trefferliste unter "results" plus weiteren Feldern.

@@ -1,7 +1,7 @@
 # komki_policy
 
-Deterministischer Policy-Kern für Komki (Lieferung 2): Ableitung (`derive`)
-für die Regelzweige `admit` und `emit`, Remedy-Katalog (§ 2.8),
+Deterministischer Policy-Kern für Komki (Lieferung 2 bis 4): Ableitung (`derive`)
+für die Regelzweige `admit`, `emit`, `store` und `transfer`, Remedy-Katalog (§ 2.8),
 Aktionsfreigabe-Mechanik (`decide_with_release`, `advance`), unabhängiger
 Ableitungsprüfer (`verify`) sowie eine reine Escript-CLI (`komki-policy`) ohne
 Runtime-Abhängigkeiten.
@@ -52,11 +52,17 @@ mix escript.build   # erzeugt ./komki-policy
 ```
 
 `--release` und `--stand` sind nur paarweise gültig (einzeln → usage,
-Exit 2). `advance` nimmt das `release`-Objekt einer Freigabe-Permit-Decision
+Exit 2). Die Flag-Menge ist je Befehl geschlossen: ein bekanntes Flag am
+falschen Befehl (`decide --proposal`, `verify --stand`, `advance --release`)
+ist ebenso `usage` (Exit 2) und wird nicht still akzeptiert und ignoriert.
+`advance` nimmt das `release`-Objekt einer Freigabe-Permit-Decision
 (§ 4.6) als eigenständige Datei; Erfolg druckt den neuen Stand kanonisch
 (Exit 0), Ablehnung druckt `{"result": "refused", "code": …}` (Exit 1) —
 zwei konkurrierende Ausführungen desselben GOs können nicht beide
-committen (Compare-and-Swap über die Versionsnummer).
+committen (Compare-and-Swap: `stand_ref` adressiert den aktuellen Stand
+und `stand_version_after == version + 1`). Ein Vorschlag außerhalb der
+§ 4.6-Form (Nicht-Kebab-IDs, falsche `stand_ref`-Form, `call_hash` ohne
+Hex64-Form) ist ein Eingabefehler (Exit 2), kein `refused`.
 
 Alle Ausgaben (Ergebnisse wie Fehlerdetails) sind kanonisch
 (`KomkiPolicy.JSON.canonical/1`): byte-stabil, sortierte Schlüssel, genau
@@ -69,8 +75,8 @@ stdout.
 |---|---|
 | `0` | Erfolg. Auch `deny`/`indeterminate` (decide), `valid` (verify) und der erfolgreiche `advance` sind legitime Ergebnisse — der Exit-Code sagt nur „Befehl ausgeführt“, nicht „erlaubt“. |
 | `1` | `verify` hat den Beweis verworfen (`result: invalid`) **oder** `advance` hat den Standübergang abgelehnt (`refused`). |
-| `2` | Eingabefehler: Parse-/Schema-/Kohärenzverstoß, fehlender `output_content_digest` bei `emit` (`emit_digest_missing`), emit-Snapshot mit `quarantine`-Objekt, fehlende Datei, fehlende/unerwartete/unbekannte Argumente, unbekannter Befehl. Immer mit strukturiertem Fehlerdatensatz auf stdout. |
-| `3` | `unsupported`: nicht implementierter Regelzweig (inkl. `plan`), Freigabe-`kind: offenlegungsfreigabe` oder Nicht-`emit`-Operation — **niemals** ein `deny`. |
+| `2` | Eingabefehler: Parse-/Schema-/Kohärenzverstoß, fehlender `output_content_digest` bei `emit` (`emit_digest_missing`), emit-Snapshot mit `quarantine`-Objekt, fehlende Datei, fehlende/unerwartete/unbekannte Argumente, bekanntes Flag am falschen Befehl, `advance`-Vorschlag außerhalb der § 4.6-Form, unbekannter Befehl. Immer mit strukturiertem Fehlerdatensatz auf stdout. |
+| `3` | `unsupported`: nicht implementierter Regelzweig (inkl. `plan`), Freigabe-`kind: offenlegungsfreigabe` oder Freigabe für eine Operation außer `emit`/`store`/`transfer` — **niemals** ein `deny`. |
 | `4` | Unerwarteter interner Fehler. Der Crash-Handler erzeugt **niemals** eine Decision und fällt **nie** auf `permit` zurück (CONTRACT § 1). |
 
 ## Semantik (Lieferung 2)
@@ -84,6 +90,28 @@ der Kern liest `object.labels` für `emit` nicht. Der Call ist ausschließlich
 über den technischen Fakt `output_content_digest` identifizierbar (fehlend →
 Eingabefehler `emit_digest_missing`); der Kern liest die Bytes nie.
 
+### `store` erhält das Label beim Speichern (RFC R.5.6, § 4.7)
+
+Ein erzeugtes Objekt landet in einem dauerhaften Speicher. Entschieden wird
+unter seinem Ausgabelabel λ(y), nicht unter B_W; B_W ⊆ λ(y) ist eine eigene
+Prämisse (`label_preservation`). Hat keine Bindung eine `store`-Regel, ist
+jedes Speichern verboten und nur mit einer Aktionsfreigabe für genau diesen
+Call zulässig — sofern die Beobachterliste des Speichers belegt ist: Ist
+`environment_observers_complete` nicht bekannt-`true`, bietet der Katalog
+kein GO an und auch ein gültiges GO ergibt `deny` (Gegenprobe 11.15, #432 —
+ein GO kann nicht belegen, wer mitliest). Die Operation steckt im Call-Hash:
+ein GO für `emit` gilt nicht für `store`.
+
+### `transfer` übergibt unter dem Ausgabelabel (RFC R.5.6, § 4.8)
+
+Ein erzeugtes Objekt geht an ein Ziel außerhalb des Raums, etwa als Anfrage
+an einen externen Dienst. Die Form ist die von `store`: entschieden unter
+λ(y), B_W ⊆ λ(y) als `label_preservation`, Empfängertest gegen die
+Beobachter des Ziels, dazu die `transfer`-Regeln der Bindungen. `emit` prüft
+damit nur noch das Erzeugen im Raum. `verify` gleicht die Regel des Baums mit
+der Operation des Intents ab (`rule_mismatch`), weil `store`- und
+`transfer`-Bäume dieselbe Form haben.
+
 ### Der Remedy-Katalog berät ohne Autorität (§ 2.8)
 
 `deny`/`indeterminate`-Decisions tragen `remedies` in derselben Ordnung wie
@@ -93,14 +121,22 @@ Payload-Formen): `fakt_nachreichen` (facts), `registrierte_transformation`
 `aktionsfreigabe` (scope `call` mit call_hash / scope `object` für die
 Erstklassifikation). Ordnung normativ: fakt < transformation < neuer Raum <
 aktionsfreigabe. Bei `admit` erscheint kein call-GO (bewusste Lücke, § 9);
-bei `emit` zusätzlich das call-GO für die fünf weichen Blocker. Für
-`indeterminate` nie ein GO — ein GO kann keine Belege herstellen.
+bei `emit`, `store` und `transfer` zusätzlich das call-GO für die weichen Blocker,
+außer die Entscheidung enthält einen unüberbrückbaren Blocker (`workspace_invalid`,
+`label_not_preserved`, bei `store` auch `recipient_not_allowed`: kein GO ersetzt
+dort den Empfängertest, #417) oder entscheidet `store` bei unbelegter
+Beobachterliste (#432: kein Befund bietet dann ein call-GO an, ein GO kann
+nicht belegen, wer mitliest). Für `indeterminate` nie ein GO — ein GO kann keine
+Belege herstellen. Der Blocker `recipient_not_allowed` und sein Katalog-Eintrag
+nennen in `recipients_outside` die Empfänger außerhalb des Empfängerkreises.
 
 ### Aktionsfreigabe trennt Urteil und Vollzug (§ 4.6)
 
 Der Freigabe-Zweig ist ein eigener Regelzweig, nie ein stiller Fallback.
 `workspace_contract_valid` bleibt Prämisse (ein GO belebt keinen ungültigen
-Vertrag); die Release-Prüfungen laufen in fester Ordnung (call hash → Fenster
+Vertrag), bei `store` und `transfer` auch `label_preservation`, bei `store`
+zudem der Empfängertest und die Beobachterliste (`recipients_unproven`: ein
+gültiges GO ergibt `deny`, #432); die Release-Prüfungen laufen in fester Ordnung (call hash → Fenster
 → Nonce → scope → authority). Permit trägt `proof: null` und das
 `release`-Objekt als **deklarative** Wirkung; der Verbrauch committet über
 `advance` (commit-before-effect, B.8, PACE-Nonce). Eine Aktionsfreigabe ist
@@ -111,15 +147,16 @@ keine Herabstufungsbefugnis: `assigned_label` bleibt B_W.
 | Modul | Aufgabe |
 |---|---|
 | `KomkiPolicy.JSON` | Strenger JSON-Parser (keine doppelten Schlüssel, kein `NaN`) + kanonischer Encoder (§ 6) |
+| `KomkiPolicy.Validations` | Geteilte Schema-Bausteine der Datensatz-Validierer (Objekt-Form, geschlossene Feldmengen, Kebab-/Hex-/Ganzzahl-Prüfungen) |
 | `KomkiPolicy.Registry` | Registry-Compiler (`komki-registry/2`): typgeprüfte B.4-Ausdrücke + registrierte Transformationen (§ 2.1) |
 | `KomkiPolicy.Context` | Snapshot-Validierung, Intent-Kohärenz |
 | `KomkiPolicy.Evaluator` | Dreiwertige Ausdrucksauswertung (kein Default für fehlende Fakten) |
 | `KomkiPolicy.Calculus` | Reine Mengenfunktionen (R_Γ, ρ_Γ, Label-Subsets) |
-| `KomkiPolicy.Derive` | Ableitung `admit`/`emit` in fester Prämissenordnung (§ 4/§ 4.5), Freigabe-Zweig `decide_with_release/5` (§ 4.6), Beweisbäume |
+| `KomkiPolicy.Derive` | Ableitung `admit`/`emit`/`store`/`transfer` in fester Prämissenordnung (§ 4/§ 4.5/§ 4.7/§ 4.8), Freigabe-Zweig `decide_with_release/5` (§ 4.6), Beweisbäume |
 | `KomkiPolicy.Remedies` | Remedy-Katalog (§ 2.8): reine Ausgabe, beratend ohne Autorität |
 | `KomkiPolicy.Release` | Aktionsfreigabe-Validierung (`komki-release/1`) + verbindliche call-hash-Formel (§ 2.6) |
 | `KomkiPolicy.Stand` | Offenlegungsstand (`komki-stand/1`) + atomarer Standübergang `advance/2` (§ 2.7) |
-| `KomkiPolicy.Verify` | Unabhängiger Prüfer (§ 5): ruft `derive` nie auf, glaubt kein `permit`, regelabhängige Sollmengen admit/emit |
+| `KomkiPolicy.Verify` | Unabhängiger Prüfer (§ 5): ruft `derive` nie auf, glaubt kein `permit`, regelabhängige Sollmengen admit/emit/store/transfer |
 | `KomkiPolicy.CLI` | Escript-Eingang; Datei-I/O nur hier im Modul, Rest pur |
 
 Der Kern ist rein: keine Uhr, kein Zufall, kein Netz, kein Dateizugriff

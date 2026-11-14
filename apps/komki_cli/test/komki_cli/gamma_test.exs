@@ -13,8 +13,12 @@ defmodule KomkiCli.GammaTest do
   test "frische Instanz: Export ist byte-gleich der Vorlage", %{cfg: cfg} do
     assert :written = Gamma.sync(cfg)
     assert File.read!(Gamma.registry_path(cfg)) == JSON.canonical(Templates.registry())
-    # Die Vorlagen-Migration des Vermittlers sieht damit eine aktuelle Datei.
-    assert Templates.provision!(cfg.base_dir) in [:already_provisioned]
+    # Der erste Vermittler-Start legt room.json und die Dokumente an und
+    # laesst den Export unberuehrt; danach ist alles eingerichtet.
+    assert Templates.provision!(cfg.base_dir) == :ok
+    assert File.read!(Gamma.registry_path(cfg)) == JSON.canonical(Templates.registry())
+    assert File.exists?(Path.join([cfg.base_dir, "mediator", "room.json"]))
+    assert Templates.provision!(cfg.base_dir) == :already_provisioned
   end
 
   test "zweiter Lauf aendert nichts", %{cfg: cfg} do

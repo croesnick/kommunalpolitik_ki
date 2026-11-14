@@ -1,12 +1,14 @@
 defmodule KomkiCli.Channel do
   @moduledoc """
-  Kanal pi → Vermittler (Ticket #143, CONTRACT §2 und §8): Laufzeitverzeichnis,
+  Unix-Socket pi → Vermittler (Ticket #143, CONTRACT §2 und §8): Laufzeitverzeichnis,
   Token, Session-ID und das stdio-Relay.
 
       <base>/run/                 0700, angelegt von `komki up`
       <base>/run/mediator.sock    Vermittler (Bandit, HTTP), Rechte 0600
       <base>/run/mediator.token   32 Byte Zufall als Hex, 0600, neu bei jedem
-                                  Vermittler-Start durch `komki up`
+                                  Kaltstart durch `komki up`; ein geplanter
+                                  Neustart (neues Γ, neue Raumdokumente)
+                                  behaelt es (Ticket #216)
 
   Das Token steht nie in argv: der Vermittler liest es per `--token-file`,
   pi bekommt es ueber die Umgebung (`KOMKI_MEDIATOR_TOKEN`) und reicht es
@@ -47,10 +49,22 @@ defmodule KomkiCli.Channel do
 
     if byte_size(path) <= @max_socket_bytes,
       do: :ok,
-      else:
-        {:error,
-         "Socket-Pfad zu lang (" <>
-           to_string(byte_size(path)) <> " > 103 Byte): " <> path <> " — kürzere Basis wählen"}
+      else: {:error, socket_too_long(path)}
+  end
+
+  @doc """
+  Meldung für einen zu langen Unix-Socket-Pfad (Ticket #246): nennt Länge,
+  Grenze und die Abhilfe. Die Basis (`KOMKI_HOME`) bestimmt die Länge.
+  """
+  @spec socket_too_long(String.t()) :: String.t()
+  def socket_too_long(path) do
+    "Socket-Pfad zu lang: " <>
+      Integer.to_string(byte_size(path)) <>
+      " Byte, macOS erlaubt höchstens " <>
+      Integer.to_string(@max_socket_bytes) <>
+      " (" <>
+      path <>
+      "). Wähle eine kürzere Basis, etwa KOMKI_HOME=/private/tmp/komki-test."
   end
 
   @doc "Legt `<base>/run` (0700) an und schreibt ein neues Token (0600)."

@@ -9,13 +9,22 @@ defmodule KomkiConnector.Manifest do
 
   Die Manifeste sind Funktionen statt Modulattribute, weil kompilierte
   Regexe unter OTP 28 nicht in Attributen gespeichert werden duerfen.
+
+  Eine Operation kann eine eigene Umgebung tragen (`environment`, #419);
+  sonst gilt die des Connectors (`environment/2`). Eine Operation der Art
+  `:admit_only` liest genau ein festes Objekt (`object`), dessen Labels
+  die `import_labels` des Manifests sind; der Vermittler entscheidet sie
+  nur ueber `admit` (Connector-Vertrag §6.4).
   """
 
   @type op_spec :: %{
-          tool: String.t(),
-          kind: :read | :write,
-          params: KomkiConnector.Params.schema(),
-          description: String.t()
+          required(:tool) => String.t(),
+          required(:kind) => :read | :write | :admit_only,
+          required(:params) => Sidecar.Params.schema(),
+          required(:description) => String.t(),
+          optional(:environment) => String.t(),
+          optional(:object) => String.t(),
+          optional(:ausgabeart) => String.t()
         }
 
   @type t :: %{
@@ -30,7 +39,7 @@ defmodule KomkiConnector.Manifest do
           import_labels: [String.t()]
         }
 
-  @ids ["documents", "ris", "vault", "web"]
+  @ids ["documents", "ratsprojekte", "ris", "vault", "web"]
 
   @doc "Alle Connector-IDs, sortiert."
   @spec ids() :: [String.t()]
@@ -39,6 +48,17 @@ defmodule KomkiConnector.Manifest do
   @doc "Alle Manifeste, sortiert nach ID."
   @spec all() :: [t()]
   def all, do: Enum.map(@ids, &fetch!/1)
+
+  @doc """
+  Das Manifest als `Sidecar.Server.manifest()`: unveraendert, plus
+  `version` = Fassung. Die Library spricht englisch (`version`, auch im
+  `ping`), komki bleibt bei der Fassung; uebersetzt wird nur hier.
+  """
+  @spec sidecar!(String.t()) :: Sidecar.Server.manifest()
+  def sidecar!(id) do
+    manifest = fetch!(id)
+    Map.put(manifest, :version, manifest.fassung)
+  end
 
   @doc "Manifest zu einer ID; unbekannte ID ist ein Programmierfehler."
   @spec fetch!(String.t()) :: t()
@@ -56,7 +76,8 @@ defmodule KomkiConnector.Manifest do
           tool: "admit_document",
           kind: :read,
           description:
-            "Ein Raumdokument anhand seiner document_id zum Agentenkontext zulassen (z. B. \"doc-oeffentlich\").",
+            "Ein Raumdokument anhand seiner document_id zum Agentenkontext zulassen (z. B. \"doc-oeffentlich\"). " <>
+              "PDFs kommen als Text je Seite mit Seitenanker [Seite N], dazu die Highlights der nutzenden Person mit Kommentar und markiertem Text.",
           params: %{
             "document_id" => %{type: :string, max: 64, required: true, pattern: ~r/^[a-z0-9-]+$/}
           }
@@ -73,14 +94,16 @@ defmodule KomkiConnector.Manifest do
   def fetch!("ris") do
     %{
       id: "ris",
-      fassung: "komki-ris/1",
+      fassung: "komki-ris/2",
       binary: "komki-connector-ris",
       ops: %{
         "search" => %{
           tool: "ris_search",
           kind: :read,
           description:
-            "Volltextsuche in oeffentlichen Tagesordnungspunkten des Ratsinformationssystems (RIS).",
+            "Volltextsuche in oeffentlichen Tagesordnungspunkten des Ratsinformationssystems (RIS). " <>
+              "Zitiere einen Treffer mit Sitzung, Datum und TOP-Nummer (Feld nummer); " <>
+              "top_id ist nur die Kennung fuer ris_show.",
           params: %{
             "text" => %{type: :string, max: 200, required: true},
             "limit" => %{type: :integer, min: 1, max: 20, required: false, default: 10}
@@ -96,11 +119,85 @@ defmodule KomkiConnector.Manifest do
           }
         }
       },
-      egress_hosts: ["risapi1.komuna.net:443"],
+      egress_hosts: ["risapi3.komuna.net:443"],
       fs: [],
-      credentials: %{},
+      # Sign-in (#148): JSON {"login", "password"}, optional. Without it the
+      # connector stays with the guest endpoints (mostly without texts).
+      credentials: %{"RIS_ZUGANG" => "ris-zugang"},
       environment: "ris-abruf@1",
       import_labels: ["ris-oeffentlich@1"]
+    }
+  end
+
+  # Weg "Fakt vorschlagen" (Durchstich #409, Bau-Ticket #277): Der
+  # ratsprojekte-Connector traegt Szene 11 — EIN Ereignis mit Teilen,
+  # ein GO in komki, die Entscheidung im Hub. Schreibend, Umgebung ist
+  # der Bestand des Hubs (`ratsprojekte-bestand@1`, Γ-GO vom 2026-11-10).
+  # Die Ausgabeart `ratsprojekte-essenz` (Arbeitstitel, Szene 13, #423)
+  # benennt das Ziel der Lockerungsbefugnisse: Der Vermittler traegt sie
+  # in die GO-Anfrage, die Engine rechnet sie gegen die Zielumgebung nach
+  # (§ 4.9). Der Hub-Socket-Pfad kommt aus der config
+  # (`ratsprojekte_socket`), das Hub-Token aus dem Schluesselbund-Service
+  # unten (der Hub kennt nur den Hash, #415).
+  #
+  # Weg "Stand lesen" (#419, Szene 12): Der Connector liest die Stand-Datei
+  # (`{ratsprojekte_stand}` aus der config), der Hub sieht keine Anfrage.
+  # Die Anfrage ist eine Konstante, ihre Umgebung hat nur nutzende Person
+  # und Agent als Beobachter: Der Vermittler entscheidet nur die Aufnahme
+  # gegen B_W, ohne emit und transfer (Connector-Vertrag §6.4). Das Label
+  # `ratsprojekte@1` steht hier und nirgends sonst.
+  def fetch!("ratsprojekte") do
+    %{
+      id: "ratsprojekte",
+      fassung: "komki-ratsprojekte/2",
+      binary: "komki-connector-ratsprojekte",
+      ops: %{
+        "stand_lesen" => %{
+          tool: "rp_stand_lesen",
+          kind: :admit_only,
+          object: "ratsprojekte-stand",
+          environment: "lokaler-arbeitsraum@1",
+          description:
+            "Den zuletzt ausgegebenen Stand des ratsprojekte-Hubs lesen: Projekte und Fakten, wie die Redaktion " <>
+              "sie freigegeben hat. Nur in einem Raum, der dafuer angelegt ist (Projektraum); der Hub erfaehrt " <>
+              "vom Lesen nichts.",
+          params: %{}
+        },
+        "fakt_vorschlagen" => %{
+          tool: "rp_fakt_vorschlagen",
+          kind: :write,
+          ausgabeart: "ratsprojekte-essenz",
+          description:
+            "Dem ratsprojekte-Hub einen Vorschlag machen: EIN Ereignis mit Teilen, ein GO deckt alle Teile, " <>
+              "die Redaktion waehlt im Hub ab, was zum Stand gehoert. Jeder Teil braucht eine Aussage und " <>
+              "einen Verweis auf eine Antwort aus diesem Raum; der Vorschlag erscheint dort als nicht verifiziert. " <>
+              "Die Projektangabe ist nur ein Hinweis. Aus oeffentlicher Recherche entscheidet die nutzende Person " <>
+              "per GO fuer genau diesen Aufruf; aus einem vertraulichen Raum (etwa dem Fraktionsraum) wird der Text " <>
+              "dem Vorstand offengelegt — dann entscheidet ein eigenes Freigabefenster, und ein Teil, den sie abwaehlt, " <>
+              "verlaesst den Raum nicht.",
+          params: %{
+            "titel" => %{type: :string, max: 120, required: true},
+            "teile" => %{
+              type: :list,
+              min_items: 1,
+              max_items: 8,
+              items: %{
+                "aussage" => %{type: :string, max: 1000, required: true},
+                "quelle" => %{type: :string, max: 400, required: true},
+                "fundstelle" => %{type: :string, max: 200, required: false}
+              }
+            },
+            "projekt_hinweis" => %{type: :string, max: 120, required: false}
+          }
+        }
+      },
+      egress_hosts: [],
+      fs: [{"{ratsprojekte_stand}", :read}],
+      credentials: %{"KOMKI_HUB_TOKEN" => "ratsprojekte-hub-token"},
+      environment: "ratsprojekte-bestand@1",
+      # Label der Stand-Datei (stand_lesen). Der Schreibweg nimmt seine
+      # Labels aus assigned_label, nicht von hier.
+      import_labels: ["ratsprojekte@1"]
     }
   end
 
@@ -186,6 +283,11 @@ defmodule KomkiConnector.Manifest do
       end)
     end)
   end
+
+  @doc "Umgebung einer Operation: ihre eigene, sonst die des Connectors."
+  @spec environment(t(), String.t()) :: String.t()
+  def environment(manifest, op),
+    do: Map.get(Map.fetch!(manifest.ops, op), :environment, manifest.environment)
 
   @doc "Alle MCP-Tool-Namen aller Connectoren, sortiert."
   @spec tools() :: [String.t()]

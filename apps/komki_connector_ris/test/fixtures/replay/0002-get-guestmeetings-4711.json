@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/guestmeetings/4711",
+    "query": null,
+    "headers": [["accept", "application/json"]]
+  },
+  "response": {
+    "status": 200,
+    "headers": [["content-type", "application/json"]],
+    "body": "{\"id\":4711,\"name\":\"Beispielsitzung\",\"meetingdate\":\"2026-10-06T18:00:00\",\"committeename\":\"Beispielgremium\",\"parts\":[{\"protectedpart\":false,\"agendaitems\":[{\"id\":\"4711-1\",\"numbering\":\"1\",\"name\":\"Beispieltop oeffentlich\",\"restricted\":false}]},{\"protectedpart\":true,\"agendaitems\":[{\"id\":\"4711-2\",\"numbering\":\"2\",\"name\":\"Beispieltop geschuetzt\",\"restricted\":true}]}]}"
+  }
+}

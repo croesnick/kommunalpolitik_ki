@@ -1,8 +1,8 @@
 defmodule KomkiMediator.Tools.VaultWriteTest do
   @moduledoc """
-  MCP-Tool `vault_write_test`: Testnotiz im Vault anlegen (Connector vault, Operation write_test).
-  Schema und Beschreibung aus dem Manifest, Ablauf emit → Vollzug → admit
-  (`KomkiMediator.ConnectorGate`).
+  MCP tool `vault_write_test`: create a test note in the vault (connector vault, operation write_test).
+  Schema and description come from the manifest; the call runs as
+  emit → store → execution → admit (`KomkiMediator.ConnectorGate`).
   """
 
   use KomkiMediator.Tools.Connector, tool: "vault_write_test"

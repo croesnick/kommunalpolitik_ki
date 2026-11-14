@@ -22,6 +22,8 @@ const paint: Paint = {
 	bold: (text) => `<b>${text}</>`,
 };
 const strip = (s: string) => s.replace(/<[^>]*>/g, "");
+// Umbruch und Spalteneinzug eingeebnet: für Sätze, die über Zeilen laufen.
+const flat = (s: string) => strip(s).replace(/\s+/g, " ");
 const measure = (s: string) => [...strip(s)].length;
 
 // Einfacher Wortumbruch auf sichtbarer Breite (im Betrieb: pi-tui).
@@ -66,9 +68,11 @@ test("Treffer im RIS: Datum deutsch, Titel, Quelle und Abruf sichtbar", () => {
 	assert.match(out, /<success><b>✓ zugelassen<\/><\/>/);
 	assert.match(strip(out), /öffentlich · 3 Treffer/);
 	assert.match(strip(out), /30\.06\.2026 +Ergebnisse des Arbeitskreises/);
+	// Die TOP-Nummer aus der Tagesordnung steht bei der Sitzung (nicht die interne top_id).
+	assert.match(strip(out), /1\. Sitzung des Mobilitätsausschusses Buchloe · TOP 4/);
 	assert.doesNotMatch(out, /https:/);
 	// 18:17Z ist 20:17 in Deutschland (MESZ), unabhängig von der TZ des Prozesses.
-	assert.match(strip(out), /Quelle: RIS · abgerufen 24\.10\.2026, 20:17 · Beleg pdr-9dd7c70b…/);
+	assert.match(strip(out), /Quelle: RIS · abgerufen 24\.10\.2026, 20:17 · Beleg pdr-adba23ef…/);
 });
 
 test("Ablehnung: rot, mit Grund, Ausweg und Beleg; Gate benannt", () => {
@@ -82,7 +86,45 @@ test("Ablehnung: rot, mit Grund, Ausweg und Beleg; Gate benannt", () => {
 	const web = strip(render("web_search_deny"));
 	assert.match(web, /Die Anfrage hat komki nicht verlassen\./);
 	assert.match(web, /brave-search/);
-	assert.match(web, /Freigabe \(GO\) für genau diesen Aufruf/);
+	assert.match(flat(render("web_search_deny")), /mit deinem GO für genau diesen Aufruf, im komki-Fenster/);
+});
+
+test("GO: was aus der Freigabe wurde, ohne dass pi selbst fragt", () => {
+	const nein = flat(render("web_search_go_abgelehnt"));
+	assert.match(nein, /✗ abgelehnt Die Anfrage hat komki nicht verlassen\./);
+	assert.match(nein, /GO Du hast die Freigabe abgelehnt\. Es bleibt beim Nein\./);
+
+	const still = flat(render("web_search_go_keine_antwort"));
+	assert.match(still, /GO Auf die Freigabe-Frage kam keine Antwort\. Es bleibt beim Nein\./);
+
+	// Angeboten, aber niemand war angedockt: der Vermittler hat nicht gefragt.
+	const ungefragt = flat(render("web_search_deny"));
+	assert.match(ungefragt, /GO Nicht gefragt, weil kein komki-Fenster bereit war\. Freigeben geht nur dort oder mit komki go\./);
+
+	// Ohne Call-GO im Katalog (Gate 2) kein GO-Satz.
+	assert.doesNotMatch(strip(render("vault_read_deny")), /^GO /m);
+});
+
+// Ticket #417: when storing, no GO replaces the recipient test. The person
+// reads who may not read along, in the same sentence in every room.
+test("Speichern außerhalb des Empfängerkreises: wer nicht mitlesen darf, kein GO-Angebot", () => {
+	const out = flat(render("vault_write_test_empfaenger"));
+	assert.match(out, /✗ abgelehnt Die Anfrage hat komki nicht verlassen\./);
+	assert.match(out, /Grund Inhalte dieses Arbeitsraums dürfen nicht an sync-dienst gehen\. Ein GO ändert daran nichts\./);
+	assert.doesNotMatch(out, /mit deinem GO|Nicht gefragt/);
+	// The reduced answer carries no catalog and no relaxation authorities.
+	assert.doesNotMatch(out, /Möglich|Lockern kann/);
+
+	// Where a GO is offered (transfer), the sentence stays as before.
+	const web = flat(render("web_search_deny"));
+	assert.match(web, /Grund Empfänger dieser Anfrage \(brave-search, nutzende-person, pi-agent\) sind in diesem Arbeitsraum nicht alle erlaubt\./);
+	assert.doesNotMatch(web, /Ein GO ändert daran nichts/);
+});
+
+test("nichts in der Anzeige sieht wie eine Frage aus, die man in pi beantwortet", () => {
+	for (const out of names.flatMap((n) => [strip(render(n)), strip(render(n, true))])) {
+		assert.doesNotMatch(out, /\[j\/N\]|\(j\/n\)|\?\s*$|GO für genau diesen Aufruf\?/m);
+	}
 });
 
 test("Zurückhaltung und Fehler sind von Zulassung unterscheidbar", () => {
@@ -98,11 +140,11 @@ test("Zurückhaltung und Fehler sind von Zulassung unterscheidbar", () => {
 test("aufgeklappt: alle Belege, Hash und Prüfschritt", () => {
 	const out = strip(render("ris_search", true));
 	assert.match(out, /Prüfschritt +Aufnahme der Antwort \(Gate 2\)/);
-	assert.match(out, /Beleg +pdr-9dd7c70ba7cd984ef64a570ecd8f24d7/);
-	assert.match(out, /Beleg der Anfrage +pdr-fd9a1894a4e0fbf070dead6287d8d877/);
-	assert.match(out, /Inhalts-Hash +sha256:cf57e3b8/);
+	assert.match(out, /Beleg +pdr-adba23efd9b227456c09452e4d561c9e/);
+	assert.match(out, /Beleg der Anfrage +pdr-40d0fb8b2296abb0ac13065efef5d80a/);
+	assert.match(out, /Inhalts-Hash +sha256:726c7b1f/);
 	assert.match(out, /komki journal verify/);
-	assert.match(strip(render("web_search_deny", true)), /GO bindet an +509f2621/);
+	assert.match(strip(render("web_search_deny", true)), /GO bindet an +e57e85f4/);
 });
 
 test("Notiz: zugeklappt gekürzt, aufgeklappt vollständig, Überschrift nicht doppelt", () => {
@@ -213,3 +255,33 @@ function hardWrap(text: string, width: number): string[] {
 		return parts;
 	});
 }
+
+test("Raumdokument: Aufrufzeile, Überschrift als Titel, Inhalt, Quelle Arbeitsraum", () => {
+	assert.equal(
+		strip(callLine("mcp__komki__admit_document", { document_id: "doc-oeffentlich" }, paint)!),
+		"Raumdokument lesen  doc-oeffentlich",
+	);
+	const out = strip(render("admit_document"));
+	assert.match(out, /✓ zugelassen · öffentlich/);
+	assert.match(out, /^Offentliche Notiz$/m);
+	assert.doesNotMatch(out, /# Offentliche Notiz/);
+	assert.match(out, /│ Diese Notiz ist allgemein zugaenglich\./);
+	assert.match(out, /Quelle: Arbeitsraum · Beleg pdr-53ece2c1…/);
+
+	const deny = strip(render("admit_document_deny"));
+	assert.match(deny, /✗ abgelehnt +Der Inhalt hat das Modell nicht erreicht\./);
+	assert.match(deny, /Eine Bedingung der Bindung ist nicht erfüllt\./);
+	assert.match(strip(render("admit_document_unknown")), /✗ Prüffehler[\s\S]*unbekanntes Objekt: "doc-phantom"/);
+});
+
+test("Raumdokumente auflisten: Kennung und Label, keine Inhalte", () => {
+	assert.equal(strip(callLine("mcp__komki__list_documents", {}, paint)!), "Raumdokumente auflisten");
+	const out = strip(render("list_documents"));
+	assert.match(out, /✓ zugelassen · 1 Dokument/);
+	assert.match(out, /• doc-oeffentlich +öffentlich/);
+	assert.match(out, /Quelle: Arbeitsraum · Beleg pdr-ac43c5ab…/);
+
+	const leer = strip(render("list_documents_leer"));
+	assert.match(leer, /✓ zugelassen · keine Dokumente/);
+	assert.match(leer, /In diesem Arbeitsraum liegt kein Dokument, das pi lesen kann\./);
+});

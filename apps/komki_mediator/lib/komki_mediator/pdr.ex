@@ -1,28 +1,59 @@
 defmodule KomkiMediator.PDR do
   @moduledoc """
-  PDR-Auditdatensaetze (Schema `"komki-pdr/3"`): eine gemeinsame Form fuer
-  `KomkiMediator.Gate` (ping, admit_document) und
-  `KomkiMediator.ConnectorGate` (Connector-Tools).
+  PDR audit records (schema `"komki-pdr/5"`): one shared shape for
+  `KomkiMediator.Gate` (ping, admit_document) and
+  `KomkiMediator.ConnectorGate` (connector tools).
 
-  Jeder Datensatz traegt dieselben Schluessel; nicht belegte Felder sind
-  `null`. Neu gegenueber `komki-pdr/2`:
+  Every record carries the same keys; unused fields are `null`.
 
-    * `rule` — der entschiedene Regelzweig (`"admit"` oder `"emit"`).
-    * `call_id` — bei Connector-Aufrufen die `decision_id` des emit-PDR;
-      emit- und admit-PDR eines Aufrufs tragen dieselbe `call_id`
-      (Connector-Vertrag §6).
-    * `session_id` — Zuordnung zur pi-Sitzung (aus der Umgebung, darf
-      `null` sein; der Kanal fuellt sie, Connector-Vertrag §8).
-    * `assigned_label` — bei emit-Permits die zugeordnete Ausgabe-Menge
-      λ(y) = B_W.
+  New in `komki-pdr/5` (ticket #423): a `store` record released by an
+  Offenlegungsfreigabe carries `offenlegung` — `{ausgabeart, ziellabel,
+  empfaenger}` — und haelt so fest, gegenueber wem offengelegt wurde
+  (Szene 13: die Offenlegung gegenueber dem Vorstand, alle Empfaenger des
+  Ziels). Auf allen anderen Records bleibt das Feld `null`.
 
-  `seq` und `prev_hash` setzt allein der Journal-Writer (Ticket #139).
+  New in `komki-pdr/4` (ticket #298): every engine decision of a connector
+  call is journaled when it is made (`outcome: permitted` for a permit).
+  The record before effect (rule `emit`, `outcome: emitted`) is no
+  decision any more: `decision` is `null`, and the new field
+  `authorized_by` lists the decision_ids of the emit and the transfer or
+  store decision it relies on (each `permitted` or `released`). In
+  `komki-pdr/3` that record was the emit decision itself; `authorized_by`
+  is `null` on all other records. To find decisions, select records with
+  a non-null `decision`; to find records before effect, select `outcome`
+  `emitted` (connector path) or `executing` (`KomkiMediator.Gate`, where
+  the permit and the record before effect are one record, so `decision`
+  is `permit` and `authorized_by` stays `null`).
+
+  New in `komki-pdr/3` compared to `komki-pdr/2`:
+
+    * `rule` — the rule branch the record belongs to (`"admit"`, `"emit"`,
+      `"transfer"` or `"store"`); for a record before effect it is the
+      branch whose output leaves the mediator.
+    * `call_id` — for connector calls, the id of the call, assigned after
+      the pre-check. Every PDR of the call carries it: each engine decision
+      (journaled when it is made), denials, GO records and the record
+      before effect (connector contract §6); a pre-check rejection has
+      none. If the call reaches execution, the record before effect (rule
+      `emit`, `outcome: emitted`) has it as its `decision_id`.
+    * `session_id` — the pi session (from the environment, may be `null`;
+      the socket access fills it, connector contract §8).
+    * `assigned_label` — for emit permits and the record before effect,
+      the assigned output set λ(y) = B_W.
+
+  Besides the decisions, the mediator writes a record with
+  `tool: "workspace"`, `decision: "loaded"` on every start: `checked_label`
+  is the B_W it decides with from now on, `payload_hash` the SHA-256 of
+  `room.json`. A room switch (ticket #268) shows up as two such records
+  with different B_W.
+
+  Only the journal writer sets `seq` and `prev_hash` (ticket #139).
   """
 
   alias KomkiMediator.{Fassung, Hash, Journal}
   alias KomkiPolicy.JSON
 
-  @schema "komki-pdr/3"
+  @schema "komki-pdr/5"
 
   @doc "Schema-Kennung der Datensaetze."
   @spec schema() :: String.t()
@@ -58,7 +89,9 @@ defmodule KomkiMediator.PDR do
       "snapshot_id" => nil,
       "checked_label" => nil,
       "assigned_label" => nil,
+      "authorized_by" => nil,
       "remedies" => nil,
+      "offenlegung" => nil,
       "abrufdatum" => DateTime.to_iso8601(DateTime.utc_now()),
       "fassung_id" => Fassung.fassung_id()
     }

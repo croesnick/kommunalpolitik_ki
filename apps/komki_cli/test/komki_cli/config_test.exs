@@ -55,6 +55,19 @@ defmodule KomkiCli.ConfigTest do
       assert cfg.profile_path == Path.join([base, "profile", "komki.sb"])
     end
 
+    test "Drafter-Pin (Ticket #318): neben dem Modell, Staging ohne MTP/-Pfad" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-drafter"))
+
+      assert cfg.drafter_path ==
+               Path.join([cfg.base_dir, "models", "mtp-gemma-4-26B-A4B-it-Q8_0.gguf"])
+
+      assert cfg.drafter_sha256 == Config.expected_drafter_sha256()
+      assert cfg.drafter_sha256 =~ ~r/^[0-9a-f]{64}$/
+
+      assert Config.staging_drafter_path() =~
+               ~r/models-staging\/mtp-gemma-4-26B-A4B-it-Q8_0\.gguf$/
+    end
+
     test "Werkzeug-Entdeckung: aufgeloeste Pfade oder nil, nie asdf-Shims" do
       cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg"))
 
@@ -135,12 +148,18 @@ defmodule KomkiCli.ConfigTest do
     test "Defaults: Egress-Ports, echte RIS-URL, Test-Vault unter der Basis" do
       cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-conn"))
       assert cfg.egress_ports == %{"ris" => 49_531, "web" => 49_532}
-      assert cfg.ris_base_url == "https://risapi1.komuna.net/web/"
+      assert cfg.ris_base_url == "https://risapi3.komuna.net/web/"
       assert cfg.ris_mock_port == nil
       assert cfg.vault_dir == Path.join(cfg.base_dir, "vault")
-      assert Config.ris_url(cfg) == "https://risapi1.komuna.net/web/"
+      assert Config.ris_url(cfg) == "https://risapi3.komuna.net/web/"
       refute Config.ris_mock?(cfg)
-      assert Map.keys(cfg.connector_bins) == ["documents", "ris", "vault", "web"]
+      assert Map.keys(cfg.connector_bins) == ["documents", "ratsprojekte", "ris", "vault", "web"]
+    end
+
+    test "Ticket #203: --port verlegt auch die Egress-Ports" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-port"), port: 49_800)
+      assert cfg.egress_ports == %{"ris" => 49_807, "web" => 49_808}
+      assert Config.egress_ports_for(49_524) == Config.default_egress_ports()
     end
 
     test "Overrides: Mock-Port schaltet die URL um, leerer vault_dir schaltet ab" do
@@ -155,9 +174,23 @@ defmodule KomkiCli.ConfigTest do
       assert cfg.vault_dir == nil
     end
 
+    test "Web-Mock-Port: Basis-URL auf den Mock, ohne Port keine" do
+      base = TestSupport.tmp_area!("komki-cfg-web")
+
+      refute Config.web_mock?(Config.defaults(base))
+      assert Config.web_mock_url(Config.defaults(base)) == nil
+
+      cfg = Config.defaults(base, web_mock_port: 4020)
+      assert Config.web_mock?(cfg)
+      assert Config.web_mock_url(cfg) == "http://127.0.0.1:4020/"
+    end
+
     test "Roundtrip mit allen neuen Feldern" do
       cfg = %{
-        Config.defaults(TestSupport.tmp_area!("komki-cfg-conn"), ris_mock_port: 4011)
+        Config.defaults(TestSupport.tmp_area!("komki-cfg-conn"),
+          ris_mock_port: 4011,
+          web_mock_port: 4021
+        )
         | escript_bin: "/opt/erl/bin/escript",
           egress_bin: "/opt/bin/komki-egress",
           connector_bins: %{"ris" => "/opt/bin/r", "vault" => nil, "web" => "/opt/bin/w"},
@@ -176,14 +209,51 @@ defmodule KomkiCli.ConfigTest do
         |> Config.encode()
         |> JSON.decode!()
         |> Map.drop(
-          ~w(escript_bin egress_bin connector_bins egress_ports ris_base_url ris_mock_port vault_dir)
+          ~w(escript_bin egress_bin connector_bins egress_ports ris_base_url ris_mock_port web_mock_port vault_dir)
         )
 
       assert {:ok, loaded} = Config.from_map(old)
       assert loaded.egress_ports == Config.default_egress_ports()
       assert loaded.ris_base_url == Config.default_ris_base_url()
       assert loaded.vault_dir == nil
+      assert loaded.web_mock_port == nil
       assert loaded.connector_bins == %{}
+    end
+
+    # Ticket #515: the RIS moved; the old default may not stay in place, or
+    # the egress (manifest allows only the new host) rejects every request.
+    test "alte RIS-Adresse wird beim Laden zur aktuellen, eine eigene bleibt" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-ris"))
+      map = cfg |> Config.encode() |> JSON.decode!()
+
+      assert {:ok, moved} =
+               Config.from_map(%{map | "ris_base_url" => "https://risapi1.komuna.net/web/"})
+
+      assert moved.ris_base_url == "https://risapi3.komuna.net/web/"
+
+      assert {:ok, own} = Config.from_map(%{map | "ris_base_url" => "https://ris.example/web/"})
+      assert own.ris_base_url == "https://ris.example/web/"
+    end
+
+    # Ticket #318 (Config-Migration): aeltere Instanzen kennen drafter_path/
+    # drafter_sha256 noch nicht. Laden traegt die Pins nach (Pfad aus base_dir,
+    # SHA aus dem Code-Pin) — doctor meldet dann nur noch die fehlende Datei,
+    # und die naechste Speicherung persistiert die Felder.
+    test "aeltere config.json ohne Drafter-Felder: Laden-Defaults (Ticket #318)" do
+      cfg = Config.defaults(TestSupport.tmp_area!("komki-cfg-old-drafter"))
+
+      old =
+        cfg
+        |> Config.encode()
+        |> JSON.decode!()
+        |> Map.drop(~w(drafter_path drafter_sha256))
+
+      assert {:ok, loaded} = Config.from_map(old)
+      assert loaded.drafter_path == cfg.drafter_path
+      assert loaded.drafter_sha256 == Config.expected_drafter_sha256()
+
+      Config.save(loaded)
+      assert {:ok, ^loaded} = Config.load(Config.config_path(loaded.base_dir))
     end
 
     test "ungültiger Egress-Port ist ein Fehler" do

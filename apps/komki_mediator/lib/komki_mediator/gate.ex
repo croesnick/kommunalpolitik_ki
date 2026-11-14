@@ -18,8 +18,10 @@ defmodule KomkiMediator.Gate do
     entschiedenen Objekt passen. Faellt eine Pruefung aus, wird der
     Inhalt zurueckgehalten (`"admitted" => "redacted"`); der
     Modellkontext sieht dann nie den unbelegten Payload.
-  * Jeder Ablauf haengt EINEN PDR-Auditdatensatz an (synchron via Journal)
-    und bettet die `decision_id` in die Antwort ein - zitierfaehig.
+  * Jeder Ablauf haengt einen PDR-Auditdatensatz an (synchron via Journal)
+    und bettet die `decision_id` in die Antwort ein - zitierfaehig. Ein
+    Permit schreibt vorher einen zweiten: `outcome: executing`, bevor der
+    Executor laeuft (Audit vor Wirkung).
 
   Der `payload_hash` bindet die Bytes, die die MCP-Schicht wirklich
   zurueckgibt (den Modellkontext), nicht den ungefilterten
@@ -36,7 +38,7 @@ defmodule KomkiMediator.Gate do
   selbst.
   """
 
-  alias KomkiMediator.{Gamma, Hash, PDR, Room}
+  alias KomkiMediator.{Gamma, Hash, Hinweis, PDR, Room}
   alias KomkiPolicy.{Derive, JSON, Verify}
 
   @typedoc "Ablauf-Umgebung: Gamma-Stand, Raum, Journal-Anbindung."
@@ -62,15 +64,82 @@ defmodule KomkiMediator.Gate do
     # (String-Schluessel). Jedes kuenftige Schema-Feld landet damit
     # mechanisch im intent_hash.
     rendered = rendered_params(params)
-    intent_hash = Hash.sha256_hex(JSON.canonical(%{"tool" => tool, "params" => rendered}))
+    intent_hash = call_hash(tool, rendered)
 
-    case Room.object_for_call(env.room, tool, rendered) do
-      {:ok, object} ->
-        decide(env, tool, intent_hash, object, executor)
-
+    with {:ok, object} <- Room.object_for_call(env.room, tool, rendered),
+         {:ok, bindings} <- Room.bindings_for(env.room, tool, object) do
+      decide(env, tool, intent_hash, object, bindings, executor)
+    else
       {:error, :unknown_object, object_id} ->
         unknown_object(env, tool, intent_hash, object_id)
+
+      {:error, detail} ->
+        error_path(env, tool, intent_hash, nil, nil, "error", detail)
     end
+  end
+
+  # -------------------------------------------------------------------------
+  # Raumdokumente auflisten (Ticket #218)
+  # -------------------------------------------------------------------------
+
+  @doc """
+  `list_documents`: nennt pi die Raumdokumente, die es mit `admit_document`
+  zulassen koennte — document_id und Labels, keine Inhalte. Je Dokument
+  entscheidet die Engine die Aufnahme gegen B_W; nur ein `permit` kommt
+  in die Liste. Was gesperrt waere, bleibt unsichtbar, auch in der Anzahl
+  (wie die Suche im Vault-Connector): sonst verriete die Liste die
+  Existenz vertraulicher Dokumente. Die Antwort traegt B_W als Labels,
+  ein PDR belegt sie.
+  """
+  @spec list_documents(env()) :: map()
+  def list_documents(env) do
+    intent_hash = call_hash("list_documents", %{})
+
+    case Room.bindings_for(env.room, "list_documents", nil) do
+      {:ok, bindings} ->
+        listed(env, intent_hash, bindings)
+
+      {:error, detail} ->
+        error_path(env, "list_documents", intent_hash, nil, nil, "error", detail)
+    end
+  end
+
+  defp listed(env, intent_hash, bindings) do
+    documents =
+      for object_id <- Room.document_ids(env.room),
+          {:ok, object} <- [Room.object_for_claim(env.room, object_id)],
+          admissible?(env, object, bindings) do
+        %{"document_id" => object_id, "labels" => object.labels}
+      end
+
+    base = %{
+      "decision" => "permit",
+      "decision_id" => new_decision_id(),
+      "documents" => documents,
+      "labels" => bindings
+    }
+
+    payload_hash = payload_hash(base)
+
+    journal_pdr(
+      env,
+      pdr("list_documents", "permit", "admitted", true, intent_hash, %{
+        decision_id: base["decision_id"],
+        checked_label: bindings,
+        remedies: nil,
+        payload_hash: payload_hash
+      })
+    )
+
+    Map.put(base, "payload_hash", payload_hash)
+  end
+
+  defp admissible?(env, object, bindings) do
+    probe = Hash.sha256_hex(object.object_id <> "@" <> object.version)
+    intent = intent(env.room, probe, object)
+    snapshot = Room.snapshot_for(env.room, env.gamma, object, Hash.digest12(probe), bindings)
+
+    match?({:ok, %{"decision" => "permit"}}, Derive.decide(env.gamma.compiled, snapshot, intent))
   end
 
   # -------------------------------------------------------------------------
@@ -108,12 +177,15 @@ defmodule KomkiMediator.Gate do
   # Entscheidungspfade
   # -------------------------------------------------------------------------
 
-  defp decide(env, tool, intent_hash, object, executor) do
+  defp decide(env, tool, intent_hash, object, bindings, executor) do
     intent = intent(env.room, intent_hash, object)
-    snapshot = Room.snapshot_for(env.room, env.gamma, object, Hash.digest12(intent_hash))
+
+    snapshot =
+      Room.snapshot_for(env.room, env.gamma, object, Hash.digest12(intent_hash), bindings)
 
     case Derive.decide(env.gamma.compiled, snapshot, intent) do
       {:ok, %{"decision" => "permit"} = decision} ->
+        executing(env, tool, intent_hash, intent, snapshot, decision)
         admit_result(env, tool, intent_hash, intent, snapshot, decision, executor.())
 
       {:ok, %{"decision" => kind} = decision} when kind in ["deny", "indeterminate"] ->
@@ -143,6 +215,25 @@ defmodule KomkiMediator.Gate do
     end
   end
 
+  # Vorbeleg vor Wirkung (R.11), wie der Vorbeleg (`emitted`) im
+  # ConnectorGate; hier faellt er mit dem Permit in einen Datensatz: Der
+  # Permit steht im Journal, bevor der Executor laeuft (etwa der
+  # Dokument-Connector liest). Scheitert das Schreiben, stoppt der
+  # Journal-Writer die Vermittlung und der Executor laeuft nie.
+  defp executing(env, tool, intent_hash, intent, snapshot, decision) do
+    journal_pdr(
+      env,
+      pdr(tool, "permit", "executing", nil, intent_hash, %{
+        decision_id: new_decision_id(),
+        intent_id: intent["intent_id"],
+        snapshot_id: snapshot["snapshot_id"],
+        checked_label: decision["checked_label"],
+        remedies: nil,
+        payload_hash: payload_hash(%{"tool" => tool, "intent_hash" => intent_hash})
+      })
+    )
+  end
+
   defp not_admitted(env, tool, intent_hash, intent, snapshot, kind, decision) do
     decision_id = new_decision_id()
 
@@ -157,7 +248,8 @@ defmodule KomkiMediator.Gate do
       "decision_id" => decision_id,
       "registry_id" => env.gamma.registry_id,
       "remedies" => remedies,
-      "relaxation_authorities" => Gamma.relaxation_authorities_for(env.gamma, remedies)
+      "relaxation_authorities" => Gamma.relaxation_authorities_for(env.gamma, remedies),
+      "hinweis" => Hinweis.text(:deny)
     }
 
     journal_pdr(
@@ -376,19 +468,31 @@ defmodule KomkiMediator.Gate do
     end
   end
 
+  # Hash-Basis eines Aufrufs: Tool samt vollstaendig gerenderten Parametern.
+  defp call_hash(tool, rendered),
+    do: Hash.sha256_hex(JSON.canonical(%{"tool" => tool, "params" => rendered}))
+
   # Exakte Parameter-Fassung des Calls: der vollstaendig gerenderte Call
   # ist die Hash-Basis fuer den intent_hash - nicht eine Projektion.
   # Structs (die vom MCP-Schema gerenderten Parameter) werden entpackt,
   # Atom-Schluessel werden String-Schluessel (der Vertrag zwischen
   # MCP-Schicht und Gate), String-Schluessel bleiben unveraendert.
+  # Durchstich #409, belegt im Wegwerf-Lauf: TIEF, nicht nur oben — anubis rendert
+  # eingebettete Listen (embeds_many, die Teile eines Vorschlags) mit
+  # Atom-Schluesseln; oben entpacken reicht nicht, sonst crasht die
+  # Kanonisierung des Aufrufs.
   @doc false
   @spec rendered_params(term()) :: %{String.t() => term()}
   def rendered_params(params) when is_struct(params),
     do: rendered_params(Map.from_struct(params))
 
   def rendered_params(params) when is_map(params) do
-    Map.new(params, fn {key, value} -> {render_key(key), value} end)
+    Map.new(params, fn {key, value} -> {render_key(key), rendered_params(value)} end)
   end
+
+  def rendered_params(values) when is_list(values), do: Enum.map(values, &rendered_params/1)
+
+  def rendered_params(value), do: value
 
   defp render_key(key) when is_atom(key), do: Atom.to_string(key)
   defp render_key(key) when is_binary(key), do: key

@@ -70,6 +70,6 @@
 
   <rect x="545" y="372" width="265" height="48" rx="24" class="svg-box"/>
   <text x="680" y="392" text-anchor="middle" class="svg-text">Internet</text>
-  <text x="680" y="408" text-anchor="middle" class="svg-small">risapi1.komuna.net · api.search.brave.com</text>
+  <text x="680" y="408" text-anchor="middle" class="svg-small">risapi3.komuna.net · api.search.brave.com</text>
   <path d="M500,396 L541,396" class="svg-line" marker-end="url(#ah)"/>
 </svg>

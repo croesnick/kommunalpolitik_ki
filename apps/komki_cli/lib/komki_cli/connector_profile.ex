@@ -11,7 +11,8 @@ defmodule KomkiCli.ConnectorProfile do
     * Netz nur `localhost:<egress-port>` (bzw. `localhost:<mock-port>` im
       RIS-Mock-Betrieb), und nur, wenn das Manifest `egress_hosts` hat,
     * Dateisystem nur nach `fs` des Manifests (`{vault_dir}` lesen,
-      `{vault_dir}/komki-test` schreiben, `{documents_dir}` lesen).
+      `{vault_dir}/komki-test` schreiben, `{documents_dir}` lesen,
+      `{ratsprojekte_stand}` lesen, #419).
 
   Kein Home, kein `~/.ssh`, kein DNS: Ein Connector kennt nur Loopback.
 
@@ -23,6 +24,7 @@ defmodule KomkiCli.ConnectorProfile do
 
   alias KomkiCli.{Config, Connectors, EscriptProfile}
   alias KomkiConnector.Manifest
+  alias Seatbelt.SBPL
 
   @doc "Profiltext eines Connectors."
   @spec connector(Config.t(), Manifest.t()) :: String.t()
@@ -32,6 +34,7 @@ defmodule KomkiCli.ConnectorProfile do
     socket = Manifest.socket_path(cfg.base_dir, manifest.id)
     log = Connectors.log_path(cfg, manifest.id)
     fs = fs_paths(cfg, manifest)
+    hub = hub_rules(cfg, manifest)
 
     EscriptProfile.render(
       EscriptProfile.header([
@@ -42,14 +45,39 @@ defmodule KomkiCli.ConnectorProfile do
         EscriptProfile.log_rules(log) ++
         socket_bind_rules(socket) ++
         connector_net_rules(Connectors.upstream(cfg, manifest)) ++
+        hub ++
         fs_rules(fs) ++
-        EscriptProfile.meta_ancestors([root, binary, socket, log] ++ Enum.map(fs, &elem(&1, 0))) ++
+        EscriptProfile.meta_ancestors(
+          [root, binary, socket, log] ++ hub_paths(cfg, manifest) ++ Enum.map(fs, &elem(&1, 0))
+        ) ++
         [
           "; Bewusst NICHT erlaubt: Netz ausser dem einen Loopback-Port, DNS, Home-Verzeichnis,",
           "; Schreiben ausserhalb von Socket, Log und den fs-Pfaden des Manifests."
         ]
     )
   end
+
+  # Durchstich #409, belegt im Wegwerf-Lauf: Der ratsprojekte-Connector ist der einzige
+  # Connector, der statt eines TCP-Wegs den EIGENEN Unix-Socket des Hubs
+  # nach draussen ruft (#415) — erlaubt ist genau dieser eine Pfad, nichts
+  # sonst. Der Agent (pi) hat diesen Pfad nicht in seinem Profil: Umgeht
+  # jemand komki, blockiert ihn erst die Sandbox und dann das Token
+  # (Szene 11: connector-bypass).
+  defp hub_rules(%Config{ratsprojekte_socket: hub} = _cfg, %{id: "ratsprojekte"})
+       when is_binary(hub) and hub != "" do
+    [
+      "; Hub-Socket des ratsprojekte-Connectors (DURCHSTICH #409): nur dieser Pfad",
+      "(allow network-outbound (remote unix-socket (path-literal " <> SBPL.quote!(hub) <> ")))"
+    ]
+  end
+
+  defp hub_rules(_cfg, _manifest), do: []
+
+  defp hub_paths(%Config{ratsprojekte_socket: hub} = _cfg, %{id: "ratsprojekte"})
+       when is_binary(hub) and hub != "",
+       do: [hub]
+
+  defp hub_paths(_cfg, _manifest), do: []
 
   @doc "Profiltext des Egress-Proxys."
   @spec egress(Config.t()) :: String.t()
@@ -80,8 +108,8 @@ defmodule KomkiCli.ConnectorProfile do
   def socket_bind_rules(socket) do
     [
       "; eigener Unix-Socket (binden, 0600 setzen, alten Socket entfernen)",
-      "(allow network-bind (local unix-socket (path-literal \"" <> socket <> "\")))",
-      "(allow file-read* file-write* (literal \"" <> socket <> "\"))"
+      "(allow network-bind (local unix-socket (path-literal " <> SBPL.quote!(socket) <> ")))",
+      "(allow file-read* file-write* (literal " <> SBPL.quote!(socket) <> "))"
     ]
   end
 
@@ -105,24 +133,36 @@ defmodule KomkiCli.ConnectorProfile do
     ]
   end
 
+  # Placeholders of the manifest's fs paths. The stand file (#419) is
+  # optional: without ratsprojekte_stand the rule is left out, the
+  # connector then cannot read anything outside its socket.
   defp fs_paths(cfg, manifest) do
-    Enum.map(manifest.fs, fn {pattern, mode} ->
-      path =
-        if String.contains?(pattern, "{vault_dir}"),
-          do: String.replace(pattern, "{vault_dir}", vault_dir!(cfg)),
-          else: String.replace(pattern, "{documents_dir}", KomkiCli.Connectors.documents_dir(cfg))
+    Enum.flat_map(manifest.fs, fn {pattern, mode} ->
+      cond do
+        String.contains?(pattern, "{vault_dir}") ->
+          [{String.replace(pattern, "{vault_dir}", vault_dir!(cfg)), mode}]
 
-      {path, mode}
+        String.contains?(pattern, "{ratsprojekte_stand}") ->
+          stand_path(cfg, pattern, mode)
+
+        true ->
+          [{String.replace(pattern, "{documents_dir}", Connectors.documents_dir(cfg)), mode}]
+      end
     end)
   end
+
+  defp stand_path(%Config{ratsprojekte_stand: stand}, pattern, mode) when is_binary(stand),
+    do: [{String.replace(pattern, "{ratsprojekte_stand}", stand), mode}]
+
+  defp stand_path(_cfg, _pattern, _mode), do: []
 
   defp fs_rules([]), do: []
 
   defp fs_rules(fs) do
     ["; Dateisystem nach Manifest (fs)"] ++
       Enum.map(fs, fn
-        {path, :read} -> "(allow file-read* (subpath \"" <> path <> "\"))"
-        {path, :write} -> "(allow file-read* file-write* (subpath \"" <> path <> "\"))"
+        {path, :read} -> "(allow file-read* (subpath " <> SBPL.quote!(path) <> "))"
+        {path, :write} -> "(allow file-read* file-write* (subpath " <> SBPL.quote!(path) <> "))"
       end)
   end
 

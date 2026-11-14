@@ -9,14 +9,18 @@ defmodule KomkiCli.ConnectorChecks do
   und meldet `credential-missing`; der Doctor zeigt die Warnung.
   """
 
-  alias KomkiCli.{Config, Connectors, Keychain, Mediator, MediatorProfile}
+  alias KomkiCli.{Config, Connectors, Keychain, Mediator, MediatorProfile, Secrets, Tresor}
+  alias KomkiCli.Tresor.Core
   alias KomkiConnector.Manifest
 
   @type check :: %{name: String.t(), ok: boolean(), reason: String.t()}
 
-  @doc "Alle Checks; `keychain` ersetzt `Keychain.present/1` (Testnaht)."
-  @spec all(Config.t(), (String.t() -> :ok | {:error, Keychain.error()})) :: [check()]
-  def all(%Config{} = cfg, keychain \\ &Keychain.present/1) do
+  @typedoc "Zustand eines Geheimnisses, wie `KomkiCli.Secrets.state/2` ihn liefert."
+  @type secret_state :: :sealed | :unsealed | :damaged | :outdated | {:error, Keychain.error()}
+
+  @doc "Alle Checks; `keychain` ersetzt `Secrets.state/2` je Service (Testnaht)."
+  @spec all(Config.t(), (String.t() -> secret_state())) :: [check()]
+  def all(%Config{} = cfg, keychain \\ &Secrets.state/1) do
     [escript_check(cfg), socket_check(cfg), ris_url_check(cfg)] ++
       binary_checks(cfg) ++
       profile_checks(cfg) ++
@@ -152,13 +156,74 @@ defmodule KomkiCli.ConnectorChecks do
   end
 
   defp credential_checks(cfg, keychain) do
+    tresor_checks(cfg) ++ secret_checks(cfg, keychain)
+  end
+
+  # Nur wenn ein aktiver Connector ein Geheimnis braucht.
+  defp tresor_checks(cfg) do
+    if Enum.any?(Connectors.enabled(cfg), &(&1.credentials != %{})),
+      do: [tresor_check(Tresor.binary())],
+      else: []
+  end
+
+  defp tresor_check(nil),
+    do: %{name: "komki-tresor", ok: false, reason: Tresor.describe(:missing_bin)}
+
+  defp tresor_check(bin) do
+    case Core.check(bin) do
+      :ok ->
+        %{name: "komki-tresor", ok: true, reason: bin <> " (Secure Enclave verfügbar)"}
+
+      {:error, :no_enclave} ->
+        %{name: "komki-tresor", ok: false, reason: Tresor.describe(:no_enclave)}
+
+      {:error, {:failed, code}} ->
+        %{name: "komki-tresor", ok: false, reason: Tresor.describe({:failed, code})}
+    end
+  end
+
+  defp secret_checks(cfg, keychain) do
     for manifest <- Connectors.enabled(cfg),
         {name, service} <- Enum.sort(manifest.credentials) do
       check = "credential " <> name
 
       case keychain.(service) do
-        :ok ->
-          %{name: check, ok: true, reason: "Schlüsselbund-Eintrag '" <> service <> "' vorhanden"}
+        :sealed ->
+          %{
+            name: check,
+            ok: true,
+            reason: "Schlüsselbund-Eintrag '" <> service <> "' versiegelt (Secure Enclave)"
+          }
+
+        :damaged ->
+          %{
+            name: check,
+            ok: true,
+            reason:
+              "WARNUNG: " <>
+                Secrets.describe(service, :damaged) <>
+                " mit 'komki secret set " <> Secrets.short_name(service) <> "'"
+          }
+
+        :outdated ->
+          %{
+            name: check,
+            ok: true,
+            reason: "WARNUNG: " <> Secrets.describe(service, :outdated)
+          }
+
+        # Warnung wie beim fehlenden Schluessel: komki benutzt den Klartext
+        # nicht (der Connector startet ohne), ihn zu versiegeln ist der Weg.
+        :unsealed ->
+          %{
+            name: check,
+            ok: true,
+            reason:
+              "WARNUNG: " <>
+                Secrets.describe(service, :unsealed) <>
+                " — 'komki setup' oder 'komki secret set " <>
+                Secrets.short_name(service) <> "' versiegelt ihn"
+          }
 
         {:error, error} ->
           %{
@@ -180,7 +245,7 @@ defmodule KomkiCli.ConnectorChecks do
 
     if File.exists?(Manifest.socket_path(cfg.base_dir, manifest.id)) do
       case Connectors.ping(cfg, manifest) do
-        {:ok, %{"fassung" => fassung}} -> %{name: name, ok: true, reason: fassung}
+        {:ok, %{"version" => fassung}} -> %{name: name, ok: true, reason: fassung}
         {:error, reason} -> %{name: name, ok: false, reason: reason}
       end
     else

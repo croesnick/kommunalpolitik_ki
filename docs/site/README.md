@@ -62,3 +62,8 @@ Gewählt am 24.10.2026 aus einem Katalog von zwölf Richtungen: „Leicht lesbar
 
 `.github/workflows/pages.yml` baut die Site in jedem Pull Request (Prüfung) und veröffentlicht sie bei jedem Push
 auf `main`. Voraussetzung: GitHub Pages steht in den Repo-Einstellungen auf „GitHub Actions“.
+
+Der Build prüft über `starlight-links-validator` die internen Links der Seiten (Slug, Trailing-Slash, Anker,
+relative und lokale Links): Ein toter interner Link bricht den Build in CI und lokal (`make docs-build`).
+Externe Links prüft das Plugin bewusst nicht — ein Netz-Check externer Links gehört laut `lychee.toml` am
+Repo-Root in einen eigenen Scheduled-Job statt ins PR-Gate.

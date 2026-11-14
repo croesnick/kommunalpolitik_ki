@@ -34,6 +34,8 @@ defmodule KomkiConnectorWeb.MixProject do
   defp deps do
     [
       {:komki_connector, path: "../komki_connector"},
+      {:sidecar, path: "../sidecar"},
+      {:komki_mock, path: "../komki_mock", only: :test},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]

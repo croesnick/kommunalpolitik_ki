@@ -1,0 +1,7 @@
+{
+  "args": {
+    "query": "Foerderung Radweg"
+  },
+  "text": "{\"decision\":\"deny\",\"decision_id\":\"pdr-848c34d1e991e725a45af9262a3b2e12\",\"go\":\"abgelehnt\",\"hinweis\":\"Die nutzende Person hat diesen Aufruf abgelehnt. Frag nicht erneut, auch nicht mit anderen Worten oder über ein anderes Werkzeug. Arbeite ohne dieses Ergebnis weiter oder beende deine Antwort.\",\"registry_id\":\"reg-komki-arbeitsraum\",\"relaxation_authorities\":[],\"remedies\":[{\"binding\":null,\"code\":\"recipient_not_allowed\",\"condition\":null,\"recipients_outside\":[\"brave-search\"],\"transitions\":[{\"required_bindings\":[],\"required_recipients\":[\"brave-search\",\"nutzende-person\",\"pi-agent\"],\"type\":\"neuer_raum\"},{\"call_hash\":\"740d6365c76b35b7e0fd183ed799c56e7974e7e9b805de80d243f550da1e098e\",\"scope\":\"call\",\"type\":\"aktionsfreigabe\"}]}],\"rule\":\"transfer\"}",
+  "tool": "web_search"
+}

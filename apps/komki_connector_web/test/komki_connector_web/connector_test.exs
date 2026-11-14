@@ -4,8 +4,8 @@ defmodule KomkiConnectorWeb.ConnectorTest do
 
   import ExUnit.CaptureLog
 
-  alias KomkiConnector.{Client, Server}
   alias KomkiConnectorWeb.{Connector, MockHttp}
+  alias Sidecar.{Client, Server}
 
   @key "BSA-geheim-0123456789abcdef"
 
@@ -40,8 +40,9 @@ defmodule KomkiConnectorWeb.ConnectorTest do
     path = "/tmp/kmw#{System.unique_integer([:positive])}.sock"
     {:ok, state} = Connector.init(init_arg)
     {:ok, listener} = Server.listen(path)
-    pid = spawn(fn -> Server.accept_loop(listener, Connector, state) end)
-    :ok = :gen_tcp.controlling_process(listener, pid)
+    token = Sidecar.Token.provision!(path)
+    pid = spawn(fn -> Server.accept_loop(listener, Connector, state, token) end)
+    :ok = :socket.setopt(listener, {:otp, :controlling_process}, pid)
 
     on_exit(fn ->
       Process.exit(pid, :kill)
@@ -144,7 +145,7 @@ defmodule KomkiConnectorWeb.ConnectorTest do
 
     assert {:error, %{"code" => "credential-missing"}} = search(path, %{"query" => "x"})
 
-    assert {:ok, %{"fassung" => "komki-web/1", "ops" => ["search"]}} =
+    assert {:ok, %{"version" => "komki-web/1", "ops" => ["search"]}} =
              Client.call(path, "c", "ping", %{})
 
     refute_received {:mock_request, _}
@@ -153,6 +154,34 @@ defmodule KomkiConnectorWeb.ConnectorTest do
   test "leerer Key gilt als fehlend" do
     path = start(fn _req -> {200, body([])} end, %{credentials: %{"BRAVE_API_KEY" => ""}})
     assert {:error, %{"code" => "credential-missing"}} = search(path, %{"query" => "x"})
+  end
+
+  # Regression #496: Vor dem Fix ging zu jedem http://-Ziel eine echte
+  # Klartext-Anfrage mit dem Subscription-Token raus (hier dann:
+  # upstream-error nach dem Verbindungsversuch). Nach dem Fix wird sie
+  # vor dem Transport verweigert — credential-missing, kein Verbindungsaufbau.
+  test "Klartext zu fremdem Host: Suche verweigert, Token verlaesst den Connector nicht" do
+    # 192.0.2.1: RFC-5737-TEST-NET-1 — nicht Loopback, nicht routbar
+    path =
+      socket_listen(
+        %{
+          credentials: %{"BRAVE_API_KEY" => @key},
+          base_url: "http://192.0.2.1:9/",
+          timeout: 300
+        },
+        fn -> :ok end
+      )
+
+    Logger.configure(level: :info)
+    on_exit(fn -> Logger.configure(level: :warning) end)
+
+    log =
+      capture_log(fn ->
+        assert {:error, %{"code" => "credential-missing"}} = search(path, %{"query" => "x"})
+      end)
+
+    assert log =~ "Klartext"
+    refute log =~ @key
   end
 
   test "HTTP-Status 401, 403, 429, 500" do
@@ -165,10 +194,19 @@ defmodule KomkiConnectorWeb.ConnectorTest do
     assert {:error, %{"code" => "credential-missing"}} = search(path, %{"query" => "401"})
     assert {:error, %{"code" => "upstream-error"}} = search(path, %{"query" => "403"})
 
-    assert {:error, %{"code" => "upstream-error", "detail" => detail}} =
-             search(path, %{"query" => "429"})
+    # Der genaue Grund steht im Connector-Log, nicht in der Antwort.
+    Logger.configure(level: :info)
+    on_exit(fn -> Logger.configure(level: :warning) end)
 
-    assert detail =~ "Rate-Limit"
+    log =
+      ExUnit.CaptureLog.capture_log([level: :info], fn ->
+        assert {:error, %{"code" => "upstream-error", "detail" => detail}} =
+                 search(path, %{"query" => "429"})
+
+        refute detail =~ "Rate-Limit"
+      end)
+
+    assert log =~ "Rate-Limit"
     assert {:error, %{"code" => "upstream-error"}} = search(path, %{"query" => "500"})
   end
 
@@ -216,7 +254,7 @@ defmodule KomkiConnectorWeb.ConnectorTest do
             do: search(path, %{"query" => q})
       end)
 
-    assert log =~ "connector=web"
+    assert log =~ "sidecar=komki-web/1"
     refute log =~ @key
     refute inspect(replies) =~ @key
     assert Enum.count(replies, &match?({:error, _}, &1)) == 6

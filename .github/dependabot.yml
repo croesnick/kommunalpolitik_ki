@@ -1,0 +1,19 @@
+# Dependabot nur für Security Updates, gruppiert: ein PR je Tool statt
+# einer je Paket. Versions-Updates macht Renovate (renovate.json), deshalb
+# ist das Limit für Versions-PRs 0. Security Updates kennen ein eigenes
+# Limit und laufen trotzdem.
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directories:
+      - "/tools/*"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"

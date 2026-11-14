@@ -6,13 +6,27 @@ defmodule KomkiMediator.TestHelpers do
 
   alias KomkiMediator.{Gamma, Room, Templates}
 
-  @doc "Ein temporaeres Basisverzeichnis (hermetisch; Zufallssuffix gegen Restbestaende frueherer Laeufe)."
+  @doc """
+  Ein temporaeres Basisverzeichnis (hermetisch; Zufallssuffix gegen
+  Restbestaende frueherer Laeufe). Der Pfad raeumt sich nach dem Test
+  selbst ab; ruft nur der Testprozess auf (on_exit).
+  """
   def tmp_base(prefix \\ "komki-mediator-test-") do
     suffix = Base.encode16(:crypto.strong_rand_bytes(8), case: :lower)
-    Path.join(System.tmp_dir!(), prefix <> suffix)
+    base = Path.join(System.tmp_dir!(), prefix <> suffix)
+
+    # Ohne Bang: Aufraeumen darf einen gruenen Test nachtraeglich nicht
+    # rot machen (Reste waeren ein Hygiene-Problem, kein Testfehler).
+    # rm_rf entfernt auch Pfade, die der Test nie angelegt hat.
+    ExUnit.Callbacks.on_exit(fn -> File.rm_rf(base) end)
+
+    base
   end
 
-  @doc "Provisioniert einen tmp-Basisraum und liefert das Basisverzeichnis zurueck."
+  @doc """
+  Provisioniert einen tmp-Basisraum und liefert das Basisverzeichnis
+  zurueck; nach dem Test wird das Verzeichnis automatisch entfernt.
+  """
   def provisioned_base do
     base = tmp_base()
     Templates.provision!(base)
@@ -100,7 +114,7 @@ defmodule KomkiMediator.TestHelpers do
     "/tmp/kmt-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"
   end
 
-  @doc "Zufaelliges Kanal-Token (64 Hex-Zeichen, wie komki up es schreibt)."
+  @doc "Zufaelliges Socket-Token (64 Hex-Zeichen, wie komki up es schreibt)."
   def new_token, do: Base.encode16(:crypto.strong_rand_bytes(32), case: :lower)
 
   @doc """
@@ -108,11 +122,11 @@ defmodule KomkiMediator.TestHelpers do
   (Besitz beim Test-Supervisor: start_supervised reisst den Baum mit jedem
   Test deterministisch ab — benanntes Journal, Env, anubis-Registry, Socket).
   """
-  def start_socket_server! do
-    base = provisioned_base()
+  def start_socket_server!(opts \\ []) do
+    base = Keyword.get_lazy(opts, :base, &provisioned_base/0)
     {gamma, room} = load_room_env(base)
-    socket = tmp_socket()
-    token = new_token()
+    socket = Keyword.get_lazy(opts, :socket, &tmp_socket/0)
+    token = Keyword.get_lazy(opts, :token, &new_token/0)
     journal_path = Path.join([base, "mediator", "journal", "pdr.jsonl"])
 
     ExUnit.Callbacks.start_supervised!(

@@ -60,6 +60,16 @@ defmodule KomkiCli.CLITest do
       assert out =~ "komki "
     end
 
+    # Ticket #318: --drafter-from ist das Pendant zu --gguf-from (vorhandene
+    # Drafter-Datei statt Download).
+    test "setup/init --help nennen --drafter-from" do
+      {setup_out, 0} = CLI.run(["setup", "--help"])
+      assert setup_out =~ "--drafter-from"
+
+      {init_out, 0} = CLI.run(["init", "--help"])
+      assert init_out =~ "--drafter-from"
+    end
+
     test "run --help nennt --capture-denials" do
       {out, 0} = CLI.run(["run", "--help"])
       assert out =~ "--capture-denials"
@@ -78,8 +88,13 @@ defmodule KomkiCli.CLITest do
       assert out =~ "config"
     end
 
-    test "session-chain ohne config verweigert (Exit 2)" do
+    test "session-chain ohne --base verweigert (Exit 2, Ticket #251)" do
       {out, 2} = CLI.run(["session-chain"])
+      assert out =~ "ohne --base"
+    end
+
+    test "session-chain ohne config verweigert (Exit 2)" do
+      {out, 2} = CLI.run(["session-chain", "--base", System.get_env("KOMKI_HOME")])
       assert out =~ "config"
     end
   end

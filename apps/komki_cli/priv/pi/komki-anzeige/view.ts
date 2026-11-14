@@ -37,6 +37,9 @@ const LABELS: Record<string, string> = {
 	"vault-oeffentlich@1": "öffentlich",
 	"web-oeffentlich@1": "öffentlich",
 	"vault-vertraulich@1": "vertraulich",
+	"doc-oeffentlich@1": "öffentlich",
+	"doc-oeffentlich@2": "öffentlich",
+	"doc-vertraulich@1": "vertraulich",
 };
 
 const BLOCKERS: Record<string, string> = {
@@ -57,9 +60,14 @@ const CONNECTOR_ERRORS: Record<string, string> = {
 	"not-found": "nicht gefunden",
 };
 
-const SOURCES: Record<string, string> = { ris: "RIS", vault: "Vault", web: "Web" };
+const SOURCES: Record<string, string> = { ris: "RIS", vault: "Vault", web: "Web", admit: "Arbeitsraum", list: "Arbeitsraum" };
 
-const GATES: Record<string, string> = { emit: "Anfrage (Gate 1)", admit: "Aufnahme der Antwort (Gate 2)" };
+const GATES: Record<string, string> = {
+	emit: "Anfrage erzeugen (Gate 1)",
+	transfer: "Anfrage übergeben (Gate 1)",
+	store: "Speichern (Gate 1)",
+	admit: "Aufnahme der Antwort (Gate 2)",
+};
 
 const COLLAPSED_HITS = 5;
 const COLLAPSED_TEXT_LINES = 4;
@@ -87,6 +95,10 @@ export function callLine(toolName: string, args: Json, p: Paint): string | undef
 			return `${title("Im Web suchen")}  ${quote(a.query)}`;
 		case "vault_write_test":
 			return `${title("Testnotiz anlegen")}  ${quote(a.title)}`;
+		case "admit_document":
+			return `${title("Raumdokument lesen")}  ${plain(a.document_id)}`;
+		case "list_documents":
+			return title("Raumdokumente auflisten");
 		default:
 			return `${title(`komki: ${tool}`)}  ${p.fg("dim", clean(JSON.stringify(a)))}`;
 	}
@@ -124,20 +136,25 @@ export function resultRows(
 	return rows;
 }
 
+// Gate 1 of a connector call: produce, hand over, store (#298).
+const OUTGOING = new Set(["emit", "transfer", "store"]);
+
 // Alles, was nicht "zugelassen" ist. undefined: Inhalt wurde zugelassen.
 function outcome(tool: string, r: Json, p: Paint): Row[] | undefined {
-	const gate = r.rule === "emit" ? "Die Anfrage hat komki nicht verlassen." : "Der Inhalt hat das Modell nicht erreicht.";
+	const outgoing = OUTGOING.has(r.rule);
+	const gate = outgoing ? "Die Anfrage hat komki nicht verlassen." : "Der Inhalt hat das Modell nicht erreicht.";
 
 	if (r.decision === "deny" || r.decision === "indeterminate") {
 		const head =
 			r.decision === "deny"
 				? p.fg("error", p.bold("✗ abgelehnt"))
 				: p.fg("warning", p.bold("? nicht entscheidbar"));
-		return [{ body: `${head}  ${p.fg("muted", gate)}` }, ...remedyRows(r, p)];
+		const go = goRow(r, p);
+		return [{ body: `${head}  ${p.fg("muted", gate)}` }, ...remedyRows(r, p), ...(go ? [go] : [])];
 	}
 
 	if (r.decision === "error") {
-		const head = r.rule === "emit" ? "✗ abgewiesen" : "✗ Prüffehler";
+		const head = outgoing ? "✗ abgewiesen" : "✗ Prüffehler";
 		return [
 			{ body: `${p.fg("error", p.bold(head))}  ${p.fg("muted", gate)}` },
 			labelled("Grund", clean(String(r.detail ?? "unbekannt")), p),
@@ -165,8 +182,36 @@ function outcome(tool: string, r: Json, p: Paint): Row[] | undefined {
 	return undefined;
 }
 
+// Was aus der Freigabe-Möglichkeit wurde. Das GO selbst fragt komki
+// außerhalb von pi (Popup `komki go`); hier steht nur, was geschah, und
+// nichts darf wie eine Frage aussehen, die man in pi beantwortet.
+// Ein erteiltes GO sieht pi als gewöhnliche Zulassung.
+function goRow(r: Json, p: Paint): Row | undefined {
+	if (r.go === "abgelehnt") return labelled("GO", "Du hast die Freigabe abgelehnt. Es bleibt beim Nein.", p);
+	if (r.go === "keine Antwort") return labelled("GO", "Auf die Freigabe-Frage kam keine Antwort. Es bleibt beim Nein.", p);
+	if (callGoOffered(r))
+		return labelled(
+			"GO",
+			p.fg("muted", "Nicht gefragt, weil kein komki-Fenster bereit war. Freigeben geht nur dort oder mit komki go."),
+			p,
+		);
+	return undefined;
+}
+
+function callGoOffered(r: Json): boolean {
+	return (Array.isArray(r.remedies) ? r.remedies : []).some((remedy: Json) =>
+		(Array.isArray(remedy?.transitions) ? remedy.transitions : []).some(
+			(t: Json) => t?.type === "aktionsfreigabe" && t.scope === "call",
+		),
+	);
+}
+
 function remedyRows(r: Json, p: Paint): Row[] {
 	const rows: Row[] = [];
+	// Store outside the recipient circle (#417): the mediator sends only who lies outside, no catalog.
+	const outside = (Array.isArray(r.recipients_outside) ? r.recipients_outside : []).map((name: unknown) => clean(String(name)));
+	if (outside.length > 0)
+		rows.push(labelled("Grund", `Inhalte dieses Arbeitsraums dürfen nicht an ${outside.join(", ")} gehen. Ein GO ändert daran nichts.`, p));
 	for (const remedy of Array.isArray(r.remedies) ? r.remedies : []) {
 		rows.push(labelled("Grund", blocker(remedy), p));
 		const ways = (Array.isArray(remedy.transitions) ? remedy.transitions : []).map(transition);
@@ -197,7 +242,7 @@ function transition(t: Json): string {
 		case "aktionsfreigabe":
 			return t.scope === "object"
 				? `nach Einstufung von ${clean(String(t.object))} (GO)`
-				: "mit einer Freigabe (GO) für genau diesen Aufruf";
+				: "mit deinem GO für genau diesen Aufruf, im komki-Fenster";
 		case "fakt_nachreichen":
 			return `nach Nachreichen von ${(t.facts ?? []).map((f: unknown) => clean(String(f))).join(", ")}`;
 		case "registrierte_transformation":
@@ -210,6 +255,7 @@ function transition(t: Json): string {
 // ---------------------------------------------------------------- Zugelassen
 
 function admittedRows(tool: string, r: Json, o: ViewOptions, p: Paint): Row[] | undefined {
+	if (tool === "list_documents") return documentList(r, o, p);
 	const hits = Array.isArray(r.results) ? r.results : undefined;
 	const count = hits ? ` · ${hits.length === 0 ? "keine Treffer" : `${hits.length} Treffer`}` : "";
 	// Ohne Treffer gibt der Vermittler keine Labels zurück; dann ist "ohne Label" keine Warnung wert.
@@ -234,6 +280,9 @@ function admittedRows(tool: string, r: Json, o: ViewOptions, p: Paint): Row[] | 
 		case "vault_read":
 			body = vaultRead(r, o, p);
 			break;
+		case "admit_document":
+			body = roomDocument(r, o, p);
+			break;
 		case "vault_write_test":
 			body = [labelled("Angelegt", p.fg("accent", clean(String(r.note_id ?? ""))), p)];
 			break;
@@ -255,7 +304,7 @@ function list(hits: Json[], o: ViewOptions, p: Paint, one: (h: Json) => Row[]): 
 function risHit(h: Json, o: ViewOptions, p: Paint): Row[] {
 	return [
 		{ lead: p.fg("muted", date(h.datum)), leadWidth: 12, body: title(h.titel, p) },
-		{ lead: "", leadWidth: 12, body: p.fg("muted", clean(String(h.sitzung ?? ""))) },
+		{ lead: "", leadWidth: 12, body: p.fg("muted", withTop(h.sitzung, h.nummer)) },
 		...urlRow(h.url, 12, o, p),
 	];
 }
@@ -280,10 +329,17 @@ function vaultHit(h: Json, overall: unknown, p: Paint): Row[] {
 	];
 }
 
+// Sitzung mit der TOP-Nummer aus der Tagesordnung, wie sie im RIS steht.
+function withTop(sitzung: unknown, nummer: unknown): string {
+	const s = clean(String(sitzung ?? ""));
+	const n = clean(String(nummer ?? "")).trim();
+	return n ? `${s} · TOP ${n}` : s;
+}
+
 function risShow(r: Json, o: ViewOptions, p: Paint): Row[] {
 	const rows: Row[] = [
 		{ body: title(r.titel, p) },
-		{ body: p.fg("muted", `${clean(String(r.sitzung ?? ""))} · ${date(r.datum)}`) },
+		{ body: p.fg("muted", `${withTop(r.sitzung, r.nummer)} · ${date(r.datum)}`) },
 		...urlRow(r.url, 0, o, p),
 	];
 	const text = clean(String(r.text ?? "")).trim();
@@ -301,6 +357,51 @@ function vaultRead(r: Json, o: ViewOptions, p: Paint): Row[] {
 		{ body: p.bold(title) },
 		...excerpt(content, "Die Notiz ist leer.", o, p),
 	];
+}
+
+// Die erste Überschrift wird zum Titel, sonst steht die Objekt-ID da.
+function roomDocument(r: Json, o: ViewOptions, p: Paint): Row[] {
+	const id = clean(String(r.document_id ?? ""));
+	let content = clean(String(r.content ?? "")).trim();
+	const first = content.split("\n", 1)[0];
+	const heading = /^#+\s/.test(first) ? first.replace(/^#+\s*/, "") : "";
+	if (heading) content = content.slice(first.length).trim();
+	return [
+		{ body: p.bold(heading || id) },
+		...(heading ? [{ body: p.fg("dim", id) }] : []),
+		...excerpt(content, "Das Dokument ist leer.", o, p),
+	];
+}
+
+// Die Raumdokumente, die pi mit admit_document lesen kann: nur Kennung und
+// Label, Inhalte kommen erst mit admit_document. Was der Raum nicht zulässt,
+// nennt der Vermittler gar nicht.
+function documentList(r: Json, o: ViewOptions, p: Paint): Row[] | undefined {
+	const docs = documentsOf(r);
+	if (!docs) return undefined;
+	const count = docs.length === 0 ? "keine Dokumente" : docs.length === 1 ? "1 Dokument" : `${docs.length} Dokumente`;
+	const head = { body: `${p.fg("success", p.bold("✓ zugelassen"))}${p.fg("muted", ` · ${count}`)}` };
+	const body: Row[] =
+		docs.length === 0
+			? [{ body: p.fg("muted", "In diesem Arbeitsraum liegt kein Dokument, das pi lesen kann.") }]
+			: docs.map((d) => ({ lead: "•", leadWidth: 2, body: `${p.bold(d.id)}  ${labelBadge(d.labels, p)}` }));
+	return [head, ...body, ...source("list_documents", r, o, p)];
+}
+
+export interface RoomDocument {
+	id: string;
+	labels: string[];
+}
+
+/** Die Dokumentliste einer list_documents-Antwort; undefined bei anderer Form. */
+export function documentsOf(r: Json): RoomDocument[] | undefined {
+	if (r?.decision !== "permit" || !Array.isArray(r.documents)) return undefined;
+	return r.documents
+		.filter((d: Json) => d && typeof d.document_id === "string")
+		.map((d: Json) => ({
+			id: clean(d.document_id),
+			labels: Array.isArray(d.labels) ? d.labels.map((l: unknown) => clean(String(l))) : [],
+		}));
 }
 
 // Text als eingerückter Auszug mit Balken; Absätze bleiben, Leerzeilen
@@ -366,7 +467,7 @@ function komkiTool(toolName: string): string | undefined {
 	return toolName.startsWith(SERVER_PREFIX) ? toolName.slice(SERVER_PREFIX.length) : undefined;
 }
 
-function labelled(key: string, value: string, p: Paint): Row {
+export function labelled(key: string, value: string, p: Paint): Row {
 	return { lead: p.fg("muted", key), leadWidth: 10, body: value };
 }
 
@@ -374,11 +475,11 @@ function hint(o: ViewOptions, p: Paint): string {
 	return p.fg("dim", `${o.expandKey}: Prüfdetails`);
 }
 
-function labelName(label: unknown): string {
+export function labelName(label: unknown): string {
 	return LABELS[String(label)] ?? clean(String(label));
 }
 
-function labelBadge(labels: unknown, p: Paint): string {
+export function labelBadge(labels: unknown, p: Paint): string {
 	const list = Array.isArray(labels) ? labels.map(String) : [];
 	if (list.length === 0) return p.fg("warning", "ohne Label");
 	const names = [...new Set(list.map((l) => (l in LABELS ? p.fg("accent", LABELS[l]) : p.fg("warning", clean(l)))))];

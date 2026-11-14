@@ -6,6 +6,8 @@ defmodule KomkiPolicy.MetricsTest do
   @tcr_max_steps 4
   @k 2
   @tcr_threshold 0.85
+  # CONTRACT § 8.3: das Quarantäne-Szenario braucht genau EIN Objekt-Level-GO.
+  @hitl_go_threshold 1
 
   @moduledoc """
   Abnahmemetriken CONTRACT.md § 8.3 — Tests als Entscheidungsbeweis.
@@ -260,27 +262,40 @@ defmodule KomkiPolicy.MetricsTest do
   # =========================================================================
 
   describe "HITL load" do
-    test "Quarantäne: genau EIN Objekt-Level-GO, danach wiederholte Aufnahmen ohne weiteres GO" do
+    test "Quarantäne: genau EIN Objekt-Level-GO, aus dem Lauf gezählt; wiederholte Aufnahmen ohne weiteres GO" do
       reg = registry()
       {snapshot, intent} = load_case("case_quarantine")
 
+      # Szenario-Eintritt: deny, und der Katalog nennt als einzige
+      # Fortsetzung das Objekt-Level-GO (§ 2.8-Ausnahme, Erstklassifikation).
       {:ok, decision} = Derive.decide(reg, snapshot, intent)
       assert decision["decision"] == "deny"
-
-      # das Skript folgt dem Katalog: Erstklassifikation als Objekt-Level-GO
       [remedy] = decision["remedies"]
       assert [%{"scope" => "object", "type" => "aktionsfreigabe"}] = remedy["transitions"]
-      go_count = 1
+
+      # Der Lauf zählt das GO: dieselbe deterministische Skript-Spur wie TCR
+      # vollzieht den Katalog — Erstklassifikation über die neue
+      # Snapshot-Version, GO-Verbrauch als Messwert statt Konstante (#120).
+      {steps, gos, permit?} = run_track(reg, snapshot, intent, 0, 0, @tcr_max_steps)
+      assert permit?
+      assert steps == 1
 
       # das GO bewirkt die neue Snapshot-Version (Erstklassifikation)
       upgraded = upgrade_object(snapshot)
 
-      # wiederholte Aufnahmen desselben Objekts — KEIN weiteres GO nötig
-      assert {:ok, %{"decision" => "permit"}} = Derive.decide(reg, upgraded, intent)
-      assert {:ok, %{"decision" => "permit"}} = Derive.decide(reg, upgraded, intent)
-      assert {:ok, %{"decision" => "permit"}} = Derive.decide(reg, upgraded, intent)
+      # wiederholte Aufnahmen desselben Objekts: jeder Lauf einzeln gemessen —
+      # keiner braucht ein weiteres GO (Zähler je Lauf bleibt null).
+      Enum.each(1..3, fn _ ->
+        {repeat_steps, repeat_gos, repeat_permit?} =
+          run_track(reg, upgraded, intent, 0, 0, @tcr_max_steps)
 
-      assert go_count == 1, "HITL-Schwellenwert § 8.3: genau ein Objekt-Level-GO"
+        assert repeat_permit?
+        assert repeat_steps == 0
+        assert repeat_gos == 0
+      end)
+
+      # HITL-Schwellenwert § 8.3: genau ein Objekt-Level-GO — aus dem Lauf gezählt.
+      assert gos == @hitl_go_threshold, "HITL-Schwellenwert § 8.3: genau ein Objekt-Level-GO"
     end
 
     test "fakt_nachreichen-Pfade brauchen null GOs" do

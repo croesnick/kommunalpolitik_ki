@@ -11,16 +11,24 @@ defmodule KomkiCli.Config do
   der Vermittler lauscht auf `<base>/run/mediator.sock` (`KomkiCli.Channel`);
   ein `mediator_port` in aelteren config.json wird ignoriert.
 
+  Dazu der MTP-Drafter (Ticket #318): `drafter_path`/`drafter_sha256`
+  — wie das Modell gepinnt, aeltere config.json laden mit Defaults (Pfad
+  aus `base_dir` abgeleitet, SHA aus dem Code-Pin; die Migration ist damit
+  rein lesend, `komki setup` laedt die fehlende Datei nach).
+
   Connectoren und Egress (Ticket #146, CONTRACT.md §2/§4/§9), alle optional
   (aeltere config.json laden mit Defaults):
 
     * `escript_bin` — aufgeloeste Erlang-`escript`-Laufzeit; jedes komki-Escript
       startet unter Seatbelt als `escript <datei>`.
     * `egress_bin`, `connector_bins` (id → Pfad) — entdeckt wie der Vermittler.
-    * `egress_ports` — Loopback-Port je Connector mit Netz (Default ris 49531,
-      web 49532).
+    * `egress_ports` — Loopback-Port je Connector mit Netz; `init` leitet sie
+      aus `port` ab (ris `port + 7`, web `port + 8`, beim Default-Port
+      49531/49532). Eine bestehende config.json behaelt ihre Ports (#203).
     * `ris_base_url` — Default die echte RIS-API; `ris_mock_port` schaltet auf
       `http://127.0.0.1:<port>/` ohne Proxy um.
+    * `web_mock_port` — schaltet den Web-Connector auf einen Brave-Mock unter
+      `http://127.0.0.1:<port>/` ohne Proxy um; ohne ihn gilt die echte API.
     * `vault_dir` — Default `<base>/vault` (synthetischer Test-Vault); leer
       oder fehlend: Vault-Connector startet nicht.
 
@@ -46,6 +54,10 @@ defmodule KomkiCli.Config do
   ]
   defstruct @enforce_keys ++
               [
+                # MTP-Drafter (Ticket #318): gepinnt wie das Modell; immer
+                # gesetzt (defaults/from_map tragen die Pins nach).
+                :drafter_path,
+                :drafter_sha256,
                 :profile_path,
                 :fd_bin,
                 :rg_bin,
@@ -58,9 +70,20 @@ defmodule KomkiCli.Config do
                 :escript_bin,
                 :egress_bin,
                 :ris_mock_port,
+                # Brave-Mock (Ticket #340): Web-Connector direkt auf Loopback
+                :web_mock_port,
                 :vault_dir,
+                # Durchstich #409, belegt im Wegwerf-Lauf: Socket des ratsprojekte-Hubs;
+                # nil heisst: kein Schreibweg in den Hub.
+                :ratsprojekte_socket,
+                # Stand-Datei des Hubs (#419, Szene 12), in Kernel-Form;
+                # nil heisst: kein Stand lesen. Ohne beide startet der
+                # ratsprojekte-Connector nicht.
+                :ratsprojekte_stand,
                 connector_bins: %{},
                 egress_ports: %{},
+                # Programm-Pins (KomkiCli.Pins): Name -> %{"path", "sha256"}
+                pins: %{},
                 ris_base_url: nil,
                 # Wie Rollen starten (Ticket #181): "escript" (escript <komki> <rolle>)
                 # oder "burrito" (<komki-binary> <rolle>)
@@ -73,6 +96,8 @@ defmodule KomkiCli.Config do
           ctx: pos_integer(),
           gguf_path: String.t(),
           gguf_sha256: String.t(),
+          drafter_path: String.t(),
+          drafter_sha256: String.t(),
           pi_home: String.t(),
           node_bin: String.t() | nil,
           cli_js: String.t() | nil,
@@ -91,7 +116,11 @@ defmodule KomkiCli.Config do
           egress_ports: %{String.t() => pos_integer()},
           ris_base_url: String.t() | nil,
           ris_mock_port: pos_integer() | nil,
-          vault_dir: String.t() | nil
+          web_mock_port: pos_integer() | nil,
+          vault_dir: String.t() | nil,
+          ratsprojekte_socket: String.t() | nil,
+          ratsprojekte_stand: String.t() | nil,
+          pins: %{String.t() => %{String.t() => String.t()}}
         }
 
   # Felder, deren Werkzeug-Pfade bei init entdeckt wurden (nil, wenn das
@@ -107,17 +136,30 @@ defmodule KomkiCli.Config do
   @expected_gguf_sha256 "ef728c8e0c337fd1067b947af006e38a9ef2419e56feced4fd29b4bf0636e30c"
   @model_filename "gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf"
 
+  # MTP-Drafter (Ticket #318, Nutzerentscheidung nach Labbook #285, F4):
+  # speculative decoding neben dem Pin — dieselbe Quelle/Revision, Datei aus
+  # dem MTP-Unterordner des Repos. 461 766 816 Byte, SHA-256 verifiziert
+  # gegen den Download (Staging-Protokoll im Labbook).
+  @expected_drafter_sha256 "6326fb9f5e487aa8dcdd313a091e3c67724cb2a666ec3b7d2895b5b26d93ed1b"
+  @drafter_filename "mtp-gemma-4-26B-A4B-it-Q8_0.gguf"
+
   @default_sandbox_exec "/usr/bin/sandbox-exec"
   @default_port 49_524
   # Nutzer-Präferenz «große Kontexte» bei 64 GB RAM: 128K ist der Default;
   # Gemma 4 hält den KV-Cache via SWA klein.
   @default_ctx 131_072
   # Connectoren (Ticket #146): je Connector mit egress_hosts ein eigener
-  # Loopback-Port am Egress-Proxy (CONTRACT.md §9).
-  @default_egress_ports %{"ris" => 49_531, "web" => 49_532}
+  # Loopback-Port am Egress-Proxy (CONTRACT.md §9). Ticket #203: relativ zu
+  # `port`, damit eine Wegwerf-Instanz mit eigenem --port neben der
+  # Hauptinstanz startet. Beim Default-Port: ris 49531, web 49532.
+  @egress_port_offsets %{"ris" => 7, "web" => 8}
+  @default_egress_ports %{"ris" => @default_port + 7, "web" => @default_port + 8}
   # Echte RIS-API (dieselbe Basis wie apps/ratsinfo); der Host steht im
   # Manifest als egress_hosts-Eintrag.
-  @default_ris_base_url "https://risapi1.komuna.net/web/"
+  @default_ris_base_url "https://risapi3.komuna.net/web/"
+  # Earlier defaults of the RIS API (#515: moved to risapi3 in November
+  # 2026); an instance that still carries one loads the current default.
+  @retired_ris_base_urls ["https://risapi1.komuna.net/web/"]
   @pi_bundle_rel "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
 
   @spec expected_gguf_sha256 :: String.t()
@@ -126,10 +168,26 @@ defmodule KomkiCli.Config do
   @spec model_filename :: String.t()
   def model_filename, do: @model_filename
 
+  @doc """
+  Erwarteter SHA-256 des MTP-Drafters (Ticket #318). Gepinnt wie das Modell.
+  """
+  @spec expected_drafter_sha256 :: String.t()
+  def expected_drafter_sha256, do: @expected_drafter_sha256
+
+  @doc "Dateiname des gepinnten MTP-Drafters (Ticket #318)."
+  @spec drafter_filename :: String.t()
+  def drafter_filename, do: @drafter_filename
+
   @doc "Default-GGUF-Quelle: das bereitgestellte Staging-Artefakt (falls vorhanden)."
   @spec default_probe_gguf() :: String.t() | nil
   def default_probe_gguf do
     if File.exists?(staging_gguf_path()), do: staging_gguf_path(), else: nil
+  end
+
+  @doc "Default-Drafter-Quelle (Ticket #318): das Staging-Artefakt, falls vorhanden."
+  @spec default_probe_drafter() :: String.t() | nil
+  def default_probe_drafter do
+    if File.exists?(staging_drafter_path()), do: staging_drafter_path(), else: nil
   end
 
   ## ------------------------------------------------------- Werkzeug-Entdeckung
@@ -244,11 +302,16 @@ defmodule KomkiCli.Config do
 
   @doc "Erlang-Wurzel zu einem `escript`-Pfad (`<root>/bin/escript`)."
   @spec erlang_root(String.t()) :: String.t()
-  def erlang_root(escript_bin), do: escript_bin |> Path.dirname() |> Path.dirname()
+  def erlang_root(escript_bin), do: Seatbelt.erlang_root(escript_bin)
 
   @doc "Default der Egress-Ports je Connector (CONTRACT.md §9)."
   @spec default_egress_ports() :: %{String.t() => pos_integer()}
   def default_egress_ports, do: @default_egress_ports
+
+  @doc "Egress-Ports zu einem llama-Port (Ticket #203: ris `port + 7`, web `port + 8`)."
+  @spec egress_ports_for(pos_integer()) :: %{String.t() => pos_integer()}
+  def egress_ports_for(port) when is_integer(port) and port > 0,
+    do: Map.new(@egress_port_offsets, fn {id, offset} -> {id, port + offset} end)
 
   @doc "Default-Basis der RIS-API (echter Betrieb)."
   @spec default_ris_base_url() :: String.t()
@@ -356,6 +419,22 @@ defmodule KomkiCli.Config do
         @model_filename
       ])
 
+  @doc """
+  Staging-Ort des MTP-Drafters (Ticket #318): dasselbe Verzeichnis wie das
+  Modell, unter dem Dateinamen ohne den `MTP/`-Repo-Pfad.
+  """
+  @spec staging_drafter_path() :: String.t()
+  def staging_drafter_path,
+    do:
+      Path.join([
+        canonical(System.user_home!()),
+        ".local",
+        "share",
+        "komki",
+        "models-staging",
+        @drafter_filename
+      ])
+
   @doc "Basisverzeichnis: KOMKI_HOME oder ~/.local/share/komki."
   @spec default_base() :: String.t()
   def default_base do
@@ -373,34 +452,12 @@ defmodule KomkiCli.Config do
   Symlink-Form matchen nicht), unter anderen Hosts bleibt z.B. `/tmp/...`
   einfach `/tmp/...`. Die Definition liest das Dateisystem selbst, keine
   Plattform-Weichen. Idempotent.
+
+  Implementierung lebt seit Ticket #226 in der Library (`Seatbelt.canonical/1`);
+  dieser Einstieg bleibt als komki-API erhalten.
   """
   @spec canonical(String.t()) :: String.t()
-  def canonical(path) when is_binary(path) do
-    path
-    |> Path.expand()
-    |> resolve_realpath()
-  end
-
-  # Kernel-Sicht via readlink(1) (kein :file.realpath in diesem OTP).
-  # BSD-readlink (macOS) scheitert an fehlenden Pfaden, GNU erlaubt
-  # fehlende letzte Komponente — deshalb Fallback: tiefsten existierenden
-  # Vorfahren aufloesen und den Rest wieder anfuegen. Ohne readlink
-  # degradiert die Aufloesung auf die expandierte Form.
-  defp resolve_realpath(expanded) do
-    if bin = System.find_executable("readlink") do
-      resolve(bin, expanded)
-    else
-      expanded
-    end
-  end
-
-  defp resolve(bin, path) do
-    case System.cmd(bin, ["-f", path]) do
-      {real, 0} -> String.trim_trailing(real)
-      {_, _} when path == "/" -> path
-      {_, _} -> Path.join(resolve(bin, Path.dirname(path)), Path.basename(path))
-    end
-  end
+  def canonical(path) when is_binary(path), do: Seatbelt.canonical(path)
 
   # Burrito-Einzeldatei (Ticket #181): Rollen starten als `<binary> <rolle>`,
   # die Laufzeit liegt entpackt unter :code.root_dir(). Sonst Escript.
@@ -436,13 +493,16 @@ defmodule KomkiCli.Config do
     base = canonical(base_dir)
     node_bin = resolve_node_bin()
     komki = Keyword.get_lazy(opts, :komki_bin, &self_komki/0)
+    port = opts[:port] || @default_port
 
     %__MODULE__{
       base_dir: base,
-      port: opts[:port] || @default_port,
+      port: port,
       ctx: opts[:ctx] || @default_ctx,
       gguf_path: Path.join([base, "models", @model_filename]),
       gguf_sha256: @expected_gguf_sha256,
+      drafter_path: Path.join([base, "models", @drafter_filename]),
+      drafter_sha256: @expected_drafter_sha256,
       pi_home: Path.join(base, "pi-home"),
       node_bin: node_bin,
       cli_js: resolve_cli_js(node_bin),
@@ -462,11 +522,16 @@ defmodule KomkiCli.Config do
           KomkiConnector.Manifest.all(),
           &{&1.id, komki || resolve_escript(&1.binary, base)}
         ),
-      egress_ports: @default_egress_ports,
+      egress_ports: egress_ports_for(port),
       ris_base_url: opts[:ris_base_url] || @default_ris_base_url,
       ris_mock_port: opts[:ris_mock_port],
+      web_mock_port: opts[:web_mock_port],
       # Default: synthetischer Test-Vault unter der Basis (init legt ihn an)
-      vault_dir: vault_dir_opt(opts[:vault_dir], base)
+      vault_dir: vault_dir_opt(opts[:vault_dir], base),
+      # Durchstich #409, belegt im Wegwerf-Lauf: Socket des ratsprojekte-Hubs, nur gesetzt,
+      # wenn die Instanz einen kennt.
+      ratsprojekte_socket: blank_to_nil(opts[:ratsprojekte_socket]),
+      ratsprojekte_stand: blank_to_nil(opts[:ratsprojekte_stand])
     }
   end
 
@@ -487,6 +552,26 @@ defmodule KomkiCli.Config do
     do: "http://127.0.0.1:" <> Integer.to_string(port) <> "/"
 
   def ris_url(%__MODULE__{ris_base_url: url}), do: url || @default_ris_base_url
+
+  # A missing or retired URL becomes the current default (in memory; the
+  # next save writes it); any other URL stays.
+  defp ris_base_url(url) when url in [nil | @retired_ris_base_urls], do: @default_ris_base_url
+  defp ris_base_url(url), do: url
+
+  @doc """
+  Web-Connector gegen einen Brave-Mock (Ticket #340)? Dann spricht er
+  direkt mit `http://127.0.0.1:<web_mock_port>/` statt ueber den
+  Egress-Proxy; ohne Mock nimmt er seine eigene Default-URL (echte API).
+  """
+  @spec web_mock?(t()) :: boolean()
+  def web_mock?(%__MODULE__{web_mock_port: port}), do: is_integer(port)
+
+  @doc "Basis-URL des Brave-Mocks; nil ohne Mock."
+  @spec web_mock_url(t()) :: String.t() | nil
+  def web_mock_url(%__MODULE__{web_mock_port: port}) when is_integer(port),
+    do: "http://127.0.0.1:" <> Integer.to_string(port) <> "/"
+
+  def web_mock_url(%__MODULE__{}), do: nil
 
   @doc "Pfad der config.json für ein Basisverzeichnis."
   @spec config_path(String.t()) :: String.t()
@@ -538,8 +623,13 @@ defmodule KomkiCli.Config do
   ]
 
   # Optionale Felder: fehlen sie in aelteren config.json, wird nil gelesen —
-  # kein Breaking-Change fuer bestehende Instanzen.
+  # kein Breaking-Change fuer bestehende Instanzen. Ausnahme drafter_path/
+  # drafter_sha256 (Ticket #318): Sie bekommen Laden-Defaults (Pfad aus
+  # base_dir, SHA aus dem Code-Pin) — aeltere Instanzen sehen so denselben
+  # Pfad wie frische, und der Doctor meldet nur die fehlende Datei.
   @optional_keys [
+    :drafter_path,
+    :drafter_sha256,
     :fd_bin,
     :rg_bin,
     :mediator_bin,
@@ -552,7 +642,13 @@ defmodule KomkiCli.Config do
     :egress_ports,
     :ris_base_url,
     :ris_mock_port,
-    :vault_dir
+    :web_mock_port,
+    :vault_dir,
+    # Durchstich #409, belegt im Wegwerf-Lauf
+    :ratsprojekte_socket,
+    # Stand lesen (#419)
+    :ratsprojekte_stand,
+    :pins
   ]
 
   @spec from_map(%{String.t() => term()}) :: {:ok, t()} | {:error, String.t()}
@@ -580,6 +676,12 @@ defmodule KomkiCli.Config do
       ctx: require_pos(:ctx, map["ctx"]),
       gguf_path: map["gguf_path"],
       gguf_sha256: map["gguf_sha256"],
+      # Ticket #318: Laden-Defaults — aeltere config.json ohne die Felder
+      # bekommen Pfad und Pin nachgetragen (Config-Migration, rein lesend).
+      drafter_path:
+        Map.get(map, "drafter_path") ||
+          Path.join([map["base_dir"], "models", @drafter_filename]),
+      drafter_sha256: Map.get(map, "drafter_sha256") || @expected_drafter_sha256,
       pi_home: map["pi_home"],
       node_bin: map["node_bin"],
       cli_js: map["cli_js"],
@@ -598,9 +700,13 @@ defmodule KomkiCli.Config do
       egress_bin: Map.get(map, "egress_bin"),
       connector_bins: Map.get(map, "connector_bins") || %{},
       egress_ports: ports(Map.get(map, "egress_ports", @default_egress_ports)),
-      ris_base_url: Map.get(map, "ris_base_url") || @default_ris_base_url,
+      ris_base_url: ris_base_url(Map.get(map, "ris_base_url")),
       ris_mock_port: optional_pos(:ris_mock_port, Map.get(map, "ris_mock_port")),
-      vault_dir: blank_to_nil(Map.get(map, "vault_dir"))
+      web_mock_port: optional_pos(:web_mock_port, Map.get(map, "web_mock_port")),
+      vault_dir: blank_to_nil(Map.get(map, "vault_dir")),
+      ratsprojekte_socket: blank_to_nil(Map.get(map, "ratsprojekte_socket")),
+      ratsprojekte_stand: blank_to_nil(Map.get(map, "ratsprojekte_stand")),
+      pins: Map.get(map, "pins") || %{}
     }
   end
 

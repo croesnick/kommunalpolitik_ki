@@ -1,13 +1,14 @@
 defmodule KomkiMediator.FakeConnector do
   @moduledoc false
 
-  # Fake-Connectoren fuer die Tests: echter KomkiConnector.Server auf einem
+  # Fake-Connectoren fuer die Tests: echter Sidecar.Server auf einem
   # Unix-Socket in einem kurzen /tmp-Pfad (macOS-Grenze 103 Byte). Jeder
   # Aufruf meldet sich beim Test-Prozess mit Operation, Parametern, Kontext
   # und der Anzahl der Journal-Datensaetze zum Aufrufzeitpunkt; die Antwort
   # liefert die im Test gesetzte Funktion `reply.(op, params, context)`.
 
-  alias KomkiConnector.Server
+  alias KomkiConnector.Manifest
+  alias Sidecar.{Server, Token}
 
   @doc "Kurzes, frisches Connector-Verzeichnis unter /tmp."
   def short_dir do
@@ -24,13 +25,15 @@ defmodule KomkiMediator.FakeConnector do
     module = module(id)
     path = Path.join(dir, id <> ".sock")
     {:ok, listener} = Server.listen(path)
+    token = Token.provision!(path)
     state = %{test: self(), journal_path: journal_path, reply: reply}
-    pid = spawn_link(fn -> Server.accept_loop(listener, module, state) end)
-    :ok = :gen_tcp.controlling_process(listener, pid)
+    pid = spawn_link(fn -> Server.accept_loop(listener, module, state, token) end)
+    :ok = :socket.setopt(listener, {:otp, :controlling_process}, pid)
     pid
   end
 
   defp module("documents"), do: KomkiMediator.FakeConnector.Documents
+  defp module("ratsprojekte"), do: KomkiMediator.FakeConnector.Ratsprojekte
   defp module("ris"), do: KomkiMediator.FakeConnector.Ris
   defp module("web"), do: KomkiMediator.FakeConnector.Web
   defp module("vault"), do: KomkiMediator.FakeConnector.Vault
@@ -44,8 +47,8 @@ defmodule KomkiMediator.FakeConnector do
 
   defmodule Documents do
     @moduledoc false
-    @behaviour KomkiConnector.Server
-    def manifest_id, do: "documents"
+    @behaviour Sidecar.Server
+    def manifest, do: Manifest.sidecar!("documents")
     def init(arg), do: {:ok, arg}
 
     def handle_op(op, params, context, state),
@@ -54,8 +57,8 @@ defmodule KomkiMediator.FakeConnector do
 
   defmodule Ris do
     @moduledoc false
-    @behaviour KomkiConnector.Server
-    def manifest_id, do: "ris"
+    @behaviour Sidecar.Server
+    def manifest, do: Manifest.sidecar!("ris")
     def init(arg), do: {:ok, arg}
 
     def handle_op(op, params, context, state),
@@ -64,8 +67,8 @@ defmodule KomkiMediator.FakeConnector do
 
   defmodule Web do
     @moduledoc false
-    @behaviour KomkiConnector.Server
-    def manifest_id, do: "web"
+    @behaviour Sidecar.Server
+    def manifest, do: Manifest.sidecar!("web")
     def init(arg), do: {:ok, arg}
 
     def handle_op(op, params, context, state),
@@ -74,11 +77,21 @@ defmodule KomkiMediator.FakeConnector do
 
   defmodule Vault do
     @moduledoc false
-    @behaviour KomkiConnector.Server
-    def manifest_id, do: "vault"
+    @behaviour Sidecar.Server
+    def manifest, do: Manifest.sidecar!("vault")
     def init(arg), do: {:ok, arg}
 
     def handle_op(op, params, context, state),
       do: KomkiMediator.FakeConnector.handle_op("vault", op, params, context, state)
+  end
+
+  defmodule Ratsprojekte do
+    @moduledoc false
+    @behaviour Sidecar.Server
+    def manifest, do: Manifest.sidecar!("ratsprojekte")
+    def init(arg), do: {:ok, arg}
+
+    def handle_op(op, params, context, state),
+      do: KomkiMediator.FakeConnector.handle_op("ratsprojekte", op, params, context, state)
   end
 end

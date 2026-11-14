@@ -28,11 +28,16 @@ defmodule KomkiCli.ConnectorProfileTest do
           "ris" => "/opt/komki/bin/komki-connector-ris",
           "web" => "/opt/komki/bin/komki-connector-web",
           "vault" => "/opt/komki/bin/komki-connector-vault",
-          "documents" => "/opt/komki/bin/komki-connector-documents"
+          "documents" => "/opt/komki/bin/komki-connector-documents",
+          # DURCHSTICH #409 (Wegwerf)
+          "ratsprojekte" => "/opt/komki/bin/komki-connector-ratsprojekte"
         },
         egress_ports: %{"ris" => 49_531, "web" => 49_532},
         ris_mock_port: nil,
-        vault_dir: @base <> "/vault"
+        vault_dir: @base <> "/vault",
+        ratsprojekte_socket: @base <> "/hub/hub.sock",
+        # Stand lesen (#419)
+        ratsprojekte_stand: @base <> "/hub/stand.json"
     }
 
     struct!(base, overrides)
@@ -114,6 +119,16 @@ defmodule KomkiCli.ConnectorProfileTest do
       refute text =~ "49531"
     end
 
+    test "Web-Mock: direkter Mock-Port statt Proxy-Port" do
+      text = ConnectorProfile.connector(cfg(web_mock_port: 4020), Manifest.fetch!("web"))
+
+      assert rules_with(text, "(allow network-outbound") == [
+               "(allow network-outbound (remote tcp \"localhost:4020\"))"
+             ]
+
+      refute text =~ "49532"
+    end
+
     test "Vault: kein Netz, {vault_dir} lesen, komki-test schreiben, sonst nichts schreiben" do
       text = ConnectorProfile.connector(cfg(), Manifest.fetch!("vault"))
 
@@ -138,6 +153,34 @@ defmodule KomkiCli.ConnectorProfileTest do
       assert_raise ArgumentError, ~r/vault_dir/, fn ->
         ConnectorProfile.connector(cfg(vault_dir: nil), Manifest.fetch!("vault"))
       end
+    end
+
+    # vault_dir kommt aus der config.json: ein Anfuehrungszeichen darf das
+    # Literal nicht schliessen und eine eigene Regel anhaengen.
+    test "Vault-Pfad mit Anfuehrungszeichen: Generierung scheitert statt Regel-Injection" do
+      assert_raise ArgumentError, ~r/unsafe SBPL string/, fn ->
+        ConnectorProfile.connector(
+          cfg(vault_dir: ~s{/opt/v")) (allow default}),
+          Manifest.fetch!("vault")
+        )
+      end
+    end
+
+    # #419: The stand file is the only thing the ratsprojekte connector
+    # may read beyond its runtime; without ratsprojekte_stand the rule is
+    # gone, and the hub socket stays the only way out.
+    test "ratsprojekte: genau die Stand-Datei lesen, ohne Stand keine fs-Regel" do
+      text = ConnectorProfile.connector(cfg(), Manifest.fetch!("ratsprojekte"))
+
+      assert rules_with(text, "(subpath \"/opt/komki-golden") == [
+               "(allow file-read* (subpath \"/opt/komki-golden/hub/stand.json\"))"
+             ]
+
+      without =
+        ConnectorProfile.connector(cfg(ratsprojekte_stand: nil), Manifest.fetch!("ratsprojekte"))
+
+      assert rules_with(without, "(subpath \"/opt/komki-golden") == []
+      refute without =~ "stand.json"
     end
   end
 
@@ -173,7 +216,7 @@ defmodule KomkiCli.ConnectorProfileTest do
       outbound = rules_with(text, "(allow network-outbound")
 
       assert outbound ==
-               Enum.map(["documents", "ris", "vault", "web"], fn id ->
+               Enum.map(["documents", "ratsprojekte", "ris", "vault", "web"], fn id ->
                  "(allow network-outbound (remote unix-socket (path-literal \"/opt/komki-golden/run/connectors/" <>
                    id <> ".sock\")))"
                end)
@@ -199,7 +242,7 @@ defmodule KomkiCli.ConnectorProfileTest do
              ]
     end
 
-    test "Ziel-Kanal (#143): Socket binden, Token lesen, kein TCP-Bind" do
+    test "Unix-Socket des Vermittlers (#143): Socket binden, Token lesen, kein TCP-Bind" do
       cfg = cfg()
       text = MediatorProfile.generate(cfg, {:unix, MediatorProfile.socket_path(cfg)})
 

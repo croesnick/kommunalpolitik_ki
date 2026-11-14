@@ -1,6 +1,6 @@
 defmodule KomkiCli.ChannelTest do
   @moduledoc """
-  Kanal pi → Vermittler (Ticket #143): Laufzeitverzeichnis, Token-Datei,
+  Unix-Socket pi → Vermittler (Ticket #143): Laufzeitverzeichnis, Token-Datei,
   Session-ID, Relay und Socket-Pfad-Grenze.
   """
 
@@ -90,7 +90,7 @@ defmodule KomkiCli.ChannelTest do
       token = env["KOMKI_MEDIATOR_TOKEN"]
 
       run_argv = Pi.argv_for(cfg, Path.join(cfg.base_dir, "runs/x"), :text, "Hallo")
-      session_argv = Pi.argv_session(cfg, false)
+      session_argv = Pi.argv_session(cfg, Path.join(cfg.pi_home, "sessions/s"), false)
 
       refute Enum.any?(run_argv ++ session_argv, &String.contains?(&1, token))
 
@@ -106,6 +106,8 @@ defmodule KomkiCli.ChannelTest do
       long = "/tmp/" <> String.duplicate("x", 90)
       assert {:error, reason} = Channel.check_socket_path(%{cfg | base_dir: long})
       assert reason =~ "103"
+      assert reason =~ "kürzere Basis"
+      assert reason =~ "KOMKI_HOME="
     end
   end
 

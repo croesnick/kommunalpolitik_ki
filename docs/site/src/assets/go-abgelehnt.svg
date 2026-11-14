@@ -1,0 +1,1765 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1082" height="962" viewBox="0 0 1082 962" font-family="Menlo, Monaco, 'Courier New', monospace">
+<rect width="1082" height="962" fill="#0d1117"/>
+<rect width="1082" height="962" rx="10" fill="#0d1117"/>
+<line x1="0" y1="34" x2="1082" y2="34" stroke="#21262d" stroke-width="1"/>
+<circle cx="18" cy="17" r="6" fill="#ff5f57"/>
+<circle cx="40" cy="17" r="6" fill="#febc2e"/>
+<circle cx="62" cy="17" r="6" fill="#28c840"/>
+<text x="541" y="21.5" fill="#6e7681" font-size="12" text-anchor="middle">komki session</text>
+<text y="61.5" xml:space="preserve">
+</text>
+<text y="81.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">T</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">.</tspan>
+</text>
+<text y="101.5" xml:space="preserve">
+</text>
+<text y="121.5" xml:space="preserve">
+</text>
+<text y="141.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#ffffff" font-weight="bold" fill-opacity="0.62">I</tspan>
+<tspan x="42.2" fill="#ffffff" font-weight="bold" fill-opacity="0.62">m</tspan>
+<tspan x="50.3" fill="#ffffff" font-weight="bold" fill-opacity="0.62"> </tspan>
+<tspan x="58.4" fill="#ffffff" font-weight="bold" fill-opacity="0.62">W</tspan>
+<tspan x="66.5" fill="#ffffff" font-weight="bold" fill-opacity="0.62">e</tspan>
+<tspan x="74.6" fill="#ffffff" font-weight="bold" fill-opacity="0.62">b</tspan>
+<tspan x="82.7" fill="#ffffff" font-weight="bold" fill-opacity="0.62"> </tspan>
+<tspan x="90.8" fill="#ffffff" font-weight="bold" fill-opacity="0.62">s</tspan>
+<tspan x="98.9" fill="#ffffff" font-weight="bold" fill-opacity="0.62">u</tspan>
+<tspan x="107.0" fill="#ffffff" font-weight="bold" fill-opacity="0.62">c</tspan>
+<tspan x="115.1" fill="#ffffff" font-weight="bold" fill-opacity="0.62">h</tspan>
+<tspan x="123.2" fill="#ffffff" font-weight="bold" fill-opacity="0.62">e</tspan>
+<tspan x="131.3" fill="#ffffff" font-weight="bold" fill-opacity="0.62">n</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">»</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">F</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">ö</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">G</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">w</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62">B</tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62">y</tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62">«</tspan>
+</text>
+<text y="161.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#ffffff" font-weight="bold" fill-opacity="0.62">✗</tspan>
+<tspan x="42.2" fill="#ffffff" font-weight="bold" fill-opacity="0.62"> </tspan>
+<tspan x="50.3" fill="#ffffff" font-weight="bold" fill-opacity="0.62">a</tspan>
+<tspan x="58.4" fill="#ffffff" font-weight="bold" fill-opacity="0.62">b</tspan>
+<tspan x="66.5" fill="#ffffff" font-weight="bold" fill-opacity="0.62">g</tspan>
+<tspan x="74.6" fill="#ffffff" font-weight="bold" fill-opacity="0.62">e</tspan>
+<tspan x="82.7" fill="#ffffff" font-weight="bold" fill-opacity="0.62">l</tspan>
+<tspan x="90.8" fill="#ffffff" font-weight="bold" fill-opacity="0.62">e</tspan>
+<tspan x="98.9" fill="#ffffff" font-weight="bold" fill-opacity="0.62">h</tspan>
+<tspan x="107.0" fill="#ffffff" font-weight="bold" fill-opacity="0.62">n</tspan>
+<tspan x="115.1" fill="#ffffff" font-weight="bold" fill-opacity="0.62">t</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">D</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">A</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">v</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">.</tspan>
+</text>
+<text y="181.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">G</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">E</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">ä</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">A</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">(</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">v</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62">,</tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="455.3" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="463.4" fill="#6e7681" fill-opacity="0.62">z</tspan>
+<tspan x="471.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="479.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="487.7" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="495.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="503.9" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="512.0" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="520.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="528.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="536.3" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="544.4" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="552.5" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="560.6" fill="#6e7681" fill-opacity="0.62">,</tspan>
+<tspan x="568.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="576.8" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="584.9" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="593.0" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="601.1" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="609.2" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="617.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="625.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="633.5" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="641.6" fill="#6e7681" fill-opacity="0.62">)</tspan>
+<tspan x="649.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="657.8" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="665.9" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="674.0" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="682.1" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="690.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="698.3" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="706.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="714.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="722.6" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="730.7" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="738.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="746.9" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="755.0" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="763.1" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="771.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="779.3" fill="#6e7681" fill-opacity="0.62">A</tspan>
+<tspan x="787.4" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="795.5" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="803.6" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="811.7" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="819.8" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="827.9" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="836.0" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="844.1" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="852.2" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="860.3" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="868.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="876.5" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="884.6" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="892.7" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="900.8" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="908.9" fill="#6e7681" fill-opacity="0.62">t</tspan>
+</text>
+<text y="201.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#c9d1d9"> </tspan>
+<tspan x="42.2" fill="#c9d1d9"> </tspan>
+<tspan x="50.3" fill="#c9d1d9"> </tspan>
+<tspan x="58.4" fill="#c9d1d9"> </tspan>
+<tspan x="66.5" fill="#c9d1d9"> </tspan>
+<tspan x="74.6" fill="#c9d1d9"> </tspan>
+<tspan x="82.7" fill="#c9d1d9"> </tspan>
+<tspan x="90.8" fill="#c9d1d9"> </tspan>
+<tspan x="98.9" fill="#c9d1d9"> </tspan>
+<tspan x="107.0" fill="#c9d1d9"> </tspan>
+<tspan x="115.1" fill="#c9d1d9">a</tspan>
+<tspan x="123.2" fill="#c9d1d9">l</tspan>
+<tspan x="131.3" fill="#c9d1d9">l</tspan>
+<tspan x="139.4" fill="#c9d1d9">e</tspan>
+<tspan x="147.5" fill="#c9d1d9"> </tspan>
+<tspan x="155.6" fill="#c9d1d9">e</tspan>
+<tspan x="163.7" fill="#c9d1d9">r</tspan>
+<tspan x="171.8" fill="#c9d1d9">l</tspan>
+<tspan x="179.9" fill="#c9d1d9">a</tspan>
+<tspan x="188.0" fill="#c9d1d9">u</tspan>
+<tspan x="196.1" fill="#c9d1d9">b</tspan>
+<tspan x="204.2" fill="#c9d1d9">t</tspan>
+<tspan x="212.3" fill="#c9d1d9">.</tspan>
+</text>
+<text y="221.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">M</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">ö</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">A</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">–</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">–</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="455.3" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="463.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="471.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="479.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="487.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="495.8" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="503.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="512.0" fill="#6e7681" fill-opacity="0.62">G</tspan>
+<tspan x="520.1" fill="#6e7681" fill-opacity="0.62">O</tspan>
+<tspan x="528.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="536.3" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="544.4" fill="#6e7681" fill-opacity="0.62">ü</tspan>
+<tspan x="552.5" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="560.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="568.7" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="576.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="584.9" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="593.0" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="601.1" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="609.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="617.3" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="625.4" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="633.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="641.6" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="649.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="657.8" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="665.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="674.0" fill="#6e7681" fill-opacity="0.62">A</tspan>
+<tspan x="682.1" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="690.2" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="698.3" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="706.4" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="714.5" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="722.6" fill="#6e7681" fill-opacity="0.62">,</tspan>
+<tspan x="730.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="738.8" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="746.9" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="755.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="763.1" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="771.2" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="779.3" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="787.4" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="795.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="803.6" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="811.7" fill="#6e7681" fill-opacity="0.62">F</tspan>
+<tspan x="819.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="827.9" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="836.0" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="844.1" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="852.2" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="860.3" fill="#6e7681" fill-opacity="0.62">r</tspan>
+</text>
+<text y="241.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">G</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">O</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">N</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">,</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">w</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">F</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="455.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="463.4" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="471.5" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="479.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="487.7" fill="#6e7681" fill-opacity="0.62">w</tspan>
+<tspan x="495.8" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="503.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="512.0" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="520.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="528.2" fill="#6e7681" fill-opacity="0.62">F</tspan>
+<tspan x="536.3" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="544.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="552.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="560.6" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="568.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="576.8" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="584.9" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="593.0" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="601.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="609.2" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="617.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="625.4" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="633.5" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="641.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="649.7" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="657.8" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="665.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="674.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="682.1" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="690.2" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="698.3" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="706.4" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="714.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="722.6" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="730.7" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="738.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="746.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="755.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="763.1" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="771.2" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="779.3" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="787.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="795.5" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="803.6" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="811.7" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="819.8" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="827.9" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="836.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="844.1" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="852.2" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="860.3" fill="#6e7681" fill-opacity="0.62">.</tspan>
+</text>
+<text y="261.5" xml:space="preserve">
+</text>
+<text y="281.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">B</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">3</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62">3</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">3</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">8</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">6</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">…</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">·</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">+</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">:</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">P</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">ü</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62">s</tspan>
+</text>
+<text y="301.5" xml:space="preserve">
+</text>
+<text y="321.5" xml:space="preserve">
+</text>
+<text y="341.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">T</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">.</tspan>
+</text>
+<text y="361.5" xml:space="preserve">
+</text>
+<text y="381.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#c9d1d9">D</tspan>
+<tspan x="42.2" fill="#c9d1d9">i</tspan>
+<tspan x="50.3" fill="#c9d1d9">e</tspan>
+<tspan x="58.4" fill="#c9d1d9"> </tspan>
+<tspan x="66.5" fill="#c9d1d9">W</tspan>
+<tspan x="74.6" fill="#c9d1d9">e</tspan>
+<tspan x="82.7" fill="#c9d1d9">b</tspan>
+<tspan x="90.8" fill="#c9d1d9">s</tspan>
+<tspan x="98.9" fill="#c9d1d9">u</tspan>
+<tspan x="107.0" fill="#c9d1d9">c</tspan>
+<tspan x="115.1" fill="#c9d1d9">h</tspan>
+<tspan x="123.2" fill="#c9d1d9">e</tspan>
+<tspan x="131.3" fill="#c9d1d9"> </tspan>
+<tspan x="139.4" fill="#c9d1d9">n</tspan>
+<tspan x="147.5" fill="#c9d1d9">a</tspan>
+<tspan x="155.6" fill="#c9d1d9">c</tspan>
+<tspan x="163.7" fill="#c9d1d9">h</tspan>
+<tspan x="171.8" fill="#c9d1d9"> </tspan>
+<tspan x="179.9" fill="#c9d1d9">„</tspan>
+<tspan x="188.0" fill="#c9d1d9">F</tspan>
+<tspan x="196.1" fill="#c9d1d9">ö</tspan>
+<tspan x="204.2" fill="#c9d1d9">r</tspan>
+<tspan x="212.3" fill="#c9d1d9">d</tspan>
+<tspan x="220.4" fill="#c9d1d9">e</tspan>
+<tspan x="228.5" fill="#c9d1d9">r</tspan>
+<tspan x="236.6" fill="#c9d1d9">p</tspan>
+<tspan x="244.7" fill="#c9d1d9">r</tspan>
+<tspan x="252.8" fill="#c9d1d9">o</tspan>
+<tspan x="260.9" fill="#c9d1d9">g</tspan>
+<tspan x="269.0" fill="#c9d1d9">r</tspan>
+<tspan x="277.1" fill="#c9d1d9">a</tspan>
+<tspan x="285.2" fill="#c9d1d9">m</tspan>
+<tspan x="293.3" fill="#c9d1d9">m</tspan>
+<tspan x="301.4" fill="#c9d1d9"> </tspan>
+<tspan x="309.5" fill="#c9d1d9">G</tspan>
+<tspan x="317.6" fill="#c9d1d9">e</tspan>
+<tspan x="325.7" fill="#c9d1d9">w</tspan>
+<tspan x="333.8" fill="#c9d1d9">e</tspan>
+<tspan x="341.9" fill="#c9d1d9">r</tspan>
+<tspan x="350.0" fill="#c9d1d9">b</tspan>
+<tspan x="358.1" fill="#c9d1d9">e</tspan>
+<tspan x="366.2" fill="#c9d1d9">g</tspan>
+<tspan x="374.3" fill="#c9d1d9">e</tspan>
+<tspan x="382.4" fill="#c9d1d9">b</tspan>
+<tspan x="390.5" fill="#c9d1d9">i</tspan>
+<tspan x="398.6" fill="#c9d1d9">e</tspan>
+<tspan x="406.7" fill="#c9d1d9">t</tspan>
+<tspan x="414.8" fill="#c9d1d9"> </tspan>
+<tspan x="422.9" fill="#c9d1d9">B</tspan>
+<tspan x="431.0" fill="#c9d1d9">a</tspan>
+<tspan x="439.1" fill="#c9d1d9">y</tspan>
+<tspan x="447.2" fill="#c9d1d9">e</tspan>
+<tspan x="455.3" fill="#c9d1d9">r</tspan>
+<tspan x="463.4" fill="#c9d1d9">n</tspan>
+<tspan x="471.5" fill="#c9d1d9">“</tspan>
+<tspan x="479.6" fill="#c9d1d9"> </tspan>
+<tspan x="487.7" fill="#c9d1d9">w</tspan>
+<tspan x="495.8" fill="#c9d1d9">u</tspan>
+<tspan x="503.9" fill="#c9d1d9">r</tspan>
+<tspan x="512.0" fill="#c9d1d9">d</tspan>
+<tspan x="520.1" fill="#c9d1d9">e</tspan>
+<tspan x="528.2" fill="#c9d1d9"> </tspan>
+<tspan x="536.3" fill="#c9d1d9">a</tspan>
+<tspan x="544.4" fill="#c9d1d9">b</tspan>
+<tspan x="552.5" fill="#c9d1d9">g</tspan>
+<tspan x="560.6" fill="#c9d1d9">e</tspan>
+<tspan x="568.7" fill="#c9d1d9">l</tspan>
+<tspan x="576.8" fill="#c9d1d9">e</tspan>
+<tspan x="584.9" fill="#c9d1d9">h</tspan>
+<tspan x="593.0" fill="#c9d1d9">n</tspan>
+<tspan x="601.1" fill="#c9d1d9">t</tspan>
+<tspan x="609.2" fill="#c9d1d9"> </tspan>
+<tspan x="617.3" fill="#c9d1d9">u</tspan>
+<tspan x="625.4" fill="#c9d1d9">n</tspan>
+<tspan x="633.5" fill="#c9d1d9">d</tspan>
+<tspan x="641.6" fill="#c9d1d9"> </tspan>
+<tspan x="649.7" fill="#c9d1d9">k</tspan>
+<tspan x="657.8" fill="#c9d1d9">o</tspan>
+<tspan x="665.9" fill="#c9d1d9">n</tspan>
+<tspan x="674.0" fill="#c9d1d9">n</tspan>
+<tspan x="682.1" fill="#c9d1d9">t</tspan>
+<tspan x="690.2" fill="#c9d1d9">e</tspan>
+<tspan x="698.3" fill="#c9d1d9"> </tspan>
+<tspan x="706.4" fill="#c9d1d9">d</tspan>
+<tspan x="714.5" fill="#c9d1d9">a</tspan>
+<tspan x="722.6" fill="#c9d1d9">h</tspan>
+<tspan x="730.7" fill="#c9d1d9">e</tspan>
+<tspan x="738.8" fill="#c9d1d9">r</tspan>
+<tspan x="746.9" fill="#c9d1d9"> </tspan>
+<tspan x="755.0" fill="#c9d1d9">n</tspan>
+<tspan x="763.1" fill="#c9d1d9">i</tspan>
+<tspan x="771.2" fill="#c9d1d9">c</tspan>
+<tspan x="779.3" fill="#c9d1d9">h</tspan>
+<tspan x="787.4" fill="#c9d1d9">t</tspan>
+<tspan x="795.5" fill="#c9d1d9"> </tspan>
+<tspan x="803.6" fill="#c9d1d9">d</tspan>
+<tspan x="811.7" fill="#c9d1d9">u</tspan>
+<tspan x="819.8" fill="#c9d1d9">r</tspan>
+<tspan x="827.9" fill="#c9d1d9">c</tspan>
+<tspan x="836.0" fill="#c9d1d9">h</tspan>
+<tspan x="844.1" fill="#c9d1d9">g</tspan>
+<tspan x="852.2" fill="#c9d1d9">e</tspan>
+<tspan x="860.3" fill="#c9d1d9">f</tspan>
+<tspan x="868.4" fill="#c9d1d9">ü</tspan>
+<tspan x="876.5" fill="#c9d1d9">h</tspan>
+<tspan x="884.6" fill="#c9d1d9">r</tspan>
+<tspan x="892.7" fill="#c9d1d9">t</tspan>
+</text>
+<text y="401.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#c9d1d9">w</tspan>
+<tspan x="42.2" fill="#c9d1d9">e</tspan>
+<tspan x="50.3" fill="#c9d1d9">r</tspan>
+<tspan x="58.4" fill="#c9d1d9">d</tspan>
+<tspan x="66.5" fill="#c9d1d9">e</tspan>
+<tspan x="74.6" fill="#c9d1d9">n</tspan>
+<tspan x="82.7" fill="#c9d1d9">.</tspan>
+</text>
+<text y="421.5" xml:space="preserve">
+</text>
+<text y="441.5" xml:space="preserve">
+</text>
+<text y="461.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">B</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">v</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">W</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">:</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62">F</tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">ö</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62">G</tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62">w</tspan>
+<tspan x="455.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="463.4" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="471.5" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="479.6" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="487.7" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="495.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="503.9" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="512.0" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="520.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="528.2" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="536.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="544.4" fill="#6e7681" fill-opacity="0.62">B</tspan>
+<tspan x="552.5" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="560.6" fill="#6e7681" fill-opacity="0.62">y</tspan>
+<tspan x="568.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="576.8" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="584.9" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="593.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="601.1" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="609.2" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="617.3" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="625.4" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="633.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="641.6" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="649.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="657.8" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="665.9" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="674.0" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="682.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="690.2" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="698.3" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="706.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="714.5" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="722.6" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="730.7" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="738.8" fill="#6e7681" fill-opacity="0.62">,</tspan>
+<tspan x="746.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="755.0" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="763.1" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="771.2" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="779.3" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="787.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="795.5" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="803.6" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="811.7" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="819.8" fill="#6e7681" fill-opacity="0.62">z</tspan>
+<tspan x="827.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="836.0" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="844.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="852.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="860.3" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="868.4" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="876.5" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="884.6" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="892.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="900.8" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="908.9" fill="#6e7681" fill-opacity="0.62">.</tspan>
+</text>
+<text y="481.5" xml:space="preserve">
+</text>
+<text y="501.5" xml:space="preserve">
+</text>
+<text y="521.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">T</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">.</tspan>
+</text>
+<text y="541.5" xml:space="preserve">
+</text>
+<text y="561.5" xml:space="preserve">
+</text>
+<text y="581.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#ffffff" font-weight="bold" fill-opacity="0.62">I</tspan>
+<tspan x="42.2" fill="#ffffff" font-weight="bold" fill-opacity="0.62">m</tspan>
+<tspan x="50.3" fill="#ffffff" font-weight="bold" fill-opacity="0.62"> </tspan>
+<tspan x="58.4" fill="#ffffff" font-weight="bold" fill-opacity="0.62">W</tspan>
+<tspan x="66.5" fill="#ffffff" font-weight="bold" fill-opacity="0.62">e</tspan>
+<tspan x="74.6" fill="#ffffff" font-weight="bold" fill-opacity="0.62">b</tspan>
+<tspan x="82.7" fill="#ffffff" font-weight="bold" fill-opacity="0.62"> </tspan>
+<tspan x="90.8" fill="#ffffff" font-weight="bold" fill-opacity="0.62">s</tspan>
+<tspan x="98.9" fill="#ffffff" font-weight="bold" fill-opacity="0.62">u</tspan>
+<tspan x="107.0" fill="#ffffff" font-weight="bold" fill-opacity="0.62">c</tspan>
+<tspan x="115.1" fill="#ffffff" font-weight="bold" fill-opacity="0.62">h</tspan>
+<tspan x="123.2" fill="#ffffff" font-weight="bold" fill-opacity="0.62">e</tspan>
+<tspan x="131.3" fill="#ffffff" font-weight="bold" fill-opacity="0.62">n</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">»</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">F</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">ö</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">G</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">w</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62">B</tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62">y</tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62">«</tspan>
+</text>
+<text y="601.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#ffffff" font-weight="bold" fill-opacity="0.62">✗</tspan>
+<tspan x="42.2" fill="#ffffff" font-weight="bold" fill-opacity="0.62"> </tspan>
+<tspan x="50.3" fill="#ffffff" font-weight="bold" fill-opacity="0.62">a</tspan>
+<tspan x="58.4" fill="#ffffff" font-weight="bold" fill-opacity="0.62">b</tspan>
+<tspan x="66.5" fill="#ffffff" font-weight="bold" fill-opacity="0.62">g</tspan>
+<tspan x="74.6" fill="#ffffff" font-weight="bold" fill-opacity="0.62">e</tspan>
+<tspan x="82.7" fill="#ffffff" font-weight="bold" fill-opacity="0.62">l</tspan>
+<tspan x="90.8" fill="#ffffff" font-weight="bold" fill-opacity="0.62">e</tspan>
+<tspan x="98.9" fill="#ffffff" font-weight="bold" fill-opacity="0.62">h</tspan>
+<tspan x="107.0" fill="#ffffff" font-weight="bold" fill-opacity="0.62">n</tspan>
+<tspan x="115.1" fill="#ffffff" font-weight="bold" fill-opacity="0.62">t</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">D</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">A</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">v</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">.</tspan>
+</text>
+<text y="621.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">G</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">E</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">ä</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">A</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">(</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">v</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62">,</tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="455.3" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="463.4" fill="#6e7681" fill-opacity="0.62">z</tspan>
+<tspan x="471.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="479.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="487.7" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="495.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="503.9" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="512.0" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="520.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="528.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="536.3" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="544.4" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="552.5" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="560.6" fill="#6e7681" fill-opacity="0.62">,</tspan>
+<tspan x="568.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="576.8" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="584.9" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="593.0" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="601.1" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="609.2" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="617.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="625.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="633.5" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="641.6" fill="#6e7681" fill-opacity="0.62">)</tspan>
+<tspan x="649.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="657.8" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="665.9" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="674.0" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="682.1" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="690.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="698.3" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="706.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="714.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="722.6" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="730.7" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="738.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="746.9" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="755.0" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="763.1" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="771.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="779.3" fill="#6e7681" fill-opacity="0.62">A</tspan>
+<tspan x="787.4" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="795.5" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="803.6" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="811.7" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="819.8" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="827.9" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="836.0" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="844.1" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="852.2" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="860.3" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="868.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="876.5" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="884.6" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="892.7" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="900.8" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="908.9" fill="#6e7681" fill-opacity="0.62">t</tspan>
+</text>
+<text y="641.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#c9d1d9"> </tspan>
+<tspan x="42.2" fill="#c9d1d9"> </tspan>
+<tspan x="50.3" fill="#c9d1d9"> </tspan>
+<tspan x="58.4" fill="#c9d1d9"> </tspan>
+<tspan x="66.5" fill="#c9d1d9"> </tspan>
+<tspan x="74.6" fill="#c9d1d9"> </tspan>
+<tspan x="82.7" fill="#c9d1d9"> </tspan>
+<tspan x="90.8" fill="#c9d1d9"> </tspan>
+<tspan x="98.9" fill="#c9d1d9"> </tspan>
+<tspan x="107.0" fill="#c9d1d9"> </tspan>
+<tspan x="115.1" fill="#c9d1d9">a</tspan>
+<tspan x="123.2" fill="#c9d1d9">l</tspan>
+<tspan x="131.3" fill="#c9d1d9">l</tspan>
+<tspan x="139.4" fill="#c9d1d9">e</tspan>
+<tspan x="147.5" fill="#c9d1d9"> </tspan>
+<tspan x="155.6" fill="#c9d1d9">e</tspan>
+<tspan x="163.7" fill="#c9d1d9">r</tspan>
+<tspan x="171.8" fill="#c9d1d9">l</tspan>
+<tspan x="179.9" fill="#c9d1d9">a</tspan>
+<tspan x="188.0" fill="#c9d1d9">u</tspan>
+<tspan x="196.1" fill="#c9d1d9">b</tspan>
+<tspan x="204.2" fill="#c9d1d9">t</tspan>
+<tspan x="212.3" fill="#c9d1d9">.</tspan>
+</text>
+<text y="661.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">M</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">ö</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">A</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">–</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">–</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="455.3" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="463.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="471.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="479.6" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="487.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="495.8" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="503.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="512.0" fill="#6e7681" fill-opacity="0.62">G</tspan>
+<tspan x="520.1" fill="#6e7681" fill-opacity="0.62">O</tspan>
+<tspan x="528.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="536.3" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="544.4" fill="#6e7681" fill-opacity="0.62">ü</tspan>
+<tspan x="552.5" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="560.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="568.7" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="576.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="584.9" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="593.0" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="601.1" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="609.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="617.3" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="625.4" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="633.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="641.6" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="649.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="657.8" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="665.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="674.0" fill="#6e7681" fill-opacity="0.62">A</tspan>
+<tspan x="682.1" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="690.2" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="698.3" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="706.4" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="714.5" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="722.6" fill="#6e7681" fill-opacity="0.62">,</tspan>
+<tspan x="730.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="738.8" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="746.9" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="755.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="763.1" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="771.2" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="779.3" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="787.4" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="795.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="803.6" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="811.7" fill="#6e7681" fill-opacity="0.62">F</tspan>
+<tspan x="819.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="827.9" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="836.0" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="844.1" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="852.2" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="860.3" fill="#6e7681" fill-opacity="0.62">r</tspan>
+</text>
+<text y="681.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">G</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">O</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">D</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">F</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">E</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">s</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="455.3" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="463.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="471.5" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="479.6" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="487.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="495.8" fill="#6e7681" fill-opacity="0.62">N</tspan>
+<tspan x="503.9" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="512.0" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="520.1" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="528.2" fill="#6e7681" fill-opacity="0.62">.</tspan>
+</text>
+<text y="701.5" xml:space="preserve">
+</text>
+<text y="721.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">B</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62">8</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">2</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">6</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">9</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">1</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">…</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">·</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">+</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">:</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">P</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">ü</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">f</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62">s</tspan>
+</text>
+<text y="741.5" xml:space="preserve">
+</text>
+<text y="761.5" xml:space="preserve">
+</text>
+<text y="781.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">T</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">h</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62">g</tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">.</tspan>
+</text>
+<text y="801.5" xml:space="preserve">
+</text>
+<text y="821.5" xml:space="preserve">
+<tspan x="26.0" fill="#c9d1d9"> </tspan>
+<tspan x="34.1" fill="#c9d1d9">A</tspan>
+<tspan x="42.2" fill="#c9d1d9">u</tspan>
+<tspan x="50.3" fill="#c9d1d9">c</tspan>
+<tspan x="58.4" fill="#c9d1d9">h</tspan>
+<tspan x="66.5" fill="#c9d1d9"> </tspan>
+<tspan x="74.6" fill="#c9d1d9">d</tspan>
+<tspan x="82.7" fill="#c9d1d9">e</tspan>
+<tspan x="90.8" fill="#c9d1d9">r</tspan>
+<tspan x="98.9" fill="#c9d1d9"> </tspan>
+<tspan x="107.0" fill="#c9d1d9">z</tspan>
+<tspan x="115.1" fill="#c9d1d9">w</tspan>
+<tspan x="123.2" fill="#c9d1d9">e</tspan>
+<tspan x="131.3" fill="#c9d1d9">i</tspan>
+<tspan x="139.4" fill="#c9d1d9">t</tspan>
+<tspan x="147.5" fill="#c9d1d9">e</tspan>
+<tspan x="155.6" fill="#c9d1d9"> </tspan>
+<tspan x="163.7" fill="#c9d1d9">V</tspan>
+<tspan x="171.8" fill="#c9d1d9">e</tspan>
+<tspan x="179.9" fill="#c9d1d9">r</tspan>
+<tspan x="188.0" fill="#c9d1d9">s</tspan>
+<tspan x="196.1" fill="#c9d1d9">u</tspan>
+<tspan x="204.2" fill="#c9d1d9">c</tspan>
+<tspan x="212.3" fill="#c9d1d9">h</tspan>
+<tspan x="220.4" fill="#c9d1d9"> </tspan>
+<tspan x="228.5" fill="#c9d1d9">w</tspan>
+<tspan x="236.6" fill="#c9d1d9">u</tspan>
+<tspan x="244.7" fill="#c9d1d9">r</tspan>
+<tspan x="252.8" fill="#c9d1d9">d</tspan>
+<tspan x="260.9" fill="#c9d1d9">e</tspan>
+<tspan x="269.0" fill="#c9d1d9"> </tspan>
+<tspan x="277.1" fill="#c9d1d9">a</tspan>
+<tspan x="285.2" fill="#c9d1d9">b</tspan>
+<tspan x="293.3" fill="#c9d1d9">g</tspan>
+<tspan x="301.4" fill="#c9d1d9">e</tspan>
+<tspan x="309.5" fill="#c9d1d9">l</tspan>
+<tspan x="317.6" fill="#c9d1d9">e</tspan>
+<tspan x="325.7" fill="#c9d1d9">h</tspan>
+<tspan x="333.8" fill="#c9d1d9">n</tspan>
+<tspan x="341.9" fill="#c9d1d9">t</tspan>
+<tspan x="350.0" fill="#c9d1d9">,</tspan>
+<tspan x="358.1" fill="#c9d1d9"> </tspan>
+<tspan x="366.2" fill="#c9d1d9">s</tspan>
+<tspan x="374.3" fill="#c9d1d9">o</tspan>
+<tspan x="382.4" fill="#c9d1d9">d</tspan>
+<tspan x="390.5" fill="#c9d1d9">a</tspan>
+<tspan x="398.6" fill="#c9d1d9">s</tspan>
+<tspan x="406.7" fill="#c9d1d9">s</tspan>
+<tspan x="414.8" fill="#c9d1d9"> </tspan>
+<tspan x="422.9" fill="#c9d1d9">i</tspan>
+<tspan x="431.0" fill="#c9d1d9">c</tspan>
+<tspan x="439.1" fill="#c9d1d9">h</tspan>
+<tspan x="447.2" fill="#c9d1d9"> </tspan>
+<tspan x="455.3" fill="#c9d1d9">k</tspan>
+<tspan x="463.4" fill="#c9d1d9">e</tspan>
+<tspan x="471.5" fill="#c9d1d9">i</tspan>
+<tspan x="479.6" fill="#c9d1d9">n</tspan>
+<tspan x="487.7" fill="#c9d1d9">e</tspan>
+<tspan x="495.8" fill="#c9d1d9"> </tspan>
+<tspan x="503.9" fill="#c9d1d9">W</tspan>
+<tspan x="512.0" fill="#c9d1d9">e</tspan>
+<tspan x="520.1" fill="#c9d1d9">b</tspan>
+<tspan x="528.2" fill="#c9d1d9">s</tspan>
+<tspan x="536.3" fill="#c9d1d9">u</tspan>
+<tspan x="544.4" fill="#c9d1d9">c</tspan>
+<tspan x="552.5" fill="#c9d1d9">h</tspan>
+<tspan x="560.6" fill="#c9d1d9">e</tspan>
+<tspan x="568.7" fill="#c9d1d9"> </tspan>
+<tspan x="576.8" fill="#c9d1d9">d</tspan>
+<tspan x="584.9" fill="#c9d1d9">u</tspan>
+<tspan x="593.0" fill="#c9d1d9">r</tspan>
+<tspan x="601.1" fill="#c9d1d9">c</tspan>
+<tspan x="609.2" fill="#c9d1d9">h</tspan>
+<tspan x="617.3" fill="#c9d1d9">f</tspan>
+<tspan x="625.4" fill="#c9d1d9">ü</tspan>
+<tspan x="633.5" fill="#c9d1d9">h</tspan>
+<tspan x="641.6" fill="#c9d1d9">r</tspan>
+<tspan x="649.7" fill="#c9d1d9">e</tspan>
+<tspan x="657.8" fill="#c9d1d9">n</tspan>
+<tspan x="665.9" fill="#c9d1d9"> </tspan>
+<tspan x="674.0" fill="#c9d1d9">k</tspan>
+<tspan x="682.1" fill="#c9d1d9">o</tspan>
+<tspan x="690.2" fill="#c9d1d9">n</tspan>
+<tspan x="698.3" fill="#c9d1d9">n</tspan>
+<tspan x="706.4" fill="#c9d1d9">t</tspan>
+<tspan x="714.5" fill="#c9d1d9">e</tspan>
+<tspan x="722.6" fill="#c9d1d9">.</tspan>
+</text>
+<text y="841.5" xml:space="preserve">
+</text>
+<text y="861.5" xml:space="preserve">
+<tspan x="26.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="455.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="463.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="471.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="479.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="487.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="495.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="503.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="512.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="520.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="528.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="536.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="544.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="552.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="560.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="568.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="576.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="584.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="593.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="601.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="609.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="617.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="625.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="633.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="641.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="649.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="657.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="665.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="674.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="682.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="690.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="698.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="706.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="714.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="722.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="730.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="738.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="746.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="755.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="763.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="771.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="779.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="787.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="795.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="803.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="811.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="819.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="827.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="836.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="844.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="852.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="860.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="868.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="876.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="884.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="892.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="900.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="908.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="917.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="925.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+</text>
+<text y="881.5" xml:space="preserve">
+</text>
+<text y="901.5" xml:space="preserve">
+<tspan x="26.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="455.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="463.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="471.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="479.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="487.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="495.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="503.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="512.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="520.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="528.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="536.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="544.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="552.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="560.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="568.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="576.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="584.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="593.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="601.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="609.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="617.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="625.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="633.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="641.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="649.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="657.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="665.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="674.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="682.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="690.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="698.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="706.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="714.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="722.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="730.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="738.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="746.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="755.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="763.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="771.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="779.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="787.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="795.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="803.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="811.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="819.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="827.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="836.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="844.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="852.2" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="860.3" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="868.4" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="876.5" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="884.6" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="892.7" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="900.8" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="908.9" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="917.0" fill="#6e7681" fill-opacity="0.62">─</tspan>
+<tspan x="925.1" fill="#6e7681" fill-opacity="0.62">─</tspan>
+</text>
+<text y="921.5" xml:space="preserve">
+<tspan x="26.0" fill="#6e7681" fill-opacity="0.62">/</tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">v</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62">/</tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">/</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">n</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62">/</tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">r</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">b</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">t</tspan>
+</text>
+<text y="941.5" xml:space="preserve">
+<tspan x="26.0" fill="#6e7681" fill-opacity="0.62">↑</tspan>
+<tspan x="34.1" fill="#6e7681" fill-opacity="0.62">1</tspan>
+<tspan x="42.2" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="50.3" fill="#6e7681" fill-opacity="0.62">9</tspan>
+<tspan x="58.4" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="66.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="74.6" fill="#6e7681" fill-opacity="0.62">↓</tspan>
+<tspan x="82.7" fill="#6e7681" fill-opacity="0.62">9</tspan>
+<tspan x="90.8" fill="#6e7681" fill-opacity="0.62">0</tspan>
+<tspan x="98.9" fill="#6e7681" fill-opacity="0.62">4</tspan>
+<tspan x="107.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="115.1" fill="#6e7681" fill-opacity="0.62">R</tspan>
+<tspan x="123.2" fill="#6e7681" fill-opacity="0.62">7</tspan>
+<tspan x="131.3" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="139.4" fill="#6e7681" fill-opacity="0.62">1</tspan>
+<tspan x="147.5" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="155.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="163.7" fill="#6e7681" fill-opacity="0.62">C</tspan>
+<tspan x="171.8" fill="#6e7681" fill-opacity="0.62">H</tspan>
+<tspan x="179.9" fill="#6e7681" fill-opacity="0.62">8</tspan>
+<tspan x="188.0" fill="#6e7681" fill-opacity="0.62">8</tspan>
+<tspan x="196.1" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="204.2" fill="#6e7681" fill-opacity="0.62">4</tspan>
+<tspan x="212.3" fill="#6e7681" fill-opacity="0.62">%</tspan>
+<tspan x="220.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="228.5" fill="#6e7681" fill-opacity="0.62">1</tspan>
+<tspan x="236.6" fill="#6e7681" fill-opacity="0.62">.</tspan>
+<tspan x="244.7" fill="#6e7681" fill-opacity="0.62">7</tspan>
+<tspan x="252.8" fill="#6e7681" fill-opacity="0.62">%</tspan>
+<tspan x="260.9" fill="#6e7681" fill-opacity="0.62">/</tspan>
+<tspan x="269.0" fill="#6e7681" fill-opacity="0.62">1</tspan>
+<tspan x="277.1" fill="#6e7681" fill-opacity="0.62">2</tspan>
+<tspan x="285.2" fill="#6e7681" fill-opacity="0.62">8</tspan>
+<tspan x="293.3" fill="#6e7681" fill-opacity="0.62">k</tspan>
+<tspan x="301.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="309.5" fill="#6e7681" fill-opacity="0.62">(</tspan>
+<tspan x="317.6" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="325.7" fill="#6e7681" fill-opacity="0.62">u</tspan>
+<tspan x="333.8" fill="#6e7681" fill-opacity="0.62">t</tspan>
+<tspan x="341.9" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="350.0" fill="#6e7681" fill-opacity="0.62">)</tspan>
+<tspan x="358.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="366.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="374.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="382.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="390.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="398.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="406.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="414.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="422.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="431.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="439.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="447.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="455.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="463.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="471.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="479.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="487.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="495.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="503.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="512.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="520.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="528.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="536.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="544.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="552.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="560.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="568.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="576.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="584.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="593.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="601.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="609.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="617.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="625.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="633.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="641.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="649.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="657.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="665.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="674.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="682.1" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="690.2" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="698.3" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="706.4" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="714.5" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="722.6" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="730.7" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="738.8" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="746.9" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="755.0" fill="#6e7681" fill-opacity="0.62">(</tspan>
+<tspan x="763.1" fill="#6e7681" fill-opacity="0.62">p</tspan>
+<tspan x="771.2" fill="#6e7681" fill-opacity="0.62">i</tspan>
+<tspan x="779.3" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="787.4" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="795.5" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="803.6" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="811.7" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="819.8" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="827.9" fill="#6e7681" fill-opacity="0.62">)</tspan>
+<tspan x="836.0" fill="#6e7681" fill-opacity="0.62"> </tspan>
+<tspan x="844.1" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="852.2" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="860.3" fill="#6e7681" fill-opacity="0.62">c</tspan>
+<tspan x="868.4" fill="#6e7681" fill-opacity="0.62">a</tspan>
+<tspan x="876.5" fill="#6e7681" fill-opacity="0.62">l</tspan>
+<tspan x="884.6" fill="#6e7681" fill-opacity="0.62">-</tspan>
+<tspan x="892.7" fill="#6e7681" fill-opacity="0.62">m</tspan>
+<tspan x="900.8" fill="#6e7681" fill-opacity="0.62">o</tspan>
+<tspan x="908.9" fill="#6e7681" fill-opacity="0.62">d</tspan>
+<tspan x="917.0" fill="#6e7681" fill-opacity="0.62">e</tspan>
+<tspan x="925.1" fill="#6e7681" fill-opacity="0.62">l</tspan>
+</text>
+<rect x="26.0" y="872" width="8.1" height="15" rx="2" fill="#c9d1d9"/>
+</svg>

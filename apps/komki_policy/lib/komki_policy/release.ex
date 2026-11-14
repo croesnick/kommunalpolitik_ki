@@ -1,6 +1,7 @@
 defmodule KomkiPolicy.Release do
   @moduledoc """
-  Aktionsfreigabe-Datensatz `komki-release/1` (CONTRACT.md § 2.6).
+  Freigabe-Datensatz `komki-release/2` (CONTRACT.md § 2.6): eine
+  Aktionsfreigabe oder — seit #423 — eine Offenlegungsfreigabe.
 
   Geschlossene Schema-Validierung plus die verbindliche Call-Hash-Formel
   (R.6.2): ein GO autorisiert ein Ereignis, nicht nur einen Text — die
@@ -9,17 +10,28 @@ defmodule KomkiPolicy.Release do
   Workspace). Kein separater Referenzvergleich; ein abweichender Call
   fällt durch den Hash-Abgleich auf.
 
+  Neu in `komki-release/2` (Ticket #423): eine Offenlegungsfreigabe
+  nennt zusätzlich die Ausgabeart und das Ziellabel der Lockerung
+  (R.6.1, R.6.2 — Ausgangs- und Ziellabel): `ausgabeart` aus dem
+  geschlossenen Vokabular (§ 2.1) und `ziellabel` als sortierte,
+  eindeutige Liste existierender Bindungen. Beide Felder sind für
+  `kind: offenlegungsfreigabe` Pflicht und für
+  `kind: aktionsfreigabe` verboten (eine Aktionsfreigabe lockert keine
+  Bindung, § 4.6). `komki-release/1` bleibt für Aktionsfreigaben
+  unverändert gültig; das Ziellabel einer Aktionsfreigabe ist immer
+  `[]`.
+
   Die Validierung ist rein und umfasst die geschlossene Feldmenge, die
   `kind`-Menge (`aktionsfreigabe` | `offenlegungsfreigabe`; unbekannte
   Werte sind Eingabefehler), die Operation (unbekannte Werte Eingabefehler;
-  bekannte Nicht-`emit`-Operationen werden erst im Freigabe-Zweig,
-  CONTRACT § 4.6, zu `unsupported`), Hex-Digest-Formate und das
+  entscheidbar sind `emit`, `store` und `transfer` erst im Freigabe-Zweig,
+  CONTRACT § 4.6 und § 4.9), Hex-Digest-Formate und das
   Frische-Fenster `valid_from <= valid_until` (logische Ganzzahlen —
   die Engine hat keine Uhr, § 1; die Prüfung gegen `as_of` geschieht im
   Freigabe-Zweig, nicht hier).
   """
 
-  alias KomkiPolicy.JSON
+  alias KomkiPolicy.{JSON, Registry, Validations}
 
   @fields [
     "schema",
@@ -36,9 +48,9 @@ defmodule KomkiPolicy.Release do
     "valid_until",
     "nonce"
   ]
+  @offenlegung_fields ["ausgabeart", "ziellabel"]
   @kinds ["aktionsfreigabe", "offenlegungsfreigabe"]
   @known_operations ["start", "admit", "emit", "transfer", "store"]
-  @hex_re ~r/\A[0-9a-f]{64}\z/
 
   @type t() :: %{
           required(:release_id) => String.t(),
@@ -52,7 +64,9 @@ defmodule KomkiPolicy.Release do
           required(:authority) => String.t(),
           required(:valid_from) => integer(),
           required(:valid_until) => integer(),
-          required(:nonce) => String.t()
+          required(:nonce) => String.t(),
+          optional(:ausgabeart) => String.t(),
+          optional(:ziellabel) => [String.t()]
         }
 
   @type error() :: %{
@@ -93,76 +107,117 @@ defmodule KomkiPolicy.Release do
   end
 
   defp validate_reason(term) do
-    with {:ok, _} <- require_map(term, "$"),
-         :ok <- require_schema(term),
-         :ok <- closed_fields(term, @fields, "$"),
-         :ok <- require_kebab(term["release_id"], "$.release_id"),
+    # Schema je Art (§ 2.6): komki-release/1 ist die Aktionsfreigabe,
+    # komki-release/2 die Offenlegungsfreigabe mit ausgabeart und
+    # ziellabel. Die Schema-Kennung muss zur Art passen.
+    schema =
+      case term do
+        %{"kind" => "offenlegungsfreigabe"} -> "komki-release/2"
+        _ -> "komki-release/1"
+      end
+
+    with {:ok, _} <- Validations.require_map(term, "$"),
+         :ok <- Validations.require_schema(term, schema, :missing_field),
+         :ok <- closed_fields_for_kind(term),
+         :ok <- Validations.require_kebab(term["release_id"], "$.release_id"),
          :ok <- require_kind(term["kind"]),
-         :ok <- require_operation(term["operation"]),
-         :ok <- require_object_ref(term["object"], "$.object"),
-         :ok <- require_kebab(term["workspace"], "$.workspace"),
-         :ok <- require_hex64(term["content_digest"], "$.content_digest"),
-         :ok <- require_hex64(term["call_hash"], "$.call_hash"),
-         :ok <- require_kebab(term["scope"], "$.scope"),
-         :ok <- require_kebab(term["authority"], "$.authority"),
+         :ok <- Validations.require_operation(term["operation"], @known_operations),
+         :ok <- Validations.require_object_ref(term["object"], "$.object"),
+         :ok <- Validations.require_kebab(term["workspace"], "$.workspace"),
+         :ok <-
+           Validations.require_hex64(term["content_digest"], "$.content_digest", :invalid_digest),
+         :ok <- Validations.require_hex64(term["call_hash"], "$.call_hash", :invalid_digest),
+         :ok <- Validations.require_kebab(term["scope"], "$.scope"),
+         :ok <- Validations.require_kebab(term["authority"], "$.authority"),
          :ok <- require_window(term),
-         :ok <- require_kebab(term["nonce"], "$.nonce") do
+         :ok <- Validations.require_kebab(term["nonce"], "$.nonce"),
+         {:ok, offenlegung} <- require_offenlegung_fields(term) do
       {:ok,
-       %{
-         release_id: term["release_id"],
-         kind: term["kind"],
-         operation: term["operation"],
-         object: term["object"],
-         workspace: term["workspace"],
-         content_digest: term["content_digest"],
-         call_hash: term["call_hash"],
-         scope: term["scope"],
-         authority: term["authority"],
-         valid_from: term["valid_from"],
-         valid_until: term["valid_until"],
-         nonce: term["nonce"]
-       }}
+       Map.merge(
+         %{
+           release_id: term["release_id"],
+           kind: term["kind"],
+           operation: term["operation"],
+           object: term["object"],
+           workspace: term["workspace"],
+           content_digest: term["content_digest"],
+           call_hash: term["call_hash"],
+           scope: term["scope"],
+           authority: term["authority"],
+           valid_from: term["valid_from"],
+           valid_until: term["valid_until"],
+           nonce: term["nonce"]
+         },
+         offenlegung
+       )}
     end
   end
 
-  defp require_map(%{} = map, _path), do: {:ok, map}
+  # Feldmenge je Art: eine Aktionsfreigabe bleibt beim geschlossenen
+  # Satz von komki-release/1; eine Offenlegungsfreigabe (komki-release/2)
+  # traegt zusaetzlich ausgabeart und ziellabel, beide Pflicht (§ 2.6).
+  defp closed_fields_for_kind(%{"kind" => "offenlegungsfreigabe"} = term) do
+    Validations.closed_fields(term, @fields ++ @offenlegung_fields, "$")
+  end
 
-  defp require_map(other, path),
-    do: {:error, {:invalid_record, path, "expected an object, got " <> Kernel.inspect(other)}}
+  defp closed_fields_for_kind(term), do: Validations.closed_fields(term, @fields, "$")
 
-  defp require_schema(%{"schema" => "komki-release/1"}), do: :ok
-
-  defp require_schema(%{"schema" => other}),
-    do:
-      {:error,
-       {:invalid_schema, "$.schema",
-        "expected \"komki-release/1\", got " <> Kernel.inspect(other)}}
-
-  defp require_schema(_other),
-    do: {:error, {:missing_field, "$.schema", "missing field \"schema\""}}
-
-  defp closed_fields(map, allowed, path) do
-    unknown = Enum.sort(Enum.reject(Map.keys(map), &(&1 in allowed)))
-
-    case unknown do
-      [] ->
-        :ok
-
-      [first | _] ->
-        {:error, {:unknown_field, path <> "." <> first, "field not part of the closed schema"}}
+  # Pflichtfelder der Offenlegungsfreigabe: ausgabeart aus dem
+  # geschlossenen Vokabular (§ 2.1), ziellabel sortiert, eindeutig, als
+  # Bindungsreferenzen. Die Existenz der Bindungen prueft der
+  # Offenlegungsfreigabe-Zweig gegen die konkrete Registry (§ 4.9);
+  # hier bleibt die Form geschlossen.
+  defp require_offenlegung_fields(%{"kind" => "offenlegungsfreigabe"} = term) do
+    with :ok <- require_ausgabeart(term["ausgabeart"]),
+         {:ok, ziellabel} <- require_ziellabel(term["ziellabel"]) do
+      {:ok, %{ausgabeart: term["ausgabeart"], ziellabel: ziellabel}}
     end
   end
 
-  defp require_kebab(value, path) when is_binary(value) do
-    if KomkiPolicy.Registry.kebab_id?(value),
-      do: :ok,
-      else: {:error, {:invalid_reference_id, path, "expected kebab-case id, got " <> value}}
+  defp require_offenlegung_fields(%{"kind" => "aktionsfreigabe"}) do
+    {:ok, %{ausgabeart: nil, ziellabel: []}}
   end
 
-  defp require_kebab(value, path),
+  defp require_offenlegung_fields(%{"kind" => kind}) do
+    {:error,
+     {:invalid_kind, "$.kind", "expected one of " <> inspect(@kinds) <> ", got " <> inspect(kind)}}
+  end
+
+  defp require_ausgabeart(nil),
+    do: {:error, {:missing_field, "$.ausgabeart", "offenlegungsfreigabe requires ausgabeart"}}
+
+  defp require_ausgabeart(value) when is_binary(value) do
+    if value in Registry.output_kinds() do
+      :ok
+    else
+      {:error,
+       {:invalid_output_kind, "$.ausgabeart",
+        "expected one of " <> inspect(Registry.output_kinds()) <> ", got " <> inspect(value)}}
+    end
+  end
+
+  defp require_ausgabeart(value),
     do:
       {:error,
-       {:invalid_reference_id, path, "expected kebab-case id, got " <> Kernel.inspect(value)}}
+       {:invalid_output_kind, "$.ausgabeart", "expected a kebab id, got " <> inspect(value)}}
+
+  defp require_ziellabel(nil),
+    do: {:error, {:missing_field, "$.ziellabel", "offenlegungsfreigabe requires ziellabel"}}
+
+  defp require_ziellabel(labels) when is_list(labels) do
+    if labels == Enum.sort(Enum.uniq(labels)) and labels != [] and
+         Enum.all?(labels, &Registry.reference_id?/1) do
+      {:ok, labels}
+    else
+      {:error,
+       {:invalid_ziellabel, "$.ziellabel",
+        "expected a sorted, duplicate-free, non-empty array of binding references"}}
+    end
+  end
+
+  defp require_ziellabel(_other) do
+    {:error, {:invalid_ziellabel, "$.ziellabel", "expected an array of binding references"}}
+  end
 
   defp require_kind(value) when value in @kinds, do: :ok
 
@@ -172,52 +227,12 @@ defmodule KomkiPolicy.Release do
       "expected one of " <> Kernel.inspect(@kinds) <> ", got " <> Kernel.inspect(value)}}
   end
 
-  defp require_operation(value) when value in @known_operations, do: :ok
-
-  defp require_operation(value) do
-    {:error, {:invalid_operation, "$.operation", "unknown operation: " <> Kernel.inspect(value)}}
-  end
-
-  defp require_object_ref(value, path) when is_binary(value) do
-    case String.split(value, "@") do
-      [object_id, version] ->
-        if KomkiPolicy.Registry.kebab_id?(object_id) and KomkiPolicy.Registry.kebab_id?(version) do
-          :ok
-        else
-          {:error,
-           {:invalid_reference_id, path,
-            "expected <object_id>@<version>, got " <> Kernel.inspect(value)}}
-        end
-
-      _ ->
-        {:error,
-         {:invalid_reference_id, path,
-          "expected <object_id>@<version>, got " <> Kernel.inspect(value)}}
-    end
-  end
-
-  defp require_object_ref(value, path) do
-    {:error,
-     {:invalid_reference_id, path,
-      "expected <object_id>@<version>, got " <> Kernel.inspect(value)}}
-  end
-
-  defp require_hex64(value, path) do
-    if is_binary(value) and Regex.match?(@hex_re, value) do
-      :ok
-    else
-      {:error,
-       {:invalid_digest, path,
-        "expected a lowercase sha256 hex string (64 hex digits), got " <> Kernel.inspect(value)}}
-    end
-  end
-
   defp require_window(term) do
     valid_from = term["valid_from"]
     valid_until = term["valid_until"]
 
-    with :ok <- nonnegative_integer(valid_from, "$.valid_from"),
-         :ok <- nonnegative_integer(valid_until, "$.valid_until") do
+    with :ok <- Validations.require_nonneg_integer(valid_from, "$.valid_from", :invalid_window),
+         :ok <- Validations.require_nonneg_integer(valid_until, "$.valid_until", :invalid_window) do
       if valid_from <= valid_until do
         :ok
       else
@@ -226,12 +241,5 @@ defmodule KomkiPolicy.Release do
           "valid_from must not exceed valid_until (#{Kernel.inspect(valid_from)} > #{Kernel.inspect(valid_until)})"}}
       end
     end
-  end
-
-  defp nonnegative_integer(value, _path) when is_integer(value) and value >= 0, do: :ok
-
-  defp nonnegative_integer(value, path) do
-    {:error,
-     {:invalid_window, path, "expected a non-negative integer, got " <> Kernel.inspect(value)}}
   end
 end

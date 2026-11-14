@@ -56,8 +56,10 @@ defmodule KomkiMediator.RelayTest do
 
     assert %{"id" => 3, "result" => %{"isError" => false}} = read_line(relay)
 
-    assert [%{"tool" => "ping", "session_id" => @session}] =
-             TestHelpers.journal_records(journal_path)
+    assert [
+             %{"tool" => "ping", "outcome" => "executing", "session_id" => @session},
+             %{"tool" => "ping", "outcome" => "admitted", "session_id" => @session}
+           ] = TestHelpers.journal_records(journal_path)
 
     Port.close(relay)
   end
@@ -73,6 +75,72 @@ defmodule KomkiMediator.RelayTest do
     assert %{"id" => 7, "error" => %{"code" => -32_000, "message" => message}} = read_line(relay)
     assert message =~ "401"
     refute message =~ wrong
+
+    Port.close(relay)
+  end
+
+  # Ticket #165: Schemaverstoss ueber das Relay - die Parameter-Vorpruefung
+  # antwortet mit decision error und schreibt den PDR mit der Session, die
+  # der Relay im Header traegt; kein emit, kein Vollzug.
+  test "Bereichsverstoss ueber das Relay: decision error, PDR mit Session", %{
+    socket: socket,
+    token: token,
+    journal_path: journal_path
+  } do
+    relay = start_relay(socket, token)
+    handshake(relay)
+
+    send_line(relay, %{
+      "jsonrpc" => "2.0",
+      "id" => 5,
+      "method" => "tools/call",
+      "params" => %{"name" => "web_search", "arguments" => %{"query" => "Radweg", "count" => 99}}
+    })
+
+    assert %{"id" => 5, "result" => %{"isError" => false, "content" => [content]}} =
+             read_line(relay)
+
+    assert %{"type" => "text", "text" => json} = content
+    assert %{"decision" => "error", "detail" => detail} = JSON.decode!(json)
+    assert detail =~ "ausserhalb 1..10"
+
+    assert [
+             %{
+               "tool" => "web_search",
+               "decision" => "error",
+               "outcome" => "error",
+               "rule" => "emit",
+               "session_id" => @session
+             }
+           ] = TestHelpers.journal_records(journal_path)
+
+    Port.close(relay)
+  end
+
+  # Ticket #216: geplanter Neustart mit gleichem Token. Die MCP-Session des
+  # alten Vermittlers ist weg; anubis legt zur unbekannten Mcp-Session-Id
+  # eine neue an, pi merkt nichts. Bricht diese Annahme (etwa 404 nach
+  # Streamable-HTTP-Spec), faellt es hier auf.
+  test "Vermittler-Neustart mit gleichem Token: Relay verbindet sich neu", %{
+    base: base,
+    socket: socket,
+    token: token
+  } do
+    relay = start_relay(socket, token)
+    handshake(relay)
+
+    :ok = stop_supervised(KomkiMediator.Supervisor)
+    File.rm(socket)
+    TestHelpers.start_socket_server!(base: base, socket: socket, token: token)
+
+    send_line(relay, %{
+      "jsonrpc" => "2.0",
+      "id" => 4,
+      "method" => "tools/call",
+      "params" => %{"name" => "ping", "arguments" => %{}}
+    })
+
+    assert %{"id" => 4, "result" => %{"isError" => false}} = read_line(relay)
 
     Port.close(relay)
   end
@@ -100,6 +168,22 @@ defmodule KomkiMediator.RelayTest do
          {~c"KOMKI_SESSION_ID", String.to_charlist(@session)}
        ]}
     ])
+  end
+
+  defp handshake(relay) do
+    send_line(relay, %{
+      "jsonrpc" => "2.0",
+      "id" => 1,
+      "method" => "initialize",
+      "params" => %{
+        "protocolVersion" => "2025-06-18",
+        "capabilities" => %{},
+        "clientInfo" => %{"name" => "relay-test", "version" => "0"}
+      }
+    })
+
+    assert %{"id" => 1, "result" => _} = read_line(relay)
+    send_line(relay, %{"jsonrpc" => "2.0", "method" => "notifications/initialized"})
   end
 
   defp send_line(port, message), do: Port.command(port, JSON.encode!(message) <> "\n")

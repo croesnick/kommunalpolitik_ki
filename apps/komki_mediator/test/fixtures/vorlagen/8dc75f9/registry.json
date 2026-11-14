@@ -1,0 +1,145 @@
+{
+  "bindings": {
+    "doc-oeffentlich@1": {
+      "operations": {
+        "admit": true
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": []
+    },
+    "doc-pending-freigabe@1": {
+      "operations": {
+        "admit": {
+          "eq": [
+            "vertraulich_freigabe",
+            true
+          ]
+        }
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": []
+    },
+    "doc-vertraulich@1": {
+      "operations": {
+        "admit": {
+          "eq": [
+            "purpose",
+            "vertraulich"
+          ]
+        }
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": []
+    },
+    "mediator-ping@1": {
+      "operations": {
+        "admit": true
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": []
+    },
+    "ris-oeffentlich@1": {
+      "operations": {
+        "admit": true,
+        "emit": true
+      },
+      "readers": [
+        "brave-search",
+        "nutzende-person",
+        "pi-agent",
+        "ris-betreiber"
+      ],
+      "relaxation_authorities": []
+    },
+    "vault-oeffentlich@1": {
+      "operations": {
+        "admit": true,
+        "emit": true
+      },
+      "readers": [
+        "brave-search",
+        "nutzende-person",
+        "pi-agent",
+        "ris-betreiber"
+      ],
+      "relaxation_authorities": []
+    },
+    "vault-vertraulich@1": {
+      "operations": {
+        "admit": true,
+        "emit": true
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": []
+    },
+    "web-oeffentlich@1": {
+      "operations": {
+        "admit": true,
+        "emit": true
+      },
+      "readers": [
+        "brave-search",
+        "nutzende-person",
+        "pi-agent",
+        "ris-betreiber"
+      ],
+      "relaxation_authorities": []
+    }
+  },
+  "environments": {
+    "lokaler-arbeitsraum@1": {
+      "observers": [
+        "nutzende-person",
+        "pi-agent"
+      ]
+    },
+    "ris-abruf@1": {
+      "observers": [
+        "nutzende-person",
+        "pi-agent",
+        "ris-betreiber"
+      ]
+    },
+    "vault-lokal@1": {
+      "observers": [
+        "nutzende-person",
+        "pi-agent"
+      ]
+    },
+    "web-suche@1": {
+      "observers": [
+        "brave-search",
+        "nutzende-person",
+        "pi-agent"
+      ]
+    }
+  },
+  "fact_fields": {
+    "output_content_digest": "string",
+    "purpose": "string",
+    "vertraulich_freigabe": "boolean"
+  },
+  "observers": [
+    "brave-search",
+    "nutzende-person",
+    "pi-agent",
+    "ris-betreiber"
+  ],
+  "registry_id": "reg-komki-arbeitsraum",
+  "schema": "komki-registry/2"
+}

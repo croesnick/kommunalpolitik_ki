@@ -8,6 +8,24 @@ defmodule KomkiCli.Llama do
 
       -m <gguf> --host 127.0.0.1 --port <port> --alias local-model
       --jinja --offline --no-webui --no-slots -c <ctx>
+      --reasoning off
+      --spec-type draft-mtp --spec-draft-n-max 4 --model-draft <drafter>
+
+  Thinking aus + MTP-Drafter (Ticket #318, Nutzerentscheidung nach Labbook
+  #285, Folgemessung F4): Der Pin verlor rund 70–80 % seiner Completion-Token
+  ans Thinking, ohne messbaren Qualitätsgewinn; mit beiden Schaltern braucht
+  er für dieselben Aufgaben rund 70 % weniger Zeit bei gleicher Bewertung
+  (blind) und gleicher Ausgabeverteilung (speculative decoding ändert nur
+  das Tempo). Flags nachgeprüft am llama-server-Build 0.7.0 (11669), auf dem
+  alle Läufe des Labbuchs liefen; `--model-draft` zeigt auf die zweite
+  SHA-verifizierte Datei der Instanz (`drafter_path`, Ticket #318).
+
+  Das Labbook mass Thinking aus noch als `--chat-template-kwargs
+  '{"enable_thinking":false}'`. Build 11669 meldet dafuer eine
+  Deprecation-Warnung; seit dem Nutzer-GO vom 31.10.2026 steht hier der
+  benannte Ersatz `--reasoning off`. Gleichwertigkeits-Sonde (gleicher Seed,
+  gleiche Sampling- und MTP-Flags): bytengleiche Antwort, gleiche
+  Completion-Token-Zahl, kein reasoning_content, draft acceptance 0,62.
 
   `--offline` und die Nichtverwendung von `-mu/-hf/-dr` sind Pflicht
   (Quellenbindung: nur das lokale, SHA-verifizierte Artefakt).
@@ -215,6 +233,21 @@ defmodule KomkiCli.Llama do
       "0.95",
       "--top-k",
       "64",
+      # Thinking aus + MTP (Ticket #318, Labbook #285 F4): gleiche Qualität,
+      # ~70 % kürzere Gesamtdauer. --reasoning off schaltet Gemma-4s Denken
+      # in der Chat aus (Nutzer-GO 31.10.2026; Ersatz fuer das im Labbook
+      # gemessene --chat-template-kwargs, siehe Moduledoc-Sonde);
+      # draft-mtp lässt den gepinnten Drafter bis zu vier Token vorschlagen,
+      # das Hauptmodell prüft jeden davon — die Ausgabeverteilung bleibt die
+      # des Hauptmodells.
+      "--reasoning",
+      "off",
+      "--spec-type",
+      "draft-mtp",
+      "--spec-draft-n-max",
+      "4",
+      "--model-draft",
+      cfg.drafter_path,
       "-c",
       to_string(cfg.ctx),
       "--api-key-file",

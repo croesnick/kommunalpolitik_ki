@@ -20,7 +20,7 @@ komki-connector-web --socket <pfad> [--proxy 127.0.0.1:<port>] [--base-url <url>
 |---|---|
 | `--socket` | Unix-Socket, den der Connector bindet (Rechte `0600`). Pflicht. |
 | `--proxy` | Egress-Proxy `komki-egress` als `host:port`. HTTPS läuft dann per `CONNECT api.search.brave.com:443` durch den Proxy. |
-| `--base-url` | Nur für Tests und Mock. Default `https://api.search.brave.com/`. |
+| `--base-url` | Nur für Tests und Mock. Default `https://api.search.brave.com/`. `komki up` setzt sie, wenn `web_mock_port` konfiguriert ist (`komki init --web-mock-port N`). |
 
 Gestartet wird der Connector von `komki up` unter seinem Seatbelt-Profil.
 
@@ -86,7 +86,7 @@ enthalten keine httpc-Gründe, denn die könnten Teile der Anfrage enthalten.
 ```bash
 cd apps/komki_connector_web
 mix deps.get
-mix test              # Mock-HTTP-Server (OTP) und echter Unix-Socket unter /tmp
+mix test              # Mock-HTTP-Server (OTP), Brave-Mock der Mock-Runtime (komki_mock), echter Unix-Socket unter /tmp
 mix credo --strict
 mix dialyzer
 mix escript.build     # erzeugt ./komki-connector-web (gitignored)

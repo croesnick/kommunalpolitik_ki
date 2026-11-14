@@ -1,0 +1,45 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "release_call_mismatch",
+      "condition": null
+    }
+  ],
+  "checked_label": [
+    "fraktion-intern@1",
+    "web-oeffentlich-fall@1"
+  ],
+  "content_digest": "91c1a28117d6d2e06c7345509d15a8beec707a90b89d3e4c4277fbcb1818b2f2",
+  "decision": "deny",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-offenlegung",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-essenz-a",
+    "version": "v1"
+  },
+  "registry_ref": "reg-fall-4711-test",
+  "release": null,
+  "remedies": [
+    {
+      "binding": null,
+      "code": "release_call_mismatch",
+      "condition": null,
+      "transitions": [
+        {
+          "ausgabeart": "ratsprojekte-essenz",
+          "call_hash": "db374793812b11b85a673b7366a4d851ca89a53889fee7a46010d2ca7f98687b",
+          "scope": "call",
+          "type": "offenlegungsfreigabe",
+          "ziellabel": [
+            "ratsprojekte@1"
+          ]
+        }
+      ]
+    }
+  ],
+  "rule": "store",
+  "snapshot_ref": "snap-offenlegung",
+  "workspace": "ws-fraktionsraum"
+}

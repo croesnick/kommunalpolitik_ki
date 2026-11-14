@@ -10,13 +10,14 @@ defmodule KomkiCli.MediatorProfile do
     * Erstprovisionierung: registry.json, room.json und documents/ anlegen
       (`KomkiMediator.Templates.provision!/1` schreibt sie beim ersten Start),
     * Log schreiben,
-    * den eigenen Kanal binden (#143): den Unix-Socket
+    * den eigenen Unix-Socket binden (#143):
       `<base>/run/mediator.sock` (binden, annehmen, 0600, alten entfernen)
       und die Token-Datei `<base>/run/mediator.token` lesen; die Variante
       `{:tcp, port}` bleibt fuer Tests und Altinstanzen generierbar,
     * `network-outbound` nur auf die Connector-Sockets
       `<base>/run/connectors/<id>.sock` (alle Manifest-IDs, damit der Text
-      nicht vom Vault-Schalter abhaengt).
+      nicht vom Vault-Schalter abhaengt) und Lesen der zugehoerigen
+      Token-Dateien `<id>.token` (`Sidecar.Token`).
 
   Kein Netz-Outbound sonst, kein process-exec fuer Connectoren (Seatbelt
   laesst sich nicht verschachteln; `komki up` startet die Connectoren).
@@ -24,6 +25,8 @@ defmodule KomkiCli.MediatorProfile do
 
   alias KomkiCli.{Channel, Config, ConnectorProfile, EscriptProfile, Mediator}
   alias KomkiConnector.Manifest
+  alias Seatbelt.SBPL
+  alias Sidecar.Token
 
   @type listen :: {:tcp, pos_integer()} | {:unix, String.t()}
 
@@ -31,13 +34,13 @@ defmodule KomkiCli.MediatorProfile do
   @spec path(Config.t()) :: String.t()
   def path(%Config{} = cfg), do: Path.join(Path.dirname(cfg.profile_path), "mediator.sb")
 
-  @doc "Socket-Pfad des Kanals (CONTRACT.md §2, #143; Quelle `KomkiCli.Channel`)."
+  @doc "Socket-Pfad des Vermittlers (CONTRACT.md §2, #143; Quelle `KomkiCli.Channel`)."
   @spec socket_path(Config.t()) :: String.t()
   def socket_path(%Config{} = cfg), do: Channel.socket_path(cfg)
 
   defp token_path(cfg), do: Channel.token_path(cfg)
 
-  @doc "Profiltext fuer den Kanal `listen`."
+  @doc "Profiltext fuer `listen`: wie pi den Vermittler erreicht."
   @spec generate(Config.t(), listen()) :: String.t()
   def generate(%Config{} = cfg, listen) do
     binary = mediator_bin!(cfg)
@@ -74,33 +77,34 @@ defmodule KomkiCli.MediatorProfile do
       "; Raum lesen (registry.json, room.json). Die Dokumente liest der",
       "; Dokument-Connector (Ticket #169); hier nur Metadaten fuer die",
       "; Erstprovisionierung, keine Inhalte.",
-      "(allow file-read* (literal \"" <>
-        data <>
-        "\") (literal \"" <>
-        Path.join(data, "registry.json") <>
-        "\") (literal \"" <> Path.join(data, "room.json") <> "\"))",
-      "(allow file-read-metadata (subpath \"" <> documents <> "\"))",
-      "(allow file-read* (subpath \"" <> journal <> "\") (subpath \"" <> go <> "\"))",
+      "(allow file-read* (literal " <>
+        SBPL.quote!(data) <>
+        ") (literal " <>
+        SBPL.quote!(Path.join(data, "registry.json")) <>
+        ") (literal " <> SBPL.quote!(Path.join(data, "room.json")) <> "))",
+      "(allow file-read-metadata (subpath " <> SBPL.quote!(documents) <> "))",
+      "(allow file-read* (subpath " <>
+        SBPL.quote!(journal) <> ") (subpath " <> SBPL.quote!(go) <> "))",
       "; Journal: anhaengen und uappnd setzen (Ticket #139)",
-      "(allow file-write* (subpath \"" <> journal <> "\"))",
+      "(allow file-write* (subpath " <> SBPL.quote!(journal) <> "))",
       "(allow process-exec (literal \"/usr/bin/chflags\"))",
       "(allow file-read* (literal \"/usr/bin/chflags\"))",
       "; Erstprovisionierung beim ersten Start (Templates.provision!/1)",
-      "(allow file-write* (literal \"" <>
-        data <>
-        "\") (literal \"" <>
-        Path.join(data, "registry.json") <>
-        "\") (literal \"" <> Path.join(data, "room.json") <> "\"))",
-      "(allow file-write* (subpath \"" <> documents <> "\"))",
+      "(allow file-write* (literal " <>
+        SBPL.quote!(data) <>
+        ") (literal " <>
+        SBPL.quote!(Path.join(data, "registry.json")) <>
+        ") (literal " <> SBPL.quote!(Path.join(data, "room.json")) <> "))",
+      "(allow file-write* (subpath " <> SBPL.quote!(documents) <> "))",
       "; GO-Anfragen und Offenlegungsstand (Ticket #98)",
-      "(allow file-write* (subpath \"" <> go <> "\"))"
+      "(allow file-write* (subpath " <> SBPL.quote!(go) <> "))"
     ]
   end
 
   # Altform: Loopback-TCP auf einem Port (vor #143).
   defp listen_rules(_cfg, {:tcp, port}) do
     [
-      "; Kanal pi -> Vermittler: Loopback-TCP (Altform vor #143)",
+      "; pi -> Vermittler: Loopback-TCP (Altform vor #143)",
       "(allow network-bind (local ip \"localhost:" <> Integer.to_string(port) <> "\"))",
       "(allow network-inbound (local ip))"
     ]
@@ -108,11 +112,11 @@ defmodule KomkiCli.MediatorProfile do
 
   # #143: Unix-Socket unter <base>/run mit Bearer-Token-Datei.
   defp listen_rules(cfg, {:unix, socket}) do
-    ["; Kanal pi -> Vermittler: Unix-Socket (CONTRACT.md §8), Token nur lesen"] ++
+    ["; pi -> Vermittler: Unix-Socket (CONTRACT.md §8), Token nur lesen"] ++
       ConnectorProfile.socket_bind_rules(socket) ++
       [
-        "(allow network-inbound (local unix-socket (path-literal \"" <> socket <> "\")))",
-        "(allow file-read* (literal \"" <> token_path(cfg) <> "\"))"
+        "(allow network-inbound (local unix-socket (path-literal " <> SBPL.quote!(socket) <> ")))",
+        "(allow file-read* (literal " <> SBPL.quote!(token_path(cfg)) <> "))"
       ]
   end
 
@@ -120,9 +124,13 @@ defmodule KomkiCli.MediatorProfile do
   defp listen_paths({:unix, socket}, cfg), do: [socket, token_path(cfg)]
 
   defp connector_rules(sockets) do
-    ["; Connector-Sockets (Frame-Protokoll, CONTRACT.md §3) — einziges Outbound"] ++
-      Enum.map(sockets, fn socket ->
-        "(allow network-outbound (remote unix-socket (path-literal \"" <> socket <> "\")))"
+    ["; Connector-Sockets (Frame-Protokoll, CONTRACT.md §3) — einziges Outbound, Token nur lesen"] ++
+      Enum.flat_map(sockets, fn socket ->
+        [
+          "(allow network-outbound (remote unix-socket (path-literal " <>
+            SBPL.quote!(socket) <> ")))",
+          "(allow file-read* (literal " <> SBPL.quote!(Token.for_socket(socket)) <> "))"
+        ]
       end)
   end
 

@@ -13,7 +13,9 @@ defmodule KomkiCli.Setup do
   Tests die Antworten vorgeben koennen.
   """
 
-  alias KomkiCli.{Config, DemoVault, Keychain, Model, Secrets, Steps}
+  alias KomkiCli.{Config, DemoVault, Model, Secrets, Steps, Tresor}
+
+  @drafter_hint "setup angehalten: ohne MTP-Drafter keine Instanz (oder --drafter-from PFAD angeben)"
 
   @type ui :: %{
           say: (String.t() -> any()),
@@ -29,10 +31,20 @@ defmodule KomkiCli.Setup do
   def run(opts, ui) do
     base = Config.default_base()
 
-    with :ok <- tools(Config.defaults(base), ui),
+    # Ticket #246: Die Basis-Laenge zuerst pruefen, damit eine zu lange Basis
+    # nicht erst einen halben Test-Vault hinterlaesst.
+    with :ok <- base_length(base),
+         :ok <- tools(Config.defaults(base), ui),
          :ok <- instance(base, opts, ui),
          :ok <- secrets(ui) do
       start(ui)
+    end
+  end
+
+  defp base_length(base) do
+    case KomkiCli.Connectors.socket_length(base) do
+      :ok -> :ok
+      {:error, reason} -> {:error, "Basis abgelehnt: " <> reason, 2}
     end
   end
 
@@ -55,7 +67,9 @@ defmodule KomkiCli.Setup do
           runtime_entry(cfg),
           {"komki-mediator", cfg.mediator_bin, @bausteine_hint},
           {"komki-egress", cfg.egress_bin, @bausteine_hint}
-        ] ++ connectors,
+        ] ++
+          connectors ++
+          [{"komki-tresor", Tresor.binary(), "xcode-select --install, dann 'make komki'"}],
       tmux: tmux
     }
   end
@@ -94,12 +108,15 @@ defmodule KomkiCli.Setup do
 
   defp instance(base, opts, ui) do
     if File.exists?(Config.config_path(base)) do
-      with :ok <- existing_instance(base, ui) do
+      with :ok <- existing_instance(base, ui),
+           :ok <- existing_drafter(base, opts, ui) do
         switch_vault(base, opts, ui)
       end
     else
-      with {:ok, vault_dir} <- vault(base, opts, ui) do
-        create_instance(base, vault_dir, opts, ui)
+      with {:ok, vault_dir} <- vault(base, opts, ui),
+           :ok <- ensure_model(opts, ui),
+           :ok <- stage_drafter(opts, ui) do
+        init_instance(base, vault_dir, opts, ui)
       end
     end
   end
@@ -110,15 +127,35 @@ defmodule KomkiCli.Setup do
     case Steps.refresh_instance() do
       :unchanged ->
         ui.say.("Instanz     vorhanden: " <> base <> " (unverändert)")
-        :ok
+        confirm_changed_pins(ui)
 
       {:refreshed, items} ->
         ui.say.("Instanz     vorhanden: " <> base <> "; aufgefrischt: " <> Enum.join(items, ", "))
-        :ok
+        confirm_changed_pins(ui)
 
       {:error, _reason, _code} = error ->
         error
     end
+  end
+
+  # Ein Programm mit anderen Bytes am selben Pfad: nur auf ausdrueckliches
+  # Ja festhalten (Default nein). Ohne Ja startet komki nicht (Doctor-Pin).
+  defp confirm_changed_pins(ui) do
+    for {name, path} <- Steps.changed_pins() do
+      ui.say.(pad("Programm") <> name <> " hat sich verändert: " <> path)
+
+      if ui.confirm.(
+           "            übernehmen? Nur wenn du es selbst aktualisiert hast",
+           false
+         ) do
+        Steps.accept_pins([name])
+        ui.say.(pad("") <> "festgehalten")
+      else
+        ui.say.(pad("") <> "nicht übernommen; komki startet erst nach Prüfung")
+      end
+    end
+
+    :ok
   end
 
   # Vault einer bestehenden Instanz wechseln, wenn --vault-dir oder --demo
@@ -156,15 +193,10 @@ defmodule KomkiCli.Setup do
   defp existing_demo_vault(base, ui) do
     dir = Path.join(base, "vault")
 
-    if File.dir?(dir) and File.ls!(dir) != [],
-      do: {:ok, Config.canonical(dir)},
-      else: demo_vault(base, ui)
-  end
-
-  defp create_instance(base, vault_dir, opts, ui) do
-    with :ok <- ensure_model(opts, ui) do
-      init_instance(base, vault_dir, opts, ui)
-    end
+    # Nur leere Ordner wie komki-test: der Test-Vault fehlt noch (#199)
+    if DemoVault.empty?(dir),
+      do: demo_vault(base, ui),
+      else: {:ok, Config.canonical(dir)}
   end
 
   # Modell (Ticket #178): vorhanden am Staging-Ort oder per --gguf-from,
@@ -189,6 +221,58 @@ defmodule KomkiCli.Setup do
     end
   end
 
+  # MTP-Drafter (Ticket #318): dieselbe Rueckfrage wie beim Modell — Quelle,
+  # Groesse und Lizenz vorab, laden nur nach GO. Vorhandenes Staging-Artefakt
+  # oder --drafter-from braucht keine Frage; init legt die Instanz-Kopie an.
+  defp stage_drafter(opts, ui) do
+    if Map.has_key?(opts, "drafter-from") or Config.default_probe_drafter() do
+      :ok
+    else
+      Enum.each(Model.drafter_summary(), ui.say)
+
+      cond do
+        not ui.confirm.("            jetzt herunterladen?", true) ->
+          {:error, @drafter_hint, 2}
+
+        (check = Model.drafter_remote_matches?()) not in [:ok, :unknown] ->
+          {:error, elem(check, 1), 2}
+
+        true ->
+          drafter_download(ui)
+      end
+    end
+  end
+
+  defp drafter_download(ui) do
+    case Model.drafter_download() do
+      {:ok, path} ->
+        ui.say.("Drafter     geladen und geprüft: " <> path)
+        :ok
+
+      {:error, reason} ->
+        {:error, reason, 2}
+    end
+  end
+
+  # Bestehende Instanz (Ticket #318): Init laeuft nicht nochmal, die Datei
+  # fehlt also moeglicherweise noch (Instanz von vor dem Produktivstart).
+  # Nachladen in die Instanz, SHA-Gate inklusive; der doctor am Ende prueft.
+  defp existing_drafter(base, opts, ui) do
+    cfg = Config.load!(Config.config_path(base))
+
+    if File.exists?(cfg.drafter_path) do
+      :ok
+    else
+      with :ok <- stage_drafter(opts, ui),
+           {:ok, _lines} <- Steps.place_drafter(cfg, opts) do
+        ui.say.("Drafter     geladen und geprüft: " <> cfg.drafter_path)
+        :ok
+      else
+        {:error, reason, code} -> {:error, reason, code}
+      end
+    end
+  end
+
   defp download(ui) do
     case Model.download() do
       {:ok, path} ->
@@ -206,6 +290,7 @@ defmodule KomkiCli.Setup do
     init_opts =
       %{"vault-dir" => vault_dir}
       |> put_if("gguf-from", Map.get(opts, "gguf-from"))
+      |> put_if("drafter-from", Map.get(opts, "drafter-from"))
       |> put_if("port", Map.get(opts, "port"))
 
     case Steps.init(init_opts) do
@@ -278,31 +363,70 @@ defmodule KomkiCli.Setup do
   end
 
   defp secret(entry, ui) do
-    if Secrets.present?(entry) do
-      ui.say.(pad(entry.name) <> "ok (Schlüsselbund-Eintrag '" <> entry.service <> "')")
-    else
-      ui.say.(pad(entry.name) <> entry.label <> " fehlt im Schlüsselbund")
+    case Secrets.state(entry) do
+      :sealed ->
+        ui.say.(
+          pad(entry.name) <>
+            "ok (Schlüsselbund-Eintrag '" <>
+            entry.service <> "', versiegelt mit der Secure Enclave)"
+        )
 
-      if ui.confirm.("            jetzt eingeben?", true) do
-        ui.say.(pad("") <> store_secret(entry, ui))
-      else
-        ui.say.(pad("") <> "übersprungen; später: komki secret set " <> entry.name)
-      end
+      :damaged ->
+        reenter(entry, ui, ": Siegel im Schlüsselbund beschädigt")
+
+      :outdated ->
+        reenter(entry, ui, ": altes Siegelformat im Schlüsselbund")
+
+      :unsealed ->
+        ui.say.(pad(entry.name) <> entry.label <> " liegt im Klartext im Schlüsselbund")
+
+        if ui.confirm.("            jetzt mit der Secure Enclave versiegeln?", true) do
+          ui.say.(pad("") <> seal_existing(entry))
+        else
+          ui.say.(pad("") <> "übersprungen; komki benutzt den Schlüssel erst versiegelt")
+        end
+
+      {:error, _} ->
+        ui.say.(pad(entry.name) <> entry.label <> " fehlt im Schlüsselbund")
+
+        if ui.confirm.("            jetzt eingeben?", true) do
+          ui.say.(pad("") <> store_secret(entry, ui))
+        else
+          ui.say.(pad("") <> "übersprungen; später: komki secret set " <> entry.name)
+        end
+    end
+  end
+
+  defp reenter(entry, ui, problem) do
+    ui.say.(pad(entry.name) <> entry.label <> problem)
+
+    if ui.confirm.("            jetzt neu eingeben?", true) do
+      ui.say.(pad("") <> store_secret(entry, ui))
+    else
+      ui.say.(pad("") <> "übersprungen; später: komki secret set " <> entry.name)
+    end
+  end
+
+  defp seal_existing(entry) do
+    case Secrets.seal_existing(entry) do
+      :ok -> "versiegelt; im Schlüsselbund steht jetzt nur noch das Siegel"
+      {:error, error} -> Secrets.describe(entry.service, error)
     end
   end
 
   @doc """
-  Fragt ein Geheimnis zweimal verdeckt ab und legt es ab. Liefert eine
-  Meldung ohne den Wert.
+  Asks for a secret twice, hidden, and stores it. For a login pair
+  (`Secrets.login_pair?/1`) it first asks for the login in the clear and
+  stores both as one seal, so `komki up` asks for Touch ID only once.
+  Returns a message without the value.
   """
   @spec store_secret(Secrets.t(), ui()) :: String.t()
   def store_secret(entry, ui) do
-    with {:ok, first} <- ui.secret.("            Wert (wird nicht angezeigt): "),
-         {:ok, ^first} <- ui.secret.("            noch einmal: "),
-         :ok <- Keychain.store(entry.service, first) do
-      "gespeichert im Schlüsselbund als '" <> entry.service <> "'"
+    with {:ok, value} <- read_secret(entry, ui),
+         :ok <- Secrets.store(entry, value) do
+      "versiegelt mit der Secure Enclave, Siegel im Schlüsselbund als '" <> entry.service <> "'"
     else
-      {:ok, _different} ->
+      {:error, :mismatch} ->
         "die beiden Eingaben stimmen nicht überein; nichts gespeichert"
 
       {:error, :no_tty} ->
@@ -312,7 +436,32 @@ defmodule KomkiCli.Setup do
         "leere Eingabe; nichts gespeichert"
 
       {:error, error} ->
-        Keychain.describe(entry.service, error)
+        Secrets.describe(entry.service, error)
+    end
+  end
+
+  defp read_secret(entry, ui) do
+    if Secrets.login_pair?(entry) do
+      with {:ok, login} <- read_login(ui),
+           {:ok, password} <- read_twice(ui, "Passwort") do
+        {:ok, JSON.encode!(%{"login" => login, "password" => password})}
+      end
+    else
+      read_twice(ui, "Wert")
+    end
+  end
+
+  defp read_login(ui) do
+    case String.trim(ui.ask.("            Anmeldename: ", "")) do
+      "" -> {:error, :empty}
+      login -> {:ok, login}
+    end
+  end
+
+  defp read_twice(ui, what) do
+    with {:ok, first} <- ui.secret.("            " <> what <> " (wird nicht angezeigt): "),
+         {:ok, second} <- ui.secret.("            noch einmal: ") do
+      if first == second, do: {:ok, first}, else: {:error, :mismatch}
     end
   end
 

@@ -10,6 +10,31 @@ defmodule KomkiCli.StepsTest do
 
   @denials_fixture Path.expand("../fixtures/denials/log-show.txt", __DIR__)
 
+  describe "chain_base/2 (Ticket #251: Basis des Panes)" do
+    @tag :tmp_dir
+    test "die Basis kommt aus --base, auch ohne KOMKI_HOME im Pane", %{tmp_dir: dir} do
+      assert Steps.chain_base(%{"base" => dir}, nil) == {:ok, Config.canonical(dir)}
+    end
+
+    @tag :tmp_dir
+    test "KOMKI_HOME mit derselben Basis ist in Ordnung", %{tmp_dir: dir} do
+      assert Steps.chain_base(%{"base" => dir}, dir) == {:ok, Config.canonical(dir)}
+    end
+
+    @tag :tmp_dir
+    test "KOMKI_HOME einer anderen Instanz bricht ab", %{tmp_dir: dir} do
+      other = Path.join(dir, "andere")
+
+      assert {:error, reason, 2} = Steps.chain_base(%{"base" => dir}, other)
+      assert reason =~ "Basis des Panes weicht ab"
+    end
+
+    test "ohne --base kein Rückfall auf die Standard-Basis" do
+      assert {:error, reason, 2} = Steps.chain_base(%{}, nil)
+      assert reason =~ "ohne --base"
+    end
+  end
+
   describe "write_pi_home/1" do
     test "Trust-Schlüssel ist das Instanz-Root (deckt arbeit und pi-home ab)" do
       cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-steps"))
@@ -77,7 +102,49 @@ defmodule KomkiCli.StepsTest do
     end
   end
 
+  # Ticket #493 (Audit #467 F24/F25): pi-home traegt die Kopie des
+  # llama-API-Keys (models.json) und die pi-Transkripte; die Kette entsteht
+  # deshalb mit 0700 wie run/ und connectors/, statt mit dem umask-Default
+  # 0755 fuer andere lokale Konten traversierbar zu bleiben (relevant, sobald
+  # die Basis ausserhalb des 0700-Heims liegt, etwa KOMKI_HOME=/private/tmp/...).
+  describe "create_pi_home!/1 (Ticket #493: pi-home-Kette 0700)" do
+    test "jedes Kettenglied entsteht mit 0700, auch ueber 0755-Altbestand hinweg" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-pi-home-mode"))
+
+      Steps.create_pi_home!(cfg)
+
+      for dir <- pi_home_chain(cfg), do: assert(mode(dir) == 0o700)
+
+      # Alt-Instanz: bereits mit 0755 entstandene Glieder korrigiert init
+      # --force bzw. jedes erneute Anlegen mit.
+      File.chmod!(cfg.pi_home, 0o755)
+      Steps.create_pi_home!(cfg)
+      assert mode(cfg.pi_home) == 0o700
+    end
+  end
+
   defp read_json(path), do: path |> File.read!() |> JSON.decode!()
+
+  # Die Kette, die init anlegt: pi-home und jede Stufe darunter (auch die
+  # Zwischenglieder .local/.cache/.pi, die mkdir_p implizit erzeugt).
+  defp pi_home_chain(cfg) do
+    [
+      cfg.pi_home,
+      Path.join([cfg.pi_home, "tmp"]),
+      Path.join([cfg.pi_home, ".config"]),
+      Path.join([cfg.pi_home, ".local"]),
+      Path.join([cfg.pi_home, ".local", "share"]),
+      Path.join([cfg.pi_home, ".cache"]),
+      Path.join([cfg.pi_home, ".cache", "node-compile"]),
+      Path.join([cfg.pi_home, ".pi"]),
+      Path.join([cfg.pi_home, ".pi", "agent"])
+    ]
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
+  end
 
   # Vermittler-Liveness-Gate (Review-Fund zur Vertragsluecke): run und
   # session muessen abbrechen, wenn der Vermittler tot oder das pidfile
@@ -196,6 +263,90 @@ defmodule KomkiCli.StepsTest do
       # Aufraeumweg ueber die eigene Eskalations-Mechanik (TERM → KILL mit
       # Identitaetscheck): zugleich Regression fuer KomkiCli.Proc.kill_checked.
       assert :ok = Proc.kill_checked(os_pid, ps_marker)
+    end
+  end
+
+  # Ticket #318: Ablage und Doctor-Checks des MTP-Drafters über die
+  # öffentlichen Nahten Steps.place_drafter/2 und Steps.drafter_checks/2 —
+  # hermetisch mit kleiner Datei und explizitem --drafter-from (das
+  # Staging-Fallback ist host-abhängig und gehört zum echten Lauf).
+  describe "MTP-Drafter (Ticket #318)" do
+    @drafter_inhalt "kleiner test-drafter"
+    @drafter_sha Base.encode16(:crypto.hash(:sha256, "kleiner test-drafter"), case: :lower)
+
+    defp drafter_cfg(prefix, sha \\ nil) do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!(prefix))
+      %{cfg | drafter_sha256: sha || @drafter_sha}
+    end
+
+    defp drafter_source(cfg) do
+      source = Path.join(cfg.base_dir, "quelle-mtp.gguf")
+      File.write!(source, @drafter_inhalt)
+      source
+    end
+
+    test "place_drafter/2: --drafter-from, SHA verifiziert, Zeilen wie beim gguf" do
+      cfg = drafter_cfg("komki-drafter-place")
+      source = drafter_source(cfg)
+
+      assert {:ok, [place, sha_line, ablage]} =
+               Steps.place_drafter(cfg, %{"drafter-from" => source})
+
+      assert place == "drafter:      " <> cfg.drafter_path
+      assert sha_line == "drafter-sha256: " <> @drafter_sha <> " (pinned, verified)"
+      assert ablage =~ ~r/drafter-ablage: (APFS-Klon|Kopie)/
+      assert File.read!(cfg.drafter_path) == @drafter_inhalt
+    end
+
+    test "place_drafter/2: falscher SHA bricht ab, Kopie entfernt" do
+      cfg = drafter_cfg("komki-drafter-falsch", String.duplicate("c", 64))
+      source = drafter_source(cfg)
+
+      assert {:error, reason, 2} = Steps.place_drafter(cfg, %{"drafter-from" => source})
+      assert reason =~ "Drafter SHA256 mismatch"
+      assert reason =~ "kopie entfernt"
+      refute File.exists?(cfg.drafter_path)
+    end
+
+    test "place_drafter/2: nicht vorhandene Quelle ist ein Usage-Fehler" do
+      cfg = drafter_cfg("komki-drafter-quelle")
+
+      assert {:error, reason, 2} =
+               Steps.place_drafter(cfg, %{"drafter-from" => "/gibt-es-nicht/mtp.gguf"})
+
+      assert reason =~ "--drafter-from Pfad nicht gefunden"
+    end
+
+    test "drafter_checks/2: Präsenz im Start-Gate, Prüfsumme im vollen Doctor" do
+      cfg = drafter_cfg("komki-drafter-checks")
+
+      # Fehlende Datei: beide Scopes rot, mit dem Nachladeweg im Reason.
+      for scope <- [:full, :profile_boot] do
+        assert [%{ok: false, reason: reason}] = Steps.drafter_checks(cfg, scope)
+        assert reason =~ "missing: " <> cfg.drafter_path
+        assert reason =~ "'komki setup' lädt den MTP-Drafter nach"
+      end
+
+      File.mkdir_p!(Path.dirname(cfg.drafter_path))
+      File.write!(cfg.drafter_path, @drafter_inhalt)
+
+      assert [%{name: "drafter presence", ok: true, reason: presence_path}] =
+               Steps.drafter_checks(cfg, :profile_boot)
+
+      assert presence_path == cfg.drafter_path
+
+      assert [%{name: "drafter sha256", ok: true, reason: @drafter_sha}] =
+               Steps.drafter_checks(cfg, :full)
+
+      # Andere Bytes: der volle Doctor meldet recorded gegen actual, das
+      # Start-Gate bleibt grün (Praesenz genügt dort, wie beim gguf).
+      verändert = %{cfg | drafter_sha256: String.duplicate("d", 64)}
+
+      assert [%{name: "drafter sha256", ok: false, reason: reason}] =
+               Steps.drafter_checks(verändert, :full)
+
+      assert reason =~ "recorded " <> String.duplicate("d", 64)
+      assert reason =~ "actual " <> @drafter_sha
     end
   end
 
@@ -416,6 +567,7 @@ defmodule KomkiCli.StepsTest do
                  "connector-web",
                  "connector-vault",
                  "connector-ris",
+                 "connector-ratsprojekte",
                  "connector-documents",
                  "egress",
                  "llama"
@@ -466,6 +618,7 @@ defmodule KomkiCli.StepsTest do
                  "connector-web",
                  "connector-vault",
                  "connector-ris",
+                 "connector-ratsprojekte",
                  "connector-documents",
                  "egress"
                ]
@@ -474,6 +627,7 @@ defmodule KomkiCli.StepsTest do
                {"connector-web", :ok},
                {"connector-vault", {:stale, _}},
                {"connector-ris", :ok},
+               {"connector-ratsprojekte", :already},
                {"connector-documents", :already},
                {"egress", :ok}
              ] =

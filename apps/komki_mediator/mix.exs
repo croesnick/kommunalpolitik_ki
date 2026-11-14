@@ -49,6 +49,7 @@ defmodule KomkiMediator.MixProject do
     [
       {:komki_policy, path: "../komki_policy"},
       {:komki_connector, path: "../komki_connector"},
+      {:sidecar, path: "../sidecar"},
       {:anubis_mcp, "~> 1.6"},
       {:bandit, "~> 1.12"},
       {:credo, "~> 1.7", only: :dev, runtime: false},

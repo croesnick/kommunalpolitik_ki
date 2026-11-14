@@ -1,25 +1,37 @@
 defmodule KomkiPolicy.Derive do
   @moduledoc """
-  Regelkern `derive` — Regelzweige `admit` (§ 4) und `emit` (§ 4.5),
-  Freigabe-Zweig `decide_with_release/5` (§ 4.6), Remedy-Katalog via
-  `KomkiPolicy.Remedies` (§ 2.8) (CONTRACT.md Lieferung 2).
+  Rule core `derive` — rule branches `admit` (§ 4), `emit` (§ 4.5),
+  `store` (§ 4.7) and `transfer` (§ 4.8), release branch
+  `decide_with_release/5` (§ 4.6), remedy catalog via
+  `KomkiPolicy.Remedies` (§ 2.8) (CONTRACT.md deliveries 2 to 4).
 
-  `decide/3` validiert Snapshot und Intent als geschlossene Schemas,
-  prüft die Referenzkohärenz und leitet in fester Prämissenordnung.
-  Nicht implementierte Regelzweige ergeben `{:unsupported, info}` —
-  niemals ein `deny` (die fehlende Prüfung ist keine verbietende
-  Prüfung). Struktur- und Validierungsfehler sind Eingabefehler, keine
-  Decisions.
+  `decide/3` validates snapshot and intent as closed schemas, checks
+  reference coherence and derives in a fixed premise order. Rule
+  branches that are not implemented yield `{:unsupported, info}` — never
+  a `deny` (a missing check is not a prohibiting check). Structure and
+  validation errors are input errors, not decisions.
 
-  `emit` ordnet λ(y) := B_W zu (Vermittler-Zuordnung, R.5.5): keine
-  Eingabe kann `assigned_label` beeinflussen — der Intent trägt keine
-  Labels und der Kern liest `object.labels` für `emit` nicht. Fehlt der
-  technische Fakt `output_content_digest`, ist der Call nicht
-  identifizierbar: Eingabefehler `emit_digest_missing` (Exit 2).
+  `emit` assigns λ(y) := B_W (mediator assignment, R.5.5): no input can
+  influence `assigned_label` — the intent carries no labels and the core
+  does not read `object.labels` for `emit`. Without the technical fact
+  `output_content_digest` the call cannot be identified: input error
+  `emit_digest_missing` (exit 2).
 
-  Urteil und Vollzug getrennt (B.8): der Kern verbraucht keine
-  Freigabe — `decide_with_release/5` plant den Verbrauch als
-  deklaratives `release`-Objekt, der atomare Übergang liegt in
+  `store` (RFC 0003 R.5.6) puts a produced object y into a durable store
+  (the snapshot's environment). It is decided under λ(y) =
+  `object.labels`, not under B_W: checked label, recipients and `store`
+  rules come from the object's bindings. B_W ⊆ λ(y) is a premise of its
+  own (`label_preservation`), because storing drops no binding. Digest
+  and classification duties as for `emit`.
+
+  `transfer` (RFC 0003 R.5.6) hands a produced object y to a target (the
+  snapshot's environment, e.g. an external service). Same shape as
+  `store`: checked label λ(y), `label_preservation`, the target's
+  recipients, and the `transfer` rules of the bindings in λ(y).
+
+  Judgement and execution are separate (B.8): the core consumes no
+  release — `decide_with_release/5` plans the consumption as a
+  declarative `release` object; the atomic transition lives in
   `KomkiPolicy.Stand.advance/2`.
   """
 
@@ -48,17 +60,63 @@ defmodule KomkiPolicy.Derive do
     "binding_condition"
   ]
 
-  @unsupported_operations ["start", "transfer", "store"]
-  @unsupported_detail "rule branch not implemented in delivery 1"
+  # store (§ 4.7) and transfer (§ 4.8): a produced object leaves the room
+  # under λ(y).
+  @handover_premises [
+    "workspace_contract_valid",
+    "has_operation_right",
+    "audit_path_ready",
+    "environment_observers_complete",
+    "label_preservation",
+    "recipient_inclusion",
+    "binding_condition"
+  ]
+
+  @handover_operations ["transfer", "store"]
+
+  # Regelzweige mit Ausgabeobjekt: Digest-Pflicht, call-GO im Katalog,
+  # Freigabe-Zweig.
+  @output_operations ["emit" | @handover_operations]
+
+  @unsupported_operations ["start"]
+  @unsupported_detail "rule branch not implemented"
+
+  # Die geschlossene Zuordnung Zielumgebung → Ausgabeart → Ziellabel
+  # (§ 4.9): die Engine entscheidet in dieser Lieferung genau die
+  # Lockerung von B_W auf den Bestand des ratsprojekte-Hubs. Andere
+  # Ziele und Ausgabearten sind strukturiert verwaltet, aber undecidable
+  # (fail-closed).
+  @offenlegung_ziellabel %{"ratsprojekte-essenz" => ["ratsprojekte@1"]}
+  @ziel_ausgabearten %{"ratsprojekte-bestand@1" => "ratsprojekte-essenz"}
+
+  @doc "Rule branches that let a produced object leave the room under λ(y) (§ 4.7, § 4.8)."
+  @spec handover_operations() :: [String.t()]
+  def handover_operations, do: @handover_operations
+
+  @doc "Rule branches with a proof tree (`verify`, § 5)."
+  @spec proof_rules() :: [String.t()]
+  def proof_rules, do: ["admit" | @output_operations]
 
   @doc "§ 4.3-Prämissennamen in fester Reihenfolge (gemeinsame Sollmenge für derive-Baum und verify)."
   @spec required_premises() :: [String.t()]
   def required_premises, do: @admit_premises
 
-  @doc "Regelabhängige Sollmengen (§ 4.3 für `admit`, § 4.5 für `emit`)."
+  @doc "Regelabhängige Sollmengen (§ 4.3 `admit`, § 4.5 `emit`, § 4.7 `store`, § 4.8 `transfer`)."
   @spec required_premises(String.t()) :: [String.t()]
   def required_premises("admit"), do: @admit_premises
   def required_premises("emit"), do: @emit_premises
+  def required_premises(rule) when rule in @handover_operations, do: @handover_premises
+
+  @doc """
+  Prüflabel einer Entscheidung: B_W für `admit` und `emit`, λ(y) (die
+  Objekt-Labels, sortiert) für `store` und `transfer` (§ 4.7, § 4.8).
+  Gemeinsam für derive und verify.
+  """
+  @spec checked_label(String.t(), map(), map()) :: [String.t()]
+  def checked_label(rule, _workspace, object) when rule in @handover_operations,
+    do: Enum.sort(Enum.uniq(object["labels"]))
+
+  def checked_label(_rule, workspace, _object), do: workspace["bindings"]
 
   @type decision() :: %{required(String.t()) => term()}
   @type error() :: %{
@@ -72,7 +130,7 @@ defmodule KomkiPolicy.Derive do
   # =========================================================================
 
   @doc """
-  Leitet für den Regelzweig `admit` oder `emit` und meldet `unsupported`
+  Leitet für den Regelzweig `admit`, `emit`, `store` oder `transfer` und meldet `unsupported`
   bzw. einen strukturierten Eingabefehler.
   """
   @spec decide(Registry.compiled(), term(), term()) ::
@@ -84,19 +142,20 @@ defmodule KomkiPolicy.Derive do
   end
 
   @doc """
-  Ausgabeshape für nicht unterstützte Regelzweige (L2: alle außer
-  `admit`, `emit` und dem Freigabe-Zweig).
+  Ausgabeshape für nicht unterstützte Regelzweige (alle außer `admit`,
+  `emit`, `store`, `transfer` und dem Freigabe-Zweig).
   """
   def unsupported_info(operation) do
     %{"result" => "unsupported", "rule" => operation, "detail" => @unsupported_detail}
   end
 
   @doc """
-  Aktionsfreigabe-Zweig (§ 4.6, B.5 Schritt 6): eigener Regelzweig mit
-  vorgelegter Aktionsfreigabe und Offenlegungsstand — nie ein stiller
-  Fallback der normalen Entscheidung. Nur `kind: aktionsfreigabe` mit
-  Operation `emit` ist entscheidbar; `offenlegungsfreigabe` und andere
-  Operationen ergeben `unsupported` (Exit 3).
+  Freigabe-Zweige (§ 4.6, § 4.9): eigener Regelzweig mit vorgelegter
+  Freigabe und Offenlegungsstand — nie ein stiller Fallback der normalen
+  Entscheidung. `kind: aktionsfreigabe` mit Operation `emit`, `store`
+  oder `transfer` entscheidet nach § 4.6; `kind: offenlegungsfreigabe`
+  mit Operation `store` nach § 4.9 (Lockerung, Ticket #423) — alles
+  andere ergibt `unsupported` (Exit 3).
   """
   @spec decide_with_release(Registry.compiled(), term(), term(), term(), term()) ::
           {:ok, decision()}
@@ -145,10 +204,11 @@ defmodule KomkiPolicy.Derive do
     case auth.operation do
       "admit" -> run_admit(ctx, registry, auth)
       "emit" -> run_emit(ctx, registry, auth)
+      handover -> run_handover(ctx, registry, auth, handover)
     end
   end
 
-  defp ensure_supported(operation) when operation in ["admit", "emit"], do: :ok
+  defp ensure_supported(operation) when operation in ["admit" | @output_operations], do: :ok
 
   defp ensure_supported(operation) when operation in @unsupported_operations do
     {:unsupported, unsupported_info(operation)}
@@ -169,38 +229,162 @@ defmodule KomkiPolicy.Derive do
          {:ok, stand} <- Stand.validate(stand_term),
          :ok <- require_supportable(auth, release) do
       # § 4.6-Reihenfolge: erst die Freigabe-Entscheidung (kind/operation),
-      # dann die emit-Digest-Pflicht — ein nicht-unterstützter Zweig ist
+      # dann die Digest-Pflicht (emit, store, transfer) — ein nicht-unterstützter Zweig ist
       # unsupported (Exit 3), auch wenn der Snapshot bereits den Digest
       # vermissen lassen würde.
       case require_emit_input(ctx) do
-        :ok -> run_release_branch(ctx, registry, auth, release, stand)
-        {:error, reason} -> {:error, reason}
+        :ok ->
+          release_branch(release.kind, ctx, registry, auth, release, stand)
+
+        {:error, reason} ->
+          {:error, reason}
       end
     end
   end
 
-  # § 4.6: nur `aktionsfreigabe` ist entscheidbar; `offenlegungsfreigabe`
-  # und Nicht-`emit`-Operationen ergeben `unsupported` (Exit 3) — kein deny.
-  defp require_supportable(auth, release) do
-    cond do
-      auth.operation != "emit" ->
-        {:unsupported, unsupported_info(auth.operation)}
+  # § 4.6 (Aktionsfreigabe) oder § 4.9 (Offenlegungsfreigabe): getrennte
+  # Regelzweige, kein stiller Fallback.
+  defp release_branch("offenlegungsfreigabe", ctx, registry, auth, release, stand),
+    do: run_offenlegung_branch(ctx, registry, auth, release, stand)
 
-      release.kind != "aktionsfreigabe" ->
-        {:unsupported, unsupported_info(release.kind)}
+  defp release_branch(_aktionsfreigabe, ctx, registry, auth, release, stand),
+    do: run_release_branch(ctx, registry, auth, release, stand)
+
+  # =========================================================================
+  # Offenlegungsfreigabe-Zweig (§ 4.9, R.5.7, R.6.1, Ticket #423)
+  # =========================================================================
+
+  @doc """
+  Ausgabeart einer Zielumgebung (§ 4.9): geschlossen und fail-closed —
+  eine unbekannte Umgebung hat keine Ausgabeart, für sie bietet der
+  Katalog keine Offenlegungsfreigabe an.
+  """
+  @spec ziel_ausgabeart(String.t() | nil) :: String.t() | nil
+  def ziel_ausgabeart(environment), do: Map.get(@ziel_ausgabearten, environment)
+
+  defp run_offenlegung_branch(ctx, registry, auth, release, stand) do
+    call_hash = output_call_hash(ctx, auth.operation)
+
+    state =
+      ctx
+      |> shared_premises(registry, auth.operation)
+      |> premise_workspace_valid()
+      |> premise_label_preservation()
+      |> release_check_call_hash(release, call_hash)
+      |> release_check_window(release, stand)
+      |> release_check_nonce(release, stand)
+      |> release_check_scope(release, stand)
+      |> release_check_authority(registry, release)
+      |> release_env_observers(auth.operation)
+      |> offenlegung_check_ziellabel(registry, release)
+      |> offenlegung_check_befugnisse(registry, release)
+      |> offenlegung_check_recipients(registry, release)
+
+    conclude_release(state, ctx, registry, auth, release, stand, call_hash)
+  end
+
+  # Ziellabel der Lockerung: sortiert, eindeutig, in der Registry
+  # vorhanden und die geschlossene Zuordnung zur Ausgabeart (§ 4.9). Die
+  # Ausgabeart muss zur Zielumgebung des Snapshots passen — die Engine
+  # rechnet sie nach, der Freigabe wird nichts geglaubt. Die Lockerung
+  # ersetzt die Bindungen der Ausgabe — das Ersetzen gilt als Entfernen
+  # (R.5.7), deshalb prüft die Engine das Ziel genauso streng wie jeden
+  # Empfängerkreis.
+  defp offenlegung_check_ziellabel(state, registry, release) do
+    cond do
+      ziel_ausgabeart(state.workspace["environment"]) != release.ausgabeart ->
+        add_blocker(state, binder("ausgabeart_unpassend", nil, nil))
+
+      Enum.any?(release.ziellabel, &(&1 not in Map.keys(registry.bindings))) ->
+        add_blocker(state, binder("ziellabel_unknown", nil, nil))
+
+      Map.get(@offenlegung_ziellabel, release.ausgabeart) != release.ziellabel ->
+        add_blocker(state, binder("ziellabel_unpassend", nil, nil))
 
       true ->
+        state
+    end
+  end
+
+  # BerechtigtZurLockerung (R.5.7): für jede Bindung der Ausgabe, deren
+  # Empfängerkreis das Ziel nicht abdeckt, braucht die Freigabe eine
+  # Befugnis dieser Autorität für genau diese Ausgabeart (§ 4.9). Eine
+  # fehlende Befugnis überbrückt kein GO — auch keine Offenlegungsfreigabe.
+  defp offenlegung_check_befugnisse(state, registry, release) do
+    registry
+    |> Calculus.lockerungsbeduerftige_bindungen(state.checked, state.rho)
+    |> Enum.reduce(state, fn binding_id, acc ->
+      if befugnis?(registry, binding_id, release) do
+        acc
+      else
+        add_blocker(acc, binder("lockerungsbefugnis_fehlt", binding_id, nil))
+      end
+    end)
+  end
+
+  # Empfängertest unter dem Ziellabel (R.5.7: Zulässigkeit der Übergabe
+  # unter L'): ein GO ersetzt ihn auch hier nicht (§ 4.6, #417).
+  defp offenlegung_check_recipients(state, registry, release) do
+    allowed = Calculus.allowed_recipients(registry, release.ziellabel)
+
+    case state.rho -- allowed do
+      [] ->
+        state
+
+      outside ->
+        blocker =
+          Map.put(binder("recipient_not_allowed", nil, nil), "recipients_outside", outside)
+
+        add_blocker(state, blocker)
+    end
+  end
+
+  # Passt eine Befugnis der Bindung zu Autoritaet und Ausgabeart der
+  # Freigabe (§ 4.9)? Die Einschaerkung ist immer `readers`: nur der
+  # Empfaengerkreis wird durch die Lockerung auf das Ziellabel ersetzt.
+  defp befugnis?(registry, binding_id, release) do
+    binding = Map.get(registry.bindings, binding_id)
+
+    if binding do
+      Enum.any?(binding.relaxation_authorities, fn entry ->
+        entry.authority == release.authority and entry.restriction == "readers" and
+          entry.output == release.ausgabeart
+      end)
+    else
+      false
+    end
+  end
+
+  # § 4.6 und § 4.9: die Aktionsfreigabe entscheidet emit, store und
+  # transfer; die Offenlegungsfreigabe entscheidet in dieser Lieferung
+  # genau store (Lockerung auf ein Ziellabel, Ticket #423). Alles andere
+  # ergibt `unsupported` (Exit 3) — kein deny.
+  defp require_supportable(auth, release) do
+    cond do
+      auth.operation not in @output_operations ->
+        {:unsupported, unsupported_info(auth.operation)}
+
+      release.kind == "aktionsfreigabe" ->
         :ok
+
+      release.kind == "offenlegungsfreigabe" and auth.operation == "store" ->
+        :ok
+
+      true ->
+        {:unsupported, unsupported_info(release.kind)}
     end
   end
 
   defp run_release_branch(ctx, registry, auth, release, stand) do
-    call_hash = emit_call_hash(ctx)
+    call_hash = output_call_hash(ctx, auth.operation)
 
     state =
       ctx
-      |> shared_premises(registry)
+      |> shared_premises(registry, auth.operation)
       |> premise_workspace_valid()
+      |> release_env_observers(auth.operation)
+      |> release_label_preservation(auth.operation)
+      |> release_recipient_inclusion(auth.operation)
       |> release_check_call_hash(release, call_hash)
       |> release_check_window(release, stand)
       |> release_check_nonce(release, stand)
@@ -208,6 +392,40 @@ defmodule KomkiPolicy.Derive do
       |> release_check_authority(registry, release)
 
     conclude_release(state, ctx, registry, auth, release, stand, call_hash)
+  end
+
+  # No GO bridges an unproven observer list when storing (§ 4.6, § 4.7,
+  # § 4.9, #432, Gegenprobe 11.15): a GO cannot prove who reads along.
+  # Both release kinds re-check the flag for exactly the operations whose
+  # GO the catalog withholds on the same condition (Remedies) — the
+  # Offenlegungsfreigabe decides store alone (§ 4.9). What is missing
+  # evidence in the normal branch (`recipients_unproven`) becomes a
+  # blocker here: a release branch decides permit or deny — a GO produces
+  # no evidence.
+  defp release_env_observers(state, operation) do
+    if operation in Remedies.unbridgeable_observers_operations() and
+         fact_state(state.facts, "environment_observers_complete") != true do
+      add_blocker(state, binder("recipients_unproven", nil, nil))
+    else
+      state
+    end
+  end
+
+  # A GO never restores a dropped binding (§ 2.8): B_W ⊆ λ(y) holds for
+  # store and transfer even with a release.
+  defp release_label_preservation(state, operation) when operation in @handover_operations,
+    do: premise_label_preservation(state)
+
+  defp release_label_preservation(state, _emit), do: state
+
+  # No GO replaces the recipient test when storing (§ 4.6, R.5.7, #417): a
+  # GO cannot decide who may read the store. For emit and transfer a GO
+  # still bridges an inadmissible recipient (#354). The catalog withholds
+  # the GO for the same operations (Remedies).
+  defp release_recipient_inclusion(state, operation) do
+    if operation in Remedies.unbridgeable_recipient_operations(),
+      do: premise_recipient_inclusion(state),
+      else: state
   end
 
   # Release-Prüfungen in fester Ordnung (§ 4.6 Schritt 3); jede Verletzung
@@ -260,57 +478,84 @@ defmodule KomkiPolicy.Derive do
   defp conclude_release(state, ctx, registry, auth, release, stand, call_hash) do
     if state.blockers == [] do
       {:ok,
-       release_decision(ctx, auth, state.checked, %{
+       release_decision(ctx, auth, state.checked, state.checked, %{
          "decision" => "permit",
          "blockers" => nil,
          "missing_evidence" => nil,
          "proof" => nil,
          "remedies" => nil,
-         "assigned_label" => state.checked,
          "content_digest" => digest_value(ctx),
-         "release" => %{
-           "release_id" => release.release_id,
-           "nonce" => release.nonce,
-           "stand_ref" => stand.stand_id <> "@" <> Integer.to_string(stand.version),
-           "stand_version_after" => stand.version + 1,
-           "call_hash" => call_hash
-         }
+         "release" => release_proposal(release, stand, call_hash)
        })}
     else
-      remedy_ctx = release_remedies_context(state, registry, call_hash)
-      findings = Remedies.catalog(registry, remedy_ctx, :release, state.blockers)
+      remedy_ctx = release_remedies_context(state, registry, call_hash, release)
+      findings = Remedies.catalog(registry, remedy_ctx, state.blockers)
 
       {:ok,
-       release_decision(ctx, auth, state.checked, %{
+       release_decision(ctx, auth, state.checked, nil, %{
          "decision" => "deny",
          "blockers" => state.blockers,
          "missing_evidence" => nil,
          "proof" => nil,
          "remedies" => findings,
-         "assigned_label" => nil,
          "content_digest" => digest_value(ctx),
          "release" => nil
        })}
     end
   end
 
-  defp release_decision(ctx, auth, checked, fields) do
-    Map.merge(base_decision(ctx, auth, checked), fields)
+  # Verbrauchsvorschlag (§ 4.6, § 4.9): die Aktionsfreigabe bleibt beim
+  # geschlossenen Fünffeld-Satz; die Offenlegungsfreigabe nennt zusätzlich
+  # Ausgabeart und Ziellabel der Lockerung — der Vermittler bindet beides
+  # über den payload_hash ins Journal (R.6.2).
+  defp release_proposal(release, stand, call_hash) do
+    base = %{
+      "release_id" => release.release_id,
+      "nonce" => release.nonce,
+      "stand_ref" => stand.stand_id <> "@" <> Integer.to_string(stand.version),
+      "stand_version_after" => stand.version + 1,
+      "call_hash" => call_hash
+    }
+
+    case release do
+      %{kind: "offenlegungsfreigabe"} ->
+        Map.merge(base, %{"ausgabeart" => release.ausgabeart, "ziellabel" => release.ziellabel})
+
+      _aktionsfreigabe ->
+        base
+    end
   end
 
-  defp release_remedies_context(ctx, _registry, call_hash) do
+  # Only `emit` assigns a label; `store` and `transfer` keep λ(y) and carry
+  # no `assigned_label`.
+  defp release_label_fields("emit", label), do: %{"assigned_label" => label}
+  defp release_label_fields(_handover, _label), do: %{}
+
+  defp release_decision(ctx, auth, checked, label, fields) do
+    ctx
+    |> base_decision(auth, checked)
+    |> Map.merge(fields)
+    |> Map.merge(release_label_fields(auth.operation, label))
+  end
+
+  defp release_remedies_context(ctx, _registry, call_hash, release) do
     %{
       rule: :release,
+      release_kind: release.kind,
+      ausgabeart: Map.get(release, :ausgabeart),
+      ziellabel: Map.get(release, :ziellabel, []),
       object_labels: [],
-      checked: ctx.workspace["bindings"],
+      checked: ctx.checked,
       rho: ctx.rho,
       object_ref: ctx.object["object_id"] <> "@" <> ctx.object["version"],
-      call_hash: call_hash
+      call_hash: call_hash,
+      observers_proven: observers_proven?(ctx)
     }
   end
 
   # =========================================================================
-  # emit-Eingabepflichten (§ 4.5): Digest-Pflicht, Klassifikationszustand
+  # Eingabepflichten für emit, store und transfer (§ 4.5, § 4.7, § 4.8): Digest-Pflicht,
+  # Klassifikationszustand
   # =========================================================================
 
   defp require_emit_input(ctx) do
@@ -350,7 +595,7 @@ defmodule KomkiPolicy.Derive do
   defp run_admit(ctx, registry, auth) do
     state =
       ctx
-      |> shared_premises(registry)
+      |> shared_premises(registry, "admit")
       |> premise_quarantine()
       |> premise_workspace_valid()
       |> premise_basis_fact("has_operation_right")
@@ -372,7 +617,7 @@ defmodule KomkiPolicy.Derive do
     with :ok <- require_emit_input(ctx) do
       state =
         ctx
-        |> shared_premises(registry)
+        |> shared_premises(registry, "emit")
         |> premise_workspace_valid()
         |> premise_basis_fact("has_operation_right")
         |> premise_basis_fact("audit_path_ready")
@@ -384,13 +629,36 @@ defmodule KomkiPolicy.Derive do
     end
   end
 
-  defp shared_premises(ctx, registry) do
+  # =========================================================================
+  # store and transfer core (§ 4.7, § 4.8): premises in fixed order,
+  # decided under λ(y)
+  # =========================================================================
+
+  defp run_handover(ctx, registry, auth, rule) do
+    with :ok <- require_emit_input(ctx) do
+      state =
+        ctx
+        |> shared_premises(registry, rule)
+        |> premise_workspace_valid()
+        |> premise_basis_fact("has_operation_right")
+        |> premise_basis_fact("audit_path_ready")
+        |> premise_env_flag()
+        |> premise_label_preservation()
+        |> premise_recipient_inclusion()
+        |> premise_binding_conditions(registry, rule)
+
+      conclude(state, ctx, registry, auth, rule)
+    end
+  end
+
+  defp shared_premises(ctx, registry, rule) do
     workspace = ctx.workspace
+    checked = checked_label(rule, workspace, ctx.object)
 
     Map.merge(ctx, %{
-      checked: workspace["bindings"],
+      checked: checked,
       rho: Calculus.actual_recipients(registry, workspace["environment"]),
-      allowed: Calculus.allowed_recipients(registry, workspace["bindings"]),
+      allowed: Calculus.allowed_recipients(registry, checked),
       blockers: [],
       evidence: []
     })
@@ -461,16 +729,29 @@ defmodule KomkiPolicy.Derive do
     end
   end
 
-  # P8: ρ_Γ(c) ⊆ R_Γ(B_W); bei B_W = ∅ ist R_Γ(∅) = 𝒪. Ist der Mengentest
-  # bekannt falsch, vereitelt dies - unabhaengig vom env-Flag - den Zugriff.
-  defp premise_recipient_inclusion(ctx) do
-    rho = MapSet.new(ctx.rho)
-    allowed = MapSet.new(ctx.allowed)
-
-    if MapSet.subset?(rho, allowed) do
+  # store/transfer P5: B_W ⊆ λ(y) — storing and handing over drop no
+  # binding (R.5.6).
+  defp premise_label_preservation(ctx) do
+    if Calculus.labels_subset?(ctx.workspace["bindings"], ctx.checked) do
       ctx
     else
-      add_blocker(ctx, binder("recipient_not_allowed", nil, nil))
+      add_blocker(ctx, binder("label_not_preserved", nil, nil))
+    end
+  end
+
+  # P8: ρ_Γ(c) ⊆ R_Γ(B_W); bei B_W = ∅ ist R_Γ(∅) = 𝒪. Ist der Mengentest
+  # bekannt falsch, vereitelt dies - unabhaengig vom env-Flag - den Zugriff.
+  # The blocker names the observers outside the circle (§ 2.4, #417).
+  defp premise_recipient_inclusion(ctx) do
+    case ctx.rho -- ctx.allowed do
+      [] ->
+        ctx
+
+      outside ->
+        blocker =
+          Map.put(binder("recipient_not_allowed", nil, nil), "recipients_outside", outside)
+
+        add_blocker(ctx, blocker)
     end
   end
 
@@ -536,27 +817,46 @@ defmodule KomkiPolicy.Derive do
   # Remedy-Kontext (§ 2.8): reine Funktion der Entscheidungslage
   # =========================================================================
 
+  # § 4.7, #432: known-true is the only proven state — `false` and a
+  # missing fact both count as an unproven observer list.
+  defp observers_proven?(ctx),
+    do: fact_state(ctx.facts, "environment_observers_complete") == true
+
   defp remedies_context(ctx, rule_kind) do
     object_labels = if rule_kind == "admit", do: ctx.object["labels"], else: []
 
+    # Ausgabeart des Ziels (§ 2.8, § 4.9): die Engine leitet sie geschlossen
+    # aus der Zielumgebung des Snapshots ab — der Katalog kann eine
+    # Offenlegungsfreigabe nur für bekannte Ziele anbieten. Der Agent
+    # nennt keine Ausgabeart; das Manifest des Connectors bestimmt die
+    # Umgebung, die Snapshot-Umgebung die Ausgabeart. Das Ziellabel
+    # gehört zur Ausgabeart (§ 4.9), es nennt der Katalog mit.
+    ausgabeart = ziel_ausgabeart(ctx.workspace["environment"])
+
     %{
-      rule: admit_or_emit(rule_kind),
+      rule: string_to_kind(rule_kind),
       object_labels: object_labels,
       checked: ctx.checked,
       rho: ctx.rho,
       object_ref: ctx.object["object_id"] <> "@" <> ctx.object["version"],
-      call_hash: if(rule_kind == "emit", do: emit_call_hash(ctx), else: nil)
+      call_hash:
+        if(rule_kind in @output_operations, do: output_call_hash(ctx, rule_kind), else: nil),
+      ausgabeart: ausgabeart,
+      ziellabel: Map.get(@offenlegung_ziellabel, ausgabeart, []),
+      # § 4.7, #432: a store into an environment with an unproven
+      # observer list loses its call GO (Remedies) — the release branch
+      # would deny the same call again.
+      observers_proven: observers_proven?(ctx)
     }
   end
 
-  defp admit_or_emit("admit"), do: :admit
-  defp admit_or_emit("emit"), do: :emit
-
-  defp emit_call_hash(ctx) do
+  # Die Operation geht in den Hash ein: ein GO für `emit` passt nie auf
+  # `store` oder `transfer` desselben Objekts und umgekehrt.
+  defp output_call_hash(ctx, operation) do
     Release.call_hash(
       digest_value(ctx),
       ctx.object["object_id"] <> "@" <> ctx.object["version"],
-      "emit",
+      operation,
       ctx.workspace["workspace_id"]
     )
   end
@@ -576,12 +876,7 @@ defmodule KomkiPolicy.Derive do
     cond do
       state.blockers != [] ->
         payload =
-          Remedies.catalog(
-            registry,
-            remedies_context(state, rule_kind),
-            string_to_kind(rule_kind),
-            state.blockers
-          )
+          Remedies.catalog(registry, remedies_context(state, rule_kind), state.blockers)
 
         decision =
           Map.merge(base_decision(ctx, auth, state.checked), %{
@@ -596,12 +891,7 @@ defmodule KomkiPolicy.Derive do
 
       state.evidence != [] ->
         payload =
-          Remedies.catalog(
-            registry,
-            remedies_context(state, rule_kind),
-            string_to_kind(rule_kind),
-            state.evidence
-          )
+          Remedies.catalog(registry, remedies_context(state, rule_kind), state.evidence)
 
         decision =
           Map.merge(base_decision(ctx, auth, state.checked), %{
@@ -632,6 +922,8 @@ defmodule KomkiPolicy.Derive do
 
   defp string_to_kind("admit"), do: :admit
   defp string_to_kind("emit"), do: :emit
+  defp string_to_kind("store"), do: :store
+  defp string_to_kind("transfer"), do: :transfer
 
   defp emit_rule_fields("emit", state, :permit) do
     %{"assigned_label" => state.checked, "content_digest" => digest_value(state)}
@@ -642,6 +934,7 @@ defmodule KomkiPolicy.Derive do
   end
 
   defp emit_rule_fields("admit", _state, _value), do: %{}
+  defp emit_rule_fields(_handover, state, _value), do: %{"content_digest" => digest_value(state)}
 
   defp base_decision(ctx, auth, checked) do
     %{
@@ -657,33 +950,47 @@ defmodule KomkiPolicy.Derive do
   end
 
   # =========================================================================
-  # Beweisbaum (§ 2.5): § 4.3 (admit) bzw. § 4.5 (emit) feste Prämissenordnung
+  # Beweisbaum (§ 2.5): § 4.3 (admit), § 4.5 (emit), § 4.7/§ 4.8 (store,
+  # transfer) feste Prämissenordnung
   # =========================================================================
 
   defp build_proof(state, registry, auth, rule_kind) do
     premises =
-      if rule_kind == "admit" do
-        [
-          quarantine_premise(state),
-          workspace_premise(),
-          basis_fact_premise(state.facts, "has_operation_right"),
-          basis_fact_premise(state.facts, "has_object_access_right"),
-          basis_fact_premise(state.facts, "audit_path_ready"),
-          basis_fact_premise(state.facts, "environment_observers_complete"),
-          label_inclusion_premise(state),
-          recipient_premise(state),
-          binding_condition_premises(state, registry, "admit")
-        ]
-      else
-        [
-          workspace_premise(),
-          basis_fact_premise(state.facts, "has_operation_right"),
-          basis_fact_premise(state.facts, "audit_path_ready"),
-          basis_fact_premise(state.facts, "environment_observers_complete"),
-          recipient_premise(state),
-          binding_condition_premises(state, registry, "emit"),
-          label_assignment_premise(state)
-        ]
+      case rule_kind do
+        "admit" ->
+          [
+            quarantine_premise(state),
+            workspace_premise(),
+            basis_fact_premise(state.facts, "has_operation_right"),
+            basis_fact_premise(state.facts, "has_object_access_right"),
+            basis_fact_premise(state.facts, "audit_path_ready"),
+            basis_fact_premise(state.facts, "environment_observers_complete"),
+            label_inclusion_premise(state),
+            recipient_premise(state),
+            binding_condition_premises(state, registry, "admit")
+          ]
+
+        "emit" ->
+          [
+            workspace_premise(),
+            basis_fact_premise(state.facts, "has_operation_right"),
+            basis_fact_premise(state.facts, "audit_path_ready"),
+            basis_fact_premise(state.facts, "environment_observers_complete"),
+            recipient_premise(state),
+            binding_condition_premises(state, registry, "emit"),
+            label_assignment_premise(state)
+          ]
+
+        handover ->
+          [
+            workspace_premise(),
+            basis_fact_premise(state.facts, "has_operation_right"),
+            basis_fact_premise(state.facts, "audit_path_ready"),
+            basis_fact_premise(state.facts, "environment_observers_complete"),
+            label_preservation_premise(state),
+            recipient_premise(state),
+            binding_condition_premises(state, registry, handover)
+          ]
       end
 
     %{
@@ -747,6 +1054,16 @@ defmodule KomkiPolicy.Derive do
       "kind" => "computed",
       "value" => true,
       "assigned_label" => ctx.checked,
+      "checked_label" => ctx.checked
+    }
+  end
+
+  defp label_preservation_premise(ctx) do
+    %{
+      "name" => "label_preservation",
+      "kind" => "computed",
+      "value" => true,
+      "workspace_bindings" => ctx.workspace["bindings"],
       "checked_label" => ctx.checked
     }
   end

@@ -27,12 +27,13 @@ defmodule Ratsinfo.MixProject do
   defp deps do
     [
       {:shared, path: "../shared"},
+      {:komki_mock, path: "../komki_mock", only: :test},
       {:req, "~> 0.7"},
       {:optimus, "~> 0.6"},
       {:jason, "~> 1.4"},
       {:ecto, "~> 3.12"},
       {:ecto_sql, "~> 3.12"},
-      {:ecto_sqlite3, "~> 0.18"},
+      {:ecto_sqlite3, "~> 0.26"},
       {:html_entities, "~> 0.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}

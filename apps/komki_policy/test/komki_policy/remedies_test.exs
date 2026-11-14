@@ -26,7 +26,8 @@ defmodule KomkiPolicy.RemediesTest do
       checked: bindings,
       rho: Calculus.actual_recipients(reg, env_id),
       object_ref: "obj-x@v1",
-      call_hash: nil
+      call_hash: nil,
+      observers_proven: false
     }
   end
 
@@ -39,7 +40,7 @@ defmodule KomkiPolicy.RemediesTest do
     ctx = test_ctx(["buergerfall-4711@1"], [], "lokale-fallverarbeitung@1")
 
     [remedy] =
-      Remedies.catalog(reg, ctx, :admit, [
+      Remedies.catalog(reg, ctx, [
         %{
           "code" => "binding_condition_false",
           "binding" => "buergerfall-4711@1",
@@ -60,7 +61,7 @@ defmodule KomkiPolicy.RemediesTest do
     }
 
     [remedy] =
-      Remedies.catalog(reg, ctx, :emit, [
+      Remedies.catalog(reg, ctx, [
         %{"code" => "basis_right_false", "binding" => nil, "condition" => "has_operation_right"}
       ])
 
@@ -83,7 +84,7 @@ defmodule KomkiPolicy.RemediesTest do
     ]
 
     Enum.each(codes, fn code ->
-      [remedy] = Remedies.catalog(reg, ctx, :admit, [finding(code)])
+      [remedy] = Remedies.catalog(reg, ctx, [finding(code)])
 
       # admit-Fälle führen keinen call-GO-Eintrag (bewusste Lücke, § 8/§ 9);
       # object_quarantine ist die Ausnahme mit objekt-scope-GO (Erstklassifikation).
@@ -118,14 +119,14 @@ defmodule KomkiPolicy.RemediesTest do
     ]
 
     Enum.each(call_go_codes, fn code ->
-      [remedy] = Remedies.catalog(reg, ctx, :emit, [finding(code)])
+      [remedy] = Remedies.catalog(reg, ctx, [finding(code)])
       types = transition_type(remedy)
 
       assert "aktionsfreigabe" in types, code
       assert hd(types) != "aktionsfreigabe", code
     end)
 
-    [ws_remedy] = Remedies.catalog(reg, ctx, :emit, [finding("workspace_invalid")])
+    [ws_remedy] = Remedies.catalog(reg, ctx, [finding("workspace_invalid")])
     refute "aktionsfreigabe" in transition_type(ws_remedy)
   end
 
@@ -140,7 +141,7 @@ defmodule KomkiPolicy.RemediesTest do
 
     Enum.each(["missing_fact", "recipients_unproven"], fn code ->
       evidence = %{"code" => code, "fact" => "environment_observers_complete", "binding" => nil}
-      [remedy] = Remedies.catalog(reg, ctx, :emit, [evidence])
+      [remedy] = Remedies.catalog(reg, ctx, [evidence])
       types = transition_type(remedy)
 
       refute "aktionsfreigabe" in types
@@ -153,7 +154,7 @@ defmodule KomkiPolicy.RemediesTest do
     reg = registry()
     ctx = test_ctx([], [], "lokale-fallverarbeitung@1")
 
-    [remedy] = Remedies.catalog(reg, ctx, :admit, [finding("object_quarantine")])
+    [remedy] = Remedies.catalog(reg, ctx, [finding("object_quarantine")])
 
     assert [%{"type" => "aktionsfreigabe", "scope" => "object", "object" => "obj-x@v1"}] =
              remedy["transitions"]
@@ -165,7 +166,7 @@ defmodule KomkiPolicy.RemediesTest do
     ctx =
       test_ctx(["buergerfall-4711@1"], ["lizenz-namensnennung@1"], "lokale-fallverarbeitung@1")
 
-    [remedy] = Remedies.catalog(reg, ctx, :admit, [finding("label_not_included")])
+    [remedy] = Remedies.catalog(reg, ctx, [finding("label_not_included")])
 
     assert Enum.any?(remedy["transitions"], fn t ->
              Map.fetch!(t, "type") == "registrierte_transformation" and
@@ -174,7 +175,7 @@ defmodule KomkiPolicy.RemediesTest do
 
     # input [lizenz] ⊄ λ([]): Transformation erscheint hier NICHT
     ctx2 = test_ctx(["buergerfall-4711@1"], [], "lokale-fallverarbeitung@1")
-    [remedy2] = Remedies.catalog(reg, ctx2, :admit, [finding("label_not_included")])
+    [remedy2] = Remedies.catalog(reg, ctx2, [finding("label_not_included")])
 
     refute Enum.any?(remedy2["transitions"], &(&1["type"] == "registrierte_transformation"))
   end
@@ -191,7 +192,7 @@ defmodule KomkiPolicy.RemediesTest do
       call_hash: "korrekt-berechnet"
     }
 
-    [remedy] = Remedies.catalog(reg, ctx, :release, [finding("release_call_mismatch")])
+    [remedy] = Remedies.catalog(reg, ctx, [finding("release_call_mismatch")])
 
     assert [
              %{
@@ -202,7 +203,7 @@ defmodule KomkiPolicy.RemediesTest do
            ] = remedy["transitions"]
 
     # workspace_invalid bleibt unüberbrückbar: neuer_raum, required_bindings [] (emit-Regeltyp)
-    [ws_remedy] = Remedies.catalog(reg, ctx, :release, [finding("workspace_invalid")])
+    [ws_remedy] = Remedies.catalog(reg, ctx, [finding("workspace_invalid")])
 
     assert [%{"type" => "neuer_raum", "required_bindings" => []}] = ws_remedy["transitions"]
   end
@@ -228,14 +229,14 @@ defmodule KomkiPolicy.RemediesTest do
       "condition" => nil
     }
 
-    [remedy] = Remedies.catalog(reg, ctx, :admit, [finding])
+    [remedy] = Remedies.catalog(reg, ctx, [finding])
 
     assert [%{"type" => "neuer_raum"}] = remedy["transitions"]
     refute Enum.any?(remedy["transitions"], &(&1["type"] == "fakt_nachreichen"))
 
     # emit: gleiche Regel, aber call-GO bleibt — Katalog nicht leer
     emit_ctx = %{ctx | rule: :emit, call_hash: "korrekt-berechnet"}
-    [emit_remedy] = Remedies.catalog(reg, emit_ctx, :emit, [finding])
+    [emit_remedy] = Remedies.catalog(reg, emit_ctx, [finding])
 
     assert Enum.map(emit_remedy["transitions"], &Map.fetch!(&1, "type")) == [
              "neuer_raum",
@@ -243,5 +244,76 @@ defmodule KomkiPolicy.RemediesTest do
            ]
 
     refute Enum.any?(emit_remedy["transitions"], &(&1["type"] == "fakt_nachreichen"))
+  end
+
+  # Ticket #432: kein GO überbrückt beim Speichern eine unbelegte
+  # Beobachterliste — der Freigabe-Zweig prüft das Flag erneut und lehnt
+  # ab. Ein Kontext ohne den Schlüssel observers_proven gilt als unbelegt:
+  # Der Katalog fragt nie nach einem GO, das der Freigabe-Zweig sogleich
+  # wieder verweigern würde.
+  test "store mit unbelegter Beobachterliste: kein call-GO für irgendeinen Befund" do
+    reg = registry()
+
+    ctx =
+      %{
+        test_ctx(["buergerfall-4711@1"], [], "lokale-fallverarbeitung@1")
+        | rule: :store,
+          call_hash: "beef",
+          observers_proven: false
+      }
+
+    [remedy] = Remedies.catalog(reg, ctx, [finding("missing_operation_rule")])
+    assert transition_type(remedy) == ["neuer_raum"]
+
+    [proven_remedy] =
+      Remedies.catalog(reg, %{ctx | observers_proven: true}, [finding("missing_operation_rule")])
+
+    assert transition_type(proven_remedy) == ["neuer_raum", "aktionsfreigabe"]
+
+    [without_flag] =
+      Remedies.catalog(reg, Map.delete(ctx, :observers_proven), [
+        finding("missing_operation_rule")
+      ])
+
+    assert transition_type(without_flag) == ["neuer_raum"]
+  end
+
+  test "emit und transfer behalten das call-GO bei unbelegter Beobachterliste (#354)" do
+    reg = registry()
+
+    Enum.each([:emit, :transfer], fn rule ->
+      ctx =
+        %{
+          test_ctx(["buergerfall-4711@1"], [], "lokale-fallverarbeitung@1")
+          | rule: rule,
+            call_hash: "beef",
+            observers_proven: false
+        }
+
+      [remedy] = Remedies.catalog(reg, ctx, [finding("missing_operation_rule")])
+
+      assert transition_type(remedy) == ["neuer_raum", "aktionsfreigabe"]
+    end)
+  end
+
+  test "Freigabe-Zweig: recipients_unproven ist unüberbrückbar, auch neben Release-Blockern" do
+    reg = registry()
+
+    ctx = %{
+      rule: :release,
+      object_labels: [],
+      checked: ["buergerfall-4711@1"],
+      rho: ["nutzende-person"],
+      object_ref: "obj-a@v1",
+      call_hash: "korrekt-berechnet",
+      observers_proven: false
+    }
+
+    remedies =
+      Remedies.catalog(reg, ctx, [finding("recipients_unproven"), finding("release_expired")])
+
+    assert Enum.map(remedies, & &1["code"]) == ["recipients_unproven", "release_expired"]
+
+    for r <- remedies, do: assert([%{"type" => "neuer_raum"}] = r["transitions"])
   end
 end

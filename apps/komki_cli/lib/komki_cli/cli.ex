@@ -9,19 +9,20 @@ defmodule KomkiCli.CLI do
   Befehle (Vertrag):
 
       komki version
-      komki setup [--demo] [--vault-dir PATH] [--gguf-from PATH] [--port N]
-      komki secret set NAME | komki secret list
+      komki setup [--demo] [--vault-dir PATH] [--gguf-from PATH] [--drafter-from PATH] [--port N]
+      komki secret set NAME | komki secret list | komki secret erzeugen NAME
       komki journal verify
-      komki init  [--gguf-from PATH] [--port N] [--ctx N]
-                  [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--force]
+      komki init  [--gguf-from PATH] [--drafter-from PATH] [--port N] [--ctx N]
+                  [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--web-mock-port N] [--force]
       komki doctor
       komki up    [--ctx N]
       komki down
       komki status
+      komki raum [recherche|vertraulich|fraktion|projektraum]
       komki go
       komki run "PROMPT" [--mode text|json] [--scratch PATH] [--timeout SEKUNDEN] [--capture-denials]
       komki session [FILE ...] [--continue] [--detach] [--decided-by ID]
-      komki session-chain [--continue]   # intern: Pane-Einstieg der Session
+      komki session-chain --base P [--continue]  # intern: Pane-Einstieg der Session
       komki label import FILE [--db PATH]
       komki label quarantine OBJ@VER [--content-ref PATH] [--origin TEXT]
                        --decided-by ID --basis TEXT [--db PATH]
@@ -68,6 +69,12 @@ defmodule KomkiCli.CLI do
   @doc false
   @spec main([binary()]) :: no_return()
   def main(argv) do
+    # Ticket #246: Rollen laufen mit `LANG=C` (Proc.escript_cmd/6); die VM
+    # schriebe stdout/stderr dann als latin1, und aus „lässt“ wuerde im Log
+    # das Byte 0xE4. komki schreibt immer UTF-8, unabhaengig von der Locale.
+    _ = :io.setopts(:standard_io, encoding: :unicode)
+    _ = :io.setopts(:standard_error, encoding: :unicode)
+
     # Multicall (Ticket #179): `komki komki-mediator ...` usw. startet die
     # Rolle; deren Einstieg blockiert und beendet die VM selbst.
     case KomkiCli.Roles.dispatch(argv) do
@@ -98,13 +105,17 @@ defmodule KomkiCli.CLI do
     halt(code)
   end
 
+  # ex_pdfium (#290) needs no bootstrap here: only the documents connector
+  # role uses it, and it cannot load from an escript anyway (#288).
   # Exqlite ist die einzige NIF-Abhaengigkeit (SQLite-Registry des
   # Label-Store). `Application.app_dir(:exqlite)/ebin` schaut auf dem
   # Code-Pfad; im Escript-Kontext ist exqlite im Zip und der Pfad zeigt in
   # das Zip-Archiv — die NIF muss aber vom realen Dateisystem laden. Die
   # Build-Tree-Pfade decken den Escript-Alltag ab (`mix escript.build`).
+  # Symlinks aufloesen: `make komki` legt `~/.local/bin/komki` als Link an,
+  # der Build-Tree liegt neben dem Ziel (Ticket #241).
   defp exqlite_ebin_paths do
-    base = Path.dirname(:escript.script_name())
+    base = :escript.script_name() |> to_string() |> KomkiCli.Config.canonical() |> Path.dirname()
 
     paths = [
       # Paket-Layout (Ticket #180): komki und lib/exqlite nebeneinander
@@ -184,6 +195,11 @@ defmodule KomkiCli.CLI do
             long: "gguf-from",
             help: "vorhandene Modelldatei (GGUF) verwenden"
           ],
+          drafter_from: [
+            value_name: "PATH",
+            long: "drafter-from",
+            help: "vorhandene MTP-Drafter-Datei verwenden (Ticket #318)"
+          ],
           port: [
             value_name: "N",
             long: "port",
@@ -214,7 +230,20 @@ defmodule KomkiCli.CLI do
               ]
             ]
           ],
-          list: [name: "list", description: "erwartete Schlüssel und ob sie vorhanden sind"]
+          list: [name: "list", description: "erwartete Schlüssel und ob sie vorhanden sind"],
+          erzeugen: [
+            name: "erzeugen",
+            description:
+              "Token neu erzeugen, versiegelt ablegen und nur seinen SHA-256 ausgeben " <>
+                "(z.B. 'komki secret erzeugen ratsprojekte-hub | ratsprojekte connector-token')",
+            args: [
+              name: [
+                value_name: "NAME",
+                required: true,
+                help: "Kurzname eines Tokens, den komki selbst erzeugt"
+              ]
+            ]
+          ]
         ]
       ],
       journal: [
@@ -238,6 +267,11 @@ defmodule KomkiCli.CLI do
             help:
               "GGUF-Quelle (Kopie; default: das Staging-Artefakt unter ~/.local/share/komki/models-staging/)"
           ],
+          drafter_from: [
+            value_name: "PATH",
+            long: "drafter-from",
+            help: "MTP-Drafter-Quelle (Kopie; default: das Staging-Artefakt; Ticket #318)"
+          ],
           port: [
             value_name: "N",
             long: "port",
@@ -259,13 +293,20 @@ defmodule KomkiCli.CLI do
           ris_base_url: [
             value_name: "URL",
             long: "ris-base-url",
-            help: "RIS-API-Basis (default https://risapi1.komuna.net/web/)"
+            help: "RIS-API-Basis (default https://risapi3.komuna.net/web/)"
           ],
           ris_mock_port: [
             value_name: "N",
             long: "ris-mock-port",
             parser: :integer,
             help: "RIS-Mock auf 127.0.0.1:N statt echter API (ohne Egress-Proxy)"
+          ],
+          web_mock_port: [
+            value_name: "N",
+            long: "web-mock-port",
+            parser: :integer,
+            help:
+              "Brave-Mock auf 127.0.0.1:N statt echter Websuche (ohne Egress-Proxy, synthetischer Test-Key statt des echten Schlüssels)"
           ]
         ],
         flags: [
@@ -298,6 +339,18 @@ defmodule KomkiCli.CLI do
         name: "go",
         description:
           "gesperrte Aufrufe ansehen und einzeln freigeben (GO gilt einmal, nur für diesen Aufruf)"
+      ],
+      raum: [
+        name: "raum",
+        description:
+          "zeigt den Raum oder wechselt den Referenzraum (lockern nur ohne laufende Session)",
+        args: [
+          name: [
+            value_name: "NAME",
+            required: false,
+            help: "recherche, vertraulich, fraktion oder projektraum; ohne Angabe nur anzeigen"
+          ]
+        ]
       ],
       status: [
         name: "status",
@@ -381,6 +434,13 @@ defmodule KomkiCli.CLI do
       session_chain: [
         name: "session-chain",
         description: "intern: pi-Kette als Port-Kind (Pane-Einstieg von 'session')",
+        options: [
+          base: [
+            value_name: "PATH",
+            long: "base",
+            help: "Basis der Instanz; 'session' schreibt sie ins Pane-Kommando (Ticket #251)"
+          ]
+        ],
         flags: [
           continue: [long: "continue", help: "vorherige Session fortsetzen (pi --continue)"]
         ]
@@ -548,7 +608,7 @@ defmodule KomkiCli.CLI do
   defp run_session(opts) do
     case KomkiCli.Steps.session_plan(opts, &show_start/1) do
       {:session_plan, header, intake} ->
-        IO.write(Enum.join(header, "\n") <> "\n")
+        if header != [], do: IO.write(Enum.join(header, "\n") <> "\n")
         render(KomkiCli.Steps.session_start(intake, opts))
 
       {:session_refused, header, _entries} ->
@@ -610,6 +670,7 @@ defmodule KomkiCli.CLI do
   defp dispatch_group(:label, tail, result), do: dispatch_label_tail(tail, result)
   defp dispatch_group(:secret, [:set], result), do: secret_set(result.args.name)
   defp dispatch_group(:secret, [:list], _result), do: secret_list()
+  defp dispatch_group(:secret, [:erzeugen], result), do: secret_erzeugen(result.args.name)
   defp dispatch_group(:journal, [:verify], _result), do: render(KomkiCli.Steps.journal_verify())
 
   defp dispatch_label_tail([sub], result) do
@@ -661,11 +722,14 @@ defmodule KomkiCli.CLI do
   defp dispatch_command(:down, _result), do: render(KomkiCli.Steps.down())
   defp dispatch_command(:status, _result), do: render(KomkiCli.Steps.status())
 
+  defp dispatch_command(:raum, result), do: render(KomkiCli.Steps.raum(result.args[:name]))
+
   defp dispatch_command(:go, _result),
     do:
       KomkiCli.GoSteps.run(KomkiCli.Config.default_base(), %{
         say: &IO.puts/1,
-        confirm: &KomkiCli.Prompt.confirm/2
+        confirm: &KomkiCli.Prompt.confirm/2,
+        select: &KomkiCli.Prompt.select/1
       })
 
   defp dispatch_command(:setup, result),
@@ -729,11 +793,51 @@ defmodule KomkiCli.CLI do
     end
   end
 
+  # Only the hash goes to stdout, so it can be piped into the hub; notes go
+  # to stderr (#440).
+  defp secret_erzeugen(name) do
+    case KomkiCli.Secrets.fetch(name) do
+      {:ok, entry} -> secret_erzeugen(entry, KomkiCli.Secrets.erzeugen(entry))
+      :error -> {erzeugbar_hinweis("unbekannter Schlüssel '" <> name <> "'"), 2}
+    end
+  end
+
+  defp secret_erzeugen(entry, {:ok, hash}) do
+    IO.puts(
+      :stderr,
+      "Neuer Token versiegelt im Schlüsselbund ('" <>
+        entry.service <> "'); ausgegeben wird nur sein SHA-256"
+    )
+
+    {hash <> "\n", 0}
+  end
+
+  defp secret_erzeugen(entry, {:error, :not_generable}),
+    do: {erzeugbar_hinweis("'" <> entry.name <> "' erzeugt komki nicht selbst"), 2}
+
+  defp secret_erzeugen(entry, {:error, error}),
+    do: {KomkiCli.Secrets.describe(entry.service, error) <> "\n", 2}
+
+  defp erzeugbar_hinweis(text) do
+    names =
+      KomkiCli.Secrets.all()
+      |> Enum.filter(&(&1.service in KomkiCli.Secrets.erzeugbar()))
+      |> Enum.map_join(", ", & &1.name)
+
+    text <> "; erzeugen lassen sich: " <> names <> "\n"
+  end
+
   defp secret_list do
     lines =
       Enum.map(KomkiCli.Secrets.all(), fn entry ->
         state =
-          if KomkiCli.Secrets.present?(entry), do: green() <> "vorhanden", else: red() <> "fehlt"
+          case KomkiCli.Secrets.state(entry) do
+            :sealed -> green() <> "versiegelt"
+            :unsealed -> red() <> "Klartext"
+            :damaged -> red() <> "beschädigt"
+            :outdated -> red() <> "altes Siegel"
+            {:error, _} -> red() <> "fehlt"
+          end
 
         String.pad_trailing(entry.name, 10) <>
           state <> reset() <> "  " <> entry.label <> " ('" <> entry.service <> "')"
@@ -1005,6 +1109,8 @@ defmodule KomkiCli.CLI do
   defp render({:journal, result}),
     do: {red() <> "Journal UNGUELTIG: " <> JSON.encode!(result) <> reset() <> "\n", 4}
 
+  defp render({:raum, text}), do: {text <> "\n", 0}
+
   defp render({:session, message}),
     do: {green() <> String.trim_trailing(message) <> reset() <> "\n", 0}
 
@@ -1217,6 +1323,14 @@ defmodule KomkiCli.CLI do
     Enum.map_join(connectors, fn
       {name, {:started, pid}} ->
         green() <> name <> " up: pid " <> to_string(pid) <> reset() <> "\n"
+
+      {name, {:started, pid, warnings}} ->
+        green() <>
+          name <>
+          " up: pid " <>
+          to_string(pid) <>
+          reset() <>
+          "\n" <> Enum.map_join(warnings, &(red() <> "  " <> &1 <> reset() <> "\n"))
 
       {name, {:already, pid}} ->
         green() <> name <> ": bereits laufend (pid " <> to_string(pid) <> ")" <> reset() <> "\n"

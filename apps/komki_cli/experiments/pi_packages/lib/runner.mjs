@@ -16,6 +16,7 @@ import {
   PI_CLI,
 } from "./config.mjs";
 import { startMockProvider } from "./mock-provider.mjs";
+import { startForwardProvider } from "./provider.mjs";
 import { parseSessionFile } from "./session.mjs";
 
 function safeId(id) {
@@ -97,6 +98,10 @@ async function newestSessionFile(dir) {
  *   timeoutMs                    - default 30000
  *   extraArgs                    - appended before prompt
  *   sessionDir                   - override session directory
+ *   provider                     - real provider instead of the mock:
+ *                                 { upstreamBaseUrl, apiKey, name, model, maxTokens }
+ *                                 pi points at a logging forward proxy
+ *                                 (lib/provider.mjs); `responses` is ignored.
  */
 export async function runPi(options = {}) {
   const runRoot = options.runRoot;
@@ -123,124 +128,159 @@ export async function runPi(options = {}) {
 
   const contextWindow = options.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
 
-  const mock = await startMockProvider({
-    script: options.responses ?? [],
-    logPath: requestsPath,
-    contextWindow,
-  });
+  let mock = null;
+  let forwarder = null;
+  let providerName = MOCK_PROVIDER;
+  let modelName = MOCK_MODEL;
+  let providerLabel = "Mock Model";
+  let apiKey = "mock-key";
+  let baseUrl;
+  let maxTokens = 512;
 
-  const models = {
-    providers: {
-      [MOCK_PROVIDER]: {
-        api: "openai-completions",
-        apiKey: "mock-key",
-        baseUrl: mock.baseUrl,
-        models: [
-          {
-            id: MOCK_MODEL,
-            name: "Mock Model",
-            contextWindow,
-            maxTokens: 512,
-            reasoning: false,
-          },
-        ],
-      },
-    },
-  };
-
-  const settings = {
-    ...(options.settings ?? {}),
-  };
-  await writeFile(path.join(agentDir, "models.json"), JSON.stringify(models, null, 2));
-  await writeFile(path.join(agentDir, "settings.json"), JSON.stringify(settings, null, 2));
-  await writeFile(path.join(agentDir, "trust.json"), JSON.stringify({}));
-
-  for (const file of options.agentFiles ?? []) {
-    const target = path.isAbsolute(file.path)
-      ? file.path
-      : path.join(agentDir, file.path);
-    await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, file.content ?? "");
+  if (options.provider) {
+    forwarder = await startForwardProvider({
+      upstreamBaseUrl: options.provider.upstreamBaseUrl,
+      logPath: requestsPath,
+    });
+    providerName = options.provider.name ?? "pi-local";
+    modelName = options.provider.model ?? "local-model";
+    providerLabel = modelName;
+    apiKey = options.provider.apiKey;
+    baseUrl = forwarder.baseUrl;
+    maxTokens = options.provider.maxTokens ?? 4096;
+  } else {
+    mock = await startMockProvider({
+      script: options.responses ?? [],
+      logPath: requestsPath,
+      contextWindow,
+    });
+    baseUrl = mock.baseUrl;
   }
 
-  const before = new Set(await listFiles(runDir));
-
-  const args = [
-    PI_CLI,
-    "--print",
-    "--mode",
-    "json",
-    "--offline",
-    "--no-extensions",
-    "--no-skills",
-    "--no-context-files",
-    "--no-prompt-templates",
-    "--no-themes",
-    "--no-approve",
-    "--session-dir",
-    sessionDir,
-    "--provider",
-    MOCK_PROVIDER,
-    "--model",
-    MOCK_MODEL,
-    "--tools",
-    options.tools ?? "read",
-  ];
-  if (options.continue) args.push("--continue");
-  for (const extension of options.extensions ?? []) {
-    args.push("-e", extension);
-  }
-  args.push(...(options.extraArgs ?? []));
-  for (const fileArg of options.fileArgs ?? []) args.push(fileArg);
-  args.push(options.prompt ?? "Sag OK");
-
-  const env = {
-    HOME: agentRoot,
-    PI_CODING_AGENT_DIR: agentDir,
-    PI_OFFLINE: "1",
-    PATH: "/usr/bin:/bin",
-    LANG: "C",
-    LC_ALL: "C",
-  };
-
-  const started = Date.now();
-  const child = spawn(NODE_BIN, args, {
-    cwd: workDir,
-    env,
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
-  });
-
+  // try/finally um den ganzen Provider-Lebenszyklus: Jeder Fehler zwischen
+  // Server-Start und Abschluss leakt sonst einen lauschenden Server, der den
+  // Node-Prozess am Leben hält.
+  let exit;
   let stdout = "";
   let stderr = "";
   let timedOut = false;
+  let requestParseErrors = 0;
+  let before = new Set();
+  let args = [];
+  let started = Date.now();
 
-  child.stdout.on("data", (chunk) => {
-    stdout += chunk;
-  });
-  child.stderr.on("data", (chunk) => {
-    stderr += chunk;
-  });
+  try {
+    const models = {
+      providers: {
+        [providerName]: {
+          api: "openai-completions",
+          apiKey,
+          baseUrl,
+          models: [
+            {
+              id: modelName,
+              name: providerLabel,
+              contextWindow,
+              maxTokens,
+              reasoning: false,
+            },
+          ],
+        },
+      },
+    };
 
-  const timeoutMs = options.timeoutMs ?? 30000;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    try {
-      process.kill(-child.pid, "SIGKILL");
-    } catch {
-      try {
-        child.kill("SIGKILL");
-      } catch {}
+    const settings = {
+      ...(options.settings ?? {}),
+    };
+    await writeFile(path.join(agentDir, "models.json"), JSON.stringify(models, null, 2));
+    await writeFile(path.join(agentDir, "settings.json"), JSON.stringify(settings, null, 2));
+    await writeFile(path.join(agentDir, "trust.json"), JSON.stringify({}));
+
+    for (const file of options.agentFiles ?? []) {
+      const target = path.isAbsolute(file.path)
+        ? file.path
+        : path.join(agentDir, file.path);
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, file.content ?? "");
     }
-  }, timeoutMs);
 
-  const exit = await new Promise((resolve) => {
-    child.on("error", (error) => resolve({ code: null, signal: null, error: String(error) }));
-    child.on("exit", (code, signal) => resolve({ code, signal }));
-  });
+    before = new Set(await listFiles(runDir));
 
-  clearTimeout(timer);
-  await mock.close();
+    args = [
+      PI_CLI,
+      "--print",
+      "--mode",
+      "json",
+      "--offline",
+      "--no-extensions",
+      "--no-skills",
+      "--no-context-files",
+      "--no-prompt-templates",
+      "--no-themes",
+      "--no-approve",
+      "--session-dir",
+      sessionDir,
+      "--provider",
+      providerName,
+      "--model",
+      modelName,
+      "--tools",
+      options.tools ?? "read",
+    ];
+    if (options.continue) args.push("--continue");
+    for (const extension of options.extensions ?? []) {
+      args.push("-e", extension);
+    }
+    args.push(...(options.extraArgs ?? []));
+    for (const fileArg of options.fileArgs ?? []) args.push(fileArg);
+    args.push(options.prompt ?? "Sag OK");
+
+    const env = {
+      HOME: agentRoot,
+      PI_CODING_AGENT_DIR: agentDir,
+      PI_OFFLINE: "1",
+      PATH: "/usr/bin:/bin",
+      LANG: "C",
+      LC_ALL: "C",
+    };
+
+    started = Date.now();
+    const child = spawn(NODE_BIN, args, {
+      cwd: workDir,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+    });
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+
+    const timeoutMs = options.timeoutMs ?? 30000;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        process.kill(-child.pid, "SIGKILL");
+      } catch {
+        try {
+          child.kill("SIGKILL");
+        } catch {}
+      }
+    }, timeoutMs);
+
+    exit = await new Promise((resolve) => {
+      child.on("error", (error) => resolve({ code: null, signal: null, error: String(error) }));
+      child.on("exit", (code, signal) => resolve({ code, signal }));
+    });
+
+    clearTimeout(timer);
+  } finally {
+    await mock?.close();
+    await forwarder?.close();
+  }
 
   const { events, parseErrors } = parseJsonl(stdout);
   const sessionFile = await newestSessionFile(sessionDir);
@@ -255,12 +295,16 @@ export async function runPi(options = {}) {
     const raw = await readFile(requestsPath, "utf8");
     for (const line of raw.split("\n")) {
       if (!line.trim()) continue;
-      const record = JSON.parse(line);
-      let body = null;
       try {
-        body = JSON.parse(record.body);
-      } catch {}
-      parsedRequests.push({ ...record, parsed: body });
+        const record = JSON.parse(line);
+        let body = null;
+        try {
+          body = JSON.parse(record.body);
+        } catch {}
+        parsedRequests.push({ ...record, parsed: body });
+      } catch {
+        requestParseErrors += 1;
+      }
     }
   } catch {}
 
@@ -274,6 +318,7 @@ export async function runPi(options = {}) {
     stderr,
     events,
     parseErrors,
+    requestParseErrors,
     session,
     sessionFile,
     requests: parsedRequests,
@@ -516,16 +561,21 @@ export async function runPiRpc(options = {}) {
   const removed = [...before].filter((file) => !after.has(file));
 
   const parsedRequests = [];
+  let requestParseErrors = 0;
   try {
     const raw = await readFile(requestsPath, "utf8");
     for (const line of raw.split("\n")) {
       if (!line.trim()) continue;
-      const record = JSON.parse(line);
-      let body = null;
       try {
-        body = JSON.parse(record.body);
-      } catch {}
-      parsedRequests.push({ ...record, parsed: body });
+        const record = JSON.parse(line);
+        let body = null;
+        try {
+          body = JSON.parse(record.body);
+        } catch {}
+        parsedRequests.push({ ...record, parsed: body });
+      } catch {
+        requestParseErrors += 1;
+      }
     }
   } catch {}
 
@@ -542,6 +592,7 @@ export async function runPiRpc(options = {}) {
     uiRequests,
     uiResponses,
     parseErrors: records.filter((r) => r.type === "harness_parse_error"),
+    requestParseErrors,
     session,
     sessionFile,
     requests: parsedRequests,

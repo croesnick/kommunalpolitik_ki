@@ -49,7 +49,8 @@ defmodule KomkiMediator.ToolsTest do
     assert body["object_id"] == "doc-oeffentlich"
     assert body["document_id"] == "doc-oeffentlich"
     assert body["content"] == content
-    assert body["labels"] == ["doc-oeffentlich@1"]
+    # Aufnahme in den Raum: die Antwort traegt B_W (R.5.4, #213)
+    assert body["labels"] == KomkiMediator.Templates.recherche_bindings()
     # Erst nach dem permit, mit genau dieser document_id
     assert_received {:connector_called, "documents", "read",
                      %{"document_id" => "doc-oeffentlich"}, %{}, _records}
@@ -83,23 +84,24 @@ defmodule KomkiMediator.ToolsTest do
     refute Map.has_key?(body, "content")
 
     # Der Katalog stammt aus der Engine-Entscheidung (KomkiPolicy.Remedies,
-    # CONTRACT § 2.8) — hier ueber das MCP-Tool hindurch, in derselben Form
-    # wie direkt durchs Gate gepinnt (remedies_test).
-    assert body["remedies"] == [
-             %{
-               "code" => "binding_condition_false",
-               "binding" => "doc-vertraulich@1",
-               "condition" => "purpose",
-               "transitions" => [
-                 %{"type" => "fakt_nachreichen", "facts" => ["purpose"]},
-                 %{
-                   "type" => "neuer_raum",
-                   "required_bindings" => ["doc-vertraulich@1"],
-                   "required_recipients" => ["nutzende-person", "pi-agent"]
-                 }
-               ]
-             }
+    # CONTRACT § 2.8); im Raum recherche liegt das Label nicht in B_W
+    # (#213). Der Hinweis macht die Sperre zum Endpunkt (#166).
+    assert [%{"code" => "label_not_included"} | _] = body["remedies"]
+    assert body["hinweis"] == KomkiMediator.Hinweis.text(:deny)
+  end
+
+  test "list_documents: document_id und Labels, keine Inhalte" do
+    assert {:reply, response, _frame} = Tools.ListDocuments.execute(%{}, Frame.new())
+    refute response.isError
+
+    body = parse_json_body(response)
+    assert body["decision"] == "permit"
+
+    assert body["documents"] == [
+             %{"document_id" => "doc-oeffentlich", "labels" => ["doc-oeffentlich@2"]}
            ]
+
+    refute Map.has_key?(hd(body["documents"]), "content")
   end
 
   test "unbekanntes Dokument: Entscheidungsfehler, kein Crash" do

@@ -1,0 +1,170 @@
+# Versionen (#538, ADR 0005, docs/agents/changesets.md). Zwei Jobs bei jedem
+# Push auf main:
+#
+# - tags: Fehlt fuer die Version einer Einheit der Tag `<einheit>/v<version>`
+#   (nach dem Merge des Version-PR), setzt `knope release` die fehlenden Tags;
+#   dieser Job pusht sie. Verglichen wird mit den vorhandenen Tags, nicht mit
+#   dem vorigen Push: Die Concurrency-Gruppe verwirft wartende Laeufe, ein
+#   spaeterer Lauf holt fehlende Tags dann nach. Keine GitHub-Releases:
+#   knope.toml hat keinen Forge. Der Merge des Version-PR durch einen
+#   Menschen ist das GO dafuer.
+# - version-pr: Liegen Changesets unter .changeset/, baut
+#   `knope prepare-release` daraus Versionen und Changelogs. Die Kaskade
+#   (scripts/changesets.exs cascade) gibt Einheiten, die eine erhoehte
+#   Bibliothek per Pfad einbinden, einen Patch. Das Ergebnis liegt auf dem
+#   festen Branch `versionen` und wird zum Version-PR. Den mergt nur ein
+#   Mensch; der Dev-Loop fasst nur Branches `loop/<n>` an.
+#
+# Mit dem GITHUB_TOKEN gepushte Branches starten keine Workflows. Der Job
+# startet die CI deshalb per workflow_dispatch auf `versionen`, damit die
+# Pflicht-Checks am Head des Version-PR stehen.
+#
+# Voraussetzung in den Repo-Einstellungen: Actions > General > "Allow GitHub
+# Actions to create and approve pull requests".
+
+name: versionen
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: versionen
+  cancel-in-progress: false
+
+env:
+  GIT_AUTHOR_NAME: github-actions[bot]
+  GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+  GIT_COMMITTER_NAME: github-actions[bot]
+  GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+
+jobs:
+  tags:
+    name: Tags setzen
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Volle Historie mit Tags: knope erkennt daran, was schon getaggt ist.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Erlang/Elixir einrichten
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      # Nur Einheiten, die schon einen Tag haben, zaehlen: Die Baseline-Tags
+      # beim Einfuehren (#538) setzt die nutzende Person von Hand.
+      - name: Fehlende Tags erkennen
+        id: diff
+        run: |
+          fehlend=$(elixir scripts/changesets.exs untagged)
+          if [ -n "${fehlend}" ]; then
+            echo "Ohne Tag: ${fehlend}"
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: knope einrichten
+        if: steps.diff.outputs.changed == 'true'
+        uses: knope-dev/action@19617851f9f13ab2f27a05989c55efb18aca3675 # v2.1.2
+        with:
+          version: 0.24.0
+
+      # knope legt annotierte Tags an (braucht die Committer-Identitaet aus
+      # env) und pusht nicht selbst.
+      - name: Tags anlegen und pushen
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          knope release
+          git push origin --tags
+
+  version-pr:
+    name: Version-PR
+    needs: tags
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Offene Changesets erkennen
+        id: offen
+        run: |
+          if ls .changeset/*.md >/dev/null 2>&1; then
+            echo "offen=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Erlang/Elixir einrichten
+        if: steps.offen.outputs.offen == 'true'
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: knope einrichten
+        if: steps.offen.outputs.offen == 'true'
+        uses: knope-dev/action@19617851f9f13ab2f27a05989c55efb18aca3675 # v2.1.2
+        with:
+          version: 0.24.0
+
+      # prepare-release stagt Versionen, Changelogs und geloeschte Changesets.
+      # Die Kaskade schreibt neue Changesets; ein zweiter Lauf verarbeitet
+      # sie. Danach darf keine weitere Kaskade noetig sein.
+      - name: Versionen und Changelogs vorbereiten
+        if: steps.offen.outputs.offen == 'true'
+        run: |
+          knope prepare-release
+          elixir scripts/changesets.exs cascade
+          if ls .changeset/*.md >/dev/null 2>&1; then
+            git add .changeset
+            knope prepare-release
+            elixir scripts/changesets.exs cascade
+            if ls .changeset/*.md >/dev/null 2>&1; then
+              echo "Kaskade nach zwei Laeufen nicht abgeschlossen" >&2
+              exit 1
+            fi
+          fi
+
+      - name: Version-PR anlegen oder aktualisieren
+        if: steps.offen.outputs.offen == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          versionen=$(elixir scripts/changesets.exs bumped | paste -sd, - | sed 's/,/, /g')
+          titel="Versionen: ${versionen}"
+          {
+            echo "Dieser PR sammelt die offenen Changesets (docs/agents/changesets.md)."
+            echo "Der Merge ist das GO: Danach setzt der Workflow versionen die Tags"
+            echo "\`<einheit>/v<version>\`. Veroeffentlicht wird dabei nichts. Nur ein Mensch"
+            echo "mergt diesen PR, der Dev-Loop nicht."
+            for f in $(git diff --cached --name-only -- 'apps/*/CHANGELOG.md'); do
+              echo
+              echo "## ${f%/CHANGELOG.md}"
+              echo
+              git diff --cached -U0 -- "${f}" | sed -n 's/^+\([^+]\)/\1/p; s/^+$//p' | sed 's/^#/##/'
+            done
+          } > "${RUNNER_TEMP}/body.md"
+
+          git commit -q -m "${titel}"
+          git push --force origin HEAD:refs/heads/versionen
+
+          pr=$(gh pr list --head versionen --base main --state open --json number --jq '.[0].number')
+          if [ -z "${pr}" ]; then
+            gh pr create --base main --head versionen --title "${titel}" --body-file "${RUNNER_TEMP}/body.md"
+          else
+            gh pr edit "${pr}" --title "${titel}" --body-file "${RUNNER_TEMP}/body.md"
+          fi
+
+          gh workflow run ci.yml --ref versionen

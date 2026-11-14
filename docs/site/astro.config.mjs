@@ -2,12 +2,19 @@
 // Entscheidung und Abwägung: docs/research/2026-10-24-doku-site-und-bildband.md
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightLinksValidator from 'starlight-links-validator';
 
 export default defineConfig({
   site: 'https://croesnick.github.io',
   base: '/kommunalpolitik_ki',
   integrations: [
     starlight({
+      // Interne Links der .mdx-Seiten prüft der Validator beim Build
+      // (Slug, Trailing-Slash, Anker, relative und lokale Links) — er läuft
+      // damit automatisch im Pages-Build jedes PR. Externe Links prüft er
+      // bewusst nicht; ein Netz-Check externer Links gehört laut
+      // lychee.toml in einen eigenen Scheduled-Job statt ins PR-Gate.
+      plugins: [starlightLinksValidator()],
       title: 'komki',
       description: 'Ein lokaler KI-Arbeitsraum für die Ratsarbeit: recherchieren mit Quellen, ohne dass Vertrauliches nach draußen gelangt.',
       defaultLocale: 'root',
@@ -31,8 +38,10 @@ export default defineConfig({
         {
           label: 'komki',
           items: [
+            { label: 'Worum es geht', slug: 'komki/worum-es-geht' },
             { label: 'So funktioniert komki', slug: 'komki/so-funktioniert-es' },
             { label: 'In Betrieb nehmen', slug: 'komki/in-betrieb-nehmen' },
+            { label: 'Mit einem Agenten einrichten', slug: 'komki/mit-agent-einrichten' },
             { label: 'Die Sicherheitsgrenze sehen', slug: 'komki/sicherheitsgrenze' },
             { label: 'Wenn etwas hakt', slug: 'komki/wenn-es-hakt' },
           ],
@@ -40,6 +49,7 @@ export default defineConfig({
         {
           label: 'Hintergrund',
           items: [
+            { label: 'RFC: Vertrauliche KI-Arbeitsräume', link: 'https://github.com/croesnick/kommunalpolitik_ki/blob/main/docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md' },
             { label: 'Entscheidungshandbuch Tool-Zugang', link: 'https://github.com/croesnick/kommunalpolitik_ki/blob/main/docs/research/2026-10-20-tool-zugang-entscheidungshandbuch.md' },
             { label: 'Labbook der Tests', link: 'https://github.com/croesnick/kommunalpolitik_ki/blob/main/docs/research/2026-10-23-labbook-komki-connectoren.md' },
             { label: 'Connector-Vertrag', link: 'https://github.com/croesnick/kommunalpolitik_ki/blob/main/apps/komki_connector/CONTRACT.md' },

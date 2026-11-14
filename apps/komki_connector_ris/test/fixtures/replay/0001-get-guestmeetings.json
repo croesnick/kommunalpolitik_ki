@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/guestmeetings",
+    "query": "client=32&from=2026-01-01&until=2026-12-31",
+    "headers": [["accept", "application/json"]]
+  },
+  "response": {
+    "status": 200,
+    "headers": [["content-type", "application/json"]],
+    "body_b64": "eyJpdGVtcyI6W3siaWQiOjQ3MTEsIm5hbWUiOiJCZWlzcGllbHNpdHp1bmciLCJtZWV0aW5nZGF0ZSI6IjIwMjYtMTAtMDZUMTg6MDA6MDAiLCJjb21taXR0ZWVuYW1lIjoiQmVpc3BpZWxncmVtaXVtIiwibG9jYXRpb25uYW1lIjoiQmVpc3BpZWxoYXVzLCBTYWFsIiwiY2xpZW50aWQiOjMyLCJjbGllbnRuYW1lIjoiQmVpc3BpZWxzdGFkdCIsInN0YXRlIjoxfV19"
+  }
+}

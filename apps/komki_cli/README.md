@@ -24,6 +24,11 @@ Komponenten mit denselben Pins:
   gewählt: starke Deutsch-Community-Reports, sauberes Tool-Calling seit den
   Template- und Parser-Fixes von April 2026. Kontext-Standard: 128K
   (Nutzer-Präferenz große Kontexte bei 64 GB RAM).
+* **MTP-Drafter** (Ticket #318): `mtp-gemma-4-26B-A4B-it-Q8_0.gguf` aus
+  derselben Repo-Revision, ebenfalls per SHA-256 verifiziert. llama-server
+  nutzt ihn für speculative decoding (`--spec-type draft-mtp`) und startet
+  ohne Thinking (`--reasoning off`): gleiche Qualität bei rund 70 %
+  kürzerer Gesamtdauer (Labbook #285, F4).
 * **Server:** `llama-server` auf Loopback, Port 49524, mit festen Flags
   (`--jinja`, `--offline`, ohne Web-UI, ohne Slots; Sampling nach der
   offiziellen Gemma-4-Empfehlung: temp 1.0, top-p 0.95, top-k 64).
@@ -77,13 +82,15 @@ Version in `packaging/pi/package.json` ändern, `pnpm install` dort, Lockfile
 prüfen und committen (Renovate schlägt das auch vor). Erlang und Elixir des Repos (`.tool-versions`)
 folgen deshalb Homebrews aktueller `erlang`-Version.
 
-Ein Release in drei Schritten:
+Ein Release in drei Schritten (veröffentlicht wird noch nicht, siehe
+[docs/release.md](../../docs/release.md)):
 
-1. Version in `apps/komki_cli/mix.exs` erhöhen und mergen.
-2. Tag setzen: `git tag komki-v<version> && git push origin komki-v<version>`.
-   Der Workflow `komki-release` baut auf Apple Silicon das Paket
-   (`make komki-paket`) und die Formel (`make komki-formel`) und hängt
-   beides an das GitHub-Release.
+1. Version und Tag entstehen über ein Changeset und den Version-PR
+   ([docs/agents/changesets.md](../../docs/agents/changesets.md)): Nach dem
+   Merge trägt der Commit den Tag `komki/v<version>`.
+2. Workflow von Hand starten: `gh workflow run komki-release.yml -f tag=komki/v<version>`.
+   Er baut auf Apple Silicon das Paket (`make komki-paket`) und die Formel
+   (`make komki-formel`) und hängt beides an das GitHub-Release.
 3. `komki.rb` aus dem Release als `Formula/komki.rb` ins Tap-Repo
    `croesnick/homebrew-tap` legen.
 
@@ -138,7 +145,7 @@ Von null bis zur ersten Recherche, im Repo-Root:
 
 ```sh
 make komki                     # baut komki (ein Programm, alle Rollen) und legt es nach ~/.local/bin
-komki setup                    # lädt beim ersten Mal das Modell (17 GB), fragt vorher
+komki setup                    # lädt beim ersten Mal das Modell (17 GB) und den MTP-Drafter (0,5 GB), fragt vorher
 komki run "Suche im RIS nach Bahnhofstraße und fasse die Treffer zusammen."
 komki session                  # interaktiv in tmux
 komki journal verify           # Hash-Kette des Journals prüfen
@@ -152,13 +159,19 @@ eigener Prozess unter ihrem eigenen Sandbox-Profil. Auf einer bestehenden
 Instanz frischt `setup` nach einem Update die Programmpfade und Profile auf
 und lässt alle Einstellungen stehen. Es fragt nach dem Vault (Enter wählt den erfundenen
 Test-Vault, `--demo` ohne Frage), legt die Instanz an, fragt den
-Brave-Key verdeckt ab, falls er im Schlüsselbund fehlt, startet alles und
+Brave-Key verdeckt ab, falls er im Schlüsselbund fehlt (oder bietet an,
+einen Klartext-Eintrag zu versiegeln), startet alles und
 prüft mit dem Doctor. Ein zweiter Lauf ändert an einer bestehenden Instanz
-nichts. Fehlt das Modell, nennt `setup` Größe, Quelle (feste Revision auf
+nichts. Ja/Nein-Fragen (Download, veränderte Programme übernehmen) gelten nur
+am Terminal: Ohne Terminal ist jede Antwort nein, auch eine hineingepipte
+(`yes j | komki setup`, Ticket #262). Fehlt das Modell, nennt `setup` Größe, Quelle (feste Revision auf
 Hugging Face) und Lizenz und lädt es nach Rückfrage an den Staging-Ort
 (`~/.local/share/komki/models-staging/`). Ein abgebrochener Download setzt
 beim nächsten Aufruf fort; verwendet wird die Datei nur mit passender
-Prüfsumme. Liegt das Modell schon woanders, `--gguf-from PFAD`. Die Instanz
+Prüfsumme. Liegt das Modell schon woanders, `--gguf-from PFAD`. Dasselbe
+gilt seit Ticket #318 für den MTP-Drafter (0,5 GB, `--drafter-from PFAD`):
+`setup` fragt beide Downloads einzeln, und einer bestehenden Instanz ohne
+Drafter lädt er nach. Die Instanz
 bekommt das Modell als APFS-Klon: kein zusätzlicher Platz, Millisekunden
 statt einer 17-GB-Kopie. `run` und `session` starten fehlende Prozesse
 selbst, `komki up` ist nur noch nötig, wenn man ausdrücklich vorab starten
@@ -178,13 +191,23 @@ veränderte `room.json` bleibt unberührt.
 
 Hinweise zu den einzelnen Schritten:
 
-* **Schlüssel:** `komki secret set brave` legt den Brave-Key verdeckt ab
-  (nie in argv, nie im Log); `komki secret list` zeigt, ob er da ist. Beim
-  ersten Start fragt macOS, ob
-  `security` auf den Eintrag `brave-search-api` zugreifen darf. Wähle
-  „Immer erlauben“, sonst startet der Web-Connector ohne Key und jede
-  Websuche meldet `credential-missing`. „Immer erlauben“ heißt: jeder Prozess
-  unter deinem Nutzer kann den Key per `security` lesen.
+* **Schlüssel:** `komki secret set brave` fragt den Brave-Key verdeckt ab,
+  versiegelt ihn mit der Secure Enclave des Macs und legt nur das Siegel im
+  Schlüsselbund ab (nie in argv, nie im Log); `komki secret list` zeigt
+  „versiegelt“, „Klartext“ oder „fehlt“. Bei jedem Start des Web-Connectors
+  fragt macOS per Touch ID oder Passwort nach („komki startet den Connector
+  web …“). Ohne Freigabe startet der Connector ohne Key, und `up` sagt das.
+  Dieselbe Rückfrage trifft jeden anderen Prozess, der den Eintrag öffnen
+  will: Den Schlüsselbund-Eintrag selbst kann jeder Prozess deines Nutzers
+  lesen, das Siegel aber nur mit deiner Freigabe öffnen. Einen Klartext-Eintrag
+  aus älteren Versionen benutzt komki nicht; `komki setup` bietet an, ihn zu
+  versiegeln.
+* **Programm-Pins:** `setup` hält die SHA-256 jedes Programms fest, das komki
+  startet (komki, escript, node, llama-server, komki-tresor, das ganze
+  pi-Paket). `up`, `run` und `session` starten nur, wenn die Bytes noch
+  stimmen. Nach `brew upgrade` (neuer Pfad) hält `setup` die neuen Hashes
+  selbst fest; ändert sich ein Programm am selben Pfad, fragt `setup` einzeln
+  nach (Standard: nein).
 * **Vault:** Der Vault-Connector zeigt nur Notizen mit
   Frontmatter-Feld `komki_labels` (z. B. `komki_labels: [vault-oeffentlich@1]`);
   alles andere bleibt unsichtbar. Geschrieben wird nur nach
@@ -193,16 +216,33 @@ Hinweise zu den einzelnen Schritten:
   Vault-Connector ab.
 * **RIS:** Ohne Zugangsdaten nutzt der Connector die öffentlichen
   Gast-Endpunkte; die liefern nur Titel, keine Texte (#148). Zum Üben ohne
-  Netz gibt es einen Mock:
-  `elixir apps/komki_connector_ris/priv/mock_ris.exs --port 49640` und
-  `komki init --force --ris-mock-port 49640`.
-* **Raum wechseln:** Welche Daten in einer Session zusammenkommen dürfen,
-  steht in `~/.local/share/komki/mediator/room.json`, Feld `workspace_bindings`. Default ist
-  **recherche** (`ris-oeffentlich@1`, `vault-oeffentlich@1`,
-  `web-oeffentlich@1`): Websuche und RIS erlaubt, vertrauliche Notizen
-  gesperrt. Für **vertraulich** `vault-vertraulich@1` ergänzen: Dann sind
-  vertrauliche Notizen lesbar und jede Web- und RIS-Suche gesperrt. Nach der
-  Änderung `komki down && komki up`.
+  Netz gibt es einen Mock auf der Mock-Runtime:
+  `cd apps/komki_mock && mix komki_mock.serve --adapter KomkiMock.Adapters.Ris --dir /tmp/mock-ris --data-port 49640`
+  und `komki init --force --ris-mock-port 49640`.
+* **Websuche ohne Netz:** Der Brave-Mock läuft genauso
+  (`--adapter KomkiMock.Adapters.Brave --data-port 49641`), dazu
+  `komki init --force --web-mock-port 49641`. Der Web-Connector spricht dann
+  direkt mit dem Mock statt über den Egress-Proxy mit `api.search.brave.com`.
+* **Raum wechseln:** `komki raum` zeigt den Raum, `komki raum vertraulich`
+  bzw. `komki raum recherche` wechselt (Ticket #268). Default ist
+  **recherche** (`doc-oeffentlich@2`, `ris-oeffentlich@1`,
+  `vault-oeffentlich@1`, `web-oeffentlich@1`): Websuche und RIS erlaubt,
+  vertrauliche Notizen gesperrt. **vertraulich** ergänzt
+  `vault-vertraulich@1`: Dann sind vertrauliche Notizen lesbar und jede
+  Web- und RIS-Suche gesperrt. Gespeichert wird das in `workspace_bindings`
+  in `~/.local/share/komki/mediator/room.json`; ein laufender Vermittler
+  startet neu, das Socket-Token bleibt. Raumdokumente liest pi nur, wenn
+  ihre Labels in diesem B_W stehen (`list_documents` zeigt, welche).
+  Zwei Regeln schützen den Kontext von pi: In den strengeren Raum geht es
+  jederzeit, in den lockereren nur ohne laufende Session und ohne laufenden
+  `komki run` (festgehalten unter `<base>/run/runs/`). Und
+  `komki session --continue` setzt eine Session nur in einem Raum fort, der
+  mindestens so streng ist wie der, in dem sie lief (festgehalten je Session
+  unter `<base>/run/sessions/`). In pi selbst holen `/resume` und `/import`
+  keine andere Session herein: Jede Session sieht unter `pi-home/sessions`
+  nur ihr eigenes Verzeichnis (Seatbelt-Profil), und die komki-Extension
+  bricht den Wechsel dorthin mit einem Hinweis ab (#295). Eigene Räume und Räume mit Startvertrag
+  stellt `komki raum` nicht um (#214).
 * **Nachvollziehen:** Jede Entscheidung steht im Journal
   `~/.local/share/komki/mediator/journal/pdr.jsonl`; `komki journal verify`
   prüft die Hash-Kette. Logs liegen unter `~/.local/share/komki/tmp/`.
@@ -215,12 +255,13 @@ Hinweise zu den einzelnen Schritten:
 ```sh
 ./komki version
 ./komki setup                       # gefuehrte Einrichtung (Werkzeuge, Vault, Instanz, Schluessel, Start)
-./komki secret set brave            # Brave-Key verdeckt in den Schluesselbund
-./komki secret list                 # erwartete Schluessel und ob sie da sind
+./komki secret set brave            # Brave-Key verdeckt eingeben, mit der Secure Enclave versiegeln
+./komki secret list                 # erwartete Schluessel: versiegelt, Klartext oder fehlt
 ./komki journal verify              # Hash-Kette des Journals pruefen
 ./komki init                        # Instanz anlegen (config, Profil, pi-home, GGUF mit SHA-Gate)
 ./komki init --gguf-from PFAD       # GGUF-Quelle explizit angeben
-./komki doctor                      # alle Checks (Werkzeuge, Profil, GGUF-SHA, Boot-Gate, Port)
+./komki init --drafter-from PFAD    # MTP-Drafter-Quelle explizit angeben (Ticket #318)
+./komki doctor                      # alle Checks (Werkzeuge, Profil, Programm-Pins, GGUF-SHA, Drafter-SHA, Boot-Gate, Port)
 ./komki up                          # llama-server, Egress, Connectoren, Vermittler starten
 ./komki run "PROMPT"                # einmaliger pi-Lauf unter dem Profil (startet bei Bedarf alles)
 ./komki run "PROMPT" --capture-denials  # zusaetzlich Sandbox-Denials des Lauffensters ablegen
@@ -229,6 +270,7 @@ Hinweise zu den einzelnen Schritten:
 ./komki session --detach            # im Hintergrund; der Befehl zum Andocken steht in der Ausgabe
 ./komki down                        # alles stoppen (Vermittler, Connectoren, Egress, llama)
 ./komki status                      # Zustand (base, gguf, port, Socket, llama, Egress, Connectoren, Vermittler)
+./komki raum                        # Raum anzeigen; mit recherche|vertraulich wechseln
 ./komki label …                     # SQLite-Registry: Bindungen, Labels, Γ-Export (siehe unten)
 ```
 
@@ -267,8 +309,9 @@ Copy-Modus schreibt weiterhin in die Zwischenablage. Aus einer laufenden
 tmux-Session heraus startet er verschachtelt (Prefix dann zweimal, etwa
 `Ctrl+B Ctrl+B d` zum Abkoppeln). `komki run` filtert Steuersequenzen aus pis
 Ausgabe, bevor sie im Terminal erscheint. Dateien aus der Session landen im Verzeichnis `arbeit`
-innerhalb der Instanz, die Session-Verläufe unter `pi-home/sessions` und
-lassen sich mit `session --continue` fortsetzen. pi startet mit einem
+innerhalb der Instanz, die Session-Verläufe in einem Verzeichnis je Session
+unter `pi-home/sessions`; die letzte lässt sich mit `session --continue`
+fortsetzen, Verläufe von vor #295 nicht mehr. pi startet mit einem
 knappen deutschen System-Prompt (Deutsch als Default, durchgehende
 Du-Form), Thinking-Blöcke sind eingeklappt; liegen `fd`/`ripgrep` vor,
 stehen `find`/`grep` für die Dateisuche bereit. Aus der Session kopieren:
@@ -282,7 +325,7 @@ ihn in pis `models.json` ein. Ohne den Schlüssel antwortet llama mit 401, damit
 keine Website im Browser das lokale Modell nutzen kann. `komki doctor` meldet
 einen llama, der ohne Schlüssel läuft.
 
-### Kanal zum Vermittler (Ticket #143)
+### Unix-Socket zum Vermittler (Ticket #143)
 
 pi erreicht den Vermittler (`komki-mediator`) nur über einen Unix-Socket,
 nicht über einen TCP-Port:
@@ -293,10 +336,12 @@ nicht über einen TCP-Port:
 <base>/run/mediator.token   32 Byte Zufall als Hex, Rechte 0600
 ```
 
-* `komki up` schreibt bei jedem Vermittler-Start ein neues Token und startet
-  den Vermittler mit `--socket` und `--token-file`. Das Token steht nie in
+* `komki up` schreibt bei jedem Kaltstart des Vermittlers ein neues Token und
+  startet ihn mit `--socket` und `--token-file`. Das Token steht nie in
   einer Kommandozeile. Läuft der Vermittler schon und antwortet mit dem
-  aktuellen Token, bleibt beides unverändert.
+  aktuellen Token, bleibt beides unverändert. Muss ein laufender Vermittler
+  neu starten (neues Γ nach `komki label import`, neue Raumdokumente), behält
+  er das Token, und eine offene pi-Session arbeitet weiter (Ticket #216).
 * Jede Anfrage braucht `Authorization: Bearer <token>`, auch `/healthz`.
   Ohne oder mit falschem Token antwortet der Vermittler mit 401 und schreibt
   eine Logzeile (ohne Token-Wert) nach `tmp/mediator.log`. Das hält andere
@@ -312,7 +357,14 @@ nicht über einen TCP-Port:
   Quelle nicht erreichbar), Label, Treffer, Quelle mit Abrufzeit und Beleg;
   ctrl+o klappt volle URLs und alle Belege auf. Das macht die pi-Extension
   `komki-anzeige` (`priv/pi/komki-anzeige/`). Sie registriert nur Renderer,
-  ändert also weder Entscheidungen noch das, was das Modell sieht. komki
+  ändert also weder Entscheidungen noch das, was das Modell sieht. Dazu
+  zeigt sie Raum, Zweck, Labels, den Weg nach draußen und die Zahl der
+  Raumdokumente in Kopf- und Fußzeile sowie in `/raum`, `/dokumente` und
+  `/hilfe` (Ticket #242). Die Daten kommen aus `raum.json`, das komki vor
+  jedem Start aus `room.json`, Γ und dem Label-Store schreibt
+  (`KomkiCli.Raumbild`), und aus der letzten Antwort von `list_documents`;
+  die Ausgaben der Befehle sind Session-Einträge, die pi nicht ans Modell
+  schickt. komki
   schreibt sie wie das Relay vor jedem pi-Start neu ins pi-Home und lädt sie
   nur in der Session (`-e`); den Übersetzungs-Cache für TypeScript schaltet
   `JITI_FS_CACHE=false` ab, weil er sonst im schreibbaren pi-Home läge.
@@ -328,6 +380,24 @@ nicht über einen TCP-Port:
   103 Byte; `komki up` lehnt eine zu tiefe Basis ab.
 
 ### Egress, Connectoren und Vermittler-Profil (Tickets #146, #137)
+
+Die Grundschichten der Profile (Escript: exec-Kette, Boot-Schicht,
+BEAM-Initialisierung, Log; pi und llama: Boot-Schicht, Terminal-Klasse)
+kommen seit #226 aus der Library [`apps/seatbelt`](../seatbelt/README.md)
+und sind dort auf Englisch kommentiert; die Regelzeilen selbst sind
+byte-identisch. Weil sich die Kommentarzeilen ändern, meldet der Doctor
+nach dem Update Profil-Drift, bis `komki setup` die Profile neu schreibt
+(das geschieht dort automatisch, sobald der Generator anderen Text
+erzeugt; `komki init --force` ist nicht nötig).
+
+**Bestehende Instanzen nach #318** (MTP-Drafter): Die config.json älterer
+Instanzen kennt `drafter_path`/`drafter_sha256` noch nicht — sie laden mit
+den Pins aus dem Code (Pfad `<base>/models/mtp-gemma-4-26B-A4B-it-Q8_0.gguf`).
+`komki doctor` meldet die fehlende Datei mit dem Nachladeweg, und `komki
+setup` lädt sie nach Rückfrage und legt sie in die Instanz; das
+llama-Profil bekommt seine Drafter-Regel beim selben `setup`-Lauf. Ein
+`init --force` ist nicht nötig. Ein bereits laufender llama rechnet erst
+nach dem nächsten Start mit den neuen Schaltern: `komki down && komki up`.
 
 Werkzeuge mit Außenwirkung (RIS, Websuche, Vault) laufen als eigene
 Prozesse, jeder unter einem eigenen, generierten Seatbelt-Profil
@@ -362,15 +432,38 @@ selbst alle Prozesse, und nur der Egress-Proxy darf nach außen:
   Shell (etwa Tokens) von den Prozessen fern. `escript` ist der aufgelöste
   Erlang-Pfad (`escript_bin`), weil der asdf-Shim unter der Sandbox scheitert.
   Die Escripts findet komki wie den Vermittler: erst `PATH`, dann `<base>/bin`.
-* **Credentials** (heute nur `BRAVE_API_KEY` für die Websuche) liest komki mit
-  `security find-generic-password -s brave-search-api -w` und schreibt sie als
-  eine JSON-Zeile in stdin des Web-Connectors, danach schließt es stdin. Sie
-  stehen nie in argv, Umgebung, Log oder Status. Fehlt der Eintrag, startet der
-  Connector trotzdem und meldet `credential-missing`; `komki doctor` warnt
-  (geprüft wird nur die Existenz, ohne den Wert zu lesen).
+* **Credentials** (heute nur `BRAVE_API_KEY` für die Websuche) liegen im
+  Schlüsselbund nur als Siegel (`ktv2.…`, Format aus `apps/sealed_envelope`).
+  komki liest es mit `security find-generic-password -s brave-search-api -w`,
+  öffnet es nach der Schlüsselvereinbarung mit `komki-tresor agree` über die
+  Secure Enclave (Touch ID oder Passwort) und schreibt den Klartext als eine JSON-Zeile in stdin des Web-Connectors,
+  danach schließt es stdin. Sie stehen nie in argv, Umgebung, Log oder Status.
+  Ein Siegel im alten Format `ktv1` öffnet komki nicht mehr; den Wert gibst du
+  mit `komki secret set` neu ein.
+  Fehlt der Eintrag, wird die Freigabe verweigert oder liegt er im Klartext vor,
+  startet der Connector ohne Key und meldet `credential-missing`; `up` nennt
+  den Grund, `komki doctor` warnt.
+* **komki-tresor** (`native/komki-tresor/main.swift`, bei `mix compile` nach
+  `priv/` gebaut und von `make komki`/`make komki-paket` neben komki kopiert):
+  ein kleines Swift-Programm, weil
+  Erlang die Secure Enclave nicht erreicht. Es macht nur die Hardware:
+  `recipient` erzeugt je Geheimnis einen P-256-Schlüssel in der Secure Enclave
+  mit der Zugriffsregel „userPresence“ (nur dieses Gerät, nur entsperrt) und
+  gibt dessen öffentlichen Schlüssel aus; der private Schlüssel verlässt die
+  Enclave nie. `agree` liefert nach der Freigabe das gemeinsame ECDH-Geheimnis.
+  Verschlüsselt wird in Elixir (`apps/sealed_envelope`: ECDH, HKDF-SHA256,
+  AES-256-GCM), Klartext erreicht das Programm nicht. Ein Siegel lässt sich auf
+  keinem anderen Mac öffnen.
+* **Connector-Token:** Vor jedem Connector-Start erzeugt `up` ein Token
+  (`run/connectors/<id>.token`, `0600`) und gibt es dem Connector über stdin.
+  Der Vermittler schickt es in jeder Anfrage mit; ein Aufruf ohne passendes
+  Token wird abgewiesen, auch `ping`. pis Sandbox kann weder die Tokendateien
+  lesen noch einen Connector-Socket erreichen.
 * **Konfiguration** (`config.json`, Defaults): `egress_ports`
-  (`{"ris": 49531, "web": 49532}`), `ris_base_url`
-  (`https://risapi1.komuna.net/web/`), `ris_mock_port` (aus; gesetzt spricht der
+  (`{"ris": 49531, "web": 49532}`; `init --port N` legt sie auf `N + 7` und
+  `N + 8`, damit eine Wegwerf-Instanz neben der Hauptinstanz startet; eine
+  bestehende `config.json` behält ihre Ports, Ticket #203), `ris_base_url`
+  (`https://risapi3.komuna.net/web/`), `ris_mock_port` (aus; gesetzt spricht der
   RIS-Connector direkt mit `http://127.0.0.1:<port>/`, ohne Proxy), `vault_dir`
   (`<base>/vault`, anfangs leer, Test-Vault siehe Schnellstart; leer gesetzt: Vault-Connector aus).
 * **Bereit** ist ein Connector, wenn die reservierte Operation `ping` die
@@ -472,16 +565,27 @@ Je Datei:
    mit demselben Γ wie der Vermittler (Label-Store, #208). Ablehnungen tragen
    den Remedy-Katalog.
 3. Nur wenn **alle** Dateien `permit` sind, legt komki sie als
-   `<base>/mediator/documents/<objekt>.md` ab, trägt jedes Objekt mit Typ
-   `document`, Version und Labels in `room.json` ein und startet den
-   Vermittler neu. Sonst endet der Start mit Exit 3, und nichts wird
-   abgelegt.
+   `<base>/mediator/documents/<objekt>.md` ab — PDF-Quellen als
+   `<objekt>.pdf` (#290) —, trägt jedes Objekt mit Typ `document`, Version
+   und Labels in `room.json` ein und startet den Vermittler neu. Sonst
+   endet der Start mit Exit 3, und nichts wird abgelegt.
 
 pi liest die Dokumente danach nur über `admit_document`; der Vermittler
-entscheidet jede Aufnahme erneut, der Dokument-Connector liest (#169). Nur
-UTF-8-Text taugt als Raumdokument. Dateien aus dem pi-Home, dem Vermittler-
-Verzeichnis oder der Registry nimmt komki nicht an. Aufnahme gibt es nur bei
-einem neuen Start, nicht mit `--continue` und nicht in eine laufende Session.
+entscheidet jede Aufnahme erneut, der Dokument-Connector liest (#169). Als
+Raumdokument taugt UTF-8-Text; PDFs (an der Endung und am `%PDF`-Header
+erkannt) liest der Connector über ex_pdfium als Text je Seite mit
+Seitenanker `[Seite N]`, dazu die Highlights mit Kommentar und markiertem
+Text — ein PDF ohne Textebene (Scan) ist ein klarer Fehler, es gibt kein
+OCR (#289). Eine Objekt-ID liegt in genau einer Form im Raum: Eine
+Markdown- und eine PDF-Fassung derselben Objekt-ID lehnt die Aufnahme ab,
+denn der Connector liest nur eine Form je Objekt. **PDF-Lesung braucht die
+NIF-Form des Programms** (Einzeldatei per `make komki-burrito` oder
+Release): Im Escript-Betrieb (`make komki`, Homebrew-Paket) antwortet jede
+PDF-Lesung mit einem klaren Fehler, bis #288 die Programmform für
+NIF-Connectoren entscheidet; `doctor` bleibt dabei grün, weil `ping` den
+NIF nicht berührt. Dateien aus dem pi-Home, dem Vermittler-Verzeichnis oder
+der Registry nimmt komki nicht an. Aufnahme gibt es nur bei einem neuen
+Start, nicht mit `--continue` und nicht in eine laufende Session.
 
 ## So sieht eine Session aus
 
@@ -521,7 +625,8 @@ Im Arbeitsraum arbeiten nur synthetische oder autorisierte öffentliche Daten.
 Geschützte oder vertrauliche Daten gehören nicht hinein.
 
 Das Boot-Gate ist vor jedem Lauf Pflicht: Ist `doctor` rot, verweigern
-`up`, `down`, `run` und `session` den Dienst. deny-default-Profile sind auf
+`up`, `down`, `run` und `session` den Dienst und nennen die roten Checks.
+Dazu gehören die Programm-Pins. deny-default-Profile sind auf
 macOS hierfür spröde, deshalb wird vor jedem Lauf neu geprüft statt blind
 vertraut.
 

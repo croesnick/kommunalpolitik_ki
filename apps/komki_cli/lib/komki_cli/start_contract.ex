@@ -91,15 +91,14 @@ defmodule KomkiCli.StartContract do
     end
   end
 
-  @doc "Header-Zeilen des Startvertrags (leer bei fehlendem Vertrag mit Hinweis)."
+  @doc """
+  Header-Zeilen des Startvertrags. Ohne Vertrag keine: Das ist der
+  Normalfall einer Session ohne Dateien, den Raum zeigt pi selbst
+  (#242). Wer Dateien mitbringt, bekommt bei fehlendem Vertrag die
+  Anleitung aus `setup_remedy/2`.
+  """
   @spec header(t()) :: [String.t()]
-  def header(%__MODULE__{contract_hash: nil} = contract) do
-    [
-      "komki session — kein Startvertrag (room.json: " <> contract.path <> ")",
-      "hinweis: Session ohne Dateien laeuft; Dateiaufnahme braucht den contract-Block " <>
-        "mit bindings, auftrag, verantwortliche_person, eingangsrechte."
-    ]
-  end
+  def header(%__MODULE__{contract_hash: nil}), do: []
 
   def header(%__MODULE__{} = contract) do
     [

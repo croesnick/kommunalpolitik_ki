@@ -63,6 +63,17 @@ defmodule KomkiCli.BurritoLaunchTest do
              EscriptProfile.runtime("/erl", "/opt/komki-bin")
   end
 
+  test "Burrito ohne runtime_root: klar scheitern statt still die Wrapper-Regeln wegzulassen" do
+    # escript_bin setzen, damit erlang_root!/1 nicht vorher anspricht: Der
+    # Fehler soll die fehlende Burrito-Laufzeit sein, nicht die fehlende
+    # Escript-Laufzeit.
+    cfg = %{burrito_cfg() | runtime_root: nil, escript_bin: "/erl/bin/escript"}
+
+    assert_raise ArgumentError,
+                 "burrito-Instanz ohne runtime_root — config.json prüfen ('komki setup')",
+                 fn -> EscriptProfile.runtime_for(cfg, "/opt/komki-bin") end
+  end
+
   test "marked_descendants/2: findet Kindprozesse mit Marker (wie die VM unter dem Burrito-Wrapper)" do
     marker = "komki-test-marker-" <> Integer.to_string(System.unique_integer([:positive]))
 

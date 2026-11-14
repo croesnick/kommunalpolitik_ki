@@ -16,23 +16,31 @@ defmodule KomkiCli.Connectors do
       stdin: genau eine JSON-Zeile mit den Credentials aus dem
       Schluesselbund (`{}` ohne Credentials oder wenn einer fehlt), danach
       schliesst komki stdin. Der Wert steht nie in argv, Umgebung oder Log.
+      Im Web-Mock steht dort statt des echten Brave-Schluessels ein
+      synthetischer Test-Key (#496): Der Mock laeuft auf Loopback im
+      Klartext, und dorthin darf der echte bezahlte Schluessel nie reisen.
     * Bereit ist ein Connector, wenn die reservierte Operation `ping` die
       Fassung des Manifests liefert; der Egress, wenn sein erster Port
       Verbindungen annimmt.
 
   pidfiles unter `<base>/tmp/` mit Identitaetscheck ueber die
   ps-Kommandozeile (`KomkiCli.Proc`), Logs unter `<base>/tmp/`.
-  `<base>/run` und `<base>/run/connectors` mit `0700`.
+  `<base>/run`, `<base>/run/connectors` und der Dokumentenordner des Raums
+  samt Elternverzeichnis mit `0700`.
   """
 
-  alias KomkiCli.{Config, ConnectorProfile, Keychain, Proc, Profile}
-  alias KomkiConnector.{Client, Manifest}
+  alias KomkiCli.{Config, ConnectorProfile, Proc, Profile, Secrets}
+  alias KomkiConnector.{Launch, Manifest, Text}
+  alias Sidecar.{Client, Token}
 
   @ready_timeout_ms 15_000
   @egress_marker "komki-egress"
 
   @type state :: {:running, pos_integer()} | :stopped | :disabled | {:error, String.t()}
-  @type up_state :: {:started, pos_integer()} | {:already, pos_integer()}
+  @type up_state ::
+          {:started, pos_integer()}
+          | {:started, pos_integer(), [String.t()]}
+          | {:already, pos_integer()}
   @type down_state :: :ok | :no_pidfile | {:stale, String.t()}
 
   # ===========================================================================
@@ -83,25 +91,34 @@ defmodule KomkiCli.Connectors do
   def socket_length(base) do
     longest = longest_socket(base)
 
-    if byte_size(longest) <= @max_socket_bytes do
-      :ok
-    else
-      {:error,
-       "Socket-Pfad zu lang (" <>
-         Integer.to_string(byte_size(longest)) <>
-         " > " <> Integer.to_string(@max_socket_bytes) <> " Byte): " <> longest}
-    end
+    if byte_size(longest) <= @max_socket_bytes,
+      do: :ok,
+      else: {:error, KomkiCli.Channel.socket_too_long(longest)}
   end
 
   # ===========================================================================
   # Auswahl und Argumente (rein)
   # ===========================================================================
 
-  @doc "Aktive Connectoren: alle Manifeste, Vault nur mit gesetztem vault_dir."
+  @doc """
+  Aktive Connectoren: alle Manifeste, Vault nur mit gesetztem vault_dir,
+  ratsprojekte (DURCHSTICH #409, Wegwerf) nur mit gesetztem
+  ratsprojekte_socket oder ratsprojekte_stand (#419) — Socket und
+  Stand-Datei gehören dem Hub (#415), nicht der komki-Basis.
+  """
   @spec enabled(Config.t()) :: [Manifest.t()]
   def enabled(%Config{} = cfg) do
     Enum.filter(Manifest.all(), fn manifest ->
-      manifest.id != "vault" or is_binary(cfg.vault_dir)
+      cond do
+        manifest.id == "vault" ->
+          is_binary(cfg.vault_dir)
+
+        manifest.id == "ratsprojekte" ->
+          is_binary(cfg.ratsprojekte_socket) or is_binary(cfg.ratsprojekte_stand)
+
+        true ->
+          true
+      end
     end)
   end
 
@@ -111,7 +128,7 @@ defmodule KomkiCli.Connectors do
 
   @doc """
   Netzweg eines Connectors: `:none` (keine egress_hosts), `{:proxy, port}`
-  oder im RIS-Mock-Betrieb `{:direct, mock_port}`.
+  oder im Mock-Betrieb (RIS, Web) `{:direct, mock_port}`.
   """
   @spec upstream(Config.t(), Manifest.t()) ::
           :none | {:proxy, pos_integer()} | {:direct, pos_integer()}
@@ -119,6 +136,7 @@ defmodule KomkiCli.Connectors do
     cond do
       manifest.egress_hosts == [] -> :none
       manifest.id == "ris" and Config.ris_mock?(cfg) -> {:direct, cfg.ris_mock_port}
+      manifest.id == "web" and Config.web_mock?(cfg) -> {:direct, cfg.web_mock_port}
       true -> {:proxy, egress_port!(cfg, manifest.id)}
     end
   end
@@ -174,32 +192,107 @@ defmodule KomkiCli.Connectors do
   defp proxy_args(_), do: []
 
   defp base_url_args(cfg, %{id: "ris"}), do: ["--base-url", Config.ris_url(cfg)]
+
+  defp base_url_args(cfg, %{id: "web"}) do
+    case Config.web_mock_url(cfg) do
+      nil -> []
+      url -> ["--base-url", url]
+    end
+  end
+
   defp base_url_args(_cfg, _manifest), do: []
 
   defp fs_args(cfg, %{id: "vault"}), do: ["--vault-dir", cfg.vault_dir]
   defp fs_args(cfg, %{id: "documents"}), do: ["--documents-dir", documents_dir(cfg)]
+
+  # Durchstich #409, belegt im Wegwerf-Lauf: Der Connector erreicht den Hub ueber dessen
+  # eigenen Unix-Socket (Pfad in argv ist keine Wegabee — nur Credentials
+  # reisen ueber stdin, CONTRACT.md §4).
+  # Stand lesen (#419): die Stand-Datei als Pfad; je nur, was gesetzt ist.
+  defp fs_args(cfg, %{id: "ratsprojekte"}) do
+    optional_arg("--hub-socket", cfg.ratsprojekte_socket) ++
+      optional_arg("--stand", cfg.ratsprojekte_stand)
+  end
+
   defp fs_args(_cfg, _manifest), do: []
 
+  defp optional_arg(flag, value) when is_binary(value), do: [flag, value]
+  defp optional_arg(_flag, nil), do: []
+
   @doc """
-  Credentials-Zeile fuer stdin: `{"<NAME>": "<wert>"}` aus `fetch`
-  (Default `Keychain.fetch/1`). Fehlt ein Wert, bleibt er weg; die Namen
-  der fehlenden kommen als zweites Element zurueck (nie Werte).
+  Synthetischer Test-Key der Websuche (#496): kein Geheimnis, erkennbar
+  als komki-eigener Mock-Wert. Im Web-Mock schreibt der Launcher ihn in
+  die stdin-Zeile, statt das Siegel des echten Brave-Schluessels zu
+  oeffnen — im Klartext zum Loopback darf er reisen, der echte
+  bezahlte Schluessel nie.
   """
-  @spec credentials_line(Manifest.t(), (String.t() -> {:ok, String.t()} | {:error, term()})) ::
-          {String.t(), [String.t()]}
-  def credentials_line(manifest, fetch \\ &Keychain.fetch/1) do
+  @spec mock_web_key() :: String.t()
+  def mock_web_key, do: "komki-mock-brave-key"
+
+  @doc """
+  Synthetic RIS account (#148): the `account` of the RIS mock's `default`
+  seed (`apps/komki_mock/priv/seeds/ris/default.json`). Against the mock it
+  takes the place of the real credential in the stdin line.
+  """
+  @spec mock_ris_zugang() :: String.t()
+  def mock_ris_zugang,
+    do: JSON.encode!(%{"login" => "ratsmitglied@komki.example", "password" => "mock-passwort"})
+
+  @doc """
+  Synthetische Credentials je Connector fuer diesen Start (#496): Im
+  Web-Mock oeffnet der Launcher das Siegel des echten Brave-Schluessels
+  nicht, sondern gibt einen Test-Key mit. Der Mock laeuft auf Loopback
+  im Klartext, und jeder lokale Prozess koennte dessen Port binden —
+  dorthin darf der echte Schluessel nie gelangen.
+  """
+  @spec synthetic_credentials(Config.t(), Manifest.t()) :: %{String.t() => String.t()}
+  def synthetic_credentials(%Config{} = cfg, %{id: "web"}) do
+    if Config.web_mock?(cfg), do: %{"BRAVE_API_KEY" => mock_web_key()}, else: %{}
+  end
+
+  # #148, as #496: the RIS mock gets its own synthetic account, the real
+  # login never travels in the clear to a loopback port.
+  def synthetic_credentials(%Config{} = cfg, %{id: "ris"}) do
+    if Config.ris_mock?(cfg), do: %{"RIS_ZUGANG" => mock_ris_zugang()}, else: %{}
+  end
+
+  def synthetic_credentials(_cfg, _manifest), do: %{}
+
+  @doc """
+  Credentials-Zeile fuer stdin: das Connector-Token unter
+  `KomkiConnector.Launch.credential_key/0` und `{"<NAME>": "<wert>"}` aus `fetch`
+  (Default `Secrets.reveal/1`: Siegel aus dem Schluesselbund, per Secure
+  Enclave geoeffnet). Eintrag in `synthetic` (Name auf Wert) steht statt
+  dessen in der Zeile, ohne dass `fetch` laeuft. Fehlt ein Wert, bleibt er
+  weg; Name und Fehlergrund der fehlenden kommen als zweites Element
+  zurueck (nie Werte).
+  """
+  @spec credentials_line(
+          Manifest.t(),
+          String.t(),
+          (String.t() -> {:ok, String.t()} | {:error, term()}),
+          %{String.t() => String.t()}
+        ) ::
+          {String.t(), [{String.t(), term()}]}
+  def credentials_line(manifest, token, fetch \\ &Secrets.reveal/1, synthetic \\ %{}) do
     {found, missing} =
       manifest.credentials
       |> Enum.sort()
-      |> Enum.reduce({%{}, []}, fn {name, service}, {found, missing} ->
-        case fetch.(service) do
+      |> Enum.reduce({%{Launch.credential_key() => token}, []}, fn {name, service},
+                                                                   {found, missing} ->
+        case synthetic_value(name, synthetic, service, fetch) do
           {:ok, value} -> {Map.put(found, name, value), missing}
-          {:error, _} -> {found, missing ++ [name]}
+          {:error, error} -> {found, missing ++ [{name, error}]}
         end
       end)
 
     {JSON.encode!(found) <> "\n", missing}
   end
+
+  defp synthetic_value(name, synthetic, _service, _fetch) when is_map_key(synthetic, name),
+    do: {:ok, Map.fetch!(synthetic, name)}
+
+  defp synthetic_value(_name, _synthetic, service, fetch), do: fetch.(service)
 
   @spec binary!(Config.t(), String.t()) :: String.t()
   def binary!(%Config{} = cfg, id) do
@@ -258,7 +351,7 @@ defmodule KomkiCli.Connectors do
   """
   @spec up(Config.t(), keyword()) :: {:ok, [{String.t(), up_state()}]} | {:error, String.t()}
   def up(%Config{} = cfg, opts \\ []) do
-    fetch = Keyword.get(opts, :fetch, &Keychain.fetch/1)
+    fetch = Keyword.get(opts, :fetch, &Secrets.reveal/1)
     ensure_run_dirs!(cfg)
 
     steps =
@@ -288,10 +381,19 @@ defmodule KomkiCli.Connectors do
     Enum.map(Enum.reverse(Manifest.ids()), &("connector-" <> &1)) ++ ["egress"]
   end
 
-  @doc "`<base>/run` und `<base>/run/connectors` mit 0700 anlegen."
+  @doc """
+  `<base>/run`, `<base>/run/connectors` und den Dokumentordner des Raums
+  samt Elternverzeichnis mit 0700 anlegen: Der Dokument-Connector startet
+  vor dem Vermittler, der den Ordner sonst erst beim ersten Start
+  befuellt. Raumdokumente sind vertraulich — ohne chmod richtet sie die
+  umask, und die lokale Lesbarkeitsgrenze faellt mit dem Basispfad
+  (Ticket #498).
+  """
   @spec ensure_run_dirs!(Config.t()) :: :ok
   def ensure_run_dirs!(cfg) do
-    for dir <- [run_dir(cfg), connectors_dir(cfg)] do
+    documents = documents_dir(cfg)
+
+    for dir <- [run_dir(cfg), connectors_dir(cfg), Path.dirname(documents), documents] do
       File.mkdir_p!(dir)
       File.chmod!(dir, 0o700)
     end
@@ -307,10 +409,24 @@ defmodule KomkiCli.Connectors do
     comp = component_for(cfg, step)
 
     case alive(comp) do
-      {:ok, pid} -> {:ok, {comp.name, {:already, pid}}}
+      {:ok, pid} -> keep_or_restart(cfg, step, comp, pid, fetch)
       :none -> start_fresh(cfg, step, comp, fetch)
     end
   end
+
+  # Ein laufender Connector ohne Tokendatei stammt aus einer komki-Version
+  # vor den Connector-Tokens (oder hat sein Token verloren); der Vermittler
+  # erreicht ihn nicht mehr. Er wird neu gestartet statt als laufend zu gelten.
+  defp keep_or_restart(cfg, {:connector, _} = step, comp, pid, fetch) do
+    if File.exists?(Token.for_socket(comp.socket)) do
+      {:ok, {comp.name, {:already, pid}}}
+    else
+      _ = stop(comp)
+      start_fresh(cfg, step, comp, fetch)
+    end
+  end
+
+  defp keep_or_restart(_cfg, _step, comp, pid, _fetch), do: {:ok, {comp.name, {:already, pid}}}
 
   defp component_for(cfg, :egress), do: egress_component(cfg)
   defp component_for(cfg, {:connector, manifest}), do: connector_component(cfg, manifest.id)
@@ -326,18 +442,77 @@ defmodule KomkiCli.Connectors do
   defp start_fresh(cfg, {:connector, manifest}, comp, fetch) do
     Profile.write!(profile_path(cfg, manifest.id), ConnectorProfile.connector(cfg, manifest))
     File.rm(comp.socket)
-    {line, _missing} = credentials_line(manifest, fetch)
+    # Capability-Token je Start (Sidecar.Token): Datei fuer den
+    # Vermittler, derselbe Wert in der stdin-Zeile fuer den Connector.
+    token = Token.provision!(comp.socket)
 
-    launch(
-      cfg,
-      comp,
-      binary!(cfg, manifest.id),
-      connector_args(cfg, manifest),
-      profile_path(cfg, manifest.id),
-      line,
-      fn -> ping(cfg, manifest) end
+    {line, missing} =
+      credentials_line(
+        needed_credentials(cfg, manifest),
+        token,
+        fetch,
+        synthetic_credentials(cfg, manifest)
+      )
+
+    result =
+      launch(
+        cfg,
+        comp,
+        binary!(cfg, manifest.id),
+        connector_args(cfg, manifest),
+        profile_path(cfg, manifest.id),
+        line,
+        fn -> ping(cfg, manifest) end
+      )
+
+    with_warnings(
+      result,
+      credential_warnings(manifest, missing) ++ start_warnings(manifest, comp.log)
     )
   end
+
+  @doc """
+  Warnings a connector logged while starting (e.g. a failed RIS sign-in,
+  #148), so `komki up` shows them and not only the log. The log is rewritten
+  on every start and carries no payloads or secrets (CONTRACT.md §4).
+  """
+  @spec start_warnings(Manifest.t(), Path.t()) :: [String.t()]
+  def start_warnings(manifest, log) do
+    case File.read(log) do
+      {:ok, log} ->
+        for line <- String.split(log, "\n"),
+            [_, text] <- [Regex.run(~r/\[warning\]\s+(.*)$/, line)],
+            do: manifest.id <> ": " <> text
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  @doc """
+  Das Manifest mit den Credentials, die dieser Start braucht: ohne
+  Hub-Socket kein Hub-Token (#419) — nur den Stand zu lesen, öffnet
+  kein Siegel und fragt nicht nach Touch ID.
+  """
+  @spec needed_credentials(Config.t(), Manifest.t()) :: Manifest.t()
+  def needed_credentials(%Config{ratsprojekte_socket: nil}, %{id: "ratsprojekte"} = manifest),
+    do: %{manifest | credentials: Map.delete(manifest.credentials, "KOMKI_HUB_TOKEN")}
+
+  def needed_credentials(_cfg, manifest), do: manifest
+
+  # Ein nicht gesetzter Schluessel ist eine Wahl (der Doctor meldet ihn);
+  # ein verweigertes oder unversiegeltes Geheimnis meldet `up` sichtbar.
+  defp credential_warnings(manifest, missing) do
+    for {name, error} <- missing, error != :missing do
+      Secrets.describe(Map.fetch!(manifest.credentials, name), error) <>
+        " — " <> manifest.id <> " startet ohne " <> name
+    end
+  end
+
+  defp with_warnings({:ok, {name, {:started, pid}}}, [_ | _] = warnings),
+    do: {:ok, {name, {:started, pid, warnings}}}
+
+  defp with_warnings(result, _warnings), do: result
 
   defp launch(cfg, comp, binary, args, profile, input, ready) do
     case alive(comp) do
@@ -387,12 +562,12 @@ defmodule KomkiCli.Connectors do
     socket = Manifest.socket_path(cfg.base_dir, manifest.id)
     call_id = "komki-cli-ping-" <> Integer.to_string(System.unique_integer([:positive]))
 
-    case Client.call(socket, call_id, "ping", %{}, %{}, timeout: 3_000) do
-      {:ok, %{"fassung" => fassung} = result} when fassung == manifest.fassung ->
+    case Client.call(socket, call_id, "ping", %{}, %{}, timeout: 3_000, texts: Text) do
+      {:ok, %{"version" => fassung} = result} when fassung == manifest.fassung ->
         {:ok, result}
 
       {:ok, result} ->
-        {:error, "ping: falsche Fassung " <> Kernel.inspect(result["fassung"])}
+        {:error, "ping: falsche Fassung " <> Kernel.inspect(result["version"])}
 
       {:error, %{"code" => code, "detail" => detail}} ->
         {:error, "ping: " <> code <> " " <> detail}
@@ -433,7 +608,11 @@ defmodule KomkiCli.Connectors do
         {:error, reason} -> {:error, reason}
       end
 
-    if comp.socket, do: File.rm(comp.socket)
+    if comp.socket do
+      File.rm(comp.socket)
+      File.rm(Token.for_socket(comp.socket))
+    end
+
     {comp.name, state}
   end
 

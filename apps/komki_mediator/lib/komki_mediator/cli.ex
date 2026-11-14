@@ -17,7 +17,7 @@ defmodule KomkiMediator.CLI do
     in argv.
   * `--connectors-dir` Verzeichnis der Connector-Sockets `<id>.sock`
     (Default: `<base>/run/connectors`, Connector-Vertrag §2)
-  * `--version` gibt die Fassung "komki-mediator/2" aus.
+  * `--version` gibt die Fassung "komki-mediator/5" aus.
 
   Bedient schon ein anderer Prozess den Socket, verweigert der Start; eine
   verwaiste Socket-Datei wird ersetzt.
@@ -117,6 +117,7 @@ defmodule KomkiMediator.CLI do
            }}
         )
 
+      :ok = journal_workspace(base, room)
       IO.puts(startup_note(base, socket, gamma))
       Process.sleep(:infinity)
     else
@@ -124,11 +125,27 @@ defmodule KomkiMediator.CLI do
     end
   end
 
+  # Jeder Start belegt das B_W, mit dem der Vermittler ab jetzt
+  # entscheidet. So steht auch ein Raumwechsel (`komki raum`, Ticket #268)
+  # im Journal: als Folge zweier Startdatensaetze mit verschiedenem B_W.
+  defp journal_workspace(base, room) do
+    {:ok, raw} = File.read(Path.join(mediator_dir(base), "room.json"))
+
+    KomkiMediator.PDR.append(KomkiMediator.Env.fetch(), %{
+      "decision_id" => KomkiMediator.PDR.new_id(),
+      "tool" => "workspace",
+      "decision" => "loaded",
+      "outcome" => "room_loaded",
+      "checked_label" => room.workspace_bindings,
+      "payload_hash" => KomkiMediator.Hash.sha256_hex(raw)
+    })
+  end
+
   defp connectors_dir(%{connectors_dir: dir}), do: dir
   defp connectors_dir(%{base: base}), do: Path.join([base, "run", "connectors"])
 
   @doc """
-  Liest das Kanal-Token (Ticket #143): genau 64 Hex-Zeichen (klein), ein
+  Liest das Socket-Token (Ticket #143): genau 64 Hex-Zeichen (klein), ein
   abschliessender Zeilenumbruch ist erlaubt. Fehler nennen den Pfad, nie
   den Inhalt.
   """

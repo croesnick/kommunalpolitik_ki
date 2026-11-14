@@ -21,94 +21,15 @@ defmodule RatsprojekteWeb.CoreComponents do
 
     * [Heroicons](https://heroicons.com) - see `icon/1` for usage.
 
-    * [Phoenix.Component](https://hexdocs.pm/phoenix_live_view/Phoenix.Component.html) -
+    * [Phoenix.Component](https://phoenix-live-view.hexdocs.pm/Phoenix.Component.html) -
       the component system used by Phoenix. Some components, such as `<.link>`
       and `<.form>`, are defined there.
 
   """
   use Phoenix.Component
 
+  alias Phoenix.HTML.Form
   alias Phoenix.LiveView.JS
-
-  # ============================================================
-  # Shared domain components (ratsprojekte design system)
-  # ============================================================
-
-  @doc """
-  Renders a status/priority/proposal badge using a CSS modifier class.
-
-  The `kind` decides which family of tokens is used; the `value` is the
-  atom that selects the concrete modifier. Centralises the previously
-  duplicated badge/1 + status_badge/1 function components that lived in
-  every LiveView with their own hardcoded colour maps.
-
-  ## Examples
-
-      <.badge kind={:status} value={:idee} />
-      <.badge kind={:priority} value={:hoch} />
-      <.badge kind={:proposal} value={:pending} />
-  """
-  attr(:kind, :atom, required: true, values: [:status, :priority, :proposal])
-  attr(:value, :atom, required: true)
-
-  def badge(assigns) do
-    modifier = badge_modifier(assigns.kind, assigns.value)
-
-    assigns = assign(assigns, :modifier, modifier)
-
-    ~H"""
-    <span class={"badge #{@modifier}"}>{@value}</span>
-    """
-  end
-
-  defp badge_modifier(:status, v), do: "badge-#{v}"
-  defp badge_modifier(:priority, v), do: "badge-#{v}"
-  defp badge_modifier(:proposal, v), do: "badge-#{v}"
-
-  @doc """
-  Renders the circular label for a Realisierungsstrang (A/B/C/D).
-
-  Colour is selected via a CSS modifier class so the palette lives in
-  `app.css` rather than in an Elixir colour map.
-  """
-  attr(:label, :string, required: true)
-
-  def strang_label(assigns) do
-    modifier =
-      case assigns.label do
-        l when l in ["A", "B", "C", "D"] -> "label-#{l}"
-        _ -> "label-default"
-      end
-
-    assigns = assign(assigns, :modifier, modifier)
-
-    ~H"""
-    <span class={"strang-label #{@modifier}"}>{@label}</span>
-    """
-  end
-
-  @doc """
-  Renders a status/priority badge for a project. Thin wrapper around
-  `<.badge kind={:status} .../>` for call-sites that read more naturally.
-  """
-  attr(:status, :atom, required: true)
-
-  def status_badge(assigns) do
-    ~H"""
-    <.badge kind={:status} value={@status} />
-    """
-  end
-
-  @doc """
-  Renders a priority badge for a project.
-  """
-  attr(:prio, :atom, required: true)
-
-  def prio_badge(assigns) do
-    ~H"""
-    <.badge kind={:priority} value={@prio} />
-    """
-  end
 
   @doc """
   Renders flash notices.
@@ -116,7 +37,14 @@ defmodule RatsprojekteWeb.CoreComponents do
   ## Examples
 
       <.flash kind={:info} flash={@flash} />
-      <.flash kind={:info} phx-mounted={show("#flash")}>Welcome Back!</.flash>
+      <.flash
+        id="welcome-back"
+        kind={:info}
+        phx-mounted={show("#welcome-back") |> JS.remove_attribute("hidden")}
+        hidden
+      >
+        Welcome Back!
+      </.flash>
   """
   attr(:id, :string, doc: "the optional id of flash container")
   attr(:flash, :map, default: %{}, doc: "the map of flash messages to display")
@@ -133,9 +61,9 @@ defmodule RatsprojekteWeb.CoreComponents do
     <div
       :if={msg = render_slot(@inner_block) || Phoenix.Flash.get(@flash, @kind)}
       id={@id}
-      data-flash
+      phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
-      class="toast toast-top toast-end z-50"
+      class="toast toast-bottom toast-end z-50"
       {@rest}
     >
       <div class={[
@@ -233,7 +161,7 @@ defmodule RatsprojekteWeb.CoreComponents do
   ```
 
   For more information on what kind of data can be passed to `options` see
-  [`options_for_select`](https://hexdocs.pm/phoenix_html/Phoenix.HTML.Form.html#options_for_select/2).
+  [`options_for_select`](https://phoenix-html.hexdocs.pm/Phoenix.HTML.Form.html#options_for_select/2).
   """
   attr(:id, :any, default: nil)
   attr(:name, :any)
@@ -283,12 +211,12 @@ defmodule RatsprojekteWeb.CoreComponents do
   def input(%{type: "checkbox"} = assigns) do
     assigns =
       assign_new(assigns, :checked, fn ->
-        Phoenix.HTML.Form.normalize_value("checkbox", assigns[:value])
+        Form.normalize_value("checkbox", assigns[:value])
       end)
 
     ~H"""
     <div class="fieldset mb-2">
-      <label>
+      <label for={@id}>
         <input
           type="hidden"
           name={@name}
@@ -316,7 +244,7 @@ defmodule RatsprojekteWeb.CoreComponents do
   def input(%{type: "select"} = assigns) do
     ~H"""
     <div class="fieldset mb-2">
-      <label>
+      <label for={@id}>
         <span :if={@label} class="label mb-1">{@label}</span>
         <select
           id={@id}
@@ -337,7 +265,7 @@ defmodule RatsprojekteWeb.CoreComponents do
   def input(%{type: "textarea"} = assigns) do
     ~H"""
     <div class="fieldset mb-2">
-      <label>
+      <label for={@id}>
         <span :if={@label} class="label mb-1">{@label}</span>
         <textarea
           id={@id}
@@ -358,7 +286,7 @@ defmodule RatsprojekteWeb.CoreComponents do
   def input(assigns) do
     ~H"""
     <div class="fieldset mb-2">
-      <label>
+      <label for={@id}>
         <span :if={@label} class="label mb-1">{@label}</span>
         <input
           type={@type}
@@ -555,14 +483,17 @@ defmodule RatsprojekteWeb.CoreComponents do
   Translates an error message using gettext.
   """
   def translate_error({msg, opts}) do
-    # You can make use of gettext to translate error messages by
-    # uncommenting and adjusting the following code:
-
-    # if count = opts[:count] do
-    #   Gettext.dngettext(RatsprojekteWeb.Gettext, "errors", msg, msg, count, opts)
-    # else
-    #   Gettext.dgettext(RatsprojekteWeb.Gettext, "errors", msg, opts)
-    # end
+    # No gettext: the hub speaks German only. Ecto's default messages get
+    # a German text by their validation; own messages are German already.
+    msg =
+      case {opts[:validation], opts[:kind]} do
+        {:required, _} -> "Bitte ausfüllen"
+        {:length, :max} -> "Höchstens %{count} Zeichen"
+        {:length, :min} -> "Mindestens %{count} Zeichen"
+        {:cast, _} -> "Das passt nicht, bitte prüfen"
+        {:inclusion, _} -> "Bitte aus der Liste wählen"
+        _ -> msg
+      end
 
     Enum.reduce(opts, msg, fn {key, value}, acc ->
       String.replace(acc, "%{#{key}}", fn _ -> to_string(value) end)
