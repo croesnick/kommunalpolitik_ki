@@ -10,6 +10,36 @@ defmodule KomkiConnectorWeb.UnitsTest do
     assert Text.clean("äöü" <> String.duplicate("x", 10), 4) == "äöüx"
   end
 
+  # Angriffsweg aus Ticket #483: ferngesteuerter Titel als '<'-Run. Vor dem
+  # Fix lief der Tag-Strip-Regex ueber die ungekappte Roheingabe; Engines
+  # mit PCRE2-Bumpalong-Rescan keilen daran (Audit #467 F11). OTP 29 beendet
+  # den Bumpalong nach dem ersten Fehlversuch und bleibt schnell — der Fix
+  # haelt den Vertrag versionsunabhaengig: linear gescannt, auf 8 KiB begrenzt.
+  test "Text.clean kappt feindliche '<'-Runs auf die ersten 8 KiB (#483)" do
+    input = String.duplicate("<", 256 * 1024)
+    assert Text.clean(input, 300) == String.duplicate("<", 300)
+  end
+
+  # Ohne Byte-Schnitt rekonstruiert clean/2 Inhalte hinter beliebig grossen
+  # Tags aus der vollen Roheingabe — der rote Fall vor dem Fix liefert hier
+  # noch "sichtbar"; nach dem Fix laeuft jedes Pass nur ueber die ersten 8 KiB.
+  test "Text.clean verarbeitet nur die ersten 8 KiB der Roheingabe (#483)" do
+    input = "<" <> String.duplicate("y", 20_000) <> ">" <> "sichtbar"
+    assert Text.clean(input, 300) == ""
+  end
+
+  test "Text.clean wirft ungeschlossene Tag-Fragmente weg (#483)" do
+    assert Text.clean("Antrag <ungezeichnet", 100) == "Antrag"
+    assert Text.clean("Stadtrat > Ausschuss", 100) == "Stadtrat > Ausschuss"
+  end
+
+  # Der Byte-Schnitt darf kein UTF-8-Zeichen zerlegen: Die Unicode-Pässe
+  # danach (Leerraum, trim, slice) verlangen gueltiges UTF-8.
+  test "Text.clean haelt den Byte-Schnitt an UTF-8-Grenzen (#483)" do
+    input = "a" <> String.duplicate("ä", 4096)
+    assert Text.clean(input, 300) == "a" <> String.duplicate("ä", 299)
+  end
+
   test "Brave.url baut Pfad und Query relativ zur Basis" do
     assert Brave.url("https://api.search.brave.com/", "a&b=c", 5) ==
              "https://api.search.brave.com/res/v1/web/search?q=a%26b%3Dc&count=5"
