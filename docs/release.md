@@ -1,9 +1,10 @@
 # Bau und Release von komki
 
 > **Zweck:** Single Source of Truth dafür, wie man zu einem laufenden komki
-> kommt. Heute gilt allein der **lokale Bau aus dem Checkout**. Ein
-> veröffentlichter Release (Tag, GitHub-Release, öffentlicher Homebrew-Tap)
-> ist beschrieben, aber nicht in Kraft (Entscheidung 29.10.2026, Ticket #79).
+> kommt. Heute gilt allein der **lokale Bau aus dem Checkout**. Versionen
+> und Tags sind in Kraft (Ticket #538). Ein veröffentlichter Release
+> (GitHub-Release, öffentlicher Homebrew-Tap) ist beschrieben, aber nicht in
+> Kraft (Entscheidung 29.10.2026, Ticket #79).
 > Grundlagen: der Burrito-Pilot aus Ticket #75
 > ([docs/research/2026-10-11-komki-burrito-pilot.md](research/2026-10-11-komki-burrito-pilot.md)),
 > die Signierungs-Entscheidung in
@@ -102,19 +103,46 @@ Ein zweites macOS-Benutzerkonto ist der ehrlichere Test, weil dort keine
 asdf-, Homebrew- oder pi-Stände des eigenen Kontos mitlaufen. Er ist noch
 nicht gelaufen (#241).
 
+## Versionen und Tags (in Kraft)
+
+Seit Ticket #538 haben fünf Einheiten eine eigene Version und ein eigenes
+Changelog: `komki` (das ganze Programm), `ratsprojekte`, `sidecar`,
+`seatbelt` und `sealed_envelope`. Eine repo-weite Gesamtversion gibt es
+nicht. Begründung: [ADR 0005](adr/0005-versionierung-mit-changesets-und-knope.md).
+
+- **Changesets:** Jede spürbare Änderung bringt ein Changeset unter
+  `.changeset/` mit. Format, Pflicht und Sprache:
+  [docs/agents/changesets.md](agents/changesets.md).
+- **Version-PR:** Der Workflow `versionen` sammelt die offenen Changesets
+  per knope in einem PR auf dem Branch `versionen`. Nur ein Mensch mergt
+  ihn, und der Merge ist das GO für die Tags.
+- **Tags:** `<einheit>/v<semver>`, etwa `komki/v0.2.0`. Das Schema gibt
+  knope bei mehreren Einheiten fest vor. Ein Tag markiert eine Version und
+  veröffentlicht nichts: Er startet keinen Bau und legt kein GitHub-Release
+  an.
+- **Version:** nie dieselbe Version zweimal. In der 0.x-Phase liest knope
+  Versionen als `0.<major>.<minor>`: Brüche und große Neuerungen → `major`
+  (0.1.0 → 0.2.0), kleinere Neuerungen → `minor`, Fehlerbehebungen →
+  `patch` (beide 0.1.0 → 0.1.1).
+- **Baseline:** Alle fünf Einheiten starten bei 0.1.0. Die Tags
+  `<einheit>/v0.1.0` stehen auf dem Merge-Commit von #538.
+
+Ein Build aus dem Checkout zwischen zwei Tags meldet die Version des
+letzten Version-PR, obwohl `main` schon weiter ist. `komki version` zeigt
+also den Stand der letzten Versionierung, nicht den genauen Commit.
+
 ## Release (später, nicht in Kraft)
 
 Diese Kette gilt erst, wenn komki veröffentlicht werden soll. Bis dahin wird
-nichts getaggt und nichts hochgeladen.
+nichts hochgeladen.
 
 Grundsätze, die beim ersten Release gelten sollen:
 
-- **Je Tool ein eigener Release**, Tag `<tool>-v<semver>`. Nur Tools mit
-  verteilbarer Datei sind release-fähig, heute allein komki. Eine
-  repo-weite Gesamtversion gibt es nicht.
-- **Version:** nie dieselbe Version zweimal. Der Tag muss zur `version` in
-  `apps/komki_cli/mix.exs` passen. In der 0.x-Phase: sichtbare Neuerungen
-  oder Brüche → Minor, Fehlerbehebungen → Patch.
+- **Je Tool ein eigener Release** zu einem vorhandenen Tag
+  `<einheit>/v<semver>` (oben). Nur Tools mit verteilbarer Datei sind
+  release-fähig, heute allein komki. Der Workflow `komki-release` startet
+  nur von Hand (`gh workflow run komki-release.yml -f tag=komki/v<version>`)
+  und prüft, dass der Tag zur `version` in `apps/komki_cli/mix.exs` passt.
 - **Bau lokal**, nicht in CI: macOS-Runner kosten rund das Zehnfache von
   Linux (0,062 gegenüber 0,006 USD/min), und am Ende steht ohnehin ein
   menschliches GO.
@@ -132,8 +160,10 @@ Grundsätze, die beim ersten Release gelten sollen:
   Live-Test für Touch ID (`cd apps/komki_cli && mix test --include touch_id`)
   auf einem Mac und zeigt genau eine Rückfrage.
 - **Ein Publish-GO** nach vorgelegtem Smoke-Protokoll, Prüfsummen, Notes und
-  Zweit-Maschinen-Check. Ein Draft legt kein Tag an, das Tag entsteht erst
-  beim Veröffentlichen.
+  Zweit-Maschinen-Check. Der Tag besteht dann schon (Version-PR); das GO
+  gilt dem Veröffentlichen.
+- **Neuerungen auf der Doku-Site:** Mit dem ersten Release bekommt
+  `docs/site/` eine Seite „Neuerungen“, die das komki-Changelog zeigt.
 
 ### Rebuild-Disziplin (Burrito)
 
@@ -170,10 +200,14 @@ Automatisierung der Kette bis zur Evidenz (`mix komki.release`).
 - Pilot-Bericht:
   [docs/research/2026-10-11-komki-burrito-pilot.md](research/2026-10-11-komki-burrito-pilot.md)
   (Ticket #75)
-- Tickets: croesnick/kommunalpolitik_ki #75, #79, #180, #181, #241
-- ADR: [docs/adr/0001](adr/0001-ad-hoc-signierung-statt-developer-id.md)
+- Tickets: croesnick/kommunalpolitik_ki #75, #79, #180, #181, #241, #538
+- ADR: [docs/adr/0001](adr/0001-ad-hoc-signierung-statt-developer-id.md),
+  [docs/adr/0005](adr/0005-versionierung-mit-changesets-und-knope.md)
 - Begriffe: [GLOSSARY.md](../GLOSSARY.md), Bau aus dem Checkout,
-  Wegwerf-Instanz, Release
+  Wegwerf-Instanz, Release, Changeset, Version-PR
+- knope 0.24.0: Tag-Schema `{name}/v{version}`, Release ohne Forge nur als
+  Git-Tag, 0.x-Lesart `0.<major>.<minor>` (Doku und Quellcode unter
+  github.com/knope-dev/knope, abgerufen 2026-11-13).
 - Draft-Mechanik („Draft legt kein Tag an“): gh-CLI-Handbuch
   (cli.github.com/manual/gh_release_create), cli/cli#11589 und
   GitHub-REST-Doku (docs.github.com/en/rest/releases/releases), abgerufen

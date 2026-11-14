@@ -305,7 +305,8 @@ defmodule KomkiCli.CLI do
             value_name: "N",
             long: "web-mock-port",
             parser: :integer,
-            help: "Brave-Mock auf 127.0.0.1:N statt echter Websuche (ohne Egress-Proxy)"
+            help:
+              "Brave-Mock auf 127.0.0.1:N statt echter Websuche (ohne Egress-Proxy, synthetischer Test-Key statt des echten Schlüssels)"
           ]
         ],
         flags: [

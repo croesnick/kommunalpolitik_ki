@@ -1,0 +1,64 @@
+# Versions and changelogs of the five units (#538, ADR 0005). Rules for
+# changesets: docs/agents/changesets.md. knope runs only in CI
+# (.github/workflows/versionen.yml). No [github] forge on purpose: without
+# one, `knope release` sets git tags `<unit>/v<version>` and creates no
+# GitHub releases (docs/release.md).
+#
+# knope reads 0.x versions as 0.<major>.<minor>: from 0.1.0, `major` gives
+# 0.2.0, `minor` and `patch` give 0.1.1.
+
+[changes]
+# Commit titles here are German prose, not Conventional Commits.
+ignore_conventional_commits = true
+
+[packages.komki]
+versioned_files = [{ path = "apps/komki_cli/mix.exs", regex = 'version: "(?<version>\d+\.\d+\.\d+)"' }]
+changelog = "apps/komki_cli/CHANGELOG.md"
+extra_changelog_sections = [
+  { types = ["major"], name = "Brüche und große Neuerungen" },
+  { types = ["minor"], name = "Neuerungen" },
+  { types = ["patch"], name = "Fehlerbehebungen" },
+]
+
+[packages.ratsprojekte]
+versioned_files = [{ path = "apps/ratsprojekte/mix.exs", regex = 'version: "(?<version>\d+\.\d+\.\d+)"' }]
+changelog = "apps/ratsprojekte/CHANGELOG.md"
+extra_changelog_sections = [
+  { types = ["major"], name = "Brüche und große Neuerungen" },
+  { types = ["minor"], name = "Neuerungen" },
+  { types = ["patch"], name = "Fehlerbehebungen" },
+]
+
+[packages.sidecar]
+versioned_files = [{ path = "apps/sidecar/mix.exs", regex = 'version: "(?<version>\d+\.\d+\.\d+)"' }]
+changelog = "apps/sidecar/CHANGELOG.md"
+
+[packages.seatbelt]
+versioned_files = [{ path = "apps/seatbelt/mix.exs", regex = 'version: "(?<version>\d+\.\d+\.\d+)"' }]
+changelog = "apps/seatbelt/CHANGELOG.md"
+
+[packages.sealed_envelope]
+versioned_files = [{ path = "apps/sealed_envelope/mix.exs", regex = 'version: "(?<version>\d+\.\d+\.\d+)"' }]
+changelog = "apps/sealed_envelope/CHANGELOG.md"
+
+# Defining workflows replaces knope's defaults. Committing, the Version PR
+# and pushing tags are done by the workflow, not by knope.
+
+[[workflows]]
+name = "prepare-release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+allow_empty = true
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "Release"
+
+[[workflows]]
+name = "document-change"
+
+[[workflows.steps]]
+type = "CreateChangeFile"

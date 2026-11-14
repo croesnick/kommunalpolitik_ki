@@ -46,14 +46,57 @@ defmodule KomkiMock.Adapters.RisTest do
     assert {200, %{"items" => [%{"name" => "Sondersitzung"}]}} = get(data, "/guestmeetings")
   end
 
-  test "only GET is served; unknown paths answer 404", %{data: data} do
-    assert {{405, _, _}, ^data} = Ris.handle(request("POST", "/auth", ""), data)
-    assert {404, _} = get(data, "/meetings/1001")
+  test "only GET and the login are served; unknown paths answer 404", %{data: data} do
+    assert {{405, _, _}, ^data} = Ris.handle(request("POST", "/guestmeetings", ""), data)
+    assert {404, _} = get(data, "/nope/1001")
   end
 
-  defp get(data, path, query \\ "") do
-    {{status, _headers, body}, ^data} = Ris.handle(request("GET", path, query), data)
+  test "the login hands out the token only for the seed's account", %{data: data} do
+    assert {200, %{"token" => "mock-ris-token"}} =
+             post_auth(data, %{
+               "login" => "ratsmitglied@komki.example",
+               "password" => "mock-passwort"
+             })
+
+    assert {401, _} =
+             post_auth(data, %{"login" => "ratsmitglied@komki.example", "password" => "falsch"})
+
+    assert {401, _} = post_auth(data, %{"login" => "ratsmitglied@komki.example"})
+    assert {401, _} = post_auth(Map.delete(data, "account"), %{"login" => "", "password" => ""})
+  end
+
+  test "signed-in endpoints need the token and answer like the guest ones", %{data: data} do
+    assert {401, _} = get(data, "/meetings/1001")
+    assert {401, _} = get(data, "/agendaitems/1001-1", "", "Bearer falsch")
+
+    assert get(data, "/meetings/1002", "", "Bearer mock-ris-token") ==
+             get(data, "/guestmeetings/1002")
+
+    assert get(data, "/agendaitems/1001-1", "", "Bearer mock-ris-token") ==
+             get(data, "/guestagendaitems/1001-1")
+  end
+
+  test "with guest_texts false only the signed-in endpoint carries the text", %{data: data} do
+    data = Map.put(data, "guest_texts", false)
+
+    assert {200, %{"textsanddocsvisible" => false, "textblocks" => []}} =
+             get(data, "/guestagendaitems/1001-1")
+
+    assert {200, %{"textsanddocsvisible" => true, "textblocks" => [_]}} =
+             get(data, "/agendaitems/1001-1", "", "Bearer mock-ris-token")
+  end
+
+  defp get(data, path, query \\ "", authorization \\ nil) do
+    headers = if authorization, do: [{"authorization", authorization}], else: []
+    request = %{request("GET", path, query) | headers: headers}
+    {{status, _headers, body}, ^data} = Ris.handle(request, data)
     {status, JSON.decode!(body)}
+  end
+
+  defp post_auth(data, body) do
+    request = %{request("POST", "/auth", "") | body: JSON.encode!(body)}
+    {{status, _headers, resp}, ^data} = Ris.handle(request, data)
+    {status, JSON.decode!(resp)}
   end
 
   defp request(method, path, query),

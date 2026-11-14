@@ -73,7 +73,7 @@ defmodule Ratsprojekte.MixProject do
        depth: 1},
       {:daisyui,
        github: "saadeghi/daisyui",
-       tag: "v5.5.20",
+       tag: "v5.8.0",
        sparse: "packages/bundle",
        app: false,
        compile: false,
@@ -88,8 +88,8 @@ defmodule Ratsprojekte.MixProject do
       # (AGENTS.md „Debugging‟), Sobelow als Security-Audit mit CI-Gate,
       # Credo als Linter. Der Dev-MCP-Endpoint (anubis_mcp) entfällt laut
       # ADR 0004 — schreibend geht es nur über den Connector (#277).
-      {:tidewave, "~> 0.6", only: :dev},
-      {:sobelow, "~> 0.18", only: [:dev, :test], runtime: false},
+      {:tidewave, "~> 0.9", only: :dev},
+      {:sobelow, "~> 0.19", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end

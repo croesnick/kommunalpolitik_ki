@@ -102,7 +102,49 @@ defmodule KomkiCli.StepsTest do
     end
   end
 
+  # Ticket #493 (Audit #467 F24/F25): pi-home traegt die Kopie des
+  # llama-API-Keys (models.json) und die pi-Transkripte; die Kette entsteht
+  # deshalb mit 0700 wie run/ und connectors/, statt mit dem umask-Default
+  # 0755 fuer andere lokale Konten traversierbar zu bleiben (relevant, sobald
+  # die Basis ausserhalb des 0700-Heims liegt, etwa KOMKI_HOME=/private/tmp/...).
+  describe "create_pi_home!/1 (Ticket #493: pi-home-Kette 0700)" do
+    test "jedes Kettenglied entsteht mit 0700, auch ueber 0755-Altbestand hinweg" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-pi-home-mode"))
+
+      Steps.create_pi_home!(cfg)
+
+      for dir <- pi_home_chain(cfg), do: assert(mode(dir) == 0o700)
+
+      # Alt-Instanz: bereits mit 0755 entstandene Glieder korrigiert init
+      # --force bzw. jedes erneute Anlegen mit.
+      File.chmod!(cfg.pi_home, 0o755)
+      Steps.create_pi_home!(cfg)
+      assert mode(cfg.pi_home) == 0o700
+    end
+  end
+
   defp read_json(path), do: path |> File.read!() |> JSON.decode!()
+
+  # Die Kette, die init anlegt: pi-home und jede Stufe darunter (auch die
+  # Zwischenglieder .local/.cache/.pi, die mkdir_p implizit erzeugt).
+  defp pi_home_chain(cfg) do
+    [
+      cfg.pi_home,
+      Path.join([cfg.pi_home, "tmp"]),
+      Path.join([cfg.pi_home, ".config"]),
+      Path.join([cfg.pi_home, ".local"]),
+      Path.join([cfg.pi_home, ".local", "share"]),
+      Path.join([cfg.pi_home, ".cache"]),
+      Path.join([cfg.pi_home, ".cache", "node-compile"]),
+      Path.join([cfg.pi_home, ".pi"]),
+      Path.join([cfg.pi_home, ".pi", "agent"])
+    ]
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
+  end
 
   # Vermittler-Liveness-Gate (Review-Fund zur Vertragsluecke): run und
   # session muessen abbrechen, wenn der Vermittler tot oder das pidfile

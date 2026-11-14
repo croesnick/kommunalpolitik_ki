@@ -26,8 +26,18 @@ defmodule KomkiCli.Secrets do
     # Durchstich #409, belegt im Wegwerf-Lauf: Token für den Unix-Socket des
     # ratsprojekte-Hubs (#415: versiegelt im Schlüsselbund, der Hub kennt
     # nur den Hash).
-    "ratsprojekte-hub-token" => {"ratsprojekte-hub", "Token des ratsprojekte-Hubs (Unix-Socket)"}
+    "ratsprojekte-hub-token" => {"ratsprojekte-hub", "Token des ratsprojekte-Hubs (Unix-Socket)"},
+    # #148: login and password in one seal, so one Touch ID prompt per
+    # `komki up`. Optional: without it the RIS connector reads as a guest,
+    # mostly without the texts of the items.
+    "ris-zugang" =>
+      {"ris",
+       "RIS-Zugang (Anmeldename und Passwort), damit komki die Texte öffentlicher TOPs liest"}
   }
+
+  # Services stored as {"login", "password"} JSON: setup asks for the login
+  # in the clear and for the password hidden.
+  @login_pairs ["ris-zugang"]
 
   # Tokens komki generates itself instead of asking for them (#440: komki
   # creates the hub token, the hub only learns its hash).
@@ -108,6 +118,10 @@ defmodule KomkiCli.Secrets do
       Keychain.store(service, sealed, opts)
     end
   end
+
+  @doc ~s|Whether the secret is a login pair (`{"login", "password"}` as JSON).|
+  @spec login_pair?(t()) :: boolean()
+  def login_pair?(%{service: service}), do: service in @login_pairs
 
   @doc "Services whose value komki generates itself (`komki secret erzeugen`)."
   @spec erzeugbar() :: [String.t()]

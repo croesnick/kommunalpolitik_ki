@@ -215,9 +215,130 @@ defmodule KomkiCli.ConnectorsTest do
       assert missing == [{"BRAVE_API_KEY", :missing}]
 
       {line, []} =
-        Connectors.credentials_line(Manifest.fetch!("ris"), token, fn _ -> flunk("kein Abruf") end)
+        Connectors.credentials_line(Manifest.fetch!("vault"), token, fn _ ->
+          flunk("kein Abruf")
+        end)
 
       assert JSON.decode!(line) == %{"KOMKI_CONNECTOR_TOKEN" => token}
+    end
+
+    # Regression #496: Im Web-Mock spricht der Connector im Klartext mit
+    # http://127.0.0.1:<mock-port>/ — ein Port, den jeder lokale Prozess
+    # binden kann. Vor dem Fix stand in dieser stdin-Zeile der echte,
+    # per Touch ID entsiegelte Brave-Schluessel (Abruf ueber fetch); nach
+    # dem Fix provisioniert der Launcher den synthetischen Test-Key und
+    # oeffnet das Siegel gar nicht.
+    test "#496: Web-Mock provisioniert den synthetischen Test-Key, das Siegel bleibt zu" do
+      cfg = cfg(web_mock_port: 4020)
+      web = Manifest.fetch!("web")
+      token = Sidecar.Token.generate()
+
+      assert ["--base-url", "http://127.0.0.1:4020/"] ==
+               Enum.take(Connectors.connector_args(cfg, web), -2)
+
+      assert Connectors.synthetic_credentials(cfg, web) == %{
+               "BRAVE_API_KEY" => Connectors.mock_web_key()
+             }
+
+      {line, missing} =
+        Connectors.credentials_line(
+          web,
+          token,
+          fn _ -> flunk("kein Abruf des echten Schluessels") end,
+          Connectors.synthetic_credentials(cfg, web)
+        )
+
+      assert JSON.decode!(line) == %{
+               "BRAVE_API_KEY" => Connectors.mock_web_key(),
+               "KOMKI_CONNECTOR_TOKEN" => token
+             }
+
+      assert missing == []
+      refute line =~ "brave-search-api"
+    end
+
+    test "#496: ohne Web-Mock bleibt es beim echten Schluessel, andere Connector ohne Synthetik" do
+      web = Manifest.fetch!("web")
+
+      assert Connectors.synthetic_credentials(cfg(), web) == %{}
+
+      {line, []} =
+        Connectors.credentials_line(web, Sidecar.Token.generate(), fn
+          "brave-search-api" -> {:ok, @kanarie}
+        end)
+
+      assert JSON.decode!(line)["BRAVE_API_KEY"] == @kanarie
+
+      # Auch mit Mock-Ports: Connectoren ohne Mock-Zugang bleiben ohne Synthetik.
+      assert Connectors.synthetic_credentials(
+               cfg(ris_mock_port: 4010, web_mock_port: 4020),
+               Manifest.fetch!("vault")
+             ) == %{}
+    end
+
+    # #148 as #496: against the RIS mock the stdin line carries the mock
+    # seed's synthetic account; the seal of the real RIS login stays shut.
+    test "#148: RIS-Mock provisioniert den synthetischen Zugang, das Siegel bleibt zu" do
+      ris = Manifest.fetch!("ris")
+      token = Sidecar.Token.generate()
+      synthetic = Connectors.synthetic_credentials(cfg(ris_mock_port: 4010), ris)
+
+      assert synthetic == %{"RIS_ZUGANG" => Connectors.mock_ris_zugang()}
+
+      {line, []} =
+        Connectors.credentials_line(
+          ris,
+          token,
+          fn _ -> flunk("kein Abruf des echten Zugangs") end,
+          synthetic
+        )
+
+      assert %{"login" => "ratsmitglied@komki.example"} =
+               line |> JSON.decode!() |> Map.fetch!("RIS_ZUGANG") |> JSON.decode!()
+
+      # Without the mock: the real login from the keychain entry ris-zugang.
+      assert Connectors.synthetic_credentials(cfg(), ris) == %{}
+
+      {line, []} =
+        Connectors.credentials_line(ris, token, fn "ris-zugang" -> {:ok, @kanarie} end)
+
+      assert JSON.decode!(line)["RIS_ZUGANG"] == @kanarie
+    end
+
+    # The synthetic account must match the mock's seed, or the sign-in against
+    # the mock fails without any test noticing (review of #148).
+    test "#148: synthetischer Zugang passt zum account des RIS-Mock-Seeds" do
+      seed =
+        "../../../komki_mock/priv/seeds/ris/default.json"
+        |> Path.expand(__DIR__)
+        |> File.read!()
+        |> JSON.decode!()
+
+      assert JSON.decode!(Connectors.mock_ris_zugang()) ==
+               Map.take(seed["account"], ["login", "password"])
+    end
+
+    test "#148: Warnungen aus dem Start-Log erscheinen bei komki up" do
+      log = Path.join(TestSupport.tmp_area!("komki-start-log"), "connector-ris.log")
+
+      File.write!(log, """
+      08:00:07.307 [warning] RIS-Anmeldung fehlgeschlagen: RIS lehnt die Anmeldung ab
+      08:00:07.313 [info] sidecar komki-ris/2 listening on /tmp/x/ris.sock
+      """)
+
+      assert Connectors.start_warnings(Manifest.fetch!("ris"), log) == [
+               "ris: RIS-Anmeldung fehlgeschlagen: RIS lehnt die Anmeldung ab"
+             ]
+
+      assert Connectors.start_warnings(Manifest.fetch!("ris"), log <> ".fehlt") == []
+    end
+
+    test "#148: ohne RIS-Zugang startet der RIS-Connector als Gast, ohne Warnung" do
+      {line, missing} =
+        Connectors.credentials_line(Manifest.fetch!("ris"), "t", fn _ -> {:error, :missing} end)
+
+      assert JSON.decode!(line) == %{"KOMKI_CONNECTOR_TOKEN" => "t"}
+      assert missing == [{"RIS_ZUGANG", :missing}]
     end
 
     test "Spawn-Zeile: env -i, sandbox-exec mit Profil, escript, stdin durchgereicht" do

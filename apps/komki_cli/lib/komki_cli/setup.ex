@@ -415,17 +415,18 @@ defmodule KomkiCli.Setup do
   end
 
   @doc """
-  Fragt ein Geheimnis zweimal verdeckt ab und legt es ab. Liefert eine
-  Meldung ohne den Wert.
+  Asks for a secret twice, hidden, and stores it. For a login pair
+  (`Secrets.login_pair?/1`) it first asks for the login in the clear and
+  stores both as one seal, so `komki up` asks for Touch ID only once.
+  Returns a message without the value.
   """
   @spec store_secret(Secrets.t(), ui()) :: String.t()
   def store_secret(entry, ui) do
-    with {:ok, first} <- ui.secret.("            Wert (wird nicht angezeigt): "),
-         {:ok, ^first} <- ui.secret.("            noch einmal: "),
-         :ok <- Secrets.store(entry, first) do
+    with {:ok, value} <- read_secret(entry, ui),
+         :ok <- Secrets.store(entry, value) do
       "versiegelt mit der Secure Enclave, Siegel im Schlüsselbund als '" <> entry.service <> "'"
     else
-      {:ok, _different} ->
+      {:error, :mismatch} ->
         "die beiden Eingaben stimmen nicht überein; nichts gespeichert"
 
       {:error, :no_tty} ->
@@ -436,6 +437,31 @@ defmodule KomkiCli.Setup do
 
       {:error, error} ->
         Secrets.describe(entry.service, error)
+    end
+  end
+
+  defp read_secret(entry, ui) do
+    if Secrets.login_pair?(entry) do
+      with {:ok, login} <- read_login(ui),
+           {:ok, password} <- read_twice(ui, "Passwort") do
+        {:ok, JSON.encode!(%{"login" => login, "password" => password})}
+      end
+    else
+      read_twice(ui, "Wert")
+    end
+  end
+
+  defp read_login(ui) do
+    case String.trim(ui.ask.("            Anmeldename: ", "")) do
+      "" -> {:error, :empty}
+      login -> {:ok, login}
+    end
+  end
+
+  defp read_twice(ui, what) do
+    with {:ok, first} <- ui.secret.("            " <> what <> " (wird nicht angezeigt): "),
+         {:ok, second} <- ui.secret.("            noch einmal: ") do
+      if first == second, do: {:ok, first}, else: {:error, :mismatch}
     end
   end
 

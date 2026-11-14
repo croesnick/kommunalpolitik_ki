@@ -96,7 +96,7 @@ komki-paket: komki-tresor
 	@shasum -a 256 "$(KOMKI_PAKET).tar.gz"
 
 # Formel aus der Vorlage: Adresse, Version und Pruefsumme des Pakets.
-KOMKI_RELEASE_URL = https://github.com/croesnick/kommunalpolitik_ki/releases/download/komki-v$(KOMKI_VERSION)/komki-$(KOMKI_VERSION)-macos-arm64.tar.gz
+KOMKI_RELEASE_URL = https://github.com/croesnick/kommunalpolitik_ki/releases/download/komki/v$(KOMKI_VERSION)/komki-$(KOMKI_VERSION)-macos-arm64.tar.gz
 define komki_formel
 	sha=$$(shasum -a 256 "$(KOMKI_PAKET).tar.gz" | cut -d' ' -f1); \
 	  sed -e "s|@URL@|$(1)|" -e "s/@VERSION@/$(KOMKI_VERSION)/g" -e "s/@SHA256@/$$sha/" packaging/homebrew/komki.rb.in > "$(2)"

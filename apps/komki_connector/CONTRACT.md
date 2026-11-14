@@ -169,6 +169,17 @@ führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Man
   ergibt `not-found`, genau wie ein nicht existierender.
   `nummer` ist die TOP-Nummer aus der Tagesordnung, wie das RIS sie führt (`numbering`, etwa `4` oder `6.2`), seit
   `komki-ris/2`; `top_id` ist die interne Kennung der RIS-API (`<Sitzung>-<Punkt>`) und nur für `show` gedacht.
+- `ris` mit Anmeldung (#148): Mit dem optionalen Credential `RIS_ZUGANG` (JSON `{"login", "password"}`) meldet sich
+  der Connector vor dem Binden des Sockets an und liest Sitzung und TOP über die angemeldeten Endpunkte; nur dort
+  liefert das RIS die Texte öffentlicher TOPs. Ergebnisformen und Filter bleiben gleich: Auch angemeldet liefert
+  `komki-ris/2` nur öffentliche TOPs, und ein TOP, dessen Detail nicht ausdrücklich `restricted: false` trägt, ist
+  `not-found`. Scheitert die Anmeldung (abgelehnt, RIS nicht erreichbar, Zugang unvollständig), startet der
+  Connector trotzdem und beantwortet jede Operation mit `credential-missing`, ohne in den Gastmodus zu fallen; den
+  Grund schreibt er beim Start als Warnung ins Log, und `komki up` zeigt Warnungen aus dem Start-Log eines Connectors
+  an. Die Anmeldung geht nur über `https` oder `http` auf Loopback hinaus (`KomkiConnector.Transport.secret_ok?/1`).
+  Verweigert die nutzende Person die Touch-ID-Freigabe, gibt `komki up` kein `RIS_ZUGANG` mit und meldet das; der
+  Connector liest dann als Gast. Läuft das Token ab, antwortet er ebenso mit `credential-missing`, statt sich
+  neu anzumelden: Jede Anmeldung braucht eine eigene Freigabe per Touch ID.
 - `web.search`: `{"results": [{"title", "url", "snippet"}], "abrufdatum"}`
 - `vault.search`: `{"results": [{"note_id", "title", "labels"}]}`. Notizen ohne gültiges `komki_labels` erscheinen
   nicht.
@@ -336,7 +347,12 @@ Zwei Referenzräume für Tests:
   (DNS-Rebinding-Schutz: auflösen, prüfen, mit genau dieser IP verbinden).
 - Log je Verbindung: Connector-Port, Host, Entscheidung, Bytes hin und zurück, Dauer. Keine Inhalte.
 - Für Mock-Betrieb (RIS-Mock auf Loopback) geht der Connector **nicht** über den Proxy. Sein Profil erlaubt
-  dann `localhost:<mock-port>`, und `komki_cli` setzt `--base-url http://127.0.0.1:<mock-port>/`.
+  dann `localhost:<mock-port>`, und `komki_cli` setzt `--base-url http://127.0.0.1:<mock-port>/`. Den echten
+  RIS-Zugang öffnet `komki up` dann nicht, sondern gibt den synthetischen Zugang des Mock-Seeds mit (#148, wie #496).
+- Der Web-Mock läuft auf Loopback im Klartext, und jeder lokale Prozess kann dessen Port binden. Deshalb
+  provisioniert `komki up` im Web-Mock statt des echten Brave-Schlüssels einen synthetischen Test-Key (#496),
+  und der Web-Connector sendet den Subscription-Token nur über `https` oder `http` auf Loopback; zu jedem
+  anderen Klartext-Ziel verweigert er die Suche.
 
 ## 10. Nicht in v1 (bewusst offen)
 

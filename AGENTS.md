@@ -44,6 +44,10 @@ Wie eine Session ein Wayfinder-Ticket bearbeitet, verifiziert und abschließt (A
 
 `.claude/settings.json` sperrt echte Daten (Hub, Vault, Schlüssel) für Read-Tool und Bash-Sandbox. Ein Stop-Hook lässt eine Session erst bei grünen Gates enden, und `gh pr create` braucht einen Prüfbericht. Was das garantiert und was nicht: [docs/agents/interaktive-sessions.md](docs/agents/interaktive-sessions.md).
 
+### Changesets
+
+Ändert ein PR etwas, das Nutzende von komki, ratsprojekte, sidecar, seatbelt oder sealed_envelope merken, bringt er ein Changeset unter `.changeset/` mit. Der Merge des Version-PR setzt dann die Tags `<einheit>/v<semver>`. Format, Pflicht, Sprache und das Label `ohne-changeset`: [docs/agents/changesets.md](docs/agents/changesets.md).
+
 ### Triage labels
 
 Fünf kanonische Triage-Rollen als Labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Siehe `docs/agents/triage-labels.md`.
@@ -206,6 +210,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `skills/terminal_screenshot` | Markdown-Skill + Python-Skripte | Terminal-Sitzung als Screenshot für READMEs (tmux-Capture → SVG, Browser-verifiziert) | Agent Skill | Funktionsfähig |
 | `skills/mermaid_vision_loop` | Markdown-Skill + Python-Skript | Mermaid-Diagramme rendern, vom Vision-Agenten bewerten lassen und refaktorieren, bis sie lesbar sind | Agent Skill | Funktionsfähig |
 | `scripts/screenshot.exs` | Elixir-Skript | Screenshots der Hub-Oberfläche als Beleg für Prüfpunkte: startet den Hub aus einem Worktree auf einer Wegwerf-Datenbank und einen Headless-Browser, beide gemeinsam in einer eigenen Sandbox ohne Netz und ohne Schreibrecht im Worktree, und liefert nur die Bilder. Regeln: `docs/agents/interaktive-sessions.md` | CLI (`elixir scripts/screenshot.exs --route/--navigate/--spec/--probe`); interaktive Sessions nutzen den Starter `komki-screenshot` aus `make screenshot-install` | Funktionsfähig |
+| `scripts/changesets.exs` | Elixir-Skript | Versionen der fünf Einheiten: prüft an jedem PR, ob ein Changeset die geänderten Einheiten nennt, und gibt beim Version-PR den Einheiten einen Patch, die eine erhöhte Bibliothek einbinden. Die Versionen selbst schreibt knope in CI (ADR 0005) | CLI (`elixir scripts/changesets.exs check/cascade/bumped`) | Funktionsfähig |
 | `scripts/dev_loop.exs` | Elixir-Skript | Dev-Loop: arbeitet freie Tickets ab, auch wenn niemand am Rechner sitzt. Eine Session setzt um, eine zweite prüft. Einfache Tickets werden gemergt, alles andere wartet mit einer kurzen Zusammenfassung auf ein GO. Eine dritte Session verfeinert Tickets und macht nur Vorschläge. Regeln und Einrichtung: `docs/agents/dev-loop.md` | CLI (`elixir scripts/dev_loop.exs`) | Prototyp |
 
 ### Externe Abhängigkeiten (nicht im Repo)
@@ -294,7 +299,7 @@ Ebenso Erlang und Elixir: `.tool-versions` pinnt sie für asdf, und die CI liest
 
 ### CI
 
-**Maßgeblich sind die Workflows unter [`.github/workflows/`](.github/workflows/)**: [`ci.yml`](.github/workflows/ci.yml) für Elixir, [`python.yml`](.github/workflows/python.yml) für die Python-Tools und die losen Skripte, [`docs-links.yml`](.github/workflows/docs-links.yml) für Markdown-Links. Dort stehen die exakten Befehle samt Begründungen. Kurzfassung (kein Ersatz für die Dateien):
+**Maßgeblich sind die Workflows unter [`.github/workflows/`](.github/workflows/)**: [`ci.yml`](.github/workflows/ci.yml) für Elixir, [`python.yml`](.github/workflows/python.yml) für die Python-Tools und die losen Skripte, [`docs-links.yml`](.github/workflows/docs-links.yml) für Markdown-Links, [`changesets.yml`](.github/workflows/changesets.yml) und [`versionen.yml`](.github/workflows/versionen.yml) für Changesets, Version-PR und Tags. Dort stehen die exakten Befehle samt Begründungen. Kurzfassung (kein Ersatz für die Dateien):
 
 ```bash
 # Elixir (Root; credo/dialyzer siehe Tooling-Tabelle oben)
@@ -317,6 +322,9 @@ uvx ruff@0.15.21 format --check skills/*/scripts
 
 # Markdown-Links, offline (Config: lychee.toml am Repo-Root)
 lychee './**/*.md'
+
+# Changesets (PR gegen main)
+elixir scripts/changesets.exs check origin/main
 ```
 
 CI-Status verlässlich prüfen: nach einem Push zuerst mit `gh run list --branch <branch> --limit 1` abgleichen, dass der Lauf zur eigenen Head-Short-SHA gehört — `gh pr checks --watch` zeigt unmittelbar nach einem Push sonst die Ergebnisse des vorherigen Heads als „pass".
@@ -351,7 +359,7 @@ kommunalpolitik_ki/
 │   ├── obsidian_mcp/       # Vault nativ lesen/schreiben (AI: MCP)
 │   ├── pdf_ingest/         # PDF-Ingestion (AI: MCP)
 │   └── ratsinfo_mcp/       # MCP-Wrapper um ratsinfo-CLI (AI: MCP)
-├── scripts/                # Dev-Loop (docs/agents/dev-loop.md), Screenshot-Werkzeug für UI-Prüfpunkte
+├── scripts/                # Dev-Loop (docs/agents/dev-loop.md), Screenshot-Werkzeug für UI-Prüfpunkte, Changesets (docs/agents/changesets.md)
 ├── skills/                 # AI-Harness-Skills
 │   ├── foerdermittel_recherche/  # Fördermittel-Recherche (AI: Agent Skill)
 │   ├── ratsprojekt_delta/      # Neue Infos gegen Projektstand halten (AI: Agent Skill)
@@ -374,6 +382,8 @@ kommunalpolitik_ki/
 │   ├── site/                      # Doku-Site komki (Astro Starlight, GitHub Pages)
 │   └── rfcs/                      # RFCs (Sandbox, vertrauliche KI-Arbeitsräume)
 ├── artifacts/              # shared Elixir build output (gitignored)
+├── .changeset/             # offene Changesets bis zum nächsten Version-PR
+├── knope.toml              # Versionen und Changelogs der fünf Einheiten (ADR 0005)
 ├── mix.exs                 # workspace root
 ├── .workspace.exs
 ├── .credo.exs

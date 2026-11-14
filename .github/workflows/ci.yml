@@ -18,6 +18,11 @@ on:
     branches: [main]
   pull_request:
     branches: ['**']
+  # Den Version-PR (#538) legt versionen.yml mit dem GITHUB_TOKEN an; solche
+  # Pushes starten keine Workflows. versionen.yml startet diese CI deshalb
+  # per workflow_dispatch auf dem Branch `versionen`, damit die Pflicht-Checks
+  # am Head des Version-PR stehen.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -99,7 +104,7 @@ jobs:
       # restore-keys: erst gleiche Locks mit anderem Code, dann irgendein
       # Stand derselben Tool-Versionen.
       - name: Mix- und Build-Cache
-        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.1.0, Node 24
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0, Node 24
         with:
           path: |
             artifacts/deps
@@ -176,8 +181,8 @@ jobs:
         if: github.event_name == 'pull_request'
         run: mix workspace.run -t test --affected --base origin/main
 
-      - name: Tests (push auf main)
-        if: github.event_name == 'push'
+      - name: Tests (push auf main, Version-PR)
+        if: github.event_name != 'pull_request'
         run: mix workspace.run -t test
 
       # Dev-Loop (#389): Entscheidungslogik (Auswahl, Merge-Regel, geschützte
@@ -185,6 +190,10 @@ jobs:
       # herdr (braucht jq, auf ubuntu-latest vorinstalliert).
       - name: Tests (Dev-Loop)
         run: for t in scripts/dev_loop/test/*_test.exs; do elixir "$t" || exit 1; done
+
+      # Changesets (#538): Regeln von Gate und Kaskade (scripts/changesets.exs).
+      - name: Tests (Changesets)
+        run: for t in scripts/changesets/test/*_test.exs; do elixir "$t" || exit 1; done
 
       # Screenshot-Werkzeug (#510): Muster der Aufnahmen und Text des Seatbelt-Profils.
       # Ob macOS das Profil durchsetzt, misst `elixir scripts/screenshot.exs --probe`.

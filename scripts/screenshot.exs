@@ -71,11 +71,6 @@ defmodule Screenshot do
     "~/.claude"
   ]
 
-  # NIF libraries the profile may read: package managers and the system,
-  # never a home directory. The list comes from the build in the worktree,
-  # which the session writes.
-  @dylib_roots ~w(/opt/homebrew /usr/local /usr/lib /System/Library)
-
   @resolver_rule "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"
 
   # Fixed here, never taken from the caller. --no-sandbox only switches off
@@ -562,25 +557,18 @@ defmodule Screenshot do
   end
 
   defp nif_dylib_dirs(build, own_roots) do
-    Path.join(build, "lib/*/priv/**/*.so")
-    |> Path.wildcard()
-    |> Enum.flat_map(&Seatbelt.MachODeps.dylib_dirs/1)
-    # otool -L also lists a library's own install name; a precompiled NIF
-    # carries the one of its CI build (/Users/runner/work/…). A missing
-    # directory holds nothing dyld could load and needs no rule.
-    |> Enum.filter(&File.dir?/1)
-    # The check below compares text, so `..` is expanded first. Both the
-    # linked path (dyld opens it, e.g. /opt/homebrew/opt/…) and its kernel
-    # target must pass it.
-    |> Enum.flat_map(&[Path.expand(&1), Seatbelt.canonical(&1)])
-    |> Enum.reject(fn dir -> Enum.any?(own_roots, &inside?(dir, &1)) end)
-    |> Enum.uniq()
-    |> Enum.sort()
-    |> tap(fn dirs ->
-      for dir <- dirs,
-          not Enum.any?(@dylib_roots, &inside?(dir, &1)),
-          do: fail("NIF-Bibliothek außerhalb von #{Enum.join(@dylib_roots, ", ")}: #{dir}")
-    end)
+    dirs =
+      Path.join(build, "lib/*/priv/**/*.so")
+      |> Path.wildcard()
+      |> Enum.flat_map(&Seatbelt.MachODeps.dylib_dirs/1)
+
+    case Profile.dylib_dirs(dirs, own_roots) do
+      {:ok, dirs} ->
+        dirs
+
+      {:error, dir} ->
+        fail("NIF-Bibliothek außerhalb von #{Enum.join(Profile.dylib_roots(), ", ")}: #{dir}")
+    end
   end
 
   # Clean environment: nothing of the caller's (tokens, keys) reaches the

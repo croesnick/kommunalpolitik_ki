@@ -7,6 +7,7 @@ defmodule KomkiConnectorWeb.CLI do
   * `--socket`   Unix-Socket, den der Connector bindet (Pflicht).
   * `--proxy`    HTTP-CONNECT-Proxy `komki-egress` als `host:port`.
   * `--base-url` nur fuer Tests und Mock; Default `https://api.search.brave.com/`.
+                Klartext-HTTP nur fuer Loopback, sonst https (Ticket #496).
 
   Credentials kommen als eine JSON-Zeile ueber stdin
   (`{"BRAVE_API_KEY": "..."}`), nie ueber argv oder Umgebung. stdin wird
@@ -76,7 +77,13 @@ defmodule KomkiConnectorWeb.CLI do
     case URI.new(url) do
       {:ok, %URI{scheme: scheme, host: host}}
       when scheme in ["http", "https"] and host not in [nil, ""] ->
-        {:ok, url}
+        # Klartext nur fuer den Loopback-Mock; sonst wuerde der Connector
+        # den Subscription-Token im Klartext senden (Ticket #496).
+        if KomkiConnector.Transport.secret_ok?(url) do
+          {:ok, url}
+        else
+          {:error, "--base-url erwartet https (http nur fuer Loopback-Mock)"}
+        end
 
       _ ->
         {:error, "--base-url erwartet eine http- oder https-URL"}
