@@ -20,8 +20,9 @@ echo '{}' | ./komki-connector-ris --socket /tmp/kmris.sock [--base-url <url>] [-
 - `--base-url`: Basis der RIS-API, Default `https://risapi3.komuna.net/web/`.
 - `--proxy`: HTTPS läuft dann per CONNECT über diesen Proxy (`komki-egress`). Klartext-HTTP (nur der
   Mock auf Loopback) geht direkt.
-- stdin: genau eine Credentials-Zeile. RIS braucht keine, also `{}`. Der Connector liest stdin bis
-  EOF, bevor er den Socket bindet.
+- stdin: genau eine Credentials-Zeile mit dem Connector-Token und optional `RIS_ZUGANG` (JSON
+  `{"login", "password"}`, #148). Der Connector liest stdin bis EOF, meldet sich mit `RIS_ZUGANG` an
+  und bindet erst dann den Socket. Ohne `RIS_ZUGANG` liest er als Gast.
 
 Im Betrieb startet `komki up` den Connector unter seinem Seatbelt-Profil (CONTRACT §4).
 
@@ -349,8 +350,14 @@ geht mit `security delete-generic-password -s ris-kassetten` und danach `init`.
 ## Grenzen
 
 - **Texte für Gäste meist leer.** Die echte Gast-API liefert bei den geprüften TOPs
-  `textsanddocsvisible: false` und keine Textblöcke. Praktisch findet die Suche dann nur Titel, und
-  `show` liefert einen leeren `text`.
+  `textsanddocsvisible: false` und keine Textblöcke. Ohne Anmeldung findet die Suche dann nur Titel, und
+  `show` liefert einen leeren `text`. Mit RIS-Zugang (`komki secret set ris`, #148) meldet sich der
+  Connector beim Start an und liest Sitzung und TOP über `meetings/{id}` und `agendaitems/{id}`. Laut
+  Strukturprofil der Aufzeichnung vom 2026-11-01 haben dort 1 136 von 1 203 öffentlichen TOPs Textblöcke.
+  Der Filter bleibt derselbe: Auch angemeldet liefert der Connector nur öffentliche TOPs.
+- **Keine neue Anmeldung während einer Sitzung.** Scheitert die Anmeldung beim Start oder läuft das Token
+  ab, antwortet der Connector mit `credential-missing`, bis komki neu startet. Den Grund nennt sein Log. Jede Anmeldung braucht eine eigene Freigabe per Touch ID
+  (Entscheidung vom 2026-10-25 in #148).
 - **Unvollständige Treffer möglich.** Budget und Frist begrenzen die Suche. Ältere Sitzungen außerhalb
   des Zeitfensters werden nicht durchsucht.
 - **Kein Stemming, kein ß/ss-Ausgleich.** „Bahnhofstrasse“ findet „Bahnhofstraße“ nicht.

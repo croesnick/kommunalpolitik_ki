@@ -28,19 +28,22 @@ defmodule KomkiConnectorWeb.UnitsTest do
     refute Brave.web_url?("https://")
   end
 
-  test "Brave.token_transport_ok? laesst https immer zu, http nur Loopback (#496)" do
-    assert Brave.token_transport_ok?("https://api.search.brave.com/res/v1/web/search?q=x")
-    assert Brave.token_transport_ok?("http://127.0.0.1:4020/res/v1/web/search?q=x")
-    assert Brave.token_transport_ok?("http://localhost:4020/")
-    assert Brave.token_transport_ok?("http://[::1]:4020/")
-    assert Brave.token_transport_ok?("http://127.8.9.9:4020/")
+  test "Transport.secret_ok? laesst https immer zu, http nur Loopback (#496)" do
+    assert KomkiConnector.Transport.secret_ok?(
+             "https://api.search.brave.com/res/v1/web/search?q=x"
+           )
+
+    assert KomkiConnector.Transport.secret_ok?("http://127.0.0.1:4020/res/v1/web/search?q=x")
+    assert KomkiConnector.Transport.secret_ok?("http://localhost:4020/")
+    assert KomkiConnector.Transport.secret_ok?("http://[::1]:4020/")
+    assert KomkiConnector.Transport.secret_ok?("http://127.8.9.9:4020/")
 
     # 192.0.2.1: RFC-5737-TEST-NET, garantiert kein Loopback
-    refute Brave.token_transport_ok?("http://192.0.2.1:9/")
-    refute Brave.token_transport_ok?("http://websuche.example/")
-    refute Brave.token_transport_ok?("ftp://127.0.0.1:4020/")
-    refute Brave.token_transport_ok?("https://")
-    refute Brave.token_transport_ok?("kein-url")
+    refute KomkiConnector.Transport.secret_ok?("http://192.0.2.1:9/")
+    refute KomkiConnector.Transport.secret_ok?("http://websuche.example/")
+    refute KomkiConnector.Transport.secret_ok?("ftp://127.0.0.1:4020/")
+    refute KomkiConnector.Transport.secret_ok?("https://")
+    refute KomkiConnector.Transport.secret_ok?("kein-url")
   end
 
   test "Brave.headers haengt den Token nur an zulaessige Transporte (#496)" do

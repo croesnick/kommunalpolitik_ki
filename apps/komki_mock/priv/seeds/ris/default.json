@@ -1,4 +1,9 @@
 {
+  "account": {
+    "login": "ratsmitglied@komki.example",
+    "password": "mock-passwort",
+    "token": "mock-ris-token"
+  },
   "meetings": [
     {
       "id": 1001,

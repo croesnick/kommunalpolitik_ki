@@ -1,34 +1,60 @@
 defmodule KomkiConnectorRis do
   @moduledoc """
-  RIS-Connector `komki-ris/2` (CONTRACT.md §5.1/§5.2): `search` und `show`
-  ueber oeffentliche Tagesordnungspunkte (TOPs) der RIS-API.
+  RIS connector `komki-ris/2` (CONTRACT.md §5.1/§5.2): `search` and `show`
+  over the public agenda items (TOPs) of the RIS API.
 
-  Der Connector nutzt nur die Gast-Endpunkte der API (`guestmeetings`,
-  `guestagendaitems`, siehe `KomkiConnectorRis.Api`) und braucht deshalb
-  keine Zugangsdaten.
+  Without credentials the connector only uses the guest endpoints
+  (`guestmeetings`, `guestagendaitems`, see `KomkiConnectorRis.Api`), where
+  the texts of the items are mostly missing.
 
-  ## Suchstrategie
+  ## Signing in (#148)
 
-  Die Volltextsuche der RIS-API (`fulltextsearch`) verlangt eine Anmeldung.
-  Der Connector sucht deshalb selbst, mit festem Anfragebudget
-  (`max_requests`) und fester Frist (`budget_ms`):
+  With the credential `RIS_ZUGANG` (JSON `{"login", "password"}`, sealed in
+  the keychain, `komki secret set ris`) the connector signs in during
+  `init/1`, before it binds the socket, and then reads meeting and item via
+  the signed-in endpoints. The password lives only until the sign-in; the
+  state keeps nothing but the token, and the log says until when it is
+  valid. When it expires, the connector says so (`credential-missing`)
+  instead of signing in again: every sign-in needs its own Touch ID
+  approval, which means restarting komki.
 
-  1. Sitzungen eines Zeitfensters laden (`days_back` zurueck, `days_ahead`
-     voraus), neueste zuerst.
-  2. Je Sitzung die Tagesordnung laden, nicht-oeffentliche TOPs verwerfen,
-     Titel vergleichen.
-  3. Mit dem Restbudget die Textbloecke der oeffentlichen TOPs laden, deren
-     Titel nicht passte, und vergleichen (neueste zuerst).
-  4. Schluss, sobald `limit` Treffer da sind oder Budget bzw. Frist
-     verbraucht sind. Das Ergebnis kann dann unvollstaendig sein.
+  If the sign-in fails (rejected, RIS unreachable, incomplete credential),
+  the connector starts anyway, so `komki up` does not take the rest of the
+  workspace down with it, and answers every operation with
+  `credential-missing`. The reason goes to the log at start, where `komki
+  up` picks it up as a warning. It does not fall back to guest mode: whoever
+  stored a credential expects texts and would silently get empty ones.
+  Refusing the Touch ID approval is different: then `komki up` hands over no
+  credential at all, says so, and the connector starts as a guest (the
+  ticket's "starts without credentials").
 
-  Verglichen wird als Teilstring ohne Ruecksicht auf Gross- und
-  Kleinschreibung (`String.downcase/1`). Weil nicht-oeffentliche TOPs vor
-  jedem Vergleich wegfallen, tauchen sie weder in Treffern noch in der
-  Anzahl auf.
+  Signed in, the connector has a council member's view. It still delivers
+  only public items: the filter (`KomkiConnectorRis.Top.public_items/1` and
+  the detail check below) is the same as without signing in. Non-public
+  items are #198.
+
+  ## Search strategy
+
+  The RIS API's full-text search (`fulltextsearch`) requires a sign-in. The
+  connector therefore searches itself, with a fixed request budget
+  (`max_requests`) and a fixed deadline (`budget_ms`):
+
+  1. Load the meetings of a time window (`days_back` back, `days_ahead`
+     ahead), newest first.
+  2. Per meeting, load the agenda, drop non-public items, compare titles.
+  3. With the remaining budget, load the text blocks of the public items
+     whose title did not match, and compare (newest first).
+  4. Stop once `limit` hits are found or budget or deadline are spent. The
+     result may then be incomplete.
+
+  Matching is a case-insensitive substring test (`String.downcase/1`).
+  Since non-public items drop out before any comparison, they appear
+  neither in the hits nor in their count.
   """
 
   @behaviour Sidecar.Server
+
+  require Logger
 
   alias KomkiConnector.Manifest
   alias KomkiConnectorRis.{Api, Http, Top}
@@ -57,13 +83,70 @@ defmodule KomkiConnectorRis do
   def init(opts) do
     cfg = Map.merge(@defaults, Map.take(opts, Map.keys(@defaults)))
 
+    with :ok <- start_http(cfg) do
+      case sign_in(with_deadline(cfg), Map.get(opts, :credentials, %{})) do
+        {:ok, nil} ->
+          {:ok, Map.put(cfg, :token, nil)}
+
+        {:ok, token} ->
+          log_validity(token)
+          {:ok, Map.put(cfg, :token, token)}
+
+        {:error, message} ->
+          Logger.warning(message)
+          {:ok, Map.merge(cfg, %{token: nil, sign_in_error: message})}
+      end
+    end
+  end
+
+  defp start_http(cfg) do
     case Http.start(cfg.proxy) do
-      :ok -> {:ok, cfg}
+      :ok -> :ok
       {:error, reason} -> {:error, "HTTP-Start fehlgeschlagen: #{inspect(reason)}"}
     end
   end
 
+  # The message of a failed sign-in names no value.
+  defp sign_in(cfg, %{"RIS_ZUGANG" => zugang}) do
+    with {:ok, login, password} <- parse_zugang(zugang),
+         {:ok, token} <- Api.login(cfg, login, password) do
+      {:ok, token}
+    else
+      {:error, _code, message} -> {:error, "RIS-Anmeldung fehlgeschlagen: " <> message}
+    end
+  end
+
+  # No credential: guest mode.
+  defp sign_in(_cfg, _credentials), do: {:ok, nil}
+
+  # How long a JWT lasts is not measured yet (#148); the first real run
+  # tells, without the token itself ever reaching the log.
+  defp log_validity(token) do
+    case Api.expires_at(token) do
+      nil -> Logger.info("RIS-Anmeldung erfolgreich, Ablauf unbekannt")
+      at -> Logger.info("RIS-Anmeldung erfolgreich, gültig bis " <> DateTime.to_iso8601(at))
+    end
+  end
+
+  defp parse_zugang(zugang) when is_binary(zugang) do
+    case JSON.decode(zugang) do
+      {:ok, %{"login" => login, "password" => password}}
+      when is_binary(login) and login != "" and is_binary(password) and password != "" ->
+        {:ok, login, password}
+
+      _ ->
+        {:error, "bad-request",
+         "RIS_ZUGANG braucht login und password; neu setzen mit 'komki secret set ris'"}
+    end
+  end
+
+  defp parse_zugang(_zugang), do: parse_zugang("")
+
+  # A failed sign-in blocks every operation (see moduledoc).
   @impl true
+  def handle_op(_op, _params, _context, %{sign_in_error: message}),
+    do: {:error, "credential-missing", message}
+
   def handle_op("search", %{"text" => text, "limit" => limit}, _context, cfg),
     do: search(String.downcase(text), limit, with_deadline(cfg))
 
@@ -210,10 +293,11 @@ defmodule KomkiConnectorRis do
     end
   end
 
-  # Die Detailantwort darf die Einstufung nur verschaerfen: steht dort ein
-  # restricted-Feld, muss es false sein.
-  defp public_detail?(%{"restricted" => restricted}), do: restricted == false
-  defp public_detail?(_), do: true
+  # The detail answer may only tighten the classification: it must carry
+  # restricted false explicitly. Without the field the item counts as
+  # non-public (fail-closed, since a council member's view may stand behind
+  # it once signed in, #148).
+  defp public_detail?(detail), do: Map.get(detail, "restricted") == false
 
   # ---------------------------------------------------------------------------
 
