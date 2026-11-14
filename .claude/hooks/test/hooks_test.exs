@@ -232,10 +232,44 @@ defmodule RepoHooksTest do
       assert pr(dir, "gh pr create --head remote-only -F pr.md") == ""
     end
 
-    test "an unknown branch is denied", %{dir: dir} do
+    test "an unknown branch is denied, and the reason names it", %{dir: dir} do
       File.write!(Path.join(dir, "pr.md"), report(head(dir)))
       decision = dir |> pr("gh pr create --head nowhere -F pr.md") |> JSON.decode!()
       assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
+      assert decision["hookSpecificOutput"]["permissionDecisionReason"] =~ "`nowhere`"
+    end
+
+    # Only gh's own flags count (#540): the same words in the body, the
+    # title or another command name no branch.
+    test "--head in the body or title text is no flag", %{dir: dir} do
+      branch(dir, "fix")
+      body = report(head(dir)) <> "\nMit `--head fix` bzw. -H fix prüft der Hook den Branch.\n"
+      File.write!(Path.join(dir, "pr.md"), body)
+
+      for command <- [
+            "gh pr create --title T --body \"#{body}\"",
+            "gh pr create --title 'x -H fix' -F pr.md",
+            "gh pr create --title T --body \"$(cat <<'EOF'\n#{body}Etwa: gh pr create -H \"fix\"\nEOF\n)\"",
+            "curl -s -H fix https://example.org && gh pr create -F pr.md"
+          ] do
+        assert pr(dir, command) == "", command
+      end
+    end
+
+    test "a quoted mention before the real --head does not win", %{dir: dir} do
+      sha = branch(dir, "fix")
+      File.write!(Path.join(dir, "pr.md"), report(sha))
+      assert pr(dir, "gh pr create --title 'see -H main' --head fix -F pr.md") == ""
+    end
+
+    test "with several --head the last one counts, as in gh", %{dir: dir} do
+      sha = branch(dir, "fix")
+      File.write!(Path.join(dir, "pr.md"), report(head(dir)))
+      decision = dir |> pr("gh pr create --head main --head fix -F pr.md") |> JSON.decode!()
+      assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+      File.write!(Path.join(dir, "pr.md"), report(sha))
+      assert pr(dir, "gh pr create --head main --head fix -F pr.md") == ""
     end
   end
 end

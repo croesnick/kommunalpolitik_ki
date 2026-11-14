@@ -38,13 +38,25 @@ defmodule PrReport do
     end
   end
 
-  @doc "What the PR body lacks: the report's parts and the current head commit."
+  @doc """
+  What the PR body lacks: the report's parts and the head commit. `head` is
+  a SHA, `{:unknown, branch}` for a `--head` that does not resolve, or nil.
+  """
   def missing(body, head) do
     parts = for {pattern, label} <- @required, not (body =~ pattern), do: label
 
-    if head && String.contains?(body, String.slice(head, 0, 7)),
-      do: parts,
-      else: parts ++ ["der aktuelle Head `#{String.slice(head || "?", 0, 7)}` („Gilt für …“)"]
+    case head do
+      {:unknown, branch} ->
+        parts ++ ["der Branch `#{branch}` (weder lokal noch unter origin/)"]
+
+      sha when is_binary(sha) ->
+        if String.contains?(body, String.slice(sha, 0, 7)),
+          do: parts,
+          else: parts ++ ["der aktuelle Head `#{String.slice(sha, 0, 7)}` („Gilt für …“)"]
+
+      nil ->
+        parts ++ ["der aktuelle Head `?` („Gilt für …“)"]
+    end
   end
 
   defp deny(gaps) do
@@ -75,17 +87,47 @@ defmodule PrReport do
   # The commit the PR is opened for: with `--head <branch>` (`-H`, also
   # `owner:branch`) that branch, local or under origin/ (#532), otherwise
   # HEAD of the session's directory. A branch that does not resolve yields
-  # nil, and the call is denied.
+  # `{:unknown, branch}`, and the call is denied.
   defp head(command, cwd) do
-    case Regex.run(~r/(?:--head|-H)[=\s]+("[^"]+"|'[^']+'|\S+)/, command) do
-      [_, branch] ->
-        branch =
-          branch |> String.trim("\"") |> String.trim("'") |> String.split(":") |> List.last()
+    case head_flags(command) do
+      [] ->
+        commit("HEAD", cwd)
 
-        Enum.find_value([branch, "refs/remotes/origin/#{branch}"], &commit(&1, cwd))
+      flags ->
+        branch =
+          flags
+          |> List.last()
+          |> String.trim("\"")
+          |> String.trim("'")
+          |> String.split(":")
+          |> List.last()
+
+        Enum.find_value([branch, "refs/remotes/origin/#{branch}"], &commit(&1, cwd)) ||
+          {:unknown, branch}
+    end
+  end
+
+  # Values of gh's own `--head`/`-H` flags (#540): only after `gh pr create`,
+  # with heredocs and quoted strings skipped as a whole, so a mention in the
+  # body, the title or another command is no flag. The scan alternates
+  # between a quoted string, consumed without a capture, and a flag.
+  @heredoc ~r/<<-?\s*(['"]?)(\w+)\1.*?\n\s*\2\s*(?=\n|\)|$)/s
+  @flag ~r/"(?:[^"\\]|\\.)*"|'[^']*'|(?<!\S)(?:--head|-H)(?:=|\s+)("[^"]*"|'[^']*'|[^\s;&|)]+)/
+
+  defp head_flags(command) do
+    command = Regex.replace(@heredoc, command, "")
+
+    case Regex.run(@create, command, return: :index) do
+      [{start, _}] ->
+        @flag
+        |> Regex.scan(binary_part(command, start, byte_size(command) - start))
+        |> Enum.flat_map(fn
+          [_, value] -> [value]
+          _ -> []
+        end)
 
       nil ->
-        commit("HEAD", cwd)
+        []
     end
   end
 
