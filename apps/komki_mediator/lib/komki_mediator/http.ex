@@ -27,7 +27,9 @@ defmodule KomkiMediator.HTTP do
      Der gepruefte Wert (oder nil) geht nach `conn.assigns.komki_session`;
      anubis reicht die Assigns je Anfrage in `frame.assigns` weiter, wo
      `KomkiMediator.Env.for_call/1` ihn abholt. Die Session-ID dient der
-     Zuordnung im PDR, nicht der Authentisierung.
+     Zuordnung im PDR, nicht der Authentisierung: Das Journal fuehrt sie
+     als behauptete Angabe des Aufrufers (`session_id_provenance`,
+     Ticket #495).
 
   Das Token reist ueber `init/1` (`token: ...`) in `conn.private` — nicht in
   die Assigns, die anubis in den Frame uebernimmt.

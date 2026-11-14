@@ -125,6 +125,7 @@ defmodule KomkiMediator.HTTPTest do
       assert [_executing, record] = TestHelpers.journal_records(journal_path)
       assert record["tool"] == "ping"
       assert record["session_id"] == @session
+      assert record["session_id_provenance"] == "caller-asserted"
     end
 
     test "ohne X-Komki-Session: session_id null im PDR", %{
@@ -135,8 +136,31 @@ defmodule KomkiMediator.HTTPTest do
       mcp = handshake!(socket, token)
       assert {:ok, %Finch.Response{status: 200}} = mcp_post(socket, call_ping(3), mcp)
 
-      assert [%{"session_id" => nil}, %{"session_id" => nil}] =
+      assert [
+               %{"session_id" => nil, "session_id_provenance" => nil},
+               %{"session_id" => nil, "session_id_provenance" => nil}
+             ] =
                TestHelpers.journal_records(journal_path)
+    end
+
+    # F27 des Sicherheits-Audits (#467, Ticket #495): Der Header
+    # authentisiert nichts - jede Token-haltende Session kann einen
+    # beliebigen Wert behaupten. Das Journal fuehrt die Angabe deshalb
+    # als behauptet (caller-asserted); die Zuordnung im PDR ist eine
+    # Behauptung des Aufrufers, keine gepruefte Sitzungsidentitaet.
+    test "fabrizierte X-Komki-Session landet als behauptete Angabe im PDR", %{
+      socket: socket,
+      token: token,
+      journal_path: journal_path
+    } do
+      fabricated = "ses-000fabrikat01"
+
+      mcp = handshake!(socket, token, [{"x-komki-session", fabricated}])
+      assert {:ok, %Finch.Response{status: 200}} = mcp_post(socket, call_ping(3), mcp)
+
+      assert [_executing, record] = TestHelpers.journal_records(journal_path)
+      assert record["session_id"] == fabricated
+      assert record["session_id_provenance"] == "caller-asserted"
     end
 
     test "ungueltige X-Komki-Session: 400", %{socket: socket, token: token} do
