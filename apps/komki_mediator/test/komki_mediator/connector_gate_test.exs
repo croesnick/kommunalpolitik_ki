@@ -45,6 +45,39 @@ defmodule KomkiMediator.ConnectorGateTest do
     }
   end
 
+  # #516: one meeting from the calendar and its public agenda.
+  defp ris_sessions do
+    %{
+      "results" => [
+        %{
+          "sitzung_id" => "4711",
+          "sitzung" => "Gartenstadt-Rat, Zusammenkunft Nr. 15",
+          "gremium" => "Gartenstadt-Rat",
+          "datum" => "2026-06-02",
+          "uhrzeit" => "18:00",
+          "url" => "https://ris.example/guestmeetings/4711"
+        }
+      ],
+      "abrufdatum" => "2026-05-28T09:00:00Z"
+    }
+  end
+
+  defp ris_agenda do
+    %{
+      "sitzung_id" => "4711",
+      "sitzung" => "Gartenstadt-Rat, Zusammenkunft Nr. 15",
+      "gremium" => "Gartenstadt-Rat",
+      "datum" => "2026-06-02",
+      "uhrzeit" => "18:00",
+      "url" => "https://ris.example/guestmeetings/4711",
+      "tops" => [
+        %{"top_id" => "4711-1", "nummer" => "1", "titel" => "Kläranlagen-Erneuerung im Süden"},
+        %{"top_id" => "4711-3", "nummer" => "3", "titel" => "Lindenallee: Baumpflanzungen"}
+      ],
+      "abrufdatum" => "2026-05-28T09:00:00Z"
+    }
+  end
+
   defp note(labels) do
     %{"note_id" => "a.md", "title" => "A", "content" => "geheimer Inhalt", "labels" => labels}
   end
@@ -55,6 +88,43 @@ defmodule KomkiMediator.ConnectorGateTest do
   # Permit flow: every decision journaled when made, then the record before
   # effect, then admit; one call_id (#298)
   # -----------------------------------------------------------------------
+
+  test "#516 ris_sessions und ris_agenda: Gate 1 erlaubt, Gate 2 nimmt mit RIS-Label auf",
+       %{env: env} do
+    fake(env, "ris", fn
+      "sessions", _params, _context -> {:ok, ris_sessions()}
+      "agenda", _params, _context -> {:ok, ris_agenda()}
+    end)
+
+    response = ConnectorGate.call(env, "ris_sessions", %{"von" => "2026-06-02"})
+
+    assert_received {:connector_called, "ris", "sessions",
+                     %{"von" => "2026-06-02", "limit" => 20}, %{}, 3}
+
+    assert response["decision"] == "permit"
+    assert response["labels"] == ["ris-oeffentlich@1"]
+    assert response["results"] == ris_sessions()["results"]
+
+    response = ConnectorGate.call(env, "ris_agenda", %{"sitzung_id" => "4711"})
+
+    assert_received {:connector_called, "ris", "agenda", %{"sitzung_id" => "4711"}, %{}, _}
+    assert response["decision"] == "permit"
+    assert response["labels"] == ["ris-oeffentlich@1"]
+    assert response["tops"] == ris_agenda()["tops"]
+  end
+
+  test "#516 ris_agenda mit verborgener Zahl verletzt die Form und wird zurueckgehalten",
+       %{env: env} do
+    fake(env, "ris", ok(Map.put(ris_agenda(), "nicht_oeffentlich", "Verborgen4711")))
+
+    response = ConnectorGate.call(env, "ris_agenda", %{"sitzung_id" => "4711"})
+
+    # Gate 2 withholds the whole answer; `verify` names the offending keys
+    # (as for every shape violation), never their values.
+    assert response["admitted"] == "redacted"
+    refute Map.has_key?(response, "tops")
+    refute inspect(response) =~ "Verborgen4711"
+  end
 
   test "recherche ris_search: Entscheidungen und Vorbeleg liegen vor dem Connector-Aufruf, dann admit",
        %{env: env} do

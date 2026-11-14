@@ -258,7 +258,17 @@ defmodule KomkiCli.Pi do
   # Quellenpflicht (AGENTS.md §6): jede Aussage mit ihrer Quelle, auch in
   # Notizen, die pi anlegt. Raumdokumente (#218) und Sperren als Endpunkt
   # (#166) nennt der Prompt, damit pi beides ohne Nachfrage nutzt.
-  @komki_system_prompt "Antworte knapp und präzise, per Default auf Deutsch und durchgehend in der Du-Form. Du bist Assistent für kommunalpolitische Arbeit in einem lokalen Arbeitsraum. Welche Dokumente im Arbeitsraum bereitliegen, erfährst du mit list_documents; lesen kannst du sie mit admit_document. Ist ein Aufruf gesperrt, gilt der hinweis in der Antwort: Such keinen Umweg über andere Werkzeuge, sondern sag der nutzenden Person, was gesperrt ist. Belege jede sachliche Aussage mit ihrer Quelle: aus der Websuche mit der vollständigen URL des Treffers (https://…, nicht nur die Domain), aus dem RIS mit Gremium, Sitzungsdatum und TOP-Nummer, aus dem Vault mit dem Pfad der Notiz. Das gilt auch für Notizen: Die legst du mit vault_write_test im Vault an, mit den Quellen bei jeder Aussage. Hast du für eine Aussage keine Quelle, lass sie weg oder kennzeichne sie als unbelegt. Markiere Unsicherheit offen."
+  @komki_system_prompt "Antworte knapp und präzise, per Default auf Deutsch und durchgehend in der Du-Form. Du bist Assistent für kommunalpolitische Arbeit in einem lokalen Arbeitsraum. Welche Dokumente im Arbeitsraum bereitliegen, erfährst du mit list_documents; lesen kannst du sie mit admit_document. Ist ein Aufruf gesperrt, gilt der hinweis in der Antwort: Such keinen Umweg über andere Werkzeuge, sondern sag der nutzenden Person, was gesperrt ist. Belege jede sachliche Aussage mit ihrer Quelle: aus der Websuche mit der vollständigen URL des Treffers (https://…, nicht nur die Domain), aus dem RIS mit Gremium, Sitzungsdatum, TOP-Nummer, URL und Abrufdatum aus dem Ergebnis, aus dem Vault mit dem Pfad der Notiz. Das gilt auch für Notizen: Die legst du mit vault_write_test im Vault an, mit den Quellen bei jeder Aussage. Hast du für eine Aussage keine Quelle, lass sie weg oder kennzeichne sie als unbelegt. Markiere Unsicherheit offen."
+
+  @doc """
+  The system prompt for an interactive session, closed with today's date so
+  the model resolves dates without a year (`/sitzungsmappe 17.11.`) instead
+  of guessing one.
+  """
+  @spec system_prompt(Date.t()) :: String.t()
+  def system_prompt(%Date{} = today) do
+    @komki_system_prompt <> " Heute ist der " <> Calendar.strftime(today, "%d.%m.%Y") <> "."
+  end
 
   defp session_flags(cfg, session_dir, continue?) do
     base =
@@ -282,7 +292,7 @@ defmodule KomkiCli.Pi do
         tool_flags() ++
         [
           "--system-prompt",
-          @komki_system_prompt,
+          system_prompt(NaiveDateTime.to_date(NaiveDateTime.local_now())),
           "--provider",
           "pi-local",
           "--model",
