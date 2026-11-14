@@ -61,8 +61,9 @@ defmodule KomkiConnectorDocuments.Pdf do
       end
     end
   rescue
-    # E.g. in an escript, where the NIF cannot be dlopen'ed from the
-    # archive (#288). The detail only reaches the local connector log.
+    # E.g. when the physical ex_pdfium directory is missing (#288) or the
+    # NIF cannot load for another reason. The detail only reaches the
+    # local connector log.
     exception ->
       {:error, "internal",
        "PDF-Lesung fehlgeschlagen: #{inspect(exception.__struct__)} #{Exception.message(exception)}"}

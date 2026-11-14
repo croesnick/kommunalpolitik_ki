@@ -73,6 +73,16 @@ defmodule KomkiConnector.ManifestTest do
     assert Manifest.environment(manifest, "stand_lesen") == "lokaler-arbeitsraum@1"
   end
 
+  # Zweite Programmform (#288, CONTRACT.md §4/§5): nur der Dokument-Connector
+  # trägt eine NIF-Anwendung; alle anderen bleiben reine Elixir-Escripts.
+  test "nif: nur der Dokument-Connector, alle Manifeste nennen das Feld" do
+    assert Manifest.fetch!("documents").nif == :ex_pdfium
+
+    for id <- Manifest.ids() -- ["documents"] do
+      assert Manifest.fetch!(id).nif == nil
+    end
+  end
+
   test "socket_path: komki-Layout unter der Basis" do
     assert Manifest.socket_path("/basis", "ris") == "/basis/run/connectors/ris.sock"
   end

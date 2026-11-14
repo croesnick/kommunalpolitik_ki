@@ -15,8 +15,11 @@ defmodule KomkiConnectorDocuments do
   per object ID, so both never coexist in a room.
 
   PDFs are rendered by `KomkiConnectorDocuments.Pdf` (license and NIF
-  origin are documented there). Its NIF cannot load in an escript; the
-  read then fails with a clear error until #288 settles the program form.
+  origin are documented there). The connector runs in the second program
+  form (#288, CONTRACT.md §4): the CLI puts the physical ex_pdfium
+  directory on the code path, so the NIF loads from disk instead of the
+  zipped escript archive. Without that directory every PDF read fails
+  with `internal`.
 
   State: `%{dir: <documents_dir>}`.
   """

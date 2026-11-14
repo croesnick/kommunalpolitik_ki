@@ -10,7 +10,7 @@ defmodule KomkiCli.ConnectorProfileTest do
 
   use ExUnit.Case, async: true
 
-  alias KomkiCli.{Config, ConnectorProfile, MediatorProfile}
+  alias KomkiCli.{Config, ConnectorProfile, MediatorProfile, TestSupport}
   alias KomkiConnector.Manifest
 
   @golden Path.expand("../fixtures/profiles", __DIR__)
@@ -181,6 +181,58 @@ defmodule KomkiCli.ConnectorProfileTest do
 
       assert rules_with(without, "(subpath \"/opt/komki-golden") == []
       refute without =~ "stand.json"
+    end
+  end
+
+  describe "NIF von der Platte (#288)" do
+    # Paket-Layout neben der Fixtur-Binary: das Profil erlaubt das Laden
+    # (dlopen) genau aus dem Verzeichnis der NIF-Anwendung — dieselbe
+    # Fundstelle wie Bootstrap und Pin (KomkiConnector.Nif).
+    defp nif_cfg do
+      area = TestSupport.tmp_area!("profil-nif")
+      File.mkdir_p!(Path.join([area, "bin", "lib", "ex_pdfium", "ebin"]))
+
+      cfg =
+        cfg(
+          connector_bins: %{
+            "ris" => "/opt/komki/bin/komki-connector-ris",
+            "web" => "/opt/komki/bin/komki-connector-web",
+            "vault" => "/opt/komki/bin/komki-connector-vault",
+            "documents" => Path.join([area, "bin", "komki-connector-documents"]),
+            "ratsprojekte" => "/opt/komki/bin/komki-connector-ratsprojekte"
+          }
+        )
+
+      {cfg, Path.join([area, "bin", "lib", "ex_pdfium"])}
+    end
+
+    test "documents: Lesen genau aus dem Verzeichnis der NIF-Anwendung" do
+      {cfg, nif} = nif_cfg()
+      text = ConnectorProfile.connector(cfg, Manifest.fetch!("documents"))
+      dir = TestSupport.readlink!(nif)
+
+      assert text =~
+               "; NIF von der Platte (#288): Laden nur aus dem Verzeichnis der NIF-Anwendung"
+
+      # Die Leseregel und der Metadaten-Eintrag (realpath-Walk von dlopen),
+      # sonst nichts: keine zweite Regel, kein Schreiben.
+      assert text =~ "(allow file-read* (subpath \"" <> dir <> "\"))"
+      assert text =~ "(allow file-read-metadata (literal \"" <> dir <> "\"))"
+      assert Enum.count(String.split(text, dir)) == 3
+    end
+
+    test "ohne Fundstelle keine NIF-Regel (Fixtur-Pfad ohne Baum)" do
+      text = ConnectorProfile.connector(cfg(), Manifest.fetch!("documents"))
+
+      refute text =~ "NIF von der Platte"
+      refute text =~ "ex_pdfium"
+    end
+
+    test "reine Elixir-Connectoren bekommen keine NIF-Schicht" do
+      for id <- ["ris", "web", "vault", "ratsprojekte"] do
+        text = ConnectorProfile.connector(cfg(), Manifest.fetch!(id))
+        refute text =~ "NIF von der Platte"
+      end
     end
   end
 

@@ -1230,8 +1230,11 @@ wurde verändert oder stammt aus einer anderen komki-Version.
 
 **Definition:** Die festgehaltene SHA-256-Prüfsumme eines Programms, das
 komki startet (komki, escript, node, llama-server, komki-tresor, das
-pi-Paket). Weicht die Prüfsumme ab, verweigert komki den Start, bis
-`komki setup` die neue Prüfsumme nach Rückfrage übernimmt.
+pi-Paket). Für einen Connector mit NIF gehört zu seinem Programm auch das
+Verzeichnis der NIF-Anwendung mit seinen nativen Dateien, als Baum-Hash
+(`komki-connector-<id>-nif`, #288). Weicht die Prüfsumme ab, verweigert
+komki den Start, bis `komki setup` die neue Prüfsumme nach Rückfrage
+übernimmt.
 
 **Wo:** `pins` in `config.json`; `Seatbelt.Pins`.
 

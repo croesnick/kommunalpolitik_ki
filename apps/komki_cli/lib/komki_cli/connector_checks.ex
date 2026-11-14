@@ -3,7 +3,10 @@ defmodule KomkiCli.ConnectorChecks do
   Doctor-Checks fuer Egress, Connectoren und Vermittler-Profil (Tickets
   #146/#137): Binaries, Profile byte-stabil, Socket-Laenge, Credentials
   (nur Existenz, Warnung statt FAIL) und je laufendem Connector die
-  reservierte Operation `ping` ueber den Socket.
+  reservierte Operation `ping` ueber den Socket. Fuer jeden aktiven
+  Connector mit NIF-Anwendung (#288, zweite Programmform) laedt der
+  Doctor die NIF ausserdem wirklich — unter dem Profil der Instanz
+  (`Connectors.nif_check/3`); `ping` allein beweist das Laden nicht.
 
   Ein fehlendes Credential ist kein FAIL: Der Connector startet trotzdem
   und meldet `credential-missing`; der Doctor zeigt die Warnung.
@@ -24,8 +27,24 @@ defmodule KomkiCli.ConnectorChecks do
     [escript_check(cfg), socket_check(cfg), ris_url_check(cfg)] ++
       binary_checks(cfg) ++
       profile_checks(cfg) ++
+      nif_checks(cfg) ++
       credential_checks(cfg, keychain) ++
       ping_checks(cfg)
+  end
+
+  # Zweite Programmform (#288): je aktiven Connector mit Manifest-Feld
+  # `nif` einen Lauf unter dem Profil der Instanz. Der Doctor zeigt damit,
+  # dass das Laden erlaubt ist und die nativen Dateien stimmen — der Pin
+  # prueft die Bytes, dieser Check das Laden.
+  defp nif_checks(cfg) do
+    for manifest <- Connectors.enabled(cfg), not is_nil(manifest.nif) do
+      name = "nif " <> manifest.id
+
+      case Connectors.nif_check(cfg, manifest) do
+        {:ok, reason} -> %{name: name, ok: true, reason: reason}
+        {:error, reason} -> %{name: name, ok: false, reason: reason}
+      end
+    end
   end
 
   # Burrito-Einzeldatei (Ticket #181): Laufzeit ist die entpackte Wurzel

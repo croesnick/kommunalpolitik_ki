@@ -70,9 +70,9 @@ mix escript.build   # erzeugt ./komki (Dev-Weg; braucht Elixir/OTP auf dem Host)
 
 Nutzende installieren komki später mit `brew install croesnick/tap/komki`;
 bis zur Veröffentlichung gibt es den Tap nur lokal (`make komki-tap`). Die
-Formel installiert das Escript mit allen Rollen, daneben die SQLite-NIF und
-pi in fester Version, und zieht `erlang`, `llama.cpp`, `node` und `tmux`
-als Abhängigkeiten nach.
+Formel installiert das Escript mit allen Rollen, daneben die SQLite-NIF
+(exqlite), die PDF-NIF von ex_pdfium (#288) und pi in fester Version, und
+zieht `erlang`, `llama.cpp`, `node` und `tmux` als Abhängigkeiten nach.
 
 pi liegt fertig im Paket: `make komki-paket` installiert es mit pnpm nach
 der Lockfile in `packaging/pi/` (`--frozen-lockfile --ignore-scripts`), samt
@@ -578,12 +578,15 @@ Seitenanker `[Seite N]`, dazu die Highlights mit Kommentar und markiertem
 Text — ein PDF ohne Textebene (Scan) ist ein klarer Fehler, es gibt kein
 OCR (#289). Eine Objekt-ID liegt in genau einer Form im Raum: Eine
 Markdown- und eine PDF-Fassung derselben Objekt-ID lehnt die Aufnahme ab,
-denn der Connector liest nur eine Form je Objekt. **PDF-Lesung braucht die
-NIF-Form des Programms** (Einzeldatei per `make komki-burrito` oder
-Release): Im Escript-Betrieb (`make komki`, Homebrew-Paket) antwortet jede
-PDF-Lesung mit einem klaren Fehler, bis #288 die Programmform für
-NIF-Connectoren entscheidet; `doctor` bleibt dabei grün, weil `ping` den
-NIF nicht berührt. Dateien aus dem pi-Home, dem Vermittler-Verzeichnis oder
+denn der Connector liest nur eine Form je Objekt. **Der NIF lädt von der
+Platte** (#288, zweite Programmform): Der Dokument-Connector bringt das
+physische ex_pdfium-Verzeichnis auf den Code-Pfad — aus dem Build-Baum
+neben dem Programm oder aus `lib/ex_pdfium/` im Paket, wie komki selbst
+exqlite lädt. Das Connector-Profil erlaubt das Laden nur aus genau diesem
+Verzeichnis, die nativen Dateien sind ein eigener Programm-Pin
+(`komki-connector-documents-nif`), und `doctor` lädt den Baustein unter dem
+Profil der Instanz wirklich (`nif documents`, nicht nur `ping`). Dateien
+aus dem pi-Home, dem Vermittler-Verzeichnis oder
 der Registry nimmt komki nicht an. Aufnahme gibt es nur bei einem neuen
 Start, nicht mit `--continue` und nicht in eine laufende Session.
 
