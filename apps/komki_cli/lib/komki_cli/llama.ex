@@ -88,8 +88,8 @@ defmodule KomkiCli.Llama do
   # llama-server-Prozesse kriegen Signale; alles andere ist ein stale
   # pidfile, das der Aufraeumweg entfernt.
   defp down_pid(cfg, pid) do
-    if llama_alive?(pid) do
-      case kill_llama(pid) do
+    if llama_alive?(cfg, pid) do
+      case kill_llama(cfg, pid) do
         :ok ->
           File.rm(pidfile(cfg))
           :ok
@@ -100,7 +100,7 @@ defmodule KomkiCli.Llama do
     else
       File.rm(pidfile(cfg))
 
-      {:stale, "pid " <> to_string(pid) <> " ist nicht (mehr) llama-server — pidfile entfernt"}
+      {:stale, Proc.not_ours(pid, "llama-server")}
     end
   end
 
@@ -111,10 +111,10 @@ defmodule KomkiCli.Llama do
   def status(%Config{} = cfg) do
     case Proc.read_pidfile(pidfile(cfg)) do
       {:ok, pid} ->
-        if llama_alive?(pid) do
+        if llama_alive?(cfg, pid) do
           {:running, pid}
         else
-          {:error, "stale pidfile: pid " <> to_string(pid) <> " is not llama-server"}
+          {:error, "stale pidfile: pid " <> to_string(pid) <> " is not llama-server of this base"}
         end
 
       :none ->
@@ -315,7 +315,7 @@ defmodule KomkiCli.Llama do
         {:ok, pid}
 
       {:error, reason} ->
-        kill_llama(pid)
+        kill_llama(cfg, pid)
         File.rm(pidfile(cfg))
         reason = reason <> "; llama log tail: " <> log_tail(cfg, 20)
         {:error, reason}
@@ -323,11 +323,13 @@ defmodule KomkiCli.Llama do
   end
 
   # Kill-Eskalation TERM→KILL mit Identitaetscheck (Proc.kill_checked).
-  defp kill_llama(pid), do: Proc.kill_checked(pid, "llama-server")
+  defp kill_llama(cfg, pid), do: Proc.kill_checked(pid, "llama-server", key_path(cfg))
 
   @doc "Prüft, ob pid existiert und als llama-server läuft (ps-Kontrolle)."
-  @spec llama_alive?(integer()) :: boolean()
-  def llama_alive?(pid), do: Proc.pid_alive?(pid, "llama-server")
+  # Anker: `--api-key-file <base>/tmp/llama.key` (Ticket #164) – der Modellpfad
+  # allein trennt zwei Basen mit derselben GGUF-Datei nicht.
+  @spec llama_alive?(Config.t(), integer()) :: boolean()
+  def llama_alive?(cfg, pid), do: Proc.pid_alive?(pid, "llama-server", key_path(cfg))
 
   @doc "Log-Tail als Einzeiler kontrolliert für Fehlermeldungen."
   @spec log_tail(Config.t(), pos_integer()) :: String.t()
@@ -337,7 +339,8 @@ defmodule KomkiCli.Llama do
 
   defp port(cfg), do: cfg.port
 
-  defp pidfile(cfg), do: Path.join([cfg.base_dir, "tmp", "llama-server.pid"])
+  @doc false
+  def pidfile(cfg), do: Path.join([cfg.base_dir, "tmp", "llama-server.pid"])
 
   @doc "GET /health via plain TCP; {:ok, status_code_string} oder {:error, reason}."
   @spec http_get_200(pos_integer()) :: {:ok, String.t()} | {:error, String.t()}

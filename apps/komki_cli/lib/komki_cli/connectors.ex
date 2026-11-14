@@ -550,7 +550,7 @@ defmodule KomkiCli.Connectors do
         {:ok, {comp.name, {:started, pid}}}
 
       {:error, reason} ->
-        Proc.kill_checked(pid, comp.marker)
+        Proc.kill_checked(pid, comp.marker, comp.anchor)
         File.rm(comp.pidfile)
         {:error, reason <> "; " <> comp.name <> " log tail: " <> Proc.log_tail(comp.log, 20)}
     end
@@ -617,8 +617,8 @@ defmodule KomkiCli.Connectors do
   end
 
   defp stop_pid(comp, pid) do
-    if Proc.pid_alive?(pid, comp.marker) do
-      case Proc.kill_checked(pid, comp.marker) do
+    if Proc.pid_alive?(pid, comp.marker, comp.anchor) do
+      case Proc.kill_checked(pid, comp.marker, comp.anchor) do
         :ok ->
           File.rm(comp.pidfile)
           :ok
@@ -629,9 +629,7 @@ defmodule KomkiCli.Connectors do
     else
       File.rm(comp.pidfile)
 
-      {:stale,
-       "pid " <>
-         Integer.to_string(pid) <> " ist nicht (mehr) " <> comp.marker <> " — pidfile entfernt"}
+      {:stale, Proc.not_ours(pid, comp.marker)}
     end
   end
 
@@ -662,7 +660,9 @@ defmodule KomkiCli.Connectors do
       :none ->
         case Proc.read_pidfile(comp.pidfile) do
           {:ok, pid} ->
-            {:error, "stale pidfile: pid " <> Integer.to_string(pid) <> " is not " <> comp.marker}
+            {:error,
+             "stale pidfile: pid " <>
+               Integer.to_string(pid) <> " is not " <> comp.marker <> " of this base"}
 
           :none ->
             :stopped
@@ -675,7 +675,7 @@ defmodule KomkiCli.Connectors do
 
   defp alive(comp) do
     with {:ok, pid} <- Proc.read_pidfile(comp.pidfile),
-         true <- Proc.pid_alive?(pid, comp.marker) do
+         true <- Proc.pid_alive?(pid, comp.marker, comp.anchor) do
       {:ok, pid}
     else
       _ -> :none
@@ -688,6 +688,8 @@ defmodule KomkiCli.Connectors do
       marker: @egress_marker,
       pidfile: egress_pidfile(cfg),
       log: egress_log_path(cfg),
+      # Egress startet ohne Argumente: der Anker ist sein Log (stdout), Ticket #164.
+      anchor: {:open_file, egress_log_path(cfg)},
       socket: nil
     }
   end
@@ -698,6 +700,7 @@ defmodule KomkiCli.Connectors do
       marker: Manifest.fetch!(id).binary,
       pidfile: pidfile(cfg, id),
       log: log_path(cfg, id),
+      anchor: Manifest.socket_path(cfg.base_dir, id),
       socket: Manifest.socket_path(cfg.base_dir, id)
     }
   end

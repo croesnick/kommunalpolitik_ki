@@ -133,8 +133,8 @@ defmodule KomkiCli.Mediator do
   # komki-mediator-Prozesse kriegen Signale; alles andere ist ein stale
   # pidfile, das der Aufraeumweg entfernt.
   defp down_pid(cfg, pid) do
-    if mediator_alive?(pid) do
-      case kill_mediator(pid) do
+    if mediator_alive?(cfg, pid) do
+      case kill_mediator(cfg, pid) do
         :ok ->
           File.rm(pidfile(cfg))
           :ok
@@ -145,7 +145,7 @@ defmodule KomkiCli.Mediator do
     else
       File.rm(pidfile(cfg))
 
-      {:stale, "pid " <> to_string(pid) <> " ist nicht (mehr) komki-mediator — pidfile entfernt"}
+      {:stale, Proc.not_ours(pid, "komki-mediator")}
     end
   end
 
@@ -156,10 +156,11 @@ defmodule KomkiCli.Mediator do
   def status(%Config{} = cfg) do
     case Proc.read_pidfile(pidfile(cfg)) do
       {:ok, pid} ->
-        if mediator_alive?(pid) do
+        if mediator_alive?(cfg, pid) do
           {:running, pid}
         else
-          {:error, "stale pidfile: pid " <> to_string(pid) <> " is not komki-mediator"}
+          {:error,
+           "stale pidfile: pid " <> to_string(pid) <> " is not komki-mediator of this base"}
         end
 
       :none ->
@@ -282,7 +283,7 @@ defmodule KomkiCli.Mediator do
         {:ok, {:started, pid, health}}
 
       {:error, reason} ->
-        kill_mediator(pid)
+        kill_mediator(cfg, pid)
         File.rm(pidfile(cfg))
         reason = reason <> "; mediator log tail: " <> log_tail(cfg, 20)
         {:error, reason}
@@ -290,11 +291,14 @@ defmodule KomkiCli.Mediator do
   end
 
   # Kill-Eskalation TERM→KILL mit Identitaetscheck (Proc.kill_checked).
-  defp kill_mediator(pid), do: Proc.kill_checked(pid, "komki-mediator")
+  defp kill_mediator(cfg, pid),
+    do: Proc.kill_checked(pid, "komki-mediator", Channel.socket_path(cfg))
 
   @doc "Prüft, ob pid existiert und als komki-mediator läuft (ps-Kontrolle)."
-  @spec mediator_alive?(integer()) :: boolean()
-  def mediator_alive?(pid), do: Proc.pid_alive?(pid, "komki-mediator")
+  # Anker: `--socket <base>/run/mediator.sock` (Ticket #164).
+  @spec mediator_alive?(Config.t(), integer()) :: boolean()
+  def mediator_alive?(cfg, pid),
+    do: Proc.pid_alive?(pid, "komki-mediator", Channel.socket_path(cfg))
 
   @doc "Log-Tail als Einzeiler kontrolliert für Fehlermeldungen."
   @spec log_tail(Config.t(), pos_integer()) :: String.t()
@@ -305,7 +309,8 @@ defmodule KomkiCli.Mediator do
   @doc "Log-Pfad des Vermittlers (auch Schreibziel im Vermittler-Profil)."
   @spec log_path(Config.t()) :: String.t()
   def log_path(cfg), do: Path.join([cfg.base_dir, "tmp", "mediator.log"])
-  defp pidfile(cfg), do: Path.join([cfg.base_dir, "tmp", "komki-mediator.pid"])
+  @doc false
+  def pidfile(cfg), do: Path.join([cfg.base_dir, "tmp", "komki-mediator.pid"])
 
   @doc """
   GET /healthz ueber den Unix-Socket (minimales HTTP/1.1, `:gen_tcp`
