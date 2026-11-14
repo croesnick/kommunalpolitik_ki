@@ -9,6 +9,8 @@ defmodule KomkiMediator.ResultShape do
   """
 
   @ris_hit ~w(datum nummer sitzung titel top_id url)
+  @ris_session ~w(datum gremium sitzung sitzung_id url)
+  @ris_agenda_top ~w(nummer titel top_id)
   @web_hit ~w(snippet title url)
   @vault_hit ~w(labels note_id title)
 
@@ -18,6 +20,18 @@ defmodule KomkiMediator.ResultShape do
 
   def check("ris", "show", result),
     do: object(result, ~w(abrufdatum datum nummer sitzung text titel top_id url))
+
+  # #516: meetings in a window, and one meeting's public agenda.
+  def check("ris", "sessions", result), do: list_result(result, ["abrufdatum"], @ris_session)
+
+  def check("ris", "agenda", result),
+    do:
+      list_field(
+        result,
+        "tops",
+        ~w(abrufdatum datum gremium sitzung sitzung_id url),
+        @ris_agenda_top
+      )
 
   def check("web", "search", result), do: list_result(result, ["abrufdatum"], @web_hit)
   def check("vault", "search", result), do: list_result(result, [], @vault_hit)
@@ -37,13 +51,20 @@ defmodule KomkiMediator.ResultShape do
   def check(id, op, _result), do: {:error, "keine Ergebnisform fuer #{id}.#{op}"}
 
   # Objekt mit Trefferliste unter "results" plus weiteren Feldern.
-  defp list_result(%{"results" => hits} = result, extra, hit_keys) when is_list(hits) do
-    with :ok <- object(Map.delete(result, "results"), extra) do
-      Enum.find_value(hits, :ok, &hit_error(&1, hit_keys))
+  defp list_result(result, extra, hit_keys), do: list_field(result, "results", extra, hit_keys)
+
+  # Object with a list of objects under `key`, plus further string fields.
+  defp list_field(result, key, extra, item_keys) do
+    case result do
+      %{^key => items} when is_list(items) ->
+        with :ok <- object(Map.delete(result, key), extra) do
+          Enum.find_value(items, :ok, &hit_error(&1, item_keys))
+        end
+
+      _ ->
+        {:error, key <> " fehlt oder ist keine Liste"}
     end
   end
-
-  defp list_result(_result, _extra, _hit_keys), do: {:error, "results fehlt oder ist keine Liste"}
 
   # nil fuer einen gueltigen Treffer, sonst der Fehler (fuer find_value).
   defp hit_error(hit, keys) do

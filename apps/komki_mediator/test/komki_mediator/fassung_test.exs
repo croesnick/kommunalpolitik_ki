@@ -6,7 +6,10 @@ defmodule KomkiMediator.FassungTest do
              "ping",
              "list_documents",
              "admit_document",
+             # Sitzungen und Tagesordnung (#516)
+             "ris_agenda",
              "ris_search",
+             "ris_sessions",
              "ris_show",
              # DURCHSTICH #409 (Wegwerf)
              "rp_fakt_vorschlagen",
@@ -31,8 +34,8 @@ defmodule KomkiMediator.FassungTest do
   end
 
   test "fassung_id ist die versionierte Kennung" do
-    # #419: + rp_stand_lesen, D.9-Pin bricht absichtlich
-    assert KomkiMediator.Fassung.fassung_id() == "komki-mediator/5"
+    # #516: + ris_agenda, ris_sessions, D.9-Pin bricht absichtlich
+    assert KomkiMediator.Fassung.fassung_id() == "komki-mediator/6"
   end
 
   # D.9: Die vom anubis-Server advertised Tool-Namen muessen exakt der

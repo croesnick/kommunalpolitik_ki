@@ -118,7 +118,7 @@ Einzige Quelle für Fassung, Operationen, Netz, Dateisystem, Credentials und Imp
 | Feld | Bedeutung |
 |---|---|
 | `id` | `documents`, `ratsprojekte`, `ris`, `web`, `vault` |
-| `fassung` | `komki-documents/1`, `komki-ratsprojekte/2`, `komki-ris/2`, `komki-web/1`, `komki-vault/1` |
+| `fassung` | `komki-documents/1`, `komki-ratsprojekte/2`, `komki-ris/3`, `komki-web/1`, `komki-vault/1` |
 | `binary` | Name des Escripts |
 | `ops` | Operation → Parameter-Schema (geschlossen, siehe unten), `kind` (`read`, `write` oder `admit_only`, §6.4), optional `ausgabeart` (nur schreibend, siehe unten), `environment` (eigene Umgebung der Operation) und bei `admit_only` das feste `object` |
 | `egress_hosts` | Host-Allowlist für den Egress-Proxy (`host:port`). Leer heißt: kein Netz, kein Proxy-Port |
@@ -144,15 +144,17 @@ CONTRACT.md § 4.9). Der Agent benennt keine Ausgabeart; das Manifest ist die ei
 | documents | `admit_document` | `read` | `document_id` (string, max 64, pattern `^[a-z0-9-]+$`) | read |
 | ratsprojekte | `rp_fakt_vorschlagen` | `fakt_vorschlagen` | `titel` (string, max 120), `teile` (list, 1..8, je `aussage` string max 1000 Pflicht, `quelle` string max 400 Pflicht, `fundstelle` string max 200), `projekt_hinweis` (string, max 120, optional) | write |
 | ratsprojekte | `rp_stand_lesen` | `stand_lesen` | keine | admit_only (§6.4), Objekt `ratsprojekte-stand`, Umgebung `lokaler-arbeitsraum@1` |
+| ris | `ris_agenda` | `agenda` | `sitzung_id` (string, max 18, pattern `^\d{1,18}$`) | read |
 | ris | `ris_search` | `search` | `text` (string, max 200), `limit` (integer 1..20, optional, Default 10) | read |
+| ris | `ris_sessions` | `sessions` | `von` (string, pattern `^\d{4}-\d{2}-\d{2}$`), `bis` (wie `von`, optional, Standard `von`, höchstens 366 Tage später), `gremium` (string, max 100, optional, Teilstring des Gremiumsnamens), `limit` (integer 1..50, optional, Default 20) | read |
 | ris | `ris_show` | `show` | `top_id` (string, max 64, pattern `^[A-Za-z0-9_-]+$`) | read |
 | web | `web_search` | `search` | `query` (string, max 400), `count` (integer 1..10, optional, Default 5) | read |
 | vault | `vault_search` | `search` | `text` (string, max 200) | read |
 | vault | `vault_read` | `read` | `note_id` (string, max 200, pattern `^[A-Za-z0-9äöüÄÖÜß _./-]+\.md$`) | read |
 | vault | `vault_write_test` | `write_test` | `title` (string, max 120), `body` (string, max 20000) | write |
 
-Der Vermittler bietet damit `ping`, `list_documents` und diese neun Tools an (Fassung `komki-mediator/5`, seit
-`rp_stand_lesen`, #419). `admit_document` ist ein
+Der Vermittler bietet damit `ping`, `list_documents` und diese elf Tools an (Fassung `komki-mediator/6`, seit
+`ris_sessions` und `ris_agenda`, #516; davor `komki-mediator/5` mit `rp_stand_lesen`, #419). `admit_document` ist ein
 Sonderfall (Ticket #169): Der Vermittler entscheidet es über die Objekt-Labels aus `room.json` gegen das B_W
 des Raums (Regelzweig `admit`, `KomkiMediator.Gate`, R.5.4, #213), bevor er den Connector ruft. Der Connector
 führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Manifest gelten dafür nicht. `ping` und
@@ -169,10 +171,18 @@ führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Man
   ergibt `not-found`, genau wie ein nicht existierender.
   `nummer` ist die TOP-Nummer aus der Tagesordnung, wie das RIS sie führt (`numbering`, etwa `4` oder `6.2`), seit
   `komki-ris/2`; `top_id` ist die interne Kennung der RIS-API (`<Sitzung>-<Punkt>`) und nur für `show` gedacht.
+- `ris.sessions` (seit `komki-ris/3`, #516): `{"results": [{"sitzung_id", "sitzung", "gremium", "datum", "url"}], "abrufdatum"}`,
+  aufsteigend nach Datum. Gelistet wird jede Sitzung des öffentlichen Kalenders im Zeitraum, auch eine, deren
+  Tagesordnung ganz nicht-öffentlich ist. Das Datum filtert der Connector selbst, nicht nur die API.
+- `ris.agenda` (seit `komki-ris/3`, #516): `{"sitzung_id", "sitzung", "gremium", "datum", "url", "tops": [{"top_id",
+  "nummer", "titel"}], "abrufdatum"}`. `tops` enthält nur öffentliche TOPs, gefiltert wie bei `search`; eine
+  Tagesordnung ohne öffentliche TOPs ist eine leere Liste, ohne Zahl oder Hinweis auf verborgene. `nummer` bleibt, wie
+  das RIS sie führt: Die Gast-Ansicht des RIS zeigt nicht-öffentliche TOPs nicht, eine Lücke in der Nummerierung ist
+  dort also ebenso sichtbar (geprüft 2026-11-14 an 12 Sitzungen). Eine unbekannte Sitzung ergibt `not-found`.
 - `ris` mit Anmeldung (#148): Mit dem optionalen Credential `RIS_ZUGANG` (JSON `{"login", "password"}`) meldet sich
   der Connector vor dem Binden des Sockets an und liest Sitzung und TOP über die angemeldeten Endpunkte; nur dort
   liefert das RIS die Texte öffentlicher TOPs. Ergebnisformen und Filter bleiben gleich: Auch angemeldet liefert
-  `komki-ris/2` nur öffentliche TOPs, und ein TOP, dessen Detail nicht ausdrücklich `restricted: false` trägt, ist
+  der Connector nur öffentliche TOPs, und ein TOP, dessen Detail nicht ausdrücklich `restricted: false` trägt, ist
   `not-found`. Scheitert die Anmeldung (abgelehnt, RIS nicht erreichbar, Zugang unvollständig), startet der
   Connector trotzdem und beantwortet jede Operation mit `credential-missing`, ohne in den Gastmodus zu fallen; den
   Grund schreibt er beim Start als Warnung ins Log, und `komki up` zeigt Warnungen aus dem Start-Log eines Connectors

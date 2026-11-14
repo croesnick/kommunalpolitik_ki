@@ -87,6 +87,13 @@ export function callLine(toolName: string, args: Json, p: Paint): string | undef
 			return `${title("RIS durchsuchen")}  ${quote(a.text)}`;
 		case "ris_show":
 			return `${title("RIS-Tagesordnungspunkt lesen")}  ${plain(a.top_id)}`;
+		case "ris_sessions": {
+			const span = a.bis && a.bis !== a.von ? `${date(a.von)} – ${date(a.bis)}` : date(a.von);
+			const gremium = a.gremium ? `  ${quote(a.gremium)}` : "";
+			return `${title("RIS-Sitzungen")}  ${plain(span)}${gremium}`;
+		}
+		case "ris_agenda":
+			return `${title("RIS-Tagesordnung lesen")}  ${plain(a.sitzung_id)}`;
 		case "vault_search":
 			return `${title("Vault durchsuchen")}  ${quote(a.text)}`;
 		case "vault_read":
@@ -277,6 +284,12 @@ function admittedRows(tool: string, r: Json, o: ViewOptions, p: Paint): Row[] | 
 		case "ris_show":
 			body = risShow(r, o, p);
 			break;
+		case "ris_sessions":
+			body = hits && list(hits, o, p, (h) => risSession(h, o, p));
+			break;
+		case "ris_agenda":
+			body = risAgenda(r, o, p);
+			break;
 		case "vault_read":
 			body = vaultRead(r, o, p);
 			break;
@@ -345,6 +358,32 @@ function risShow(r: Json, o: ViewOptions, p: Paint): Row[] {
 	const text = clean(String(r.text ?? "")).trim();
 	rows.push(...excerpt(text, "Zu diesem Tagesordnungspunkt ist kein Text hinterlegt.", o, p));
 	return rows;
+}
+
+// #516: a meeting from the calendar, and the public agenda of one meeting.
+function risSession(h: Json, o: ViewOptions, p: Paint): Row[] {
+	return [
+		{ lead: p.fg("muted", date(h.datum)), leadWidth: 12, body: title(h.sitzung, p) },
+		{ lead: "", leadWidth: 12, body: p.fg("muted", clean(String(h.gremium ?? ""))) },
+		...urlRow(h.url, 12, o, p),
+	];
+}
+
+function risAgenda(r: Json, o: ViewOptions, p: Paint): Row[] {
+	const tops: Json[] = Array.isArray(r.tops) ? r.tops : [];
+	const rows: Row[] = [
+		{ body: title(r.sitzung, p) },
+		{ body: p.fg("muted", `${clean(String(r.gremium ?? ""))} · ${date(r.datum)}`) },
+		...urlRow(r.url, 0, o, p),
+	];
+	if (tops.length === 0) {
+		rows.push({ body: p.fg("dim", "Keine öffentlichen Tagesordnungspunkte veröffentlicht.") });
+		return rows;
+	}
+	const top = (t: Json): Row[] => [
+		{ lead: p.fg("muted", `TOP ${clean(String(t.nummer ?? ""))}`), leadWidth: 9, body: clean(String(t.titel ?? "")) },
+	];
+	return [...rows, ...list(tops, o, p, top)];
 }
 
 function vaultRead(r: Json, o: ViewOptions, p: Paint): Row[] {

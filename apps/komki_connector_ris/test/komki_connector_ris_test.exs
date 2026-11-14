@@ -39,6 +39,12 @@ defmodule KomkiConnectorRisTest do
   defp show(path, top_id),
     do: Client.call(path, "pdr-v", "show", %{"top_id" => top_id}, %{}, texts: Text)
 
+  defp sessions(path, params),
+    do: Client.call(path, "pdr-t", "sessions", params, %{}, texts: Text)
+
+  defp agenda(path, sitzung_id),
+    do: Client.call(path, "pdr-a", "agenda", %{"sitzung_id" => sitzung_id}, %{}, texts: Text)
+
   defp ids(%{"results" => results}), do: Enum.map(results, & &1["top_id"])
 
   describe "gegen den Mock" do
@@ -167,12 +173,83 @@ defmodule KomkiConnectorRisTest do
       end
 
       assert {:error, %{"code" => "bad-request"}} = show(path, "../meetings/1001")
-      assert {:error, %{"code" => "unknown-op"}} = Client.call(path, "c", "sessions", %{})
+      assert {:error, %{"code" => "unknown-op"}} = Client.call(path, "c", "meetings", %{})
+
+      for params <- [
+            %{},
+            %{"von" => "15.09.2026"},
+            %{"von" => "2026-09-15", "limit" => 51},
+            %{"von" => "2026-09-15", "gremium" => String.duplicate("a", 101)}
+          ] do
+        assert {:error, %{"code" => "bad-request"}} = sessions(path, params)
+      end
+
+      for id <- ["", "1001-1", "../1001", String.duplicate("1", 19)] do
+        assert {:error, %{"code" => "bad-request"}} = agenda(path, id)
+      end
     end
 
     test "ping meldet die Fassung", %{path: path} do
-      assert {:ok, %{"version" => "komki-ris/2", "ops" => ["search", "show"]}} =
+      assert {:ok,
+              %{"version" => "komki-ris/3", "ops" => ["agenda", "search", "sessions", "show"]}} =
                Client.call(path, "c", "ping", %{})
+    end
+
+    # Ticket #516: find the meeting by date, then read its public agenda.
+    test "sessions listet die Sitzungen eines Zeitraums, aelteste zuerst", %{path: path} do
+      assert {:ok, %{"results" => results, "abrufdatum" => _}} =
+               sessions(path, %{"von" => "2026-07-01", "bis" => "2026-09-30"})
+
+      assert Enum.map(results, & &1["sitzung_id"]) == ["1002", "1001"]
+
+      assert hd(results) == %{
+               "sitzung_id" => "1002",
+               "sitzung" => "Sitzung des Bau- und Umweltausschusses",
+               "gremium" => "Bau- und Umweltausschuss",
+               "datum" => "2026-07-10",
+               "url" => hd(results)["url"]
+             }
+    end
+
+    test "sessions: ein Tag, Gremium als Teilstring, Zeitraum geprueft", %{path: path} do
+      # The mock ignores the window; the connector filters by date itself.
+      assert {:ok, %{"results" => [%{"sitzung_id" => "1001"}]}} =
+               sessions(path, %{"von" => "2026-09-15"})
+
+      assert {:ok, %{"results" => [%{"sitzung_id" => "1002"}]}} =
+               sessions(path, %{"von" => "2026-01-01", "bis" => "2026-12-31", "gremium" => "BAU"})
+
+      assert {:ok, %{"results" => []}} = sessions(path, %{"von" => "2026-11-17"})
+
+      assert {:error, %{"code" => "bad-request"}} =
+               sessions(path, %{"von" => "2026-09-15", "bis" => "2026-09-14"})
+
+      assert {:error, %{"code" => "bad-request"}} =
+               sessions(path, %{"von" => "2025-01-01", "bis" => "2026-12-31"})
+    end
+
+    test "agenda liefert nur oeffentliche TOPs, ohne Spur der anderen", %{path: path} do
+      # 1002-2 is restricted, 1002-3 sits in the protected part.
+      assert {:ok, result} = agenda(path, "1002")
+
+      assert Enum.sort(Map.keys(result)) ==
+               ~w(abrufdatum datum gremium sitzung sitzung_id tops url)
+
+      assert result["tops"] == [
+               %{
+                 "top_id" => "1002-1",
+                 "nummer" => "1",
+                 "titel" => "Neubau Kindergarten St. Josef"
+               }
+             ]
+
+      assert {:ok, %{"tops" => tops}} = agenda(path, "1001")
+      assert Enum.map(tops, & &1["top_id"]) == ["1001-1", "1001-3"]
+    end
+
+    test "agenda: unbekannte Sitzung ist not-found", %{path: path} do
+      assert {:error, %{"code" => "not-found"}} = agenda(path, "9999")
+      assert {:error, %{"code" => "not-found"}} = agenda(path, "0")
     end
 
     test "Log enthaelt keinen Suchtext", %{path: path} do

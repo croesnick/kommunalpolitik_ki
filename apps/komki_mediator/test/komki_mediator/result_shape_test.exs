@@ -34,4 +34,43 @@ defmodule KomkiMediator.ResultShapeTest do
     assert {:error, _} = ResultShape.check("ris", "search", %{"abrufdatum" => "d"})
     assert {:error, _} = ResultShape.check("ris", "unbekannt", %{})
   end
+
+  # #516: sessions as a hit list, agenda as an object with a list of items.
+  test "ris sessions und agenda haben geschlossene Formen" do
+    session = %{
+      "sitzung_id" => "1",
+      "sitzung" => "S",
+      "gremium" => "G",
+      "datum" => "2026-11-17",
+      "url" => "u"
+    }
+
+    assert :ok =
+             ResultShape.check("ris", "sessions", %{"results" => [session], "abrufdatum" => "d"})
+
+    assert {:error, _} =
+             ResultShape.check("ris", "sessions", %{
+               "results" => [Map.put(session, "nicht_oeffentlich", "3")],
+               "abrufdatum" => "d"
+             })
+
+    agenda =
+      session
+      |> Map.put("abrufdatum", "d")
+      |> Map.put("tops", [%{"top_id" => "1-1", "nummer" => "1", "titel" => "T"}])
+
+    assert :ok = ResultShape.check("ris", "agenda", agenda)
+    assert :ok = ResultShape.check("ris", "agenda", %{agenda | "tops" => []})
+
+    # No hidden count, no extra item field, no missing list.
+    assert {:error, _} = ResultShape.check("ris", "agenda", Map.put(agenda, "verborgen", "2"))
+
+    assert {:error, _} =
+             ResultShape.check("ris", "agenda", %{
+               agenda
+               | "tops" => [%{"top_id" => "1-1", "nummer" => "1", "titel" => "T", "text" => "x"}]
+             })
+
+    assert {:error, _} = ResultShape.check("ris", "agenda", Map.delete(agenda, "tops"))
+  end
 end

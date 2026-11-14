@@ -1,7 +1,8 @@
 defmodule KomkiConnectorRis do
   @moduledoc """
-  RIS connector `komki-ris/2` (CONTRACT.md §5.1/§5.2): `search` and `show`
-  over the public agenda items (TOPs) of the RIS API.
+  RIS connector `komki-ris/3` (CONTRACT.md §5.1/§5.2): `search` and `show`
+  over the public agenda items (TOPs) of the RIS API, `sessions` (meetings in
+  a date window) and `agenda` (the public items of one meeting, #516).
 
   Without credentials the connector only uses the guest endpoints
   (`guestmeetings`, `guestagendaitems`, see `KomkiConnectorRis.Api`), where
@@ -153,6 +154,12 @@ defmodule KomkiConnectorRis do
   def handle_op("show", %{"top_id" => top_id}, _context, cfg),
     do: show(top_id, with_deadline(cfg))
 
+  def handle_op("sessions", %{"von" => von} = params, _context, cfg),
+    do: sessions(von, Map.get(params, "bis", von), params, with_deadline(cfg))
+
+  def handle_op("agenda", %{"sitzung_id" => sitzung_id}, _context, cfg),
+    do: agenda(sitzung_id, with_deadline(cfg))
+
   defp with_deadline(cfg),
     do: Map.put(cfg, :deadline, System.monotonic_time(:millisecond) + cfg.budget_ms)
 
@@ -300,9 +307,108 @@ defmodule KomkiConnectorRis do
   defp public_detail?(detail), do: Map.get(detail, "restricted") == false
 
   # ---------------------------------------------------------------------------
+  # sessions and agenda (#516)
+  # ---------------------------------------------------------------------------
+
+  @max_window_days 366
+
+  # Meetings come from the public calendar, so every meeting is listed, even
+  # one whose agenda turns out to be entirely non-public.
+  defp sessions(von, bis, params, cfg) do
+    with {:ok, from, until} <- window(von, bis),
+         {:ok, items} <- Api.meetings(cfg, from, until) do
+      needle = params |> Map.get("gremium", "") |> String.downcase()
+
+      results =
+        items
+        |> Enum.filter(&listed?(&1, from, until, needle))
+        |> Enum.sort_by(&Top.string(&1["meetingdate"]))
+        |> Enum.take(params["limit"])
+        |> Enum.map(&session(&1, cfg))
+
+      {:ok, %{"results" => results, "abrufdatum" => abrufdatum()}}
+    end
+  end
+
+  defp window(von, bis) do
+    with {:ok, from} <- Date.from_iso8601(von),
+         {:ok, until} <- Date.from_iso8601(bis),
+         diff when diff in 0..@max_window_days <- Date.diff(until, from) do
+      {:ok, from, until}
+    else
+      _ -> {:error, "bad-request", "Zeitraum ungueltig: von <= bis, hoechstens 366 Tage"}
+    end
+  end
+
+  # A valid ID, inside the window, and the committee matches the filter.
+  defp listed?(meeting, from, until, needle) do
+    match?(%{"id" => id} when is_integer(id) and id > 0, meeting) and
+      in_window?(meeting, from, until) and
+      String.contains?(String.downcase(Top.string(meeting["committeename"])), needle)
+  end
+
+  # The API's window is not trusted to be exact; the date decides.
+  defp in_window?(meeting, from, until) do
+    case Date.from_iso8601(Top.date(meeting["meetingdate"])) do
+      {:ok, day} -> Date.compare(day, from) != :lt and Date.compare(day, until) != :gt
+      _ -> false
+    end
+  end
+
+  defp session(meeting, cfg) do
+    id = Integer.to_string(meeting["id"])
+
+    %{
+      "sitzung_id" => id,
+      "sitzung" => Top.string(meeting["name"]),
+      "gremium" => Top.string(meeting["committeename"]),
+      "datum" => Top.date(meeting["meetingdate"]),
+      "url" => meeting_url(cfg, id)
+    }
+  end
+
+  # Only public items, filtered before anything is counted: an agenda whose
+  # items are all non-public is an empty list, with no hint at what is hidden.
+  # Every reason not to show a meeting yields the same not-found.
+  defp agenda(sitzung_id, cfg) do
+    with {:ok, id} <- parse_meeting_id(sitzung_id),
+         {:ok, meeting} <- Api.meeting(cfg, id) do
+      {:ok,
+       %{
+         "sitzung_id" => sitzung_id,
+         "sitzung" => Top.string(meeting["name"]),
+         "gremium" => Top.string(meeting["committeename"]),
+         "datum" => Top.date(meeting["meetingdate"]),
+         "url" => meeting_url(cfg, sitzung_id),
+         "tops" => Enum.map(Top.public_items(meeting), &agenda_item/1),
+         "abrufdatum" => abrufdatum()
+       }}
+    else
+      {:error, _, _} = e -> e
+      _ -> {:error, "not-found", "Sitzung nicht gefunden"}
+    end
+  end
+
+  defp parse_meeting_id(sitzung_id) do
+    case Integer.parse(sitzung_id) do
+      {id, ""} when id > 0 -> {:ok, id}
+      _ -> :error
+    end
+  end
+
+  defp agenda_item(top) do
+    %{
+      "top_id" => top["id"],
+      "nummer" => Top.string(top["numbering"]),
+      "titel" => Top.string(top["name"])
+    }
+  end
+
+  # ---------------------------------------------------------------------------
 
   # Link aus Basis-URL und gepruefter ID, nie aus Upstream-Freitext.
   defp url(cfg, top_id), do: cfg.base_url <> "guestagendaitems/" <> top_id
+  defp meeting_url(cfg, sitzung_id), do: cfg.base_url <> "guestmeetings/" <> sitzung_id
 
   defp abrufdatum do
     DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
