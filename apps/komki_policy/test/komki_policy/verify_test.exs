@@ -383,4 +383,119 @@ defmodule KomkiPolicy.VerifyTest do
       assert Enum.any?(reasons, &(&1["code"] == "unknown_premise"))
     end
   end
+
+  # ---------------------------------------------------------------------
+  # Geschmiedete Beweise aus dem Sicherheits-Audit #467 (F5/F7/F8):
+  # Verify ist die Anti-Faelschungs-Kontrolle fuer Permit-Baume und darf
+  # keinen der Angriffswege validieren (CONTRACT § 5, § 8).
+  # ---------------------------------------------------------------------
+
+  describe "Geschmiedete Beweise (Audit #467: #477, #479, #480)" do
+    defp premise_index(proof, name),
+      do: Enum.find_index(proof["premises"], &(&1["name"] == name))
+
+    test "#477: expression:null kaschiert keine fehlende Operationsregel" do
+      reg = registry()
+      snapshot = fixture("case_deny_missing_rule/snapshot.json")
+      intent = fixture("case_deny_missing_rule/intent.json")
+      proof = fixture("proofs/proof_admitless_condition.json")
+
+      # Angriff (F5): die binding_condition fuer die regellose Bindung
+      # traegt expression:null — der nil == nil-Vergleich unterdrueckte
+      # expression_mismatch, Derive lehnt denselben Call mit
+      # missing_operation_rule ab. Nach dem Fix lehnt schon die
+      # Eingabevalidierung null ab (§ 2.5: expression ist der
+      # Registry-AST, Boolean oder Objekt — nie null).
+      forged = put_in(proof, ["premises", Access.at(8), "expression"], nil)
+
+      assert {:error, %{code: :invalid_entry, path: "$.premises.[8].expression"}} =
+               Verify.check(reg, snapshot, intent, forged)
+    end
+
+    test "#479: eine Fakt-Prämisse entlädt ihren Slot nur mit der Tatsache, die ihr Name benennt" do
+      reg = registry()
+      snapshot = fixture("case_deny_no_basis/snapshot.json")
+      intent = fixture("case_deny_no_basis/intent.json")
+      proof = fixture("proofs/proof_false_fact_value.json")
+
+      # Angriff (F7): der Slot heisst has_operation_right, die payload
+      # prueft den wahren Fakt has_object_access_right — Verify stellte
+      # den falschen Fakt fest und validierte den Baum, obwohl Derive
+      # mit basis_right_false ablehnt. Nach dem Fix ist die umgelenkte
+      # Prämisse eine unbekannte Prämisse (§ 2.5: fact == name; derselbe
+      # Mechanismus deckt den workspace_contract_valid-Slot ab).
+      index = premise_index(proof, "has_operation_right")
+      forged = put_in(proof, ["premises", Access.at(index), "fact"], "has_object_access_right")
+
+      assert {:ok, %{"result" => "invalid", "reasons" => reasons}} =
+               Verify.check(reg, snapshot, intent, forged)
+
+      assert [%{"code" => "unknown_premise"}] = reasons
+    end
+
+    test "#480: treu gespiegelte false-Prämissen tragen die permit-Conclusion nicht" do
+      reg = registry()
+
+      # Angriff (F8), Fall 1 — Auditszenario case_deny_no_basis: die
+      # has_operation_right-Prämisse spiegelt den false-Snapshot treu;
+      # ohne true-Zwang validierte Verify den Permit-Baum, obwohl Derive
+      # mit basis_right_false ablehnt (§ 5 Schritt 9).
+      snapshot = fixture("case_deny_no_basis/snapshot.json")
+      intent = fixture("case_deny_no_basis/intent.json")
+      proof = fixture("proofs/proof_false_fact_value.json")
+
+      index = premise_index(proof, "has_operation_right")
+      forged = put_in(proof, ["premises", Access.at(index), "value"], false)
+
+      assert {:ok, %{"result" => "invalid", "reasons" => reasons}} =
+               Verify.check(reg, snapshot, intent, forged)
+
+      assert ["premise_not_true", "conclusion_mismatch"] ==
+               Enum.map(reasons, &Map.fetch!(&1, "code"))
+
+      # Fall 2: workspace_contract_valid spiegelt ein false workspace.valid.
+      permit_snapshot = fixture("case_permit/snapshot.json")
+      permit_intent = fixture("case_permit/intent.json")
+      permit_proof = fixture("case_permit/proof_valid.json")
+      invalid_workspace = put_in(permit_snapshot, ["workspace", "valid"], false)
+
+      forged_workspace =
+        put_in(
+          permit_proof,
+          [
+            "premises",
+            Access.at(premise_index(permit_proof, "workspace_contract_valid")),
+            "value"
+          ],
+          false
+        )
+
+      assert {:ok, %{"result" => "invalid", "reasons" => workspace_reasons}} =
+               Verify.check(reg, invalid_workspace, permit_intent, forged_workspace)
+
+      assert ["premise_not_true", "conclusion_mismatch"] ==
+               Enum.map(workspace_reasons, &Map.fetch!(&1, "code"))
+
+      # Fall 3: not_quarantine behauptet false, obwohl das Objekt
+      # klassifiziert ist — der behauptete Wert wird gegen das
+      # nachgerechnete Urteil verglichen, nicht ignoriert.
+      forged_quarantine =
+        put_in(
+          permit_proof,
+          ["premises", Access.at(premise_index(permit_proof, "not_quarantine")), "value"],
+          false
+        )
+
+      assert {:ok, %{"result" => "invalid", "reasons" => quarantine_reasons}} =
+               Verify.check(
+                 reg,
+                 fixture("case_permit/snapshot.json"),
+                 permit_intent,
+                 forged_quarantine
+               )
+
+      assert ["premise_not_true", "conclusion_mismatch"] ==
+               Enum.map(quarantine_reasons, &Map.fetch!(&1, "code"))
+    end
+  end
 end
