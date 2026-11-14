@@ -5,6 +5,7 @@ defmodule KomkiConnectorWeb.MixProject do
     [
       app: :komki_connector_web,
       version: "0.1.0",
+      description: "Websuche über Brave Search als Connector für den Vermittler",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",

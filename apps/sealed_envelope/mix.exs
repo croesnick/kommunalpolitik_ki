@@ -5,6 +5,8 @@ defmodule SealedEnvelope.MixProject do
     [
       app: :sealed_envelope,
       version: "0.1.0",
+      description:
+        "Seal a secret to a P-256 key that lives elsewhere (Secure Enclave, token, HSM) and open it only through its owner",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",

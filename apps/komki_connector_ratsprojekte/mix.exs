@@ -5,6 +5,8 @@ defmodule KomkiConnectorRatsprojekte.MixProject do
     [
       app: :komki_connector_ratsprojekte,
       version: "0.1.0",
+      description:
+        "ratsprojekte-Connector: reicht Vorschläge an den Hub weiter und liest den ausgegebenen Stand",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",

@@ -5,6 +5,8 @@ defmodule Seatbelt.MixProject do
     [
       app: :seatbelt,
       version: "0.1.0",
+      description:
+        "A dependency-free Elixir library for running programs under macOS Seatbelt confinement with deny-default profiles",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",

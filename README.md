@@ -75,7 +75,7 @@ Vollständig stehen Prinzipien, Guardrails und Tooling-Vorgaben in [AGENTS.md](A
 | `skills/` | Abläufe für den AI-Harness, siehe oben | Agent Skill |
 | `docs/site/` | Doku-Site zu komki (GitHub Pages) | Website |
 
-Die vollständige Übersicht mit Status steht in [AGENTS.md](AGENTS.md#tool-übersicht).
+Status und laufende Arbeit stehen auf dem GitHub-Board; die Kurzbeschreibung jeder App steht als `description:` im jeweiligen `mix.exs`.
 
 ## Werkzeugkasten einrichten
 
