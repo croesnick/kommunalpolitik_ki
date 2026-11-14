@@ -181,6 +181,16 @@ defmodule KomkiCli.PiTest do
       assert String.contains?(prompt, "Deutsch")
       assert String.contains?(prompt, "Du-Form")
       assert String.contains?(prompt, "kommunalpolitische")
+
+      today = NaiveDateTime.to_date(NaiveDateTime.local_now())
+      assert String.ends_with?(prompt, Calendar.strftime(today, "Heute ist der %d.%m.%Y."))
+    end
+
+    test "System-Prompt nennt das Datum und verlangt RIS-Quellen mit URL und Abrufdatum" do
+      prompt = Pi.system_prompt(~D[2026-11-14])
+
+      assert String.ends_with?(prompt, "Heute ist der 14.11.2026.")
+      assert String.contains?(prompt, "TOP-Nummer, URL und Abrufdatum")
     end
 
     test "Gate 2 (Ticket #104): Built-ins aus, nur die Vermittler-Tools", %{cfg: cfg} do
