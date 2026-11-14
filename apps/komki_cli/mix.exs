@@ -19,6 +19,8 @@ defmodule KomkiCli.MixProject do
     [
       app: :komki_cli,
       version: "0.1.0",
+      description:
+        "KomKI: lokal gesandboxter Arbeitsraum für den pi-Agenten, mit Vermittler, Regel-Prüfkern, Egress-Proxy und Connectoren als Rollen",
       elixir: "~> 1.19",
       # test/support (Fixtures) nur in :test kompiliert — weder Escript (:dev)
       # noch Release sehen die Test-Helfer.

@@ -5,6 +5,8 @@ defmodule KomkiEgress.MixProject do
     [
       app: :komki_egress,
       version: "0.1.0",
+      description:
+        "Egress-Proxy: gibt jedem Connector einen eigenen Port und erreicht darüber nur freigegebene Ziele",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",

@@ -5,6 +5,8 @@ defmodule KomkiMock.MixProject do
     [
       app: :komki_mock,
       version: "0.1.0",
+      description:
+        "Mock-Runtime: spielt externe Systeme wie RIS und Websuche als lokale Dienste für Tests und Agents nach",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",
