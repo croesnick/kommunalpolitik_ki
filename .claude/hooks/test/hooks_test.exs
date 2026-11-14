@@ -281,12 +281,48 @@ defmodule RepoHooksTest do
             "gh pr create --help; bash <<'EOF'\ngh pr create --head fix -F pr.md\nEOF",
             # The rest of a heredoc's opening line is still arguments.
             "gh pr create --title T -F pr.md <<'EOF' --head fix\nText\nEOF",
-            # Quotes nested in "$(…)" leave one open: the old reading applies.
-            "gh pr create --title \"$(printf '%s' \"it's\")\" --head fix --label 'x' -F pr.md"
+            "gh pr create --title \"$(printf '%s' \"it's\")\" --head fix --label 'x' -F pr.md",
+            # Other commands, comments and heredocs end where the shell ends them.
+            "gh pr create -F pr.md --head fix;# --head main",
+            "gh pr create --head fix -F pr.md && curl -s -H main https://x",
+            "gh pr create --head fix -F pr.md 2>&1 | grep -H main",
+            "gh pr create -F pr.md --head fix; echo gh pr create --head main",
+            "gh pr create --head fix -F pr.md <<\\EOF\n--head main\nEOF",
+            "gh pr create --title T <<<'true' \\\n--head fix -F pr.md\ntrue",
+            "gh pr create --head fix -F pr.md <<'EOF'\nx\nEOF)\n--head main\nEOF",
+            "gh pr create --head fix -F pr.md <<A 3<<B\nx\nA\n--head main\nB",
+            "gh pr create --head fix -F pr.md <<'E.O'\n--head main\nE.O",
+            "gh pr create --head fix -F pr.md &# --head main",
+            # Short flags as pflag reads them.
+            "gh pr create -Hfix -F pr.md",
+            "gh pr create -dH fix -F pr.md",
+            "gh pr create \"--head\" fix -F pr.md"
           ] do
         decision = dir |> pr(command) |> JSON.decode!()
         assert decision["hookSpecificOutput"]["permissionDecision"] == "deny", command
       end
+    end
+
+    test "a value that is no fixed text is named in the denial", %{dir: dir} do
+      File.write!(Path.join(dir, "pr.md"), report(head(dir)))
+      decision = dir |> pr("gh pr create --head \"$BRANCH\" -F pr.md") |> JSON.decode!()
+      assert decision["hookSpecificOutput"]["permissionDecisionReason"] =~ "`\"$BRANCH\"`"
+    end
+
+    # Without shfmt the reading of #532 applies: the first --head anywhere.
+    test "without shfmt the old reading applies", %{dir: dir} do
+      sha = branch(dir, "fix")
+      File.write!(Path.join(dir, "pr.md"), report(sha))
+      without = &PrReport.run(%{"cwd" => dir, "tool_input" => %{"command" => &1}}, nil)
+
+      assert without.("gh pr create --head fix -F pr.md") == ""
+
+      # A mention in the title counts again, as before #540.
+      File.write!(Path.join(dir, "pr.md"), report(head(dir)))
+      command = "gh pr create --title 'x -H fix' -F pr.md"
+      assert pr(dir, command) == ""
+      decision = command |> without.() |> JSON.decode!()
+      assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
     end
 
     test "with several --head the last one counts, as in gh", %{dir: dir} do
