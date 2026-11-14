@@ -19,6 +19,13 @@ defmodule KomkiCli.Denials do
   Systempfade bleiben verbatim, Home-/Instanz-/Scratch-Pfade werden
   maskiert, unbekannte absolute Pfade fallen auf `<redacted-path>`.
 
+  **Sanitize (Ticket #494):** Denial-Targets sind Log-Daten und koennen
+  Steuersequenzen tragen (OSC 52 schreibt die Zwischenablage, CSI
+  ueberschreibt Zeilen). Der Footer laeuft deshalb zusaetzlich durch
+  `KomkiCli.Terminal.sanitize/1` — die nach der Redaktion verbatim
+  uebrig bleibenden Systempfade (`/usr`, `/opt`, …) bleiben lesbar, nur
+  ihre Steuerbytes verlieren die Wirkung im Terminal.
+
   Der `log show`-Aufruf laeuft als argv-Liste (keine Shell) im komki-BEAM,
   nicht unter dem pi-Profil und ohne sudo. Der Bericht wird atomar
   geschrieben: exklusive Temp-Datei im `0700`-Verzeichnis, sofort `0600`,
@@ -26,7 +33,7 @@ defmodule KomkiCli.Denials do
   ueberschrieben; parallele Writer bekommen einen Suffix.
   """
 
-  alias KomkiCli.Config
+  alias KomkiCli.{Config, Terminal}
 
   @log_binary "/usr/bin/log"
 
@@ -569,13 +576,21 @@ defmodule KomkiCli.Denials do
   maximal fuenf gruppierte `operation target ×n`-Zeilen. Ohne Denials:
   `denials: none in run window`. Bei Capture-/Persistenzfehlern:
   `denials: capture FAILED (<reason>); no report`.
+
+  Ticket #494 (F26): Der Footer laeuft vollstaendig durch
+  `KomkiCli.Terminal.sanitize/1` — Denial-Zeilen wie Fehler-Footer.
+  Entscheidung: die verbatim-Redaktion (`@verbatim_prefixes`) laesst
+  Systempfade unter `/usr`, `/opt`, … absichtlich roh durch; nach dem
+  Sanitize bleiben diese Pfade lesbar, nur ihre Steuerbytes verschwinden.
   """
   @spec footer(map()) :: String.t()
-  def footer(%{status: "ok", denials: [], report_path: _path}) do
+  def footer(summary), do: summary |> footer_text() |> Terminal.sanitize()
+
+  defp footer_text(%{status: "ok", denials: [], report_path: _path}) do
     "denials: none in run window"
   end
 
-  def footer(%{status: "ok", denials: denials, report_path: path}) do
+  defp footer_text(%{status: "ok", denials: denials, report_path: path}) do
     total = Enum.sum(Enum.map(denials, & &1.occurrences))
 
     head =
@@ -599,13 +614,13 @@ defmodule KomkiCli.Denials do
     Enum.join([head | lines] ++ more, "\n")
   end
 
-  def footer(%{error: reason}) when is_binary(reason) do
+  defp footer_text(%{error: reason}) when is_binary(reason) do
     # Sicherheitsnetz: selbst ein unredigierter Summary-Fehler verliert hier
     # Home-/absolute Pfade, auch wenn Steps bereits zentral redigiert.
     "denials: capture FAILED (" <> redact(reason, "", nil) <> "); no report"
   end
 
-  def footer(_summary), do: "denials: capture FAILED (unknown error); no report"
+  defp footer_text(_summary), do: "denials: capture FAILED (unknown error); no report"
 
   # ------------------------------------------------------------------ Helfer
 

@@ -221,4 +221,50 @@ defmodule KomkiCli.CLITest do
       refute stderr =~ System.user_home!()
     end
   end
+
+  # Ticket #494 (Audit #467, F31): Jede terminalgebundene Zeichenkette aus
+  # Log-/Dateisystem-Daten laeuft durch Terminal.sanitize/1 — Fehlergründe
+  # wie Intake-Header. Angriff: ein Pfad (gültiger APFS-Name, --gguf-from,
+  # Denial-Target) trägt OSC 52 (Zwischenablage) oder einen eingebetteten
+  # Zeilenumbruch, der eine gefälschte Statuszeile vortäuscht.
+  describe "Terminal-Sanitize aus Dateisystem-/Log-Daten (Ticket #494)" do
+    setup do
+      # Deterministisch ohne ANSI: render schmückt Fehler nur mit red()/reset().
+      Application.put_env(:elixir, :ansi_enabled, false)
+      System.delete_env("_IS_TTY")
+
+      on_exit(fn ->
+        Application.delete_env(:elixir, :ansi_enabled)
+      end)
+
+      :ok
+    end
+
+    test "Fehlergrund mit OSC 52 im Pfad: Steuerwirkung weg, Pfad lesbar" do
+      reason = "--gguf-from Pfad nicht gefunden: /tmp/m\e]52;c;c2VjcmV0\a.gguf"
+
+      assert {out, 2} = CLI.render_result({:error, reason, 2})
+
+      refute out =~ "\e"
+      refute out =~ "c2VjcmV0"
+      assert out =~ "Pfad nicht gefunden: /tmp/m.gguf"
+    end
+
+    test "Verweigerung: Newline-/OSC-Fälschung aus Header-Daten erzeugt keine Statuszeile" do
+      attack =
+        "  datei: /quellen/brief\e]52;c;c2VjcmV0\a" <>
+          "\n  datei: vertraulich.md -> permit"
+
+      assert {out, 3} = CLI.render_session_refused([attack])
+
+      refute out =~ "\e"
+      refute out =~ "c2VjcmV0"
+
+      # Eine Statuszeile je Datei: der eingebettete Zeilenumbruch erzeugt
+      # keine gefälschte zweite 'datei:'-Zeile …
+      assert out |> String.split("\n") |> Enum.count(&String.starts_with?(&1, "  datei:")) == 1
+      # … sondern bleibt als sichtbares Escape im Dateinamen lesbar.
+      assert out =~ "\\n  datei: vertraulich.md -> permit"
+    end
+  end
 end
