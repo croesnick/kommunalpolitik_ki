@@ -304,24 +304,90 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert Map.take(with_secret, keys) == Map.take(without, keys)
   end
 
-  test "Fake meldet ein Label ausserhalb von Γ: redacted (#211)", %{env: env} do
-    fake(env, "vault", ok(note(["gibt-es-nicht@1"])))
+  # -----------------------------------------------------------------------
+  # #482 (F10/F14): Notizen ausserhalb von Γ sind unsichtbar — die Suche
+  # verwirft sie still (L-109-Invariante), das Einzellesen antwortet wie
+  # not-found. Keine Antwortform darf ihre Existenz verraten.
+  # -----------------------------------------------------------------------
 
-    response = ConnectorGate.call(env, "vault_read", %{"note_id" => "a.md"})
+  test "vault_search mit Nicht-Γ-Treffer: still verworfen, zulaessige Treffer bleiben (#482)",
+       %{env: env} do
+    admissible = [%{"note_id" => "a.md", "title" => "A", "labels" => ["vault-oeffentlich@1"]}]
+    hidden = [%{"note_id" => "p.md", "title" => "P", "labels" => ["gibt-es-nicht@1"]}]
 
-    assert response["admitted"] == "redacted"
-    assert response["verify"] == ["label_not_in_gamma"]
-    refute Map.has_key?(response, "content")
+    fake(env, "vault", ok(%{"results" => admissible ++ hidden}))
+    with_hidden = ConnectorGate.call(env, "vault_search", %{"text" => "x"})
 
-    [_decided, _transfer, _emit, admit] = records(env)
+    fake(env, "vault", ok(%{"results" => admissible}))
+    without = ConnectorGate.call(env, "vault_search", %{"text" => "x"})
+
+    keys = ["decision", "results", "labels"]
+    assert Map.take(with_hidden, keys) == Map.take(without, keys)
+    assert Enum.map(with_hidden["results"], & &1["note_id"]) == ["a.md"]
+    refute inspect(with_hidden) =~ "p.md"
+  end
+
+  test "vault_search mit nur Nicht-Γ-Treffern: sieht aus wie keine Treffer (#482)", %{
+    env: env
+  } do
+    hidden = [%{"note_id" => "p.md", "title" => "P", "labels" => ["gibt-es-nicht@1"]}]
+
+    fake(env, "vault", ok(%{"results" => hidden}))
+    with_hidden = ConnectorGate.call(env, "vault_search", %{"text" => "x"})
+
+    fake(env, "vault", ok(%{"results" => []}))
+    without = ConnectorGate.call(env, "vault_search", %{"text" => "x"})
+
+    keys = ["decision", "results", "labels"]
+    assert Map.take(with_hidden, keys) == Map.take(without, keys)
+    assert with_hidden["results"] == []
+    refute inspect(with_hidden) =~ "p.md"
+  end
+
+  test "vault_search mit Treffer ohne Labels: still verworfen (#482)", %{env: env} do
+    admissible = [%{"note_id" => "a.md", "title" => "A", "labels" => ["vault-oeffentlich@1"]}]
+    unlabelled = [%{"note_id" => "u.md", "title" => "U", "labels" => []}]
+
+    fake(env, "vault", ok(%{"results" => admissible ++ unlabelled}))
+
+    response = ConnectorGate.call(env, "vault_search", %{"text" => "x"})
+
+    assert response["decision"] == "permit"
+    assert Enum.map(response["results"], & &1["note_id"]) == ["a.md"]
+  end
+
+  # #211 fuehrte den Γ-Check fuer Vault-Notizen ein und antwortete auf
+  # Nicht-Γ mit einer unterscheidbaren Redaktion; #482 (neuerer,
+  # expliziter Vertrag) verlangt die Not-found-Form. Γ-interne Notizen
+  # ausserhalb B_W bleiben deny mit Remedy-Katalog (Test weiter oben).
+  test "vault_read einer Nicht-Γ-Notiz: antwortet wie not-found (#482, Spannung zu #211)",
+       %{env: env} do
+    fake(env, "vault", fn "read", _params, _context -> {:ok, note(["gibt-es-nicht@1"])} end)
+    hidden = ConnectorGate.call(env, "vault_read", %{"note_id" => "a.md"})
+
+    fake(env, "vault", fn "read", _params, _context -> {:error, "not-found", "KANARIE"} end)
+    absent = ConnectorGate.call(env, "vault_read", %{"note_id" => "a.md"})
+
+    keys = ["decision", "rule", "admitted", "error"]
+    assert Map.take(hidden, keys) == Map.take(absent, keys)
+    assert Map.keys(hidden) == Map.keys(absent)
+    assert hidden["error"] == %{"code" => "not-found", "detail" => "nicht gefunden"}
+    refute Map.has_key?(hidden, "content")
+    refute inspect(hidden) =~ "geheimer Inhalt"
+
+    [_decided, _transfer, _emit, admit | _rest] = records(env)
     assert admit["outcome"] == "redacted"
   end
 
-  test "Notiz ohne Labels: redacted (fail-closed)", %{env: env} do
+  test "Notiz ohne Labels: antwortet wie not-found (fail-closed, #482)", %{env: env} do
     fake(env, "vault", ok(note([])))
 
     response = ConnectorGate.call(env, "vault_read", %{"note_id" => "a.md"})
-    assert response["admitted"] == "redacted"
+
+    assert response["admitted"] == false
+    assert response["error"] == %{"code" => "not-found", "detail" => "nicht gefunden"}
+    refute Map.has_key?(response, "content")
+    refute inspect(response) =~ "geheimer Inhalt"
   end
 
   test "RIS-Labels kommen aus dem Manifest, nicht aus der Antwort", %{env: env} do
