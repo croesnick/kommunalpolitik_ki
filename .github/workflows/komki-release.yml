@@ -1,14 +1,21 @@
-# komki-Release (Ticket #180): ein Tag `komki-v<version>` baut das Paket fuer
-# die Homebrew-Formel auf Apple Silicon und haengt Paket und fertige Formel
-# an ein GitHub-Release. Die Formel kommt danach von Hand ins Tap-Repo
-# croesnick/homebrew-tap (Formula/komki.rb). Den Tag setzt der Mensch
-# (GO-Prinzip): git tag komki-v0.1.0 && git push origin komki-v0.1.0
+# komki-Release (Ticket #180): baut zu einem vorhandenen Tag `komki/v<version>`
+# das Paket fuer die Homebrew-Formel auf Apple Silicon und haengt Paket und
+# fertige Formel an ein GitHub-Release. Die Formel kommt danach von Hand ins
+# Tap-Repo croesnick/homebrew-tap (Formula/komki.rb).
+#
+# Seit #538 setzt der Workflow versionen.yml die Tags beim Merge des
+# Version-PR. Ein Tag markiert nur eine Version und startet hier nichts:
+# Veroeffentlicht wird erst nach dem Publish-GO, per Hand gestartet
+# (GO-Prinzip): gh workflow run komki-release.yml -f tag=komki/v0.2.0
 name: komki-release
 
 on:
-  push:
-    tags:
-      - 'komki-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Vorhandener Tag, z. B. komki/v0.2.0'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -20,6 +27,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
 
       - name: Erlang/Elixir einrichten
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
@@ -37,9 +46,11 @@ jobs:
           node-version-file: .tool-versions
 
       - name: Version pruefen (Tag = mix.exs)
+        env:
+          TAG: ${{ inputs.tag }}
         run: |
           version=$(grep -m1 'version:' apps/komki_cli/mix.exs | sed 's/.*"\(.*\)".*/\1/')
-          test "komki-v${version}" = "${GITHUB_REF_NAME}" || { echo "Tag ${GITHUB_REF_NAME} passt nicht zu Version ${version}"; exit 1; }
+          test "komki/v${version}" = "${TAG}" || { echo "Tag ${TAG} passt nicht zu Version ${version}"; exit 1; }
 
       # Seit #435 kompiliert der Workspace exqlite gegen die SQLCipher-
       # Systembibliothek (config :exqlite in apps/komki_cli/config/config.exs);
@@ -55,7 +66,9 @@ jobs:
       - name: Release anlegen
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" dist/komki-*-macos-arm64.tar.gz dist/komki.rb \
-            --title "komki ${GITHUB_REF_NAME#komki-v}" \
+          gh release create "${TAG}" dist/komki-*-macos-arm64.tar.gz dist/komki.rb \
+            --verify-tag \
+            --title "komki ${TAG#komki/v}" \
             --notes "Installation: brew install croesnick/tap/komki, danach komki setup. Formel: komki.rb (ins Tap-Repo)."

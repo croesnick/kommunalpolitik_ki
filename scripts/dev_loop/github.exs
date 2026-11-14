@@ -201,8 +201,8 @@ defmodule DevLoop.GitHub do
     end
   end
 
-  @doc "Creates the PR and returns its number."
-  def create_pr(ctx, branch, title, body) do
+  @doc "Creates the PR with the given labels and returns its number."
+  def create_pr(ctx, branch, title, body, labels \\ []) do
     case write(
            ctx,
            [
@@ -218,7 +218,7 @@ defmodule DevLoop.GitHub do
              title,
              "--body-file",
              "-"
-           ],
+           ] ++ Enum.flat_map(labels, &["--label", &1]),
            body
          ) do
       {:ok, url} ->
@@ -231,6 +231,19 @@ defmodule DevLoop.GitHub do
         raise "PR für #{branch} nicht angelegt: #{out}"
     end
   end
+
+  @doc "Adds the label to the PR or removes it."
+  def pr_label(ctx, pr, label, add?),
+    do:
+      write(ctx, [
+        "pr",
+        "edit",
+        "#{pr}",
+        "--repo",
+        @repo,
+        if(add?, do: "--add-label", else: "--remove-label"),
+        label
+      ])
 
   @doc "Replaces the PR text: a rework round brings new evidence and decisions."
   def update_pr(ctx, pr, body) do

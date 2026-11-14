@@ -1425,16 +1425,52 @@ nicht berühren sollen. Der Pfad muss kurz sein, weil Unix-Sockets höchstens
 
 ### Release
 
-**Definition:** Ein veröffentlichter GitHub-Release eines Tools, getaggt
-`<tool>-v<semver>` (z. B. `komki-v0.1.0`). Für komki ist der Ablauf in
-[`docs/release.md`](docs/release.md) beschrieben, aber noch nicht in Kraft:
-Bis auf Weiteres gilt der Bau aus dem Checkout.
+**Definition:** Ein veröffentlichter GitHub-Release eines Tools zu einem
+vorhandenen Tag `<einheit>/v<semver>` (z. B. `komki/v0.2.0`). Für komki ist
+der Ablauf in [`docs/release.md`](docs/release.md) beschrieben, aber noch
+nicht in Kraft: Bis auf Weiteres gilt der Bau aus dem Checkout.
+
+**Abgrenzung:** Ein Tag ist kein Release. Tags setzt der Merge des
+[Version-PR](#version-pr); veröffentlicht wird erst nach dem Publish-GO.
 
 **Begriffe im Release-Ablauf:** *Payload-Staleness* (eine neu gebaute
 Burrito-Einzeldatei derselben Version nutzt den schon entpackten alten
 Inhalt weiter), *Smoke-Matrix* (feste Prüfschritte gegen die Datei, die
-veröffentlicht werden soll), *Publish-GO* (das eine GO, das Tag und
-Veröffentlichung abdeckt).
+veröffentlicht werden soll), *Publish-GO* (das GO, das die Veröffentlichung
+zu einem vorhandenen Tag abdeckt).
+
+---
+
+### Changeset
+
+**Definition:** Eine Markdown-Datei unter `.changeset/`, die ein PR
+mitbringt: welche versionierte Einheit (komki, ratsprojekte, sidecar,
+seatbelt, sealed_envelope) sich mit welcher Stufe (`major`, `minor`,
+`patch`) ändert, und ein Eintrag für deren Changelog. Englischer Fachbegriff
+aus dem Werkzeug Changesets; das Format liest hier knope.
+
+**Abgrenzung:** Nicht Ectos `Ecto.Changeset`. Kein Commit-Text: Ein
+Changeset ist für die Leser des Changelogs geschrieben.
+
+**Nicht:** „Change-Datei“ (Eigenprägung, im Ticket #538 noch verwendet).
+
+**Wo:** [`docs/agents/changesets.md`](docs/agents/changesets.md),
+[ADR 0005](docs/adr/0005-versionierung-mit-changesets-und-knope.md).
+
+---
+
+### Version-PR
+
+**Definition:** Der PR auf dem Branch `versionen`, den der Workflow
+`versionen` aus den offenen [Changesets](#changeset) baut: erhöhte Versionen
+in den `mix.exs`, neue Changelog-Abschnitte, dazu die Kaskade für Einheiten,
+die eine erhöhte Bibliothek einbinden. Sein Merge durch einen Menschen ist
+das GO für die Tags `<einheit>/v<semver>`.
+
+**Abgrenzung:** Kein Release, es wird nichts veröffentlicht. Der Dev-Loop
+mergt ihn nie.
+
+**Wo:** [`docs/agents/changesets.md`](docs/agents/changesets.md).
 
 ---
 
