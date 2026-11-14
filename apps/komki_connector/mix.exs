@@ -5,6 +5,8 @@ defmodule KomkiConnector.MixProject do
     [
       app: :komki_connector,
       version: "0.1.0",
+      description:
+        "Komki-Seite des Connector-Vertrags: Manifeste, deutsche Modell-Texte, Start-Einstieg und CA-Zertifikate",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",

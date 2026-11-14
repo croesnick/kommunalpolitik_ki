@@ -5,6 +5,8 @@ defmodule KomkiConnectorDocuments.MixProject do
     [
       app: :komki_connector_documents,
       version: "0.1.0",
+      description:
+        "Dokument-Connector: liest die Raumdokumente für admit_document, PDFs Seite für Seite als Text",
       elixir: "~> 1.19",
       # test/support (TestPDF factory) is compiled in :test only.
       elixirc_paths: elixirc_paths(Mix.env()),

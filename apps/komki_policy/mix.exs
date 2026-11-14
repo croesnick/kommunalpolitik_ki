@@ -5,6 +5,8 @@ defmodule KomkiPolicy.MixProject do
     [
       app: :komki_policy,
       version: "0.1.0",
+      description:
+        "Regel-Prüfkern: entscheidet, ob eine Absicht nach den Regeln zulässig ist, und verifiziert die Begründung unabhängig nach",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",

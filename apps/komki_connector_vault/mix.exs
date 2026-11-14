@@ -5,6 +5,8 @@ defmodule KomkiConnectorVault.MixProject do
     [
       app: :komki_connector_vault,
       version: "0.1.0",
+      description:
+        "Vault-Connector: durchsucht und liest Notizen eines lokalen Markdown-Vaults und legt Testnotizen an",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",

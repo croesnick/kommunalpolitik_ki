@@ -19,6 +19,8 @@ defmodule KomkiCli.MixProject do
     [
       app: :komki_cli,
       version: "0.1.0",
+      description:
+        "KomKI: lokal gesandboxter Arbeitsraum für den pi-Agenten, mit Vermittler, Regel-Prüfkern, Egress-Proxy und Connectoren als Rollen",
       elixir: "~> 1.19",
       # test/support (Fixtures) nur in :test kompiliert — weder Escript (:dev)
       # noch Release sehen die Test-Helfer.
@@ -130,7 +132,7 @@ defmodule KomkiCli.MixProject do
     [
       {:optimus, "~> 0.6"},
       {:burrito, "~> 1.6"},
-      {:exqlite, "~> 0.42"},
+      {:exqlite, "~> 0.43"},
       {:komki_policy, path: "../komki_policy"},
       # Connector-Manifeste und Frame-Client (Ticket #146): Profilgenerator,
       # Start-Argumente und der ping im Doctor lesen dasselbe Modul wie der

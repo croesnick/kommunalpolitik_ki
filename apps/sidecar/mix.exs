@@ -5,6 +5,8 @@ defmodule Sidecar.MixProject do
     [
       app: :sidecar,
       version: "0.1.0",
+      description:
+        "A framed, capability-token protocol for sandboxed sidecar processes over Unix domain sockets, with zero runtime dependencies",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",

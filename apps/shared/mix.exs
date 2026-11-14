@@ -5,6 +5,7 @@ defmodule Shared.MixProject do
     [
       app: :shared,
       version: "0.1.0",
+      description: "Geteilte Domain-Models der Elixir-Apps",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",

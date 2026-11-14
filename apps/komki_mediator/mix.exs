@@ -5,6 +5,7 @@ defmodule KomkiMediator.MixProject do
     [
       app: :komki_mediator,
       version: "0.1.0",
+      description: "MCP-Server des Vermittlers für Tool-Aufrufe mit Policy-Gates und PDR-Journal",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",

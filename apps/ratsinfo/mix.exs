@@ -5,6 +5,8 @@ defmodule Ratsinfo.MixProject do
     [
       app: :ratsinfo,
       version: "0.1.0",
+      description:
+        "RIS-Scraper, CLI und lokale Volltextsuche für das Ratsinformationssystem der VGem Buchloe",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",
@@ -33,7 +35,7 @@ defmodule Ratsinfo.MixProject do
       {:jason, "~> 1.4"},
       {:ecto, "~> 3.12"},
       {:ecto_sql, "~> 3.12"},
-      {:ecto_sqlite3, "~> 0.18"},
+      {:ecto_sqlite3, "~> 0.26"},
       {:html_entities, "~> 0.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}

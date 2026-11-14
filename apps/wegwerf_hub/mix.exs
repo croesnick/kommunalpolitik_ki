@@ -5,6 +5,8 @@ defmodule WegwerfHub.MixProject do
     [
       app: :wegwerf_hub,
       version: "0.1.0",
+      description:
+        "Wegwerf-Doppel des ratsprojekte-Hubs für echte Läufe auf Wegwerf-Instanzen, nicht Teil des Releases",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",
