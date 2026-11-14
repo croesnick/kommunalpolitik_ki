@@ -82,7 +82,7 @@ defmodule KomkiConnectorRis.Http do
     )
   end
 
-  @doc "POST eines JSON-Rumpfs mit JSON-Antwort. Nur Status 200 gilt als Erfolg."
+  @doc "POST of a JSON body with a JSON answer. Only status 200 counts as success."
   @spec post_json(String.t(), [{String.t(), String.t()}], String.t(), pos_integer()) ::
           {:ok, term()} | {:error, error()}
   def post_json(url, headers, body, timeout_ms) do

@@ -68,7 +68,8 @@ defmodule KomkiConnectorRis.Api do
     if KomkiConnector.Transport.secret_ok?(cfg.base_url) do
       post_login(cfg, JSON.encode!(%{"login" => login, "password" => password}))
     else
-      {:error, "bad-request", "RIS-Anmeldung nur über https; Adresse in --base-url prüfen"}
+      {:error, "bad-request",
+       "RIS-Anmeldung nur über https (http nur für den Loopback-Mock); --base-url prüfen"}
     end
   end
 

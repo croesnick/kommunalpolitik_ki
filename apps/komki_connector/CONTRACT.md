@@ -176,7 +176,9 @@ führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Man
   `not-found`. Scheitert die Anmeldung (abgelehnt, RIS nicht erreichbar, Zugang unvollständig), startet der
   Connector trotzdem und beantwortet jede Operation mit `credential-missing`, ohne in den Gastmodus zu fallen; den
   Grund schreibt er beim Start als Warnung ins Log, und `komki up` zeigt Warnungen aus dem Start-Log eines Connectors
-  an. Die Anmeldung geht nur über `https` oder `http` auf Loopback hinaus (`KomkiConnector.Transport.secret_ok?/1`). Läuft das Token ab, antwortet er ebenso mit `credential-missing`, statt sich
+  an. Die Anmeldung geht nur über `https` oder `http` auf Loopback hinaus (`KomkiConnector.Transport.secret_ok?/1`).
+  Verweigert die nutzende Person die Touch-ID-Freigabe, gibt `komki up` kein `RIS_ZUGANG` mit und meldet das; der
+  Connector liest dann als Gast. Läuft das Token ab, antwortet er ebenso mit `credential-missing`, statt sich
   neu anzumelden: Jede Anmeldung braucht eine eigene Freigabe per Touch ID.
 - `web.search`: `{"results": [{"title", "url", "snippet"}], "abrufdatum"}`
 - `vault.search`: `{"results": [{"note_id", "title", "labels"}]}`. Notizen ohne gültiges `komki_labels` erscheinen

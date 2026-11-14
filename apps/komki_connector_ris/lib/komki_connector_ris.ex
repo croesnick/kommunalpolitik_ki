@@ -24,6 +24,9 @@ defmodule KomkiConnectorRis do
   `credential-missing`. The reason goes to the log at start, where `komki
   up` picks it up as a warning. It does not fall back to guest mode: whoever
   stored a credential expects texts and would silently get empty ones.
+  Refusing the Touch ID approval is different: then `komki up` hands over no
+  credential at all, says so, and the connector starts as a guest (the
+  ticket's "starts without credentials").
 
   Signed in, the connector has a council member's view. It still delivers
   only public items: the filter (`KomkiConnectorRis.Top.public_items/1` and
