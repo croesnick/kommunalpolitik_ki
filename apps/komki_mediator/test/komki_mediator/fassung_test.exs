@@ -6,7 +6,7 @@ defmodule KomkiMediator.FassungTest do
              "ping",
              "list_documents",
              "admit_document",
-             # Sitzungen und Tagesordnung (#516)
+             # Sessions and agenda (#516)
              "ris_agenda",
              "ris_search",
              "ris_sessions",
@@ -34,7 +34,7 @@ defmodule KomkiMediator.FassungTest do
   end
 
   test "fassung_id ist die versionierte Kennung" do
-    # #516: + ris_agenda, ris_sessions, D.9-Pin bricht absichtlich
+    # #516: + ris_agenda, ris_sessions; the D.9 pin breaks on purpose
     assert KomkiMediator.Fassung.fassung_id() == "komki-mediator/6"
   end
 

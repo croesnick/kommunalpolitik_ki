@@ -9,7 +9,7 @@ defmodule KomkiMediator.ResultShape do
   """
 
   @ris_hit ~w(datum nummer sitzung titel top_id url)
-  @ris_session ~w(datum gremium sitzung sitzung_id url)
+  @ris_session ~w(datum gremium sitzung sitzung_id uhrzeit url)
   @ris_agenda_top ~w(nummer titel top_id)
   @web_hit ~w(snippet title url)
   @vault_hit ~w(labels note_id title)
@@ -29,7 +29,7 @@ defmodule KomkiMediator.ResultShape do
       list_field(
         result,
         "tops",
-        ~w(abrufdatum datum gremium sitzung sitzung_id url),
+        ~w(abrufdatum datum gremium sitzung sitzung_id uhrzeit url),
         @ris_agenda_top
       )
 

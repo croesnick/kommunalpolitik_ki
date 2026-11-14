@@ -154,8 +154,8 @@ defmodule KomkiConnectorRis do
   def handle_op("show", %{"top_id" => top_id}, _context, cfg),
     do: show(top_id, with_deadline(cfg))
 
-  def handle_op("sessions", %{"von" => von} = params, _context, cfg),
-    do: sessions(von, Map.get(params, "bis", von), params, with_deadline(cfg))
+  def handle_op("sessions", params, _context, cfg),
+    do: sessions(params, with_deadline(cfg))
 
   def handle_op("agenda", %{"sitzung_id" => sitzung_id}, _context, cfg),
     do: agenda(sitzung_id, with_deadline(cfg))
@@ -314,8 +314,8 @@ defmodule KomkiConnectorRis do
 
   # Meetings come from the public calendar, so every meeting is listed, even
   # one whose agenda turns out to be entirely non-public.
-  defp sessions(von, bis, params, cfg) do
-    with {:ok, from, until} <- window(von, bis),
+  defp sessions(%{"von" => von} = params, cfg) do
+    with {:ok, from, until} <- window(von, Map.get(params, "bis", von)),
          {:ok, items} <- Api.meetings(cfg, from, until) do
       needle = params |> Map.get("gremium", "") |> String.downcase()
 
@@ -363,26 +363,34 @@ defmodule KomkiConnectorRis do
       "sitzung" => Top.string(meeting["name"]),
       "gremium" => Top.string(meeting["committeename"]),
       "datum" => Top.date(meeting["meetingdate"]),
+      "uhrzeit" => clock(meeting["absolutestarttime"]),
       "url" => meeting_url(cfg, id)
     }
   end
 
-  # Only public items, filtered before anything is counted: an agenda whose
-  # items are all non-public is an empty list, with no hint at what is hidden.
-  # Every reason not to show a meeting yields the same not-found.
+  # "HH:MM" from an ISO date-time, or empty when the RIS gives none.
+  defp clock(value) do
+    case Regex.run(~r/^\d{4}-\d{2}-\d{2}T(\d{2}:\d{2})/, Top.string(value)) do
+      [_, hh_mm] -> hh_mm
+      nil -> ""
+    end
+  end
+
+  # The agenda always comes from the guest endpoint, signed in or not: a
+  # meeting only a council member can see must not show up even as an empty
+  # agenda (its existence would leak through a guessed ID). Only public items,
+  # filtered before anything is counted: an agenda whose items are all
+  # non-public is an empty list, with no hint at what is hidden. Every reason
+  # not to show a meeting yields the same not-found.
   defp agenda(sitzung_id, cfg) do
     with {:ok, id} <- parse_meeting_id(sitzung_id),
-         {:ok, meeting} <- Api.meeting(cfg, id) do
+         {:ok, %{"id" => ^id} = meeting} <- Api.meeting(Map.put(cfg, :token, nil), id) do
+      tops = Enum.map(Top.public_items(meeting), &agenda_item/1)
+
       {:ok,
-       %{
-         "sitzung_id" => sitzung_id,
-         "sitzung" => Top.string(meeting["name"]),
-         "gremium" => Top.string(meeting["committeename"]),
-         "datum" => Top.date(meeting["meetingdate"]),
-         "url" => meeting_url(cfg, sitzung_id),
-         "tops" => Enum.map(Top.public_items(meeting), &agenda_item/1),
-         "abrufdatum" => abrufdatum()
-       }}
+       meeting
+       |> session(cfg)
+       |> Map.merge(%{"tops" => tops, "abrufdatum" => abrufdatum()})}
     else
       {:error, _, _} = e -> e
       _ -> {:error, "not-found", "Sitzung nicht gefunden"}

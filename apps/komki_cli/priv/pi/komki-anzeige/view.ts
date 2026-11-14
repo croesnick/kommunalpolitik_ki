@@ -364,16 +364,23 @@ function risShow(r: Json, o: ViewOptions, p: Paint): Row[] {
 function risSession(h: Json, o: ViewOptions, p: Paint): Row[] {
 	return [
 		{ lead: p.fg("muted", date(h.datum)), leadWidth: 12, body: title(h.sitzung, p) },
-		{ lead: "", leadWidth: 12, body: p.fg("muted", clean(String(h.gremium ?? ""))) },
+		{ lead: "", leadWidth: 12, body: p.fg("muted", withTime(h.gremium, h.uhrzeit)) },
 		...urlRow(h.url, 12, o, p),
 	];
+}
+
+// Committee with the start time, if the RIS gives one.
+function withTime(gremium: unknown, uhrzeit: unknown): string {
+	const g = clean(String(gremium ?? ""));
+	const t = clean(String(uhrzeit ?? "")).trim();
+	return t ? `${g} · ${t} Uhr` : g;
 }
 
 function risAgenda(r: Json, o: ViewOptions, p: Paint): Row[] {
 	const tops: Json[] = Array.isArray(r.tops) ? r.tops : [];
 	const rows: Row[] = [
 		{ body: title(r.sitzung, p) },
-		{ body: p.fg("muted", `${clean(String(r.gremium ?? ""))} · ${date(r.datum)}`) },
+		{ body: p.fg("muted", `${withTime(r.gremium, r.uhrzeit)} · ${date(r.datum)}`) },
 		...urlRow(r.url, 0, o, p),
 	];
 	if (tops.length === 0) {

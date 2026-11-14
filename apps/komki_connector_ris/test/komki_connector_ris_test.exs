@@ -196,7 +196,8 @@ defmodule KomkiConnectorRisTest do
     end
 
     # Ticket #516: find the meeting by date, then read its public agenda.
-    test "sessions listet die Sitzungen eines Zeitraums, aelteste zuerst", %{path: path} do
+    test "sessions listet die Sitzungen eines Zeitraums, aelteste zuerst",
+         %{path: path, base_url: base_url} do
       assert {:ok, %{"results" => results, "abrufdatum" => _}} =
                sessions(path, %{"von" => "2026-07-01", "bis" => "2026-09-30"})
 
@@ -207,7 +208,8 @@ defmodule KomkiConnectorRisTest do
                "sitzung" => "Sitzung des Bau- und Umweltausschusses",
                "gremium" => "Bau- und Umweltausschuss",
                "datum" => "2026-07-10",
-               "url" => hd(results)["url"]
+               "uhrzeit" => "18:30",
+               "url" => base_url <> "guestmeetings/1002"
              }
     end
 
@@ -228,12 +230,16 @@ defmodule KomkiConnectorRisTest do
                sessions(path, %{"von" => "2025-01-01", "bis" => "2026-12-31"})
     end
 
-    test "agenda liefert nur oeffentliche TOPs, ohne Spur der anderen", %{path: path} do
+    test "agenda liefert nur oeffentliche TOPs, ohne Spur der anderen",
+         %{path: path, base_url: base_url} do
       # 1002-2 is restricted, 1002-3 sits in the protected part.
       assert {:ok, result} = agenda(path, "1002")
 
       assert Enum.sort(Map.keys(result)) ==
-               ~w(abrufdatum datum gremium sitzung sitzung_id tops url)
+               ~w(abrufdatum datum gremium sitzung sitzung_id tops uhrzeit url)
+
+      assert result["url"] == base_url <> "guestmeetings/1002"
+      assert result["uhrzeit"] == "18:30"
 
       assert result["tops"] == [
                %{
@@ -358,6 +364,18 @@ defmodule KomkiConnectorRisTest do
       assert "/meetings/1001" in paths
       assert "/agendaitems/1001-1" in paths
       refute "/guestagendaitems/1001-1" in paths
+    end
+
+    # Review of #516: signed in, a guessed meeting ID must not reveal a
+    # meeting outside the public calendar. The agenda comes from the guest
+    # endpoint only.
+    test "angemeldet holt agenda die Tagesordnung nur ueber den Gast-Endpunkt" do
+      %{path: path, mock: mock} = signed_in_stack()
+      assert {:ok, %{"tops" => [_]}} = agenda(path, "1002")
+
+      paths = mock |> KomkiMock.Server.log() |> Enum.map(& &1["path"])
+      assert "/guestmeetings/1002" in paths
+      refute "/meetings/1002" in paths
     end
 
     # A failed sign-in must not take the rest of `komki up` down with it, and

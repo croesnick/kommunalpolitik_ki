@@ -229,11 +229,11 @@ test("fremde Tools bleiben unberührt", () => {
 test("RIS-Sitzungen und Tagesordnung: Datum, Gremium, TOPs mit Nummer", () => {
 	const sessions = flat(render("ris_sessions"));
 	assert.match(sessions, /2 Treffer/);
-	assert.match(sessions, /17\.11\.2026 7\. Sitzung des Stadtrates Stadtrat/);
-	assert.match(sessions, /Bauausschuss/);
+	assert.match(sessions, /02\.06\.2026 Gartenstadt-Rat, Zusammenkunft Nr\. 15 Gartenstadt-Rat · 18:00 Uhr/);
+	assert.match(sessions, /Gartenstadt Kulturausschuss · 17:00 Uhr/);
 
 	const agenda = flat(render("ris_agenda"));
-	assert.match(agenda, /7\. Sitzung des Stadtrates Stadtrat · 17\.11\.2026/);
+	assert.match(agenda, /Gartenstadt-Rat, Zusammenkunft Nr\. 15 Gartenstadt-Rat · 18:00 Uhr · 02\.06\.2026/);
 	assert.match(agenda, /TOP 1 Tagesordnungspunkt 1/);
 	assert.match(agenda, /… 2 weitere/);
 	assert.match(flat(render("ris_agenda", true)), /TOP 7 Tagesordnungspunkt 7/);
