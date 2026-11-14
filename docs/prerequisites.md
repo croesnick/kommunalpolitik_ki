@@ -387,6 +387,33 @@ externe URLs gibt es nicht.
 
 ---
 
+## `shfmt` (Shell-Parser für den PR-Hook)
+
+**Zweck:** Der PreToolUse-Hook vor `gh pr create` liest damit den Befehl
+als Syntaxbaum (`shfmt --to-json`), um `--head` so zu verstehen wie die
+Shell und gh. Erwähnungen in Titel, Body oder Heredoc zählen dann nicht
+als Flag ([#540](https://github.com/croesnick/kommunalpolitik_ki/issues/540)).
+shfmt (BSD-3-Clause) führt nichts aus, es parst nur.
+
+**Install:**
+
+```bash
+brew install shfmt
+```
+
+**Benötigt von:**
+
+| Skill / Workflow | Anmerkung |
+|---|---|
+| `.claude/hooks/pr_report.exs` | Liest `--head` aus dem Aufruf von `gh pr create` |
+| CI-Schritt „Tests (Hooks)“ | Installiert eine gepinnte Binary (Version und SHA-256 in `.github/workflows/ci.yml`) |
+
+**Fallback (wenn `shfmt` nicht verfügbar):** Der Hook liest wie vor #540
+den ersten `--head` im ganzen Befehl. Eine Erwähnung im Body-Text kann dann
+zu einer Ablehnung führen; Ausweg ist `--body-file`.
+
+---
+
 ## KomKI-CLI (`apps/komki_cli`)
 
 **Zweck:** Lokal gesandboxter KI-Arbeitsraum (`komki`): Seatbelt-Profil,
