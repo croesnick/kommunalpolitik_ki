@@ -249,7 +249,7 @@ defmodule RepoHooksTest do
       for command <- [
             "gh pr create --title T --body \"#{body}\"",
             "gh pr create --title 'x -H fix' -F pr.md",
-            "gh pr create --title T --body \"$(cat <<'EOF'\n#{body}Etwa: gh pr create -H \"fix\"\nEOF\n)\"",
+            "gh pr create --title T --body \"$(cat <<'EOF'\n#{body}Etwa: -H \"fix\", geht's?\nEOF\n)\"",
             "gh pr create --title T --body-file - <<'PR-BODY'\n#{body}Etwa: -H \"fix\"\nPR-BODY",
             "curl -s -H fix https://example.org && gh pr create -F pr.md"
           ] do
@@ -273,7 +273,16 @@ defmodule RepoHooksTest do
             "gh pr create --title 'it'\\''s' --head fix --label 'doc' -F pr.md",
             "gh pr create --title a\\\"b --head fix --label \"doc\" -F pr.md",
             "gh pr create --title $'it\\'s' --head fix --label 'x' -F pr.md",
-            "bash <<'EOF'\ngh pr create --head fix -F pr.md\nEOF"
+            "bash <<'EOF'\ngh pr create --head fix -F pr.md\nEOF",
+            # A call quoted or in a heredoc earlier must not shift the quotes.
+            "git commit -m 'Hook: gh pr create' && gh pr create --head fix --title 'T' -F pr.md",
+            "cat > b.md <<'EOF'\nDer Hook lehnt \"gh pr create\" ab, geht's?\nEOF\ngh pr create --head fix --title 'T' -F pr.md",
+            "gh pr create --help # don't\ngh pr create --head fix --title 'T' -F pr.md",
+            "gh pr create --help; bash <<'EOF'\ngh pr create --head fix -F pr.md\nEOF",
+            # The rest of a heredoc's opening line is still arguments.
+            "gh pr create --title T -F pr.md <<'EOF' --head fix\nText\nEOF",
+            # Quotes nested in "$(…)" leave one open: the old reading applies.
+            "gh pr create --title \"$(printf '%s' \"it's\")\" --head fix --label 'x' -F pr.md"
           ] do
         decision = dir |> pr(command) |> JSON.decode!()
         assert decision["hookSpecificOutput"]["permissionDecision"] == "deny", command

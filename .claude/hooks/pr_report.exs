@@ -90,46 +90,62 @@ defmodule PrReport do
   # `{:unknown, branch}`, and the call is denied.
   defp head(command, cwd) do
     case head_flags(command) do
-      [] ->
-        commit("HEAD", cwd)
-
-      flags ->
-        branch =
-          flags
-          |> List.last()
-          |> String.trim("\"")
-          |> String.trim("'")
-          |> String.split(":")
-          |> List.last()
-
-        Enum.find_value([branch, "refs/remotes/origin/#{branch}"], &commit(&1, cwd)) ||
-          {:unknown, branch}
+      [] -> commit("HEAD", cwd)
+      flags -> flags |> List.last() |> branch_head(cwd)
     end
   end
 
-  # Values of gh's own `--head`/`-H` flags (#540): from the first
-  # `gh pr create` on, with heredocs that follow it and quoted strings
-  # skipped as a whole, so a mention in the body or the title is no flag,
-  # and neither is one in a command before it. The scan alternates between
-  # an escape or a quoted string, consumed without a capture, and a flag.
-  @heredoc ~r/<<(?:-\s*(['"]?)(\w[\w-]*)\1.*?\n\t*\2|\s*(['"]?)(\w[\w-]*)\3.*?\n\4)(?=\n|\)|$)/s
-  @flag ~r/\\.|\$'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|'[^']*'|(?<!\S)(?:--head|-H)(?:=|\s+)("[^"]*"|'[^']*'|[^\s;&|)]+)/
+  defp branch_head(value, cwd) do
+    branch = value |> String.trim("\"") |> String.trim("'") |> String.split(":") |> List.last()
+
+    Enum.find_value([branch, "refs/remotes/origin/#{branch}"], &commit(&1, cwd)) ||
+      {:unknown, branch}
+  end
+
+  # Values of gh's own `--head`/`-H` flags (#540). One scan from the start
+  # keeps the quotes in step: heredoc bodies are cut beforehand (the rest of
+  # the opening line stays), escapes, quoted strings and comments are
+  # skipped as a whole, and only flags after the first `gh pr create`
+  # outside them count. A mention in the body or the title is thus no flag.
+  #
+  # Where that reading is unsure, the old one of #532 applies (first
+  # `--head` anywhere), so the hook never lets more through than before: a
+  # quote left open (quotes nested in "$(…)"), no call outside quoted text,
+  # or quoted text that itself holds a call with `--head` (`bash -c "…"`,
+  # `bash <<'EOF'`).
+  @old_flag ~r/(?:--head|-H)[=\s]+("[^"]+"|'[^']+'|\S+)/
+  @heredoc ~r/(<<(-)?\s*(['"]?)(\w[\w-]*)\3[^\n]*)\n(?:.*?\n)??(?(2)\t*)\4(?=\n|\)|$)/s
+  @token Regex.compile!(
+           ~S{\\.|\$'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|'[^']*'|(?<!\S)#[^\n]*|(["'])|(} <>
+             Regex.source(@create) <>
+             ~S{)|(?<!\S)(?:--head|-H)(?:=|\s+)("[^"]*"|'[^']*'|[^\s;&|)]+)}
+         )
 
   defp head_flags(command) do
-    case Regex.run(@create, command, return: :index) do
-      [{start, _}] ->
-        rest =
-          Regex.replace(@heredoc, binary_part(command, start, byte_size(command) - start), "")
+    text = Regex.replace(@heredoc, command, fn _, opening, _, _, _ -> opening end)
 
-        @flag
-        |> Regex.scan(rest)
-        |> Enum.flat_map(fn
-          [_, value] -> [value]
-          _ -> []
-        end)
+    bodies =
+      for [all, opening | _] <- Regex.scan(@heredoc, command),
+          do: String.replace_prefix(all, opening, "")
 
-      nil ->
-        []
+    # Token shapes: [skipped], [_, open quote], [_, "", call], [_, "", "", value].
+    tokens = Regex.scan(@token, text)
+    call? = &match?([_, "", _], &1)
+    skipped = for [skipped] <- tokens, do: skipped
+
+    unsure? =
+      Enum.any?(tokens, &match?([_, _], &1)) or not Enum.any?(tokens, call?) or
+        Enum.any?(bodies ++ skipped, &(&1 =~ @create and &1 =~ @old_flag))
+
+    if unsure? do
+      for [_, value] <- [Regex.run(@old_flag, command)], do: value
+    else
+      tokens
+      |> Enum.drop_while(&(not call?.(&1)))
+      |> Enum.flat_map(fn
+        [_, "", "", value] -> [value]
+        _ -> []
+      end)
     end
   end
 
