@@ -11,11 +11,35 @@ defmodule KomkiPolicy.JSON do
   Der Encoder (`canonical/1`) erzeugt eine deterministische, byte-stabile
   Kanonisierung: Objektschlüssel bytewise aufsteigend sortiert (UTF-8),
   2-Space-Einrückung, LF-Zeilenenden, keine Leerzeilen, genau ein finales
-  Newline.
+  Newline. Die Einrückung wächst pro Ebene, deshalb hat der Encoder eine
+  explizite Tiefengrenze (`@max_depth`, Ticket #473): Jenseits der Grenze
+  scheitert die Kanonisierung strukturiert (`DepthLimitError` mit `code`,
+  `path`, `detail` — dieselbe Fehlerform wie die Parse-Fehler), statt pro
+  Eingabeebene weiter zu rekursieren.
 
   Objekte werden als Maps mit String-Schlüsseln dargestellt, Arrays als
   Listen, `null` als `nil`.
   """
+
+  # Tiefengrenze des Encoders (Ticket #473, Audit F1): Die 2-Space-
+  # Einrueckung alloziert Θ(Tiefe²) Zellen und Bytes - ohne Grenze kann
+  # eine einzige verschachtelte Eingabe den Aufrufer sprengen. 128 liegt
+  # weit ueber jeder Γ-Struktur und begrenzt den Extremfall auf ~32k
+  # Einrueckungszellen.
+  @max_depth 128
+
+  defmodule DepthLimitError do
+    @moduledoc """
+    Strukturierter Tiefenverstoß des kanonischen Encoders (Ticket #473):
+    Feldform wie die Parse-Fehler (`code`, `path`, `detail`).
+    """
+    defexception [:code, :path, :detail]
+
+    @impl true
+    def message(%{code: code, path: path, detail: detail}) do
+      "JSON canonical encoding failed (#{code}) at #{path}: #{detail}"
+    end
+  end
 
   @type json_value ::
           nil | true | false | integer() | float() | String.t() | [json_value()] | %{}
@@ -67,11 +91,13 @@ defmodule KomkiPolicy.JSON do
   @doc """
   Encodiert einen Wert in die kanonische Darstellung (deterministisch,
   byte-stabil; genau ein finales Newline). Nicht-JSON-Terme (z. B. Atome
-  oder Maps mit Nicht-String-Schlüsseln) verursachen einen `ArgumentError`.
+  oder Maps mit Nicht-String-Schlüsseln) verursachen einen `ArgumentError`;
+  Werte, die tiefer als `@max_depth` verschachtelt sind, einen
+  `DepthLimitError`.
   """
   @spec canonical(json_value()) :: binary()
   def canonical(value) do
-    encoded = [encode_value(value, 0), "\n"]
+    encoded = [encode_value(value, 0, []), "\n"]
     IO.iodata_to_binary(encoded)
   end
 
@@ -568,44 +594,69 @@ defmodule KomkiPolicy.JSON do
   # Kanonischer Encoder
   # ---------------------------------------------------------------------------
 
-  defp encode_value(nil, _depth), do: "null"
-  defp encode_value(true, _depth), do: "true"
-  defp encode_value(false, _depth), do: "false"
-  defp encode_value(value, _depth) when is_integer(value), do: Integer.to_string(value)
-  defp encode_value(value, _depth) when is_float(value), do: Float.to_string(value)
-  defp encode_value(value, _depth) when is_binary(value), do: encode_string(value)
-  defp encode_value(value, depth) when is_list(value), do: encode_list(value, depth)
-  defp encode_value(value, depth) when is_map(value), do: encode_map(value, depth)
-
-  defp encode_list([], _depth), do: "[]"
-
-  defp encode_list(items, depth) do
-    ["[\n", encode_items(items, depth + 1), "\n", pad(depth), "]"]
+  # Pfad-Segmente werden als umgekehrte Liste mitgetragen (eine Zelle je
+  # Ebene) und nur beim Fehler zu einem JSON-Pointer-ahnlichen String
+  # zusammengesetzt.
+  defp encode_value(_value, depth, path) when depth > @max_depth do
+    raise DepthLimitError,
+      code: :depth_limit_exceeded,
+      path: render_path(path),
+      detail: "nesting deeper than the limit of #{@max_depth} cannot be canonicalized"
   end
 
-  defp encode_items([item], depth), do: [pad(depth), encode_value(item, depth)]
+  defp encode_value(nil, _depth, _path), do: "null"
+  defp encode_value(true, _depth, _path), do: "true"
+  defp encode_value(false, _depth, _path), do: "false"
+  defp encode_value(value, _depth, _path) when is_integer(value), do: Integer.to_string(value)
+  defp encode_value(value, _depth, _path) when is_float(value), do: Float.to_string(value)
+  defp encode_value(value, _depth, _path) when is_binary(value), do: encode_string(value)
 
-  defp encode_items([item | rest], depth) do
-    [pad(depth), encode_value(item, depth), ",\n", encode_items(rest, depth)]
+  defp encode_value(value, depth, path) when is_list(value),
+    do: encode_list(value, depth, path)
+
+  defp encode_value(value, depth, path) when is_map(value),
+    do: encode_map(value, depth, path)
+
+  defp encode_list([], _depth, _path), do: "[]"
+
+  defp encode_list(items, depth, path) do
+    ["[\n", encode_items(items, depth + 1, path, 0), "\n", pad(depth), "]"]
   end
 
-  defp encode_map(%{} = value, _depth) when map_size(value) == 0, do: "{}"
+  defp encode_items([item], depth, path, index),
+    do: [pad(depth), encode_value(item, depth, [{:index, index} | path])]
 
-  defp encode_map(%{} = value, depth) do
+  defp encode_items([item | rest], depth, path, index) do
+    [
+      pad(depth),
+      encode_value(item, depth, [{:index, index} | path]),
+      ",\n",
+      encode_items(rest, depth, path, index + 1)
+    ]
+  end
+
+  defp encode_map(%{} = value, _depth, _path) when map_size(value) == 0, do: "{}"
+
+  defp encode_map(%{} = value, depth, path) do
     keys = Enum.sort(Map.keys(value))
-    entries = canonical_entries(value, keys, depth)
+    entries = canonical_entries(value, keys, depth, path)
 
     ["{\n", join_entries(entries, depth + 1), "\n", pad(depth), "}"]
   end
 
-  defp canonical_entries(_value, [], _depth), do: []
+  defp canonical_entries(_value, [], _depth, _path), do: []
 
-  defp canonical_entries(value, [key | rest], depth) when is_binary(key) do
-    entry = [encode_string(key), ": ", encode_value(Map.fetch!(value, key), depth + 1)]
-    [entry | canonical_entries(value, rest, depth)]
+  defp canonical_entries(value, [key | rest], depth, path) when is_binary(key) do
+    entry = [
+      encode_string(key),
+      ": ",
+      encode_value(Map.fetch!(value, key), depth + 1, [{:key, key} | path])
+    ]
+
+    [entry | canonical_entries(value, rest, depth, path)]
   end
 
-  defp canonical_entries(_value, [key | _rest], _depth) do
+  defp canonical_entries(_value, [key | _rest], _depth, _path) do
     raise ArgumentError, "non-string map key cannot be canonicalized: #{inspect(key)}"
   end
 
@@ -616,6 +667,16 @@ defmodule KomkiPolicy.JSON do
   end
 
   defp pad(depth), do: List.duplicate("  ", depth)
+
+  defp render_path(segments) do
+    "$" <>
+      (segments
+       |> Enum.reverse()
+       |> Enum.map_join("", fn
+         {:key, key} -> "." <> key
+         {:index, index} -> "[" <> Integer.to_string(index) <> "]"
+       end))
+  end
 
   defp encode_string(value) when is_binary(value) do
     [?", escaped_bytes(value), ?"]
