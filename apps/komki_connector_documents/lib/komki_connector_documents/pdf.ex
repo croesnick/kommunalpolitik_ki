@@ -4,6 +4,11 @@ defmodule KomkiConnectorDocuments.Pdf do
   page anchor `[Seite N]` followed by its text, then the highlights of the
   user, each with its comment and the marked text.
 
+  Since #488 the render runs in a separate OS process
+  (`KomkiConnectorDocuments.Pdf.Helper`): the connector VM never loads the
+  pdfium NIF itself, so a native crash, OOM or a killed helper is a
+  per-request error instead of a dead connector.
+
   ## License and origin of the NIF
 
   Built on `ex_pdfium` 0.6.0 (MIT), a NIF over the Rust crate
@@ -32,11 +37,27 @@ defmodule KomkiConnectorDocuments.Pdf do
 
   The NIF's page index is 16 bit, so documents with 65 535 pages or more
   cannot be counted reliably and are rejected.
+
+  ## Bounds of the helper process (#488)
+
+  The helper dies alone: crash, OOM and the wallclock kill (12 s, below
+  the mediator's 15 s call timeout, CONTRACT.md §3) become a per-request
+  `upstream-error`. Its rlimit attempt on the address space stays without
+  effect on macOS — the kernel rejects every RLIMIT_AS change (measured
+  2026-11-14) — so on this platform the timeout and the crash isolation
+  are the effective bounds. ex_pdfium has no decompression budget: a page
+  whose content stream expands far beyond the file size allocates in the
+  helper until the wallclock kills it. That bound belongs into the
+  external package and is deliberately left open (#488).
   """
 
   # Larger extracted text would not fit into a protocol frame anyway; page
   # extraction stops as soon as the page texts alone exceed it.
   @max_bytes Sidecar.Frame.max_bytes()
+
+  alias KomkiConnectorDocuments.Pdf.Helper
+
+  @type result :: {:ok, String.t()} | {:error, String.t(), String.t()}
 
   # pdfium synthesizes spaces without a box: a gap of this share of the
   # font size counts as a word boundary.
@@ -46,12 +67,37 @@ defmodule KomkiConnectorDocuments.Pdf do
   @page_limit 65_535
 
   @doc """
-  Renders the PDF at `path` as text with page anchors and highlights.
+  Renders the PDF at `path` as text with page anchors and highlights — in
+  a separate OS process (`Pdf.Helper`, #488): the helper's crash, OOM or
+  wallclock kill is a per-request error instead of a dead connector.
   Errors carry a code from the closed set of the frame protocol; the German
   `detail` only goes to the connector log (CONTRACT.md §3).
   """
-  @spec render(Path.t()) :: {:ok, String.t()} | {:error, String.t(), String.t()}
-  def render(path) do
+  @spec render(Path.t()) :: result()
+  def render(path), do: render(path, [])
+
+  @doc """
+  `render/1` with a wallclock budget for the helper process
+  (`timeout_ms`, see `Pdf.Helper`) — tests use a short one.
+  """
+  @spec render(Path.t(), timeout_ms: pos_integer()) :: result()
+  def render(path, opts) do
+    Helper.render(path, opts)
+  rescue
+    # The helper machinery itself failed (not the PDF): internal. The
+    # child's render errors arrive as relayed result terms.
+    exception ->
+      {:error, "internal",
+       "PDF-Hilfsprozess fehlgeschlagen: #{inspect(exception.__struct__)} #{Exception.message(exception)}"}
+  end
+
+  @doc """
+  The render inside the helper process: page anchors, pages, highlights
+  (#290). Only `KomkiConnectorDocuments.Pdf.Helper.run/0` calls this — the
+  connector itself reaches a PDF only through `render/1`.
+  """
+  @spec render_in_process(Path.t()) :: result()
+  def render_in_process(path) do
     with {:ok, doc} <- open(path) do
       try do
         content(doc)

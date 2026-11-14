@@ -1,6 +1,8 @@
 defmodule KomkiConnectorDocuments.ConnectorTest do
   use ExUnit.Case, async: true
 
+  alias KomkiConnectorDocuments.Pdf
+  alias KomkiConnectorDocuments.Pdf.Helper
   alias KomkiConnectorDocuments.TestPDF
   alias Sidecar.{Client, Server}
 
@@ -74,6 +76,70 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
     assert {:ok, content} = KomkiConnectorDocuments.Pdf.render(path)
     assert content =~ "- Seite 1: „Gamma drei“ — Kommentar: Einzeilig\n"
     assert content =~ "- Seite 1: „Delta vier Epsilon fuenf“ — Kommentar: Zweizeilig"
+  end
+
+  # #488 (F17): the pdfium render runs in a helper process. The bomb is a
+  # regular readable PDF (the small variant proves pdfium decompresses it),
+  # but its expansion alone exceeds the short wallclock budget: the helper
+  # dies controlled, the call gets upstream-error and the connector VM
+  # stays alive and answers the next PDF normally.
+  test "Flate-Bombe: Helper stirbt kontrolliert, Aufruf erhaelt upstream-error", %{dir: dir} do
+    klein = Path.join(dir, "doc-bombe-klein.pdf")
+    TestPDF.bomb(klein, 2_000_000)
+
+    assert {:error, "too-large", _detail} = Pdf.render(klein)
+
+    bombe = Path.join(dir, "doc-bombe.pdf")
+    TestPDF.bomb(bombe, 200_000_000)
+
+    assert {:error, "upstream-error", _detail} = Pdf.render(bombe, timeout_ms: 1500)
+
+    normal = Path.join(dir, "doc-eng.pdf")
+    TestPDF.tight_lines(normal)
+
+    assert {:ok, content} = Pdf.render(normal)
+    assert content =~ "- Seite 1: „Gamma drei“ — Kommentar: Einzeilig\n"
+  end
+
+  # #488: the spawn line carries the rlimit attempt, the fixed eval and the
+  # PDF path as a plain argument; only real directories are on the path.
+  test "Helper-Anrufzeile: rlimit-Versuch, fester Eval, Pfad als Argument" do
+    argv = Helper.command("/tmp/docs/raum.pdf")
+    ["-c", wrapper, erl | rest] = argv
+
+    assert wrapper =~ "ulimit -v "
+    assert wrapper =~ ~s(exec "$0" "$@")
+    # The erl of the running beam: under a Burrito release it lives in
+    # <root>/erts-<vsn>/bin, in dev in the root's bin — the init argument
+    # bindir names the right one in every context.
+    {:ok, [[bindir | _] | _]} = :init.get_argument(:bindir)
+    assert erl == Path.join(bindir, "erl")
+    assert File.exists?(erl)
+    assert Enum.at(rest, -1) == "/tmp/docs/raum.pdf"
+
+    eval_index = Enum.find_index(rest, &(&1 == "-e"))
+    assert Enum.at(rest, eval_index + 1) == "KomkiConnectorDocuments.Pdf.Helper.run()"
+
+    pas = rest |> Enum.chunk_every(2) |> Enum.filter(&match?(["-pa", _], &1))
+    assert pas != []
+    Enum.each(pas, fn ["-pa", dir] -> assert File.dir?(dir) end)
+  end
+
+  # #488: classification keeps the closed set of error codes — a death
+  # inside the render is upstream-error, a child that never became
+  # runnable and a malformed reply are internal.
+  test "Helper-Klassifikation: Crash nach Marker ist upstream-error" do
+    assert {:ok, "inhalt"} =
+             Helper.classify({:done, 0, "H" <> :erlang.term_to_binary({:ok, "inhalt"})}, 12_000)
+
+    assert {:error, "upstream-error", _detail} = Helper.classify({:done, 139, "H"}, 12_000)
+
+    assert {:error, "internal", _detail} = Helper.classify({:done, 1, ""}, 12_000)
+    assert {:error, "internal", _detail} = Helper.classify({:done, 0, ""}, 12_000)
+    assert {:error, "internal", _detail} = Helper.classify({:done, 0, "HX"}, 12_000)
+
+    assert {:error, "upstream-error", _detail} = Helper.classify(:timeout, 12_000)
+    assert {:error, "internal", _detail} = Helper.classify(:overflow, 12_000)
   end
 
   test "PDF ohne Textebene: klarer Fehler statt leerem Text", %{socket: socket} do
