@@ -34,6 +34,11 @@ pieces that usually cost a weekend of denial-log archaeology already in place:
   `Seatbelt.SBPL.quote!/1`, which raises on `"`, `\` and control
   characters, and header comments must not contain line breaks. A path can
   never close its literal and smuggle in a rule.
+- Mach-O load commands yield only validated read scopes: a declared
+  dependency must resolve to an existing file, and its directory — in both
+  path forms — must sit inside the allowlist of roots
+  (`Seatbelt.MachODeps.dylib_dirs/2`); breadth ceilings ("/",
+  single-segment dirs) are refused (#474).
 - Fixed inputs → byte-identical output, enforced by goldens and determinism
   tests.
 - All emitted profile text — comments included — is ASCII/English. Comment

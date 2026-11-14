@@ -15,6 +15,15 @@ defmodule Seatbelt.MachODeps do
   the backend bundles libggml-cpu-apple_m*.so, libggml-metal.so live
   there; without it the backend registry stays empty).
 
+  Scope validation at the seam (#474): load commands name the read
+  scopes of the sandbox themselves, so every granted directory is
+  checked before it becomes one — the declared dependency must resolve
+  to an existing file, both path forms of its directory must sit inside
+  the allowlist of roots, and breadth ceilings are refused (never "/",
+  at least two path segments). Declarations that fail yield no scope
+  and are not walked further; the worst case is a profile that is too
+  narrow, never one that is too wide.
+
   Fallback: otool missing or file unreadable -> [] (CI on Linux; the
   profile stays generatable).
 
@@ -32,13 +41,35 @@ defmodule Seatbelt.MachODeps do
   #   caveat cuts both ways — exp6: rules in canonical form only do not match);
   # - per dep directory its sibling libexec, when present (ggml puts the
   #   backend bundles there; without it the backend registry stays empty);
-  # - otool missing or file unreadable: [] (CI on Linux; profile stays generatable).
+  # - otool missing or file unreadable: [] (CI on Linux; profile stays generatable);
+  # - scope validation at the seam (#474, audit #467 finding F2): a Mach-O
+  #   names the read scopes of its own sandbox, so load commands are
+  #   attacker-influenceable surface. A dep grants its directory only when
+  #   it resolves to an existing regular file (a dead install name, e.g.
+  #   the CI build path of a precompiled NIF, holds nothing dyld could
+  #   load), both path forms of its directory (expanded, kernel-canonical)
+  #   sit inside the allowlist (symlink escapes and prefix-sharing
+  #   neighbours are refused), and the breadth ceiling holds (never "/",
+  #   at least two segments — roots are filtered by the same rule).
+  #   Failed declarations yield no scope and are not walked further:
+  #   fail closed, the worst case is a profile that is too narrow.
   @doc """
   Dylib directories of the binary including libexec siblings; see the
   moduledoc for the methodology.
+
+  `extra_roots` extends the allowlist a granted directory must sit in:
+  the package managers and the system (`/opt/homebrew`, `/usr/local`,
+  `/usr/lib`, `/System/Library` — the list scripts/screenshot/profile.exs
+  pins for the same question) plus the install prefix of the program (its
+  own directory and the parent, the conventional `<prefix>/bin` layout of
+  llama.cpp releases and Homebrew kegs, where lib and libexec sit beside
+  bin). Callers that know their install tree declare it here instead of
+  relying on the prefix derivation: the prefix is location trust, and a
+  binary planted next to user secrets (PATH shadowing) keeps that lever
+  until they do (#474).
   """
-  @spec dylib_dirs(String.t()) :: [String.t()]
-  def dylib_dirs(bin) do
+  @spec dylib_dirs(String.t(), [String.t()]) :: [String.t()]
+  def dylib_dirs(bin, extra_roots \\ []) when is_list(extra_roots) do
     if System.find_executable("otool") == nil or not File.exists?(bin) do
       []
     else
@@ -49,11 +80,53 @@ defmodule Seatbelt.MachODeps do
       # sees MapSet.t() in recursive positions as an opaque term with
       # diverging subtypes (call_without_opaque, verification finding);
       # the sets are tiny, uniq/sort sits at the end.
+      roots = allowed_roots(bin, extra_roots)
+
       bin
-      |> dylib_walk([bin], [], [])
-      |> libexec_forms()
+      |> dylib_walk(roots, [bin], [], [])
+      |> libexec_forms(roots)
     end
   end
+
+  # Allowlist of granted directories (#474): package managers and the
+  # system (the roots scripts/screenshot/profile.exs pins for the same
+  # question), plus the install prefix of the program — its own directory
+  # and the parent, the conventional <prefix>/bin layout (llama.cpp
+  # releases, Homebrew kegs; lib and libexec sit beside bin). The prefix
+  # derivation is location trust in the binary's neighbourhood; callers
+  # that know their tree pass extra_roots.
+  @dylib_roots ~w(/opt/homebrew /usr/local /usr/lib /System/Library)
+
+  defp allowed_roots(bin, extra_roots) do
+    bin_dir = Path.dirname(bin)
+
+    (@dylib_roots ++ [bin_dir, Path.dirname(bin_dir)] ++ extra_roots)
+    |> Enum.map(&Seatbelt.canonical/1)
+    |> Enum.filter(&deep_enough?/1)
+    |> Enum.uniq()
+  end
+
+  # A directory becomes a read scope only as a checked scope (#474):
+  # expanded, within the breadth ceiling, inside the allowlist. Returns
+  # the granted form (expanded — a ".." detour reaches the profile
+  # resolved, never as text).
+  defp checked_dir(dir, roots) do
+    expanded = Path.expand(dir)
+
+    if deep_enough?(expanded) and inside_roots?(expanded, roots) do
+      {:ok, expanded}
+    else
+      :error
+    end
+  end
+
+  # Breadth ceiling (#474): never "/", and at least two segments — a dep
+  # directly under "/" must not widen to the root, and granted trees need
+  # <root>/<dir> depth at minimum. Roots are held to the same rule.
+  defp deep_enough?(dir), do: dir != "/" and length(Path.split(dir)) >= 2
+
+  defp inside_roots?(dir, roots),
+    do: Enum.any?(roots, &(dir == &1 or String.starts_with?(dir, &1 <> "/")))
 
   defp otool_output(args) do
     case System.find_executable("otool") do
@@ -68,41 +141,48 @@ defmodule Seatbelt.MachODeps do
     end
   end
 
-  defp dylib_walk(_bin, [], _visited, dirs), do: dirs
+  defp dylib_walk(_bin, _roots, [], _visited, dirs), do: dirs
 
-  defp dylib_walk(bin, [macho | queue], visited, dirs) do
+  defp dylib_walk(bin, roots, [macho | queue], visited, dirs) do
     canonical_macho = Seatbelt.canonical(macho)
 
     if canonical_macho in visited do
-      dylib_walk(bin, queue, visited, dirs)
+      dylib_walk(bin, roots, queue, visited, dirs)
     else
       deps = otool_deps(macho)
       rpaths = otool_rpaths(macho)
 
       {queue, dirs} =
         Enum.reduce(deps, {queue, dirs}, fn dep, {acc_queue, acc_dirs} ->
-          dep_dirs(dep, rpaths, macho, bin, acc_queue, acc_dirs)
+          dep_dirs(dep, rpaths, macho, bin, roots, acc_queue, acc_dirs)
         end)
 
-      dylib_walk(bin, queue, [canonical_macho | visited], dirs)
+      dylib_walk(bin, roots, queue, [canonical_macho | visited], dirs)
     end
   end
 
-  defp dep_dirs(dep, rpaths, macho, bin, queue, dirs) do
+  defp dep_dirs(dep, rpaths, macho, bin, roots, queue, dirs) do
     case resolve_dep(dep, rpaths, macho, bin) do
       :skip ->
         {queue, dirs}
 
-      {:dep, declared, resolved} ->
-        # Keep the raw form of the declared directory (dyld opens exactly
-        # this path form — path-form caveat exp6) plus the canonical form.
-        dirs = Enum.uniq([Path.dirname(declared) | dirs])
+      {:dep, _declared, nil} ->
+        # #474: the declaration does not resolve to an existing file —
+        # nothing dyld could load, no scope, no further walk.
+        {queue, dirs}
 
-        if resolved != nil do
-          dirs = Enum.uniq([Seatbelt.canonical(Path.dirname(resolved)) | dirs])
-          {queue ++ [resolved], dirs}
+      {:dep, declared, resolved} ->
+        with {:ok, declared_dir} <- checked_dir(Path.dirname(declared), roots),
+             {:ok, canonical_dir} <-
+               checked_dir(Seatbelt.canonical(Path.dirname(resolved)), roots) do
+          # Both forms pass as checked scopes; keep the declared form
+          # (dyld opens exactly this path form — path-form caveat exp6)
+          # plus the canonical form.
+          {queue ++ [resolved], Enum.uniq([declared_dir, canonical_dir | dirs])}
         else
-          {queue, dirs}
+          # Outside the allowlist or below the breadth ceiling: no scope,
+          # no further walk (#474) — fail closed.
+          _ -> {queue, dirs}
         end
     end
   end
@@ -174,7 +254,9 @@ defmodule Seatbelt.MachODeps do
   end
 
   defp maybe_canonical(path) do
-    if File.exists?(path), do: Seatbelt.canonical(path), else: nil
+    # A dep is a loadable file, not any existing directory entry (#474):
+    # directories and special files resolve to nothing.
+    if File.regular?(path), do: Seatbelt.canonical(path), else: nil
   end
 
   # Deps from `otool -L`: drop the header line (the binary's own name);
@@ -244,19 +326,25 @@ defmodule Seatbelt.MachODeps do
   defp rpath_value(value), do: value |> String.split(" (", parts: 2) |> List.first()
 
   # Sibling libexec per dep directory (ggml backend scan location); both
-  # path forms stay when canonical and declared diverge.
-  defp libexec_forms(dirs) do
-    (dirs ++ Enum.flat_map(dirs, &dir_libexec_forms/1))
+  # path forms stay when canonical and declared diverge — as checked
+  # scopes like every other grant (#474).
+  defp libexec_forms(dirs, roots) do
+    (dirs ++ Enum.flat_map(dirs, &dir_libexec_forms(&1, roots)))
     |> Enum.uniq()
     |> Enum.sort()
   end
 
-  defp dir_libexec_forms(dir) do
+  defp dir_libexec_forms(dir, roots) do
     declared = Path.join(Path.dirname(dir), "libexec")
     sibling = Seatbelt.canonical(declared)
 
     if File.exists?(sibling) do
-      Enum.uniq([sibling, declared])
+      with {:ok, declared_dir} <- checked_dir(declared, roots),
+           {:ok, canonical_dir} <- checked_dir(sibling, roots) do
+        Enum.uniq([declared_dir, canonical_dir])
+      else
+        _ -> []
+      end
     else
       []
     end
