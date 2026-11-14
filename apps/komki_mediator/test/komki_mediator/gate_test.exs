@@ -144,7 +144,9 @@ defmodule KomkiMediator.GateTest do
   end
 
   # R.5.4 (#213): das Validierungslabel ist B_W des Raums, nicht λ(x).
-  test "recherche: doc-vertraulich liegt nicht in B_W -> deny label_not_included", %{
+  # #484: ein nicht zulaessiges Dokument antwortet wie ein unbekanntes
+  # Objekt; die Entscheidung samt Katalog bleibt im Journal.
+  test "recherche: doc-vertraulich liegt nicht in B_W -> verborgen wie unbekannt (#484)", %{
     env: env,
     journal_path: journal_path
   } do
@@ -156,12 +158,15 @@ defmodule KomkiMediator.GateTest do
         fn -> flunk("Executor darf nach einem deny nicht laufen") end
       )
 
-    assert response["decision"] == "deny"
-    assert [%{"code" => "label_not_included"} | _] = response["remedies"]
-    assert response["hinweis"] == KomkiMediator.Hinweis.text(:deny)
+    assert response["decision"] == "error"
+    assert response["detail"] == "unbekanntes Objekt: \"doc-vertraulich\""
+    refute Map.has_key?(response, "remedies")
+    refute Map.has_key?(response, "hinweis")
 
     assert [pdr] = TestHelpers.journal_records(journal_path)
+    assert pdr["decision"] == "deny"
     assert pdr["checked_label"] == env.room.workspace_bindings
+    assert [%{"code" => "label_not_included"} | _] = pdr["remedies"]
   end
 
   test "Raum ohne workspace_bindings: admit_document faellt fail-closed aus", %{
@@ -185,7 +190,7 @@ defmodule KomkiMediator.GateTest do
              TestHelpers.journal_records(journal_path)
   end
 
-  test "doc-vertraulich -> deny mit Engine-Remedy-Katalog (kein nackter Fehler)", %{
+  test "doc-vertraulich -> verborgen wie unbekannt; der Katalog bleibt im Journal (#484)", %{
     env: env,
     journal_path: journal_path
   } do
@@ -196,17 +201,23 @@ defmodule KomkiMediator.GateTest do
         env,
         "admit_document",
         %{"document_id" => "doc-vertraulich"},
-        TestHelpers.admit_executor(env.room, "doc-vertraulich")
+        fn -> flunk("Executor darf nach einem deny nicht laufen") end
       )
 
-    assert response["decision"] == "deny"
+    assert response["decision"] == "error"
     assert response["decision_id"] =~ "pdr-"
-    assert response["registry_id"] == "reg-komki-arbeitsraum"
+    assert response["detail"] == "unbekanntes Objekt: \"doc-vertraulich\""
+    refute Map.has_key?(response, "remedies")
+    refute Map.has_key?(response, "content")
 
-    # Engine-Katalog (KomkiPolicy.Remedies, CONTRACT § 2.8), unverändert
-    # durchgereicht: der Blocker spiegelt sich mit fakt_nachreichen VOR
+    assert [pdr] = TestHelpers.journal_records(journal_path)
+    assert pdr["decision"] == "deny"
+    assert pdr["outcome"] == "not_admitted"
+
+    # Engine-Katalog (KomkiPolicy.Remedies, CONTRACT § 2.8), unverändert im
+    # Journal: der Blocker spiegelt sich mit fakt_nachreichen VOR
     # neuer_raum; admit kennt keine aktionsfreigabe.
-    assert response["remedies"] == [
+    assert pdr["remedies"] == [
              %{
                "code" => "binding_condition_false",
                "binding" => "doc-vertraulich@1",
@@ -221,16 +232,9 @@ defmodule KomkiMediator.GateTest do
                ]
              }
            ]
-
-    assert response["relaxation_authorities"] == []
-    refute Map.has_key?(response, "content")
-
-    assert [pdr] = TestHelpers.journal_records(journal_path)
-    assert pdr["decision"] == "deny"
-    assert pdr["outcome"] == "not_admitted"
   end
 
-  test "doc-pending-freigabe -> indeterminate mit Engine-Remedy-Katalog", %{
+  test "doc-pending-freigabe -> verborgen wie unbekannt; Katalog im Journal (#484)", %{
     env: env,
     journal_path: journal_path
   } do
@@ -241,12 +245,18 @@ defmodule KomkiMediator.GateTest do
         env,
         "admit_document",
         %{"document_id" => "doc-pending-freigabe"},
-        TestHelpers.admit_executor(env.room, "doc-pending-freigabe")
+        fn -> flunk("Executor darf nach einem indeterminate nicht laufen") end
       )
 
-    assert response["decision"] == "indeterminate"
+    assert response["decision"] == "error"
+    assert response["detail"] == "unbekanntes Objekt: \"doc-pending-freigabe\""
+    refute Map.has_key?(response, "remedies")
 
-    assert response["remedies"] == [
+    assert [pdr] = TestHelpers.journal_records(journal_path)
+    assert pdr["decision"] == "indeterminate"
+    assert pdr["outcome"] == "not_admitted"
+
+    assert pdr["remedies"] == [
              %{
                "code" => "missing_fact",
                "fact" => "vertraulich_freigabe",
@@ -262,16 +272,9 @@ defmodule KomkiMediator.GateTest do
              }
            ]
 
-    # Γ (R.2.2): die Autoritaeten der Lockerungsbefugnisse der benannten
-    # Bindung bleiben Teil der Antwort, aus dem rohen Registry-Term. Der
-    # Store exportiert sie seit #423 strukturiert (vorher [] fail-closed,
-    # #208/#109); doc-pending-freigabe traegt die Freigabe-Notiz-Befugnis
-    # der nutzenden Person.
-    assert response["relaxation_authorities"] == ["nutzende-person"]
-
-    assert [pdr] = TestHelpers.journal_records(journal_path)
-    assert pdr["decision"] == "indeterminate"
-    assert pdr["outcome"] == "not_admitted"
+    # Γ (R.2.2): die Freigabe-Notiz-Befugnis der nutzenden Person bleibt
+    # aus dem rohen Registry-Term ablesbar; in die Antwort reist sie seit
+    # #484 nicht mehr.
   end
 
   test "unbekanntes Dokument -> Entscheidungsfehler, PDR not_admitted, kein Crash", %{
@@ -292,6 +295,50 @@ defmodule KomkiMediator.GateTest do
     assert [pdr] = TestHelpers.journal_records(journal_path)
     assert pdr["outcome"] == "not_admitted"
     assert pdr["intent_hash"] =~ "sha256:"
+  end
+
+  # -----------------------------------------------------------------------
+  # #484 (F12): ein blockiertes Raumdokument und ein unbekanntes Objekt
+  # antworten ununterscheidbar; λ(x) reist nicht in die Antwort. Das
+  # Journal fuehrt die wahre Entscheidung weiter.
+  # -----------------------------------------------------------------------
+
+  test "blockiertes Dokument und unbekanntes Objekt sind ununterscheidbar (#484)", %{
+    env: env,
+    journal_path: journal_path
+  } do
+    test_proc = self()
+    executor = fn -> send(test_proc, :executor_called) end
+
+    blocked =
+      Gate.call(env, "admit_document", %{"document_id" => "doc-vertraulich"}, executor)
+
+    phantom =
+      Gate.call(env, "admit_document", %{"document_id" => "doc-phantom"}, executor)
+
+    refute_received :executor_called
+
+    # Dieselbe Antwortform: die Detail-Zeile nennt nur die Eingabe des
+    # Aufrufers, nie Existenz, Label oder Katalog des Dokuments.
+    assert Map.keys(blocked) == Map.keys(phantom)
+    assert blocked["decision"] == "error"
+    assert blocked["detail"] == "unbekanntes Objekt: \"doc-vertraulich\""
+    assert phantom["detail"] == "unbekanntes Objekt: \"doc-phantom\""
+    refute Map.has_key?(blocked, "remedies")
+    refute Map.has_key?(blocked, "relaxation_authorities")
+    refute Map.has_key?(blocked, "hinweis")
+    refute Map.has_key?(blocked, "registry_id")
+    refute inspect(blocked) =~ "doc-vertraulich@1"
+
+    # Das Journal sieht die Wahrheit: Entscheidung, Label-Katalog und
+    # checked_label bleiben fuer die nutzende Person abrufbar.
+    [blocked_pdr, phantom_pdr] = TestHelpers.journal_records(journal_path)
+    assert blocked_pdr["decision"] == "deny"
+    assert blocked_pdr["outcome"] == "not_admitted"
+    assert [%{"code" => "label_not_included"} | _] = blocked_pdr["remedies"]
+    assert blocked_pdr["checked_label"] == env.room.workspace_bindings
+    assert phantom_pdr["decision"] == "error"
+    assert phantom_pdr["remedies"] == nil
   end
 
   test "admit_document auf ein Nicht-Dokument (mediator-ping) -> unknown_object (#134)", %{

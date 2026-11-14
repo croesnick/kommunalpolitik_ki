@@ -56,9 +56,8 @@ defmodule KomkiMediator.ToolsTest do
                      %{"document_id" => "doc-oeffentlich"}, %{}, _records}
   end
 
-  test "admit_document doc-vertraulich: deny, der Dokument-Connector wird nicht gerufen", %{
-    base: base
-  } do
+  test "admit_document doc-vertraulich: verborgen wie ein unbekanntes Dokument, der Dokument-Connector wird nicht gerufen (#484)",
+       %{base: base} do
     dir = FakeConnector.short_dir()
     on_exit(fn -> File.rm_rf!(dir) end)
     env = TestHelpers.restart_env(base, %{connectors_dir: dir})
@@ -67,11 +66,15 @@ defmodule KomkiMediator.ToolsTest do
     assert {:reply, response, _frame} =
              Tools.AdmitDocument.execute(%{document_id: "doc-vertraulich"}, Frame.new())
 
-    assert parse_json_body(response)["decision"] == "deny"
+    body = parse_json_body(response)
+    assert body["decision"] == "error"
+    assert body["detail"] == "unbekanntes Objekt: \"doc-vertraulich\""
+    refute Map.has_key?(body, "remedies")
     refute_received {:connector_called, "documents", _, _, _, _}
   end
 
-  test "admit_document doc-vertraulich: deny als Remedy-Plan, isError bleibt false", %{base: base} do
+  test "admit_document doc-vertraulich: wie ein unbekanntes Dokument, isError bleibt false (#484)",
+       %{base: base} do
     _ = base
 
     assert {:reply, response, _frame} =
@@ -80,14 +83,20 @@ defmodule KomkiMediator.ToolsTest do
     refute response.isError
 
     body = parse_json_body(response)
-    assert body["decision"] == "deny"
+    assert body["decision"] == "error"
+    assert body["detail"] == "unbekanntes Objekt: \"doc-vertraulich\""
     refute Map.has_key?(body, "content")
 
-    # Der Katalog stammt aus der Engine-Entscheidung (KomkiPolicy.Remedies,
-    # CONTRACT § 2.8); im Raum recherche liegt das Label nicht in B_W
-    # (#213). Der Hinweis macht die Sperre zum Endpunkt (#166).
-    assert [%{"code" => "label_not_included"} | _] = body["remedies"]
-    assert body["hinweis"] == KomkiMediator.Hinweis.text(:deny)
+    # #484: Die Antwort ist von der auf ein Phantom-Dokument nicht zu
+    # unterscheiden; der Katalog der Engine-Entscheidung bleibt im
+    # Journal (gate_test). Im Raum recherche liegt das Label nicht in
+    # B_W (#213).
+    assert {:reply, phantom_response, _frame} =
+             Tools.AdmitDocument.execute(%{document_id: "doc-phantom"}, Frame.new())
+
+    phantom = parse_json_body(phantom_response)
+    assert Map.keys(body) == Map.keys(phantom)
+    assert phantom["detail"] == "unbekanntes Objekt: \"doc-phantom\""
   end
 
   test "list_documents: document_id und Labels, keine Inhalte" do
