@@ -705,13 +705,58 @@ defmodule KomkiCli.Profile do
   # eigenen flachen node_modules neben seinen Abhaengigkeiten. pi laedt von
   # dort jiti, sobald es eine TypeScript-Extension uebersetzt (die Anzeige,
   # KomkiCli.Anzeige). Liegt pi unter node, deckt die Regel oben das ab.
+  # Global per pnpm installiertes pi (Escript-Kanal) liegt im Store-Spiegel;
+  # dort sind die Abhaengigkeiten Symlinks, und pi folgt ihnen seit 1.5.1
+  # ueber den realpath (#556) — deshalb zusaetzlich die Spiegel-Regel.
   defp pi_deps_reads(root, root), do: []
 
   defp pi_deps_reads(root, _node_modules_root) do
     [
       "; Abhaengigkeiten des pi-Pakets (flaches node_modules, etwa jiti)",
       "(allow file-read* (subpath " <> SBPL.quote!(root) <> "))"
-    ]
+    ] ++ pnpm_store_mirror_reads(root)
+  end
+
+  # pnpm >= 11 installiert globale Pakete unter .../store/vN/links/<scope>/
+  # <paket>/<hash>/node_modules; die Abhaengigkeiten daneben sind Symlinks
+  # auf .../links/@/<dep>/... — der content-addressed Spiegel. Seatbelt ist
+  # pfadbasiert: Reads ueber den realpath landen ausserhalb der erlaubten
+  # Subtrees und sterben an "operation not permitted". Breite vergleichbar
+  # mit der node-globalen Regel (gesamter npm-Baum der node-Installation).
+  # Nur Spiegel-Pfade, die eindeutig an store/vN/links erkennbar sind,
+  # bekommen die Regel; andere Layouts keinerlei zusaetzliche Freigabe.
+  defp pnpm_store_mirror_reads(pi_modules) do
+    case pnpm_store_mirror(pi_modules) do
+      nil ->
+        []
+
+      mirror ->
+        [
+          "; pnpm-Store-Spiegel: realpath-Ziele der Abhaengigkeits-Symlinks (#556)",
+          "(allow file-read* (subpath " <> SBPL.quote!(mirror) <> "))"
+        ]
+    end
+  end
+
+  defp pnpm_store_mirror(pi_modules) do
+    # Path.split fuehrt bei absoluten Pfaden das Wurzelsegment "/" mit;
+    # es zaehlt nicht als Pfadbestandteil und muss weg, sonst verdoppelt
+    # sich der Slash beim Zusammenbau.
+    segments =
+      case Path.split(pi_modules) do
+        ["/" | rest] -> rest
+        relative -> relative
+      end
+
+    with idx when is_integer(idx) <- Enum.find_index(segments, &(&1 == "links")),
+         true <- idx >= 2,
+         "store" <- Enum.at(segments, idx - 2),
+         version when is_binary(version) <- Enum.at(segments, idx - 1),
+         true <- version =~ ~r/^v\d+$/ do
+      "/" <> Enum.join(Enum.take(segments, idx + 1) ++ ["@"], "/")
+    else
+      _ -> nil
+    end
   end
 
   # <root>/node_modules/@earendil-works/pi-coding-agent -> <root>/node_modules

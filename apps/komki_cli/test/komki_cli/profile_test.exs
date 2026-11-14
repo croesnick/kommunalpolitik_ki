@@ -128,6 +128,44 @@ defmodule KomkiCli.ProfileTest do
       assert String.contains?(text, @deps)
       assert String.contains?(text, "(allow file-read* (subpath \"" <> packaged <> "\"))")
       refute text =~ ~r/file-write\* \(subpath "#{packaged}/
+      # Kein pnpm-Store im Spiel: keine Spiegel-Regel.
+      refute String.contains?(text, "Store-Spiegel")
+    end
+
+    test "pi global per pnpm: Spiegel-Ziele der Abhaengigkeits-Symlinks lesbar (#556)", %{
+      cfg: cfg,
+      scratch: scratch
+    } do
+      # Store-v11-Links-Layout wie `pnpm add -g` es anlegt; die Abhaengigkeiten
+      # neben pi (jiti fuer die Anzeige) sind Symlinks auf .../links/@/<dep>.
+      hash = "3e415a5e00ec36c1325ad1716282f9025cec093333850a479153be56207e5758"
+      store_root = "/private/tmp/pnpm-global/store/v11/links"
+
+      store_pkg =
+        Path.join([
+          store_root,
+          "@earendil-works",
+          "pi-coding-agent",
+          "1.5.2",
+          hash,
+          "node_modules",
+          "@earendil-works",
+          "pi-coding-agent"
+        ])
+
+      cfg = %{cfg | cli_js: store_pkg <> "/dist/bundle/cli.js"}
+      text = Profile.generate(cfg, scratch)
+
+      assert String.contains?(text, @deps)
+      assert String.contains?(text, "(allow file-read* (subpath \"" <> store_pkg <> "\"))")
+
+      assert String.contains?(
+               text,
+               "(allow file-read* (subpath \"" <> store_root <> "/@\"))"
+             )
+
+      # Wie beim komki-Paket: nur lesen, kein Schreiben auf dem Store.
+      refute text =~ ~r/file-write\* \(subpath "#{store_root}/
     end
   end
 
