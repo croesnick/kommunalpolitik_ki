@@ -361,7 +361,10 @@ defmodule KomkiConnectorRisTest do
 
       paths = mock |> KomkiMock.Server.log() |> Enum.map(& &1["path"])
       assert "/auth" in paths
-      assert "/meetings/1001" in paths
+      # The public check runs on the guest agenda (review of #516), the text
+      # comes from the signed-in endpoint.
+      assert "/guestmeetings/1001" in paths
+      refute "/meetings/1001" in paths
       assert "/agendaitems/1001-1" in paths
       refute "/guestagendaitems/1001-1" in paths
     end

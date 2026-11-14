@@ -270,9 +270,12 @@ defmodule KomkiConnectorRis do
 
   # Jeder Grund, warum ein TOP nicht gezeigt wird (unbekannt, nicht-oeffentlich,
   # Sitzung fehlt, ID-Form falsch), ergibt denselben not-found-Fehler.
+  # Whether the item is public is decided on the guest agenda, as for
+  # ris_agenda: a meeting only a council member sees stays invisible even
+  # for a guessed top_id. Only the text comes from the signed-in endpoint.
   defp show(top_id, cfg) do
     with {:ok, meeting_id} <- Top.meeting_id(top_id),
-         {:ok, meeting} <- Api.meeting(cfg, meeting_id),
+         {:ok, meeting} <- Api.meeting(Map.put(cfg, :token, nil), meeting_id),
          {:ok, top} <- find_public(meeting, top_id),
          {:ok, detail} <- Api.agendaitem(cfg, top_id),
          true <- public_detail?(detail) do
