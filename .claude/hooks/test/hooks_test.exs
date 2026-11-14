@@ -194,5 +194,48 @@ defmodule RepoHooksTest do
       decision = dir |> pr("cd x && gh pr create -F pr.md") |> JSON.decode!()
       assert decision["hookSpecificOutput"]["permissionDecisionReason"] =~ "aktuelle Head"
     end
+
+    # A session standing in another worktree opens a PR for a branch (#532):
+    # the report must name that branch's head, not the directory's.
+    defp branch(dir, name) do
+      git = fn args -> {_, 0} = System.cmd("git", args, cd: dir, stderr_to_stdout: true) end
+      git.(["branch", name])
+      git.(["switch", "-q", name])
+      File.write!(Path.join(dir, "b.txt"), "b\n")
+      git.(~w(add -A))
+      git.(~w(commit -q -m branch))
+      sha = head(dir)
+      git.(~w(switch -q main))
+      sha
+    end
+
+    test "with --head the report must name that branch's head", %{dir: dir} do
+      sha = branch(dir, "fix")
+      File.write!(Path.join(dir, "pr.md"), report(sha))
+
+      for flag <- ["--head fix", "--head=fix", "-H fix", "--head croesnick:fix"] do
+        assert pr(dir, "gh pr create #{flag} --body-file pr.md") == "", flag
+      end
+    end
+
+    test "with --head a report for the directory's head is denied", %{dir: dir} do
+      branch(dir, "fix")
+      File.write!(Path.join(dir, "pr.md"), report(head(dir)))
+      decision = dir |> pr("gh pr create --head fix -F pr.md") |> JSON.decode!()
+      assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
+    end
+
+    test "a branch only under origin/ resolves too", %{dir: dir} do
+      sha = branch(dir, "fix")
+      {_, 0} = System.cmd("git", ~w(update-ref refs/remotes/origin/remote-only fix), cd: dir)
+      File.write!(Path.join(dir, "pr.md"), report(sha))
+      assert pr(dir, "gh pr create --head remote-only -F pr.md") == ""
+    end
+
+    test "an unknown branch is denied", %{dir: dir} do
+      File.write!(Path.join(dir, "pr.md"), report(head(dir)))
+      decision = dir |> pr("gh pr create --head nowhere -F pr.md") |> JSON.decode!()
+      assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
+    end
   end
 end
