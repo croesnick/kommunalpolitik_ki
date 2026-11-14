@@ -6,7 +6,7 @@ defmodule KomkiConnectorRis.MixProject do
       app: :komki_connector_ris,
       version: "0.1.0",
       description:
-        "RIS-Connector: sucht und liest öffentliche Tagesordnungspunkte im Ratsinformationssystem, mit Recorder und Kassetten für Tests",
+        "RIS-Connector: sucht und liest öffentliche Tagesordnungspunkte im Ratsinformationssystem, mit Recorder und Kassetten für Tests und Prüfskript für Tagesordnungen",
       elixir: "~> 1.19",
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",
