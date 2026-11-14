@@ -10,7 +10,7 @@ defmodule KomkiMediator.Fassung do
   # Schreibweg "Fakt vorschlagen" (Durchstich #409, Bau-Ticket #277): +
   # rp_fakt_vorschlagen, D.9-Pin bricht absichtlich (wie bei #218).
   # Stand lesen (#419): + rp_stand_lesen, Fassung 5.
-  # Sitzungen und Tagesordnung (#516): + ris_agenda, ris_sessions, Fassung 6.
+  # Sessions and agenda (#516): + ris_agenda, ris_sessions, version 6.
   @fassung_id "komki-mediator/6"
 
   # Feste Ordnung: die Tools des Vermittlers selbst (ping, seit #218

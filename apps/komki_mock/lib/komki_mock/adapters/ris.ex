@@ -108,6 +108,7 @@ defmodule KomkiMock.Adapters.Ris do
       "id" => m["id"],
       "name" => m["name"],
       "meetingdate" => m["date"],
+      "absolutestarttime" => m["date"],
       "committeename" => m["committee"],
       "locationname" => "Rathaus Buchloe, Sitzungssaal",
       "clientid" => 32,

@@ -146,7 +146,7 @@ CONTRACT.md § 4.9). Der Agent benennt keine Ausgabeart; das Manifest ist die ei
 | ratsprojekte | `rp_stand_lesen` | `stand_lesen` | keine | admit_only (§6.4), Objekt `ratsprojekte-stand`, Umgebung `lokaler-arbeitsraum@1` |
 | ris | `ris_agenda` | `agenda` | `sitzung_id` (string, max 18, pattern `^\d{1,18}$`) | read |
 | ris | `ris_search` | `search` | `text` (string, max 200), `limit` (integer 1..20, optional, Default 10) | read |
-| ris | `ris_sessions` | `sessions` | `von` (string, pattern `^\d{4}-\d{2}-\d{2}$`), `bis` (wie `von`, optional, Standard `von`, höchstens 366 Tage später), `gremium` (string, max 100, optional, Teilstring des Gremiumsnamens), `limit` (integer 1..50, optional, Default 20) | read |
+| ris | `ris_sessions` | `sessions` | `von` (string, max 10, pattern `^\d{4}-\d{2}-\d{2}$`), `bis` (wie `von`, optional, Standard `von`, höchstens 366 Tage später), `gremium` (string, max 100, optional, Teilstring des Gremiumsnamens), `limit` (integer 1..50, optional, Default 20) | read |
 | ris | `ris_show` | `show` | `top_id` (string, max 64, pattern `^[A-Za-z0-9_-]+$`) | read |
 | web | `web_search` | `search` | `query` (string, max 400), `count` (integer 1..10, optional, Default 5) | read |
 | vault | `vault_search` | `search` | `text` (string, max 200) | read |
@@ -158,8 +158,8 @@ Der Vermittler bietet damit `ping`, `list_documents` und diese elf Tools an (Fas
 Sonderfall (Ticket #169): Der Vermittler entscheidet es über die Objekt-Labels aus `room.json` gegen das B_W
 des Raums (Regelzweig `admit`, `KomkiMediator.Gate`, R.5.4, #213), bevor er den Connector ruft. Der Connector
 führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Manifest gelten dafür nicht. `ping` und
-`list_documents` (#218) beantwortet der Vermittler selbst, ohne Connector. Das ist Fassung
-`komki-mediator/4`, und der D.9-Pin bricht absichtlich.
+`list_documents` (#218) beantwortet der Vermittler selbst, ohne Connector; sie kamen mit `komki-mediator/4`. Jede neue
+Fassung bricht den D.9-Pin absichtlich.
 
 ### 5.2 Ergebnisformen (Connector → Vermittler)
 
@@ -171,11 +171,12 @@ führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Man
   ergibt `not-found`, genau wie ein nicht existierender.
   `nummer` ist die TOP-Nummer aus der Tagesordnung, wie das RIS sie führt (`numbering`, etwa `4` oder `6.2`), seit
   `komki-ris/2`; `top_id` ist die interne Kennung der RIS-API (`<Sitzung>-<Punkt>`) und nur für `show` gedacht.
-- `ris.sessions` (seit `komki-ris/3`, #516): `{"results": [{"sitzung_id", "sitzung", "gremium", "datum", "url"}], "abrufdatum"}`,
-  aufsteigend nach Datum. Gelistet wird jede Sitzung des öffentlichen Kalenders im Zeitraum, auch eine, deren
+- `ris.sessions` (seit `komki-ris/3`, #516): `{"results": [{"sitzung_id", "sitzung", "gremium", "datum", "uhrzeit", "url"}],
+  "abrufdatum"}`, aufsteigend nach Datum; `uhrzeit` ist `HH:MM` aus `absolutestarttime` oder leer. Gelistet wird jede Sitzung des öffentlichen Kalenders im Zeitraum, auch eine, deren
   Tagesordnung ganz nicht-öffentlich ist. Das Datum filtert der Connector selbst, nicht nur die API.
-- `ris.agenda` (seit `komki-ris/3`, #516): `{"sitzung_id", "sitzung", "gremium", "datum", "url", "tops": [{"top_id",
-  "nummer", "titel"}], "abrufdatum"}`. `tops` enthält nur öffentliche TOPs, gefiltert wie bei `search`; eine
+- `ris.agenda` (seit `komki-ris/3`, #516): `{"sitzung_id", "sitzung", "gremium", "datum", "uhrzeit", "url", "tops": [{"top_id",
+  "nummer", "titel"}], "abrufdatum"}`. Die Tagesordnung kommt immer vom Gast-Endpunkt, auch angemeldet: Eine Sitzung,
+  die nur ein Ratsmitglied sieht, erscheint so auch über eine erratene `sitzung_id` nicht. `tops` enthält nur öffentliche TOPs, gefiltert wie bei `search`; eine
   Tagesordnung ohne öffentliche TOPs ist eine leere Liste, ohne Zahl oder Hinweis auf verborgene. `nummer` bleibt, wie
   das RIS sie führt: Die Gast-Ansicht des RIS zeigt nicht-öffentliche TOPs nicht, eine Lücke in der Nummerierung ist
   dort also ebenso sichtbar (geprüft 2026-11-14 an 12 Sitzungen). Eine unbekannte Sitzung ergibt `not-found`.

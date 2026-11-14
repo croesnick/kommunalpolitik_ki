@@ -107,7 +107,7 @@ defmodule KomkiConnector.Manifest do
           description:
             "Sitzungen des Ratsinformationssystems (RIS) in einem Zeitraum auflisten: von und bis als " <>
               "JJJJ-MM-TT (bis optional, Standard: derselbe Tag, hoechstens 366 Tage), optional gremium " <>
-              "als Teil des Gremiumsnamens. Liefert je Sitzung sitzung_id fuer ris_agenda. " <>
+              "als Teil des Gremiumsnamens. Liefert je Sitzung Datum, Uhrzeit und sitzung_id fuer ris_agenda. " <>
               "Nutze das zuerst, wenn nach einer Sitzung an einem Datum gefragt ist.",
           params: %{
             "von" => %{type: :string, max: 10, required: true, pattern: ~r/^\d{4}-\d{2}-\d{2}$/},
@@ -121,9 +121,8 @@ defmodule KomkiConnector.Manifest do
           kind: :read,
           description:
             "Die oeffentliche Tagesordnung einer RIS-Sitzung anhand ihrer sitzung_id (aus ris_sessions): " <>
-              "TOP-Nummer, Titel und top_id fuer ris_show. Nicht-oeffentliche TOPs liefert dieses " <>
-              "Werkzeug grundsaetzlich nicht. Eine leere Liste heisst: keine oeffentlichen TOPs " <>
-              "veroeffentlicht.",
+              "TOP-Nummer, Titel und top_id fuer ris_show. Nicht-oeffentliche TOPs liefert komki " <>
+              "nicht. Eine leere Liste heisst: keine oeffentlichen TOPs im RIS.",
           params: %{
             "sitzung_id" => %{type: :string, max: 18, required: true, pattern: ~r/^\d{1,18}$/}
           }
@@ -135,7 +134,7 @@ defmodule KomkiConnector.Manifest do
             "Volltextsuche in oeffentlichen Tagesordnungspunkten des Ratsinformationssystems (RIS). " <>
               "Zitiere einen Treffer mit Sitzung, Datum und TOP-Nummer (Feld nummer); " <>
               "top_id ist nur die Kennung fuer ris_show. Fuer die Tagesordnung einer Sitzung " <>
-              "nimm ris_sessions und ris_agenda. Nicht-oeffentliche TOPs liefert das RIS hier nie.",
+              "nimm ris_sessions und ris_agenda. Nicht-oeffentliche TOPs liefert komki nicht.",
           params: %{
             "text" => %{type: :string, max: 200, required: true},
             "limit" => %{type: :integer, min: 1, max: 20, required: false, default: 10}
@@ -147,7 +146,7 @@ defmodule KomkiConnector.Manifest do
           description:
             "Einen oeffentlichen Tagesordnungspunkt des RIS anhand seiner top_id lesen: Text mit " <>
               "Sachverhalt und Beschlussvorschlag, soweit das RIS ihn liefert. Nicht-oeffentliche TOPs " <>
-              "liefert das RIS hier nie.",
+              "liefert komki nicht.",
           params: %{
             "top_id" => %{type: :string, max: 64, required: true, pattern: ~r/^[A-Za-z0-9_-]+$/}
           }

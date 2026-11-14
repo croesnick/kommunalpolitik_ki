@@ -41,7 +41,8 @@ defmodule KomkiMediator.ResultShapeTest do
       "sitzung_id" => "1",
       "sitzung" => "S",
       "gremium" => "G",
-      "datum" => "2026-11-17",
+      "datum" => "2026-06-02",
+      "uhrzeit" => "18:00",
       "url" => "u"
     }
 

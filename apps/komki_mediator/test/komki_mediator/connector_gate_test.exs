@@ -51,28 +51,30 @@ defmodule KomkiMediator.ConnectorGateTest do
       "results" => [
         %{
           "sitzung_id" => "4711",
-          "sitzung" => "7. Sitzung des Stadtrates",
-          "gremium" => "Stadtrat",
-          "datum" => "2026-11-17",
+          "sitzung" => "Gartenstadt-Rat, Zusammenkunft Nr. 15",
+          "gremium" => "Gartenstadt-Rat",
+          "datum" => "2026-06-02",
+          "uhrzeit" => "18:00",
           "url" => "https://ris.example/guestmeetings/4711"
         }
       ],
-      "abrufdatum" => "2026-11-14T19:00:00Z"
+      "abrufdatum" => "2026-05-28T09:00:00Z"
     }
   end
 
   defp ris_agenda do
     %{
       "sitzung_id" => "4711",
-      "sitzung" => "7. Sitzung des Stadtrates",
-      "gremium" => "Stadtrat",
-      "datum" => "2026-11-17",
+      "sitzung" => "Gartenstadt-Rat, Zusammenkunft Nr. 15",
+      "gremium" => "Gartenstadt-Rat",
+      "datum" => "2026-06-02",
+      "uhrzeit" => "18:00",
       "url" => "https://ris.example/guestmeetings/4711",
       "tops" => [
-        %{"top_id" => "4711-1", "nummer" => "1", "titel" => "Ergänzung der Tagesordnung"},
-        %{"top_id" => "4711-3", "nummer" => "3", "titel" => "Leitlinien Wohnungsbau"}
+        %{"top_id" => "4711-1", "nummer" => "1", "titel" => "Kläranlagen-Erneuerung im Süden"},
+        %{"top_id" => "4711-3", "nummer" => "3", "titel" => "Lindenallee: Baumpflanzungen"}
       ],
-      "abrufdatum" => "2026-11-14T19:00:00Z"
+      "abrufdatum" => "2026-05-28T09:00:00Z"
     }
   end
 
@@ -94,10 +96,10 @@ defmodule KomkiMediator.ConnectorGateTest do
       "agenda", _params, _context -> {:ok, ris_agenda()}
     end)
 
-    response = ConnectorGate.call(env, "ris_sessions", %{"von" => "2026-11-17"})
+    response = ConnectorGate.call(env, "ris_sessions", %{"von" => "2026-06-02"})
 
     assert_received {:connector_called, "ris", "sessions",
-                     %{"von" => "2026-11-17", "limit" => 20}, %{}, 3}
+                     %{"von" => "2026-06-02", "limit" => 20}, %{}, 3}
 
     assert response["decision"] == "permit"
     assert response["labels"] == ["ris-oeffentlich@1"]
