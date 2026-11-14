@@ -1,0 +1,188 @@
+---
+title: So funktioniert komki
+description: Agent, Vermittler, Connectoren und Räume, kurz hergeleitet.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Architektur from '../../../assets/architektur.svg';
+import Anfrage from '../../../assets/anfrage.svg';
+import GoAbgelehnt from '../../../assets/go-abgelehnt.svg';
+import GoExistenzLeck from '../../../assets/go-existenz-leck.svg';
+import RaumRecherche from '../../../assets/raum-recherche.svg';
+import RaumVertraulich from '../../../assets/raum-vertraulich-hell.svg';
+
+Ein KI-Agent, der recherchieren darf, ist praktisch. Gefährlich wird er, wenn drei Dinge zusammenkommen: Er kennt private Daten, er liest fremde Inhalte, und er hat einen Weg nach draußen. Simon Willison nennt das die [lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/). Dann reicht ein präparierter Text auf einer Webseite, und der Agent trägt deine Notizen hinaus. komki ist so gebaut, dass diese Kombination nicht entstehen kann.
+
+## Das Bild im Kopf
+
+<div class="komki-figure"><Architektur /></div>
+
+Jeder gestrichelte Kasten ist eine eigene Sandbox. Pfeile zeigen die einzigen erlaubten Wege, kleine Schrift die Freigaben. Gestartet werden alle Prozesse von `komki up`.
+
+- **pi** ist der Agent. Er läuft mit einem lokalen Sprachmodell (gemma) in einer macOS-Sandbox, die ihm fast alles verbietet: kein Internet, kein Zugriff auf deine Dateien, keine fremden Prozesse. Eigene Werkzeuge zum Lesen, Schreiben oder Ausführen hat er nicht; auch Notizen liest und schreibt er nur über den Vermittler. Er erreicht genau zwei Dinge: das Sprachmodell und den Vermittler.
+- **Der Vermittler** ist die einzige Tür nach draußen. Er selbst hat kein Internet. Er entscheidet jede Anfrage und schreibt jede Entscheidung ins Journal.
+- **Die Connectoren** für RIS, Websuche, Vault und die Raumdokumente des Arbeitsraums laufen als eigene Prozesse, jeder in seiner eigenen Sandbox, mit genau den Rechten, die es braucht. Der Brave-Key liegt nur beim Web-Connector, dein RIS-Zugang nur beim RIS-Connector.
+- **Der Egress-Proxy** ist der einzige Prozess, der ins Internet darf, und auch er nur zu freigegebenen Adressen, je Connector getrennt.
+
+Drei Regeln halten das zusammen:
+
+1. **Feste Fragen statt freier Befehle.** Ein Connector bietet nur eng gefasste Operationen an, etwa „suche im RIS nach Text“. Kein Tool nimmt eine beliebige URL, einen Pfad oder einen Shell-Befehl entgegen.
+2. **Schlüssel bleiben beim Connector.** Der Brave-Key liegt im macOS-Schlüsselbund, versiegelt mit der Secure Enclave deines Macs. Öffnen lässt er sich nur mit Touch ID oder deinem Passwort, deshalb fragt macOS beim Start danach. Dann geht er nur an den Web-Connector. pi sieht ihn nie, und ein anderes Programm auf deinem Mac kommt ohne deine Freigabe nicht an ihn heran.
+3. **Hin und zurück wird geprüft.** Die Anfrage ist eine Ausgabe, die Antwort ein neuer Eingang. Beides entscheidet ein Regelwerk, und jede Entscheidung landet im Journal.
+
+## Was bei einer Anfrage passiert
+
+Angenommen, pi möchte im Web nach „Förderung Radwege Bayern“ suchen. Der Vermittler lässt das Regelwerk an zwei Toren entscheiden:
+
+<div class="komki-figure"><Anfrage /></div>
+
+Gate 1 besteht technisch aus zwei Fragen: `emit` (der Raum erzeugt die Anfrage) und `transfer` (die Anfrage geht an den Connector; beim Schreiben heißt das `store`). Gate 2 heißt `admit` (einen Eingang aufnehmen).
+
+- **Gate 1:** Wer würde die Anfrage sehen? Bei der Websuche ist das Brave. Ist Brave ein zulässiger Empfänger für alles, was gerade im Raum liegt? Wenn nein, ist hier Schluss, und es entsteht keine einzige Netzverbindung.
+- **Beleg vor der Wirkung:** Erst wenn der Beleg zu Gate 1 im Journal steht, ruft der Vermittler den Connector.
+- **Gate 2:** Die Antwort bekommt ein Label, etwa `web-oeffentlich@1`. Das Label vergibt der Vermittler nach festen Regeln, nicht der Connector. Passt das Label nicht zum Raum, kommt der Inhalt nicht bei pi an.
+
+## Räume: was zusammenkommen darf
+
+Ein **Raum** legt fest, welche Arten von Daten in einer Sitzung zusammenkommen dürfen. komki kennt vier:
+
+| Darf pi … | Raum `recherche` (Standard) | Raum `vertraulich` | Raum `fraktion` | Raum `projektraum` |
+|---|---|---|---|---|
+| im RIS suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO |
+| im Web suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO |
+| öffentliche Notizen lesen | <span class="ja">ja</span> | <span class="ja">ja</span> | <span class="ja">ja</span> | <span class="ja">ja</span>, nach deinem GO |
+| vertrauliche Notizen lesen | <span class="nein">nein, sie sind unsichtbar</span> | <span class="ja">ja</span> | <span class="nein">nein, unsichtbar</span> | <span class="nein">nein, unsichtbar</span> |
+| interne Fraktionsarbeit lesen | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span> | <span class="nein">nein</span> |
+| den Stand aus ratsprojekte lesen | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span> |
+| Notizen in `komki-test/` schreiben | <span class="ja">ja</span>, nach deinem GO | <span class="ja">ja</span>, nach deinem GO, mit vertraulichem Label | <span class="ja">ja</span>, nach deinem GO | <span class="ja">ja</span>, nach deinem GO |
+| gegengelesene Essenz an ratsprojekte geben | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span>, mit Offenlegung gegenüber dem Vorstand | <span class="nein">nein</span>; Fakten nach deinem GO |
+
+<Aside type="tip" title="Warum das wirkt">
+Im Raum „vertraulich“ fehlt jeder Weg nach draußen, solange du nicht selbst einen einzelnen Aufruf freigibst. Selbst ein Agent, der vollständig von einem Angreifer gesteuert würde, kann vertrauliche Inhalte dort nicht weitergeben. Im Raum „recherche“ ist der Weg nach draußen offen, dafür kommt der Agent gar nicht erst an Vertrauliches. Du wechselst mit `komki raum vertraulich`, `komki raum recherche`, `komki raum fraktion` und `komki raum projektraum`. Das kannst du [selbst ausprobieren](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
+</Aside>
+
+Der Raum `fraktion` trägt interne Fraktionsarbeit und die Projektidee: Fraktion und der Betreiber der Nextcloud, in dem der Fraktionsordner liegt, lesen mit — der Vorstand nicht. In den ratsprojekte-Hub gelangt aus ihm nur, was du selbst gegengelesen und freigegeben hast: der Weg ist eine Offenlegung gegenüber dem Vorstand, und du wählst die Teile vorher ab (siehe unten). Bis du das brauchst, trägst du die Essenz von Hand ein: eine kurze Fassung schreiben lassen, gegenlesen, im Hub eintragen — komki hält diese Übergabe nicht im Journal fest.
+
+### Den Stand aus ratsprojekte lesen
+
+Willst du mit pi durchgehen, wo ein Projekt steht, wechselst du in den **Projektraum**. Nur dort darf der Stand hinein, den ratsprojekte als Datei ausgibt. pi liest ihn mit `rp_stand_lesen`, ohne dass du freigeben musst, und ratsprojekte erfährt davon nichts: komki liest nur die Datei. Dafür fragt im Projektraum jede Anfrage nach draußen nach deinem GO, auch die Websuche. So kennt ein Raum entweder den Stand oder hat einen freien Weg nach draußen, nie beides.
+
+Wo die Datei liegt, steht in der `config.json` deiner Instanz unter `ratsprojekte_stand`. Ohne den Eintrag meldet `rp_stand_lesen` im Projektraum einen Fehler, weil komki keine Datei kennt.
+
+Aus einem echten Lauf auf einer Wegwerf-Instanz, mit derselben Frage in beiden Räumen. Im Raum `recherche` antwortet pi:
+
+```text
+Der Zugriff auf den `ratsprojekte`-Stand ist in diesem Arbeitsraum gesperrt. Um diese Information lesen zu können, muss ein neuer Raum angelegt werden, der mit dem Label `ratsprojekte@1` versehen ist.
+```
+
+Dann der Wechsel:
+
+```text
+$ komki raum projektraum
+Raum        recherche → projektraum
+            Wie recherche, dazu der Stand aus ratsprojekte. Websuche, RIS und Vault nur mit deinem GO für den einzelnen Aufruf.
+Vermittler  neu gestartet, er entscheidet jetzt im neuen Raum.
+```
+
+Und dieselbe Frage im Projektraum:
+
+```text
+Das Projekt Radweg Bahnhofstraße wird im ratsprojekte-Hub unter dem Titel „Radweg Bahnhofstraße: Verkehrszählung“ geführt. Laut dem aktuellen Stand ist die nächste Beratung durch den Bauausschuss für den 17.11.2026 als TOP 4 vorgesehen (Quelle: ratsprojekte-Stand).
+```
+
+Zurück nach `recherche` geht es nur ohne laufende Session, sonst käme der Stand mit.
+
+## Was pi dir zeigt: Raum, Labels, Dokumente
+
+Beim Start zeigt pi oben, in welchem Raum du arbeitest, wofür er da ist, welche Labels darin zusammenkommen und ob Anfragen nach draußen offen sind. Unten steht dasselbe kurz in der Fußzeile, dazu die Zahl der Raumdokumente, sobald pi sie aufgelistet hat. Welche Dokumente bereitliegen, erfährt pi über den Vermittler (`list_documents`): nur Kennung und Label, den Inhalt erst beim Lesen.
+
+<div class="komki-figure"><RaumRecherche /></div>
+
+Drei Befehle zeigen dir mehr, ohne dass etwas davon beim Modell ankommt:
+
+| Befehl | Was du siehst |
+|---|---|
+| `/raum` | Raum, Zweck, jedes Label mit seiner Bezeichnung und wer es sehen darf, der Weg nach draußen |
+| `/dokumente` | die Raumdokumente, die pi zuletzt aufgelistet hat |
+| `/hilfe` | alle Befehle von komki in pi |
+
+Im Raum „vertraulich“ steht oben, dass der Weg nach draußen gesperrt ist. Das Bild zeigt `/raum` dort, im hellen Farbschema:
+
+<div class="komki-figure"><RaumVertraulich /></div>
+
+Die Anzeige beschreibt den Raum, sie entscheidet nichts. Ob ein Aufruf läuft, entscheidet weiter der Vermittler, Aufruf für Aufruf.
+
+## Eigene Dokumente in die Session holen
+
+Eine Vorlage, ein Protokoll, eine Notiz — oder eine Drucksache als PDF: `komki session vorlage.md drucksache.pdf` bringt Dateien als Dokumente des Arbeitsraums mit. Vorher prüft komki, ob sie hinein dürfen. Dafür braucht jede Datei ein Label im Label-Store (`komki label`), und der Raum braucht einen Startvertrag in `room.json`: wofür er da ist, welche Labels er verträgt, welche Dateien herein dürfen.
+
+- Passt alles, liegen die Dateien danach als Dokumente im Raum, und pi liest sie über den Vermittler, mit Beleg im Journal.
+- PDFs liest der Dokument-Connector als Text je Seite mit Seitenanker `[Seite N]` — Zitate lassen sich so auf die Seite belegen —, dazu die Markierungen (Highlights), die du im PDF gesetzt hast, mit Kommentar und markiertem Text. Ein Scan ohne Textebene meldet einen klaren Fehler, es gibt kein OCR. Die PDF-Lesung braucht die Einzeldatei von komki (`make komki-burrito`): Im Escript-Betrieb meldet jede PDF-Lesung einen Fehler, bis die Programmform entschieden ist — Details unter [Wenn es hakt](/kommunalpolitik_ki/komki/wenn-es-hakt/). Eine Objekt-ID liegt in genau einer Form im Raum: Markdown und PDF derselben Objekt-ID lehnt die Aufnahme ab.
+- Kennt komki die Datei nicht, kommt sie in Quarantäne, bis du sie einordnest. Die Session startet dann nicht.
+- Passt das Label nicht zum Raum, etwa eine öffentliche Datei in einem Raum mit enger Zweckbindung, lehnt komki ab und sagt, was stattdessen ginge.
+
+Einzelheiten stehen in der [README von komki_cli](https://github.com/croesnick/kommunalpolitik_ki/tree/main/apps/komki_cli#dateien-beim-session-start-aufnehmen-ticket-92).
+
+## Freigabe: dein GO für genau einen Aufruf
+
+Manchmal ist eine gesperrte Anfrage in Ordnung, etwa eine Websuche nach einem Förderprogramm, während eine vertrauliche Notiz offen ist. Dann entscheidest du. Schreiben ist immer gesperrt, bis du es freigibst: Keine Regel erlaubt komki, von sich aus eine Notiz abzulegen. Das Fenster sagt dann „Aktion: speichern“. Läuft eine Session und hängt dein Terminal daran, öffnet komki bei einer gesperrten Anfrage ein Fenster. Das Bild stammt aus einer echten Session im Raum „vertraulich“:
+
+<div class="komki-figure"><GoExistenzLeck /></div>
+
+Geht die Anfrage nach draußen, nennt das Fenster, wer sie zu sehen bekommt, hier Brave für die Websuche. Bedenke: Schon der Aufruf selbst verrät, *dass* und *wann* aus diesem Arbeitsraum gefragt wird, auch wenn der Suchtext harmlos aussieht. Ein GO für eine Suche nach „x“ ist also nicht folgenlos.
+
+Mit `j` läuft genau diese Anfrage, einmal. Fragt pi danach etwas anderes oder dasselbe noch einmal, wird wieder gesperrt. Enter oder `n` heißt Nein. Antwortest du zwei Minuten lang nicht, bleibt es ebenfalls beim Nein. Jede Freigabe und jede Ablehnung steht im Journal.
+
+Ohne angedocktes Terminal, also bei `komki run` oder einer Session im Hintergrund, fragt komki nicht und lehnt sofort ab. Offene Anfragen kannst du auch in einem zweiten Terminal mit `komki go` beantworten.
+
+Beim Speichern gibt es eine Grenze, die auch dein GO nicht verschiebt: Würde jemand mitlesen, der Inhalte dieses Arbeitsraums nicht sehen darf, öffnet komki gar kein Fenster. In pi steht dann, wer das ist. Die Grenze greift auch ohne bekannten Mitleser: Gilt die Beobachterliste des Speichers als unvollständig, lehnt komki ab und fragt nach keinem GO — ein GO kann nicht belegen, wer mitliest. Ein GO legt fest, *ob* etwas geschieht, aber nicht, *wer* es liest. Mit den Regeln, die komki mitbringt, kommt das nicht vor: Dort lesen im Vault nur du und pi mit.
+
+In pi steht danach unter der Sperre, was aus der Freigabe wurde: abgelehnt, ohne Antwort geblieben oder gar nicht gefragt, weil kein Fenster bereit war. Eine Frage zum Beantworten zeigt pi nie. Das GO kommt nur aus dem Freigabefenster von komki, damit ein gekaperter Agent keinen Freigabe-Dialog vortäuschen kann. Das Bild zeigt beide Fälle aus einer echten Session: Erst war kein Fenster angedockt, beim zweiten Versuch lautete die Antwort Nein.
+
+<div class="komki-figure"><GoAbgelehnt /></div>
+
+### Offenlegung: Essenz aus dem Fraktionsraum in den Hub
+
+Gibt pi aus dem Fraktionsraum etwas an ratsprojekte weiter, verlässt der Text den Raum und wird dem Vorstand offengelegt. Das ist kein gewöhnliches GO: Das Fenster sagt es mit eigenen Worten, nennt alle Empfänger und zeigt die Teile einzeln an. Vor dem GO wählst du aus, welche Teile den Raum verlassen dürfen — ein abgewähltes Teil fliegt nicht erst im Hub raus, es geht gar nicht erst hinaus, und die Freigabe bindet genau die Auswahl.
+
+Das Fenster stammt aus einem echten Lauf auf einer Wegwerf-Instanz (Raum `fraktion`, Aufruf `rp_fakt_vorschlagen`):
+
+```text
+Gesperrter Aufruf (Beleg pdr-eb178e848619483e969c7d1e9306c69d)
+  Werkzeug:  rp_fakt_vorschlagen
+  Aktion:    speichern — jedes Schreiben braucht dein GO
+  Ausgabe:   ratsprojekte-essenz (Lockerung auf ratsprojekte@1)
+  Offenlegung: Ich lege den ausgewählten Text bewusst gegenüber dem Vorstand offen.
+  Alle Empfänger: Fraktion, Betreiber der Nextcloud (Ordner für den Stand), nutzende-person, pi-agent, Sicherung (Time Machine), Vorstand
+  Parameter:
+    projekt_hinweis: "radweg-bahnhofstrasse"
+    teile: [%{"aussage" => "Die Fraktion bevorzugt die Führung des Radwegs entlang der Bahntrasse.", "quelle" => "antwort-trasse"}, %{"aussage" => "Der Antragsentwurf sieht eine Beteiligung der Anwohner vor.", "quelle" => "antwort-entwurf"}]
+    titel: "Essenz aus dem Fraktionsraum"
+  Teile:
+    1. %{"aussage" => "Die Fraktion bevorzugt die Führung des Radwegs entlang der Bahntrasse.", "quelle" => "antwort-trasse"}
+    2. %{"aussage" => "Der Antragsentwurf sieht eine Beteiligung der Anwohner vor.", "quelle" => "antwort-entwurf"}
+  Gesperrt:  recipient_not_allowed, missing_operation_rule
+  Ein GO gilt nur für genau diesen Aufruf, einmal, fünf Minuten lang.
+Teile, die den Raum verlassen dürfen (z. B. 1,3 — Enter = alle):
+```
+
+Die Eingabe `1` übernimmt nur den ersten Teil, `Enter` nähme alle. Danach fragt das Fenster noch einmal mit dem Satz der Offenlegung:
+
+```text
+GO: Ich lege die ausgewählten Teile bewusst gegenüber dem Vorstand offen. [j/N] j
+Offenlegung erteilt — sie gilt nur für diesen Aufruf, einmal.
+```
+
+Im Hub kommt genau der ausgewählte Teil an, als „nicht verifiziert“ bis ein Mensch die Quelle nachgeschlagen hat, und das Journal hält fest, gegenüber wem du offengelegt hast: Ausgabeart, Ziellabel und alle Empfänger. Auch dein GO verschiebt die Grenze nicht rückwärts: Liegt im Raum etwas, das du dafür nicht lockern darfst — etwa nichtöffentliche Ratsunterlagen —, öffnet komki gar kein Fenster, und pi hört nur, dass nichts übertragen wurde.
+
+## Vorlagen für die Ratsarbeit
+
+Typische Aufgaben startest du mit einem Befehl statt mit einem selbst formulierten Auftrag. Tipp in pi `/` und wähle:
+
+| Befehl | Was pi tut |
+|---|---|
+| `/sitzungsmappe [Thema]` | fasst die Raumdokumente je Tagesordnungspunkt zusammen: Worum es geht, Beschlussvorschlag, Kosten und Fristen, offene Fragen |
+| `/zusammenfassen <Dokument>` | fasst ein Raumdokument, einen Tagesordnungspunkt oder eine Notiz knapp zusammen |
+| `/quellen` | listet alle Quellen aus dem bisherigen Gespräch auf, ohne neue Abfrage |
+
+Jede Vorlage verlangt Quellen und erlaubt keine Websuche, um die du nicht gebeten hast. Vorlagen sind nur Text: Was pi damit tut, läuft wie jeder andere Auftrag durch den Vermittler.

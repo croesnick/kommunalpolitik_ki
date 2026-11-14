@@ -1,0 +1,240 @@
+/* See the Tailwind configuration guide for advanced usage
+   https://tailwindcss.com/docs/configuration */
+
+@import "tailwindcss" source(none);
+@import "phoenix-colocated/ratsprojekte/colocated.css";
+@source "../css";
+@source "../js";
+@source "../../lib/ratsprojekte_web";
+/* Required for Tailwind to automatically pick up changes in colocated CSS files in dev */
+@source "../../_build/dev/phoenix-colocated/ratsprojekte/*/";
+
+/* A Tailwind plugin that makes "hero-#{ICON}" classes available.
+   The heroicons installation itself is managed by your mix.exs */
+@plugin "../vendor/heroicons";
+
+/* daisyUI Tailwind Plugin. */
+@plugin "daisyui/packages/bundle/daisyui" {
+  themes: false;
+}
+
+/* daisyUI theme plugin.
+  We ship with two themes, a light one inspired on Phoenix colors and a dark one inspired
+  on Elixir colors. Build your own at: https://daisyui.com/theme-generator/ */
+@plugin "daisyui/packages/bundle/daisyui-theme" {
+  name: "dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: #181d24;
+  --color-base-200: #1b2129;
+  --color-base-300: #2c3440;
+  --color-base-content: #e6e9ef;
+  --color-primary: #8db8ef;
+  --color-primary-content: #0f1520;
+  --color-secondary: #c9cfd9;
+  --color-secondary-content: #13171d;
+  --color-accent: #8db8ef;
+  --color-accent-content: #0f1520;
+  --color-neutral: #e6e9ef;
+  --color-neutral-content: #13171d;
+  --color-info: #8db8ef;
+  --color-info-content: #0f1520;
+  --color-success: #7fd18f;
+  --color-success-content: #13171d;
+  --color-warning: #e7bd63;
+  --color-warning-content: #13171d;
+  --color-error: #ff9a8f;
+  --color-error-content: #13171d;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.45rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.21875rem;
+  --size-field: 0.21875rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/packages/bundle/daisyui-theme" {
+  name: "light";
+  default: true;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: #ffffff;
+  --color-base-200: #f2f6fb;
+  --color-base-300: #dde3ec;
+  --color-base-content: #1c2330;
+  --color-primary: #1f5c9e;
+  --color-primary-content: #ffffff;
+  --color-secondary: #3f4a5b;
+  --color-secondary-content: #ffffff;
+  --color-accent: #1f5c9e;
+  --color-accent-content: #ffffff;
+  --color-neutral: #1c2330;
+  --color-neutral-content: #ffffff;
+  --color-info: #1f5c9e;
+  --color-info-content: #ffffff;
+  --color-success: #1f7a3a;
+  --color-success-content: #ffffff;
+  --color-warning: #8a5a00;
+  --color-warning-content: #ffffff;
+  --color-error: #b42318;
+  --color-error-content: #ffffff;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.45rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.21875rem;
+  --size-field: 0.21875rem;
+  --border: 1.5px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* Add variants based on LiveView classes */
+@custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
+@custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
+@custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);
+
+/* Use the data attribute for dark mode  */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* Make LiveView wrapper divs transparent for layout */
+[data-phx-session], [data-phx-teleported-src] { display: contents }
+
+/* This file is for your main application CSS */
+
+/* The hub (#437): calm, readable, colours from the storyboard. */
+:root {
+  --hub-body: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --hub-head: "Zilla Slab", Georgia, "Times New Roman", serif;
+  --stufe-1: #c8391f; --stufe-2: #ef9a7f; --stufe-3: #cfd5dd; --stufe-4: #8fbf5a; --stufe-5: #1f7a3a;
+}
+body { font-family: var(--hub-body); background: var(--color-base-100); line-height: 1.55; }
+.hub-titel, .hub-marke { font-family: var(--hub-head); font-weight: 600; line-height: 1.15; text-wrap: balance; }
+
+.hub-kopf {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem;
+  padding: 0.65rem max(16px, 1.25rem); border-bottom: 1px solid var(--color-base-300);
+}
+.hub-marke { font-size: 1.15rem; }
+.hub-nav { display: flex; gap: 0.25rem; }
+.hub-nav a { padding: 0.25rem 0.65rem; border-radius: 0.4rem; color: var(--color-primary); font-weight: 600; }
+.hub-nav a:hover { background: color-mix(in oklab, var(--color-primary) 8%, transparent); }
+.hub-nav a[aria-current="page"] { background: color-mix(in oklab, var(--color-primary) 12%, transparent); }
+.hub-main { max-width: 84rem; margin: 0 auto; padding: 1rem max(16px, 1.25rem) 3rem; }
+.hub-leer { margin-top: 2rem; color: color-mix(in oklab, var(--color-base-content) 70%, transparent); }
+
+.hub-brett { display: grid; gap: 0.6rem; margin-top: 0.8rem; align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+@media (min-width: 72rem) { .hub-brett { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.hub-spalte { padding: 0.6rem; border-radius: 0.55rem; background: var(--color-base-200); min-width: 0; }
+.hub-karte { margin-top: 0.45rem; padding: 0.6rem 0.65rem; border: 1px solid var(--color-base-300);
+  border-radius: 0.45rem; background: var(--color-base-100); }
+.hub-karte:hover { border-color: var(--color-primary); }
+.hub-kreis { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem;
+  border-radius: 50%; font-size: 0.6875rem; font-weight: 700; border: 1.5px dashed var(--color-base-300);
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.hub-kreis-ja { border: 1.5px solid var(--color-primary); background: var(--color-primary); color: var(--color-primary-content); }
+
+.hub-seite { display: grid; gap: 1.5rem; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 64rem) { .hub-seite { grid-template-columns: minmax(0, 1fr) 22rem; } }
+.hub-phasen { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; margin-top: 0.9rem; }
+.hub-phasen button { padding: 0.35rem 0.2rem; background: color-mix(in oklab, var(--color-base-content) 8%, var(--color-base-100)); font-size: 0.8125rem; cursor: pointer;
+  hyphens: auto; }
+@media (max-width: 40rem) { .hub-phasen button { font-size: 0.6875rem; padding-inline: 0.1rem; } }
+.hub-phasen button:hover { outline: 1px solid var(--color-primary); outline-offset: -1px; }
+.hub-phasen button:first-child { border-radius: 0.4rem 0 0 0.4rem; }
+.hub-phasen button:last-child { border-radius: 0 0.4rem 0.4rem 0; }
+.hub-phasen .war { background: color-mix(in oklab, var(--color-primary) 14%, transparent); color: var(--color-primary); }
+.hub-phasen .jetzt { background: var(--color-primary); color: var(--color-primary-content); font-weight: 700; }
+.hub-naechst { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.8rem; margin-top: 1rem;
+  padding: 0.55rem 0.8rem; border: 1px solid var(--color-base-300); border-radius: 0.5rem; }
+
+.hub-block { margin-top: 1.25rem; }
+.hub-block > h2, .hub-block > summary { display: flex; align-items: baseline; gap: 0.6rem; font-weight: 700;
+  padding-bottom: 0.25rem; border-bottom: 1px solid var(--color-base-300); }
+.hub-aktion { margin-left: auto; font-size: 0.8125rem; font-weight: 400; color: var(--color-primary); cursor: pointer; }
+.hub-aktion:hover { text-decoration: underline; }
+.hub-zeile { padding: 0.5rem 0; border-bottom: 1px solid var(--color-base-300); }
+.hub-zeile:last-child { border-bottom: 0; }
+.hub-mb { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 0.2rem 0.8rem; padding: 0.55rem 0;
+  border-bottom: 1px solid var(--color-base-300); }
+.hub-mb:last-child { border-bottom: 0; }
+.hub-mb.leer { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.hub-vert { display: flex; gap: 2px; height: 0.65rem; margin-top: 0.3rem; max-width: 26rem; }
+.hub-vert i { display: block; border-radius: 2px; min-width: 2px; }
+.hub-vert .stufe-1 { background: var(--stufe-1); } .hub-vert .stufe-2 { background: var(--stufe-2); }
+.hub-vert .stufe-3 { background: var(--stufe-3); } .hub-vert .stufe-4 { background: var(--stufe-4); }
+.hub-vert .stufe-5 { background: var(--stufe-5); }
+.hub-antrag { margin-top: 0.6rem; padding: 0.65rem 0.75rem; border: 1px solid var(--color-base-300); border-radius: 0.5rem; }
+.hub-stufen { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 0.45rem; font-size: 0.75rem; }
+.hub-stufen li { padding: 0.15rem 0.5rem; background: color-mix(in oklab, var(--color-base-content) 8%, var(--color-base-100)); }
+.hub-stufen .war { color: var(--color-primary); }
+.hub-stufen .jetzt { background: var(--color-primary); color: var(--color-primary-content); font-weight: 700; }
+.hub-check { width: 1.1rem; text-align: center; font-weight: 700; }
+.hub-check-ok { color: var(--color-success); }
+.hub-check-open { color: var(--color-warning); }
+.hub-check-hint { color: color-mix(in oklab, var(--color-base-content) 50%, transparent); }
+
+.hub-verlauf { margin-top: 0.75rem; display: grid; gap: 0.6rem; }
+.hub-verlauf li { padding-left: 0.65rem; border-left: 2px solid var(--color-base-300); }
+.hub-verlauf li.entscheidung { border-left-color: var(--color-primary); font-weight: 600; }
+.hub-verlauf small { display: block; font-weight: 400; font-size: 0.75rem;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.hub-mehr > summary { cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--color-primary); margin: 0.4rem 0; }
+:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* The briefing (#438): follows the theme on screen; printed it is always dark ink on white. */
+.hub-buehne { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 64rem) { .hub-buehne { grid-template-columns: minmax(0, 1fr) 20rem; } }
+.hub-panel { padding: 0.9rem 1rem; border: 1px solid var(--color-base-300); border-radius: 0.5rem; font-size: 0.875rem; }
+.hub-hinweis { margin-top: 0.75rem; padding: 0.55rem 0.7rem; border-radius: 0.4rem;
+  background: color-mix(in oklab, var(--color-warning) 14%, transparent); }
+.hub-papier { --paper-ink: var(--color-base-content); --paper-line: var(--color-base-300);
+  --paper-soft: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+  background: var(--color-base-100); color: var(--paper-ink); padding: 1.75rem 2rem; border: 1px solid var(--color-base-300);
+  border-radius: 0.25rem; box-shadow: 0 1px 3px rgb(0 0 0 / 0.08); font-size: 0.9375rem; min-width: 0; max-width: 52rem; }
+@media (max-width: 40rem) { .hub-papier { padding: 1rem; } }
+.hub-papier h1 { font-size: 1.5rem; }
+.hub-papier h2 { font-weight: 700; font-size: 0.8125rem; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--paper-soft); margin-top: 1.1rem; border-bottom: 1px solid var(--paper-line); padding-bottom: 0.2rem; }
+.hub-papier-kopf { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--paper-soft); }
+.hub-papier-leise { color: var(--paper-soft); }
+.hub-papier-zeile { padding: 0.2rem 0; font-size: 0.875rem; }
+.hub-papier-projekt { padding: 0.5rem 0; border-bottom: 1px solid var(--paper-line); }
+.hub-papier-projekt:last-child { border-bottom: 0; }
+.hub-papier-projekt > b { font-size: 1rem; }
+.hub-papier-projekt > p { font-size: 0.875rem; margin-top: 0.1rem; }
+.hub-papier-fuss { margin-top: 1rem; font-size: 0.75rem; color: var(--paper-soft); }
+.hub-ueberblick { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.9rem; }
+.hub-ueberblick div { flex: 1 1 5.5rem; padding: 0.4rem 0.6rem; border: 1px solid var(--paper-line); border-radius: 0.35rem;
+  font-size: 0.75rem; color: var(--paper-soft); }
+.hub-ueberblick b { display: block; font-size: 1.25rem; line-height: 1.2; color: var(--paper-ink); }
+.hub-sgrid { display: grid; grid-template-columns: minmax(7rem, 10.5rem) minmax(0, 1fr); gap: 0.3rem 1rem;
+  margin-top: 0.4rem; font-size: 0.875rem; }
+.hub-sgrid > dt { color: var(--paper-soft); font-weight: 600; }
+.hub-sgrid > dt small { display: block; font-weight: 400; font-size: 0.75rem; }
+.hub-sgrid > dd { margin: 0; min-width: 0; }
+.hub-dran, .hub-ergebnis { width: 100%; border-collapse: collapse; margin-top: 0.3rem; font-size: 0.875rem; }
+.hub-dran th { padding: 0.55rem 0 0.15rem; text-align: left; }
+.hub-dran td, .hub-ergebnis td { padding: 0.2rem 0.8rem 0.2rem 0; border-top: 1px solid var(--paper-line); vertical-align: top; }
+.hub-dran td:first-child { width: 38%; font-weight: 600; }
+.hub-dran td:last-child { padding-right: 0; white-space: nowrap; text-align: right; color: var(--paper-soft); }
+.hub-ergebnis-vert { min-width: 12rem; }
+.hub-papier .hub-vert + div { color: var(--paper-soft); }
+.hub-argumente { margin-top: 0.3rem; padding-left: 1rem; list-style: disc; font-size: 0.8125rem; }
+
+@media print {
+  @page { size: A4; margin: 16mm 15mm; }
+  .hub-kopf, .hub-panel, #flash-group { display: none !important; }
+  body { background: #fff; }
+  .hub-main { max-width: none; padding: 0; }
+  .hub-buehne { display: block; }
+  .hub-papier { --paper-ink: #1c2330; --paper-soft: #5b6574; --paper-line: #dde3ec; background: #fff;
+    max-width: none; padding: 0; border: 0; border-radius: 0; box-shadow: none; font-size: 10.5pt; }
+  .hub-papier h2 { break-after: avoid; }
+  .hub-papier-projekt, .hub-dran tr, .hub-ergebnis tr, .hub-ueberblick { break-inside: avoid; }
+  .hub-vert i { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}

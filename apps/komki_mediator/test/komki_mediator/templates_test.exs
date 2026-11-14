@@ -23,6 +23,21 @@ defmodule KomkiMediator.TemplatesTest do
     assert stat_after.mtime == stat_before.mtime
   end
 
+  # Frische Instanz: `komki up` exportiert registry.json vor dem ersten
+  # Vermittler-Start (#208). room.json und Dokumente muessen trotzdem kommen.
+  test "nur registry.json vorhanden (Export): room.json und Dokumente werden angelegt" do
+    base = KomkiMediator.TestHelpers.tmp_base("kmtpl-")
+
+    mediator_dir = Path.join(base, "mediator")
+    File.mkdir_p!(mediator_dir)
+    File.write!(Path.join(mediator_dir, "registry.json"), "EXPORT")
+
+    assert Templates.provision!(base) == :ok
+    assert File.read!(Path.join(mediator_dir, "registry.json")) == "EXPORT"
+    assert File.exists?(Path.join(mediator_dir, "room.json"))
+    assert File.exists?(Path.join([mediator_dir, "documents", "doc-oeffentlich.md"]))
+  end
+
   test "die drei Dokumente liegen mit deutschem Inhalt", %{base: base} do
     documents_dir = Path.join([base, "mediator", "documents"])
 
@@ -32,6 +47,28 @@ defmodule KomkiMediator.TemplatesTest do
 
       assert String.starts_with?(content, "# ")
       assert Templates.document_content(document_id) == content
+    end
+  end
+
+  # Regression F30/#498: Der Store der Raumdokumente entstand unter
+  # Standard-umask (022) mit 0755, die Vorlagedokumente mit 0644 — auf einem
+  # Multi-User-Host mit durchquerbarer Basis las jedes lokale Konto die
+  # Fraktionsraum-Dokumente direkt. Vor dem Fix rot: write_templates rief nur
+  # mkdir_p! und write!/1 ohne chmod. Wie im CLI (run/, connectors/, Token,
+  # denials) haerten Store und Elternverzeichnis auf 0700, Dateien auf 0600.
+  test "Dokumenten-Store 0700, Vermittler-Verzeichnis 0700, Vorlagedokumente 0600" do
+    base = KomkiMediator.TestHelpers.tmp_base("kmtpl-modi-")
+    on_exit(fn -> File.rm_rf(base) end)
+
+    assert Templates.provision!(base) == :ok
+
+    documents_dir = Path.join([base, "mediator", "documents"])
+
+    assert mode(Path.dirname(documents_dir)) == 0o700
+    assert mode(documents_dir) == 0o700
+
+    for document_id <- ["doc-oeffentlich", "doc-vertraulich", "doc-pending-freigabe"] do
+      assert mode(Path.join(documents_dir, document_id <> ".md")) == 0o600
     end
   end
 
@@ -55,33 +92,148 @@ defmodule KomkiMediator.TemplatesTest do
     assert decisions["mediator-ping"]["decision"] == "permit"
   end
 
-  test "Raum fuehrt deny mit binding_condition_false (doc-vertraulich) her", %{base: base} do
+  # R.5.4 (#213): Im Default-Raum recherche liegen die Labels der beiden
+  # anderen Dokumente ausserhalb von B_W.
+  test "Raum recherche: doc-vertraulich und doc-pending-freigabe nicht in B_W", %{base: base} do
     decisions = room_decisions(base)
 
-    assert decisions["doc-vertraulich"]["decision"] == "deny"
+    for object_id <- ["doc-vertraulich", "doc-pending-freigabe"] do
+      assert decisions[object_id]["decision"] == "deny"
+      assert %{"code" => "label_not_included"} = hd(decisions[object_id]["blockers"])
+    end
+  end
 
-    assert List.first(decisions["doc-vertraulich"]["blockers"]) == %{
+  test "Raum mit doc-vertraulich@1 in B_W: deny mit binding_condition_false", %{base: base} do
+    decision = room_decisions(base, ["doc-vertraulich@1"])["doc-vertraulich"]
+
+    assert decision["decision"] == "deny"
+
+    assert List.first(decision["blockers"]) == %{
              "code" => "binding_condition_false",
              "binding" => "doc-vertraulich@1",
              "condition" => "purpose"
            }
   end
 
-  test "Raum fuehrt indeterminate mit missing_fact (doc-pending-freigabe) her", %{base: base} do
-    decisions = room_decisions(base)
+  test "Raum mit doc-pending-freigabe@1 in B_W: indeterminate mit missing_fact", %{base: base} do
+    decision = room_decisions(base, ["doc-pending-freigabe@1"])["doc-pending-freigabe"]
 
-    assert decisions["doc-pending-freigabe"]["decision"] == "indeterminate"
+    assert decision["decision"] == "indeterminate"
 
-    assert List.first(decisions["doc-pending-freigabe"]["missing_evidence"]) == %{
+    assert List.first(decision["missing_evidence"]) == %{
              "code" => "missing_fact",
              "fact" => "vertraulich_freigabe",
              "binding" => "doc-pending-freigabe@1"
            }
   end
 
-  defp room_decisions(base) do
+  # Γ-Konventionen des Connector-Vertrags §7, dazu seit #423 die
+  # Fraktionsraum-Welt (Beobachter, Hub-Umgebung, Essenz-Befugnisse).
+  test "Registry traegt Beobachter, Umgebungen und Connector-Bindungen nach §7" do
+    registry = Templates.registry()
+
+    assert registry["observers"] == [
+             "brave-search",
+             "fraktion",
+             "nextcloud-betreiber",
+             "nutzende-person",
+             "pi-agent",
+             "ris-betreiber",
+             "sicherung",
+             "vorstand"
+           ]
+
+    assert registry["fact_fields"]["output_content_digest"] == "string"
+
+    assert registry["environments"]["web-suche@1"]["observers"] == [
+             "brave-search",
+             "nutzende-person",
+             "pi-agent"
+           ]
+
+    assert registry["environments"]["ris-abruf@1"]["observers"] == [
+             "nutzende-person",
+             "pi-agent",
+             "ris-betreiber"
+           ]
+
+    for binding <- [
+          "doc-oeffentlich@2",
+          "ris-oeffentlich@1",
+          "web-oeffentlich@1",
+          "vault-oeffentlich@1"
+        ] do
+      assert registry["bindings"][binding]["readers"] == registry["observers"]
+
+      assert registry["bindings"][binding]["operations"] == %{
+               "admit" => true,
+               "emit" => true,
+               "transfer" => true
+             }
+    end
+
+    assert registry["bindings"]["vault-vertraulich@1"]["readers"] == [
+             "nutzende-person",
+             "pi-agent"
+           ]
+
+    assert {:ok, _} = KomkiPolicy.Registry.compile(registry)
+  end
+
+  # Szene 13, #423: die Hub-Umgebung, die Bindungen des Fraktionsraums
+  # mit der Essenz-Befugnis und der gemeinsam gebundene Bestand.
+  test "Fraktionsraum-Welt: Hub-Umgebung, Befugnisse, ratsprojekte-Bestand" do
+    registry = Templates.registry()
+
+    hub = [
+      "fraktion",
+      "nextcloud-betreiber",
+      "nutzende-person",
+      "pi-agent",
+      "sicherung",
+      "vorstand"
+    ]
+
+    assert registry["environments"]["ratsprojekte-bestand@1"]["observers"] == hub
+
+    # ratsprojekte@1: admit+emit nach dem Γ-GO vom 2026-11-10, keine
+    # transfer-Regel — jede Speicherung bleibt GO-pflichtig.
+    assert registry["bindings"]["ratsprojekte@1"]["readers"] == hub
+
+    assert registry["bindings"]["ratsprojekte@1"]["operations"] == %{
+             "admit" => true,
+             "emit" => true
+           }
+
+    for binding <- ["fraktion-intern@1", "fraktionsprojekt-radweg@1"] do
+      assert registry["bindings"][binding]["readers"] == [
+               "fraktion",
+               "nextcloud-betreiber",
+               "nutzende-person",
+               "pi-agent"
+             ]
+
+      # Der Vorstand fehlt bewusst (ADR 0004); die Befugnis erlaubt Miriam
+      # die Lockerung fuer genau die Ausgabeart ratsprojekte-essenz.
+      assert registry["bindings"][binding]["relaxation_authorities"] == [
+               %{
+                 "authority" => "nutzende-person",
+                 "restriction" => "readers",
+                 "output" => "ratsprojekte-essenz"
+               }
+             ]
+    end
+
+    # ratsarbeit@1 bekommt die Befugnis nie (Szene 13, Gegenprobe 13.1).
+    assert registry["bindings"]["ratsarbeit@1"]["relaxation_authorities"] == []
+    assert {:ok, _} = KomkiPolicy.Registry.compile(registry)
+  end
+
+  # `bindings` ersetzt B_W des Default-Raums (nil: recherche).
+  defp room_decisions(base, bindings \\ nil) do
     {:ok, gamma} = Gamma.load(Path.join([base, "mediator", "registry.json"]))
     {:ok, room} = Room.load(Path.join(base, "mediator"))
+    room = if bindings, do: %{room | workspace_bindings: bindings}, else: room
 
     object_ids = ["mediator-ping", "doc-oeffentlich", "doc-vertraulich", "doc-pending-freigabe"]
 
@@ -90,7 +242,8 @@ defmodule KomkiMediator.TemplatesTest do
       tool = if object_id == "mediator-ping", do: "ping", else: "admit_document"
 
       {:ok, object} = Room.object_for_call(room, tool, params)
-      snapshot = Room.snapshot_for(room, gamma, object, "aaaabbbbcccc")
+      {:ok, checked} = Room.bindings_for(room, tool, object)
+      snapshot = Room.snapshot_for(room, gamma, object, "aaaabbbbcccc", checked)
 
       intent = %{
         "schema" => "komki-intent/1",
@@ -103,5 +256,10 @@ defmodule KomkiMediator.TemplatesTest do
       {:ok, decision} = Derive.decide(gamma.compiled, snapshot, intent)
       {object_id, decision}
     end)
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
   end
 end

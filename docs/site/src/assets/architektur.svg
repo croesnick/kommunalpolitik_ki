@@ -1,0 +1,75 @@
+<svg viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="arch-title arch-desc">
+  <title id="arch-title">Architektur des komki-Arbeitsraums</title>
+  <desc id="arch-desc">pi läuft in einer Sandbox ohne Internet und spricht nur mit dem Vermittler. Der Vermittler prüft jede Anfrage und jede Antwort nach den Regeln des Raums und ruft drei Connectoren in eigenen Sandboxen auf, jeden nur mit seinen freigegebenen Operationen. RIS- und Web-Connector erreichen das Internet nur über den Egress-Proxy und dort nur ihre eigene freigegebene Adresse.</desc>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="svg-arrowhead"/></marker></defs>
+
+  <!-- pi -->
+  <rect x="20" y="40" width="170" height="124" rx="10" class="svg-zone"/>
+  <text x="32" y="60" class="svg-small">Sandbox</text>
+  <rect x="40" y="70" width="130" height="44" rx="8" class="svg-box"/>
+  <text x="105" y="97" text-anchor="middle" class="svg-strong">pi (Agent)</text>
+  <text x="105" y="136" text-anchor="middle" class="svg-denytext">kein Internet</text>
+  <text x="105" y="152" text-anchor="middle" class="svg-denytext">keine eigenen Dateien</text>
+
+  <!-- llama -->
+  <rect x="20" y="236" width="170" height="64" rx="10" class="svg-zone"/>
+  <text x="32" y="256" class="svg-small">Sandbox</text>
+  <text x="105" y="283" text-anchor="middle" class="svg-strong">Sprachmodell (gemma)</text>
+  <path d="M105,164 L105,232" class="svg-line" marker-end="url(#ah)"/>
+  <text x="112" y="203" class="svg-small">lokal, offline</text>
+
+  <!-- Vermittler -->
+  <rect x="270" y="40" width="210" height="150" rx="10" class="svg-zone"/>
+  <text x="282" y="60" class="svg-small">Sandbox · kein Internet</text>
+  <rect x="290" y="70" width="170" height="44" rx="8" class="svg-hot"/>
+  <text x="375" y="97" text-anchor="middle" class="svg-onhot">Vermittler</text>
+  <text x="375" y="134" text-anchor="middle" class="svg-small">prüft jede Anfrage</text>
+  <text x="375" y="149" text-anchor="middle" class="svg-small">und jede Antwort,</text>
+  <text x="375" y="164" text-anchor="middle" class="svg-small">schreibt alles ins Journal</text>
+  <rect x="270" y="206" width="210" height="58" rx="8" class="svg-box"/>
+  <text x="282" y="226" class="svg-small">Raum „recherche“ erlaubt:</text>
+  <text x="282" y="243" class="svg-text">RIS · Web · öffentliche Notizen</text>
+  <text x="282" y="258" class="svg-denytext">vertrauliche Notizen: unsichtbar</text>
+  <path d="M375,190 L375,206" class="svg-line"/>
+  <path d="M190,92 L286,92" class="svg-line" marker-end="url(#ah)"/>
+  <text x="238" y="84" text-anchor="middle" class="svg-small">mit Token</text>
+
+  <!-- Connectoren -->
+  <rect x="560" y="20" width="240" height="66" rx="10" class="svg-zone"/>
+  <text x="572" y="38" class="svg-small">Sandbox</text>
+  <text x="680" y="58" text-anchor="middle" class="svg-strong">RIS-Connector</text>
+  <text x="680" y="76" text-anchor="middle" class="svg-small">nur: suchen · TOP zeigen</text>
+
+  <rect x="560" y="102" width="240" height="66" rx="10" class="svg-zone"/>
+  <text x="572" y="120" class="svg-small">Sandbox · hält den Brave-Key</text>
+  <text x="680" y="140" text-anchor="middle" class="svg-strong">Web-Connector</text>
+  <text x="680" y="158" text-anchor="middle" class="svg-small">nur: Websuche</text>
+
+  <rect x="560" y="184" width="240" height="66" rx="10" class="svg-zone"/>
+  <text x="572" y="202" class="svg-small">Sandbox</text>
+  <text x="680" y="222" text-anchor="middle" class="svg-strong">Vault-Connector</text>
+  <text x="680" y="240" text-anchor="middle" class="svg-small">nur: suchen · lesen · Testnotiz</text>
+
+  <path d="M480,80 C520,80 520,53 556,53" class="svg-line" marker-end="url(#ah)"/>
+  <path d="M480,100 C520,100 520,135 556,135" class="svg-line" marker-end="url(#ah)"/>
+  <path d="M480,120 C514,120 514,217 556,217" class="svg-line" marker-end="url(#ah)"/>
+
+  <rect x="595" y="282" width="170" height="44" rx="8" class="svg-box"/>
+  <text x="680" y="301" text-anchor="middle" class="svg-text">Vault-Ordner</text>
+  <text x="680" y="317" text-anchor="middle" class="svg-small">nur Notizen mit Label</text>
+  <path d="M680,250 L680,278" class="svg-line" marker-end="url(#ah)"/>
+
+  <!-- Egress -->
+  <rect x="250" y="350" width="250" height="90" rx="10" class="svg-zone"/>
+  <text x="262" y="368" class="svg-small">Sandbox · einziger Weg ins Netz</text>
+  <text x="375" y="392" text-anchor="middle" class="svg-strong">Egress-Proxy</text>
+  <text x="375" y="412" text-anchor="middle" class="svg-small">RIS-Connector → nur RIS-Server</text>
+  <text x="375" y="427" text-anchor="middle" class="svg-small">Web-Connector → nur Brave</text>
+  <path d="M560,70 C540,70 540,300 452,346" class="svg-line" marker-end="url(#ah)"/>
+  <path d="M560,152 C548,152 548,312 476,346" class="svg-line" marker-end="url(#ah)"/>
+
+  <rect x="545" y="372" width="265" height="48" rx="24" class="svg-box"/>
+  <text x="680" y="392" text-anchor="middle" class="svg-text">Internet</text>
+  <text x="680" y="408" text-anchor="middle" class="svg-small">risapi3.komuna.net · api.search.brave.com</text>
+  <path d="M500,396 L541,396" class="svg-line" marker-end="url(#ah)"/>
+</svg>

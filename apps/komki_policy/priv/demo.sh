@@ -64,7 +64,8 @@ stand_next="$work_dir/komki-policy-stand-next.json"
   --release "$fix/case_release_permit/release.json" \
   --stand "$fix/case_release_permit/stand.json" > "$work_dir/komki-policy-release-decision.json"
 
-python3 -c 'import json,sys; json.dump(json.load(open(sys.argv[1]))["release"], open(sys.argv[2],"w"))' \
+# Elixir-first: Extraktion im Familien-Stack (Elixir-stdlib-JSON), kein python3.
+elixir -e 'File.write!(Enum.fetch!(System.argv, 1), JSON.encode!(Map.fetch!(JSON.decode!(File.read!(Enum.fetch!(System.argv, 0))), "release")))' \
   "$work_dir/komki-policy-release-decision.json" "$proposal"
 
 # advance: erster Commit des GOs; das Ergebnis (neuer Stand) wird Vollzug

@@ -4,10 +4,11 @@ defmodule KomkiCli.Pi do
 
     * **Einmal-Lauf** (`run/4`): headless `--print`, stdin aus `/dev/null`,
       ephemeral (keine Session-Datei).
-    * **Interaktive Session** (`argv_session/2`, aufgerufen vom internen
+    * **Interaktive Session** (`argv_session/3`, aufgerufen vom internen
       `session-chain`): pi als Port-Kind des Pane-BEAM mit `:nouse_stdio` —
-      die tmux-Pty ist das Terminal. Persistente Session-Dateien unter
-      `pi-home/sessions`, fortsetzbar via pi `--continue`.
+      die tmux-Pty ist das Terminal. Persistente Session-Dateien in einem
+      eigenen Verzeichnis je komki-Session unter `pi-home/sessions`
+      (`KomkiCli.Raum.open_session/2`), fortsetzbar via pi `--continue`.
 
   Environment (identisch fuer beide Modi — die validierte Lauf-Konvention):
 
@@ -20,6 +21,11 @@ defmodule KomkiCli.Pi do
       NODE_COMPILE_CACHE = pi-home/.cache/node-compile
       PI_OFFLINE         = 1
       LANG / LC_ALL      = C
+
+  Dazu kommt der Socket zum Vermittler (Ticket #143, `KomkiCli.Channel`):
+  `KOMKI_MEDIATOR_TOKEN` und `KOMKI_SESSION_ID`. pi reicht beide ueber die
+  `env`-Felder der mcp.json an `komki-relay.js` weiter. Das Token steht nie
+  in argv.
 
   cwd ist beim Einmal-Lauf der Scratch, in der Session die Arbeitsflaeche
   `arbeit` — nie das pi-Home (Ticket #133): pi laedt `AGENTS.md`/`CLAUDE.md`
@@ -35,12 +41,12 @@ defmodule KomkiCli.Pi do
   node -> cli.js gestartet (der asdf-Shim scheitert unter dem Profil stumm).
   """
 
-  alias KomkiCli.Config
+  alias KomkiCli.{Anzeige, Config}
   require Config
 
   @session_term "xterm-256color"
 
-  @incomplete_tools_msg "config unvollstaendig: node/cli/llama-server fehlen — init verweigert unvollstaendige Instanzen"
+  @incomplete_tools_msg "config unvollständig: node/cli/llama-server fehlen — init verweigert unvollständige Instanzen"
 
   @type mode :: :text | :json
 
@@ -52,16 +58,24 @@ defmodule KomkiCli.Pi do
   sandbox-exec und `sh -c 'exec …'` ersetzen sich per exec, die OS-pid des
   Ports ist deshalb der node-Prozess selbst.
   """
-  @spec run(Config.t(), String.t(), mode(), String.t(), pos_integer()) ::
+  @spec run(
+          Config.t(),
+          String.t(),
+          mode(),
+          String.t(),
+          pos_integer(),
+          %{String.t() => String.t()}
+        ) ::
           {:ok, output :: String.t()}
           | {:error, output :: String.t(), status :: integer()}
-  def run(%Config{} = cfg, scratch_dir, mode, prompt, timeout_ms)
+  def run(%Config{} = cfg, scratch_dir, mode, prompt, timeout_ms, channel_env)
       when mode in [:text, :json] and is_binary(prompt) and is_integer(timeout_ms) and
-             timeout_ms > 0 do
+             timeout_ms > 0 and is_map(channel_env) do
     profile_path = profile_path_for(cfg, scratch_dir)
     KomkiCli.Profile.write!(profile_path, KomkiCli.Profile.generate(cfg, scratch_dir))
     [program | args] = argv_for(cfg, scratch_dir, mode, prompt)
-    run_with_timeout(program, args, env_for(cfg), scratch_dir, timeout_ms)
+    env = Map.merge(env_for(cfg), channel_env)
+    run_with_timeout(program, args, env, scratch_dir, timeout_ms)
   end
 
   @doc """
@@ -136,9 +150,12 @@ defmodule KomkiCli.Pi do
   # Interaktive Session (tmux-Pty als stdin)
   # ===========================================================================
 
-  @doc "pi-Session-Verzeichnis (persistente Session-Dateien unter pi-home)."
-  @spec session_dir(Config.t()) :: String.t()
-  def session_dir(%Config{} = cfg), do: Path.join(cfg.pi_home, "sessions")
+  @doc """
+  Wurzel der Session-Verzeichnisse unter pi-home. Jede komki-Session hat
+  darin ein eigenes (Ticket #295), das Profil gibt nur dieses frei.
+  """
+  @spec sessions_root(Config.t()) :: String.t()
+  def sessions_root(%Config{} = cfg), do: Path.join(cfg.pi_home, "sessions")
 
   @doc """
   Profil-Pfad der interaktiven Session (eine tmux-Session gleichzeitig,
@@ -155,8 +172,8 @@ defmodule KomkiCli.Pi do
   @redirect_stdout_sh ~s(exec "$0" "$@" > /dev/fd/0)
 
   @doc """
-  argv der interaktiven Session: sandbox-exec-Direktkette ohne `--print`
-  und ohne stdin-Redirect (die tmux-Pty ist stdin — ein `/dev/null`-Redirect
+  argv der interaktiven Session in `session_dir`: sandbox-exec-Direktkette
+  ohne `--print` und ohne stdin-Redirect (die tmux-Pty ist stdin — ein `/dev/null`-Redirect
   wuerde die TUI-Eingabe kappen). Fuer Doctor/Tests sichtbar.
 
   `tty_redirect` (Burrito-Fix, Pilot 2026-10-11): Mit `true` laeuft die
@@ -166,14 +183,15 @@ defmodule KomkiCli.Pi do
   (dort ist stdout ohnehin die Pane-PTY); das passende Profil erlaubt das
   Oeffnen von /dev/fd/0 kontextfrei.
   """
-  @spec argv_session(Config.t(), boolean(), boolean()) :: [String.t()]
+  @spec argv_session(Config.t(), String.t(), boolean(), boolean()) :: [String.t()]
 
   # Header fuehrt den Default (Multi-Clause-Konvention): Escript-Pfad ruft
-  # argv_session/2 ohne Redirect-Angabe, session_chain gibt den Kontext mit.
-  def argv_session(cfg, continue?, tty_redirect \\ false)
+  # argv_session/3 ohne Redirect-Angabe, session_chain gibt den Kontext mit.
+  def argv_session(cfg, session_dir, continue?, tty_redirect \\ false)
 
-  def argv_session(%Config{} = cfg, continue?, tty_redirect)
-      when is_boolean(continue?) and is_boolean(tty_redirect) and Config.tools_ready(cfg) do
+  def argv_session(%Config{} = cfg, session_dir, continue?, tty_redirect)
+      when is_binary(session_dir) and is_boolean(continue?) and is_boolean(tty_redirect) and
+             Config.tools_ready(cfg) do
     prefix = [cfg.sandbox_exec, "-f", session_profile_path(cfg), "--"]
 
     chain =
@@ -183,10 +201,10 @@ defmodule KomkiCli.Pi do
         [cfg.node_bin, cfg.cli_js]
       end
 
-    prefix ++ chain ++ session_flags(cfg, continue?)
+    prefix ++ chain ++ session_flags(cfg, session_dir, continue?)
   end
 
-  def argv_session(%Config{}, _continue?, _tty_redirect),
+  def argv_session(%Config{}, _session_dir, _continue?, _tty_redirect),
     do: raise(ArgumentError, message: @incomplete_tools_msg)
 
   @doc "Lauf-Umgebung als Key-Value-Paare (deterministisch sortiert)."
@@ -194,19 +212,26 @@ defmodule KomkiCli.Pi do
   def env_list(%Config{} = cfg), do: cfg |> env_for() |> Map.to_list() |> Enum.sort()
 
   @doc """
-  Session-Umgebung fuer den Port-Replace: Lauf-Umgebung plus `TERM` fuer
+  Session-Umgebung fuer den Port-Replace: Lauf-Umgebung plus Socket-Zugang
+  (`KOMKI_MEDIATOR_TOKEN`, `KOMKI_SESSION_ID`, Ticket #143) plus `TERM` fuer
   die TUI. Der Port-Env ersetzt die geerbte Umgebung komplett — dieselbe
   Konvention wie beim Einmal-Lauf via `System.cmd`-env-Replace.
   """
-  @spec session_env(Config.t()) :: [{String.t(), String.t()}]
-  def session_env(%Config{} = cfg),
-    do: env_list(cfg) ++ [{"TERM", @session_term}]
+  @spec session_env(Config.t(), %{String.t() => String.t()}) :: [{String.t(), String.t()}]
+  def session_env(%Config{} = cfg, channel_env) when is_map(channel_env),
+    do: env_list(cfg) ++ Enum.sort(channel_env) ++ [{"TERM", @session_term}]
 
   @doc """
   Pane-Kommando fuer `tmux new-session … <command>`: der Pfad des
   komki-Programms (Escript oder Burrito-Standalone-Binary, vom Aufrufer
   übergeben — `KomkiCli.Runtime.self_path/0`) plus dem internen
-  `session-chain`-Befehl.
+  `session-chain`-Befehl mit der Basis der Instanz.
+
+  Die Basis steht ausdrücklich im Kommando (Ticket #251): Die Umgebung des
+  Panes stammt vom tmux-Server, nicht vom Aufruf. Wurde der Server ohne
+  `KOMKI_HOME` gestartet, fiele das Pane sonst auf die Standard-Basis
+  zurück, und eine Wegwerf-Instanz spräche mit dem Vermittler der
+  Hauptinstanz.
 
   Statt die Sandbox-Kette direkt in die Pane zu legen, startet die Pane
   einen eigenen Mini-BEAM (das komki-Programm selbst). Hintergrund ist ein
@@ -217,10 +242,12 @@ defmodule KomkiCli.Pi do
   haelt die Seatbelt-Grenze unverletzt: sandbox-exec bleibt der Anfang
   des gepinnten Kettenstücks.
   """
-  @spec pane_command(String.t(), boolean()) :: String.t()
-  def pane_command(script_path, continue?) when is_binary(script_path) do
+  @spec pane_command(String.t(), String.t(), boolean()) :: String.t()
+  def pane_command(script_path, base, continue?)
+      when is_binary(script_path) and is_binary(base) do
     args =
-      [Path.expand(script_path), "session-chain"] ++ if(continue?, do: ["--continue"], else: [])
+      [Path.expand(script_path), "session-chain", "--base", base] ++
+        if(continue?, do: ["--continue"], else: [])
 
     Enum.map_join(args, " ", &sh_quote/1)
   end
@@ -228,14 +255,18 @@ defmodule KomkiCli.Pi do
   # Knapper KomKI-System-Prompt (Nutzer-Wunsch: geeignet, per Default
   # Deutsch). Ersetzt pis Coding-Assistenten-Default — der KomkiCli ist
   # Ratsarbeit, nicht Codearbeit.
-  @komki_system_prompt "Antworte knapp und präzise, per Default auf Deutsch und durchgehend in der Du-Form. Du bist Assistent für kommunalpolitische Arbeit in einem lokalen, offline laufenden Arbeitsraum. Belege sachliche Aussagen mit Quellen, wo vorhanden, und markiere Unsicherheit offen."
+  # Quellenpflicht (AGENTS.md §6): jede Aussage mit ihrer Quelle, auch in
+  # Notizen, die pi anlegt. Raumdokumente (#218) und Sperren als Endpunkt
+  # (#166) nennt der Prompt, damit pi beides ohne Nachfrage nutzt.
+  @komki_system_prompt "Antworte knapp und präzise, per Default auf Deutsch und durchgehend in der Du-Form. Du bist Assistent für kommunalpolitische Arbeit in einem lokalen Arbeitsraum. Welche Dokumente im Arbeitsraum bereitliegen, erfährst du mit list_documents; lesen kannst du sie mit admit_document. Ist ein Aufruf gesperrt, gilt der hinweis in der Antwort: Such keinen Umweg über andere Werkzeuge, sondern sag der nutzenden Person, was gesperrt ist. Belege jede sachliche Aussage mit ihrer Quelle: aus der Websuche mit der vollständigen URL des Treffers (https://…, nicht nur die Domain), aus dem RIS mit Gremium, Sitzungsdatum und TOP-Nummer, aus dem Vault mit dem Pfad der Notiz. Das gilt auch für Notizen: Die legst du mit vault_write_test im Vault an, mit den Quellen bei jeder Aussage. Hast du für eine Aussage keine Quelle, lass sie weg oder kennzeichne sie als unbelegt. Markiere Unsicherheit offen."
 
-  defp session_flags(cfg, continue?) do
+  defp session_flags(cfg, session_dir, continue?) do
     base =
       [
         "--offline"
         | mcp_contract_flags()
       ] ++
+        anzeige_flags(cfg) ++
         [
           "--no-skills",
           "--no-context-files",
@@ -246,13 +277,10 @@ defmodule KomkiCli.Pi do
           # Headless-Laeufe (pi_flags) behalten --no-approve: dort gibt es keinen
           # Projekt-Kontext.
           "--session-dir",
-          session_dir(cfg),
-          # ls ist reines Node (kein Binary noetig) — ohne es kann der Agent
-          # Verzeichnisse nicht sehen und rät dann zu read . (EISDIR-Live-Fund).
-          # find/grep brauchen fd/rg: init kopiert sie in pi's agent-bin-Fundus;
-          # fehlen sie auf dem Host, bleiben die Tools ehrlich weg.
-          "--tools",
-          tools_list(cfg),
+          session_dir
+        ] ++
+        tool_flags() ++
+        [
           "--system-prompt",
           @komki_system_prompt,
           "--provider",
@@ -270,25 +298,21 @@ defmodule KomkiCli.Pi do
   # Verbindung (pi >= 1.0; Issue #103: kein Pin).
   defp mcp_contract_flags, do: ["--no-extensions", "-e", "builtin:mcp"]
 
-  # Vermittler-Tools (Ticket #133): pi 1.1.0 blendet MCP-Tools aus, sobald
-  # --tools eine Allowlist traegt (Live-Fund: das Modell sah nur `write`).
-  # Das Muster schaltet genau den Server `komki` frei; welche seiner Tools
-  # sichtbar sind, pinnt weiter die mcp.json (exposure hidden + direct).
-  @mediator_tools "mcp__komki__*"
+  # Nur in der Session: lesbare Vermittler-Antworten statt Roh-JSON, die
+  # Vorlagen für die Ratsarbeit und das komki-Theme (KomkiCli.Anzeige). Die
+  # Extension zeichnet nur; der Einmal-Lauf hat keine TUI. Die expliziten
+  # Pfade laden trotz --no-prompt-templates und --no-themes, entdeckte
+  # Vorlagen und Themes bleiben aus.
+  defp anzeige_flags(cfg), do: Anzeige.flags(cfg)
 
-  # ls ist immer dabei (reines Node); find/grep nur mit entdeckter Binary —
-  # sonst scheitert der Tool-Aufruf erst zur Laufzeit.
-  defp tools_list(%Config{} = cfg) do
-    ["read", "write", "ls"]
-    |> maybe_tool("find", cfg.fd_bin)
-    |> maybe_tool("grep", cfg.rg_bin)
-    |> Kernel.++([@mediator_tools])
-    |> Enum.join(",")
-  end
-
-  defp maybe_tool(names, _tool, nil), do: names
-
-  defp maybe_tool(names, tool, _binary), do: names ++ [tool]
+  # Gate-2-Schliessung (Ticket #104, identisch in Session und Einmal-Lauf):
+  # pis Built-ins (read, write, ls, find, grep, bash, ...) sind aus; jeder
+  # Datei- und Netzweg laeuft ueber die Vermittler-Tools und damit durch
+  # Gate 1 und Gate 2 (Lesen: vault_read, Schreiben: vault_write_test).
+  # Die Allowlist bleibt, weil pi 1.1.0 MCP-Tools ausblendet, sobald --tools
+  # gesetzt ist (Ticket #133); das Muster schaltet genau den Server `komki`
+  # frei, welche seiner Tools sichtbar sind, pinnt die mcp.json.
+  defp tool_flags, do: ["--no-builtin-tools", "--tools", "mcp__komki__*"]
 
   defp sh_quote(bin) when is_binary(bin),
     do: "'" <> String.replace(bin, "'", "'\\''") <> "'"
@@ -306,9 +330,10 @@ defmodule KomkiCli.Pi do
         "--no-approve",
         "--no-session",
         "--session-dir",
-        Path.join(scratch_dir, "pi-sessions"),
-        "--tools",
-        "write," <> @mediator_tools,
+        Path.join(scratch_dir, "pi-sessions")
+      ] ++
+      tool_flags() ++
+      [
         "--provider",
         "pi-local",
         "--model",
@@ -327,13 +352,17 @@ defmodule KomkiCli.Pi do
       "XDG_DATA_HOME" => Path.join([cfg.pi_home, ".local", "share"]),
       "XDG_CACHE_HOME" => Path.join([cfg.pi_home, ".cache"]),
       "NODE_COMPILE_CACHE" => Path.join([cfg.pi_home, ".cache", "node-compile"]),
+      # Kein Übersetzungs-Cache für Extensions: er läge im schreibbaren
+      # pi-Home, und eine präparierte Cache-Datei würde statt der frisch
+      # geschriebenen Anzeige geladen (KomkiCli.Anzeige).
+      "JITI_FS_CACHE" => "false",
       "PI_OFFLINE" => "1",
       "LANG" => "C",
       "LC_ALL" => "C"
     }
   end
 
-  @doc "argv fuer den sandbox-exec-Aufruf (fuer Doctor/Tests sichtbar)."
+  @doc "argv für den sandbox-exec-Aufruf (für Doctor/Tests sichtbar)."
   @spec argv_for(Config.t(), String.t(), mode(), String.t()) :: [String.t()]
   def argv_for(%Config{} = cfg, scratch_dir, mode, prompt) when Config.tools_ready(cfg) do
     profile_path = profile_path_for(cfg, scratch_dir)

@@ -4,11 +4,27 @@ defmodule KomkiMediator.Room do
   Die Daten stammen aus `room.json` (Schema `"komki-mediator-room/1"`):
   Identitaet, Arbeitsraum, Umfeld, Fakten und die Objektbelegung —
   Objekt-IDs auf Version und Labels abgebildet.
+
+  Optional `workspace_bindings`: B_W des Raums (sortierte Liste,
+  Connector-Vertrag §7). Danach entscheiden die Connector-Operationen und
+  seit #213 auch `admit_document` und `list_documents` (R.5.4: das
+  Validierungslabel ist B_W, nicht bloss λ(x)). Fehlt das Feld, ist es
+  `nil`, und der Raum bietet keine dieser Operationen an (fail-closed).
+  Nur `ping` entscheidet mit den Labels seines Objekts.
   """
 
   @schema "komki-mediator-room/1"
 
-  defstruct [:dir, :identity, :workspace_id, :environment, :facts, :objects, :documents_dir]
+  defstruct [
+    :dir,
+    :identity,
+    :workspace_id,
+    :environment,
+    :facts,
+    :objects,
+    :documents_dir,
+    :workspace_bindings
+  ]
 
   @type t :: %__MODULE__{
           dir: Path.t(),
@@ -17,7 +33,8 @@ defmodule KomkiMediator.Room do
           environment: String.t(),
           facts: %{String.t() => map()},
           objects: %{String.t() => map()},
-          documents_dir: Path.t()
+          documents_dir: Path.t(),
+          workspace_bindings: [String.t()] | nil
         }
 
   # Objektbildung je Toolaufruf: die Basis eines jeden Calls.
@@ -84,7 +101,8 @@ defmodule KomkiMediator.Room do
        environment: term["environment"],
        facts: term["facts"],
        objects: term["objects"],
-       documents_dir: Path.join(dir, term["documents_dir"])
+       documents_dir: Path.join(dir, term["documents_dir"]),
+       workspace_bindings: Map.get(term, "workspace_bindings")
      }}
   end
 
@@ -96,16 +114,51 @@ defmodule KomkiMediator.Room do
 
   @doc """
   Objektbildung je Toolaufruf: `"ping"` → das Ping-Objekt,
-  `"admit_document"` → das Dokument aus `params["document_id"]`. Ein an
-  `room.json` unbekanntes Objekt bleibt ein strukturierter Fehler, nicht
-  ein Crash.
+  `"admit_document"` → das Dokument aus `params["document_id"]`, nur wenn
+  das Objekt den Typ `"document"` traegt (#134); das Tool einer
+  Nur-Aufnahme-Operation (`kind: :admit_only`, #419) → ihr festes Objekt
+  aus dem Manifest. Ein unbekanntes Objekt bleibt ein strukturierter
+  Fehler, nicht ein Crash.
   """
   @spec object_for_call(t(), String.t(), %{String.t() => term()}) ::
           {:ok, Object.t()} | {:error, :unknown_object, String.t() | nil}
   def object_for_call(room, "ping", _params), do: entry(room, "mediator-ping")
 
+  # Werkzeug und Objekttyp sind gebunden (#134): admit_document loest nur
+  # Objekte vom Typ "document" auf. Alles andere, auch ein Objekt ohne Typ,
+  # endet wie ein unbekanntes Objekt, ohne Entscheidung der Engine.
   def object_for_call(room, "admit_document", params) do
-    entry(room, params["document_id"])
+    object_id = params["document_id"]
+
+    case room.objects[object_id] do
+      %{"type" => "document"} -> entry(room, object_id)
+      _ -> {:error, :unknown_object, object_id}
+    end
+  end
+
+  # Admit-only connector operations (#419): the object and its labels come
+  # from the manifest, never from room.json.
+  def object_for_call(_room, tool, _params) do
+    case connector_object(&(&1.tool == tool)) do
+      {:ok, object} -> {:ok, object}
+      :error -> {:error, :unknown_object, nil}
+    end
+  end
+
+  # The fixed object of an admit-only operation (connector contract §6.4):
+  # its id from the manifest, version `v1`, labels = `import_labels`.
+  defp connector_object(match?) do
+    objects =
+      for manifest <- KomkiConnector.Manifest.all(),
+          {_op, %{kind: :admit_only} = spec} <- manifest.ops,
+          match?.(spec) do
+        %Object{object_id: spec.object, version: "v1", labels: Enum.sort(manifest.import_labels)}
+      end
+
+    case objects do
+      [object | _] -> {:ok, object}
+      [] -> :error
+    end
   end
 
   defp entry(room, object_id) do
@@ -120,21 +173,53 @@ defmodule KomkiMediator.Room do
 
   @doc """
   Loest einen Objekt-Claim aus dem realisierten Payload gegen room.json
-  auf: zum Claim eine Objektbelegung (Objekt-ID, Version, Labels).
+  auf: zum Claim eine Objektbelegung (Objekt-ID, Version, Labels). Das
+  Objekt einer Nur-Aufnahme-Operation (#419) kommt aus dem Manifest und
+  geht vor: Ein gleichnamiges Objekt in room.json kann seine Labels nicht
+  ersetzen.
   """
   @spec object_for_claim(t(), String.t()) ::
           {:ok, Object.t()} | {:error, :unknown_object, String.t()}
-  def object_for_claim(room, object_id), do: entry(room, object_id)
+  def object_for_claim(room, object_id) do
+    case connector_object(&(&1.object == object_id)) do
+      {:ok, object} -> {:ok, object}
+      :error -> entry(room, object_id)
+    end
+  end
+
+  @doc """
+  Die Bindungen, gegen die ein Raum-Tool entscheidet: `ping` gegen die
+  Labels seines Objekts, `admit_document` und `list_documents` gegen B_W
+  (R.5.4, #213). Ohne `workspace_bindings` gibt es keine Raumdokumente.
+  """
+  @spec bindings_for(t(), String.t(), Object.t() | nil) ::
+          {:ok, [String.t()]} | {:error, String.t()}
+  def bindings_for(_room, "ping", %Object{labels: labels}), do: {:ok, labels}
+
+  def bindings_for(%__MODULE__{workspace_bindings: bindings}, _tool, _object)
+      when is_list(bindings),
+      do: {:ok, bindings}
+
+  def bindings_for(_room, _tool, _object),
+    do: {:error, "Raum ohne workspace_bindings: keine Raumdokumente"}
+
+  @doc """
+  Objekt-IDs der Raumdokumente (Objekte vom Typ `"document"`), sortiert.
+  """
+  @spec document_ids(t()) :: [String.t()]
+  def document_ids(room) do
+    Enum.sort(for {object_id, %{"type" => "document"}} <- room.objects, do: object_id)
+  end
 
   @doc """
   Baut den vollstaendigen komki-Snapshot eines Aufrufs. `workspace.bindings`
-  sind GENAU die Objekt-Labels — `checked_label` faellt damit mit den
-  Prueflabels zusammen (Bedingung, die `Verify.check` an den Beweis stellt).
+  sind die Bindungen aus `bindings_for/3`; `checked_label` faellt damit mit
+  ihnen zusammen (Bedingung, die `Verify.check` an den Beweis stellt).
   Klassifikation ist fest `"classified"`; die Fakten kommen unveraendert
   aus dem Raum.
   """
-  @spec snapshot_for(t(), KomkiMediator.Gamma.t(), Object.t(), String.t()) :: map()
-  def snapshot_for(room, gamma, object, digest12) do
+  @spec snapshot_for(t(), KomkiMediator.Gamma.t(), Object.t(), String.t(), [String.t()]) :: map()
+  def snapshot_for(room, gamma, object, digest12, bindings) do
     %{
       "schema" => "komki-snapshot/1",
       "snapshot_id" => "snap-" <> digest12,
@@ -142,7 +227,7 @@ defmodule KomkiMediator.Room do
       "identity" => room.identity,
       "workspace" => %{
         "workspace_id" => room.workspace_id,
-        "bindings" => object.labels,
+        "bindings" => bindings,
         "valid" => true,
         "environment" => room.environment
       },
@@ -153,6 +238,41 @@ defmodule KomkiMediator.Room do
         "labels" => object.labels
       },
       "facts" => room.facts
+    }
+  end
+
+  @doc """
+  Snapshot eines Connector-Aufrufs (Connector-Vertrag §6): B_W aus
+  `workspace_bindings`, Umgebung und Fakten je Gate. Gate 1 (`emit`)
+  setzt die Umgebung aus dem Manifest und den Fakt
+  `output_content_digest`; Gate 2 (`admit`) nimmt `room.environment` und
+  die Raumfakten.
+  """
+  @spec connector_snapshot(t(), KomkiMediator.Gamma.t(), %{
+          snapshot_id: String.t(),
+          environment: String.t(),
+          object: Object.t(),
+          facts: %{String.t() => map()}
+        }) :: map()
+  def connector_snapshot(room, gamma, spec) do
+    %{
+      "schema" => "komki-snapshot/1",
+      "snapshot_id" => spec.snapshot_id,
+      "registry_ref" => gamma.registry_id,
+      "identity" => room.identity,
+      "workspace" => %{
+        "workspace_id" => room.workspace_id,
+        "bindings" => room.workspace_bindings,
+        "valid" => true,
+        "environment" => spec.environment
+      },
+      "object" => %{
+        "object_id" => spec.object.object_id,
+        "version" => spec.object.version,
+        "classification" => "classified",
+        "labels" => spec.object.labels
+      },
+      "facts" => spec.facts
     }
   end
 end

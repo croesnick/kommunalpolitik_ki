@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/guestagendaitems/4711-1",
+    "query": null,
+    "headers": [["accept", "application/json"]]
+  },
+  "response": {
+    "status": 200,
+    "headers": [["content-type", "application/json"]],
+    "body": "{\"id\":\"4711-1\",\"numbering\":\"1\",\"name\":\"Beispieltop oeffentlich\",\"restricted\":false,\"textsanddocsvisible\":true,\"meetingid\":4711,\"textblocks\":[{\"caption\":\"Sachverhalt\",\"content\":\"PHA+QmVpc3BpZWx0ZXh0IG1pdCA8c3Ryb25nPkZvcm1hdGllcnVuZzwvc3Ryb25nPiB1bmQgU29uZGVyemVpY2hlbi48L3A+\"}],\"documents\":[]}"
+  }
+}

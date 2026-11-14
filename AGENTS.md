@@ -18,11 +18,13 @@ gh project item-add 1 --owner croesnick --url <issue-url>
 
 Bot-Issues wie die Renovate Dependency Dashboard landen nicht auf dem Board.
 
-**Status führen:** Ein angefangenes Ticket auf `In Progress` setzen, nach Merge oder Close auf `Done`:
+**Status führen:** Ein angefangenes Ticket von Hand auf `In Progress` setzen. `Done` setzt der Board-Workflow, sobald das Ticket geschlossen ist:
 
 ```bash
 gh project item-edit 1 --owner croesnick --url <issue-url> --field Status --value "In Progress"
 ```
+
+**Ticket schließen:** Der PR-Text enthält `Closes #<n>`, dann schließt der Merge das Ticket. `(Ticket #<n>)` im Titel oder in Commits reicht dafür nicht. Erledigt ein PR ein Ticket bewusst nur teilweise, steht dort `Refs #<n>` mit einem Satz, warum.
 
 **Ticket-Disziplin:** Neue Erkenntnisse oder angepasste Anforderungen während der Arbeit werden entweder ins bestehende Ticket eingetragen oder als sinnvolles Folgeticket angelegt — nichts wird still am Ticket vorbei eingebaut.
 
@@ -36,11 +38,23 @@ Tickets und Specs leben als GitHub Issues in `croesnick/kommunalpolitik_ki` (`gh
 
 ### Lane-Protokoll
 
-Wie eine Session ein Wayfinder-Ticket bearbeitet, verifiziert und abschließt (Abnahmekriterien im Ticket statt im Dispatch-Prompt): [docs/agents/lane-protocol.md](docs/agents/lane-protocol.md).
+Wie eine Session ein Wayfinder-Ticket bearbeitet, verifiziert und abschließt (Abnahmekriterien im Ticket statt im Dispatch-Prompt). Am Ende steht ein Prüfbericht: Ergebnis und Nachweis je vereinbartem Prüfpunkt, dazu die Entscheidungen, die die Umsetzung selbst getroffen hat. Die Ergebnisse vergibt eine Session, die nicht gebaut hat: [docs/agents/lane-protocol.md](docs/agents/lane-protocol.md). Welche Prüfpunkte bei jeder Änderung eines Bereichs zusätzlich gelten, steht in [docs/agents/pruefpunkte.md](docs/agents/pruefpunkte.md).
+
+### Interaktive Sessions
+
+`.claude/settings.json` sperrt echte Daten (Hub, Vault, Schlüssel) für Read-Tool und Bash-Sandbox. Ein Stop-Hook lässt eine Session erst bei grünen Gates enden, und `gh pr create` braucht einen Prüfbericht. Was das garantiert und was nicht: [docs/agents/interaktive-sessions.md](docs/agents/interaktive-sessions.md).
+
+### Changesets
+
+Ändert ein PR etwas, das Nutzende von komki, ratsprojekte, sidecar, seatbelt oder sealed_envelope merken, bringt er ein Changeset unter `.changeset/` mit. Der Merge des Version-PR setzt dann die Tags `<einheit>/v<semver>`. Format, Pflicht, Sprache und das Label `ohne-changeset`: [docs/agents/changesets.md](docs/agents/changesets.md).
 
 ### Triage labels
 
 Fünf kanonische Triage-Rollen als Labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Siehe `docs/agents/triage-labels.md`.
+
+### AI-Stufen
+
+`ai:s-tier`, `ai:a-tier` und `ai:b-tier` sagen, was ein Ticket verlangt: Grenze und Urteil, Feature mit Vertrag oder Handwerk. Daraus folgt, welche Modellklasse es bekommt. Berührt eine A- oder B-Aufgabe einen geschützten Pfad, hört die Session auf und eskaliert. Kriterien, geschützte Pfade, Zielbild-Vorlage und die aktuelle Zuordnung der Modelle: [docs/agents/ai-tiers.md](docs/agents/ai-tiers.md).
 
 ### Domain docs
 
@@ -51,6 +65,7 @@ Single-context: `GLOSSARY.md` am Repo-Root (kanonische Nomenklatur aller Domäne
 Wer Γ erzeugt, prüft oder konsumiert, findet die verbindlichen Daten an drei Orten:
 
 - **Engine-Datenvertrag**: `apps/komki_policy/CONTRACT.md` mit den Γ-Konsumformaten (`komki-registry/2`, Snapshot, Intent, Decision, Proof). Der Vertrag gehört zur Engine, weil `KomkiPolicy.Registry.compile/1` die Formate durchsetzt; Änderungen nur durch den Integrator.
+- **Ein Γ** (#208): Der Label-Store ist die Quelle. Die Vorlage des Arbeitsraums ist `KomkiMediator.Templates.label_store_seed/0`; `komki up` importiert sie und schreibt `<base>/mediator/registry.json` als Export (`KomkiCli.Gamma.sync/1`). `registry.json` nie von Hand pflegen.
 - **Store-Importformat**: Moduledoc in `apps/komki_cli/lib/komki_cli/label_store.ex`, lebendes Beispiel in `apps/komki_cli/priv/fixtures/registry-seed.json`. Format `komki-label-store/2`: die Obermenge mit den R.2.2-Metadaten (Bezeichnung, Geltungsbereich, verantwortliche Stelle, Auflagen, strukturierte Lockerungsbefugnis) und den Beobachtertypen (R.2.5).
 - **Normative Basis**: `docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md` mit ≈ 2 400 Zeilen; Abschnitte per Anker-Grep (`R.N.M`, `B.N`) und gerangelte Reads statt Volltext.
 
@@ -60,7 +75,7 @@ Regel am Γ-Übergang: Import und Export validieren immer über `KomkiPolicy.Reg
 
 ### 1. Elixir-first
 
-Wenn nichts Prinzipielles dagegen spricht, wird ein Tool in Elixir gebaut. „Prinzipielles dagegen" heißt: das Ökosystem einer anderen Sprache bietet eine Bibliothek, die in Elixir keine Entsprechung hat und nicht sinnvoll als CLI/NIF angebunden werden kann. Beispiele: `trafilatura` (Python, Artikel-Extraktion), `PyMuPDF` (Python, PDF-Annotation-Extraktion), `Playwright` (Node, Headless-Browser). Dogmatismus ist nicht das Ziel — aber der Default ist Elixir.
+Tools werden in Elixir gebaut. Fehlt eine Bibliothek, bauen wir sie selbst und geben sie als eigenständiges Paket an die Elixir-Community zurück (wie `apps/sidecar`, `apps/seatbelt`). Dass es in einer anderen Sprache eine fertige Bibliothek gibt (etwa `PyMuPDF`, `trafilatura`, `Playwright`), reicht als Grund für eine Abweichung nicht. Abgewichen wird nur aus starken Gründen und **nur nach Rücksprache mit der nutzenden Person**: Die Abwägung kommt als Vorschlag ins Ticket, gebaut wird erst nach dem GO. Nativer Code ist ausdrücklich in Ordnung und keine Abweichung, etwa ein NIF in Rust über Rustler oder ein vorkompilierter NIF aus einem Hex-Paket. Am Ende steht aber eine Elixir-Schnittstelle, außer es sprechen gute Gründe dagegen. Für Connectoren regelt das [ADR 0002](docs/adr/0002-connectoren-nur-in-elixir.md). Die bestehenden Python-Tools unter `tools/` bleiben vorerst als Werkzeuge außerhalb von komki.
 
 ### 2. Unix-Prinzip
 
@@ -92,11 +107,13 @@ wird von Anfang an mitgedacht, nicht nachträglich aufgesetzt.
 
 Jede Aussage, die ein Tool produziert und politisch relevant ist, braucht eine Quelle: URL, Abrufdatum, ggf. Paragraf. Ein Stadtrat ohne Quellen ist unglaubwürdig. Ein Stadtrat mit Quellen ist eine Bastion. Das gilt für den `foerdermittel_recherche`-Skill, `ratsinfo report`, und jeden anderen Output.
 
+**Quellen verifizieren.** Jede Quelle wird vor der Verwendung geprüft: Links auflösen und prüfen, dass die Seite zeigt, wofür sie zitiert wird (ein HTTP-200 allein genügt nicht), Fundstelle (Seite, Paragraf) nachschlagen, Zitate gegen den Wortlaut halten. URL, Kennung und Abrufdatum stammen aus dem tatsächlichen Abruf. Was sich nicht prüfen lässt, wird als „nicht verifiziert" gekennzeichnet.
+
 ### 7. GO-Prinzip: KI berät, Mensch entscheidet
 
-Die KI entscheidet nichts ohne GO. Keine Triage-Änderung, kein Vault-Eintrag, kein Task-Update ohne Bestätigung. Das ist nicht nur eine Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt beim Menschen. Tools sind read-only by design, wo immer möglich.
+Die KI entscheidet nichts ohne GO. Keine Triage-Änderung, kein Vault-Eintrag, kein Task-Update ohne Bestätigung. Das ist nicht nur eine Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt beim Menschen. Tools sind read-only by design, wo immer möglich. Die Regel gilt für die Arbeit an Ratsinhalten; die Pflege des GitHub-Boards in Dev-Sessions (Tickets anlegen, kommentieren, Status setzen) braucht kein GO.
 
-GO kann in der AI-Session (Chat) erteilt werden — die KI führt die Entscheidung dann über das `decide_proposal`-MCP-Tool aus. Der Browser-Weg über die LiveView bleibt als Alternative, ist aber nicht der einzige Weg. Entscheidend ist das explizite GO durch den Menschen, nicht der Kanal.
+GO kann in der AI-Session (Chat) erteilt werden. Entscheidend ist das explizite GO durch den Menschen, nicht der Kanal. Für Entscheidungen im ratsprojekte-Hub reicht ein GO im Chat nicht: Dort führt keine KI eine Entscheidung aus. Die KI schlägt über den Connector-Schreibweg vor, der Mensch entscheidet im Hub (ADR 0004). `decide_proposal` gibt es nicht mehr.
 
 ### 8. Datenschutz-Grenze
 
@@ -106,22 +123,23 @@ Nur Zugriff auf das, was als Stadtrat bzw. öffentlich regulär abrufbar ist. Ni
 
 Technische Tools nicht als „AI-Zugriff" oder „ich will RAG bauen" framen, sondern als „strukturierte öffentliche Ratsinformationen", „digitale Arbeitsfähigkeit", „Transparenz".
 
-### 10. Vault = Source of Truth, ratsprojekte = Destillat
+### 10. Vault für Material, Hub für den Stand
 
-Der Obsidian-Vault ist das Gedächtnis — roh, unstrukturiert, alles. ratsprojekte ist das Destillat — konsolidiert, strukturiert, antragsreif, quellenbelegt. Der Datenfluss ist **strikt einseitig**: Vault → ratsprojekte. Nie umgekehrt.
+Vault und ratsprojekte-Hub stehen nebeneinander, jeder ist Quelle für eine eigene Art von Wahrheit (ADR 0004):
 
-- **Vault** ist Source of Truth, nicht ratsprojekte.
-- **ratsprojekte** bekommt nur Destillate, nie Rohmaterial.
-- **Pflicht**: Alles, was in der OpenCode-Session entsteht, fließt als konsolidierte Notiz zurück in den Vault, *bevor* es als Proposal in ratsprojekte eingereicht wird.
-- **Kein Rückfluss**: ratsprojekte schreibt nie zurück in den Vault. ratsprojekte ist das Endprodukt, nicht der Input.
+- **Vault** ist die Quelle für Material: roh, unstrukturiert, alles. Notizen, Mails, Recherchen, Gesprächsnotizen. Der Vault ist das Gedächtnis.
+- **Hub** ist die Quelle für den Stand: welche Ratsprojekte es gibt, in welcher Phase, wer dran ist, was entschieden ist. Fraktion und Vorstand bekommen ihn als ausgegebenen Stand.
+- **Menschen schreiben direkt in den Hub.** Eine Idee darf dort entstehen, ohne dass es eine Vault-Notiz gibt.
+- **Die KI schlägt nur vor**: aus einem komki-Raum über den Connector, nach GO, und die Redaktion entscheidet im Hub (§7). Material aus dem Vault erreicht den Hub nur auf diesem Weg oder von Hand.
+- **Kein Rückfluss**: Der Hub schreibt nie in den Vault und nie ins RIS.
 
-Der `ratsprojekt_proposal`-Skill orchestriert diesen Workflow: sammeln → konsolidieren (in den Vault) → Gates prüfen → Proposal einbringen.
+Der Slug verbindet beide: `/projekte/{slug}` im Hub, `#ratsprojekt/{slug}` als Vault-Tag.
 
 ### 11. Projektlebenszyklus (kanonisch)
 
-Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Abschluss/Archivierung ist in [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) als Mermaid-Chart dokumentiert. Dieses Dokument ist der **Single Source of Truth für den Projektlebenszyklus** — alle Skills, MCP-Tools und AI-Workflows richten sich nach ihm.
+Der Lebenszyklus eines Ratsprojekts im Hub (Phasen, Ablagen, wer entscheidet, wie Vorschläge aus komki hineinkommen) ist in [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md) als Mermaid-Chart dokumentiert. Dieses Dokument ist der **Single Source of Truth für den Projektlebenszyklus** — alle Skills, Connectoren und AI-Workflows richten sich nach ihm. Die Grenzen zu komki stehen in [`docs/schnittstellen/stand.md`](docs/schnittstellen/stand.md) (Lesen) und [`docs/schnittstellen/connector-socket.md`](docs/schnittstellen/connector-socket.md) (Schreiben).
 
-**Pflicht**: Bei Änderungen am Lifecycle (neue States, Übergänge, Gates) wird zuerst das Lifecycle-Dokument aktualisiert, *bevor* Code oder Skills angepasst werden. Jede OpenCode-Sitzung, die Workflow-Änderungen vornimmt, prüft und aktualisiert das Dokument.
+**Pflicht**: Bei Änderungen am Lifecycle (neue Phasen, Ablagen, Regeln für Wechsel) wird zuerst das Lifecycle-Dokument aktualisiert, *bevor* Code oder Skills angepasst werden. Jede AI-Session, die Workflow-Änderungen vornimmt, prüft und aktualisiert das Dokument.
 
 ### Kanonische Dokumentation unter `docs/`
 
@@ -131,12 +149,19 @@ Der vollständige Lifecycle von Vault-Idee über Proposal zum Projekt bis zum Ab
 | [`docs/workflows.md`](docs/workflows.md) | Use Cases & Lückenanalyse für die Ratsarbeit | Workflows, Lücken, Priorisierung |
 | [`GLOSSARY.md`](GLOSSARY.md) (Repo-Root) | Kanonische Nomenklatur des Repos | Begriffsdefinitionen (Sitzungsmappe, Ratsprojekt, Vault, etc.) |
 | [`docs/prerequisites.md`](docs/prerequisites.md) | Externe Abhängigkeiten (nicht im Repo) | Installationsanleitungen, Fallbacks, benötigt von |
+| [`docs/release.md`](docs/release.md) | Bau und Release von komki | lokaler Bau aus dem Checkout (gültig), Release-Kette (später) |
 
-Diese vier Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows, Begriffen oder Voraussetzungen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
+Diese fünf Dokumente sind die **kanonische Referenz** für alle Skills, MCP-Tools und AI-Workflows. Bei Änderungen an Workflows, Begriffen oder Voraussetzungen wird zuerst das jeweilige Dokument aktualisiert — analog zum Lifecycle-Dokument.
+
+### Doku-Site aktuell halten
+
+Die Doku-Site unter [`docs/site/`](docs/site/) (veröffentlicht über GitHub Pages) ist der Benutzer-Guide zu komki. **Pflicht**: Ändert ein PR, was Nutzende von komki sehen oder tun (Befehle, Optionen, Ausgaben, Einrichtung, Sicherheitsgrenze), passt derselbe PR die betroffenen Seiten an. Terminal-Ausgaben dort stammen aus echten Läufen, nie nachgebaut. Gestaltungsregeln: [`docs/site/README.md`](docs/site/README.md).
 
 ## Sprachregelung
 
 Etablierte englische Fachbegriffe werden immer und konsistent auf Englisch verwendet — nicht eingedeutscht und nicht durch neugeprägte deutsche Komposita ersetzt (z. B. remedy plan, field provenance, taint tracking, paired execution). Deutsch wird nur verwendet, wenn (a) noch kein etablierter englischer Begriff existiert oder (b) ein etablierter deutscher Begriff vorhanden ist (z. B. Nichtinterferenz, Sitzungsmappe). Neue Begriffe — welcher Sprache auch immer — werden bei ihrer ersten Verwendung definiert.
+
+**Code-Kommentare:** In Code mit englischen Bezeichnern sind Kommentare und Docstrings englisch. Deutsch bleiben Inhalte, die Daten oder Oberfläche sind: Prompts, Fixtures, Meldungen an Nutzende.
 
 ## Lizenz-Bewusstsein
 
@@ -149,11 +174,24 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | Tool | Sprache | Zweck | AI-Schnittstelle | Status |
 |---|---|---|---|---|
 | `apps/ratsinfo` | Elixir | RIS-Scraper + CLI + lokale Volltextsuche | CLI (`ratsinfo sync/search/show`) | Funktionsfähig |
-| `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Stadtrats-Projekt-Dashboard | LiveView + MCP (`/mcp`) | Funktionsfähig |
+| `apps/ratsprojekte` | Elixir (Phoenix LiveView) | Lokaler Hub: Weg von der Idee zum Antrag (ADR 0004). Läuft als Release, startet bei der Anmeldung gesperrt, wird im Browser oder per `ratsprojekte open` mit Touch ID geöffnet; die Datenbank ist verschlüsselt | CLI (`ratsprojekte einrichten/open/sperren/status/recover/connector-token/launchagent`); Oberfläche LiveView; Maschinenweg: Stand-Datei (#438) und Connector-Schreibweg (#277) | Gerüst (#435), lokaler Betrieb (#440), Schema und Kontext (#436), Oberfläche mit Main Flow (#437), Druckansicht des Stands (#438, Datei für Maschinen folgt); Bau-Reihe #438, #439 läuft |
 | `apps/shared` | Elixir | Geteilte Domain-Models | — (Bibliothek) | Funktionsfähig |
-| `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi) + lokale Label-Registry mit Export an den Regel-Prüfkern (RFC 0003) | CLI (`komki init/doctor/up/down/status/run/session/label`) | Funktionsfähig |
+| `apps/komki_cli` | Elixir | KomKI-CLI: lokal gesandboxter Arbeitsraum (Seatbelt + llama-server + pi), ein Programm, das Vermittler, Egress-Proxy und Connectoren als Rollen mitbringt, + lokale Label-Registry mit Export an den Regel-Prüfkern (RFC 0003); Schlüssel liegen nur versiegelt im Schlüsselbund (Secure Enclave, Freigabe per Touch ID über das kleine Swift-Programm `komki-tresor`), gestartete Programme werden per Prüfsumme festgehalten | CLI (`komki setup/init/doctor/up/down/status/raum/go/run/session/secret/journal/label`) | Funktionsfähig |
 | `apps/komki_policy` | Elixir | Regel-Prüfkern: rechnet aus, ob eine Absicht nach den Regeln zulässig ist, und verifiziert die Begründung unabhängig nach; rein, führt selbst nichts aus | CLI (`komki-policy validate/decide/verify/advance`) | Funktionsfähig |
-| `apps/komki_mediator` | Elixir | Vermittler: MCP-Server für pis Tool-Aufrufe — jede Operation wird vor der Ausführung von komki_policy entschieden (Gate 1), jede Antwort vor der Aufnahme in den Kontext geprüft und gelabelt (Gate 2), jede Entscheidung im PDR-Journal festgehalten | MCP (von `komki up` gestartet, Loopback-Port) | Funktionsfähig |
+| `apps/seatbelt` | Elixir | Library für macOS-Seatbelt-Sandboxen: deterministische Profil-Generierung, Escript-/BEAM-Grundschicht, Boot-Gate-Sonden und Programm-Pins (Prüfsummen); komki-unabhängig, Code und Doku auf Englisch (Kandidat für eine Veröffentlichung auf hex.pm, Ticket #226) | — (Bibliothek) | Funktionsfähig |
+| `apps/komki_mediator` | Elixir | Vermittler: MCP-Server für pis Tool-Aufrufe — jede Operation wird vor der Ausführung von komki_policy entschieden (Gate 1), jede Antwort vor der Aufnahme in den Kontext geprüft und gelabelt (Gate 2), jede Entscheidung im PDR-Journal festgehalten | MCP (von `komki up` gestartet, Unix-Socket mit Token) | Funktionsfähig |
+| `apps/komki_connector` | Elixir | Komki-Seite des Connector-Vertrags: die Manifeste (einzige Quelle für Operationen, Netz, Ordner, Labels), die deutschen Modell-Texte, der Start-Einstieg und die CA-Zertifikate; das Frame-Protokoll selbst lebt in `apps/sidecar` | — (Bibliothek, Vertrag in `CONTRACT.md`) | Funktionsfähig |
+| `apps/sidecar` | Elixir | Das Frame-Protokoll mit Capability-Token als eigene Bibliothek: 1-MiB-Frames über Unix-Sockets, geschlossene Fehlercodes, Parameter-Schemas, optionaler Peer-uid-Check — bewusst komplett englisch in Code und Doku (Hex-Kandidat, #225) | — (Bibliothek) | Funktionsfähig |
+| `apps/sealed_envelope` | Elixir | Bibliothek für das ktv2-Siegel: verschlüsselt ein Geheimnis für einen Schlüssel, der woanders liegt (etwa in der Secure Enclave), und öffnet es nur über dessen Besitzer; die gesamte Verschlüsselung läuft in Elixir, nur die Schlüsselvereinbarung kommt von außen. Ein Test-Ersatz mit Schlüssel in einer Datei ist ausdrücklich nur für Tests. komki-unabhängig, Code und Doku auf Englisch (Hex-Kandidat, #224) | — (Bibliothek) | Funktionsfähig |
+| `apps/komki_egress` | Elixir | Ausgangstür ins Internet für die Connectoren: jeder Connector bekommt einen eigenen lokalen Port und erreicht darüber nur die Adressen, die für ihn freigegeben sind; alles andere wird abgewiesen und protokolliert, ohne Inhalte mitzuschreiben | CLI (`komki-egress`, Konfiguration per stdin; später von `komki up` gestartet) | Funktionsfähig |
+| `apps/komki_connector_web` | Elixir | Websuche über Brave Search für den Vermittler: liefert Titel, Link und Kurztext je Treffer; der API-Schlüssel kommt aus dem Schlüsselbund und erscheint nirgends | Rolle `komki-connector-web` im Programm komki (von `komki up` gestartet, Aufruf nur über den Vermittler) | Funktionsfähig |
+| `apps/komki_connector_ratsprojekte` | Elixir | ratsprojekte-Anschluss für den Vermittler: reicht Vorschläge (ein Ereignis mit Teilen) an den Hub weiter; der Schreib-Token liegt nur beim Connector, der Hub kennt nur seinen Hash. Aus einem Fraktionsraum wird die Übergabe zur Offenlegung gegenüber dem Vorstand — die Teile wählt die nutzende Person vorher im Freigabefenster ab (#423). Liest außerdem den Stand, den der Hub als Datei ausgibt — nur in einem Projektraum, ohne dass der Hub davon etwas merkt (#419) | Rolle `komki-connector-ratsprojekte` im Programm komki, Aufruf nur über den Vermittler | Funktionsfähig |
+| `apps/wegwerf_hub` | Elixir | Wegwerf-Doppel des ratsprojekte-Hubs für echte Läufe auf Wegwerf-Instanzen (Durchstich #409, Essenz-Lauf #423): nimmt Vorschläge über einen Unix-Socket mit Token-Hash an, stript unsichtbare Zeichen, verwaltet Vorschläge als Dateien und gibt den Stand als Datei aus (#419); Platzhalter, bis der echte Phoenix-Hub aus #435/#437/#438 steht, nicht Teil des Homebrew-Pakets | CLI `wegwerf-hub` (serve/liste/entscheiden/ablehnen/gesperrt/leeren/stand-ausgeben) | Wegwerf |
+| `apps/komki_connector_vault` | Elixir | Vault-Anschluss für komki: durchsucht und liest Notizen eines lokalen Markdown-Vaults (nur Notizen mit gültigem Label) und legt Testnotizen in einem eigenen Ordner an; Symlinks und Pfade aus dem Vault heraus werden abgewiesen; mit erfundenem Test-Vault | Frame-Protokoll über Unix-Socket (von `komki up` gestartet, aufgerufen vom Vermittler) | Funktionsfähig |
+| `apps/komki_connector_documents` | Elixir | Liest die Raumdokumente des Arbeitsraums für `admit_document`, erst nachdem der Vermittler die Aufnahme erlaubt hat; so braucht der Vermittler selbst keinen Zugriff auf die Dokumente. PDFs gibt er Seite für Seite als Text weiter, dazu die Markierungen der nutzenden Person mit Kommentar und markiertem Text. Dafür nutzt er die Bibliothek ex_pdfium (MIT-Lizenz, darin pdfium von Google unter BSD-3-Clause; Herkunft im Moduledoc von `KomkiConnectorDocuments.Pdf`). PDFs liest nur die Einzeldatei von komki (`make komki-burrito`), mit `make komki` noch nicht (#288) | Connector-Socket (von `komki up` gestartet, Aufruf nur über den Vermittler) | Funktionsfähig |
+| `apps/komki_connector_ris` | Elixir | RIS-Anbindung für den Vermittler: sucht und liest öffentliche Tagesordnungspunkte im Ratsinformationssystem; nicht-öffentliche Punkte bleiben unsichtbar, auch in der Trefferzahl. Das Übungs-RIS für Tests läuft auf der Mock-Runtime (`apps/komki_mock`); dazu Werkzeuge, die echte RIS-Antworten außerhalb des Repos aufzeichnen, im Mock abspielen, daraus einen Formatbericht ohne Inhalte und ein Strukturprofil der Sichtbarkeits-Belegung ableiten, daraus synthetische Kassetten im Universum „Gartenstadt“ generieren, sie per N-Gramm gegen die Aufzeichnungen prüfen, die echten Kassetten vor dem Versiegeln auf durchgesickerte Geheimnisse prüfen und nach der Session per Touch ID verschlüsseln (`priv/ris_cassettes.exs`) | Connector-Socket (von `komki up` gestartet, CLI `komki-connector-ris`) | Funktionsfähig |
+| `apps/komki_mock` | Elixir | Übungs-Gegenstellen für Tests und Agents: spielt externe Systeme (RIS, Websuche, …) als eigenständige lokale Dienste nach, mit Zustand in Dateien, benannten Ausgangsständen, Zurücksetzen, Störfällen (Fehler, langsam, nicht erreichbar) und einem Protokoll aller Anfragen. Nachgebaut sind bisher das RIS und die Brave-Websuche; aufgezeichnete Antworten lassen sich abspielen. Nicht Teil des Homebrew-Pakets | CLI (`mix komki_mock.serve`) + Steuer-Port (HTTP) | Funktionsfähig |
+| `docs/site` | Astro Starlight (Node) | Bebilderter Benutzer-Guide zu komki: wie es funktioniert, wie man es startet, wie man die Sicherheitsgrenze selbst sieht; veröffentlicht als Website über GitHub Pages | Website (Markdown/MDX-Quellen, `pnpm build`) | Funktionsfähig |
 | `tools/allgaeuer_zeitung_mcp` | Python | AZ-Artikel suchen/lesen | MCP | Bestehend |
 | `tools/pdf_ingest` | Python | PDFs ingesten, Highlights extrahieren | MCP (`opencode.json`) | Funktionsfähig |
 | `tools/nextcloud_ods_mcp` | Python | ODS-Dateien lesen (Sheets, Ranges, Zellen, Suche) | MCP (`opencode.json`) | Funktionsfähig |
@@ -161,9 +199,9 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `tools/ratsinfo_mcp` | Python | MCP-Wrapper um `ratsinfo`-CLI (search, show, sessions, sync, stats) | MCP | Funktionsfähig |
 | Nextcloud-MCP (`cbcoutinho/nextcloud-mcp-server`) | Python (extern) | Nextcloud: Files/WebDAV, CalDAV, Notes, Deck, Talk | MCP (`opencode.json`, `uvx`) | Eingebunden |
 | `skills/foerdermittel_recherche` | Markdown-Skill | Fördermittel-Recherche orchestrieren | Agent Skill | Funktionsfähig |
-| `skills/ratsprojekt_delta` | Markdown-Skill | Neue Infos gegen Projektstand halten, Delta produzieren | Agent Skill | Funktionsfähig |
-| `skills/ratsprojekt_stand` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Funktionsfähig |
-| `skills/ratsprojekt_proposal` | Markdown-Skill | Proposal-Workflow: sammeln → Vault → Gates → Proposal | Agent Skill | Funktionsfähig |
+| `skills/ratsprojekt_delta` | Markdown-Skill | Neue Infos gegen Projektstand halten, Delta produzieren | Agent Skill | Wartet: Backend mit #435 entfallen, Neubau folgt #375 |
+| `skills/ratsprojekt_stand` | Markdown-Skill | Projekt-Standortbestimmung aus ratsprojekte | Agent Skill | Wartet: Backend mit #435 entfallen, Neubau folgt #375 |
+| `skills/ratsprojekt_proposal` | Markdown-Skill | Proposal-Workflow: sammeln → Vault → Gates → Proposal | Agent Skill | Wartet: Backend mit #435 entfallen, Neubau folgt #375 |
 | `skills/sitzungsvorbereitung` | Markdown-Skill | Sitzungsmappe erstellen (WF 1: sync → TOPs → AZ → Vault → Mappe) | Agent Skill | Funktionsfähig |
 | `skills/bericht_aus_dem_stadtrat` | Markdown-Skill | Bericht aus dem Stadtrat: Sitzungen seit letztem Bericht sammeln und verdichten | Agent Skill | Funktionsfähig |
 | `skills/vault_suche` | Markdown-Skill | Obsidian-Vault durchsuchen | Agent Skill | Funktionsfähig |
@@ -171,6 +209,9 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `skills/antrag_generieren` | Markdown-Skill | Stadtratsantrag entwerfen (fraktionsneutral; fraktionsspezifische Vorlage via Vault-Tag) | Agent Skill | Funktionsfähig |
 | `skills/terminal_screenshot` | Markdown-Skill + Python-Skripte | Terminal-Sitzung als Screenshot für READMEs (tmux-Capture → SVG, Browser-verifiziert) | Agent Skill | Funktionsfähig |
 | `skills/mermaid_vision_loop` | Markdown-Skill + Python-Skript | Mermaid-Diagramme rendern, vom Vision-Agenten bewerten lassen und refaktorieren, bis sie lesbar sind | Agent Skill | Funktionsfähig |
+| `scripts/screenshot.exs` | Elixir-Skript | Screenshots der Hub-Oberfläche als Beleg für Prüfpunkte: startet den Hub aus einem Worktree auf einer Wegwerf-Datenbank und einen Headless-Browser, beide gemeinsam in einer eigenen Sandbox ohne Netz und ohne Schreibrecht im Worktree, und liefert nur die Bilder. Regeln: `docs/agents/interaktive-sessions.md` | CLI (`elixir scripts/screenshot.exs --route/--navigate/--spec/--probe`); interaktive Sessions nutzen den Starter `komki-screenshot` aus `make screenshot-install` | Funktionsfähig |
+| `scripts/changesets.exs` | Elixir-Skript | Versionen der fünf Einheiten: prüft an jedem PR, ob ein Changeset die geänderten Einheiten nennt, und gibt beim Version-PR den Einheiten einen Patch, die eine erhöhte Bibliothek einbinden. Die Versionen selbst schreibt knope in CI (ADR 0005) | CLI (`elixir scripts/changesets.exs check/cascade/bumped`) | Funktionsfähig |
+| `scripts/dev_loop.exs` | Elixir-Skript | Dev-Loop: arbeitet freie Tickets ab, auch wenn niemand am Rechner sitzt. Eine Session setzt um, eine zweite prüft. Einfache Tickets werden gemergt, alles andere wartet mit einer kurzen Zusammenfassung auf ein GO. Eine dritte Session verfeinert Tickets und macht nur Vorschläge. Regeln und Einrichtung: `docs/agents/dev-loop.md` | CLI (`elixir scripts/dev_loop.exs`) | Prototyp |
 
 ### Externe Abhängigkeiten (nicht im Repo)
 
@@ -181,6 +222,7 @@ Abhängigkeiten auf Lizenzkompatibilität prüfen. PyMuPDF ist AGPL-3.0 (oder ko
 | `RENOVATE_TOKEN` (Fine-grained PAT) | Dependency-Updates via self-hosted Renovate (Rechte-Anforderungen: [`docs/prerequisites.md`](docs/prerequisites.md)) | `.github/workflows/renovate.yml` (CI, alle 6 h) |
 | `zig` 0.16.0 + `xz` | komki-Einzeldatei-Binary via Burrito (nur Release-Bau; Versionsprüfung auf Gleichheit) | `apps/komki_cli` (Ticket #75, Details: [`docs/prerequisites.md`](docs/prerequisites.md)) |
 | `nextcloud-mcp-server` (`uvx`) | Nextcloud-MCP (WebDAV/CalDAV/Notes/Deck/Talk) via Subprocess | WF 9 (Nextcloud-Kollaborationsplattform) |
+| `chrome-headless-shell` (Playwright) | Headless-Browser, gepinnt per Prüfsumme | `scripts/screenshot.exs` (Ticket #510, Details: [`docs/prerequisites.md`](docs/prerequisites.md)) |
 | `lychee` CLI | Markdown-Links offline prüfen (CI nutzt die lychee-Action mit eigener Binary) | `docs-links`-Check der CI-Kurzfassung, Pre-commit-Hook `lychee-markdown-links` |
 
 > **Hinweis:** Der `obsidian` CLI ist eine externe Abhängigkeit, die lokal installiert sein muss. Vollständige Dokumentation (Install, Konfiguration, Fallbacks, Limitierungen) siehe [`docs/prerequisites.md`](docs/prerequisites.md).
@@ -196,26 +238,15 @@ Skills, die fraktionsneutral bleiben (wie `antrag_generieren`), verweisen auf fr
 ## ratsprojekte — Planungsstand
 
 ### Konzept
-Rechtlich-inhaltliche Standortbestimmung für Stadtratsprojekte. Kein Task-Tracker, keine Todo-Liste. Sondern: welche Realisierungsstränge gibt es, welche rechtlichen Vorbedingungen stehen, welcher Weg kann gegangen werden — und welcher nicht. Die KI kann lesen und Vorschläge machen (GO-Prinzip). Langfristig: Antragsvorlagen aus Projektdaten generieren.
+Lokaler Hub für den Weg von der Idee zum Antrag ([ADR 0004](docs/adr/0004-ratsprojekte-als-lokaler-hub.md)): Der Hub führt den gemeinsamen Stand, Menschen schreiben direkt, die KI schlägt vor (GO-Prinzip). Die Redaktion führt, alle anderen bekommen eine bewusst ausgegebene Fassung.
 
 ### Architektur
-- Phoenix LiveView für Dashboard
-- `anubis_mcp` (LGPL-3.0) für AI-Zugriff — MCP-Endpoint unter `http://localhost:4000/mcp` (dev-only, read-only Tools)
-- Ecto + SQLite3 (geteilte DB mit ratsinfo)
+- Phoenix LiveView (Gerüst: Phoenix 1.8.16, LiveView 1.2.13, Bandit, Tailwind v4, esbuild — Ticket #435)
+- Kein MCP-Endpoint am Hub (ADR 0004): Schreibendes geht nur über den Connector-Socket mit Token (#277, baut auf #440), der Stand geht als Datei für Maschinen hinaus (#438)
+- Ecto + SQLite3 über exqlite, das im Workspace gegen die SQLCipher-Systembibliothek gebaut wird (BSD-Lizenz; gilt auch für ratsinfo und komki_cli). Eigene Datei unter `~/Library/Application Support/ratsprojekte/` statt der geteilten mit ratsinfo; ohne Schlüssel verhält sich SQLCipher wie normales SQLite.
 
 ### Datenmodell
-```
-Projekt (titel, slug, beschreibung, status, prioritaet, beschlussvorschlag, adressat)
-  status: idee | aktiv | abgeschlossen | verworfen  (siehe docs/ratsprojekte-lifecycle.md)
-├── Realisierungsstrang (label A/B/C, titel, beschreibung, rechtliche_grundlage, bedingung, bedingung_erfuellt)
-│   ├── Vorbedingung (text, erfuellt, rechtliche_grundlage, typ)
-│   └── Schritt (text, frist) — geordnete Liste, keine Checkboxen
-└── Quelle (typ, titel, url, paragraf, abrufdatum)
-
-PendingProposal (projekt_id, typ, status)  — AI-Vorschläge, GO-Gate vor Mutation
-  typ:    add_projekt | add_realisierungsstrang | change_status
-  status: pending | approved | rejected
-```
+Das alte Modell (Projekt/Realisierungsstrang/PendingProposal) ist mit dem Gerüstwechsel (#435) gefallen. Das kleine Modell (Ratsprojekt, Verlauf, Meinungsbild, Befragung, Fakt, Variante, Antrag) steht in [ADR 0004](docs/adr/0004-ratsprojekte-als-lokaler-hub.md) und ist als Schema und Kontext gebaut (#436, `Ratsprojekte.Projects` und `Ratsprojekte.Surveys`, Überblick im [README der App](apps/ratsprojekte/README.md#modell)); Lebenszyklus, Workflows und Glossar beschreiben es (#434).
 
 ### Slug-Konvention
 
@@ -224,13 +255,13 @@ Projekte werden über Slugs identifiziert, nicht über DB-IDs. Der Slug ist der 
 - **Format**: kebab-case, lowercase, ASCII only (`^[a-z0-9]+(?:-[a-z0-9]+)*$`). Umlaute als ae/oe/ue/ss.
 - **ratsprojekte URL**: `/projekte/marktplatz-umgestalten` (Slug in der URL, nicht die ID)
 - **Vault-Tag**: `#ratsprojekt/marktplatz-umgestalten` (gleicher Slug als Obsidian-Tag)
-- **MCP-Tools**: alle projektbezogenen Tools nehmen `slug` als Parameter, nie `id`
-- **Intern**: DB-IDs bleiben als Primary Keys und Foreign Keys in `pending_proposals.projekt_id`. Slug→ID-Auflösung passiert an der Grenze (LiveView mount, MCP tool execute).
+- **Schnittstellen**: alle projektbezogenen Wege nehmen `slug` als Parameter, nie `id` (Umsetzung mit der Oberfläche, #437)
+- **Intern**: DB-IDs bleiben als Primary Keys und Foreign Keys. Slug→ID-Auflösung passiert an der Grenze.
 - **Copy-Button**: auf der Projekt-Detailseite kopiert ein Button den Vault-Tag `#ratsprojekt/{slug}` in die Zwischenablage
 
 ### Roadmap
 
-Die Punkte 1 bis 4, 7 und 8 der ursprünglichen Roadmap sind abgeschlossen; der bisher hier stehende Detailstatus ist als veraltetes Duplikat des Boards weggefallen. Offen: Antragsvorlagen als Markdown-Render aus Projektdaten (Issue #15), Ratsinfo-Integration (Quellen verlinken mit Sitzung und TOP) sowie Value Proposition + Success Metrics als harte Gates in `check_antragsreife` (bis dahin policy-level über das Lifecycle-Dokument und die Skills). Status und laufende Arbeit stehen auf dem GitHub-Board (Feld „Status"), der Projektlebenszyklus in [docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md).
+Das Gerüst steht (#435), die Bau-Reihe aus ADR 0004 läuft über die Tickets #434 (kanonische Dokumente), #436 (Schema und Kontext), #437 (Oberfläche, Main Flow „Was ist passiert?‟), #438 (Stand ausgeben), #439 (Befragung), #440 (lokaler Betrieb) und #277 (Connector-Schreibweg „Fakt vorschlagen‟). Status und laufende Arbeit stehen auf dem GitHub-Board (Feld „Status"). #438 baut gegen [docs/schnittstellen/stand.md](docs/schnittstellen/stand.md), #277 gegen [docs/schnittstellen/connector-socket.md](docs/schnittstellen/connector-socket.md).
 
 ## Tooling-Vorgaben
 
@@ -240,7 +271,7 @@ Achtung: `mix credo` und `mix dialyzer` sind **App-Tasks** — am Repo-Root exis
 
 | Werkzeug | Rolle | Befehl |
 |---|---|---|
-| Credo | Linter | Root: `mix workspace.run -t credo --exclude ratsprojekte -- --strict`; App-lokal: `cd apps/<app> && mix credo --strict` |
+| Credo | Linter | Root: `mix workspace.run -t credo -- --strict` (alle Apps); App-lokal: `cd apps/<app> && mix credo --strict` |
 | Dialyzer | Static Type Checker | App-lokal: `cd apps/<app> && mix dialyzer` (Root-Dispatch crasht mit dialyxir im Workspace-Pattern) |
 | mix format | Formatter | `mix format --check-formatted` (Root, deckt alle Apps ab) |
 | mix test | Test-Runner | `mix workspace.run -t test --affected --base origin/main` |
@@ -264,16 +295,18 @@ in `endpoint.ex` als Plug eingetragen (nur `:dev`).
 
 Die Python-Version steht zentral in `.tool-versions` am Repo-Root: asdf und uv lesen die Datei direkt, die CI parst sie für `setup-python` (python.yml). Änderungen dort greifen damit überall.
 
+Ebenso Erlang und Elixir: `.tool-versions` pinnt sie für asdf, und die CI liest dieselbe Datei (`setup-beam` mit `version-file`). Die Versionen folgen Homebrews aktuellem `erlang`, weil die komki-Formel davon abhängt (`packaging/homebrew/`).
+
 ### CI
 
-**Maßgeblich sind die Workflows unter [`.github/workflows/`](.github/workflows/)**: [`ci.yml`](.github/workflows/ci.yml) für Elixir, [`python.yml`](.github/workflows/python.yml) für die Python-Tools und die losen Skripte, [`docs-links.yml`](.github/workflows/docs-links.yml) für Markdown-Links. Dort stehen die exakten Befehle samt Begründungen. Kurzfassung (kein Ersatz für die Dateien):
+**Maßgeblich sind die Workflows unter [`.github/workflows/`](.github/workflows/)**: [`ci.yml`](.github/workflows/ci.yml) für Elixir, [`python.yml`](.github/workflows/python.yml) für die Python-Tools und die losen Skripte, [`docs-links.yml`](.github/workflows/docs-links.yml) für Markdown-Links, [`changesets.yml`](.github/workflows/changesets.yml) und [`versionen.yml`](.github/workflows/versionen.yml) für Changesets, Version-PR und Tags. Dort stehen die exakten Befehle samt Begründungen. Kurzfassung (kein Ersatz für die Dateien):
 
 ```bash
 # Elixir (Root; credo/dialyzer siehe Tooling-Tabelle oben)
 mix deps.get && mix workspace.run -t deps.get
 mix format --check-formatted
 mix workspace.run -t compile -- --warnings-as-errors
-mix workspace.run -t credo --exclude ratsprojekte -- --strict
+mix workspace.run -t credo -- --strict
 mix workspace.run -t test --affected --base origin/main   # PR; lokal ohne --base
 
 # Python (pro Tool unter tools/)
@@ -289,6 +322,9 @@ uvx ruff@0.15.21 format --check skills/*/scripts
 
 # Markdown-Links, offline (Config: lychee.toml am Repo-Root)
 lychee './**/*.md'
+
+# Changesets (PR gegen main)
+elixir scripts/changesets.exs check origin/main
 ```
 
 CI-Status verlässlich prüfen: nach einem Push zuerst mit `gh run list --branch <branch> --limit 1` abgleichen, dass der Lauf zur eigenen Head-Short-SHA gehört — `gh pr checks --watch` zeigt unmittelbar nach einem Push sonst die Ergebnisse des vorherigen Heads als „pass".
@@ -300,10 +336,22 @@ kommunalpolitik_ki/
 ├── GLOSSARY.md             # kanonische Nomenklatur aller Domänen
 ├── apps/                   # Elixir-Apps (workspace-Pattern)
 │   ├── ratsinfo/           # RIS-Scraper + CLI (AI: CLI)
-│   ├── ratsprojekte/       # Projekt-Dashboard (AI: LiveView + MCP)
+│   ├── ratsprojekte/       # Lokaler Hub von der Idee zum Antrag (AI: LiveView)
 │   ├── shared/             # Geteilte Domain-Models
 │   ├── komki_policy/       # Regel-Prüfkern für Zulässigkeits-Entscheidungen (AI: CLI)
 │   ├── komki_mediator/     # Vermittler: MCP-Gates + PDR-Journal für pis Tool-Aufrufe (AI: MCP)
+│   ├── komki_connector/    # Connector-Vertrag, Manifeste, deutsche Texte, Launch (Bibliothek)
+│   ├── sidecar/            # Frame-Protokoll + Capability-Token als eigene Library (bewusst englisch, #225)
+│   ├── seatbelt/           # macOS-Seatbelt-Profile, Boot-Gate, Programm-Pins als eigene Library (bewusst englisch, #226)
+│   ├── sealed_envelope/    # ktv2-Siegel: Format, Krypto, Schlüsselvereinbarung als Behaviour (bewusst englisch, #224)
+│   ├── komki_egress/       # Egress-Proxy: freigegebene Ziele je Connector (AI: CLI)
+│   ├── komki_connector_web/ # Connector web: Brave-Websuche hinter dem Vermittler
+│   ├── komki_connector_ratsprojekte/ # ratsprojekte-Connector: Vorschläge an den Hub (Schreib-Token), Stand lesen
+│   ├── wegwerf_hub/      # Wegwerf-Doppel des Hubs für echte Läufe (nicht im Release)
+│   ├── komki_connector_vault/ # Vault-Connector: Notizen suchen/lesen, Testnotizen schreiben (via Vermittler)
+│   ├── komki_connector_documents/ # Dokument-Connector: Raumdokumente für admit_document lesen (via Vermittler)
+│   ├── komki_connector_ris/ # RIS-Connector: öffentliche TOPs suchen/lesen, Recorder, Kassetten (AI: Connector)
+│   ├── komki_mock/         # Mock-Runtime: stateful HTTP-Mocks mit Seeds, Reset, Szenarien; RIS-, Brave- und Replay-Adapter (nicht im Release)
 │   └── komki_cli/          # KomKI-CLI: gesandboxter Arbeitsraum (Seatbelt + llama + pi) (AI: CLI)
 ├── tools/                  # Nicht-Elixir
 │   ├── allgaeuer_zeitung_mcp/  # AZ-Artikel (AI: MCP)
@@ -311,6 +359,7 @@ kommunalpolitik_ki/
 │   ├── obsidian_mcp/       # Vault nativ lesen/schreiben (AI: MCP)
 │   ├── pdf_ingest/         # PDF-Ingestion (AI: MCP)
 │   └── ratsinfo_mcp/       # MCP-Wrapper um ratsinfo-CLI (AI: MCP)
+├── scripts/                # Dev-Loop (docs/agents/dev-loop.md), Screenshot-Werkzeug für UI-Prüfpunkte, Changesets (docs/agents/changesets.md)
 ├── skills/                 # AI-Harness-Skills
 │   ├── foerdermittel_recherche/  # Fördermittel-Recherche (AI: Agent Skill)
 │   ├── ratsprojekt_delta/      # Neue Infos gegen Projektstand halten (AI: Agent Skill)
@@ -319,14 +368,22 @@ kommunalpolitik_ki/
 │   ├── sitzungsvorbereitung/   # Sitzungsmappe erstellen (AI: Agent Skill)
 │   ├── bericht_aus_dem_stadtrat/ # Rückblick als Vault-Notiz (AI: Agent Skill)
 │   ├── antrag_generieren/      # Stadtratsantrag entwerfen (AI: Agent Skill)
+│   ├── sprachinventur/         # Fachbegriffe inventieren und vereinheitlichen (AI: Agent Skill)
+│   ├── terminal_screenshot/    # Terminal-Screenshots für READMEs (AI: Agent Skill)
+│   ├── mermaid_vision_loop/    # Mermaid-Diagramme rendern und verbessern (AI: Agent Skill)
 │   └── vault_suche/        # Vault-Volltextsuche (AI: Agent Skill)
 ├── docs/                   # Kanonische Dokumentation
 │   ├── ratsprojekte-lifecycle.md  # Projektlebenszyklus (Mermaid-Chart)
 │   ├── workflows.md               # Use Cases & Lückenanalyse der Ratsarbeit
 │   ├── prerequisites.md           # Externe Abhängigkeiten
+│   ├── release.md                 # Bau aus dem Checkout, Release-Kette (später)
+│   ├── adr/                       # ADRs (Entscheidungen mit Begründung)
 │   ├── research/                  # Recherchen zu Architektur-Entscheidungen
+│   ├── site/                      # Doku-Site komki (Astro Starlight, GitHub Pages)
 │   └── rfcs/                      # RFCs (Sandbox, vertrauliche KI-Arbeitsräume)
 ├── artifacts/              # shared Elixir build output (gitignored)
+├── .changeset/             # offene Changesets bis zum nächsten Version-PR
+├── knope.toml              # Versionen und Changelogs der fünf Einheiten (ADR 0005)
 ├── mix.exs                 # workspace root
 ├── .workspace.exs
 ├── .credo.exs

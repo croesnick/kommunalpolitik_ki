@@ -1,45 +1,64 @@
 defmodule RatsprojekteWeb.Router do
   use RatsprojekteWeb, :router
 
+  # CSP zurückgetragen aus dem alten Bestand (#435, ursprünglich #150/#151):
+  # Alle Assets kommen aus priv/static, also bleibt alles auf der eigenen
+  # Origin; `connect-src 'self'` deckt die LiveView-WebSocket (/live) ab.
+  # Drei bewusste Ausnahmen, alle aus dem alten Bestand übernommen bzw.
+  # für das Gerüst nötig:
+  # - `style-src 'unsafe-inline'`: LiveViews setzen inline style-Attribute,
+  #   die LiveView bei jedem DOM-Patch neu anwendet.
+  # - Der SHA-256-Hash erlaubt allein das Inline-Theme-Script im Root-Layout
+  #   (FOUC-Vermeidung, vor dem CSS). Ändert sich das Script, muss der Hash
+  #   hier und im CSP-Test mitgezogen werden — der Test erzwingt das.
+  # - `img-src 'self' data:`: Die Icons (Heroicons, `.hero-*`) kommen als
+  #   data:-SVG-Masken aus app.css; ohne data: fehlen sie (geprüft mit #437).
+  @content_security_policy Enum.join(
+                             [
+                               "default-src 'self'",
+                               "script-src 'self' 'sha256-BK52NP1e8rQFFVZCoDYB4YoCL0cZc/KAVl4dkMM7/QM='",
+                               "style-src 'self' 'unsafe-inline'",
+                               "img-src 'self' data:",
+                               "connect-src 'self'",
+                               "base-uri 'self'",
+                               "form-action 'self'",
+                               "frame-ancestors 'self'"
+                             ],
+                             "; "
+                           )
+
   pipeline :browser do
     plug(:accepts, ["html"])
     plug(:fetch_session)
     plug(:fetch_live_flash)
     plug(:put_root_layout, html: {RatsprojekteWeb.Layouts, :root})
     plug(:protect_from_forgery)
-    plug(:put_secure_browser_headers)
-    plug(RatsprojekteWeb.Plugs.Nav)
+    plug(:put_secure_browser_headers, %{"content-security-policy" => @content_security_policy})
   end
 
-  pipeline :api do
-    plug(:accepts, ["json"])
-  end
-
-  pipeline :mcp do
-    plug(:accepts, ["json", "event-stream"])
-  end
-
-  # MCP-Endpoint für AI-Zugriff (dev-only, read-only)
-  if Mix.env() == :dev do
-    scope "/mcp" do
-      pipe_through(:mcp)
-
-      forward("/", Anubis.Server.Transport.StreamableHTTP.Plug, server: Ratsprojekte.MCP.Server)
-    end
+  # The gate (#440, ADR 0004): without the session marker of the current
+  # unlock only the lock page with „Entsperren“. The LiveViews check the
+  # same marker on mount (`on_mount: RatsprojekteWeb.Zugang`), and their
+  # events count as actions that postpone the lock.
+  pipeline :zugang do
+    plug(RatsprojekteWeb.Zugang)
   end
 
   scope "/", RatsprojekteWeb do
     pipe_through(:browser)
 
-    live("/", ProjektLive.Index, :index)
-    live("/projekte/:slug", ProjektLive.Show, :show)
+    get("/zugang/:token", ZugangController, :einloesen)
+    post("/entsperren", ZugangController, :entsperren)
+  end
 
-    # Propose-Confirm-Pattern: GO-Gate für AI-Vorschläge in der LiveView
-    live("/projekte/:projekt_slug/proposals", ProposalLive.Index, :index)
-    live("/projekte/:projekt_slug/proposals/:id", ProposalLive.Show, :show)
+  scope "/", RatsprojekteWeb do
+    pipe_through([:browser, :zugang])
 
-    # Top-level proposals (für add_projekt Vorschläge ohne Eltern-Projekt)
-    live("/proposals", ProposalLive.Index, :index)
-    live("/proposals/:id", ProposalLive.Show, :show)
+    live_session :hub, on_mount: RatsprojekteWeb.Zugang do
+      live("/", OverviewLive)
+      live("/projekte/:slug", ProjectLive)
+      live("/stand", BriefingLive)
+      live("/stand/:id", BriefingLive)
+    end
   end
 end

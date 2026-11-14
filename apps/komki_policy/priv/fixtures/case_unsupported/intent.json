@@ -1,7 +1,7 @@
 {
   "schema": "komki-intent/1",
-  "intent_id": "intent-transfer-oeffentlich-a",
-  "operation": "transfer",
+  "intent_id": "intent-start-oeffentlich-a",
+  "operation": "start",
   "object": "obj-oeffentlich-a@v1",
   "workspace": "ws-fall-4711"
 }

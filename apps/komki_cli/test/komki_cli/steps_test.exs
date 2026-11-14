@@ -6,10 +6,37 @@ defmodule KomkiCli.StepsTest do
   # wie auch vom pi-home aus faendig werden.
   use ExUnit.Case, async: true
 
-  alias KomkiCli.{Config, Proc, Steps, TestSupport}
+  alias KomkiCli.{Config, Denials, Proc, Steps, TestSupport}
+
+  @denials_fixture Path.expand("../fixtures/denials/log-show.txt", __DIR__)
+
+  describe "chain_base/2 (Ticket #251: Basis des Panes)" do
+    @tag :tmp_dir
+    test "die Basis kommt aus --base, auch ohne KOMKI_HOME im Pane", %{tmp_dir: dir} do
+      assert Steps.chain_base(%{"base" => dir}, nil) == {:ok, Config.canonical(dir)}
+    end
+
+    @tag :tmp_dir
+    test "KOMKI_HOME mit derselben Basis ist in Ordnung", %{tmp_dir: dir} do
+      assert Steps.chain_base(%{"base" => dir}, dir) == {:ok, Config.canonical(dir)}
+    end
+
+    @tag :tmp_dir
+    test "KOMKI_HOME einer anderen Instanz bricht ab", %{tmp_dir: dir} do
+      other = Path.join(dir, "andere")
+
+      assert {:error, reason, 2} = Steps.chain_base(%{"base" => dir}, other)
+      assert reason =~ "Basis des Panes weicht ab"
+    end
+
+    test "ohne --base kein Rückfall auf die Standard-Basis" do
+      assert {:error, reason, 2} = Steps.chain_base(%{}, nil)
+      assert reason =~ "ohne --base"
+    end
+  end
 
   describe "write_pi_home/1" do
-    test "Trust-Schluessel ist das Instanz-Root (deckt arbeit und pi-home ab)" do
+    test "Trust-Schlüssel ist das Instanz-Root (deckt arbeit und pi-home ab)" do
       cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-steps"))
 
       Steps.write_pi_home(cfg)
@@ -75,7 +102,49 @@ defmodule KomkiCli.StepsTest do
     end
   end
 
+  # Ticket #493 (Audit #467 F24/F25): pi-home traegt die Kopie des
+  # llama-API-Keys (models.json) und die pi-Transkripte; die Kette entsteht
+  # deshalb mit 0700 wie run/ und connectors/, statt mit dem umask-Default
+  # 0755 fuer andere lokale Konten traversierbar zu bleiben (relevant, sobald
+  # die Basis ausserhalb des 0700-Heims liegt, etwa KOMKI_HOME=/private/tmp/...).
+  describe "create_pi_home!/1 (Ticket #493: pi-home-Kette 0700)" do
+    test "jedes Kettenglied entsteht mit 0700, auch ueber 0755-Altbestand hinweg" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-pi-home-mode"))
+
+      Steps.create_pi_home!(cfg)
+
+      for dir <- pi_home_chain(cfg), do: assert(mode(dir) == 0o700)
+
+      # Alt-Instanz: bereits mit 0755 entstandene Glieder korrigiert init
+      # --force bzw. jedes erneute Anlegen mit.
+      File.chmod!(cfg.pi_home, 0o755)
+      Steps.create_pi_home!(cfg)
+      assert mode(cfg.pi_home) == 0o700
+    end
+  end
+
   defp read_json(path), do: path |> File.read!() |> JSON.decode!()
+
+  # Die Kette, die init anlegt: pi-home und jede Stufe darunter (auch die
+  # Zwischenglieder .local/.cache/.pi, die mkdir_p implizit erzeugt).
+  defp pi_home_chain(cfg) do
+    [
+      cfg.pi_home,
+      Path.join([cfg.pi_home, "tmp"]),
+      Path.join([cfg.pi_home, ".config"]),
+      Path.join([cfg.pi_home, ".local"]),
+      Path.join([cfg.pi_home, ".local", "share"]),
+      Path.join([cfg.pi_home, ".cache"]),
+      Path.join([cfg.pi_home, ".cache", "node-compile"]),
+      Path.join([cfg.pi_home, ".pi"]),
+      Path.join([cfg.pi_home, ".pi", "agent"])
+    ]
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
+  end
 
   # Vermittler-Liveness-Gate (Review-Fund zur Vertragsluecke): run und
   # session muessen abbrechen, wenn der Vermittler tot oder das pidfile
@@ -130,7 +199,7 @@ defmodule KomkiCli.StepsTest do
       assert scratch == Path.join(runs, "x")
     end
 
-    test "Pfad ausserhalb wird abgelehnt", %{base: base} do
+    test "Pfad außerhalb wird abgelehnt", %{base: base} do
       outside = TestSupport.tmp_area!("komki-scratch-outside")
       assert {:error, msg, 2} = Steps.scratch_for(%{"scratch" => outside}, base)
       assert msg =~ "unterhalb"
@@ -141,7 +210,7 @@ defmodule KomkiCli.StepsTest do
       assert {:error, _, 2} = Steps.scratch_for(%{"scratch" => Path.join(runs, "../x")}, base)
     end
 
-    test "Symlink unter runs mit Ziel ausserhalb wird abgelehnt", %{base: base, runs: runs} do
+    test "Symlink unter runs mit Ziel außerhalb wird abgelehnt", %{base: base, runs: runs} do
       outside = TestSupport.tmp_area!("komki-scratch-target")
       File.mkdir_p!(runs)
       link = Path.join(runs, "link")
@@ -151,7 +220,7 @@ defmodule KomkiCli.StepsTest do
   end
 
   describe "require_mediator_up/1 (Liveness-Gate vor pi)" do
-    test "kein pidfile, stiller Port: Abbruch mit 'komki up'-Hinweis (Exit 2)" do
+    test "kein pidfile, stiller Socket: Abbruch mit 'komki up'-Hinweis (Exit 2)" do
       cfg = med_gate_cfg("komki-steps-med")
 
       assert {:error, reason, 2} = Steps.require_mediator_up(cfg)
@@ -197,7 +266,377 @@ defmodule KomkiCli.StepsTest do
     end
   end
 
+  # Ticket #318: Ablage und Doctor-Checks des MTP-Drafters über die
+  # öffentlichen Nahten Steps.place_drafter/2 und Steps.drafter_checks/2 —
+  # hermetisch mit kleiner Datei und explizitem --drafter-from (das
+  # Staging-Fallback ist host-abhängig und gehört zum echten Lauf).
+  describe "MTP-Drafter (Ticket #318)" do
+    @drafter_inhalt "kleiner test-drafter"
+    @drafter_sha Base.encode16(:crypto.hash(:sha256, "kleiner test-drafter"), case: :lower)
+
+    defp drafter_cfg(prefix, sha \\ nil) do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!(prefix))
+      %{cfg | drafter_sha256: sha || @drafter_sha}
+    end
+
+    defp drafter_source(cfg) do
+      source = Path.join(cfg.base_dir, "quelle-mtp.gguf")
+      File.write!(source, @drafter_inhalt)
+      source
+    end
+
+    test "place_drafter/2: --drafter-from, SHA verifiziert, Zeilen wie beim gguf" do
+      cfg = drafter_cfg("komki-drafter-place")
+      source = drafter_source(cfg)
+
+      assert {:ok, [place, sha_line, ablage]} =
+               Steps.place_drafter(cfg, %{"drafter-from" => source})
+
+      assert place == "drafter:      " <> cfg.drafter_path
+      assert sha_line == "drafter-sha256: " <> @drafter_sha <> " (pinned, verified)"
+      assert ablage =~ ~r/drafter-ablage: (APFS-Klon|Kopie)/
+      assert File.read!(cfg.drafter_path) == @drafter_inhalt
+    end
+
+    test "place_drafter/2: falscher SHA bricht ab, Kopie entfernt" do
+      cfg = drafter_cfg("komki-drafter-falsch", String.duplicate("c", 64))
+      source = drafter_source(cfg)
+
+      assert {:error, reason, 2} = Steps.place_drafter(cfg, %{"drafter-from" => source})
+      assert reason =~ "Drafter SHA256 mismatch"
+      assert reason =~ "kopie entfernt"
+      refute File.exists?(cfg.drafter_path)
+    end
+
+    test "place_drafter/2: nicht vorhandene Quelle ist ein Usage-Fehler" do
+      cfg = drafter_cfg("komki-drafter-quelle")
+
+      assert {:error, reason, 2} =
+               Steps.place_drafter(cfg, %{"drafter-from" => "/gibt-es-nicht/mtp.gguf"})
+
+      assert reason =~ "--drafter-from Pfad nicht gefunden"
+    end
+
+    test "drafter_checks/2: Präsenz im Start-Gate, Prüfsumme im vollen Doctor" do
+      cfg = drafter_cfg("komki-drafter-checks")
+
+      # Fehlende Datei: beide Scopes rot, mit dem Nachladeweg im Reason.
+      for scope <- [:full, :profile_boot] do
+        assert [%{ok: false, reason: reason}] = Steps.drafter_checks(cfg, scope)
+        assert reason =~ "missing: " <> cfg.drafter_path
+        assert reason =~ "'komki setup' lädt den MTP-Drafter nach"
+      end
+
+      File.mkdir_p!(Path.dirname(cfg.drafter_path))
+      File.write!(cfg.drafter_path, @drafter_inhalt)
+
+      assert [%{name: "drafter presence", ok: true, reason: presence_path}] =
+               Steps.drafter_checks(cfg, :profile_boot)
+
+      assert presence_path == cfg.drafter_path
+
+      assert [%{name: "drafter sha256", ok: true, reason: @drafter_sha}] =
+               Steps.drafter_checks(cfg, :full)
+
+      # Andere Bytes: der volle Doctor meldet recorded gegen actual, das
+      # Start-Gate bleibt grün (Praesenz genügt dort, wie beim gguf).
+      verändert = %{cfg | drafter_sha256: String.duplicate("d", 64)}
+
+      assert [%{name: "drafter sha256", ok: false, reason: reason}] =
+               Steps.drafter_checks(verändert, :full)
+
+      assert reason =~ "recorded " <> String.duplicate("d", 64)
+      assert reason =~ "actual " <> @drafter_sha
+    end
+  end
+
+  # Ticket #125: Naht um pi-Lauf, Zeitfenster und Denial-Capture. Kein
+  # echtes llama/pi/log — pi_fun und capture_fun sind injiziert.
+  describe "run_pi_with_capture/5" do
+    test "pi laeuft vor dem Capture, Fenster wird uebergeben, Bericht geschrieben" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-steps-denials"))
+      scratch = Path.join([cfg.base_dir, "runs", "lauf-1"])
+      test_pid = self()
+
+      output =
+        @denials_fixture
+        |> File.read!()
+        |> String.replace("/Users/alice/.local/share/komki", cfg.base_dir)
+
+      pi_fun = fn _cfg, _scratch, _mode, _prompt ->
+        send(test_pid, :pi_done)
+        {:ok, "antwort"}
+      end
+
+      capture_fun = fn window, opts ->
+        send(test_pid, {:capture, window, opts})
+
+        Denials.capture(
+          window,
+          opts ++ [binary: "/bin/sh", runner: fn _argv -> {output, 0} end]
+        )
+      end
+
+      assert {:run_ok, ^scratch, "antwort", summary} =
+               Steps.run_pi_with_capture(cfg, scratch, :text, "hallo",
+                 capture?: true,
+                 drain_ms: 0,
+                 pi_fun: pi_fun,
+                 capture_fun: capture_fun
+               )
+
+      assert_receive :pi_done
+      assert_receive {:capture, window, opts}
+
+      assert %{status: "ok", report_path: report_path, error: nil} = summary
+      assert report_path == Path.join("denials", Path.basename(report_path))
+      refute report_path =~ cfg.base_dir
+      refute report_path =~ System.user_home!()
+
+      absolute_report = Path.join(cfg.base_dir, report_path)
+      assert File.exists?(absolute_report)
+
+      footer = Denials.footer(summary)
+      refute footer =~ cfg.base_dir
+      refute footer =~ System.user_home!()
+
+      assert opts[:base_dir] == cfg.base_dir
+      assert opts[:scratch] == scratch
+
+      assert DateTime.compare(window.start, window.end) == :lt
+      assert window.pre_roll_ms == 1_000
+      assert window.drain_wait_ms == 0
+      assert window.duration_ms >= 0
+
+      report_json = absolute_report |> File.read!() |> JSON.decode!()
+      assert report_json["schema"] == "komki-denials/1"
+      assert report_json["run"]["mode"] == "text"
+      assert report_json["run"]["pi_exit"] == 0
+      assert is_list(report_json["denials"]) and report_json["denials"] != []
+
+      report_raw = JSON.encode!(report_json)
+      refute report_raw =~ System.user_home!()
+      refute report_raw =~ cfg.base_dir
+      refute report_raw =~ scratch
+      assert report_json["epistemic_limit"] =~ "kein Konfinement-Beweis"
+    end
+
+    test "Capture laeuft auch im pi-Fehlerfall" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-steps-denials-err"))
+      scratch = Path.join([cfg.base_dir, "runs", "lauf-2"])
+      test_pid = self()
+
+      pi_fun = fn _cfg, _scratch, _mode, _prompt -> {:error, "pi kaputt", 7} end
+
+      capture_fun = fn _window, _opts ->
+        send(test_pid, :capture_ran)
+        {:ok, ok_capture()}
+      end
+
+      assert {:run_error, ^scratch, "pi kaputt", 7, %{status: "ok"}} =
+               Steps.run_pi_with_capture(cfg, scratch, :json, "hallo",
+                 capture?: true,
+                 drain_ms: 0,
+                 pi_fun: pi_fun,
+                 capture_fun: capture_fun
+               )
+
+      assert_receive :capture_ran
+    end
+
+    test "kein Capture ohne Flag" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-steps-denials-off"))
+      scratch = Path.join([cfg.base_dir, "runs", "lauf-3"])
+      test_pid = self()
+
+      result =
+        Steps.run_pi_with_capture(cfg, scratch, :text, "hallo",
+          pi_fun: fn _cfg, _scratch, _mode, _prompt -> {:ok, "antwort"} end,
+          capture_fun: fn _window, _opts ->
+            send(test_pid, :capture_ran)
+            {:ok, ok_capture()}
+          end
+        )
+
+      assert {:run_ok, ^scratch, "antwort", nil} = result
+      refute_received :capture_ran
+      refute File.exists?(Denials.dir(cfg))
+    end
+
+    test "Capture-Fehler bleibt als Fehler sichtbar" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-steps-denials-fail"))
+      scratch = Path.join([cfg.base_dir, "runs", "lauf-4"])
+
+      assert {:run_ok, ^scratch, "antwort", summary} =
+               Steps.run_pi_with_capture(cfg, scratch, :text, "hallo",
+                 capture?: true,
+                 drain_ms: 0,
+                 pi_fun: fn _cfg, _scratch, _mode, _prompt -> {:ok, "antwort"} end,
+                 capture_fun: fn _window, _opts -> {:error, "log fehlt"} end
+               )
+
+      assert summary == %{
+               status: "capture_error",
+               denials: [],
+               report_path: nil,
+               error: "log fehlt"
+             }
+    end
+
+    test "Fehlerpfad wird vor dem Footer redigiert" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-steps-denials-redact"))
+      scratch = Path.join([cfg.base_dir, "runs", "lauf-5"])
+
+      raw_error = "cannot read " <> Path.join(cfg.base_dir, "denials/report.json")
+
+      assert {:run_ok, ^scratch, "antwort", summary} =
+               Steps.run_pi_with_capture(cfg, scratch, :text, "hallo",
+                 capture?: true,
+                 drain_ms: 0,
+                 pi_fun: fn _cfg, _scratch, _mode, _prompt -> {:ok, "antwort"} end,
+                 capture_fun: fn _window, _opts -> {:error, raw_error} end
+               )
+
+      refute summary.error =~ cfg.base_dir
+      refute summary.error =~ System.user_home!()
+      assert summary.error =~ "<base>/<redacted>"
+
+      footer = Denials.footer(summary)
+      refute footer =~ cfg.base_dir
+      refute footer =~ System.user_home!()
+    end
+  end
+
+  # Seit #132 liegt jeder Scratch unterhalb von runs/; denials/ ist ein
+  # Nachbar. Ein Scratch im oder ueber dem Berichtsverzeichnis faellt damit
+  # schon an scratch_for/2 (frueher eigener Guard, Ticket #125).
+  describe "Scratch und Denial-Verzeichnis" do
+    test "Scratch gleich, unter oder ueber denials/ wird abgewiesen" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-steps-denials-guard"))
+      denials = Denials.dir(cfg)
+      File.mkdir_p!(Path.join(denials, "sub"))
+
+      for scratch <- [denials, Path.join(denials, "sub"), cfg.base_dir] do
+        assert {:error, _reason, 2} = Steps.scratch_for(%{"scratch" => scratch}, cfg.base_dir)
+      end
+
+      runs_scratch = Path.join([cfg.base_dir, "runs", "lauf"])
+      File.mkdir_p!(runs_scratch)
+      assert {:ok, _} = Steps.scratch_for(%{"scratch" => runs_scratch}, cfg.base_dir)
+    end
+  end
+
+  defp ok_capture do
+    %{
+      status: "ok",
+      log_binary: "/usr/bin/log",
+      argv: [],
+      predicate: "",
+      error: nil,
+      matched: 0,
+      parsed: 0,
+      unparsed: 0,
+      denials: [],
+      redacted_count: 0
+    }
+  end
+
   defp med_gate_cfg(prefix) do
-    %{TestSupport.fixture_cfg(TestSupport.tmp_area!(prefix)) | mediator_port: 1}
+    # Kein Token, kein Socket: healthz scheitert sicher (Ticket #143).
+    TestSupport.fixture_cfg(TestSupport.tmp_area!(prefix))
+  end
+
+  describe "up/down-Reihenfolge (Ticket #146)" do
+    test "start_order: llama, egress, Connectoren, Vermittler; stop_order umgekehrt" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-order"))
+
+      assert Steps.start_order(cfg) ==
+               [
+                 "llama",
+                 "egress",
+                 "connector-documents",
+                 "connector-ris",
+                 "connector-vault",
+                 "connector-web",
+                 "mediator"
+               ]
+
+      assert Steps.stop_order() ==
+               [
+                 "mediator",
+                 "connector-web",
+                 "connector-vault",
+                 "connector-ris",
+                 "connector-ratsprojekte",
+                 "connector-documents",
+                 "egress",
+                 "llama"
+               ]
+
+      assert Steps.start_order(%{cfg | vault_dir: nil, ris_mock_port: 4010}) ==
+               [
+                 "llama",
+                 "egress",
+                 "connector-documents",
+                 "connector-ris",
+                 "connector-web",
+                 "mediator"
+               ]
+    end
+
+    test "down_with/1: stoppt Egress und Connectoren per pidfile, Ergebnis in stop_order, idempotent" do
+      cfg = TestSupport.fixture_cfg(TestSupport.tmp_area!("komki-down"))
+      tmp = Path.join(cfg.base_dir, "tmp")
+      File.mkdir_p!(tmp)
+
+      # Marker-Prozesse wie im Liveness-Gate-Test: die ps-Kommandozeile
+      # traegt den Escript-Namen, den der Identitaetscheck erwartet.
+      pids =
+        for {file, marker} <- [
+              {"komki-egress.pid", "komki-egress"},
+              {"connector-ris.pid", "komki-connector-ris"},
+              {"connector-web.pid", "komki-connector-web"}
+            ] do
+          port =
+            Port.open({:spawn_executable, "/bin/sh"},
+              args: ["-c", "while :; do sleep 1; done # " <> marker]
+            )
+
+          {:os_pid, pid} = Port.info(port, :os_pid)
+          File.write!(Path.join(tmp, file), Integer.to_string(pid) <> "\n")
+          pid
+        end
+
+      # stale pidfile beim Vault-Connector: wird entfernt, nichts getoetet
+      File.write!(Path.join(tmp, "connector-vault.pid"), "99998\n")
+
+      assert {:down, %{mediator: :already, connectors: connectors, llama: :already}} =
+               Steps.down_with(cfg)
+
+      assert Enum.map(connectors, &elem(&1, 0)) ==
+               [
+                 "connector-web",
+                 "connector-vault",
+                 "connector-ris",
+                 "connector-ratsprojekte",
+                 "connector-documents",
+                 "egress"
+               ]
+
+      assert [
+               {"connector-web", :ok},
+               {"connector-vault", {:stale, _}},
+               {"connector-ris", :ok},
+               {"connector-ratsprojekte", :already},
+               {"connector-documents", :already},
+               {"egress", :ok}
+             ] =
+               connectors
+
+      refute Enum.any?(pids, &Proc.pid_alive?(&1, ""))
+
+      assert {:down, %{connectors: again}} = Steps.down_with(cfg)
+      assert Enum.all?(again, fn {_name, state} -> state == :already end)
+    end
   end
 end

@@ -15,7 +15,7 @@ defmodule KomkiMediator.Tools.Ping do
 
   @impl true
   def execute(_params, frame) do
-    env = Env.fetch()
+    env = Env.for_call(frame)
     gamma = env.gamma
 
     executor = fn ->

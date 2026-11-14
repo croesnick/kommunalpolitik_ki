@@ -8,12 +8,13 @@ defmodule KomkiPolicy.Stand do
   verbrauchte Noncen auf die verbrauchende release-id. `advance/2` ist
   rein und atomar (Compare-and-Swap über die Version): Erfolg nur, wenn
   `stand_ref` exakt `<stand_id>@<version>` des übergebenen Standes
-  adressiert und die Nonce noch nicht verbraucht ist. Zwei konkurrierende
+  adressiert, `stand_version_after` genau `version + 1` beträgt und die
+  Nonce noch nicht verbraucht ist. Zwei konkurrierende
   Ausführungen desselben GOs können nicht beide committet werden — das
   Führen des aktuellen Standes ist Vollzug außerhalb des Kerns (B.8).
   """
 
-  alias KomkiPolicy.Registry
+  alias KomkiPolicy.{Registry, Validations}
 
   @fields ["schema", "stand_id", "version", "scope", "as_of", "consumed"]
 
@@ -64,8 +65,9 @@ defmodule KomkiPolicy.Stand do
   @doc """
   Atomarer Standübergang (§ 2.7): `vorschlag` ist das `release`-Objekt
   einer Permit-Entscheidung des Freigabe-Zweigs (Form § 4.6: `release_id`,
-  `nonce`, `stand_ref`, `stand_version_after`, `call_hash`). Erfolg liefert
-  den nächsten Stand (`version + 1`, `consumed` erweitert); sonst
+  `nonce`, `stand_ref`, `stand_version_after`, `call_hash`). Ein Vorschlag
+  außerhalb der § 4.6-Form ist ein Eingabefehler (`{:error, …}`); Erfolg
+  liefert den nächsten Stand (`version + 1`, `consumed` erweitert); sonst
   `{:refused, %{code: …}}`.
   """
   @spec advance(%{String.t() => term()}, term()) ::
@@ -75,13 +77,23 @@ defmodule KomkiPolicy.Stand do
          {:ok, proposal} <- validate_proposal(vorschlag) do
       do_advance(current, proposal)
     else
+      # validate/1 liefert die strukturierte Fehler-Map direkt — sonst krachte
+      # ein schema-ungültiger Stand in WithClauseError (CLI-Exit 4 statt 2);
+      # validate_proposal/1 liefert das Reason-Tupel.
+      {:error, %{} = error} ->
+        {:error, error}
+
       {:error, {code, path, detail}} ->
         {:error, %{code: code, path: path, detail: detail}}
     end
   end
 
+  # CAS (§ 2.7): der Vorschlag muss exakt den NÄCHSTEN Stand adressieren —
+  # `stand_ref` auf den aktuellen Stand und `stand_version_after == version + 1`
+  # (#120). Ein handgemachter Vorschlag mit abweichender Zielversion ist ein
+  # Versionskonflikt, kein Commit.
   defp do_advance(current, proposal) do
-    if proposal.stand_ref == current.stand_id <> "@" <> Integer.to_string(current.version) do
+    if addresses_next_version?(current, proposal) do
       claim_nonce(current, proposal)
     else
       {:refused,
@@ -90,10 +102,17 @@ defmodule KomkiPolicy.Stand do
          :detail =>
            "proposal stand_ref " <>
              Kernel.inspect(proposal.stand_ref) <>
+             " with stand_version_after " <>
+             Integer.to_string(proposal.stand_version_after) <>
              " does not address current version " <>
              Integer.to_string(current.version)
        }}
     end
+  end
+
+  defp addresses_next_version?(current, proposal) do
+    proposal.stand_ref == current.stand_id <> "@" <> Integer.to_string(current.version) and
+      proposal.stand_version_after == current.version + 1
   end
 
   defp claim_nonce(current, proposal) do
@@ -117,13 +136,18 @@ defmodule KomkiPolicy.Stand do
   # -------------------------------------------------------------------------
 
   defp validate_reason(term) do
-    with {:ok, _} <- require_map(term, "$"),
-         :ok <- require_schema(term),
-         :ok <- closed_fields(term, @fields, "$"),
-         :ok <- require_kebab(term["stand_id"], "$.stand_id"),
-         :ok <- nonneg_integer(term["version"], "$.version"),
-         :ok <- require_kebab(term["scope"], "$.scope"),
-         :ok <- require_integer(term["as_of"], "$.as_of"),
+    with {:ok, _} <- Validations.require_map(term, "$"),
+         :ok <- Validations.require_schema(term, "komki-stand/1", :missing_field),
+         :ok <- Validations.closed_fields(term, @fields, "$"),
+         :ok <- Validations.require_kebab(term["stand_id"], "$.stand_id"),
+         :ok <-
+           Validations.require_nonneg_integer(
+             term["version"],
+             "$.version",
+             :invalid_stand_version
+           ),
+         :ok <- Validations.require_kebab(term["scope"], "$.scope"),
+         :ok <- Validations.require_integer(term["as_of"], "$.as_of", :invalid_as_of),
          :ok <- validate_consumed(term["consumed"], "$.consumed") do
       {:ok,
        %{
@@ -148,10 +172,13 @@ defmodule KomkiPolicy.Stand do
         :ok
 
       {{nonce, _}, _} ->
-        {:error, {:invalid_reference_id, path, "not a kebab-case nonce: " <> nonce}}
+        {:error,
+         {:invalid_reference_id, path, "not a kebab-case nonce: " <> Kernel.inspect(nonce)}}
 
       {_, {_, release_id}} ->
-        {:error, {:invalid_reference_id, path, "not a kebab-case release_id: " <> release_id}}
+        {:error,
+         {:invalid_reference_id, path,
+          "not a kebab-case release_id: " <> Kernel.inspect(release_id)}}
     end
   end
 
@@ -163,11 +190,17 @@ defmodule KomkiPolicy.Stand do
   # Validierung: Verbrauchs-Vorschlag (Form § 4.6, geschlossene Feldmenge)
   # -------------------------------------------------------------------------
 
+  # § 4.6-Form; seit #423 (§ 4.9) darf ein Vorschlag zusaetzlich die
+  # Offenlegung benennen: `ausgabeart` und `ziellabel` der Lockerung —
+  # optional, nur zusammen, nur gueltig geprueft (R.6.2: der Verbrauch
+  # dokumentiert, wofuer die Freigabe galt). Der fortgeschriebene Stand
+  # selbst speichert nur die Nonce.
   @proposal_fields ["release_id", "nonce", "stand_ref", "stand_version_after", "call_hash"]
-  @proposal_string_fields ["release_id", "nonce", "stand_ref", "call_hash"]
+  @offenlegung_fields ["ausgabeart", "ziellabel"]
 
   defp validate_proposal(term) when is_map(term) do
-    with :ok <- closed_proposal_fields(term) do
+    with :ok <- closed_proposal_fields(term),
+         :ok <- validate_offenlegung_fields(term) do
       case Enum.reject(@proposal_fields, &Map.has_key?(term, &1)) do
         [] ->
           proposal_shape(term)
@@ -183,10 +216,14 @@ defmodule KomkiPolicy.Stand do
     {:error, {:invalid_proposal, "$", "expected an object, got " <> Kernel.inspect(term)}}
   end
 
-  # Geschlossene Feldmenge nach der § 4.6-Form; Extra-Felder sind Eingabefehler
-  # (`unknown_field`) — dieselbe Strenge wie bei allen Schemata des Vertrags.
+  # Geschlossene Feldmenge nach der § 4.6-Form, zusaetzlich die beiden
+  # optionalen Offenlegungsfelder (§ 4.9, #423); jede andere Extra-Feld
+  # ist ein Eingabefehler (`unknown_field`) — dieselbe Strenge wie bei
+  # allen Schemata des Vertrags.
   defp closed_proposal_fields(term) do
-    case Enum.sort(Enum.reject(Map.keys(term), &(&1 in @proposal_fields))) do
+    case Enum.sort(
+           Enum.reject(Map.keys(term), &(&1 in (@proposal_fields ++ @offenlegung_fields)))
+         ) do
       [] ->
         :ok
 
@@ -195,75 +232,105 @@ defmodule KomkiPolicy.Stand do
     end
   end
 
-  defp proposal_shape(term) do
-    strings_ok = Enum.all?(@proposal_string_fields, fn field -> is_binary(term[field]) end)
+  # Die Offenlegungsfelder sind optional, aber nur zusammen gueltig: Beide
+  # da — `ausgabeart` aus dem geschlossenen Vokabular, `ziellabel` als
+  # sortierte, eindeutige Bindungsreferenzen —; keines da; eines allein
+  # ist ein Eingabefehler.
+  defp validate_offenlegung_fields(term) do
+    case {Map.has_key?(term, "ausgabeart"), Map.has_key?(term, "ziellabel")} do
+      {false, false} ->
+        :ok
 
-    version_ok = is_integer(term["stand_version_after"]) and term["stand_version_after"] >= 0
+      {true, true} ->
+        require_proposal_offenlegung(term)
 
-    if strings_ok and version_ok do
-      {:ok,
-       %{
-         release_id: term["release_id"],
-         nonce: term["nonce"],
-         stand_ref: term["stand_ref"],
-         stand_version_after: term["stand_version_after"],
-         call_hash: term["call_hash"]
-       }}
+      _eins_allein ->
+        {:error, {:invalid_proposal, "$", "ausgabeart and ziellabel belong together"}}
+    end
+  end
+
+  defp require_proposal_offenlegung(term) do
+    with :ok <- require_proposal_ausgabeart(term["ausgabeart"]),
+         do: require_proposal_ziellabel(term["ziellabel"])
+  end
+
+  defp require_proposal_ausgabeart(value) when is_binary(value) do
+    if value in Registry.output_kinds() do
+      :ok
     else
       {:error,
-       {:invalid_proposal, "$",
-        "release proposal fields must be strings (except stand_version_after)"}}
+       {:invalid_proposal, "$.ausgabeart",
+        "expected one of " <> inspect(Registry.output_kinds()) <> ", got " <> inspect(value)}}
+    end
+  end
+
+  defp require_proposal_ausgabeart(value) do
+    {:error,
+     {:invalid_proposal, "$.ausgabeart",
+      "expected one of " <> inspect(Registry.output_kinds()) <> ", got " <> inspect(value)}}
+  end
+
+  defp require_proposal_ziellabel(labels) when is_list(labels) do
+    if labels == Enum.sort(Enum.uniq(labels)) and labels != [] and
+         Enum.all?(labels, &Registry.reference_id?/1) do
+      :ok
+    else
+      {:error, {:invalid_proposal, "$.ziellabel", "expected sorted, unique binding references"}}
+    end
+  end
+
+  defp require_proposal_ziellabel(_other) do
+    {:error, {:invalid_proposal, "$.ziellabel", "expected an array of binding references"}}
+  end
+
+  # Intake nach der geschlossenen § 4.6-Form (#120): `release_id` und `nonce`
+  # landen im fortgeschriebenen `consumed`-Ledger (Kebab, sonst verletzt
+  # `to_record/1` des Ergebnisses die Ausgabe-Invariante), `stand_ref` trägt
+  # die `<stand_id>@<version>`-Form (`Registry.reference_id?/1`), `call_hash`
+  # ist SHA-256-Hex und `stand_version_after` eine nicht-negative Ganzzahl.
+  # Die Bindung von `stand_ref`/`stand_version_after` an den aktuellen Stand
+  # prüft `do_advance/2` — hier geht es nur um die Form der Eingabe.
+  defp proposal_shape(term) do
+    with :ok <- Validations.require_kebab(term["release_id"], "$.release_id"),
+         :ok <- Validations.require_kebab(term["nonce"], "$.nonce"),
+         :ok <- require_stand_ref(term["stand_ref"]),
+         :ok <- Validations.require_hex64(term["call_hash"], "$.call_hash", :invalid_proposal),
+         :ok <-
+           Validations.require_nonneg_integer(
+             term["stand_version_after"],
+             "$.stand_version_after",
+             :invalid_proposal
+           ) do
+      {:ok,
+       Map.merge(
+         %{
+           release_id: term["release_id"],
+           nonce: term["nonce"],
+           stand_ref: term["stand_ref"],
+           stand_version_after: term["stand_version_after"],
+           call_hash: term["call_hash"]
+         },
+         proposal_offenlegung(term)
+       )}
+    end
+  end
+
+  # Die Offenlegung des Vorschlags (§ 4.9): nur da, wenn beide Felder
+  # da sind; sonst bleibt der Vorschlag die reine § 4.6-Form.
+  defp proposal_offenlegung(%{"ausgabeart" => ausgabeart, "ziellabel" => ziellabel}),
+    do: %{ausgabeart: ausgabeart, ziellabel: ziellabel}
+
+  defp proposal_offenlegung(_term), do: %{}
+
+  defp require_stand_ref(value) do
+    if Registry.reference_id?(value) do
+      :ok
+    else
+      {:error,
+       {:invalid_reference_id, "$.stand_ref",
+        "expected <stand_id>@<version>, got " <> Kernel.inspect(value)}}
     end
   end
 
   # -------------------------------------------------------------------------
-
-  defp require_map(%{} = map, _path), do: {:ok, map}
-
-  defp require_map(other, path),
-    do: {:error, {:invalid_record, path, "expected an object, got " <> Kernel.inspect(other)}}
-
-  defp require_schema(%{"schema" => "komki-stand/1"}), do: :ok
-
-  defp require_schema(%{"schema" => other}) do
-    {:error,
-     {:invalid_schema, "$.schema", "expected \"komki-stand/1\", got " <> Kernel.inspect(other)}}
-  end
-
-  defp require_schema(_other),
-    do: {:error, {:missing_field, "$.schema", "missing field \"schema\""}}
-
-  defp closed_fields(map, allowed, path) do
-    unknown = Enum.sort(Enum.reject(Map.keys(map), &(&1 in allowed)))
-
-    case unknown do
-      [] ->
-        :ok
-
-      [first | _] ->
-        {:error, {:unknown_field, path <> "." <> first, "field not part of the closed schema"}}
-    end
-  end
-
-  defp require_kebab(value, path) do
-    if is_binary(value) and Registry.kebab_id?(value),
-      do: :ok,
-      else:
-        {:error,
-         {:invalid_reference_id, path, "expected kebab-case id, got " <> Kernel.inspect(value)}}
-  end
-
-  defp nonneg_integer(value, _path) when is_integer(value) and value >= 0, do: :ok
-
-  defp nonneg_integer(value, path) do
-    {:error,
-     {:invalid_stand_version, path,
-      "expected a non-negative integer, got " <> Kernel.inspect(value)}}
-  end
-
-  defp require_integer(value, _path) when is_integer(value), do: :ok
-
-  defp require_integer(value, path) do
-    {:error, {:invalid_as_of, path, "expected an integer, got " <> Kernel.inspect(value)}}
-  end
 end

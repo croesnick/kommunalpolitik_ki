@@ -5,16 +5,26 @@ defmodule KomkiCli.DoctorBootTest do
   (`a`) sandbox-exec vorhanden ist — GitHub-Actions-Linux-Runner haben kein
   `/usr/bin/sandbox-exec` und zählen dann null Tests — und (`b`) das
   verifizierte GGUF-Artefakt der Sandbox-Forschung am erwarteten Pfad
-  liegt; ohne beides findet dieser Modul keine Tests statt.
+  liegt (seit Ticket #318 auch der MTP-Drafter); ohne beides findet dieser
+  Modul keine Tests statt.
+
+  Der Test kopiert etwa 17 GB und bootet einen echten llama-server (Port
+  59999). Deshalb ist er mit `:llama_boot` getaggt und im Standardlauf
+  ausgeschlossen (`test_helper.exs`, Ticket #392). Ausführen:
+
+      cd apps/komki_cli && mix test --include llama_boot
   """
 
   use ExUnit.Case, async: false
+
+  @moduletag :llama_boot
 
   alias KomkiCli.Config
 
   @sandbox_exec System.find_executable("sandbox-exec")
 
-  if @sandbox_exec != nil and Config.default_probe_gguf() != nil do
+  if @sandbox_exec != nil and Config.default_probe_gguf() != nil and
+       Config.default_probe_drafter() != nil do
     # Aliase innerhalb der Bedingung: Im Ruhezustand (kein sandbox-exec wie
     # auf CI-Linux, oder kein Staging-GGUF) kompiliert der Block nicht und
     # warnt nicht ueber unbenutzte Aliase.
@@ -41,6 +51,18 @@ defmodule KomkiCli.DoctorBootTest do
       File.mkdir_p!(Path.dirname(fake_mediator))
       File.write!(fake_mediator, "komki-mediator-platzhalter ( teste-Instanz )")
 
+      # Ticket #146: Egress und Connectoren ebenso als Platzhalter (Praesenz
+      # und Profil-Identitaet; gestartet werden sie hier nicht).
+      for name <- [
+            "komki-egress",
+            "komki-connector-ris",
+            "komki-connector-web",
+            "komki-connector-vault",
+            "komki-connector-documents"
+          ] do
+        File.write!(Path.join([home, "bin", name]), name <> "-platzhalter")
+      end
+
       {init_out, 0} = CLI.run(["init", "--port", "59999"])
       {:ok, init_out: init_out}
     end
@@ -48,9 +70,13 @@ defmodule KomkiCli.DoctorBootTest do
     test "init ok, gepinntes SHA verifiziert", %{init_out: init_out} do
       assert init_out =~ "init ok"
       assert init_out =~ "gguf-sha256:  " <> Config.expected_gguf_sha256()
+
+      # Ticket #318: der MTP-Drafter liegt mit eigenem SHA in der Instanz.
+      assert init_out =~ "drafter-sha256: " <> Config.expected_drafter_sha256()
+      assert init_out =~ "drafter:      "
     end
 
-    test "doctor: alle Checks gruen inklusive Boot-Gate" do
+    test "doctor: alle Checks grün inklusive Boot-Gate" do
       # cfg aus der Instanz der setup_all-Phase: der llama-Boot-Probe-Check
       # heisst "boot " <> llama-server-Pfad (steps.ex: boot_l) — genau
       # gepinnt statt Substring ("llama-server" matcht auch den Tools-Check,
@@ -62,15 +88,32 @@ defmodule KomkiCli.DoctorBootTest do
       assert out_doctor =~ "boot /usr/bin/true"
       assert out_doctor =~ "boot /bin/sh"
       assert out_doctor =~ "llama profile"
+
+      # Ticket #318: der volle Doctor prüft die Drafter-Prüfsumme (die
+      # Präsenz-Form "drafter presence" gehört zum Start-Gate von `up`
+      # und ist in steps_test abgedeckt).
+      assert out_doctor =~ "drafter sha256"
+
       # bestehende pi-Probes + der neue llama-server-Boot-Probe unter seinem Profil
       assert out_doctor =~ "boot " <> cfg.llama_server_bin
       refute out_doctor =~ "FAIL"
     end
 
-    test "run ohne laufenden llama-server: fail-fast mit Hinweis (Exit 2)" do
-      {out_run, 2} = CLI.run(["run", "hallo"])
-      assert out_run =~ "llama-server nicht aktiv"
-      assert out_run =~ "'komki up' zuerst"
+    # Ticket #176: run startet fehlende Prozesse selbst (wie up). In diesem
+    # Testumfeld scheitert der Start; die Ursache kommt mit Runtime-Exit 4,
+    # statt dass run auf 'komki up' verweist.
+    #
+    # Boots the real llama-server with the 17 GB model (~45 s on this host),
+    # so ExUnit's default 60 s limit flakes under parallel load.
+    @tag timeout: 180_000
+    test "run ohne laufenden llama-server startet selbst; scheitert der Start, kommt die Ursache (Exit 4)" do
+      # Der Startversuch kann einen echten llama-server hochfahren: danach
+      # immer stoppen, sonst bleibt er als Waise auf dem Testport.
+      on_exit(fn -> CLI.run(["down"]) end)
+
+      {out_run, 4} = CLI.run(["run", "hallo"])
+      refute out_run =~ "'komki up' zuerst"
+      assert out_run =~ "egress"
     end
 
     test "down ohne Boot-Gate: bereits gestoppt ist Erfolg (Exit 0)" do

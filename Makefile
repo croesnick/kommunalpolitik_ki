@@ -1,4 +1,4 @@
-.PHONY: test lint format ci deps elixir-test python-test install
+.PHONY: test lint format ci deps elixir-test python-test install ratsprojekte komki komki-tresor komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview screenshot-install
 
 # Escript bauen und nach /usr/local/bin symlinken.
 # Workspace-Pattern: mix.exs der ratsinfo-App referenziert ../artifacts/deps
@@ -12,6 +12,152 @@ install:
 	@echo "ratsinfo installiert: $(PWD)/apps/ratsinfo/ratsinfo -> /usr/local/bin/ratsinfo"
 	@echo "Falls der Symlink-Rechte fehlt: sudo make install"
 	@echo "Alternative ohne sudo: ln -sf $(PWD)/apps/ratsinfo/ratsinfo ~/.local/bin/ratsinfo"
+
+# komki bauen und in den PATH legen (Tickets #176, #179): ein Programm, das
+# Vermittler, Egress-Proxy und Connectoren als Rollen enthaelt.
+KOMKI_LINK_DIR ?= $(HOME)/.local/bin
+komki: komki-tresor
+	@cd apps/komki_cli && mix deps.get >/dev/null && mix escript.build
+	@mkdir -p "$(KOMKI_LINK_DIR)"
+	@ln -sf "$(PWD)/apps/komki_cli/komki" "$(KOMKI_LINK_DIR)/komki"
+	@echo ""
+	@echo "komki gebaut: $(KOMKI_LINK_DIR)/komki"
+	@echo "Weiter mit: komki setup"
+
+# ratsprojekte-Hub als Release aus dem Checkout (Ticket #440, ADR 0004): Assets,
+# Release, komki-tresor nach bin/ (der Hub versiegelt seinen Datenbank-Schlüssel
+# damit). Installiert wird eine Kopie nach RATSPROJEKTE_OPT, damit der Hub nicht
+# an einem Checkout oder Worktree hängt; der Befehl `ratsprojekte` zeigt dorthin.
+# Läuft der Hub schon (LaunchAgent eingerichtet), wird er angehalten, ersetzt und
+# gesperrt neu gestartet. Beim ersten Mal danach: ratsprojekte einrichten.
+RATSPROJEKTE_REL = $(PWD)/apps/ratsprojekte/_build/prod/rel/ratsprojekte
+RATSPROJEKTE_OPT ?= $(HOME)/.local/opt/ratsprojekte
+RATSPROJEKTE_PLIST = $(HOME)/Library/LaunchAgents/ratsprojekte.hub.plist
+ratsprojekte: komki-tresor
+	@cd apps/ratsprojekte && MIX_ENV=prod mix deps.get >/dev/null && MIX_ENV=prod mix compile \
+	  && MIX_ENV=prod mix assets.setup >/dev/null && MIX_ENV=prod mix assets.deploy >/dev/null \
+	  && MIX_ENV=prod mix release --overwrite --quiet
+	@cp apps/komki_cli/priv/komki-tresor "$(RATSPROJEKTE_REL)/bin/komki-tresor"
+	@if [ -f "$(RATSPROJEKTE_PLIST)" ]; then \
+	  launchctl bootout gui/$$(id -u)/ratsprojekte.hub 2>/dev/null || true; \
+	  while launchctl print gui/$$(id -u)/ratsprojekte.hub >/dev/null 2>&1; do sleep 0.2; done; \
+	fi
+	@mkdir -p "$(RATSPROJEKTE_OPT)" "$(KOMKI_LINK_DIR)"
+	@rsync -a --delete "$(RATSPROJEKTE_REL)/" "$(RATSPROJEKTE_OPT)/"
+	@ln -sf "$(RATSPROJEKTE_OPT)/bin/ratsprojekte-befehl" "$(KOMKI_LINK_DIR)/ratsprojekte"
+	@echo "ratsprojekte installiert: $(RATSPROJEKTE_OPT), Befehl $(KOMKI_LINK_DIR)/ratsprojekte"
+	@if [ -f "$(RATSPROJEKTE_PLIST)" ]; then "$(RATSPROJEKTE_OPT)/bin/ratsprojekte-befehl" launchagent an; \
+	  else echo "Weiter mit: ratsprojekte einrichten"; fi
+
+# Screenshot-Werkzeug (#510) an einen festen Ort außerhalb jedes Worktrees.
+# Interaktive Sessions starten nur den Starter bin/komki-screenshot außerhalb
+# ihrer Sandbox (.claude/settings.json); die Sandbox darf dort nicht schreiben,
+# Edit und Write sind dort gesperrt. Quelle ist der Stand von main auf GitHub
+# (gh api), nicht das lokale .git, das Sessions beschreiben dürfen; die
+# Laufzeit kommt aus dessen .tool-versions, ohne einen Interpreter zu starten.
+# Im Haupt-Checkout ausführen, nach dem Merge. Details: scripts/screenshot/install.sh.
+SCREENSHOT_HOME ?= $(HOME)/.local/share/komki-tools/screenshot
+SCREENSHOT_REF ?= main
+screenshot-install:
+	@sh scripts/screenshot/install.sh "$(SCREENSHOT_HOME)" "$(SCREENSHOT_REF)"
+
+# komki-tresor: versiegelt Geheimnisse mit der Secure Enclave (Swift, weil
+# Erlang die Enclave nicht erreicht; Quelle apps/komki_cli/native). komki
+# sucht es neben sich selbst. `mix compile` baut es nach apps/komki_cli/priv
+# (Ticket #224, braucht swiftc aus den Xcode Command Line Tools); hier nur
+# noch neben das Escript kopieren, damit es in allen Kanälen neben komki
+# liegt. Der Test verweigert, wenn das Ziel fehlt oder aelter ist als die
+# Quelle (etwa ohne swiftc) — kein stiller Versand eines alten Binaries.
+komki-tresor:
+	@cd apps/komki_cli && mix deps.get >/dev/null && mix compile
+	@if [ ! -f apps/komki_cli/priv/komki-tresor ] || \
+	  [ apps/komki_cli/native/komki-tresor/main.swift -nt apps/komki_cli/priv/komki-tresor ]; then \
+	  echo "komki-tresor fehlt oder ist veraltet: swiftc (xcode-select --install) prüfen"; exit 1; fi
+	@cp apps/komki_cli/priv/komki-tresor apps/komki_cli/komki-tresor
+
+# Paket fuer die Homebrew-Formel (Ticket #180): das Escript (prod), die
+# SQLite-NIF von exqlite und pi mit allen Abhaengigkeiten nebeneinander, als
+# dist/komki-<version>-macos-arm64.tar.gz. pi installiert pnpm nach der
+# Lockfile in packaging/pi, ohne Installationsskripte; die Formel kopiert nur
+# noch und laedt nichts nach. Vorgebaute Module fuer andere Plattformen und
+# die .bin-Links fallen weg.
+KOMKI_VERSION = $(shell grep -m1 'version:' apps/komki_cli/mix.exs | sed 's/.*"\(.*\)".*/\1/')
+KOMKI_PAKET = dist/komki-$(KOMKI_VERSION)-macos-arm64
+komki-paket: komki-tresor
+	@cd apps/komki_cli && MIX_ENV=prod mix deps.get >/dev/null && MIX_ENV=prod mix escript.build
+	@rm -rf "$(KOMKI_PAKET)" && mkdir -p "$(KOMKI_PAKET)/lib/exqlite"
+	@cp apps/komki_cli/komki apps/komki_cli/komki-tresor "$(KOMKI_PAKET)/"
+	@cp -R apps/komki_cli/_build/prod/lib/exqlite/ebin apps/komki_cli/_build/prod/lib/exqlite/priv "$(KOMKI_PAKET)/lib/exqlite/"
+	@cd packaging/pi && pnpm install --frozen-lockfile --prod --ignore-scripts >/dev/null
+	@cp -R packaging/pi/node_modules "$(KOMKI_PAKET)/lib/node_modules"
+	@rm -rf "$(KOMKI_PAKET)/lib/node_modules/.bin"
+	@find "$(KOMKI_PAKET)/lib/node_modules" -type d -path '*/prebuilds/*' ! -path '*/prebuilds/*/*' ! -name darwin-arm64 -exec rm -rf {} +
+	@tar -C dist -czf "$(KOMKI_PAKET).tar.gz" "$(notdir $(KOMKI_PAKET))"
+	@shasum -a 256 "$(KOMKI_PAKET).tar.gz"
+
+# Formel aus der Vorlage: Adresse, Version und Pruefsumme des Pakets.
+KOMKI_RELEASE_URL = https://github.com/croesnick/kommunalpolitik_ki/releases/download/komki/v$(KOMKI_VERSION)/komki-$(KOMKI_VERSION)-macos-arm64.tar.gz
+define komki_formel
+	sha=$$(shasum -a 256 "$(KOMKI_PAKET).tar.gz" | cut -d' ' -f1); \
+	  sed -e "s|@URL@|$(1)|" -e "s/@VERSION@/$(KOMKI_VERSION)/g" -e "s/@SHA256@/$$sha/" packaging/homebrew/komki.rb.in > "$(2)"
+endef
+
+# Formel fuer ein GitHub-Release (Workflow komki-release)
+komki-formel: komki-paket
+	@$(call komki_formel,$(KOMKI_RELEASE_URL),dist/komki.rb)
+	@echo "Formel geschrieben: dist/komki.rb"
+
+# Lokaler Tap croesnick/tap (nur auf diesem Rechner, kein Remote): Paket bauen,
+# Formel mit file://-Adresse in den Tap legen, per Homebrew (neu) installieren.
+KOMKI_TAP = $(shell brew --repository)/Library/Taps/croesnick/homebrew-tap
+komki-tap: komki-paket
+	@mkdir -p "$(KOMKI_TAP)/Formula"
+	@test -d "$(KOMKI_TAP)/.git" || git -C "$(KOMKI_TAP)" init -q
+	@cp packaging/homebrew/TAP-README.md "$(KOMKI_TAP)/README.md"
+	@$(call komki_formel,file://$(PWD)/$(KOMKI_PAKET).tar.gz,$(KOMKI_TAP)/Formula/komki.rb)
+	@git -C "$(KOMKI_TAP)" add README.md Formula/komki.rb
+	@git -C "$(KOMKI_TAP)" diff --cached --quiet || git -C "$(KOMKI_TAP)" commit -q -m "komki $(KOMKI_VERSION) (lokal gebaut)"
+	@rm -f "$$(brew --cache croesnick/tap/komki 2>/dev/null)"
+	@export HOMEBREW_NO_INSTALL_UPGRADE=1 HOMEBREW_NO_AUTO_UPDATE=1; \
+	  if brew list --formula komki >/dev/null 2>&1; then brew reinstall croesnick/tap/komki; else brew install croesnick/tap/komki; fi
+
+# Burrito-Einzeldatei (Ticket #181): komki mit eingebauter Laufzeit, fuer
+# Rechner ohne Homebrew. Laufzeit = die laufende Erlang-Installation (Burrito
+# hat fuer die aktuelle OTP-Version keine vorgebaute). Bau braucht zig 0.16.0
+# und xz (docs/prerequisites.md). Ergebnis: dist/komki-<version>-macos-arm64-einzeldatei
+KOMKI_ZIG ?= $(HOME)/.local/opt/zig-aarch64-macos-0.16.0
+komki-burrito: komki-tresor
+	@mkdir -p dist
+	@cp apps/komki_cli/komki-tresor dist/komki-tresor
+	@root=$$(erl -noshell -eval 'io:format("~s",[code:root_dir()]), halt().'); \
+	  otp=$$(cat "$$root"/releases/*/OTP_VERSION | head -1); \
+	  tar -czf dist/erts-$$otp-macos-aarch64.tar.gz -C "$$root" -s ",^\.,otp-$$otp-macos-aarch64," . ; \
+	  cd apps/komki_cli && PATH="$(KOMKI_ZIG):$$PATH" MIX_ENV=prod BURRITO_TARGET=macos_silicon \
+	    KOMKI_CUSTOM_ERTS="$(PWD)/dist/erts-$$otp-macos-aarch64.tar.gz" mix release --overwrite
+	@cp apps/komki_cli/burrito_out/komki_macos_silicon "$(KOMKI_PAKET)-einzeldatei"
+	@echo "Einzeldatei: $(KOMKI_PAKET)-einzeldatei (dist/komki-tresor gehört daneben)"
+
+# Doku-Site lokal ansehen (docs/site/README.md). pnpm in der Version aus
+# docs/site/package.json (packageManager), wie in der CI; fehlt es fuer die
+# node-Version aus .tool-versions, hilft einmalig `corepack enable pnpm`.
+DOCS_DIR = docs/site
+DOCS_PNPM_CHECK = @cd $(DOCS_DIR) && pnpm --version >/dev/null 2>&1 || { \
+	echo "pnpm fehlt fuer die node-Version aus .tool-versions."; \
+	echo "Einmalig: corepack enable pnpm (mit asdf danach: asdf reshim nodejs)"; exit 1; }
+
+# Live-Reload unter http://localhost:4321/kommunalpolitik_ki/
+docs:
+	$(DOCS_PNPM_CHECK)
+	@cd $(DOCS_DIR) && pnpm install --frozen-lockfile && pnpm dev
+
+# dist/ bauen wie in der CI (.github/workflows/pages.yml)
+docs-build:
+	$(DOCS_PNPM_CHECK)
+	@cd $(DOCS_DIR) && pnpm install --frozen-lockfile && pnpm build
+
+# dist/ so ansehen, wie GitHub Pages es ausliefert
+docs-preview: docs-build
+	@cd $(DOCS_DIR) && pnpm preview
 
 deps:
 	mix deps.get

@@ -1,0 +1,7 @@
+{
+  "args": {
+    "top_id": "../etc/passwd"
+  },
+  "text": "{\"decision\":\"error\",\"decision_id\":\"pdr-ed7fcac73630b571916220972223429b\",\"detail\":\"Parameter: top_id: unzulaessiges Format\",\"rule\":\"emit\"}",
+  "tool": "ris_show"
+}

@@ -190,6 +190,17 @@ def test_title_not_a_content_row(tmp_path, monkeypatch):
     assert check(src, out) == (True, [])
 
 
+def test_truecolor_and_background_codes(tmp_path, monkeypatch):
+    # pi-Themes färben mit 38;2;r;g;b. Ein 48;2-Hintergrund darf seine
+    # Farbwerte nicht als eigene Codes einschleusen (eine 2 wäre sonst dim).
+    capture = "\x1b[38;2;255;154;143mX\x1b[0m \x1b[48;2;2;2;2mY\x1b[0m\n"
+    src, out = render_capture(tmp_path, monkeypatch, capture=capture)
+    tspans = {ts.text: ts for ts in all_tspans(ET.parse(out).getroot())}
+    assert tspans["X"].get("fill") == "#ff9a8f"
+    assert tspans["Y"].get("fill-opacity") is None
+    assert check(src, out) == (True, [])
+
+
 def test_cli_contract(tmp_path):
     src = tmp_path / "capture.txt"
     src.write_text(CAPTURE, encoding="utf-8")
@@ -225,3 +236,44 @@ def test_cli_contract(tmp_path):
     )
     assert corrupted.returncode == 1
     assert "FIDELITY FAILED" in corrupted.stdout
+
+
+def test_osc_links_are_dropped(tmp_path, monkeypatch):
+    capture = "\n".join(
+        [
+            "Quelle: \x1b]8;;https://example.org\x07RIS\x1b]8;;\x07 fertig",
+            "\x1b]8;;https://example.org\x1b\\Link\x1b]8;;\x1b\\ mit ST",
+        ]
+    )
+    src, out = render_capture(tmp_path, monkeypatch, capture=capture)
+    root = ET.parse(out).getroot()
+    text = [
+        "".join(ts.text or "" for ts in row.iter(NS_TSPAN))
+        for row in content_rows(root)
+    ]
+    assert text[0].rstrip() == "Quelle: RIS fertig"
+    assert text[1].rstrip() == "Link mit ST"
+    assert check(src, out) == (True, [])
+
+
+def test_light_theme_cli(tmp_path):
+    src = tmp_path / "capture.txt"
+    src.write_text(CAPTURE, encoding="utf-8")
+    out = tmp_path / "out.svg"
+
+    def run(*args):
+        return subprocess.run(
+            [sys.executable, *map(str, args)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert run(RENDERER, src, out, "Hell", "hell").returncode == 0
+    svg = out.read_text(encoding="utf-8")
+    assert 'fill="#ffffff"' in svg
+    assert 'fill="#1f2328"' in svg
+    assert "FIDELITY OK" in run(CHECKER, src, out, "hell").stdout
+    # Dasselbe SVG gegen die dunklen Standardfarben geprüft: Abweichung.
+    assert "FIDELITY FAILED" in run(CHECKER, src, out).stdout
+    assert run(RENDERER, src, out, "Hell", "pastell").returncode != 0

@@ -83,7 +83,7 @@ defmodule KomkiCli.LabelCLITest do
           db
         ])
 
-      assert out =~ "ungueltige Version" or out =~ "OBJ@VER"
+      assert out =~ "ungültige Version" or out =~ "OBJ@VER"
     end
   end
 

@@ -1,0 +1,5 @@
+{
+  "args": {},
+  "text": "{\"decision\":\"permit\",\"decision_id\":\"pdr-ac43c5abc922bf36624066f1f3129f54\",\"documents\":[{\"document_id\":\"doc-oeffentlich\",\"labels\":[\"doc-oeffentlich@2\"]}],\"labels\":[\"doc-oeffentlich@2\",\"ris-oeffentlich@1\",\"vault-oeffentlich@1\",\"web-oeffentlich@1\"],\"payload_hash\":\"sha256:8b1f0768baf5c6c29779ad20e40957dfe5a3481ffad84f4f3e735c34107e6d9e\"}",
+  "tool": "list_documents"
+}

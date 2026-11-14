@@ -31,55 +31,141 @@ nicht priorisiert).
 
 ### Ratsprojekt
 
-**Definition:** Ein politisches Projekt, das im ratsprojekte-Dashboard
-erfasst ist: mit Realisierungssträngen, Vorbedingungen, Quellen, Status und
-Beschlussvorschlag. Ein Ratsprojekt ist das strukturierte Distillat, nicht
-das Rohmaterial.
+**Definition:** Ein politisches Vorhaben auf dem Weg von der Idee zum Antrag
+und weiter bis zur Umsetzung, geführt im ratsprojekte-Hub. Es hat eine
+[Phase](#phase), einen nächsten Schritt, einen Verlauf und kann in einer
+[Ablage](#phase) liegen. Dazu kommen Meinungsbilder, [Fakten](#fakt),
+[Varianten](#variante), Anträge und Querverweise.
 
-**Wo:** In ratsprojekte (Datenbank + LiveView + MCP).
+**Wo:** Im Hub (`apps/ratsprojekte`, Kontext `Ratsprojekte.Projects`). Eine
+Idee darf dort entstehen, ohne dass es eine Vault-Notiz gibt.
 
 **Slug:** Jedes Ratsprojekt hat einen Slug (`/projekte/{slug}`), der
 gleichzeitig Vault-Tag ist (`#ratsprojekt/{slug}`). Siehe AGENTS.md §
 Slug-Konvention.
 
-**Vault-Notiz:** Jedes Ratsprojekt hat eine eigene Notiz im Vault. Dort
-werden Recherchen, Emails, Fördermittel-Reports etc. angehängt. Der
-Datenfluss ist einseitig: Vault → ratsprojekte.
+**Lebenszyklus:** [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md).
 
-**Verwandt:** Realisierungsstrang, Vorbedingung, Proposal, Antragsreife.
+**Siehe:** [ADR 0004](docs/adr/0004-ratsprojekte-als-lokaler-hub.md).
+
+---
+
+### Phase
+
+**Definition:** Wo ein Ratsprojekt auf dem Weg zum Antrag steht: Idee,
+Meinungsbildung, Ausarbeitung, Im Rat, Umsetzung. Phasen sind frei
+wechselbar, weil der echte Ablauf Schleifen hat; den Grund hält der Verlauf
+fest, nicht eine Sperre im Code.
+
+**Ablage:** Daneben kann ein Ratsprojekt in einer Ablage liegen: Ruht,
+Verworfen oder Abgeschlossen. Dann ist es nicht mehr aktiv und behält seine
+Phase. Ablegen und Wiederaufnehmen brauchen einen Grund.
+
+**Nicht:** Status (so hieß es im alten Modell mit `idee`/`aktiv`). „Ablage“
+heißt im Hub auch der Ort, an dem ein Antragstext liegt (Querverweis).
+
+**Siehe:** ADR 0004, „Das Modell ist klein“;
+[`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md).
+
+---
+
+### Kreis
+
+**Definition:** Eine Gruppe von Menschen, die der Hub unterscheidet. Für die
+Fassungen ist ein Kreis, wer eine bestimmte Fassung zu sehen bekommt:
+[Redaktion](#redaktion) (Arbeitsansicht), [Engerer Kreis](#engerer-kreis)
+(Stand), Basis (Befragungstexte), Öffentlichkeit (eingereichter Antrag und
+Beschluss). Bei Meinungsbildern sagt der Kreis, wessen Meinung es ist:
+Fraktion, Vorstand, Basis oder Externe.
+
+**Nicht:** Persona (ein Mensch mit einem Ziel), Entscheidungsrecht (gehört
+einem Gremium, etwa der Fraktion). Rechte je Eintrag gibt es nicht, nur feste
+Fassungen.
+
+**Siehe:** ADR 0004, „Personas, Kreise und Entscheidungsrechte sind getrennt“.
+
+---
+
+### Redaktion
+
+**Definition:** Die Person, die den Hub führt. Sie sieht die Arbeitsansicht
+mit allem, auch privaten Einträgen und Querverweisen, trägt ein, übernimmt
+Vorschläge aus komki oder lehnt sie ab und entscheidet bei jeder Ausgabe, ob
+ein Stand weitergeht.
+
+**Nicht:** Ein Gremium. Die Redaktion trägt Entscheidungen von Fraktion und
+Vorstand ein, trifft sie aber nicht.
+
+**Siehe:** ADR 0004, Tabellen der Kreise und Entscheidungsrechte.
+
+---
+
+### Engerer Kreis
+
+**Definition:** Fraktion und Vorstand. Sie bekommen den
+[Stand](#stand): was neu ist, wer dran ist, Entscheidungen, Meinungsbilder,
+Fakten und Anträge.
+
+**Nicht:** Basis (bekommt nur die Texte einer Befragung), Externe wie
+Elternbeirat, Vereine oder andere Fraktionen (bekommen nichts aus dem Hub).
+
+**Siehe:** ADR 0004, „Personas, Kreise und Entscheidungsrechte sind getrennt“.
+
+---
+
+### Fakt
+
+**Definition:** Eine Aussage zu einem Ratsprojekt mit Beleg (Fundstelle und
+Quelle), Abrufdatum und Prüfstatus. Was die KI findet, gilt als nicht
+verifiziert, bis ein Mensch die Fundstelle nachgeschlagen hat. URL und
+Abrufdatum eines Fakts aus komki setzt der Vermittler aus dem Journal ein,
+nicht der Agent.
+
+**Nicht:** Quelle (die Herkunft, auf die sich ein Fakt stützt).
+
+**Siehe:** ADR 0004, „Das Modell ist klein“; Schreibweg
+[`docs/schnittstellen/connector-socket.md`](docs/schnittstellen/connector-socket.md).
+
+---
+
+### Variante
+
+**Definition:** Eine Alternative zum selben Ziel eines Ratsprojekts, mit
+Kennbuchstabe, Vorbedingungen und dem Status offen, gewählt oder verworfen
+samt Grund.
+
+**Nicht:** Realisierungsstrang (so hieß sie im alten Modell).
+
+**Siehe:** ADR 0004, „Das Modell ist klein“.
 
 ---
 
 ### Realisierungsstrang
 
-**Definition:** Ein möglicher Weg, ein Ratsprojekt umzusetzen. Jedes
-Ratsprojekt hat mindestens einen, oft mehrere (A/B/C), die parallel
-verfolgt oder gegeneinander abgewogen werden. Jeder Strang hat eine
-rechtliche Grundlage, eine Bedingung und geordnete Schritte.
-
-**Wo:** In ratsprojekte, verknüpft mit einem Ratsprojekt.
+**Definition:** Der frühere Name der [Variante](#variante), aus dem Modell vor
+dem Hub. Neue Texte sagen Variante.
 
 ---
 
 ### Vorbedingung
 
 **Definition:** Eine rechtliche oder sachliche Voraussetzung, die erfüllt
-sein muss, bevor ein Realisierungsstrang weiterverfolgt werden kann.
-Vorbedingungen können erfüllt oder offen sein. Der Status wird manuell
-gesetzt (GO-Prinzip).
+sein muss, bevor eine [Variante](#variante) weiterverfolgt werden kann:
+Rechtsgrundlage oder Voraussetzung, erfüllt oder offen. Ein Mensch setzt den
+Status im Hub.
 
-**Wo:** In ratsprojekte, verknüpft mit einem Realisierungsstrang.
+**Wo:** Im Hub, an einer Variante.
 
 ---
 
 ### Vault
 
-**Definition:** Der Obsidian-Vault des Stadtrats. Source of Truth — roh,
-unstrukturiert, alles. Notizen, Emails, Recherchen, Bürgeranliegen,
+**Definition:** Der Obsidian-Vault des Stadtrats. Quelle für Material — roh,
+unstrukturiert, alles: Notizen, Emails, Recherchen, Bürgeranliegen,
 Sitzungsmappen. Der Vault ist das Gedächtnis.
 
-**Datenfluss:** Vault → ratsprojekte (einseitig). Nie umgekehrt. Siehe
-AGENTS.md §10.
+**Verhältnis zum Hub:** Der Vault ist Quelle für das Material, der Hub für den
+Stand. Der Hub schreibt nie in den Vault. Siehe AGENTS.md §10.
 
 **Vault-Tag:** `#ratsprojekt/{slug}` verknüpft Vault-Notizen mit
 Ratsprojekten.
@@ -88,13 +174,9 @@ Ratsprojekten.
 
 ### Destillat
 
-**Definition:** Das konsolidierte, strukturierte Ergebnis, das aus dem
-rohen Vault-Material destilliert wurde und in ratsprojekte einfließt. Ein
-Destillat ist quellenbelegt, antragsreif (oder explizit nicht) und auf
-einen Realisierungsstrang bezogen.
-
-**Beziehung:** Vault = Source of Truth (roh), ratsprojekte = Destillat
-(strukturiert).
+**Definition:** Im Modell vor dem Hub das konsolidierte Ergebnis, das aus dem
+Vault in ratsprojekte floss. Seit ADR 0004 abgelöst: Der Hub führt den
+[Stand](#stand), kein Destillat, und Menschen schreiben direkt hinein.
 
 **Sprache:** Kanonisch „Destillat“ (Duden/DWDS); die frühere Schreibweise
 „Distillat“ ist eine Fehlform und wurde am 2026-10-14 im Korpus ersetzt.
@@ -109,42 +191,49 @@ Nextcloud-Kollaborationsplattform („Projekt-Kondensat“), das
 
 **Abgrenzung:** Kondensat ≠ Destillat. Das Kondensat ist ein Zwischenstand
 aus geteilten Tabellen (Input für den Delta-Abgleich); das Destillat ist
-das konsolidierte Ergebnis, das aus dem Vault in ratsprojekte fließt. Das
+das konsolidierte Ergebnis, das im alten Modell aus dem Vault in ratsprojekte floss. Das
 Kondensat liefert Vergleichsdaten, keine Projekte.
+
+**Stand:** Entfällt mit dem Hub. Das Sheet der Fraktion wird am Tag des ersten
+ausgegebenen Stands eingefroren (ADR 0004, #54).
+
+---
+
+### Vorschlag
+
+**Definition:** Was komki dem Hub über den Connector anbietet: genau ein
+Ereignis mit Teilen, nach einem GO in komki. Im Hub entscheidet die
+[Redaktion](#redaktion), welche Teile zum Stand passen. Abgewählte Teile
+werden gelöscht, der Verlauf hält nur fest, dass einer nicht übernommen wurde.
+
+**Nicht:** Antrag (der Stadtratsantrag ins RIS). Ein offener Vorschlag ist für
+komki unsichtbar, auch als Anzahl.
+
+**Siehe:** ADR 0004, „Menschen schreiben direkt, die KI schlägt vor“;
+[`docs/schnittstellen/connector-socket.md`](docs/schnittstellen/connector-socket.md).
 
 ---
 
 ### Proposal
 
-**Definition:** Ein Vorschlag der KI, der in der
-`pending_proposals`-Tabelle von ratsprojekte liegt und auf GO
-(Genehmigung) durch den Stadtrat wartet. Die KI schlägt vor, der Mensch
-entscheidet (GO-Prinzip).
+**Definition:** Im Modell vor dem Hub ein Vorschlag der KI in der Tabelle
+`pending_proposals`, über den im Chat per `decide_proposal` entschieden wurde.
+Beides ist mit ADR 0004 entfallen; an seine Stelle tritt der
+[Vorschlag](#vorschlag), über den die Redaktion im Hub entscheidet.
 
-**Typen:** `add_projekt` | `add_realisierungsstrang` | `change_status` |
-`projekt_update` | `strang_update`.
-
-**Status:** `pending` → `approved` | `rejected` (einmalig, irreversibel).
-
-**Abgrenzung:** Proposal ≠ Antrag. Das Proposal ist der interne
-ratsprojekte-Vorschlag mit GO-Gate (Tabelle `pending_proposals`); der
-Antrag ist der Stadtratsantrag ins Ratsinformationssystem. „Antragsreife“
-bewertet ein Ratsprojekt bzw. sein Proposal — nie den Stadtratsantrag.
-
-**Sprache:** Proposal bleibt der Repo-Term (Code-Vokabular: `PendingProposal`,
-`decide_proposal`). Der Nachbarbegriff der deutschen ITIL-Terminologie lautet
-„Change-Vorschlag“, ist aber ITIL-methodisch vorgeprägt. „Änderungsantrag“ ist
-tabu — kollidiert mit dem Stadtrats-Änderungsantrag.
+**Sprache:** „Änderungsantrag“ ist tabu — kollidiert mit dem
+Stadtrats-Änderungsantrag.
 
 ---
 
 ### GO
 
-**Definition:** Das explizite Go (Genehmigung) des Stadtrats, ohne das die
-KI keine schreibenden oder entscheidenden Aktionen ausführt. GO kann im
-Chat erteilt werden — die KI führt es dann über das `decide_proposal`-MCP-
-Tool aus. GO ist nicht nur Arbeitsregel, sondern ethische Architektur:
-demokratische Verantwortung bleibt beim Menschen.
+**Definition:** Das explizite Go (Genehmigung) des Menschen, ohne das die
+KI keine schreibenden oder entscheidenden Aktionen ausführt. GO ist nicht nur
+Arbeitsregel, sondern ethische Architektur: demokratische Verantwortung bleibt
+beim Menschen. In komki erteilt die nutzende Person das GO im Freigabefenster;
+im Hub entscheidet die Redaktion selbst, eine KI führt dort keine
+Entscheidung aus.
 
 **Siehe:** AGENTS.md §7.
 
@@ -152,25 +241,25 @@ demokratische Verantwortung bleibt beim Menschen.
 
 ### Antragsreife
 
-**Definition:** Der Reifegrad eines Ratsprojekts oder Proposals. Wird über
-Hard Gates (quellen_vorhanden, adressat_gesetzt, beschlussvorschlag_konkret,
-realisierungsstrang_vorhanden, vorbedingungen_erfuellt,
-value_proposition_vorhanden, success_metrics_vorhanden) deterministisch
-geprüft. Drei Stufen: `nicht_antragsreif` / `antragsreif` /
-`antragsreif_mit_vorbehalten`.
+**Definition:** Eine Checkliste im Hub, die zeigt, wie weit ein Ratsprojekt
+für einen Antrag ist: Nutzen, Erfolgsmaß, Beschlussvorschlag, Adressat,
+verifizierte Fakten, gewählte Variante und erfüllte Vorbedingungen, Festlegung
+der Fraktion. Sie sperrt nichts; ob ein Antrag eingereicht wird, entscheidet
+die Fraktion.
 
-**Siehe:** `ratsprojekt_proposal`-Skill, `check_antragsreife`-MCP-Tool.
+**Siehe:** [`docs/ratsprojekte-lifecycle.md`](docs/ratsprojekte-lifecycle.md),
+Abschnitt „Antragsreife“.
 
 ---
 
 ### Beschlussvorschlag
 
 **Definition:** Der konkrete Text, der als Beschlussvorschlag in eine
-Sitzung eingebracht wird. Muss > 20 Zeichen haben, sachlich formuliert
-sein und einen klaren Adressaten haben (Stadtrat, Bürgermeister,
-Vergabeausschuss).
+Sitzung eingebracht wird. Sachlich formuliert, mit klarem Adressaten
+(Stadtrat, Bürgermeister, Vergabeausschuss).
 
-**Wo:** In ratsprojekte als Feld am Ratsprojekt.
+**Wo:** Im Hub als Feld am Antrag (`motion_text`). Der Antragstext selbst
+liegt nicht im Hub.
 
 ---
 
@@ -246,8 +335,9 @@ zugehörige Einträge zu einer Sitzung.
 Gremiums), dokumentiert im RIS. Ein Beschluss hat ein Datum, eine
 Beschlussnummer und ist einer Sitzung/einem TOP zugeordnet.
 
-**Lücke:** Ratsprojekte kann aktuell nicht auf eine konkrete
-Beschlussnummer verweisen. Siehe `docs/workflows.md` WF 4.
+**Referenz:** Ratsprojekte verweisen über eine Quelle vom Typ `sitzung`
+auf Sitzung, TOP und Beschluss (`ris_sitzung_id`, `ris_top`,
+`beschluss_nr`).
 
 ---
 
@@ -344,6 +434,83 @@ Berichtet, was beschlossen wurde und wie die Fraktion positioniert war.
 **Erzeugung:** Aus den Beschlüssen (RIS-Daten / `ratsinfo show`).
 Template-basiert. Die KI generiert den Text, das Posten bleibt beim
 Stadtrat (GO).
+
+---
+
+## Beteiligungsbegriffe
+
+Das Format dieser Begriffe an der Grenze zwischen Hub und Plattform steht in
+[`docs/schnittstellen/befragung.md`](docs/schnittstellen/befragung.md).
+
+### Beteiligungsplattform
+
+**Definition:** Das Werkzeug, das einen Kreis anonym zu mehreren Themen befragt.
+Eigenständig und austauschbar; der Hub kennt weder Namen noch Adresse.
+
+**Nicht:** Meinungsbildungstool, Umfragetool.
+
+### Befragung
+
+**Definition:** Eine Frage an einen Kreis zu mehreren Themen. Im Hub bündelt
+sie mehrere Ratsprojekte, mit Frist. Sie ist der Übergabepunkt zwischen Hub und
+Beteiligungsplattform und läuft erst, wenn die Redaktion das Hochladen bestätigt
+hat. Danach bleibt sie als Ergebnisseite stehen, in der Reihenfolge der Ideen.
+
+**Nicht:** Umfrage, Abstimmung, Runde.
+
+### Befragungspaket
+
+**Definition:** Die Datei mit den Texten einer Befragung, die vom Hub zur
+Beteiligungsplattform getragen wird.
+
+### Rücklauf
+
+**Definition:** Die Datei mit Verteilungen und Argumenten einer Befragung, die
+von der Beteiligungsplattform zum Hub getragen wird. Sie ist ein vollständiger
+Schnappschuss und ersetzt den vorigen.
+
+**Nicht:** Ergebnis (das ist die Ansicht im Hub), Export.
+
+### Thema
+
+**Definition:** Ein Eintrag einer Befragung, mit eigens geschriebenem Titel und
+eigener Beschreibung. Es kann zu einem Ratsprojekt gehören, ist aber keins.
+
+### Verteilung
+
+**Definition:** Die Zahl der Personen je Stufe zu einem Thema, über fünf Stufen
+von „klar dagegen“ bis „klar dafür“. Sie ist anonym und nicht bindend.
+
+**Nicht:** Ergebnis, Punktestand, Votum.
+
+### Beteiligung
+
+**Definition:** Die Zahl der Personen mit mindestens einer Antwort in einer
+Befragung.
+
+**Nicht:** Quote.
+
+### Argument
+
+**Definition:** Ein Text dafür oder dagegen zu einem Thema, den eine teilnehmende
+Person schreibt. Er geht wörtlich und ohne Bezug zu ihr an die Befragenden.
+
+**Nicht:** Kommentar, Beitrag.
+
+### Fremder Text
+
+**Definition:** Text in ratsprojekte, den kein Mensch aus der Redaktion geschrieben
+oder gelesen und gespeichert hat, etwa Argumente und noch nicht zugeordnete
+Vorschläge aus einem Rücklauf. Menschen lesen ihn wörtlich, für komki bleibt er
+unsichtbar.
+
+### Meinungsbild
+
+**Definition:** Der Eintrag im Hub, was ein Kreis zu einem Ratsprojekt denkt:
+Datum, ein Satz, optional eine Verteilung. Es kann aus einem Rücklauf entstehen,
+aber auch aus einem Handzeichen am Stammtisch.
+
+**Nicht:** Stimmungsbild, Abstimmungsergebnis.
 
 ---
 
@@ -490,6 +657,21 @@ oracle; ersetzt die frühere Prägung „Auswerter-Orakel“.
 
 ---
 
+### Referenzszenario
+
+**Definition:** Eine erfundene, durchgehende Geschichte aus der Ratsarbeit,
+die alle kanonischen Workflows aus RFC 0003 und alle Quellen von komki
+verbindet. Sie beschreibt, was komki können soll, und dient zugleich als
+Spezifikation der Szenario-Tests und als Vorlage für die Doku-Site.
+
+**Abgrenzung:** Ein kanonischer Workflow (RFC 0003, R.7.1–R.7.3) ist ein
+einzelner normativer Ablauf; das Referenzszenario setzt die Workflows zu
+einer Geschichte zusammen und erfindet keine eigenen Regeln.
+
+**Siehe:** [Referenzszenario „Radweg Bahnhofstraße“](docs/szenarien/radweg-bahnhofstrasse.md).
+
+---
+
 ## Sicherheitsmodell
 
 Die folgenden Begriffe beschreiben das Modell für vertrauliche
@@ -526,6 +708,55 @@ einer Klassifikation. Ein Objekt ohne Label ist nicht dasselbe wie ein
 Objekt mit einem ausdrücklich leeren Label.
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+
+---
+
+### Gemeinsam gebundener Speicher
+
+**Definition:** Ein Speicher, der seine Einträge nicht nachweisbar trennt und
+deshalb als Ganzes genau ein Label trägt. Sein Empfängerkreis sind die
+Beobachter des Bestands. Beispiel: ratsprojekte mit `ratsprojekte@1`.
+
+**Nicht:** labelführender Speicher (der prüft je Eintrag).
+
+**Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md), R.4.4.
+
+---
+
+### Stand
+
+**Definition:** Die Fassung von ratsprojekte für den engeren Kreis, also
+Fraktion und Vorstand: wer dran ist, was neu ist, Meinungsbilder, Fakten,
+Anträge und alle aktiven Projekte. Private Einträge und Querverweise fehlen.
+
+**Nicht:** GO-Stand oder Regelstand Γ (Zustände im Sicherheitsmodell);
+Ausgabe (was ein Arbeitsraum erzeugt).
+
+---
+
+### Ausgegebener Stand
+
+**Definition:** Ein einzelnes, datiertes Dokument aus dem Stand, das die
+Redaktion bewusst an Fraktion und Vorstand weitergegeben hat. Es ändert sich
+danach nicht mehr und lässt sich nicht zurückholen, eine Korrektur wirkt nur
+nach vorn.
+
+**Nicht:** Rückblick (dieselbe Fassung ab einem frei gewählten Tag, nur zur
+Vorbereitung, nicht weitergegeben).
+
+---
+
+### Maschinenlesbarer Stand
+
+**Definition:** Die Fassung des Stands, die komki lesen darf. Sie enthält nur
+ausdrücklich erlaubte Felder, also weder private Einträge noch Querverweise,
+offene Vorschläge oder fremden Text. Der Hub schreibt sie beim Ausgeben eines
+Stands als Datei, versiegelt für komki; öffnen kann sie nur komki mit Touch ID.
+Aufnehmen darf sie nur ein [Projektraum](#projektraum).
+
+**Nicht:** Stand (die Fassung für Fraktion und Vorstand, sie zeigt auch Argumente).
+
+**Siehe:** [`docs/schnittstellen/stand.md`](docs/schnittstellen/stand.md).
 
 ---
 
@@ -601,9 +832,80 @@ unterscheiden und wird für jeden gewählten Verarbeitungszweig betrachtet.
 mit eigenem Zustand und einer festen Menge von Bindungen. Sein unveränderlicher
 Startvertrag legt diese Bindungen, den Zweck, zulässige Operationen und den
 Lebenszyklus fest. Ein Chatfenster
-allein bildet noch keinen solchen Arbeitsraum.
+allein bildet noch keinen solchen Arbeitsraum. Ohne Startvertrag gibt es
+keinen Arbeitsraum; seine Bindungen sind die einzige Angabe von B_W. Eine
+andere Bindungsmenge heißt ein anderer Arbeitsraum, nie ein geänderter.
+
+**Kennung und Titel:** Die Kennung ist ein inhaltsleeres Wortpaar wie
+`stiller-reiher`. komki vergibt sie, sie ist je komki-Instanz eindeutig,
+bleibt unverändert und wird nie neu vergeben. Der Titel, etwa „Mappe
+Stadtrat 17.11.“, nennt das Thema. Weil schon die Themenwahl vertraulich
+sein kann, trägt er die Bindungen des Raums und erscheint nur der
+nutzenden Person, nie in technischen Spuren.
+
+**Session im Raum:** Jede Session gehört zu genau einem Arbeitsraum. Ein
+Raum kann beliebig viele Sessions haben. Eine Session in einem anderen Raum
+fortzusetzen, ist eine Übergabe ihres Verlaufs und nur in einen Raum mit
+mindestens denselben Bindungen zulässig.
+
+**Offen und geschlossen:** Ein geschlossener Raum hat seine Aufgabe
+erledigt. Er nimmt nichts mehr auf und startet keine Session mehr, bleibt
+aber Quelle für spätere Übergaben. Schließen kann nur die nutzende Person,
+ein Wiederöffnen gibt es nicht.
+
+**Kurzform:** „Raum“ ist als Kurzform erlaubt, wo der Zusammenhang eindeutig
+ist (Doku-Site, `komki raum`, Referenzszenario).
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+
+In komki steht der Startvertrag als `contract`-Block in
+`<base>/mediator/room.json` (Ticket #92).
+
+---
+
+### Projektraum
+
+**Definition:** Ein Arbeitsraum, der `ratsprojekte@1` trägt und damit als
+einziger den maschinenlesbaren Stand aufnehmen darf. Weil er den Stand
+kennt, braucht dort jede Anfrage nach draußen ein GO.
+
+**In komki:** Referenzraum `projektraum` (`komki raum projektraum`), der
+Rechercheraum plus `ratsprojekte@1`.
+
+**Siehe:** [Maschinenlesbarer Stand](#maschinenlesbarer-stand),
+[Referenzszenario](docs/szenarien/radweg-bahnhofstrasse.md), Szene 12.
+
+---
+
+### Raumdokument
+
+**Definition:** Ein Dokument, das zum Arbeitsraum gehört: als Datei unter
+`<base>/mediator/documents/`, als Objekt mit Typ `document`, Version und
+Labels in `room.json`. pi liest es nur über `admit_document`; der Vermittler
+entscheidet jede Aufnahme, der Dokument-Connector liest die Datei. Neue
+Raumdokumente kommen über die Dateiaufnahme beim Session-Start
+(`komki session DATEI`, Ticket #92).
+
+**Siehe:** [Arbeitsraum und Startvertrag](#arbeitsraum-und-startvertrag),
+[Quarantäne](#quarantäne).
+
+---
+
+### Raumbild
+
+**Definition:** Die Beschreibung des Raums für die pi-Oberfläche: Name
+(„recherche“, „vertraulich“ oder eigener Raum), Zweck, die Labels in B_W
+mit ihren Bezeichnungen und für jeden Empfänger außerhalb des Rechners, ob
+der Empfängerkreis aller Bindungen ihn einschließt („nach draußen offen“).
+komki schreibt es vor jedem pi-Start als `raum.json` aus `room.json`, Γ und
+dem Label-Store (Ticket #242).
+
+**Abgrenzung:** Reine Anzeige. Was pi darf, entscheidet weiter der
+Vermittler mit der Engine, Aufruf für Aufruf. Ins Modell gelangt das
+Raumbild nicht.
+
+**Wo:** `KomkiCli.Raumbild`; angezeigt von
+`apps/komki_cli/priv/pi/komki-anzeige/raum.ts`.
 
 ---
 
@@ -614,6 +916,80 @@ sein Nutzinhalt. Dazu gehören die Auswahl, das Ziel, Metadaten sowie das
 Auftreten und die Reihenfolge des Vorgangs.
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+
+---
+
+### Aufnahme
+
+**Definition:** Der Schritt, mit dem ein Eingang Teil eines Arbeitsraums
+wird. Zulässig nur, wenn das Label des Eingangs in der Bindungsmenge des
+Raums liegt, der Raum gültig ist und die Aufnahme unter allen
+Raumbindungen erlaubt ist. Auftrag, Verlauf, geladene Anweisungen und
+Ergebnisse von Sub-Agenten sind ebenfalls Eingänge.
+
+**Abgrenzung:** Eine Leseberechtigung an der Quelle ersetzt die Aufnahme
+nicht. Im Vermittler heißt der Schritt `admit` (Gate 2).
+
+**Nur-Aufnahme-Operation:** Eine Connector-Operation, deren Anfrage keine
+Ausgabe ist: Sie hat keine Parameter, und ihre Umgebung zeigt sie niemandem
+außerhalb des Raums. Der Vermittler entscheidet dann nur die Aufnahme, vor
+dem Lesen und ohne GO-Weg. Einziges Beispiel ist das Lesen des
+maschinenlesbaren Stands (`rp_stand_lesen`).
+
+**Siehe:** RFC 0003 R.5.4, Connector-Vertrag §6.4 (`apps/komki_connector/CONTRACT.md`).
+
+---
+
+### Übergabe
+
+**Definition:** Der Schritt, mit dem eine Ausgabe den Arbeitsraum verlässt:
+an einen Empfänger, einen Speicher oder einen anderen Arbeitsraum.
+Zulässig nur unter dem Label der Ausgabe; ein Zielraum prüft zusätzlich
+seine eigene Aufnahme.
+
+**Abgrenzung:** Eine Übergabe entfernt keine Bindung, dafür braucht es eine
+Lockerung. Im Vermittler heißt der Schritt `transfer`, beim Schreiben in
+einen Speicher `store` (beides Gate 1).
+
+**Siehe:** RFC 0003 R.5.6, [Aufnahme](#aufnahme), [Lockerung und Lockerungsbefugnis](#lockerung-und-lockerungsbefugnis).
+
+---
+
+### Lockerung und Lockerungsbefugnis
+
+**Definition:** Eine Lockerung erzeugt aus einer Ausgabe eine neue Ausgabe
+mit weniger Bindungen, gedeckt durch eine konkrete Offenlegungsfreigabe.
+Die Lockerungsbefugnis ist der Eintrag in einer Bindung, wer welche
+Einschränkung für welche Ausgabe lockern darf. Ohne Eintrag ist keine
+Lockerung zulässig.
+
+**Abgrenzung:** Original und laufender Arbeitsraum behalten ihr Label. Ein
+GO ersetzt keine fehlende Lockerungsbefugnis. Befugnisse sind strukturierte
+Einträge `{authority, restriction, output}` im Γ (CONTRACT.md § 2.1); eine
+Bindung, deren Empfängerkreis das Ziel ohnehin abdeckt, lockert nichts
+und braucht keine Befugnis.
+
+**Siehe:** RFC 0003 R.2.2, R.5.7; [Aktionsfreigabe und Offenlegungsfreigabe](#aktionsfreigabe-und-offenlegungsfreigabe), [Ausgabeart](#ausgabeart).
+
+---
+
+### Ausgabeart
+
+**Definition:** Das `output` einer Lockerungsbefugnis und einer
+Offenlegungsfreigabe: wofür eine Bindung gelockert werden darf — im
+ersten gebauten Fall `ratsprojekte-essenz` (Arbeitstitel) für gegengelesene
+Essenz aus dem Fraktionsraum in den ratsprojekte-Hub (Szene 13, #423).
+Das Vokabular ist geschlossen (CONTRACT.md § 2.1), die Engine ordnet die
+Ausgabeart der Zielumgebung zu und rechnet sie gegen die Freigabe nach;
+der Agent benennt keine Ausgabeart.
+
+**Abgrenzung:** Die Ausgabeart benennt den Zweck der Lockerung, nicht das
+Ziellabel: `ratsprojekte-essenz` lockert auf `ratsprojekte@1`, aber das
+Ziellabel steht in der Freigabe und wird separat geprüft (R.6.2).
+
+_Vermeiden:_ Ausgabeform, Exportart.
+
+**Siehe:** [Lockerung und Lockerungsbefugnis](#lockerung-und-lockerungsbefugnis), [Aktionsfreigabe und Offenlegungsfreigabe](#aktionsfreigabe-und-offenlegungsfreigabe).
 
 ---
 
@@ -699,14 +1075,68 @@ bei einer weiteren Entscheidung gemeinsam zu berücksichtigen sind.
 Wirkung (R.6.1) — eine Transaktion, nicht nur einen Text; sie wird an
 den exakten call hash gebunden, mit Frische-Fenster und einmalig
 verbrauchter Nonce (R.6.3). Eine Offenlegungsfreigabe erlaubt zusätzlich das
-Lockern von Bindungen (Herabstufungsbefugnis); sie ist in
-`komki_policy` bewusst nicht implementiert (`unsupported`).
+Lockern von Bindungen (Herabstufungsbefugnis): Sie nennt Ausgabeart und
+Ziellabel der Lockerung und wirkt nur, wenn jede lockerungsbedürftige
+Bindung die Befugnis trägt (R.5.7). Seit #423 entscheidet die Engine
+sie für `store` (`komki-release/2`, CONTRACT.md § 4.9), zuerst für
+gegegengelesene Essenz aus dem Fraktionsraum in den ratsprojekte-Hub
+(Szene 13).
 
-**Siehe:** RFC 0003 R.6.1–R.6.3; [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.6, § 4.6.
+**Siehe:** RFC 0003 R.6.1–R.6.3; [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.6, § 4.6, § 4.9.
 
 ---
 
-### call hash
+### Manuelle Inhaltsfreigabe und begrenzte Faktenfreigabe
+
+**Definition:** Die zwei Modi kontrollierter Offenlegung. Bei der manuellen
+Inhaltsfreigabe prüft eine berechtigte Person einen konkreten Text und gibt
+genau ihn frei. Bei der begrenzten Faktenfreigabe werden Quelle, Version,
+Fakten, Auswahl und Veröffentlichungsweise unabhängig vom geschützten
+Agenten festgelegt; ein neuer Arbeitsraum schreibt den Text nur aus diesen
+Fakten.
+
+**Abgrenzung:** Die manuelle Inhaltsfreigabe sichert nur die unveränderte
+Ausführung des freigegebenen Texts, nicht die Abwesenheit verdeckter
+Kodierung. Die begrenzte Faktenfreigabe gibt die stärkere Zusage.
+
+**Siehe:** RFC 0003 R.6.4, R.7.2.
+
+---
+
+### Essenz
+
+**Definition:** Die gekürzte, gegengelesene Fassung eines vertraulichen
+Texts für den ratsprojekte-Hub — etwa der Antragsentwurf aus dem
+Fraktionsraum (Szene 13). Sie ist der einzige Inhalt, der aus
+vertraulichen Räumen in den Hub gelangt: von Hand eingetragen oder,
+seit #423, über komki als Lockerung mit Offenlegungsfreigabe und
+Teileauswahl vor dem GO.
+
+**Abgrenzung:** Die Essenz ist kein Zitat und kein Fakt mit Quelle, sie
+trägt die eigene Substanz des Raums in der Wortwahl der nutzenden Person.
+Nichtöffentliches gehört nie in die Essenz, auch nicht von Hand. Der
+Faktenweg (G2) wäre die stärkere Form und ist für die Essenz noch
+offen (#363).
+
+_Vermeiden:_ Kurzfassung, Auszug, Zusammenfassung.
+
+**Siehe:** [Manuelle Inhaltsfreigabe und begrenzte Faktenfreigabe](#manuelle-inhaltsfreigabe-und-begrenzte-faktenfreigabe), [Ausgabeart](#ausgabeart), [Gemeinsam gebundener Speicher](#gemeinsam-gebundener-speicher).
+
+---
+
+### Freigabefenster
+
+**Definition:** Das Fenster außerhalb des Agenten, in dem die nutzende
+Person ein GO für ein konkretes Ereignis erteilt oder verweigert. Der
+Agent kann es weder öffnen noch beschreiben noch nachahmen.
+
+_Vermeiden:_ komki-Fenster, GO-Fenster.
+
+**Siehe:** [Freigabe und Freigabedienst](#freigabe-und-freigabedienst), [GO](#go).
+
+---
+
+### Call Hash
 
 **Definition:** SHA-256 (Hex, kleingeschrieben) über die kanonische
 JSON-Darstellung des Objekts `{content_digest, object, operation,
@@ -738,8 +1168,19 @@ legaler Fortsetzungen aus **genau vier Übergangstypen** — `fakt_nachreichen`,
 Engine zu jeder `deny`-/`indeterminate`-Entscheidung mitliefert. Der Katalog ist **beratend,
 erzeugt keine Autorität**: keine Eingabe akzeptiert ihn, keine Fortsetzung
 wird ausgeführt. Normative Ordnung: fakt < transformation < neuer Raum <
-aktionsfreigabe — ein GO steht nie an erster Stelle. Im Code als
-Remedy-Katalog (`KomkiPolicy.Remedies`, CONTRACT § 2.8).
+aktionsfreigabe — ein GO steht nie an erster Stelle. Die Norm gilt für die
+deny-/indeterminate-Kataloge (§ 2.8); zwei bewusste Ausnahmen: Bei
+`object_quarantine` ist das Objekt-Level-GO der Erstklassifikation der
+einzige Katalog-Eintrag — es gibt für ein Quarantäne-Objekt keine
+nicht-verletzende Fortsetzung —, und der Aktionsfreigabe-Zweig (§ 4.6) nennt
+je Release-Blocker genau den neu berechneten call-GO, während die
+unüberbrückbaren Blocker (`workspace_invalid`, `label_not_preserved`, bei
+`store` auch `recipient_not_allowed` und `recipients_unproven`) ihren
+`neuer_raum`-Eintrag behalten — kein Befund einer solchen Entscheidung
+bietet ein call-GO an. Dasselbe gilt im direkten Zweig bei `store` mit
+unbelegter Beobachterliste (#432): Ein GO kann nicht belegen, wer mitliest.
+Im Code als Remedy-Katalog (`KomkiPolicy.Remedies`,
+CONTRACT § 2.8).
 
 **Siehe:** [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.8; RFC 0003 R.6;
 `docs/research/2026-10-13-agent-policy-models-openappa-pace.md` (Move 1).
@@ -763,6 +1204,273 @@ Auswirkungen.
 im Audit-Journal: Intent-Hash, Payload-Hash und Γ-Stand-Hash des Aufrufs.
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
+
+---
+
+## komki-Bausteine
+
+Begriffe aus der Umsetzung von komki, die über eine App hinaus vorkommen.
+
+### Seatbelt-Profil
+
+**Definition:** Die Sandbox-Regeln (SBPL, Sandbox Profile Language), unter
+denen macOS einen komki-Prozess startet. Jeder Prozess hat ein eigenes
+Profil: pi, llama-server, Vermittler, Egress-Proxy und jeder Connector.
+komki erzeugt die Profile deterministisch, und `komki doctor` prüft, dass
+die Neuerzeugung byte-gleich ist. Eine Abweichung (Drift) heißt: Das Profil
+wurde verändert oder stammt aus einer anderen komki-Version.
+
+**Wo:** `apps/seatbelt` (Library), Profile unter `<base>/profile/`.
+
+**Sprache:** Seatbelt und Sandbox bleiben englisch.
+
+---
+
+### Programm-Pin
+
+**Definition:** Die festgehaltene SHA-256-Prüfsumme eines Programms, das
+komki startet (komki, escript, node, llama-server, komki-tresor, das
+pi-Paket). Weicht die Prüfsumme ab, verweigert komki den Start, bis
+`komki setup` die neue Prüfsumme nach Rückfrage übernimmt.
+
+**Wo:** `pins` in `config.json`; `Seatbelt.Pins`.
+
+---
+
+### Socket-Token
+
+**Definition:** Das geheime Zufallstoken (32 Byte, als Hex), mit dem sich pi
+am Unix-Socket des Vermittlers ausweist. `komki up` schreibt es nach
+`<base>/run/mediator.token` (0600). pi bekommt es über die Umgebung
+(`KOMKI_MEDIATOR_TOKEN`) und reicht es an `komki-relay.js` weiter. Jede
+Anfrage an den Socket trägt es als `Authorization: Bearer <token>`; ohne
+oder mit falschem Token antwortet der Vermittler mit 401.
+
+**Abgrenzung:** Nicht zu verwechseln mit dem Capability-Token des
+[Sidecar](#sidecar)-Protokolls, das der Vermittler je Aufruf an einen
+Connector gibt.
+
+**Sprache:** „Kanal-Token“ ist eine Fehlform, ebenso „Kanal“ für die
+Verbindung pi → Vermittler: Das Wort sagt nicht, was gemeint ist. Es heißt
+Socket-Token bzw. Unix-Socket (Entscheidung 2026-10-29). Code-Bezeichner
+wie `KomkiCli.Channel` bleiben englisch.
+
+**Wo:** `KomkiCli.Channel`; Vertrag in
+[`apps/komki_connector/CONTRACT.md`](apps/komki_connector/CONTRACT.md) § 8.
+
+---
+
+### komki-tresor
+
+**Definition:** Das kleine Swift-Programm, das Schlüssel (etwa den
+Brave-API-Key) mit der Secure Enclave versiegelt und nur nach Freigabe per
+Touch ID oder Passwort öffnet. Im Schlüsselbund liegt nur das Siegel.
+
+**Abgrenzung:** Ein Programmname, keine Übersetzung von Vault. Der Vault
+bleibt Vault (siehe Sprachregel unter „Harness- und Werkzeugbegriffe“).
+
+**Wo:** `apps/komki_cli/native/komki-tresor/`, gebaut von `mix compile`.
+
+---
+
+### Sidecar
+
+**Definition:** Das Frame-Protokoll zwischen Vermittler und Connector als
+eigene Library: Frames über Unix-Sockets, ein Capability-Token je Aufruf,
+geschlossene Fehlercodes. Der Name folgt dem etablierten Sidecar-Muster: Ein
+Hilfsprozess läuft neben dem Hauptprozess und spricht mit ihm über eine
+schmale Schnittstelle.
+
+**Wo:** `apps/sidecar`; Vertrag in
+[`apps/komki_connector/CONTRACT.md`](apps/komki_connector/CONTRACT.md) § 3.
+
+**Sprache:** Bleibt englisch, Code und Doku der Library sind englisch.
+
+---
+
+### Kassette
+
+**Definition:** Eine aufgezeichnete Anfrage samt Antwort an eine RIS-API,
+als JSON-Datei, wie bei VCR oder ExVCR. Der Aufzeichnungs-Proxy (Recorder)
+schreibt sie, der Mock spielt sie im Replay-Modus zurück, und aus mehreren
+Kassetten entstehen inhaltsfreie Berichte: das inferred schema und das
+Strukturprofil.
+
+**Arten:** *Echte Kassetten* enthalten echte, auch nicht-öffentliche
+Inhalte. Sie liegen nie im Repo und laufen nie durch eine Agenten-Session;
+aufbewahrt werden sie verschlüsselt (`priv/ris_cassettes.exs`, Freigabe per
+Touch ID) — Details im Connector-README, Abschnitt „Kassetten
+verschlüsseln“; bis zur Verschlüsselung ist eine Kassette Klartext. Committbar
+sind die inhaltsfreien Berichte (inferred schema, Strukturprofil) und
+*synthetische Kassetten* aus dem Gartenstadt-Generator: erfundene Inhalte
+im echten Format, per Konstruktion ohne echten Bezug und über den
+N-Gramm-Abgleich freigegeben (`test/fixtures/gartenstadt/`).
+
+**Wo:** [`apps/komki_connector_ris/README.md`](apps/komki_connector_ris/README.md)
+§ „Aufzeichnung und Replay echter Antwortformate“.
+
+---
+
+### Inferred schema
+
+**Definition:** Ein aus Beispieldaten abgeleitetes Formatschema (schema
+inference): je RIS-Endpunkt die Schlüssel, Typen, Formen (ISO-Datum,
+ID-Muster, Base64-HTML) und Array-Längen der Antworten, aber keine Inhalte.
+Es entsteht aus Kassetten und ist der Vertrag zwischen echtem RIS und Mock;
+`--compare` meldet Abweichungen zwischen zwei Aufnahmen (Schema-Drift).
+
+**Abgrenzung:** Kein JSON Schema im Sinne des Standards, sondern ein eigenes,
+committbares Berichtsformat. Datei- und Verzeichnisnamen heißen noch
+`skeleton` (`priv/ris_skeleton.exs`, `priv/skeletons/`); früher hieß es
+„Skelett-Bericht“.
+
+**Wo:** [`apps/komki_connector_ris/README.md`](apps/komki_connector_ris/README.md)
+§ „Schema inference: Format ohne Inhalte“.
+
+---
+
+### Strukturprofil
+
+**Definition:** Der inhaltsfreie Bericht des Struktur-Extraktors
+(`priv/ris_struktur.exs`) über die Belegung einer Aufzeichnung: je Sitzung
+Teil-Layout und Status, je TOP restricted-Flag, Sichtbarkeit und Zähler für
+Textblöcke, Abstimmungen und Dokumente. Tragbar ist nur, was Gäste am RIS
+ebenfalls sehen könnten (fail-closed wie der Connector-Filter): Titellängen
+nur für nachweislich öffentliche TOPs, Abstimmungsergebnisse nie, Gremien
+nur als anonyme Indizes (`c1`, `c2`, …). Es ist die Vorlage des
+Gartenstadt-Generators — die Antwortformate erzwingt der Konformitätstest
+gegen das inferred schema.
+
+**Wo:** committet unter `apps/komki_connector_ris/priv/strukturen/`.
+
+---
+
+### Gartenstadt
+
+**Definition:** Das erfundene Datenuniversum der synthetischen Kassetten
+(`priv/gartenstadt_daten.exs`): eine Kleinstadt mit erfundenen Gremien,
+Themen, Straßen und Namen, deren Problemlagen nicht auf die Themen der
+echten Aufzeichnungen zurückführbar sind (Negativliste — Sicherheit per
+Konstruktion statt nur per Prüfung, Entscheidung in #313). Die Lindenallee
+ist die reservierte Teststraße der Sonderfälle und fehlt im Straßenpool.
+
+**Wo:** `apps/komki_connector_ris/priv/gartenstadt_daten.exs`;
+Fixtures unter `apps/komki_connector_ris/test/fixtures/gartenstadt/`.
+
+---
+
+### N-Gramm-Abgleich
+
+**Definition:** Das Freigabetor vor jedem Commit synthetischer Kassetten
+(`priv/ris_ngramm.exs`): Wort-N-Gramm (Standard 6) über alle String-Werte
+der Antwortkörper, Base64-HTML dekodiert, gegen die echten Aufzeichnungen.
+Ein übereinstimmendes Gramm ist ein Fund (Exit 1). Läuft lokal bei der
+nutzenden Person über die entschlüsselten echten Kassetten — echte Kassetten
+liest kein Agent; die Fund-Zeile druckt den Streifen bewusst, er ist ja der
+Leak.
+
+**Wo:** `apps/komki_connector_ris/priv/ris_ngramm.exs`.
+
+---
+
+### Leak-Prüfung
+
+**Definition:** Der Schritt zwischen Aufzeichnung und Versiegelung einer
+Session: `ris_cassettes.exs check` durchsucht Klartext-Kassetten nach den
+Geheimnissen aus `.env` und token-Datei (Auswertung exakt wie ratsinfo:
+erste Fundstelle, auch auskommentierte oder `export`-Zeilen), im Rohtext
+und in den Base64-dekodierten Bodies. Exit 1 gilt bei Funden und wenn die
+Prüfung nicht vollständig war (unlesbare Dateien oder Verzeichnisse, kein
+Geheimnis ladbar) — nichts geprüft ist nicht sauber.
+
+**Wo:** `apps/komki_connector_ris/priv/ris_cassettes.exs`, Verb `check`
+(#328).
+
+---
+
+### Sammel-Verzeichnis
+
+**Definition:** Ein Kassettenverzeichnis ohne eigenen Klartext, das nur
+Unterverzeichnisse hält — etwa die Kassetten-Basis
+(`~/.local/share/kommunalpolitik_ki/ris-cassettes/`) mit ihren
+Zeitstempel-Verzeichnissen. `check` steigt in es hinein und prüft die
+Unterverzeichnisse statt seiner selbst.
+
+**Wo:** `ris_cassettes.exs check` ohne Verzeichnisargument.
+
+---
+
+### Bau aus dem Checkout
+
+**Definition:** Der heute gültige Weg zu komki: Repo klonen, `make komki`
+baut das Escript im Clone und legt einen Link nach `~/.local/bin`, danach
+`komki setup`. Wer schon Homebrew nutzt, kann mit `make komki-tap` dasselbe
+lokal als Homebrew-Paket installieren (Tap nur auf diesem Rechner).
+
+**Abgrenzung:** Kein Release. Es gibt keinen veröffentlichten Tap und keine
+heruntergeladene Datei.
+
+**Wo:** [`docs/release.md`](docs/release.md) § „Lokaler Bau aus dem Checkout“.
+
+---
+
+### Wegwerf-Instanz
+
+**Definition:** Eine zweite komki-Instanz mit eigenem `KOMKI_HOME` und
+eigenem Port neben der Hauptinstanz, für echte Läufe, die die Hauptinstanz
+nicht berühren sollen. Der Pfad muss kurz sein, weil Unix-Sockets höchstens
+103 Byte lang sein dürfen (etwa `/private/tmp/komki-test`).
+
+---
+
+### Release
+
+**Definition:** Ein veröffentlichter GitHub-Release eines Tools zu einem
+vorhandenen Tag `<einheit>/v<semver>` (z. B. `komki/v0.2.0`). Für komki ist
+der Ablauf in [`docs/release.md`](docs/release.md) beschrieben, aber noch
+nicht in Kraft: Bis auf Weiteres gilt der Bau aus dem Checkout.
+
+**Abgrenzung:** Ein Tag ist kein Release. Tags setzt der Merge des
+[Version-PR](#version-pr); veröffentlicht wird erst nach dem Publish-GO.
+
+**Begriffe im Release-Ablauf:** *Payload-Staleness* (eine neu gebaute
+Burrito-Einzeldatei derselben Version nutzt den schon entpackten alten
+Inhalt weiter), *Smoke-Matrix* (feste Prüfschritte gegen die Datei, die
+veröffentlicht werden soll), *Publish-GO* (das GO, das die Veröffentlichung
+zu einem vorhandenen Tag abdeckt).
+
+---
+
+### Changeset
+
+**Definition:** Eine Markdown-Datei unter `.changeset/`, die ein PR
+mitbringt: welche versionierte Einheit (komki, ratsprojekte, sidecar,
+seatbelt, sealed_envelope) sich mit welcher Stufe (`major`, `minor`,
+`patch`) ändert, und ein Eintrag für deren Changelog. Englischer Fachbegriff
+aus dem Werkzeug Changesets; das Format liest hier knope.
+
+**Abgrenzung:** Nicht Ectos `Ecto.Changeset`. Kein Commit-Text: Ein
+Changeset ist für die Leser des Changelogs geschrieben.
+
+**Nicht:** „Change-Datei“ (Eigenprägung, im Ticket #538 noch verwendet).
+
+**Wo:** [`docs/agents/changesets.md`](docs/agents/changesets.md),
+[ADR 0005](docs/adr/0005-versionierung-mit-changesets-und-knope.md).
+
+---
+
+### Version-PR
+
+**Definition:** Der PR auf dem Branch `versionen`, den der Workflow
+`versionen` aus den offenen [Changesets](#changeset) baut: erhöhte Versionen
+in den `mix.exs`, neue Changelog-Abschnitte, dazu die Kaskade für Einheiten,
+die eine erhöhte Bibliothek einbinden. Sein Merge durch einen Menschen ist
+das GO für die Tags `<einheit>/v<semver>`.
+
+**Abgrenzung:** Kein Release, es wird nichts veröffentlicht. Der Dev-Loop
+mergt ihn nie.
+
+**Wo:** [`docs/agents/changesets.md`](docs/agents/changesets.md).
 
 ---
 

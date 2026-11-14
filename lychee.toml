@@ -18,3 +18,9 @@ extensions = ["md"]
 # auflösen, statt sie als Fehler zu werten. Relative Pfade sind seit
 # lychee v0.23 erlaubt.
 root_dir = "."
+
+# Abhaengigkeiten und Build-Ausgaben sind keine Repo-Doku: Doku-Site (Astro
+# Starlight; die Seiten selbst sind .mdx und fallen ohnehin nicht unter
+# extensions = ["md"]), pi-Paket, dist/ und artifacts/. Alle gitignored, sie
+# existieren nur lokal nach einem Build und fluten sonst den lokalen Lauf.
+exclude_path = ["docs/site/node_modules", "docs/site/dist", "docs/site/.astro", "packaging/pi/node_modules", "dist", "artifacts", "apps/artifacts"]

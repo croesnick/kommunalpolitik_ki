@@ -28,7 +28,7 @@ defmodule KomkiCli.LabelStoreTest do
       assert LabelStore.registry_id(db) == {:ok, "komki-synth-demo"}
     end
 
-    test "Re-Import identischer Datei ist ein No-op (R.2.2: Bindung unveraenderlich)", %{
+    test "Re-Import identischer Datei ist ein No-op (R.2.2: Bindung unveränderlich)", %{
       db: db,
       seed: seed
     } do
@@ -44,7 +44,7 @@ defmodule KomkiCli.LabelStoreTest do
       seed2 = deep_put(seed, ["bindings", "ratsarbeit@1", "bezeichnung"], "Anderer Text")
 
       assert {:error, reason} = LabelStore.import_registry(db, seed2)
-      assert reason =~ "unveraenderlich"
+      assert reason =~ "unveränderlich"
       assert reason =~ "ratsarbeit@1"
     end
 
@@ -55,7 +55,7 @@ defmodule KomkiCli.LabelStoreTest do
       assert reason =~ "unknown_field"
     end
 
-    test "B.4-ungueltige Expression propagiert den Engine-Compile-Fehler (Code + Pfad)", %{
+    test "B.4-ungültige Expression propagiert den Engine-Compile-Fehler (Code + Pfad)", %{
       db: db,
       seed: seed
     } do
@@ -67,7 +67,7 @@ defmodule KomkiCli.LabelStoreTest do
       assert reason =~ "$.bindings"
     end
 
-    test "reader ausserhalb des Beobachterraums verweigert (unknown_observer)", %{
+    test "reader außerhalb des Beobachterraums verweigert (unknown_observer)", %{
       db: db,
       seed: seed
     } do
@@ -136,7 +136,7 @@ defmodule KomkiCli.LabelStoreTest do
       assert reason =~ "--content-ref und --origin"
     end
 
-    test "Rueckholung bestehenden Objekts in Quarantäne haengt decisions-Eintrag an", %{
+    test "Rückholung bestehenden Objekts in Quarantäne haengt decisions-Eintrag an", %{
       db: db
     } do
       {:ok, _} = import_seed(db)
@@ -167,7 +167,7 @@ defmodule KomkiCli.LabelStoreTest do
       assert reason =~ "neue Inhaltsfassung braucht neue Objektversion"
     end
 
-    test " Erstklassifikation mit Label setzt classified (Historie 2 Eintraege)", %{db: db} do
+    test " Erstklassifikation mit Label setzt classified (Historie 2 Einträge)", %{db: db} do
       {:ok, _} = import_seed(db)
       {:ok, _} = quarantine(db, ref("brief-4711", "v1"))
 
@@ -187,7 +187,7 @@ defmodule KomkiCli.LabelStoreTest do
       assert d2.labels == ["ratsarbeit@1"]
     end
 
-    test "ausdruecklich leeres Label ist classified mit [], NICHT Quarantäne (R.2.5)", %{db: db} do
+    test "ausdrücklich leeres Label ist classified mit [], NICHT Quarantäne (R.2.5)", %{db: db} do
       {:ok, _} = import_seed(db)
       {:ok, _} = quarantine(db, ref("brief-4711", "v1"))
 
@@ -280,7 +280,13 @@ defmodule KomkiCli.LabelStoreTest do
                 ]
               }
             },
-            "relaxation_authorities" => []
+            "relaxation_authorities" => [
+              %{
+                "authority" => "nutzende-person",
+                "restriction" => "auflagen",
+                "output" => "sitzungsmappe"
+              }
+            ]
           },
           "lizenz-namensnennung@1" => %{
             "readers" => ["fraktionskollege", "lokale-verarbeitung", "nutzende-person"],
@@ -314,7 +320,7 @@ defmodule KomkiCli.LabelStoreTest do
   end
 
   # ========================================================================
-  # Lockerungsbefugnisse (R.2.2, strukturiert; Γ emittiert [], Ticket #109)
+  # Lockerungsbefugnisse (R.2.2, strukturiert; Γ-Export seit #423)
   # ========================================================================
 
   describe "Strukturierte Lockerungsbefugnisse (R.2.2)" do
@@ -332,7 +338,7 @@ defmodule KomkiCli.LabelStoreTest do
       assert binding.relaxation_authorities == [@seed_entry]
     end
 
-    test "flache String-Liste verweigert (strukturierte Eintraege noetig)", %{db: db, seed: seed} do
+    test "flache String-Liste verweigert (strukturierte Einträge nötig)", %{db: db, seed: seed} do
       seed2 =
         deep_put(seed, ["bindings", "ratsarbeit@1", "relaxation_authorities"], ["nutzende-person"])
 
@@ -341,7 +347,7 @@ defmodule KomkiCli.LabelStoreTest do
       assert reason =~ "erwartet Objekt"
     end
 
-    test "authority ausserhalb des Beobachterraums verweigert", %{db: db, seed: seed} do
+    test "authority außerhalb des Beobachterraums verweigert", %{db: db, seed: seed} do
       entry = Map.put(@seed_entry, "authority", "fremder-dienst")
       seed2 = deep_put(seed, ["bindings", "ratsarbeit@1", "relaxation_authorities"], [entry])
 
@@ -350,7 +356,7 @@ defmodule KomkiCli.LabelStoreTest do
       assert reason =~ "fremder-dienst"
     end
 
-    test "restriction ausserhalb der drei Einschraenkungskomponenten verweigert", %{
+    test "restriction außerhalb der drei Einschraenkungskomponenten verweigert", %{
       db: db,
       seed: seed
     } do
@@ -362,7 +368,7 @@ defmodule KomkiCli.LabelStoreTest do
       assert reason =~ ~s("labels")
     end
 
-    test "doppelte Eintraege verweigert (nicht stillschweigend vereinzelt)", %{
+    test "doppelte Einträge verweigert (nicht stillschweigend vereinzelt)", %{
       db: db,
       seed: seed
     } do
@@ -376,15 +382,38 @@ defmodule KomkiCli.LabelStoreTest do
       assert reason =~ "doppelte Lockerungsbefugnis"
     end
 
-    test "Γ-Export emittiert [], obwohl der Store Eintraege haelt (Ticket #109)", %{
+    test "Γ-Export traegt die strukturierten Eintraege (seit #423; vorher [] bis #109)", %{
       db: db
     } do
       {:ok, _} = import_seed(db)
 
       assert {:ok, json} = LabelStore.export(db)
       decoded = JSON.decode!(json)
-      assert decoded["bindings"]["ratsarbeit@1"]["relaxation_authorities"] == []
+
+      assert decoded["bindings"]["ratsarbeit@1"]["relaxation_authorities"] == [
+               %{
+                 "authority" => "nutzende-person",
+                 "restriction" => "auflagen",
+                 "output" => "sitzungsmappe"
+               }
+             ]
+
+      # Der exportierte Γ kompiliert: Die Engine validiert die Eintraege
+      # gegen das geschlossene Vokabular (CONTRACT § 2.1).
       assert {:ok, _compiled} = Registry.compile(decoded)
+    end
+
+    test "Eintrag mit unbekannter Ausgabeart ueberlebt den Store, aber nicht die Engine-Projektion",
+         %{
+           db: db,
+           seed: seed
+         } do
+      entry = Map.put(@seed_entry, "output", "unbekannte-ausgabe")
+      seed2 = deep_put(seed, ["bindings", "ratsarbeit@1", "relaxation_authorities"], [entry])
+
+      assert {:error, reason} = LabelStore.import_registry(db, seed2)
+      assert reason =~ "invalid_output_kind"
+      assert reason =~ "unbekannte-ausgabe"
     end
   end
 
@@ -393,7 +422,7 @@ defmodule KomkiCli.LabelStoreTest do
   # ========================================================================
 
   describe "Beobachtertypen und Entscheider-Gate (R.2.5)" do
-    test "Verarbeitungsdomaene als decided-by verweigert: nur eine Person entscheidet", %{
+    test "Verarbeitungsdomäne als decided-by verweigert: nur eine Person entscheidet", %{
       db: db
     } do
       {:ok, _} = import_seed(db)
@@ -405,11 +434,11 @@ defmodule KomkiCli.LabelStoreTest do
                  ref("brief-4711", "v1"),
                  [],
                  "lokale-verarbeitung",
-                 "Automatisch klassifiziert durch Verarbeitungsdomaene"
+                 "Automatisch klassifiziert durch Verarbeitungsdomäne"
                )
 
       assert reason =~ "R.2.5"
-      assert reason =~ "Verarbeitungsdomaene"
+      assert reason =~ "Verarbeitungsdomäne"
 
       assert {:error, reason} =
                LabelStore.quarantine(db, ref("protokoll-9", "v1"), %{
@@ -420,10 +449,10 @@ defmodule KomkiCli.LabelStoreTest do
                })
 
       assert reason =~ "R.2.5"
-      assert reason =~ "Verarbeitungsdomaene"
+      assert reason =~ "Verarbeitungsdomäne"
     end
 
-    test "Store ohne observer_types-Eintraege verweigert Entscheidungen (fail-closed)", %{
+    test "Store ohne observer_types-Einträge verweigert Entscheidungen (fail-closed)", %{
       db: db
     } do
       {:ok, _} = import_seed(db)
@@ -469,7 +498,7 @@ defmodule KomkiCli.LabelStoreTest do
       assert reason =~ ~s(erwartet "person" oder "processing_domain")
     end
 
-    test "Wechsel eines Beobachtertyps verweigert (Typen sind unveraenderlich)", %{
+    test "Wechsel eines Beobachtertyps verweigert (Typen sind unveränderlich)", %{
       db: db,
       seed: seed
     } do
@@ -478,7 +507,7 @@ defmodule KomkiCli.LabelStoreTest do
       seed2 = deep_put(seed, ["observer_types", "nutzende-person"], "processing_domain")
 
       assert {:error, reason} = LabelStore.import_registry(db, seed2)
-      assert reason =~ "Beobachtertyp unveraenderlich"
+      assert reason =~ "Beobachtertyp unveränderlich"
       assert reason =~ "person != processing_domain"
     end
   end

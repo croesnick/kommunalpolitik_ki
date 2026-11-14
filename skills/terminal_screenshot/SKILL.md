@@ -67,6 +67,12 @@ python3 scripts/render_terminal_svg.py capture.txt out.svg "Fenstertitel"
 python3 scripts/check_svg_fidelity.py capture.txt out.svg
 ```
 
+Für ein helles Terminal hängen beide Skripte `hell` an. Damit pi sein helles
+Theme wählt, braucht der tmux-Server vor dem Start einen hellen Hintergrund
+(`tmux set-option -g window-style 'bg=#ffffff,fg=#1f2328'`); pi fragt die
+Hintergrundfarbe ab. Hintergrundfarben zeichnet der Renderer nicht: Ein
+tmux-Popup mit eigenem dunklem Hintergrund gehört deshalb in ein dunkles Bild.
+
 Der Renderer arbeitet zeichenweise mit absoluten x-Koordinaten (8.1px-Raster
 bei 13.5px Font) — dadurch ist das Layout von den Font-Metriken des Betrachters
 unabhängig. Leerraum-Runs über 4 Zeilen werden auf 2 gecroppt (leerer

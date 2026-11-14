@@ -538,7 +538,7 @@ defmodule KomkiPolicy.PropertyTest do
             ) do
         reg = registry()
         ctx = merits_ctx(kind)
-        [remedy] = Remedies.catalog(reg, ctx, kind, [finding_of(code)])
+        [remedy] = Remedies.catalog(reg, ctx, [finding_of(code)])
         types = Enum.map(remedy["transitions"], &Map.fetch!(&1, "type"))
 
         case {code, types} do
@@ -576,7 +576,7 @@ defmodule KomkiPolicy.PropertyTest do
         ctx = merits_ctx(kind)
 
         [remedy] =
-          Remedies.catalog(reg, ctx, kind, [%{"code" => code, "fact" => fact, "binding" => nil}])
+          Remedies.catalog(reg, ctx, [%{"code" => code, "fact" => fact, "binding" => nil}])
 
         refute Enum.any?(remedy["transitions"], &(&1["type"] == "aktionsfreigabe"))
       end
@@ -591,8 +591,136 @@ defmodule KomkiPolicy.PropertyTest do
         checked: ["buergerfall-4711@1", "lizenz-namensnennung@1"],
         rho: ["nutzende-person", "lokale-fallverarbeitung"],
         object_ref: "obj-p@v1",
-        call_hash: "korr-berechnet"
+        call_hash: "korr-berechnet",
+        observers_proven: true
       }
+    end
+  end
+
+  # =====================================================================
+  # store: no GO replaces the recipient test (ticket #417, R.5.7)
+  # =====================================================================
+
+  describe "store: kein GO ersetzt den Empfängertest (#417)" do
+    alias KomkiPolicy.{Calculus, Derive}
+
+    @bindings ["buergerfall-4711@1", "lizenz-namensnennung@1", "nur-start-test@1"]
+
+    # A store decision over generated environments, labels and base facts.
+    # The release of case_release_store_recipient stays valid throughout:
+    # its call hash binds digest, object, operation and workspace, and the
+    # generator changes none of them.
+    property "mit gültigem GO permit genau dann, wenn Empfängertest und Labelerhalt gelten" do
+      reg = registry()
+      base = fixture("case_release_store_recipient/snapshot.json")
+      intent = fixture("case_release_store_recipient/intent.json")
+      release = fixture("case_release_store_recipient/release.json")
+      stand = fixture("case_release_store_recipient/stand.json")
+
+      check all(
+              environment <-
+                StreamData.member_of(["lokale-fallverarbeitung@1", "recherche-webdienst@1"]),
+              labels <- binding_subset(),
+              bw <- binding_subset(),
+              operation_right <- StreamData.boolean(),
+              purpose <- StreamData.member_of(["antwort-fall-4711", "anderer-zweck"]),
+              initial_seed: @seed,
+              max_runs: @max_runs
+            ) do
+        snapshot =
+          base
+          |> put_in(["workspace", "environment"], environment)
+          |> put_in(["workspace", "bindings"], Enum.sort(bw))
+          |> put_in(["object", "labels"], Enum.sort(labels))
+          |> put_in(["facts", "has_operation_right", "value"], operation_right)
+          |> put_in(["facts", "purpose", "value"], purpose)
+
+        rho = Calculus.actual_recipients(reg, environment)
+
+        recipients_ok? =
+          MapSet.subset?(MapSet.new(rho), MapSet.new(Calculus.allowed_recipients(reg, labels)))
+
+        preserved? = Calculus.labels_subset?(bw, labels)
+
+        {:ok, normal} = Derive.decide(reg, snapshot, intent)
+        {:ok, released} = Derive.decide_with_release(reg, snapshot, intent, release, stand)
+
+        assert released["decision"] ==
+                 if(recipients_ok? and preserved?, do: "permit", else: "deny")
+
+        unless recipients_ok? do
+          outside = rho -- Calculus.allowed_recipients(reg, labels)
+
+          for decision <- [normal, released] do
+            blocker = Enum.find(decision["blockers"], &(&1["code"] == "recipient_not_allowed"))
+            assert blocker["recipients_outside"] == outside
+            refute call_go_offered?(decision["remedies"])
+          end
+        end
+      end
+    end
+
+    # Any subset of the fixture bindings, sorted; the empty set included.
+    defp binding_subset do
+      StreamData.map(StreamData.list_of(StreamData.boolean(), length: length(@bindings)), fn
+        flags -> for {binding, true} <- Enum.zip(@bindings, flags), do: binding
+      end)
+    end
+
+    defp call_go_offered?(remedies) do
+      Enum.any?(remedies, fn r ->
+        Enum.any?(r["transitions"], &(&1["type"] == "aktionsfreigabe" and &1["scope"] == "call"))
+      end)
+    end
+  end
+
+  # =====================================================================
+  # store: no GO bridges an unproven observer list (ticket #432,
+  # Gegenprobe 11.15)
+  # =====================================================================
+
+  describe "store: kein GO überbrückt eine unbelegte Beobachterliste (#432)" do
+    alias KomkiPolicy.{Calculus, Derive}
+
+    # The release of case_release_store_observers stays valid throughout:
+    # its call hash binds digest, object, operation and workspace, and the
+    # generator changes none of them. Gegenprobe 11.15: a GO cannot prove
+    # who reads along — only a proven list lets the same GO permit.
+    property "mit gültigem GO permit genau dann, wenn die Beobachterliste belegt ist" do
+      reg = registry()
+      base = fixture("case_release_store_observers/snapshot.json")
+      intent = fixture("case_release_store_observers/intent.json")
+      release = fixture("case_release_store_observers/release.json")
+      stand = fixture("case_release_store_observers/stand.json")
+
+      check all(
+              env_value <- StreamData.member_of([true, false, :missing]),
+              initial_seed: @seed,
+              max_runs: @max_runs
+            ) do
+        facts =
+          case env_value do
+            :missing -> Map.delete(base["facts"], "environment_observers_complete")
+            value -> put_in(base["facts"], ["environment_observers_complete", "value"], value)
+          end
+
+        snapshot = %{base | "facts" => facts}
+
+        {:ok, normal} = Derive.decide(reg, snapshot, intent)
+
+        {:ok, released} = Derive.decide_with_release(reg, snapshot, intent, release, stand)
+
+        assert released["decision"] == if(env_value == true, do: "permit", else: "deny")
+
+        if env_value != true do
+          assert [%{"code" => "recipients_unproven"}] = released["blockers"]
+          assert is_nil(released["release"])
+
+          # The catalog asks nobody for a GO that cannot take effect — the
+          # normal branch keeps the finding as missing evidence instead.
+          refute call_go_offered?(normal["remedies"])
+        end
+      end
     end
   end
 

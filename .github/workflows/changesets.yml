@@ -1,0 +1,63 @@
+# Changeset-Gate (#538, docs/agents/changesets.md): Aendert ein PR lib/ oder
+# priv/ einer Einheit aus knope.toml, muss ein Changeset des PRs sie nennen.
+# Das Label `ohne-changeset` ueberspringt die Pruefung; die Begruendung steht
+# im Pruefbericht. Danach zeigt knope ohne Schreiben, welche Versionen der
+# naechste Version-PR braeuchte, und prueft damit die Changesets mit knope
+# selbst.
+#
+# Laeuft auch bei labeled/unlabeled, damit das Label sofort wirkt. Das Label
+# wird zur Laufzeit gelesen, nicht aus dem Ereignis: `gh pr create --label`
+# setzt es erst nach dem Anlegen, das Ereignis `opened` kennt es noch nicht.
+# Ohne cancel-in-progress: Der Dev-Loop wertet abgebrochene Laeufe als rot.
+
+name: changesets
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: changesets-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Changesets
+    runs-on: ubuntu-latest
+    steps:
+      # Volle Historie: Diff gegen die Basis und knopes Blick auf die Tags.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Erlang/Elixir einrichten
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Changesets pruefen
+        env:
+          BASE: ${{ github.base_ref }}
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh pr view "${PR}" --repo "${GITHUB_REPOSITORY}" --json labels --jq '.labels[].name' | grep -qx ohne-changeset; then
+            echo "Label ohne-changeset gesetzt: Pruefung uebersprungen, Begruendung steht im Pruefbericht."
+          else
+            elixir scripts/changesets.exs check "origin/${BASE}"
+          fi
+
+      - name: knope einrichten
+        uses: knope-dev/action@19617851f9f13ab2f27a05989c55efb18aca3675 # v2.1.2
+        with:
+          version: 0.24.0
+
+      - name: Vorschau des naechsten Version-PR (knope, ohne Schreiben)
+        run: knope prepare-release --dry-run

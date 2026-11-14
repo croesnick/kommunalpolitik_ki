@@ -1,0 +1,7 @@
+{
+  "args": {
+    "top_id": "117643874-999"
+  },
+  "text": "{\"admitted\":false,\"decision\":\"permit\",\"decision_id\":\"pdr-ea095dc5a86f981ad29255150c939bab\",\"emit_decision_id\":\"pdr-ad5c573289fc9eb03adf7628ed70276d\",\"error\":{\"code\":\"not-found\",\"detail\":\"kein TOP mit dieser Kennung\"},\"rule\":\"admit\"}",
+  "tool": "ris_show"
+}

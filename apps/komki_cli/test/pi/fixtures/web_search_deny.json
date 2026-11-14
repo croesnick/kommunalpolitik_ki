@@ -1,0 +1,7 @@
+{
+  "args": {
+    "query": "Bürgerfall 4711 Bahnhofstraße"
+  },
+  "text": "{\"decision\":\"deny\",\"decision_id\":\"pdr-9bd4cc63c3aacd152c3aa7f0086b2c9a\",\"hinweis\":\"Gesperrt: Dieser Aufruf ist in diesem Arbeitsraum nicht zulässig. Ein anderes Werkzeug oder eine umformulierte Anfrage führt nicht zum Ziel, denn die Sperre hängt am Arbeitsraum, nicht an der Formulierung. Versuche es nicht erneut. Sag der nutzenden Person, was gesperrt ist, und nenne die Schritte aus remedies.\",\"registry_id\":\"reg-komki-arbeitsraum\",\"relaxation_authorities\":[],\"remedies\":[{\"binding\":null,\"code\":\"recipient_not_allowed\",\"condition\":null,\"recipients_outside\":[\"brave-search\"],\"transitions\":[{\"required_bindings\":[],\"required_recipients\":[\"brave-search\",\"nutzende-person\",\"pi-agent\"],\"type\":\"neuer_raum\"},{\"call_hash\":\"e57e85f4a582ae65509caecad88a5e88e193df1a493818c204ab3754e9592078\",\"scope\":\"call\",\"type\":\"aktionsfreigabe\"}]}],\"rule\":\"transfer\"}",
+  "tool": "web_search"
+}

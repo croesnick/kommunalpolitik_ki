@@ -8,6 +8,24 @@ defmodule KomkiCli.Llama do
 
       -m <gguf> --host 127.0.0.1 --port <port> --alias local-model
       --jinja --offline --no-webui --no-slots -c <ctx>
+      --reasoning off
+      --spec-type draft-mtp --spec-draft-n-max 4 --model-draft <drafter>
+
+  Thinking aus + MTP-Drafter (Ticket #318, Nutzerentscheidung nach Labbook
+  #285, Folgemessung F4): Der Pin verlor rund 70–80 % seiner Completion-Token
+  ans Thinking, ohne messbaren Qualitätsgewinn; mit beiden Schaltern braucht
+  er für dieselben Aufgaben rund 70 % weniger Zeit bei gleicher Bewertung
+  (blind) und gleicher Ausgabeverteilung (speculative decoding ändert nur
+  das Tempo). Flags nachgeprüft am llama-server-Build 0.7.0 (11669), auf dem
+  alle Läufe des Labbuchs liefen; `--model-draft` zeigt auf die zweite
+  SHA-verifizierte Datei der Instanz (`drafter_path`, Ticket #318).
+
+  Das Labbook mass Thinking aus noch als `--chat-template-kwargs
+  '{"enable_thinking":false}'`. Build 11669 meldet dafuer eine
+  Deprecation-Warnung; seit dem Nutzer-GO vom 31.10.2026 steht hier der
+  benannte Ersatz `--reasoning off`. Gleichwertigkeits-Sonde (gleicher Seed,
+  gleiche Sampling- und MTP-Flags): bytengleiche Antwort, gleiche
+  Completion-Token-Zahl, kein reasoning_content, draft acceptance 0,62.
 
   `--offline` und die Nichtverwendung von `-mu/-hf/-dr` sind Pflicht
   (Quellenbindung: nur das lokale, SHA-verifizierte Artefakt).
@@ -111,7 +129,7 @@ defmodule KomkiCli.Llama do
     end
   end
 
-  @doc "Health-Endpoint pruefen (plain TCP auf Loopback, GET /health)."
+  @doc "Health-Endpoint prüfen (plain TCP auf Loopback, GET /health)."
   @spec health(Config.t()) :: :ok | {:error, String.t()}
   def health(%Config{} = cfg) do
     case http_get_200(port(cfg)) do
@@ -128,11 +146,11 @@ defmodule KomkiCli.Llama do
 
   # ---------------------------------------------------------------- API-Key
 
-  @doc "Pfad der Schluesseldatei (ausserhalb von pi-home, pi liest sie nicht)."
+  @doc "Pfad der Schlüsseldatei (außerhalb von pi-home, pi liest sie nicht)."
   @spec key_path(Config.t()) :: String.t()
   def key_path(cfg), do: Path.join([cfg.base_dir, "tmp", "llama.key"])
 
-  @doc "Neuen Zufallsschluessel schreiben (0600, vor dem Inhalt gesetzt)."
+  @doc "Neuen Zufallsschlüssel schreiben (0600, vor dem Inhalt gesetzt)."
   @spec write_key!(Config.t()) :: String.t()
   def write_key!(cfg) do
     key = 32 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
@@ -144,7 +162,7 @@ defmodule KomkiCli.Llama do
     key
   end
 
-  @doc "Schluessel des laufenden llama-server, falls komki ihn gestartet hat."
+  @doc "Schlüssel des laufenden llama-server, falls komki ihn gestartet hat."
   @spec read_key(Config.t()) :: {:ok, String.t()} | :none
   def read_key(cfg) do
     case File.read(key_path(cfg)) do
@@ -215,6 +233,21 @@ defmodule KomkiCli.Llama do
       "0.95",
       "--top-k",
       "64",
+      # Thinking aus + MTP (Ticket #318, Labbook #285 F4): gleiche Qualität,
+      # ~70 % kürzere Gesamtdauer. --reasoning off schaltet Gemma-4s Denken
+      # in der Chat aus (Nutzer-GO 31.10.2026; Ersatz fuer das im Labbook
+      # gemessene --chat-template-kwargs, siehe Moduledoc-Sonde);
+      # draft-mtp lässt den gepinnten Drafter bis zu vier Token vorschlagen,
+      # das Hauptmodell prüft jeden davon — die Ausgabeverteilung bleibt die
+      # des Hauptmodells.
+      "--reasoning",
+      "off",
+      "--spec-type",
+      "draft-mtp",
+      "--spec-draft-n-max",
+      "4",
+      "--model-draft",
+      cfg.drafter_path,
       "-c",
       to_string(cfg.ctx),
       "--api-key-file",
@@ -264,7 +297,7 @@ defmodule KomkiCli.Llama do
   defp spawn_llama(%Config{} = _cfg),
     do:
       raise(ArgumentError,
-        message: "config unvollstaendig: llama-server-Pfad fehlt (init praeflight)"
+        message: "config unvollständig: llama-server-Pfad fehlt (init praeflight)"
       )
 
   defp wait_health(cfg, pid) do
@@ -292,11 +325,11 @@ defmodule KomkiCli.Llama do
   # Kill-Eskalation TERM→KILL mit Identitaetscheck (Proc.kill_checked).
   defp kill_llama(pid), do: Proc.kill_checked(pid, "llama-server")
 
-  @doc "Prueft, ob pid existiert und als llama-server laeuft (ps-Kontrolle)."
+  @doc "Prüft, ob pid existiert und als llama-server läuft (ps-Kontrolle)."
   @spec llama_alive?(integer()) :: boolean()
   def llama_alive?(pid), do: Proc.pid_alive?(pid, "llama-server")
 
-  @doc "Log-Tail als Einzeiler kontrolliert fuer Fehlermeldungen."
+  @doc "Log-Tail als Einzeiler kontrolliert für Fehlermeldungen."
   @spec log_tail(Config.t(), pos_integer()) :: String.t()
   def log_tail(cfg, lines), do: Proc.log_tail(log_path(cfg), lines)
 

@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/guestmeetings",
+    "query": "client=32",
+    "headers": [["accept", "application/json"]]
+  },
+  "response": {
+    "status": 200,
+    "headers": [["content-type", "application/json"]],
+    "body": "{\"items\":[{\"id\":4711,\"name\":\"x\",\"zustaendigkeit\":\"Beispielamt\",\"meetingdate\":\"2026-10-06T18:00:00\"}]}"
+  }
+}

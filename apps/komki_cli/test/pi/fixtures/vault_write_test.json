@@ -1,0 +1,8 @@
+{
+  "args": {
+    "body": "- Ziel: durchgehender Radweg Bahnhof–Schulzentrum",
+    "title": "Zusammenfassung Radverkehr"
+  },
+  "text": "{\"decision\":\"permit\",\"decision_id\":\"pdr-78df3be9ff7410ffb853711cf10a3f2d\",\"emit_decision_id\":\"pdr-b01074600a8e6288ef2ba52246773678\",\"labels\":[\"ris-oeffentlich@1\",\"vault-oeffentlich@1\",\"web-oeffentlich@1\"],\"note_id\":\"komki-test/Zusammenfassung Radverkehr.md\",\"payload_hash\":\"sha256:b39122ce786e98eb16374655fcefecaf65ebcd4733e6f5109b7a74ee7ebc0f0e\",\"rule\":\"admit\"}",
+  "tool": "vault_write_test"
+}

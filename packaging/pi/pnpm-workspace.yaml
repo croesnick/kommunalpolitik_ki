@@ -1,0 +1,4 @@
+# Flacher node_modules-Baum wie bei npm (keine Symlinks in den pnpm-Store),
+# damit er sich ins Release-Archiv kopieren laesst und komki pi unter
+# lib/node_modules findet.
+nodeLinker: hoisted

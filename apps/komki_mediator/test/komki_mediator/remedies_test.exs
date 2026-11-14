@@ -26,9 +26,11 @@ defmodule KomkiMediator.RemediesTest do
 
   test "deny: Antwort-Katalog ist byte-gleich dem Katalog aus KomkiPolicy.Remedies", %{
     env: env,
-    gamma: gamma,
-    room: room
+    gamma: gamma
   } do
+    env = own_room(env, "doc-vertraulich")
+    room = env.room
+
     response =
       Gate.call(
         env,
@@ -45,7 +47,6 @@ defmodule KomkiMediator.RemediesTest do
       Remedies.catalog(
         gamma.compiled,
         catalog_ctx(gamma, room, "doc-vertraulich"),
-        :admit,
         decision["blockers"]
       )
 
@@ -57,9 +58,11 @@ defmodule KomkiMediator.RemediesTest do
 
   test "indeterminate: Antwort-Katalog ist byte-gleich dem Katalog aus KomkiPolicy.Remedies", %{
     env: env,
-    gamma: gamma,
-    room: room
+    gamma: gamma
   } do
+    env = own_room(env, "doc-pending-freigabe")
+    room = env.room
+
     response =
       Gate.call(
         env,
@@ -76,7 +79,6 @@ defmodule KomkiMediator.RemediesTest do
       Remedies.catalog(
         gamma.compiled,
         catalog_ctx(gamma, room, "doc-pending-freigabe"),
-        :admit,
         decision["missing_evidence"]
       )
 
@@ -92,6 +94,8 @@ defmodule KomkiMediator.RemediesTest do
   test "Ordnung im Katalog: fakt_nachreichen VOR neuer_raum, kein GO am admit-Pfad", %{
     env: env
   } do
+    env = own_room(env, "doc-vertraulich")
+
     response =
       Gate.call(
         env,
@@ -115,6 +119,8 @@ defmodule KomkiMediator.RemediesTest do
   test "indeterminate kennt kein aktionsfreigabe: ein GO stellt keine Belege her", %{
     env: env
   } do
+    env = own_room(env, "doc-pending-freigabe")
+
     response =
       Gate.call(
         env,
@@ -140,20 +146,26 @@ defmodule KomkiMediator.RemediesTest do
     env: env,
     gamma: gamma
   } do
+    # Seit #423 exportiert der Label-Store die strukturierten Befugnisse
+    # (vorher [] fail-closed bis #109): doc-pending-freigabe traegt die
+    # Freigabe-Notiz-Befugnis aus der Vorlage.
     assert gamma.term["bindings"]["doc-pending-freigabe@1"]["relaxation_authorities"] == [
-             "nutzende-person"
+             %{
+               "authority" => "nutzende-person",
+               "restriction" => "operations",
+               "output" => "freigabe-notiz"
+             }
            ]
 
-    # Die kompilierte Form traegt sie bewusst nicht — der Katalog der
-    # Engine kann sie folglich auch nicht tragen.
-    refute Map.has_key?(
-             gamma.compiled.bindings["doc-pending-freigabe@1"],
-             "relaxation_authorities"
-           )
+    # Die kompilierte Form traegt sie als Engine-Feld — sie ist Teil des
+    # Schemas komki-registry/2 (CONTRACT § 2.1), ohne Remedy-Semantik.
+    assert gamma.compiled.bindings["doc-pending-freigabe@1"].relaxation_authorities == [
+             %{authority: "nutzende-person", restriction: "operations", output: "freigabe-notiz"}
+           ]
 
     pending =
       Gate.call(
-        env,
+        own_room(env, "doc-pending-freigabe"),
         "admit_document",
         %{"document_id" => "doc-pending-freigabe"},
         fn -> {:ok, %{"content" => "egal"}} end
@@ -161,12 +173,14 @@ defmodule KomkiMediator.RemediesTest do
 
     vertraulich =
       Gate.call(
-        env,
+        own_room(env, "doc-vertraulich"),
         "admit_document",
         %{"document_id" => "doc-vertraulich"},
         fn -> {:ok, %{"content" => "egal"}} end
       )
 
+    # admit-Ablehnungen nennen nur die Autoritaeten (WER lockern darf),
+    # keine Ausgabearten und keine Ziele.
     assert pending["relaxation_authorities"] == ["nutzende-person"]
     assert vertraulich["relaxation_authorities"] == []
   end
@@ -176,9 +190,16 @@ defmodule KomkiMediator.RemediesTest do
   # bilden (reine Funktion der Entscheidungslage, § 2.8)
   # -----------------------------------------------------------------------
 
+  # Raum, dessen B_W genau die Labels des Dokuments sind: so zeigt die
+  # Engine den Blocker der Dokument-Bindung selbst (seit #213 entscheidet
+  # admit_document gegen B_W).
+  defp own_room(env, document_id) do
+    put_in(env.room.workspace_bindings, env.room.objects[document_id]["labels"])
+  end
+
   defp derive_decision(gamma, room, document_id) do
     {:ok, object} = Room.object_for_call(room, "admit_document", %{"document_id" => document_id})
-    snapshot = Room.snapshot_for(room, gamma, object, "remediestest")
+    snapshot = Room.snapshot_for(room, gamma, object, "remediestest", room.workspace_bindings)
     intent = intent(room, document_id)
     Derive.decide(gamma.compiled, snapshot, intent)
   end
@@ -189,10 +210,11 @@ defmodule KomkiMediator.RemediesTest do
     %{
       rule: :admit,
       object_labels: object.labels,
-      checked: object.labels,
+      checked: room.workspace_bindings,
       rho: Calculus.actual_recipients(gamma.compiled, room.environment),
       object_ref: object.object_id <> "@" <> object.version,
-      call_hash: nil
+      call_hash: nil,
+      observers_proven: true
     }
   end
 

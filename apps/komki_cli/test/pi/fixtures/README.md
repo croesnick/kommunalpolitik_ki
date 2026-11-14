@@ -1,0 +1,25 @@
+# Fixtures für die Anzeige-Extension
+
+Jede Datei ist eine echte Antwort von `KomkiMediator.ConnectorGate.call/3`,
+erzeugt mit den Fake-Connectoren aus der Testumgebung des Vermittlers
+(`FakeConnector`, `TestHelpers`): `tool` und `args` sind der Aufruf, `text` ist
+der JSON-Text, den pi als MCP-Ergebnis bekommt.
+
+Ausnahme: `list_documents*.json` stammen aus `KomkiMediator.Gate.list_documents/1`
+mit dem Default-Raum (`list_documents`) und einem Raum, dessen B_W kein
+Dokument zulässt (`list_documents_leer`).
+
+`vault_write_test_empfaenger.json` stammt aus dem Raum vertraulich mit einem
+nur für den Test erweiterten Γ: Die Umgebung `vault-lokal@1` hat dort den
+zusätzlichen Beobachter `sync-dienst`, wie in
+`KomkiMediator.GoStoreTest` (Ticket #417). Der Default-Γ hat kein solches Ziel.
+
+Die Inhalte sind erfunden (Sitzungen, Titel, Notizen, Treffer). Nur die
+Antwortformen sind echt: zugelassen, abgelehnt (Gate 1 und Gate 2),
+zurückgehalten, Connector nicht erreichbar, nicht gefunden, Vorprüfung
+abgewiesen, keine Treffer.
+
+Ändert der Vermittler eine Antwortform, gehören die betroffenen Fixtures neu
+erzeugt: einen Wegwerf-Test unter `apps/komki_mediator/test/` anlegen, der
+`ConnectorGate.call/3` wie in `connector_gate_test.exs` aufruft und das
+Ergebnis hierher schreibt.

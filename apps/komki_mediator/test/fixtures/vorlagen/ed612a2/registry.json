@@ -1,0 +1,74 @@
+{
+  "bindings": {
+    "doc-oeffentlich@1": {
+      "operations": {
+        "admit": true
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": []
+    },
+    "doc-pending-freigabe@1": {
+      "operations": {
+        "admit": {
+          "eq": [
+            "vertraulich_freigabe",
+            true
+          ]
+        }
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": [
+        "nutzende-person"
+      ]
+    },
+    "doc-vertraulich@1": {
+      "operations": {
+        "admit": {
+          "eq": [
+            "purpose",
+            "vertraulich"
+          ]
+        }
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": []
+    },
+    "mediator-ping@1": {
+      "operations": {
+        "admit": true
+      },
+      "readers": [
+        "nutzende-person",
+        "pi-agent"
+      ],
+      "relaxation_authorities": []
+    }
+  },
+  "environments": {
+    "lokaler-arbeitsraum@1": {
+      "observers": [
+        "nutzende-person",
+        "pi-agent"
+      ]
+    }
+  },
+  "fact_fields": {
+    "purpose": "string",
+    "vertraulich_freigabe": "boolean"
+  },
+  "observers": [
+    "nutzende-person",
+    "pi-agent"
+  ],
+  "registry_id": "reg-komki-arbeitsraum",
+  "schema": "komki-registry/1"
+}

@@ -18,6 +18,11 @@ on:
     branches: [main]
   pull_request:
     branches: ['**']
+  # Den Version-PR (#538) legt versionen.yml mit dem GITHUB_TOKEN an; solche
+  # Pushes starten keine Workflows. versionen.yml startet diese CI deshalb
+  # per workflow_dispatch auf dem Branch `versionen`, damit die Pflicht-Checks
+  # am Head des Version-PR stehen.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -34,6 +39,16 @@ jobs:
       # Empfehlung aus der setup-beam Doku (Oban CI): verhindert
       # Kernel-Tabellenkonflikte auf frischen Linux Runnern.
       ERL_AFLAGS: "-kernel prevent_overlapping_tables false"
+      # exqlite baut im Workspace gegen die SQLCipher-Systembibliothek
+      # (ADR 0004 „Betrieb‟, #435). Die Env-Variablen hier sind die zweite
+      # Schicht neben config :exqlite in den Apps: EXQLITE_USE_SYSTEM als
+      # OS-Variable nimmt exqlite schon vor dem make-Lauf aus dem
+      # vorcompilierte-Artefakte-Pfad, Pfade und Präfix sind der Schritt
+      # „SQLCipher bauen“ weiter unten.
+      EXQLITE_USE_SYSTEM: "1"
+      SQLCIPHER_PREFIX: "/usr/local"
+      EXQLITE_SYSTEM_CFLAGS: "-I/usr/local/include/sqlcipher"
+      EXQLITE_SYSTEM_LDFLAGS: "-L/usr/local/lib -lsqlcipher"
     steps:
       # Volle Historie: der Test-Task braucht einen Base-Commit für
       # --affected (siehe Testschritte).
@@ -42,24 +57,62 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Versionen zentral aus .tool-versions (wie asdf lokal), exakt.
       - name: Erlang/Elixir einrichten
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
-          elixir-version: '1.19.5'
-          otp-version: '28'
+          version-file: .tool-versions
+          version-type: strict
+
+      # SQLCipher aus der Quelle bauen (#435): ubuntu-latest (24.04) liefert
+      # libsqlcipher-dev 4.5.6 OHNE FTS5 — ratsinfos Volltextsuche und der
+      # SQLCipher-Test der App bräuchten es aber. Aus der Quelle mit den
+      # Configure-Flags der Homebrew-Formel gebaut (Stand v4.20.0), hält die
+      # CI auf dem gleichen Stand wie die lokale Entwicklung (brew install
+      # sqlcipher, siehe docs/prerequisites.md). Ein Kaltlauf dauert rund
+      # eine Minute; ein Runner-Pin auf ubuntu-26.04 wäre die Alternative,
+      # hat aber kein setup-beam-Prebuild für OTP 29 und baut Erlang erst
+      # aus der Quelle.
+      - name: SQLCipher bauen (v4.20.0, mit FTS5)
+        run: |
+          sudo apt-get install -y -q libssl-dev
+          git clone --depth 1 --branch v4.20.0 https://github.com/sqlcipher/sqlcipher /tmp/sqlcipher
+          cd /tmp/sqlcipher
+          ./configure \
+            --prefix=/usr/local \
+            --includedir=/usr/local/include/sqlcipher \
+            --disable-tcl \
+            --dll-basename=libsqlcipher \
+            --enable-load-extension \
+            --with-tempstore=yes \
+            CFLAGS="-DSQLITE_HAS_CODEC -DSQLITE_ENABLE_JSON1 -DSQLITE_ENABLE_FTS3 -DSQLITE_ENABLE_FTS3_PARENTHESIS -DSQLITE_ENABLE_FTS5 -DSQLITE_ENABLE_COLUMN_METADATA -DSQLITE_EXTRA_INIT=sqlcipher_extra_init -DSQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown" \
+            LDFLAGS="-lcrypto"
+          make -j"$(nproc)"
+          # Serial wie die Homebrew-Formel (dort ENV.deparallelize um einen
+          # „install: mkdir .../lib: File exists“-Lauf zu vermeiden).
+          sudo make install
+          sudo ldconfig
 
       # Ein Cache-Eintrag für alles: Hex-Pakete und kompilierte Deps liegen
       # unter artifacts/deps, App-Builds und Dialyzer-PLTs unter
-      # apps/*/_build. Key hashed aus beiden Lockdateien und allen mix.exs.
+      # apps/*/_build. Key hashed aus beiden Lockdateien, allen mix.exs und
+      # den Quellen unter apps/*/lib sowie apps/*/config (dort stehen seit
+      # #435 die exqlite-Build-Flags): Ohne den Quellen-Hash gaebe es bei
+      # reinen Code-Aenderungen einen exakten Treffer, und actions/cache
+      # speichert dann nichts. Die inkrementell aktualisierten PLTs (siehe
+      # Dialyzer) gingen verloren, jeder Lauf baute sie neu (#235).
+      # restore-keys: erst gleiche Locks mit anderem Code, dann irgendein
+      # Stand derselben Tool-Versionen.
       - name: Mix- und Build-Cache
-        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.1.0, Node 24
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0, Node 24
         with:
           path: |
             artifacts/deps
             apps/*/_build
-          key: mix-${{ runner.os }}-ex19.5-otp28-${{ hashFiles('workspace.lock', 'apps/workspace.lock', 'mix.exs', 'apps/*/mix.exs') }}
+          key: mix-${{ runner.os }}-${{ hashFiles('.tool-versions') }}-${{ hashFiles('workspace.lock', 'apps/workspace.lock', 'mix.exs', 'apps/*/mix.exs') }}-${{ hashFiles('apps/*/lib/**', 'apps/*/config/**') }}
           restore-keys: |
-            mix-${{ runner.os }}-ex19.5-otp28-
+            mix-${{ runner.os }}-${{ hashFiles('.tool-versions') }}-${{ hashFiles('workspace.lock', 'apps/workspace.lock', 'mix.exs', 'apps/*/mix.exs') }}-
+            mix-${{ runner.os }}-${{ hashFiles('.tool-versions') }}-
 
       # Bootstrap wie in elixir.yml: erst Root-deps.get, denn das holt das
       # workspace-Werkzeug selbst nach artifacts/deps. mix workspace.run
@@ -84,11 +137,30 @@ jobs:
       # Credo strict ueber den Workspace-Dispatch — Ausschlussliste statt
       # Erlaubnisliste: Jede neue App rutscht automatisch in die Credo-Pflicht
       # (Voraussetzung: credo als Dev-Dep); nur ein bewusster Ausschluss
-      # erfordert hier Pflege. ratsprojekte ist bewusst ausgeschlossen:
-      # Sein credo-Lauf schlaegt mit vorbestehenden Funden fehl, dieser PR
-      # heilt keine Altschulden. Lokal verifiziert: 4 Projekte, exit 0.
-      - name: Credo strict (alle Apps, ausser deklarierte Ausnahmen)
-        run: mix workspace.run -t credo --exclude ratsprojekte -- --strict
+      # erfordert hier Pflege. Der fruehere Ausschluss von ratsprojekte ist
+      # mit dem Gerüstwechsel (#435) entfallen: Das frische phx.new-Gerüst
+      # ist strict sauber, die Sonderrolle waere Ausruestung statt Regel.
+      - name: Credo strict (alle Apps)
+        run: mix workspace.run -t credo -- --strict
+
+      # Sobelow fuer die Phoenix-App. Config: apps/ratsprojekte/.sobelow-conf.
+      # --threshold high begrenzt auf High-Confidence-Findings. Das Gerüst
+      # ist fundfrei (CSP gesetzt, zurueckgetragen aus dem alten Bestand,
+      # #435) — der Schritt bleibt rot bei jedem neuen Fund.
+      - name: Sobelow (ratsprojekte)
+        working-directory: apps/ratsprojekte
+        run: mix sobelow --private --threshold high --exit
+
+      # Der Asset-Bau des Gerüsts (Tailwind v4 + esbuild, #435) hat kein
+      # Test-Gate im phx.new-Stand — hier laeuft er sichtbar, damit ein
+      # Renovate-Bump der Asset-Deps (tailwind, esbuild, heroicons, daisyui)
+      # oder der Workspace-NODE_PATHs rot wird statt still zu brechen.
+      # Binaries landen unter apps/ratsprojekte/_build und damit im Cache.
+      - name: Assets bauen (ratsprojekte)
+        working-directory: apps/ratsprojekte
+        run: |
+          mix assets.setup
+          mix assets.build
 
       # Tests ueber den Workspace, ohne --cover. Abweichung von AGENTS.md
       # ("-- --cover"): Mix' Default-Schwellwert fuer Coverage ist 90 %.
@@ -109,9 +181,28 @@ jobs:
         if: github.event_name == 'pull_request'
         run: mix workspace.run -t test --affected --base origin/main
 
-      - name: Tests (push auf main)
-        if: github.event_name == 'push'
+      - name: Tests (push auf main, Version-PR)
+        if: github.event_name != 'pull_request'
         run: mix workspace.run -t test
+
+      # Dev-Loop (#389): Entscheidungslogik (Auswahl, Merge-Regel, geschützte
+      # Pfade inkl. Abgleich mit docs/agents/ai-tiers.md) und der Viewer für
+      # herdr (braucht jq, auf ubuntu-latest vorinstalliert).
+      - name: Tests (Dev-Loop)
+        run: for t in scripts/dev_loop/test/*_test.exs; do elixir "$t" || exit 1; done
+
+      # Changesets (#538): Regeln von Gate und Kaskade (scripts/changesets.exs).
+      - name: Tests (Changesets)
+        run: for t in scripts/changesets/test/*_test.exs; do elixir "$t" || exit 1; done
+
+      # Screenshot-Werkzeug (#510): Muster der Aufnahmen und Text des Seatbelt-Profils.
+      # Ob macOS das Profil durchsetzt, misst `elixir scripts/screenshot.exs --probe`.
+      - name: Tests (Screenshot-Werkzeug)
+        run: for t in scripts/screenshot/test/*_test.exs; do elixir "$t" || exit 1; done
+
+      # Hooks interaktiver Sessions (#462): Stop-Gates und Prüfbericht vor gh pr create.
+      - name: Tests (Hooks)
+        run: elixir .claude/hooks/test/hooks_test.exs
 
       # Coverage-Gate fuer komki_policy (Schwellwert: apps/komki_policy/
       # mix.exs). Zeilendeckung ist hier Sekundaermetrik; die Orakel-
@@ -128,14 +219,40 @@ jobs:
       # Umbrella-Child-Bootstrap, der auf frischem Runner ebenfalls
       # crasht (dialyxir haelt die App fuer ein Umbrella-Child, weil das
       # Lockfile "../workspace.lock" heisst). Apps mit Dialyzer-Pflicht:
-      # komki_policy und komki_cli.
+      # komki_policy, komki_cli, Vermittler, Connector-Bibliothek, Egress,
+      # die drei Connectoren, die Seatbelt-, die Sidecar- und die
+      # Sealed-Envelope-Library und die Mock-Runtime.
+      #
+      # Veraltete Deps-PLTs: Die Pfad-Abhaengigkeiten (komki_connector,
+      # komki_policy, ...) stehen im Deps-PLT der App. dialyxir prueft das
+      # PLT von sich aus nur, wenn sich Lockdatei oder App-Liste aendern; ein
+      # aus dem Cache geholtes PLT kannte so eine neue Funktion in
+      # komki_connector nicht und meldete call_to_missing (PR #223).
+      # --force-check prueft das PLT bei jedem Lauf gegen den aktuellen
+      # Build (dialyxir 1.4.7, Dialyxir.Plt.check_beams/3): geaenderte Module
+      # werden neu analysiert, neue hinzugefuegt, verschwundene entfernt.
+      # Das ersetzt den frueheren Komplett-Neubau aller Deps-PLTs bei jeder
+      # Code-Aenderung (#235).
       - name: Dialyzer (komki_policy)
         working-directory: apps/komki_policy
-        run: mix dialyzer
+        run: mix dialyzer --force-check
 
       - name: Dialyzer (komki_cli)
         working-directory: apps/komki_cli
-        run: mix dialyzer
+        run: mix dialyzer --force-check
+
+      - name: Dialyzer (seatbelt)
+        working-directory: apps/seatbelt
+        run: mix dialyzer --force-check
+
+      - name: Dialyzer (Vermittler, Connectoren, Egress, Sidecar, Sealed Envelope, Mock-Runtime)
+        run: |
+          set -e
+          for app in komki_mediator komki_connector komki_egress komki_connector_ris komki_connector_web komki_connector_vault komki_connector_documents sidecar sealed_envelope komki_mock; do
+            echo "::group::dialyzer $app"
+            (cd "apps/$app" && mix dialyzer --force-check)
+            echo "::endgroup::"
+          done
 
       # Stärkster Akzeptanzschritt: frischer Checkout, escript Build, alle
       # Kommandopfade mit erwarteten Exit-Codes (decide permit/deny/
@@ -143,3 +260,26 @@ jobs:
       # Skript bei Abweichung laut ab. Abnahme-Referenz: priv/demo.sh
       - name: Demo (komki-policy Akzeptanz)
         run: bash apps/komki_policy/priv/demo.sh
+
+  # Anzeige-Extension fuer pi (apps/komki_cli/priv/pi/komki-anzeige): reine
+  # Node-Tests ohne Abhaengigkeiten, node 24 fuehrt TypeScript direkt aus.
+  # Node-Version zentral aus .tool-versions (wie in pages.yml).
+  anzeige:
+    name: komki-anzeige (Node-Tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Node-Version aus .tool-versions lesen
+        id: node
+        run: |
+          version="$(awk '$1 == "nodejs" { print $2; exit }' .tool-versions)"
+          if [ -z "$version" ]; then
+            >&2 echo "Keine nodejs-Zeile in .tool-versions gefunden."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+      - name: Node-Tests
+        run: node --test apps/komki_cli/test/pi/*.test.ts

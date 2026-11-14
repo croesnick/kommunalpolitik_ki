@@ -23,7 +23,7 @@ defmodule KomkiCli.TerminalTest do
     assert Terminal.sanitize("ok\e]52;c;abc") == "ok"
   end
 
-  test "C1-Steuerzeichen und ungueltiges UTF-8 tragen keine Sequenz" do
+  test "C1-Steuerzeichen und ungültiges UTF-8 tragen keine Sequenz" do
     assert Terminal.sanitize("a\u009B31mb") == "a31mb"
     refute Terminal.sanitize(<<"a", 0x9B, "b">>) =~ <<0x9B>>
   end

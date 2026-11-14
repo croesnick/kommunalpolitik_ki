@@ -13,9 +13,9 @@ description: >
   Stadtrat", "Ich brauche einen Bericht für den Stammtisch / die
   Fraktionssitzung / den Vorstand", "Was ist seit dem letzten Bericht
   passiert?", "Fasse die letzten Ausschüsse zusammen", "Was gab es seit X
-  im Stadtrat?". Der Skill endet mit der Berichtsnotiz im Vault. Keine
-  Anträge, keine Positionen, keine Öffentlichkeitsarbeit — Anträge macht der
-  Skill `antrag_generieren`, Öffentlichkeitsarbeit ist WF 10.
+  im Stadtrat?". Der Skill endet mit der Berichtsnotiz im Vault, geschrieben
+  erst nach GO mit Vorschau. Keine Anträge, keine Positionen, keine Öffentlichkeitsarbeit —
+  Anträge macht der Skill `antrag_generieren`, Öffentlichkeitsarbeit ist WF 10.
 ---
 
 # Bericht aus dem Stadtrat Skill
@@ -230,8 +230,9 @@ lesen. AZ-Artikel sind Belege, nicht Hauptinhalt.
 
 ### 8. Zusammenfassung in den Vault schreiben
 
-Die Berichtsnotiz wird über die `obsidian`-CLI direkt in den Vault
-geschrieben. Ziel-Pfad:
+Die Berichtsnotiz wird erst nach einem GO über die `obsidian`-CLI in den
+Vault geschrieben. Ablauf: Bericht in eine Temp-Datei, YAML-Check (Schritt 9),
+GO mit Vorschau, Schreiben, Nachprüfung. Ziel-Pfad:
 
 ```
 1 - Projects/Stadtrat Buchloe/Berichte/<YYYY-MM-DD> Bericht aus dem Stadtrat.md
@@ -241,30 +242,22 @@ Beispiel: `1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Sta
 
 `<YYYY-MM-DD>` = Datum des anstehenden Termins.
 
-**Ordner sicherstellen** (falls noch nicht vorhanden):
+**Existenz prüfen** (vor der Vorschau, lesend): Gibt es die Datei schon, kommt
+das Überschreiben in die Vorschau; Alternative ist ein Suffix `_v2`.
+
+**GO einholen:** Zielpfad und Gliederung zeigen; bei existierender Datei
+ausdrücklich auf das Überschreiben hinweisen. Ohne GO kein Write — das gilt
+auch für das Neuanlegen und für den Ordner `Berichte`.
+
+**Nach dem GO: Ordner anlegen und die geprüfte Temp-Datei übernehmen**
+(derselbe Befehl wie in `sitzungsvorbereitung` Schritt 5):
 
 ```bash
-obsidian vault="<vault-name>" eval code="require('fs').mkdirSync('1 - Projects/Stadtrat Buchloe/Berichte', { recursive: true })"
+obsidian vault="<vault-name>" eval code="app.vault.adapter.mkdir('1 - Projects/Stadtrat Buchloe/Berichte').then(() => app.vault.adapter.write('1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Stadtrat.md', require('fs').readFileSync('<temp-datei>', 'utf8')))"
 ```
 
-**Datei schreiben** — zwei Varianten:
-
-Variante A (Empfehlung, wenn der Inhalt sauber übergeben werden kann):
-
-```bash
-obsidian vault="<vault-name>" create path="1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Stadtrat.md" content="..."
-```
-
-Dabei Newlines im Content als `\n` kodieren.
-
-Variante B (für mehrzeilige Inhalte robuster):
-
-```bash
-obsidian vault="<vault-name>" eval code="app.vault.create('1 - Projects/Stadtrat Buchloe/Berichte/2026-07-16 Bericht aus dem Stadtrat.md', `<inhalt-mit-backticks>`)"
-```
-
-Vor dem Schreiben prüfen, ob die Datei bereits existiert — ggf. überschreiben
-(nur nach Bestätigung, siehe GO-Prinzip) oder mit Suffix `_v2` anlegen.
+So landet genau die geprüfte und vorgezeigte Datei im Vault; `adapter.write`
+überschreibt eine bestehende Datei, aber nur mit dem GO.
 
 ### YAML-Frontmatter: Quoting-Regel
 
@@ -299,10 +292,10 @@ Ausnahme: Wenn ein Wert ein `'` (Apostroph) enthält, entweder mit
 Double-Quotes wrappen (wenn der Wert sonst keine `"` hat) oder das `'`
 verdoppeln: `'It''s a test'`.
 
-### 9. Validierung nach dem Vault-Write
+### 9. Validierung vor dem Vault-Write und Nachprüfung
 
-Nach jedem Schreiben der Berichtsnotiz **muss** das Frontmatter
-re-validiert werden. Falls das YAML kaputt ist: nicht still weitermachen,
+Vor dem GO **muss** das Frontmatter der Temp-Datei validiert werden, nach
+dem Schreiben die Notiz im Vault noch einmal. Falls das YAML kaputt ist: nicht still weitermachen,
 sondern Fehler melden und fixen.
 
 ```bash
@@ -327,8 +320,11 @@ except yaml.YAMLError as e:
 Praxis-Workflow:
 1. Bericht in eine Temp-Datei schreiben
 2. YAML validieren (obiger Check)
-3. Bei OK: Temp-Datei in den Vault übernehmen (`obsidian eval` + `adapter.write`)
-4. Bei Fehler: Quoting fixen, wieder von vorne
+3. Bei Fehler: Quoting fixen, wieder von vorne
+4. Bei OK: GO mit Vorschau einholen (Schritt 8). Ohne GO kein Write.
+5. Nach GO: Ordner `Berichte` anlegen und Temp-Datei in den Vault übernehmen
+   (`obsidian eval` + `adapter.write`)
+6. Nachprüfung: Frontmatter der geschriebenen Notiz erneut validieren
 
 Dieser Check eliminiert eine ganze Bug-Klasse (siehe "Lücke" in
 `sitzungsvorbereitung` / WF 1).
@@ -415,15 +411,16 @@ Der Bericht ist ein **Vorschlag**. Die KI sammelt (Sitzungen, TOPs, AZ,
 Vault-Notizen), strukturiert thematisch und schlägt Diskussionsthemen vor.
 Der Stadtrat entscheidet, was er daraus macht.
 
-**Schreiben der Berichtsnotiz im Vault:** Die Notiz ist eine
-Vorbereitungsunterlage für den Termin, kein entscheidender Eingriff in
-ratsprojekte oder den RIS-Bestand. Daher ist **kein GO nötig fürs
-Schreiben der Berichtsnotiz** — die KI darf sie direkt im Vault erstellen
-(analog `sitzungsvorbereitung`).
+**Schreiben der Berichtsnotiz im Vault:** Jeder Vault-Write geschieht
+nur nach GO mit Vorschau (Zielpfad und Gliederung, bei existierender Datei
+mit ausdrücklichem Hinweis aufs Überschreiben) — auch beim Neuanlegen,
+wie in `sitzungsvorbereitung`. **Ohne GO kein Write.**
 
-**Aber — GO erforderlich für:**
+**GO erforderlich für:**
 
-- Überschreiben einer bereits existierenden Berichtsnotiz (vorher fragen)
+- Jedes Schreiben der Berichtsnotiz in den Vault, auch das Neuanlegen
+- Überschreiben einer bereits existierenden Berichtsnotiz (ausdrücklich
+  in der Vorschau benennen)
 - Anträge, Positionen oder politische Forderungen (sind nicht Teil des
   Berichts, siehe Abgrenzung)
 - Jede schreibende Aktion in ratsprojekte (`propose_*`, `decide_proposal`)
@@ -454,6 +451,11 @@ Skill kennzeichnet die Quellentypen konsistent (siehe §6 `AGENTS.md` und
   ausführen.
 - **Ohne bestätigte Quelle:** als "nicht belegt" kennzeichnen, nicht
   verschweigen.
+- **Beschlüsse und Vorlagen nicht verschärfen:** Verben, Rollen und
+  Gewissheit wie im RIS. „Empfiehlt dem Rat“ ist kein Beschluss, „zur
+  Haushaltsplanung melden“ ist keine Aufnahme in den Haushalt, „kann
+  gefördert werden“ ist keine Zusage. Das lokale Modell verschärft so
+  etwas häufig (Labbook `docs/research/2026-10-31-modell-ab.md`).
 
 ## Komposition mit anderen Skills
 
@@ -472,7 +474,8 @@ automatisch ohne GO.
 | Lebenszyklus-Referenz | [`docs/ratsprojekte-lifecycle.md`](../../docs/ratsprojekte-lifecycle.md) | Bei Status-Übergängen / Gates, falls Projekte erwähnt werden |
 | Öffentlichkeitsarbeit (Vorbericht/Nachbericht aus dem Bericht) | WF 10 Skill (folgt) | Nur auf GO — der Bericht ist intern, nicht für Kanäle |
 
-Der Skill endet immer mit der fertigen Berichtsnotiz im Vault und ggf.
+Der Skill endet mit der fertigen Berichtsnotiz im Vault (geschrieben nach
+GO mit Vorschau; ohne GO bleibt sie in der Temp-Datei) und ggf.
 Vorschlägen aus dieser Tabelle — der GO für Folgeschritte liegt bei der
 nutzenden Person.
 
@@ -485,7 +488,7 @@ nutzenden Person.
 | 3 | Keine persistente Liste der Bericht-Termine/Stichtage im Vault | Termine müssen jedes Mal gesucht/erfragt werden | Zukünftig: eigener Bericht-Kalender im Vault (Notiz-Tabelle) oder in Nextcloud (WF 9, `nc_calendar_list_events`) |
 | 4 | Kein automatischer Zeitraum-Filter in `ratsinfo sessions` | CLI listet alle Sitzungen, Filterung nach Datum manuell | KI filtert die Ausgabe von `ratsinfo sessions` gegen `zeitraum_von`/`heute` |
 | 5 | Kein automatisches Themen-Clustering | TOPs werden chronologisch gelistet, thematische Bündelung muss ad-hoc passieren | KI clustert manuell nach Schwerpunkten (Klima, Mobilität, Bauen, etc.) |
-| 6 | YAML-Frontmatter kann durch externe Strings (deutsche Anführungszeichen in AZ-Titeln) brechen | Properties in Obsidian nicht sichtbar / kaputt | Single-Quotes für alle YAML-Strings mit externem Text; YAML nach Vault-Write re-validieren (siehe "Validierung nach dem Vault-Write") |
+| 6 | YAML-Frontmatter kann durch externe Strings (deutsche Anführungszeichen in AZ-Titeln) brechen | Properties in Obsidian nicht sichtbar / kaputt | Single-Quotes für alle YAML-Strings mit externem Text; YAML der Temp-Datei vor dem GO validieren, nach dem Write nachprüfen (siehe "Validierung vor dem Vault-Write und Nachprüfung") |
 
 Siehe auch [`docs/workflows.md`](../../docs/workflows.md) WF 11 "Lücken"
 für die strategische Einordnung.

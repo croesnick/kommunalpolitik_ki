@@ -2,6 +2,8 @@ defmodule KomkiCli.CLITest do
   # KOMKI_HOME ist eine globale Umgebung; keine parallelen Module (Race).
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureIO
+
   alias KomkiCli.{CLI, TestSupport}
 
   setup do
@@ -58,6 +60,21 @@ defmodule KomkiCli.CLITest do
       assert out =~ "komki "
     end
 
+    # Ticket #318: --drafter-from ist das Pendant zu --gguf-from (vorhandene
+    # Drafter-Datei statt Download).
+    test "setup/init --help nennen --drafter-from" do
+      {setup_out, 0} = CLI.run(["setup", "--help"])
+      assert setup_out =~ "--drafter-from"
+
+      {init_out, 0} = CLI.run(["init", "--help"])
+      assert init_out =~ "--drafter-from"
+    end
+
+    test "run --help nennt --capture-denials" do
+      {out, 0} = CLI.run(["run", "--help"])
+      assert out =~ "--capture-denials"
+    end
+
     test "--help druckt usage inkl. session (kein stummes 0)" do
       {out, 0} = CLI.run(["--help"])
       assert out =~ "USAGE:"
@@ -71,8 +88,13 @@ defmodule KomkiCli.CLITest do
       assert out =~ "config"
     end
 
-    test "session-chain ohne config verweigert (Exit 2)" do
+    test "session-chain ohne --base verweigert (Exit 2, Ticket #251)" do
       {out, 2} = CLI.run(["session-chain"])
+      assert out =~ "ohne --base"
+    end
+
+    test "session-chain ohne config verweigert (Exit 2)" do
+      {out, 2} = CLI.run(["session-chain", "--base", System.get_env("KOMKI_HOME")])
       assert out =~ "config"
     end
   end
@@ -148,6 +170,55 @@ defmodule KomkiCli.CLITest do
 
       refute out =~ "\e["
       assert out =~ "unrecognized arguments"
+    end
+  end
+
+  describe "Denial-Status → Exit-Code (fail-closed)" do
+    test "ok und nil sind 0, jeder Fehlerstatus ist 4" do
+      assert CLI.run_exit_code(nil) == 0
+      assert CLI.run_exit_code(%{status: "ok"}) == 0
+
+      for status <- ~w(capture_error write_error timeout unavailable unparseable) do
+        assert CLI.run_exit_code(%{status: status}) == 4, status
+      end
+    end
+
+    test "stdout bleibt pi-Ausgabe, Footer geht auf stderr und enthaelt keinen Username" do
+      summary = %{
+        status: "capture_error",
+        denials: [],
+        report_path: nil,
+        error: "log fehlt"
+      }
+
+      stderr =
+        capture_io(:stderr, fn ->
+          assert {"scratch: /tmp/komki\npi antwort\n", 4} =
+                   CLI.render_result({:run_ok, "/tmp/komki", "pi antwort", summary})
+        end)
+
+      assert stderr =~ "denials: capture FAILED (log fehlt); no report"
+      refute stderr =~ System.user_home!()
+    end
+
+    test "ok-Footer nennt den relativen Berichtspfad ohne Username" do
+      summary = %{
+        status: "ok",
+        denials: [
+          %{operation: "file-read-data", target: "<scratch>/<redacted>", occurrences: 1}
+        ],
+        report_path: "denials/20261017T211507.000000Z-abcdef123456.json",
+        error: nil
+      }
+
+      stderr =
+        capture_io(:stderr, fn ->
+          assert {_stdout, 0} =
+                   CLI.render_result({:run_ok, "/tmp/komki", "pi antwort", summary})
+        end)
+
+      assert stderr =~ "report: denials/"
+      refute stderr =~ System.user_home!()
     end
   end
 end

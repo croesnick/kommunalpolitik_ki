@@ -1,0 +1,7 @@
+{
+  "args": {
+    "text": "Radverkehr"
+  },
+  "text": "{\"decision\":\"permit\",\"decision_id\":\"pdr-7e065ccd36bc4b71249599381ba8acd1\",\"emit_decision_id\":\"pdr-eadc858374af9068e45e65450b6a2a15\",\"labels\":[\"vault-oeffentlich@1\"],\"payload_hash\":\"sha256:9532d3d91de7cbd3791a54de4571b8cbf8ecd4061ba266306cd2c666c4572138\",\"results\":[{\"labels\":[\"vault-oeffentlich@1\"],\"note_id\":\"Projekte/Verkehr/Radverkehrskonzept.md\",\"title\":\"Radverkehrskonzept Buchloe\"},{\"labels\":[\"vault-oeffentlich@1\"],\"note_id\":\"Sitzungen/2026-09-17 Bauausschuss.md\",\"title\":\"Bauausschuss 17.09.2026\"}],\"rule\":\"admit\"}",
+  "tool": "vault_search"
+}

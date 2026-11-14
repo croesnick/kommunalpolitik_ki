@@ -1,60 +1,359 @@
 defmodule KomkiMediator.Templates do
   @moduledoc """
   Default-Raumaufstellung als Elixir-Maps: Registry (Gamma), Raum und die
-  drei Beispieldokumente. Ausgegeben wird ueber `KomkiPolicy.JSON.canonical`
+  drei Beispieldokumente. Die Registry traegt zusaetzlich die
+  Γ-Konventionen des Connector-Vertrags §7 (Beobachter, Umgebungen,
+  Connector-Bindungen, Fakt `output_content_digest`); der Default-Raum ist
+  der Referenzraum **recherche**. Ausgegeben wird ueber `KomkiPolicy.JSON.canonical`
   — der Provisionierungs-Output ist damit von Haus aus kanonisch.
 
   provision!/1 ist idempotent: sobald `registry.json` existiert, wird
-  NICHTS mehr ueberschrieben — ein nachtraeglich redigierter Raum bleibt
-  genau so, wie die nutzende Person ihn hinterlassen hat.
+  nichts ueberschrieben, was die nutzende Person veraendert haben koennte.
+  Einzige Ausnahme (Ticket #177): Ist `registry.json` oder `room.json`
+  byte-genau eine fruehere Fassung dieser Vorlagen (SHA-256 in
+  `@outdated`), ersetzt provision!/1 diese Datei durch die aktuelle. Seit
+  #208 entscheidet das je Datei: `registry.json` ist der Export des
+  Label-Store (`label_store_seed/0`), `komki up` schreibt ihn vor dem Start. Eine Sicherung
+  entfaellt bewusst: der Inhalt einer unveraenderten Vorlage steht
+  vollstaendig im Git-Verlauf, und das Seatbelt-Profil des Vermittlers
+  erlaubt nur genau diese beiden Dateinamen.
+
+  Pflege: Wer `label_store_seed/0` oder `room/0` aendert, traegt die bisherigen
+  Hashes aus `@current` in `@outdated` ein und setzt `@current` neu; ein
+  Test haelt `@current` an den tatsaechlichen Vorlagen fest.
   """
 
   alias KomkiPolicy.JSON
 
   @mediator_dir "mediator"
 
-  @doc "Registry-Term des Default-Arbeitsraums (Gamma der Aufstellung)."
-  def registry do
+  # SHA-256 der kanonischen Vorlagen. @outdated: fruehere Fassungen auf main
+  # (#106 und #107 fuer die Registry, beide mit demselben Raum; #134 nur
+  # fuer den Raum; 8dc75f9 vor #213 fuer beide).
+  @current %{
+    "registry.json" => "7524cca748ac4f580d5385c4ff68cb182bd6b4a92915382244bfbe597c37c140",
+    "room.json" => "8bb7a156134d43ebd4cc0027fc66ec27c26e00ae696d0d65f83b8ad8c9d57469"
+  }
+  @outdated %{
+    "registry.json" => [
+      "fed48d30194094c6e84be239ef40bf74be88457b1aaec09cb3dce8b5bb090e4f",
+      "d2b6a4e987036711a517a31dc40368dea82f7136b4213fbf9614cf290ba6d22f",
+      # bis #208: Lockerungsbefugnis von doc-pending-freigabe in Engine-Form
+      "38e86ed685b8887ddac4eb1976873b105fb1f272ce6c8ff67ac806370c8ecdf7",
+      # 8dc75f9: vor #213 (ohne doc-oeffentlich@2)
+      "2c7391d3c63e5e06a1910372cb8632026f35f288f750cd3d87b2195db575d835",
+      # before #298: bindings without a transfer rule
+      "038a1756f2be26e6a13b844e802d15afbb6b9d65fc5b05a19ffb168066ffcc62",
+      # vor #423: ohne Fraktionsraum-Welt, Lockerungsbefugnisse exportiert als []
+      "9d06e591083615071f4386298ddb1e62e9d6f2fc20388a21741fc9bab07d55e0"
+    ],
+    "room.json" => [
+      "127831a737e7f5565d8def234c260ca270056b8954b346725f03ef638ef0b51f",
+      # 05b9b2d: Objekte noch ohne Typ (vor #134)
+      "4b3ac34dc5ac6a81ea5cb81178cd1fea9f0045e753a079823aab98f6ea45fe32",
+      # 8dc75f9: vor #213 (Dokument-Label nicht in B_W)
+      "e16da13d5a89a0cf48204c24a3e2ef5c5b13a4fa778949dc6a76fa2e89729298"
+    ]
+  }
+
+  @observers [
+    "brave-search",
+    "fraktion",
+    "nextcloud-betreiber",
+    "nutzende-person",
+    "pi-agent",
+    "ris-betreiber",
+    "sicherung",
+    "vorstand"
+  ]
+
+  # Beobachtertypen (Label-Store, R.2.5): nur eine Person darf
+  # klassifizieren; Agent und Empfaenger sind Verarbeitungsdomaenen.
+  # Fraktion und Vorstand sind Personengruppen (Szenario, Beobachtertabelle);
+  # der Bestand des Hubs liest sie mit (ADR 0004, Szene 11). Die Sicherung
+  # ist Time Machine (ADR 0004, lokaler Betrieb), der nextcloud-betreiber
+  # ist der Weg des Stands.
+  @observer_types %{
+    "brave-search" => "processing_domain",
+    "fraktion" => "person",
+    "nextcloud-betreiber" => "processing_domain",
+    "nutzende-person" => "person",
+    "pi-agent" => "processing_domain",
+    "ris-betreiber" => "processing_domain",
+    "sicherung" => "processing_domain",
+    "vorstand" => "person"
+  }
+
+  # Beobachter der Umgebung ratsprojekte-bestand@1: der gemeinsam gebundene
+  # Bestand des Hubs (ADR 0004, Szene 11) — die nutzende Person, der Agent,
+  # Fraktion und Vorstand, der Betreiber der Nextcloud als Weg des Stands
+  # und die Sicherung (Time Machine).
+  @hub_observers [
+    "fraktion",
+    "nextcloud-betreiber",
+    "nutzende-person",
+    "pi-agent",
+    "sicherung",
+    "vorstand"
+  ]
+
+  # Befugnis fuer gegengelesene Essenz an ratsprojekte (Szene 13, #423):
+  # Miriam darf den Empfaengerkreis dieser Bindungen fuer genau diese
+  # Ausgabeart lockern (R.2.2, R.5.7).
+  @essenz_befugnis [
     %{
-      "schema" => "komki-registry/2",
+      "authority" => "nutzende-person",
+      "restriction" => "readers",
+      "output" => "ratsprojekte-essenz"
+    }
+  ]
+
+  @doc """
+  Vorlage des Arbeitsraums in Store-Form `komki-label-store/2` (Ticket
+  #208): die eine Quelle fuer Γ. `komki setup` und `komki up` importieren
+  sie in den Label-Store; `<base>/mediator/registry.json` ist dessen
+  Export. `registry/0` ist die Projektion dieses Seeds und damit genau das,
+  was der Export liefert.
+  """
+  @spec label_store_seed() :: map()
+  def label_store_seed do
+    %{
+      "schema" => "komki-label-store/2",
       "registry_id" => "reg-komki-arbeitsraum",
-      "observers" => ["nutzende-person", "pi-agent"],
+      "observers" => @observers,
+      "observer_types" => @observer_types,
       "fact_fields" => %{
+        "output_content_digest" => "string",
         "purpose" => "string",
         "vertraulich_freigabe" => "boolean"
       },
       "environments" => %{
-        "lokaler-arbeitsraum@1" => %{"observers" => ["nutzende-person", "pi-agent"]}
+        "lokaler-arbeitsraum@1" => %{"observers" => ["nutzende-person", "pi-agent"]},
+        "ratsprojekte-bestand@1" => %{"observers" => @hub_observers},
+        "ris-abruf@1" => %{"observers" => ["nutzende-person", "pi-agent", "ris-betreiber"]},
+        "vault-lokal@1" => %{"observers" => ["nutzende-person", "pi-agent"]},
+        "web-suche@1" => %{"observers" => ["brave-search", "nutzende-person", "pi-agent"]}
       },
-      "bindings" => %{
-        "mediator-ping@1" => %{
-          "readers" => ["nutzende-person", "pi-agent"],
-          "operations" => %{"admit" => true},
-          "relaxation_authorities" => []
-        },
-        "doc-oeffentlich@1" => %{
-          "readers" => ["nutzende-person", "pi-agent"],
-          "operations" => %{"admit" => true},
-          "relaxation_authorities" => []
-        },
-        "doc-vertraulich@1" => %{
-          "readers" => ["nutzende-person", "pi-agent"],
-          "operations" => %{"admit" => %{"eq" => ["purpose", "vertraulich"]}},
-          "relaxation_authorities" => []
-        },
-        "doc-pending-freigabe@1" => %{
-          "readers" => ["nutzende-person", "pi-agent"],
-          "operations" => %{"admit" => %{"eq" => ["vertraulich_freigabe", true]}},
-          "relaxation_authorities" => ["nutzende-person"]
-        }
-      }
+      "bindings" =>
+        Map.merge(connector_bindings(), %{
+          "mediator-ping@1" =>
+            binding("Liveness-Probe des Vermittlers", ["nutzende-person", "pi-agent"], %{
+              "admit" => true
+            }),
+          "doc-oeffentlich@1" =>
+            binding("Öffentliches Raumdokument", ["nutzende-person", "pi-agent"], %{
+              "admit" => true
+            }),
+          # Seit #213 steht das Dokument-Label in B_W und gilt damit fuer
+          # jede Operation des Raums. Mit Empfaengerkreis und Operationen
+          # von @1 sperrte das in recherche RIS und Websuche; Bindungen sind
+          # unveraenderlich (R.2.1), darum eine neue Fassung, offen wie die
+          # oeffentlichen Connector-Bindungen.
+          "doc-oeffentlich@2" =>
+            binding("Öffentliches Raumdokument", @observers, %{
+              "admit" => true,
+              "emit" => true,
+              "transfer" => true
+            }),
+          "doc-vertraulich@1" =>
+            binding("Vertrauliches Raumdokument", ["nutzende-person", "pi-agent"], %{
+              "admit" => %{"eq" => ["purpose", "vertraulich"]}
+            }),
+          "doc-pending-freigabe@1" =>
+            "Raumdokument in Freigabe-Pause"
+            |> binding(["nutzende-person", "pi-agent"], %{
+              "admit" => %{"eq" => ["vertraulich_freigabe", true]}
+            })
+            |> Map.put("relaxation_authorities", [
+              %{
+                "authority" => "nutzende-person",
+                "restriction" => "operations",
+                "output" => "freigabe-notiz"
+              }
+            ]),
+          # Fraktionsraum (Szenario, Bindungstabelle): interne
+          # Fraktionsarbeit. Miriam, pi-agent, Fraktion und der
+          # nextcloud-betreiber (Fraktionsordner) lesen mit — der Vorstand
+          # fehlt bewusst (ADR 0004, verworfene Option fraktion-intern@2).
+          # Die Befugnis erlaubt Miriam die gegengelesene Essenz an
+          # ratsprojekte (Szene 13, #423); fuer konkrete Rechercheauftraege
+          # entscheidet #354.
+          "fraktion-intern@1" =>
+            binding(
+              "Interne Fraktionsarbeit",
+              ["fraktion", "nextcloud-betreiber", "nutzende-person", "pi-agent"],
+              %{"admit" => true, "emit" => true, "transfer" => true},
+              %{"relaxation_authorities" => @essenz_befugnis}
+            ),
+          "fraktionsprojekt-radweg@1" =>
+            binding(
+              "Die Projektidee selbst",
+              ["fraktion", "nextcloud-betreiber", "nutzende-person", "pi-agent"],
+              %{"admit" => true, "emit" => true, "transfer" => true},
+              %{"relaxation_authorities" => @essenz_befugnis}
+            ),
+          # Nichtoeffentliche Ratsunterlagen (Szenario, Bindungstabelle):
+          # Aufheben kann nur der Stadtrat — Miriam bekommt die
+          # Essenz-Befugnis bewusst nie (Szene 13, Gegenprobe 13.1).
+          "ratsarbeit@1" =>
+            binding("Nichtöffentliche Ratsunterlagen", ["nutzende-person", "pi-agent"], %{
+              "admit" => %{"eq" => ["purpose", "mandat"]}
+            }),
+          # Volltext aus dem Zeitungsabo (Szenario, Bindungstabelle): die
+          # Auflage verlangt Quellenangabe, erlaubt Miriam nur ein
+          # Kurzzitat mit Quelle (§ 51, § 63 UrhG) — nichts fuer
+          # ratsprojekte (Gegenprobe 13.3).
+          "abo-az@1" =>
+            binding(
+              "Volltext aus dem Zeitungsabo",
+              ["nutzende-person", "pi-agent"],
+              %{"admit" => true},
+              %{
+                "auflagen" => [
+                  %{
+                    "art" => "quellenangabe",
+                    "beschreibung" => "Quellenangabe mit Urhebername bei jeder Verwendung",
+                    "nachweisart" => "dokumentation"
+                  }
+                ],
+                "relaxation_authorities" => [
+                  %{
+                    "authority" => "nutzende-person",
+                    "restriction" => "auflagen",
+                    "output" => "kurzzitat-mit-quelle"
+                  }
+                ]
+              }
+            ),
+          # Bestand des ratsprojekte-Hubs (ADR 0004, Szene 11): gemeinsam
+          # gebunden, admit+emit nach dem Γ-GO vom 2026-11-10, keine
+          # transfer-Regel — jede Übergabe und jede Speicherung bleibt
+          # GO-pflichtig.
+          "ratsprojekte@1" =>
+            binding("Bestand des ratsprojekte-Hubs", @hub_observers, %{
+              "admit" => true,
+              "emit" => true
+            })
+        })
     }
   end
 
   @doc """
-  Raum-Term des Default-Arbeitsraums. Bewusst OHNE die
-  `vertraulich_freigabe`-Fakt: `doc-pending-freigabe` faehrt damit die
-  indeterminate-Route (missing_fact) — die Freigabe ist nachzuholen.
+  Registry-Term des Default-Arbeitsraums (`komki-registry/2`): die
+  Projektion von `label_store_seed/0` auf die Engine-Form, so wie der
+  Label-Store exportiert. Lockerungsbefugnisse traegt der Export seit
+  #423 strukturiert (komki-registry/2, R.2.2): die Engine validiert die
+  Einträge gegen das geschlossene Vokabular und entscheidet die
+  Essenz-Befugnis im Offenlegungsfreigabe-Zweig (§ 4.9).
+  """
+  def registry do
+    seed = label_store_seed()
+
+    seed
+    |> Map.drop(["observer_types"])
+    |> Map.put("schema", "komki-registry/2")
+    |> Map.put(
+      "bindings",
+      Map.new(seed["bindings"], fn {id, b} ->
+        {id, Map.take(b, ["readers", "operations", "relaxation_authorities"])}
+      end)
+    )
+  end
+
+  defp binding(bezeichnung, readers, operations, extras \\ %{}) do
+    Map.merge(
+      %{
+        "bezeichnung" => bezeichnung,
+        "geltungsbereich" => "komki-Arbeitsraum (Vorlage)",
+        "verantwortliche_stelle" => "nutzende-person",
+        "readers" => readers,
+        "operations" => operations,
+        "auflagen" => [],
+        "relaxation_authorities" => []
+      },
+      extras
+    )
+  end
+
+  # Connector bindings (connector contract §7): admit, emit and transfer
+  # without conditions. The recipient set does the separation:
+  # vault-vertraulich is read only by nutzende-person and pi-agent, so in a
+  # room with this binding every request to RIS or web search fails
+  # recipient_inclusion at the handover (transfer, #298). The @1 versions
+  # carry transfer only since #298; an older label store rejects them
+  # (R.2.1) and has to be set aside.
+  #
+  # Oeffentliche Bindungen tragen die volle Beobachterliste (Modell `alle`,
+  # #418): oeffentliche Inhalte darf jeder Beobachter lesen — auch Fraktion,
+  # Vorstand und die Sicherung des Hubs. Ohne das bestuende der
+  # Empfaengertest des Hubs (ratsprojekte-bestand@1) fuer keinen Raum,
+  # Szene 11 waere unerfuellbar. `alle` als Platzhalter ist erst #418;
+  # bis dahin steht die Liste ausgeschrieben.
+  defp connector_bindings do
+    open = %{"admit" => true, "emit" => true, "transfer" => true}
+
+    %{
+      "ris-oeffentlich@1" => binding("Öffentliche RIS-Inhalte", @observers, open),
+      "web-oeffentlich@1" => binding("Öffentliche Web-Treffer", @observers, open),
+      "vault-oeffentlich@1" => binding("Öffentliche Vault-Notiz", @observers, open),
+      "vault-vertraulich@1" =>
+        binding("Vertrauliche Vault-Notiz", ["nutzende-person", "pi-agent"], open)
+    }
+  end
+
+  @doc "B_W des Referenzraums recherche (Default-Raum)."
+  @spec recherche_bindings() :: [String.t()]
+  def recherche_bindings,
+    do: ["doc-oeffentlich@2", "ris-oeffentlich@1", "vault-oeffentlich@1", "web-oeffentlich@1"]
+
+  @doc "B_W des Referenzraums vertraulich (Connector-Vertrag §7)."
+  @spec vertraulich_bindings() :: [String.t()]
+  def vertraulich_bindings,
+    do: [
+      "doc-oeffentlich@2",
+      "ris-oeffentlich@1",
+      "vault-oeffentlich@1",
+      "vault-vertraulich@1",
+      "web-oeffentlich@1"
+    ]
+
+  @doc """
+  B_W des Projektraums (Szene 12, #419): der Rechercheraum plus
+  `ratsprojekte@1`. Nur hier darf der Stand des Hubs hinein. Weil
+  `ratsprojekte@1` keine `transfer`-Regel hat, brauchen Websuche, RIS und
+  Vault hier ein GO je Aufruf; Websuche und RIS liegen zudem ausserhalb
+  des Empfaengerkreises des Hubs.
+  """
+  @spec projektraum_bindings() :: [String.t()]
+  def projektraum_bindings,
+    do: Enum.sort(["ratsprojekte@1" | recherche_bindings()])
+
+  @doc """
+  B_W des Referenzraums fraktion (Szenario, Raumtabelle: antrag-radweg):
+  interne Fraktionsarbeit und die Projektidee, dazu die oeffentlichen
+  Bindungen jedes Raums. Ratsprojekte ist kein Weg dieses Raums — die
+  Essenz dorthin ist die Lockerung mit Offenlegungsfreigabe (Szene 13,
+  #423), der Fraktionsordner liegt bei der Nextcloud.
+  """
+  @spec fraktion_bindings() :: [String.t()]
+  def fraktion_bindings,
+    do: [
+      "doc-oeffentlich@2",
+      "fraktion-intern@1",
+      "fraktionsprojekt-radweg@1",
+      "ris-oeffentlich@1",
+      "vault-oeffentlich@1",
+      "web-oeffentlich@1"
+    ]
+
+  @doc """
+  Raum-Term des Default-Arbeitsraums. `workspace_bindings` ist B_W des
+  Referenzraums recherche. Darin liegt nur `doc-oeffentlich`; die beiden
+  anderen Beispieldokumente tragen Labels ausserhalb von B_W und sind hier
+  nicht zulaessig (R.5.4, #213), `list_documents` nennt sie nicht. Bewusst
+  OHNE die `vertraulich_freigabe`-Fakt: in einem Raum mit
+  `doc-pending-freigabe@1` in B_W faehrt die Aufnahme damit die
+  indeterminate-Route (missing_fact).
   """
   def room do
     %{
@@ -63,6 +362,7 @@ defmodule KomkiMediator.Templates do
       "workspace_id" => "ws-komki-arbeitsraum",
       "environment" => "lokaler-arbeitsraum@1",
       "documents_dir" => "documents",
+      "workspace_bindings" => recherche_bindings(),
       "facts" => %{
         "audit_path_ready" => %{
           "value" => true,
@@ -91,10 +391,23 @@ defmodule KomkiMediator.Templates do
         }
       },
       "objects" => %{
-        "mediator-ping" => %{"version" => "v1", "labels" => ["mediator-ping@1"]},
-        "doc-oeffentlich" => %{"version" => "v1", "labels" => ["doc-oeffentlich@1"]},
-        "doc-vertraulich" => %{"version" => "v1", "labels" => ["doc-vertraulich@1"]},
+        "mediator-ping" => %{
+          "type" => "ping",
+          "version" => "v1",
+          "labels" => ["mediator-ping@1"]
+        },
+        "doc-oeffentlich" => %{
+          "type" => "document",
+          "version" => "v1",
+          "labels" => ["doc-oeffentlich@2"]
+        },
+        "doc-vertraulich" => %{
+          "type" => "document",
+          "version" => "v1",
+          "labels" => ["doc-vertraulich@1"]
+        },
         "doc-pending-freigabe" => %{
+          "type" => "document",
           "version" => "v1",
           "labels" => ["doc-pending-freigabe@1"]
         }
@@ -125,27 +438,87 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
 )
   end
 
-  @doc "Provisioniert `<base>/mediator/` nur, wenn keine `registry.json` vorliegt."
+  @doc "Gepinnte SHA-256 der aktuellen Vorlagen (fuer den Pflege-Test)."
+  def current_hashes, do: @current
+
+  @doc """
+  Provisioniert `<base>/mediator/`: legt fehlende Vorlagen je Datei an und
+  ersetzt unveraenderte fruehere Fassungen (Ticket #177). Je Datei, weil
+  `komki up` die `registry.json` als Export des Label-Store schreibt, bevor
+  der Vermittler zum ersten Mal startet (#208); `room.json` und die
+  Beispieldokumente fehlen dann noch. Ergebnis: `:ok` (etwas neu angelegt),
+  `:already_provisioned`, `{:migrated, from}` (alte Vorlagen ersetzt).
+  """
+  @spec provision!(Path.t()) :: :ok | :already_provisioned | {:migrated, String.t()}
   def provision!(base_dir) do
     mediator_dir = Path.join(base_dir, @mediator_dir)
-    registry_path = Path.join(mediator_dir, "registry.json")
 
-    if File.exists?(registry_path) do
-      :already_provisioned
-    else
-      documents_dir = Path.join(mediator_dir, room()["documents_dir"])
-      File.mkdir_p!(documents_dir)
-      File.write!(registry_path, JSON.canonical(registry()))
-      File.write!(Path.join(mediator_dir, "room.json"), JSON.canonical(room()))
-      write_documents(documents_dir)
-      :ok
+    case Enum.reject(["registry.json", "room.json"], &File.exists?(Path.join(mediator_dir, &1))) do
+      [] ->
+        migrate(mediator_dir)
+
+      missing ->
+        write_templates(mediator_dir, missing)
+        :ok
     end
   end
 
+  # Je Datei (Ticket #208): registry.json erzeugt komki_cli als Export des
+  # Label-Store, eine Paarbindung an room.json gibt es deshalb nicht mehr.
+  # Ersetzt wird nur eine unveraenderte alte Vorlage; eigene Dateien bleiben.
+  defp migrate(mediator_dir) do
+    case Enum.filter(["registry.json", "room.json"], &(state(mediator_dir, &1) == :outdated)) do
+      [] ->
+        :already_provisioned
+
+      files ->
+        write_templates(mediator_dir, files)
+        {:migrated, "unveraenderte Vorlagen einer frueheren Fassung: " <> Enum.join(files, ", ")}
+    end
+  end
+
+  defp state(dir, file) do
+    case File.read(Path.join(dir, file)) do
+      {:ok, raw} ->
+        hash = Base.encode16(:crypto.hash(:sha256, raw), case: :lower)
+
+        cond do
+          hash == @current[file] -> :current
+          hash in @outdated[file] -> :outdated
+          true -> :own
+        end
+
+      {:error, _} ->
+        :own
+    end
+  end
+
+  # Dokumente nur anlegen, wenn sie fehlen: vorhandene bleiben unberuehrt.
+  # Store und Elternverzeichnis haerten auf 0700 wie run/ und connectors/ im
+  # CLI, Vorlagedokumente auf 0600 (Ticket #498): Raumdokumente sind
+  # vertraulich, die umask darf die lokale Lesbarkeitsgrenze nicht aufloesen.
+  defp write_templates(mediator_dir, files) do
+    documents_dir = Path.join(mediator_dir, room()["documents_dir"])
+
+    for dir <- [mediator_dir, documents_dir] do
+      File.mkdir_p!(dir)
+      File.chmod!(dir, 0o700)
+    end
+
+    for file <- files do
+      term = if file == "registry.json", do: registry(), else: room()
+      File.write!(Path.join(mediator_dir, file), JSON.canonical(term))
+    end
+
+    write_documents(documents_dir)
+  end
+
   defp write_documents(documents_dir) do
-    for document_id <- ["doc-oeffentlich", "doc-vertraulich", "doc-pending-freigabe"] do
-      path = Path.join(documents_dir, document_id <> ".md")
+    for document_id <- ["doc-oeffentlich", "doc-vertraulich", "doc-pending-freigabe"],
+        path = Path.join(documents_dir, document_id <> ".md"),
+        not File.exists?(path) do
       File.write!(path, document_content(document_id))
+      File.chmod!(path, 0o600)
     end
 
     :ok

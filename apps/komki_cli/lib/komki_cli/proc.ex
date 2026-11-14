@@ -39,7 +39,7 @@ defmodule KomkiCli.Proc do
     end
   end
 
-  @doc "Prueft, ob pid existiert und den `marker` in der ps-Kommandozeile faehrt."
+  @doc "Prüft, ob pid existiert und den `marker` in der ps-Kommandozeile fährt."
   @spec pid_alive?(term(), String.t()) :: boolean()
   def pid_alive?(pid, marker) when is_integer(pid) and pid > 0 do
     case System.cmd("/bin/ps", ["-p", to_string(pid), "-o", "command="]) do
@@ -59,15 +59,23 @@ defmodule KomkiCli.Proc do
   @spec kill_checked(term(), String.t()) :: :ok | {:error, String.t()}
   def kill_checked(pid, marker) do
     if pid_alive?(pid, marker) do
-      System.cmd("/bin/kill", ["-TERM", to_string(pid)])
+      # Burrito-Einzeldatei (Ticket #181): der Wrapper startet die VM als
+      # Kindprozess. Nur den Wrapper zu beenden liesse die Rolle als Waise
+      # weiterlaufen; deshalb alle Nachfahren mit demselben Marker mit.
+      family = [pid | marked_descendants(pid, marker)]
+      signal(family, "-TERM")
       Process.sleep(800)
 
-      if pid_alive?(pid, marker) do
-        System.cmd("/bin/kill", ["-KILL", to_string(pid)])
-        Process.sleep(300)
+      case Enum.filter(family, &pid_alive?(&1, marker)) do
+        [] ->
+          :ok
+
+        alive ->
+          signal(alive, "-KILL")
+          Process.sleep(300)
       end
 
-      if pid_alive?(pid, marker) do
+      if Enum.any?(family, &pid_alive?(&1, marker)) do
         {:error, marker <> " pid " <> to_string(pid) <> " still alive after SIGKILL"}
       else
         :ok
@@ -75,6 +83,27 @@ defmodule KomkiCli.Proc do
     else
       {:error,
        "pid " <> to_string(pid) <> " is not " <> marker <> " (pidfile stale); not sent any signal"}
+    end
+  end
+
+  defp signal(pids, sig), do: System.cmd("/bin/kill", [sig | Enum.map(pids, &to_string/1)])
+
+  @doc "Nachfahren von `pid` (rekursiv per pgrep -P), die `marker` in der Kommandozeile tragen."
+  @spec marked_descendants(pos_integer(), String.t()) :: [pos_integer()]
+  def marked_descendants(pid, marker) do
+    pid
+    |> descendants()
+    |> Enum.filter(&pid_alive?(&1, marker))
+  end
+
+  defp descendants(pid) do
+    case System.cmd("/usr/bin/pgrep", ["-P", to_string(pid)], stderr_to_stdout: true) do
+      {out, 0} ->
+        children = out |> String.split("\n", trim: true) |> Enum.map(&String.to_integer/1)
+        children ++ Enum.flat_map(children, &descendants/1)
+
+      _ ->
+        []
     end
   end
 
@@ -90,12 +119,170 @@ defmodule KomkiCli.Proc do
   Flags/Port bewusst unquotiert).
   """
   @spec spawn_line(String.t(), [String.t()], String.t()) :: String.t()
-  def spawn_line(binary, args, log_path) do
-    "nohup " <>
+  def spawn_line(binary, args, log_path), do: spawn_line(binary, args, log_path, "")
+
+  @doc """
+  Spawn-Zeile mit stdin-Umleitung (Ticket #146): `"0<&0"` reicht das stdin
+  der Shell an den Hintergrundprozess durch, `"< /dev/null"` schliesst es.
+
+  POSIX gibt einem `&`-Job in einer nicht-interaktiven Shell /dev/null als
+  stdin, BEVOR explizite Umleitungen greifen; ein schlichtes `0<&0`
+  duplizierte dann nur /dev/null (dash auf Linux; bash auf macOS ist
+  nachsichtiger). Deshalb wird stdin vorher auf fd 3 gesichert und im Job
+  explizit von dort umgeleitet (`exec 3<&0; … 0<&3 3<&- &`).
+  """
+  @spec spawn_line(String.t(), [String.t()], String.t(), String.t()) :: String.t()
+  def spawn_line(binary, args, log_path, stdin_redirect) do
+    stdin_prefix(stdin_redirect) <>
+      "nohup " <>
       quote_bin(binary) <>
       " " <>
       Enum.join(args, " ") <>
+      stdin_part(stdin_redirect) <>
       " > " <> quote_bin(log_path) <> " 2>&1 & echo $!"
+  end
+
+  defp stdin_prefix("0<&0"), do: "exec 3<&0; "
+  defp stdin_prefix(_redirect), do: ""
+
+  defp stdin_part(""), do: ""
+  defp stdin_part("0<&0"), do: " 0<&3 3<&-"
+  defp stdin_part(redirect), do: " " <> redirect
+
+  @doc """
+  Gesandboxter Escript-Start (Ticket #146), als gequotete Wortliste fuer
+  `spawn_line/4`:
+
+      env -i HOME=<home> PATH=/usr/bin:/bin LANG=C
+        sandbox-exec -f <profil> <escript> <datei> <args>
+
+  `env -i` leert die Umgebung: Variablen aus der Shell der nutzenden Person
+  (etwa API-Tokens) erreichen den gesandboxten Prozess nicht. erlexec
+  verlangt HOME; es zeigt auf ein Verzeichnis, das das Profil nicht freigibt.
+  Der erste Eintrag ist das Programm (`/usr/bin/env`), der Rest die
+  Argumente; ungequotet (die Aufrufer quoten fuer `spawn_line/4`).
+  """
+  @spec escript_cmd(String.t(), String.t(), String.t(), String.t(), [String.t()], String.t()) ::
+          [String.t()]
+  def escript_cmd(sandbox_exec, profile, escript_bin, file, args, home) do
+    [
+      "/usr/bin/env",
+      "-i",
+      "HOME=" <> home,
+      "PATH=/usr/bin:/bin",
+      "LANG=C",
+      sandbox_exec,
+      "-f",
+      profile,
+      escript_bin,
+      file | args
+    ]
+  end
+
+  @doc """
+  Gesandboxter Start einer Rolle der Burrito-Einzeldatei (Ticket #181):
+
+      env -i HOME=<home> PATH=/usr/bin:/bin LANG=C KOMKI_INSTALL_DIR=<dir>
+        sandbox-exec -f <profil> <komki-binary> <args>
+
+  Wie `escript_cmd/6` mit geleerter Umgebung; einzige Ergaenzung ist
+  `KOMKI_INSTALL_DIR`, damit der Burrito-Wrapper die schon entpackte
+  Laufzeit findet (er sucht sie sonst unter HOME, und HOME zeigt hier auf
+  das Laufverzeichnis der Instanz).
+  """
+  @spec burrito_cmd(String.t(), String.t(), String.t(), [String.t()], String.t(), String.t()) ::
+          [String.t()]
+  def burrito_cmd(sandbox_exec, profile, binary, args, home, install_dir) do
+    [
+      "/usr/bin/env",
+      "-i",
+      "HOME=" <> home,
+      "PATH=/usr/bin:/bin",
+      "LANG=C",
+      "KOMKI_INSTALL_DIR=" <> install_dir,
+      sandbox_exec,
+      "-f",
+      profile,
+      binary | args
+    ]
+  end
+
+  @doc """
+  Start-Wortliste einer Rolle je nach Startart der Instanz: Burrito-Binary
+  oder Escript (`escript_cmd/6`, Rollenname steckt dann schon in `args`).
+  """
+  @spec role_cmd(KomkiCli.Config.t(), String.t(), String.t(), [String.t()], String.t()) ::
+          [String.t()]
+  def role_cmd(cfg, profile, binary, args, home) do
+    if cfg.launcher == "burrito" and binary == cfg.komki_bin do
+      burrito_cmd(
+        cfg.sandbox_exec,
+        profile,
+        binary,
+        args,
+        home,
+        KomkiCli.Config.burrito_install_dir(cfg)
+      )
+    else
+      escript_cmd(cfg.sandbox_exec, profile, escript!(cfg), binary, args, home)
+    end
+  end
+
+  defp escript!(%{escript_bin: bin}) when is_binary(bin), do: bin
+
+  defp escript!(_cfg),
+    do:
+      raise(ArgumentError, "escript-Laufzeit nicht entdeckt (Erlang installieren, 'komki setup')")
+
+  @doc """
+  Startet eine Spawn-Zeile (`spawn_line/4` mit `"0<&0"`) und schreibt
+  `input` in ihr stdin (Ticket #146: Credentials nur ueber stdin, nie argv
+  oder Umgebung). Die Daten liegen im Pipe-Puffer, bevor die Shell
+  zurueckkehrt; danach schliesst komki das Schreibende — der Kindprozess
+  liest die Zeile und dann EOF. Kein Temp-File, keine Shell-Interpolation
+  des Inhalts. Liefert die pid aus `echo $!`.
+  """
+  @spec spawn_detached(String.t(), iodata(), String.t()) ::
+          {:ok, pos_integer()} | {:error, String.t()}
+  def spawn_detached(line, input, cd) do
+    port =
+      Port.open({:spawn_executable, "/bin/sh"}, [
+        :binary,
+        :exit_status,
+        :use_stdio,
+        :stderr_to_stdout,
+        args: ["-c", line],
+        cd: cd
+      ])
+
+    Port.command(port, input)
+    result = collect_spawn(port, "")
+    close_quietly(port)
+    result
+  end
+
+  defp collect_spawn(port, acc) do
+    receive do
+      {^port, {:data, data}} ->
+        collect_spawn(port, acc <> data)
+
+      {^port, {:exit_status, 0}} ->
+        case Integer.parse(String.trim(acc)) do
+          {pid, ""} when pid > 0 -> {:ok, pid}
+          _ -> {:error, "spawn: unexpected pid line: " <> Kernel.inspect(acc)}
+        end
+
+      {^port, {:exit_status, code}} ->
+        {:error, "spawn failed (exit " <> to_string(code) <> "): " <> acc}
+    after
+      10_000 -> {:error, "spawn: keine pid nach 10 s"}
+    end
+  end
+
+  defp close_quietly(port) do
+    Port.close(port)
+  rescue
+    ArgumentError -> :ok
   end
 
   @doc """
@@ -126,7 +313,7 @@ defmodule KomkiCli.Proc do
     end
   end
 
-  @doc "Log-Tail als Einzeiler kontrolliert fuer Fehlermeldungen."
+  @doc "Log-Tail als Einzeiler kontrolliert für Fehlermeldungen."
   @spec log_tail(String.t(), pos_integer()) :: String.t()
   def log_tail(path, lines) do
     if File.exists?(path) do

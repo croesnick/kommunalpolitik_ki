@@ -34,25 +34,29 @@ defmodule KomkiCli.ProfileTest do
     end
   end
 
-  describe "Netz-Exceptions (genau zwei outbound-TCP-Regeln, gepinnte Reihenfolge)" do
-    test "loopback-Spezifik: llama-Port zuerst, Vermittler-Port danach", %{text: text, cfg: cfg} do
+  describe "Netz-Exceptions (llama-Port und Vermittler-Socket, gepinnte Reihenfolge)" do
+    test "llama-Port zuerst, Vermittler-Socket danach, sonst kein Netzziel", %{
+      text: text,
+      cfg: cfg
+    } do
       llama_rule =
         "(allow network-outbound (remote tcp \"localhost:" <> to_string(cfg.port) <> "\"))"
 
-      mediator_rule =
-        "(allow network-outbound (remote tcp \"localhost:" <>
-          to_string(cfg.mediator_port) <> "\"))"
+      # Ticket #143: der Vermittler lauscht nur auf dem Unix-Socket.
+      socket_rule =
+        "(allow network-outbound (remote unix-socket (path-literal \"" <>
+          Path.join([cfg.base_dir, "run", "mediator.sock"]) <> "\")))"
 
-      # Ticket #102: zweite Loopback-Exception für den Vermittler-MCP-Port,
-      # gleiche Regelklasse, deterministische Reihenfolge (byte-stabil).
-      tcp_lines =
+      syslog_rule =
+        "(allow network-outbound (remote unix-socket (literal \"/private/var/run/syslog\")))"
+
+      outbound =
         text
         |> String.split("\n")
-        |> Enum.filter(
-          &(String.contains?(&1, "network-outbound") and String.contains?(&1, "tcp"))
-        )
+        |> Enum.filter(&String.starts_with?(&1, "(allow network-outbound"))
 
-      assert tcp_lines == [llama_rule, mediator_rule]
+      assert outbound == [syslog_rule, llama_rule, socket_rule]
+      assert String.ends_with?(text, llama_rule <> "\n" <> socket_rule <> "\n")
     end
   end
 
@@ -101,8 +105,34 @@ defmodule KomkiCli.ProfileTest do
     end
   end
 
+  describe "Abhängigkeiten des pi-Pakets (Anzeige-Extension braucht jiti)" do
+    @deps "; Abhaengigkeiten des pi-Pakets"
+
+    test "pi unter node: der node-Baum deckt sie ab, keine Zusatzregel", %{text: text} do
+      assert String.contains?(
+               text,
+               "(allow file-read* (subpath \"/usr/local/lib/node_modules\"))"
+             )
+
+      refute String.contains?(text, @deps)
+    end
+
+    test "pi aus dem komki-Paket: sein flaches node_modules ist lesbar", %{
+      cfg: cfg,
+      scratch: scratch
+    } do
+      packaged = "/opt/komki/libexec/lib/node_modules"
+      cfg = %{cfg | cli_js: packaged <> "/@earendil-works/pi-coding-agent/dist/bundle/cli.js"}
+      text = Profile.generate(cfg, scratch)
+
+      assert String.contains?(text, @deps)
+      assert String.contains?(text, "(allow file-read* (subpath \"" <> packaged <> "\"))")
+      refute text =~ ~r/file-write\* \(subpath "#{packaged}/
+    end
+  end
+
   describe "pi-Such-Werkzeuge (fd/rg-Fundus)" do
-    test "exec-Literale fuer die agent-bin-Kopien", %{text: text, cfg: cfg} do
+    test "exec-Literale für die agent-bin-Kopien", %{text: text, cfg: cfg} do
       bin = Path.join([cfg.pi_home, ".pi", "agent", "bin"])
 
       assert String.contains?(
@@ -117,7 +147,7 @@ defmodule KomkiCli.ProfileTest do
     end
   end
 
-  describe "Portabilitaet (Nutzer-Regel: keine hartkodierten Systempfade)" do
+  describe "Portabilität (Nutzer-Regel: keine hartkodierten Systempfade)" do
     test "Nicht-brew-Konfiguration erzeugt keinerlei /opt/homebrew-Literale", %{
       cfg: cfg,
       scratch: scratch
@@ -150,10 +180,42 @@ defmodule KomkiCli.ProfileTest do
   end
 
   describe "/dev/fd/0-Redirect (Burrito-Session-Fix, Pilot 2026-10-11)" do
-    test "Regeln vorhanden — kontextfrei im Profil, damit die Identitaet nicht vom Laufkontext abhaengt",
+    test "Regeln vorhanden — kontextfrei im Profil, damit die Identität nicht vom Laufkontext abhängt",
          %{text: text} do
       assert String.contains?(text, "(allow file-write* (literal \"/dev/fd/0\"))")
       assert String.contains?(text, "(allow file-read-metadata (literal \"/dev/fd\"))")
+    end
+  end
+
+  describe "Session-Verläufe (Ticket #295)" do
+    # Bei Seatbelt gilt die letzte passende Regel: Die Sperre muss hinter der
+    # pi-Home-Freigabe stehen, die Freigabe der eigenen Session dahinter.
+    defp index!(text, line) do
+      {idx, _} = :binary.match(text, line)
+      idx
+    end
+
+    test "Einmal-Lauf: alle Sessions zu", %{cfg: cfg, text: text} do
+      root = KomkiCli.Pi.sessions_root(cfg)
+      deny = ~s|(deny file-read* (subpath "#{root}"))|
+
+      assert index!(text, ~s|(allow file-read* (subpath "#{cfg.pi_home}"))|) < index!(text, deny)
+      assert String.contains?(text, ~s|(deny file-write* (subpath "#{root}"))|)
+      refute String.contains?(text, ~s|(allow file-read* (subpath "#{root}/|)
+    end
+
+    test "Session: nur ihr eigenes Verzeichnis offen", %{cfg: cfg, scratch: scratch} do
+      root = KomkiCli.Pi.sessions_root(cfg)
+      own = Path.join(root, "2026-10-30T12-00-00-000000Z")
+      text = Profile.generate(cfg, scratch, own)
+
+      assert index!(text, ~s|(deny file-read* (subpath "#{root}"))|) <
+               index!(text, ~s|(allow file-read* (subpath "#{own}"))|)
+
+      assert String.contains?(text, ~s|(allow file-write* (subpath "#{own}"))|)
+
+      # Keine andere Freigabe unter den Sessions.
+      assert [_] = Regex.scan(~r|\(allow file-read\* \(subpath "#{Regex.escape(root)}/|, text)
     end
   end
 
@@ -222,7 +284,7 @@ defmodule KomkiCli.ProfileTest do
              ]
     end
 
-    test "exec/read fuer llama-server, Modell und Log", %{text: text, cfg: cfg} do
+    test "exec/read für llama-server, Modell und Log", %{text: text, cfg: cfg} do
       assert String.contains?(
                text,
                "(allow process-exec (literal \"" <> cfg.llama_server_bin <> "\"))"
@@ -232,6 +294,19 @@ defmodule KomkiCli.ProfileTest do
 
       log = Path.join([cfg.base_dir, "tmp", "llama-server.log"])
       assert String.contains?(text, "(allow file-write* (literal \"" <> log <> "\"))")
+    end
+
+    # Ticket #318: der MTP-Drafter ist die zweite gepinnte Datei des
+    # Inferenz-Prozesses — genau dieses Literal, kein models-Subpath und
+    # keine breitere Freigabe (Write bleibt dem Log vorbehalten).
+    test "MTP-Drafter: genau diese Datei lesbar, nichts darüber hinaus", %{text: text, cfg: cfg} do
+      assert String.contains?(
+               text,
+               "(allow file-read* (literal \"" <> cfg.drafter_path <> "\"))"
+             )
+
+      refute String.contains?(text, ~s|(subpath "#{Path.dirname(cfg.drafter_path)}")|)
+      refute String.contains?(text, ~s|(allow file-write* (literal "#{cfg.drafter_path}"))|)
     end
 
     test "Write-Scope-Disziplin: file-write nur Log + dtracehelper", %{text: text, cfg: cfg} do

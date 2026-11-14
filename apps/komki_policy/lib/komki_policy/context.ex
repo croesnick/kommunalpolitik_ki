@@ -23,7 +23,7 @@ defmodule KomkiPolicy.Context do
     gleich dem Snapshot (`intent_snapshot_mismatch`).
   """
 
-  alias KomkiPolicy.Registry
+  alias KomkiPolicy.{Registry, Validations}
 
   @snapshot_fields [
     "schema",
@@ -87,13 +87,13 @@ defmodule KomkiPolicy.Context do
   end
 
   defp validate_intent_reason(intent) do
-    with {:ok, _} <- require_map(intent, "$"),
+    with {:ok, _} <- Validations.require_map(intent, "$"),
          :ok <- require_schema(intent, "komki-intent/1"),
-         :ok <- closed_fields(intent, @intent_fields, "$"),
-         :ok <- require_kebab(intent["intent_id"], "$.intent_id"),
-         :ok <- require_object_ref(intent["object"], "$.object"),
-         :ok <- require_kebab(intent["workspace"], "$.workspace"),
-         :ok <- require_operation(intent["operation"]) do
+         :ok <- Validations.closed_fields(intent, @intent_fields, "$"),
+         :ok <- Validations.require_kebab(intent["intent_id"], "$.intent_id"),
+         :ok <- Validations.require_object_ref(intent["object"], "$.object"),
+         :ok <- Validations.require_kebab(intent["workspace"], "$.workspace"),
+         :ok <- Validations.require_operation(intent["operation"], @known_operations) do
       {:ok,
        %{
          operation: intent["operation"],
@@ -118,10 +118,10 @@ defmodule KomkiPolicy.Context do
   end
 
   defp validate_snapshot_reason(snapshot, registry) do
-    with {:ok, _} <- require_map(snapshot, "$"),
+    with {:ok, _} <- Validations.require_map(snapshot, "$"),
          :ok <- require_schema(snapshot, "komki-snapshot/1"),
-         :ok <- closed_fields(snapshot, @snapshot_fields, "$"),
-         :ok <- require_kebab(snapshot["snapshot_id"], "$.snapshot_id"),
+         :ok <- Validations.closed_fields(snapshot, @snapshot_fields, "$"),
+         :ok <- Validations.require_kebab(snapshot["snapshot_id"], "$.snapshot_id"),
          :ok <- require_registry_ref(snapshot, registry),
          :ok <- require_identity(snapshot, registry),
          {:ok, workspace} <- validate_workspace(snapshot["workspace"], registry),
@@ -178,11 +178,6 @@ defmodule KomkiPolicy.Context do
 
   defp fail(code, path, detail), do: {:error, {code, path, detail}}
 
-  defp require_map(%{} = map, _path), do: {:ok, map}
-
-  defp require_map(other, path),
-    do: fail(:invalid_record, path, "expected an object, got " <> Kernel.inspect(other))
-
   defp require_schema(%{"schema" => schema} = _term, schema), do: :ok
 
   defp require_schema(term, schema),
@@ -192,55 +187,6 @@ defmodule KomkiPolicy.Context do
         "$.schema",
         "expected " <> schema <> ", got " <> Kernel.inspect(term["schema"])
       )
-
-  defp closed_fields(map, allowed, path) do
-    unknown = Enum.sort(Enum.reject(Map.keys(map), &(&1 in allowed)))
-
-    case unknown do
-      [] ->
-        :ok
-
-      [first | _] ->
-        fail(:unknown_field, path <> "." <> first, "field not part of the closed schema")
-    end
-  end
-
-  defp require_kebab(value, path) do
-    if Registry.kebab_id?(value) do
-      :ok
-    else
-      fail(:invalid_reference_id, path, "expected kebab-case id, got " <> Kernel.inspect(value))
-    end
-  end
-
-  defp require_object_ref(value, path) do
-    if object_ref_ok?(value) do
-      :ok
-    else
-      fail(
-        :invalid_reference_id,
-        path,
-        "expected <object_id>@<version>, got " <> Kernel.inspect(value)
-      )
-    end
-  end
-
-  defp object_ref_ok?(value) when is_binary(value) do
-    case String.split(value, "@") do
-      [object_id, version] -> Registry.kebab_id?(object_id) and Registry.kebab_id?(version)
-      _ -> false
-    end
-  end
-
-  defp object_ref_ok?(_other), do: false
-
-  defp require_operation(operation) do
-    if operation in @known_operations do
-      :ok
-    else
-      fail(:invalid_operation, "$.operation", "unknown operation: " <> Kernel.inspect(operation))
-    end
-  end
 
   defp require_registry_ref(snapshot, registry) do
     if snapshot["registry_ref"] == registry.registry_id do
@@ -266,9 +212,9 @@ defmodule KomkiPolicy.Context do
   defp validate_workspace(ws, registry) do
     path = "$.workspace"
 
-    with {:ok, _} <- require_map(ws, path),
-         :ok <- closed_fields(ws, @workspace_fields, path),
-         :ok <- require_kebab(ws["workspace_id"], path <> ".workspace_id"),
+    with {:ok, _} <- Validations.require_map(ws, path),
+         :ok <- Validations.closed_fields(ws, @workspace_fields, path),
+         :ok <- Validations.require_kebab(ws["workspace_id"], path <> ".workspace_id"),
          :ok <- require_boolean(ws["valid"], path <> ".valid"),
          :ok <-
            member_of_registry(
@@ -297,10 +243,10 @@ defmodule KomkiPolicy.Context do
   defp validate_object(obj, registry) do
     path = "$.object"
 
-    with {:ok, _} <- require_map(obj, path),
-         :ok <- closed_fields(obj, @object_fields, path),
-         :ok <- require_kebab(obj["object_id"], path <> ".object_id"),
-         :ok <- require_kebab(obj["version"], path <> ".version"),
+    with {:ok, _} <- Validations.require_map(obj, path),
+         :ok <- Validations.closed_fields(obj, @object_fields, path),
+         :ok <- Validations.require_kebab(obj["object_id"], path <> ".object_id"),
+         :ok <- Validations.require_kebab(obj["version"], path <> ".version"),
          :ok <- require_classification(obj, path),
          :ok <-
            member_of_registry(
@@ -326,7 +272,7 @@ defmodule KomkiPolicy.Context do
   end
 
   defp validate_facts(facts, registry) do
-    case require_map(facts, "$.facts") do
+    case Validations.require_map(facts, "$.facts") do
       {:ok, _} -> validate_fact_entries(Map.to_list(facts), registry)
       {:error, reason} -> reason_to_finding(reason)
     end
@@ -348,8 +294,8 @@ defmodule KomkiPolicy.Context do
   defp validate_fact_entry({name, entry}, registry) do
     path = "$.facts." <> name
 
-    with {:ok, _} <- require_map(entry, path),
-         :ok <- closed_fields(entry, @fact_entry_fields, path),
+    with {:ok, _} <- Validations.require_map(entry, path),
+         :ok <- Validations.closed_fields(entry, @fact_entry_fields, path),
          :ok <- known_fact_field?(name, registry, path),
          :ok <- require_source(entry, path),
          :ok <- require_source_kind(entry, path) do

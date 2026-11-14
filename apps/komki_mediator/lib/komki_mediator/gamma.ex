@@ -40,17 +40,50 @@ defmodule KomkiMediator.Gamma do
     end
   end
 
-  @doc "Vereinigte Relaxationsbefugnisse einer Bindung aus dem rohen Registry-Term."
+  @doc """
+  Vereinigte Autoritaeten der Relaxationsbefugnisse einer Bindung aus dem
+  rohen Registry-Term.
 
-  # Die Relaxationsbefugnisse stehen nur im rohen Registry-Term (die
-  # kompilierte Form traegt sie bewusst nicht); eine unbekannte Bindung
-  # faellt auf die leere Liste zurueck.
+  Die Befugnisse stehen als strukturierte Eintraege
+  `{authority, restriction, output}` im Γ (#423, R.2.2) — wer sie liest,
+  sieht die Autoritaeten; WAS damit lockern darf, entscheidet allein die
+  Engine (§ 4.9). Eine unbekannte Bindung faellt auf die leere Liste
+  zurueck. Alte Registries mit flachen Strings toleriert der Export nicht
+  mehr: Er schreibt seit #423 nur strukturierte Eintraege.
+  """
   @spec relaxation_authorities(t(), String.t()) :: [String.t()]
   def relaxation_authorities(%__MODULE__{term: term}, binding) do
     case term["bindings"][binding] do
-      %{"relaxation_authorities" => authorities} -> List.wrap(authorities || [])
-      _ -> []
+      %{"relaxation_authorities" => authorities} ->
+        authorities
+        |> List.wrap()
+        |> Enum.flat_map(fn
+          %{"authority" => authority} -> [authority]
+          _flat_or_foreign -> []
+        end)
+        |> Enum.uniq()
+
+      _ ->
+        []
     end
+  end
+
+  @doc """
+  Relaxationsbefugnisse zu einem Remedy-Katalog: Γ-Metadaten (R.2.2) aus
+  dem rohen Registry-Term, keine Remedy-Semantik. WAS legal fortsetzbar
+  ist, sagt allein der Engine-Katalog; hier steht nur, WER eine benannte
+  Bindung lockern darf. Aufgeschluesselt je Bindung der Engine-Befunde,
+  sortiert und einmalig.
+  """
+  @spec relaxation_authorities_for(t(), [map()] | nil) :: [String.t()]
+  def relaxation_authorities_for(gamma, remedies) do
+    remedies
+    |> List.wrap()
+    |> Enum.flat_map(fn remedy -> List.wrap(remedy["binding"]) end)
+    |> Enum.uniq()
+    |> Enum.flat_map(&relaxation_authorities(gamma, &1))
+    |> Enum.uniq()
+    |> Enum.sort()
   end
 
   defp read(path) do

@@ -42,10 +42,44 @@ defmodule KomkiMediator.GammaTest do
 
   # Relaxationsbefugnisse stehen nur im rohen Registry-Term; der Zugriff
   # laeuft als Oeffnung ueber Gamma statt als Grab im Term fremden Modulen.
+  # Seit #423 traegt die Vorlage selbst strukturierte Befugnisse (die
+  # Essenz-Befugnis des Fraktionsraums) und der Export gibt sie her; der
+  # Zugriff wird zusaetzlich an einem eigenen Registry-Term geprueft.
   test "relaxation_authorities liest die Befugnis aus dem rohen Registry-Term", %{base: base} do
-    {:ok, gamma} = Gamma.load(Path.join([base, "mediator", "registry.json"]))
+    path = Path.join([base, "mediator", "registry.json"])
+    {:ok, gamma} = Gamma.load(path)
 
-    assert Gamma.relaxation_authorities(gamma, "doc-pending-freigabe@1") == ["nutzende-person"]
+    assert Gamma.relaxation_authorities(gamma, "fraktion-intern@1") == ["nutzende-person"]
+
+    assert Gamma.relaxation_authorities(gamma, "fraktionsprojekt-radweg@1") == [
+             "nutzende-person"
+           ]
+
+    # ratsarbeit@1 bekommt die Befugnis bewusst nie (Szene 13); ein
+    # eigener Term mit einer zweiten Befugnis derselben Bindung duerfen
+    # mehrere Autoritaeten benennen.
+    {:ok, term} = KomkiPolicy.JSON.parse(File.read!(path))
+
+    term =
+      put_in(term, ["bindings", "doc-pending-freigabe@1", "relaxation_authorities"], [
+        %{
+          "authority" => "nutzende-person",
+          "restriction" => "operations",
+          "output" => "freigabe-notiz"
+        },
+        %{
+          "authority" => "nutzende-person",
+          "restriction" => "readers",
+          "output" => "ratsprojekte-essenz"
+        }
+      ])
+
+    File.write!(path, KomkiPolicy.JSON.canonical(term))
+    {:ok, gamma} = Gamma.load(path)
+
+    assert Gamma.relaxation_authorities(gamma, "doc-pending-freigabe@1") == [
+             "nutzende-person"
+           ]
   end
 
   test "relaxation_authorities faellt fuer Bindung ohne Befugnis auf die leere Liste", %{
@@ -54,6 +88,7 @@ defmodule KomkiMediator.GammaTest do
     {:ok, gamma} = Gamma.load(Path.join([base, "mediator", "registry.json"]))
 
     assert Gamma.relaxation_authorities(gamma, "doc-oeffentlich@1") == []
+    assert Gamma.relaxation_authorities(gamma, "ratsarbeit@1") == []
   end
 
   test "relaxation_authorities faellt fuer unbekannte Bindung auf die leere Liste", %{base: base} do

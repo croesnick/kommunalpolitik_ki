@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/guestmeetings/9999",
+    "query": null,
+    "headers": [["accept", "application/json"]]
+  },
+  "response": {
+    "status": 404,
+    "headers": [["content-type", "application/json"]],
+    "body_b64": "eyJlcnJvciI6Im5vdCBmb3VuZCJ9"
+  }
+}

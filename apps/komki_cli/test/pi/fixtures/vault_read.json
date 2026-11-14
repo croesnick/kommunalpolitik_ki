@@ -1,0 +1,7 @@
+{
+  "args": {
+    "note_id": "Projekte/Verkehr/Radverkehrskonzept.md"
+  },
+  "text": "{\"content\":\"# Radverkehrskonzept Buchloe\\n\\nFiktive Notiz für den Test-Vault.\\n\\nZiel ist ein durchgehender Radweg vom Bahnhof zum Schulzentrum. Der Abschnitt\\nBahnhofstraße ist der Engpass: Parkstreifen auf beiden Seiten, kein Platz für\\neinen Schutzstreifen. Varianten:\\n\\n1. Einbahnregelung für Kfz, Radweg in beide Richtungen\\n2. Wegfall des Parkstreifens auf der Nordseite\\n3. Umleitung über die Gartenstraße\\n\\nNächster Schritt: Verkehrszählung im Frühjahr 2027.\\n\\nSiehe auch [[Sitzungen/2026-09-17 Bauausschuss]].\\n\",\"decision\":\"permit\",\"decision_id\":\"pdr-fe93fe71db589badddb76d2adafadf6f\",\"emit_decision_id\":\"pdr-2bad889703f2140d02473ecfd80f58f1\",\"labels\":[\"vault-oeffentlich@1\"],\"note_id\":\"Projekte/Verkehr/Radverkehrskonzept.md\",\"payload_hash\":\"sha256:6e8f57452be96d8c6f08a02a5fbf7aa29def4ab4cd554e72e80718f8011013a1\",\"rule\":\"admit\",\"title\":\"Radverkehrskonzept Buchloe\"}",
+  "tool": "vault_read"
+}

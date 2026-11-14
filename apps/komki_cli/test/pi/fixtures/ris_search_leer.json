@@ -1,0 +1,7 @@
+{
+  "args": {
+    "text": "Haushaltssatzung 2031"
+  },
+  "text": "{\"abrufdatum\":\"2026-10-24T18:17:10Z\",\"decision\":\"permit\",\"decision_id\":\"pdr-a5afac02cb113d02961c9a8ff542cbdf\",\"emit_decision_id\":\"pdr-41b1dedc4b65fbc5e6379abe3d7cc747\",\"labels\":[\"ris-oeffentlich@1\"],\"payload_hash\":\"sha256:c9fc9376e164d1307cb38b2ee496645d82192ef6b76d9ed778200a69f6afcd5e\",\"results\":[],\"rule\":\"admit\"}",
+  "tool": "ris_search"
+}

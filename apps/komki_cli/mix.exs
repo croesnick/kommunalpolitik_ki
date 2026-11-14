@@ -1,6 +1,20 @@
 defmodule KomkiCli.MixProject do
   use Mix.Project
 
+  @workspace_deps [
+    :komki_policy,
+    :komki_connector,
+    :komki_mediator,
+    :komki_egress,
+    :komki_connector_ris,
+    :komki_connector_web,
+    :komki_connector_vault,
+    :komki_connector_documents,
+    :seatbelt,
+    :sealed_envelope,
+    :sidecar
+  ]
+
   def project do
     [
       app: :komki_cli,
@@ -9,6 +23,12 @@ defmodule KomkiCli.MixProject do
       # test/support (Fixtures) nur in :test kompiliert — weder Escript (:dev)
       # noch Release sehen die Test-Helfer.
       elixirc_paths: elixirc_paths(Mix.env()),
+      # komki-tresor (Swift) beim Kompilieren nach priv/ bauen (Ticket #224);
+      # NACH den Standard-Compilern, damit der Task selbst schon kompiliert ist.
+      # Ohne macOS/swiftc ueberspringt der Task mit Info statt Fehler.
+      compilers: Mix.compilers() ++ [:komki_tresor],
+      # test/support holds compiled helpers and the fake tresor script, no tests.
+      test_ignore_filters: [&String.starts_with?(&1, "test/support/")],
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",
       start_permanent: Mix.env() == :prod,
@@ -23,7 +43,20 @@ defmodule KomkiCli.MixProject do
       # ignore_warnings zeigt auf eine LEERE, committete Datei: es wird
       # nichts ignoriert — jede Warnung bleibt sichtbar und wird behoben;
       # die Angabe entfernt nur dialyxirs Hinweiszeile.
-      dialyzer: [no_umbrella: true, ignore_warnings: "dialyzer.ignore-warnings"],
+      # Die Workspace-Schwestern (Path-Deps) gehoeren nicht in die PLT:
+      # dialyxir haelt eine gecachte PLT fuer aktuell, solange sich die
+      # Lockfiles nicht aendern, auch wenn eine Schwester neue Module hat
+      # (CI-Fund #98: unknown_function). Sie werden deshalb bei jedem Lauf
+      # mitanalysiert.
+      dialyzer: [
+        no_umbrella: true,
+        # :mix gehoert in die PLT, weil der Compile-Task komki_tresor die
+        # Mix-API nutzt (Mix.raise, Mix.shell, Mix.Project).
+        plt_add_apps: [:mix],
+        ignore_warnings: "dialyzer.ignore-warnings",
+        plt_ignore_apps: @workspace_deps,
+        paths: Enum.map([:komki_cli | @workspace_deps], &"_build/#{Mix.env()}/lib/#{&1}/ebin")
+      ],
       deps: deps()
     ]
   end
@@ -61,12 +94,23 @@ defmodule KomkiCli.MixProject do
         steps: [:assemble, &Burrito.wrap/1],
         burrito: [
           targets: [
-            macos_silicon: [os: :darwin, cpu: :aarch64]
+            macos_silicon: [os: :darwin, cpu: :aarch64] ++ custom_erts()
           ],
           debug: Mix.env() != :prod
         ]
       ]
     ]
+  end
+
+  # Eigene Laufzeit (Ticket #181): Burrito bringt vorgebaute ERTS nur fuer
+  # manche OTP-Versionen mit (fuer 29.1.2 noch nicht). `make komki-burrito`
+  # packt die laufende Erlang-Installation als Tarball und reicht ihn ueber
+  # KOMKI_CUSTOM_ERTS herein; ohne die Variable nimmt Burrito seine eigene.
+  defp custom_erts do
+    case System.get_env("KOMKI_CUSTOM_ERTS") do
+      nil -> []
+      path -> [custom_erts: path]
+    end
   end
 
   # Runtime-Deps: optimus 0.6 (CLI-Layer), burrito 1.6 (Ticket #75),
@@ -88,6 +132,29 @@ defmodule KomkiCli.MixProject do
       {:burrito, "~> 1.6"},
       {:exqlite, "~> 0.42"},
       {:komki_policy, path: "../komki_policy"},
+      # Connector-Manifeste und Frame-Client (Ticket #146): Profilgenerator,
+      # Start-Argumente und der ping im Doctor lesen dasselbe Modul wie der
+      # Vermittler (CONTRACT.md §5).
+      {:komki_connector, path: "../komki_connector"},
+      {:sidecar, path: "../sidecar"},
+      # Multicall (Ticket #179): Vermittler, Egress-Proxy und Connectoren als
+      # Rollen desselben Programms (`komki komki-mediator ...`). Die Apps
+      # bleiben im Workspace getrennt; gebuendelt wird nur hier.
+      {:komki_mediator, path: "../komki_mediator"},
+      {:komki_egress, path: "../komki_egress"},
+      {:komki_connector_ris, path: "../komki_connector_ris"},
+      {:komki_connector_web, path: "../komki_connector_web"},
+      {:komki_connector_vault, path: "../komki_connector_vault"},
+      {:komki_connector_documents, path: "../komki_connector_documents"},
+      # DURCHSTICH #409 (Wegwerf): ratsprojekte-Connector als Rolle.
+      {:komki_connector_ratsprojekte, path: "../komki_connector_ratsprojekte"},
+      # Seatbelt-Kern (Ticket #226): Profil-Emitter, Presets, Escript-Schicht,
+      # Boot-Gate-Sonde, Pins — komki-unabhaengige Library, Path-Dep auf die
+      # Workspace-Schwester ohne Hex-Lock-Eintrag (wie komki_policy).
+      {:seatbelt, path: "../seatbelt"},
+      # Siegel-Format und -Krypto (ktv2): KomkiCli.Tresor.Core liefert nur die
+      # Schluesselvereinbarung ueber komki-tresor.
+      {:sealed_envelope, path: "../sealed_envelope"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]

@@ -1,0 +1,7 @@
+{
+  "args": {
+    "note_id": "Projekte/Verkehr/Radverkehrskonzept.md"
+  },
+  "text": "{\"admitted\":\"redacted\",\"decision\":\"permit\",\"decision_id\":\"pdr-03779ad32ef220946fe9aa1f6da75993\",\"emit_decision_id\":\"pdr-981d685eba0d2093b1998541db99fdf9\",\"payload_hash\":\"sha256:e9e33ba2e3f0211aacc335a8aa79f81f61daf4b869f05094f0447c563c882d79\",\"reason\":\"Labels der Notiz ausserhalb der import_labels\",\"rule\":\"admit\",\"verify\":[\"label_not_importable\"]}",
+  "tool": "vault_read"
+}

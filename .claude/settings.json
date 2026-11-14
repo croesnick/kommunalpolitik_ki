@@ -1,0 +1,95 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "excludedCommands": [
+      "gh *",
+      "git push",
+      "git push *",
+      "git fetch",
+      "git fetch *",
+      "git pull",
+      "git pull *",
+      "/Users/crn/.local/share/komki-tools/screenshot/bin/komki-screenshot",
+      "/Users/crn/.local/share/komki-tools/screenshot/bin/komki-screenshot *"
+    ],
+    "filesystem": {
+      "denyRead": [
+        "~/.ssh",
+        "~/.config/gh",
+        "~/Library/Keychains",
+        "~/Library/Application Support/ratsprojekte",
+        "~/Library/Mobile Documents/iCloud~md~obsidian"
+      ],
+      "allowRead": [
+        "~/Library/Application Support/ratsprojekte/dev.db",
+        "~/Library/Application Support/ratsprojekte/dev.db-shm",
+        "~/Library/Application Support/ratsprojekte/dev.db-wal",
+        "~/Library/Application Support/ratsprojekte/dev.db-journal"
+      ],
+      "allowWrite": [
+        "~/.hex",
+        "~/.mix",
+        "~/.cache",
+        "/tmp",
+        "/private/tmp",
+        "~/Library/Application Support/ratsprojekte/dev.db",
+        "~/Library/Application Support/ratsprojekte/dev.db-shm",
+        "~/Library/Application Support/ratsprojekte/dev.db-wal",
+        "~/Library/Application Support/ratsprojekte/dev.db-journal"
+      ]
+    },
+    "network": {
+      "allowLocalBinding": true,
+      "allowUnixSockets": ["/tmp", "/private/tmp"],
+      "allowedDomains": [
+        "hex.pm",
+        "repo.hex.pm",
+        "builds.hex.pm",
+        "registry.npmjs.org",
+        "pypi.org",
+        "files.pythonhosted.org",
+        "github.com",
+        "objects.githubusercontent.com"
+      ]
+    }
+  },
+  "permissions": {
+    "allow": ["Bash(/Users/crn/.local/share/komki-tools/screenshot/bin/komki-screenshot)", "Bash(/Users/crn/.local/share/komki-tools/screenshot/bin/komki-screenshot *)"],
+    "deny": [
+      "Bash(security *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Read(~/.ssh/**)",
+      "Read(~/.config/gh/**)",
+      "Read(~/Library/Keychains/**)",
+      "Read(~/Library/Application Support/ratsprojekte/**)",
+      "Read(~/Library/Mobile Documents/iCloud~md~obsidian/**)",
+      "Edit(~/.local/share/komki-tools/**)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "elixir \"${CLAUDE_PROJECT_DIR}/.claude/hooks/stop_gates.exs\" run",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); case \"$input\" in *gh*pr*) printf '%s' \"$input\" | elixir \"${CLAUDE_PROJECT_DIR}/.claude/hooks/pr_report.exs\" run || { echo 'PR-Hook gescheitert, gh pr gesperrt (.claude/hooks/pr_report.exs)' >&2; exit 2; } ;; esac"
+          }
+        ]
+      }
+    ]
+  }
+}

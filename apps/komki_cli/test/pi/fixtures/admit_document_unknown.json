@@ -1,0 +1,7 @@
+{
+  "args": {
+    "document_id": "doc-phantom"
+  },
+  "text": "{\"decision\":\"error\",\"decision_id\":\"pdr-4253479c6d77557495298407a0ff0a11\",\"detail\":\"unbekanntes Objekt: \\\"doc-phantom\\\"\"}",
+  "tool": "admit_document"
+}

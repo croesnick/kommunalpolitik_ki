@@ -216,7 +216,7 @@ defmodule KomkiCli.LabelSteps do
 
           {:error, reason} ->
             {:error,
-             "Registry-Datei ungueltiges JSON (" <> path <> "): " <> Kernel.inspect(reason)}
+             "Registry-Datei ungültiges JSON (" <> path <> "): " <> Kernel.inspect(reason)}
         end
 
       {:error, posix} ->
