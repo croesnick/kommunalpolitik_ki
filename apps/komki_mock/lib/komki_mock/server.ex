@@ -25,7 +25,7 @@ defmodule KomkiMock.Server do
 
   use GenServer
 
-  alias KomkiMock.{ControlPlug, DataPlug}
+  alias KomkiMock.{ControlPlug, DataPlug, StateDir}
 
   @scenarios ~w(ok error slow refused)
   @default_delay_ms 3_000
@@ -84,11 +84,17 @@ defmodule KomkiMock.Server do
   def init(opts) do
     adapter = Keyword.fetch!(opts, :adapter)
     dir = Keyword.fetch!(opts, :dir)
-    File.mkdir_p!(dir)
 
-    case load_or_seed(adapter, dir, Keyword.get(opts, :seed, "default")) do
-      {:ok, persisted} -> {:ok, boot(persisted, adapter, dir, opts)}
-      {:error, reason} -> {:stop, reason}
+    # Placement check before the first write, then owner-only state
+    # directory (Ticket #481, Fund F9): the persisted data carries real
+    # recorded council content and accepted mock tokens.
+    with :ok <- StateDir.check(adapter, dir) do
+      :ok = StateDir.prepare!(dir)
+
+      case load_or_seed(adapter, dir, Keyword.get(opts, :seed, "default")) do
+        {:ok, persisted} -> {:ok, boot(persisted, adapter, dir, opts)}
+        {:error, reason} -> {:stop, reason}
+      end
     end
   end
 
@@ -196,7 +202,20 @@ defmodule KomkiMock.Server do
       "scenario" => state.scenario
     }
 
-    File.write!(log_path(state), [JSON.encode!(entry), "\n"], [:append])
+    path = log_path(state)
+    ensure_log_file(path)
+    File.write!(path, [JSON.encode!(entry), "\n"], [:append])
+  end
+
+  # One request line per append, owner-only like the other state files
+  # (Ticket #481): File.write!/[:append] would create the log with
+  # umask-Default; a pre-existing log gets its mode corrected.
+  defp ensure_log_file(path) do
+    unless File.exists?(path) do
+      File.write!(path, "")
+    end
+
+    File.chmod!(path, 0o600)
   end
 
   # --- Seeds and persistence ----------------------------------------------
@@ -252,6 +271,8 @@ defmodule KomkiMock.Server do
   defp write_json(path, value) do
     tmp = path <> ".tmp"
     File.write!(tmp, JSON.encode!(value))
+    # Owner-only before the rename carries the mode into place (Ticket #481).
+    File.chmod!(tmp, 0o600)
     File.rename!(tmp, path)
   end
 

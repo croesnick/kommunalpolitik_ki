@@ -105,7 +105,11 @@ defmodule KomkiMediator.Go do
   @spec await(config(), map()) ::
           {:release, map()} | {:selection, [String.t()]} | :refused | :timeout
   def await(%{dir: dir, timeout_ms: timeout_ms}, %{"call_hash" => hash} = request) do
+    # GO-Zustand wie run/ haerten (Ticket #485, Fund F13): Anfragen tragen
+    # den vollen Text abgelehnter Ausgaben, das Verzeichnis duerfen andere
+    # lokale Konten nicht einmal betreten.
     File.mkdir_p!(dir)
+    File.chmod!(dir, 0o700)
     deadline = System.monotonic_time(:millisecond) + timeout_ms
     expires_at = System.os_time(:second) + div(timeout_ms, 1000)
     request_file = Path.join(dir, hash <> ".request.json")
@@ -323,11 +327,16 @@ defmodule KomkiMediator.Go do
     }
   end
 
-  @doc "Schreibt JSON atomar (tmp + rename), damit der Leser nie eine halbe Datei sieht."
+  @doc """
+  Schreibt JSON atomar (tmp + rename), damit der Leser nie eine halbe Datei
+  sieht. Die Datei entsteht mit 0600 (Ticket #485, Fund F13): GO-Anfragen
+  und -Antworten sind nur fuer die Eigentuemerin lesbar.
+  """
   @spec write_atomic(Path.t(), map()) :: :ok
   def write_atomic(file, term) do
     tmp = file <> ".tmp"
     File.write!(tmp, KomkiPolicy.JSON.canonical(term))
+    File.chmod!(tmp, 0o600)
     File.rename!(tmp, file)
   end
 end

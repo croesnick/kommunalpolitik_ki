@@ -3,6 +3,8 @@ defmodule KomkiMock.ServerTest do
 
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureIO
+
   alias KomkiMock.Adapters.Notes
   alias KomkiMock.Server
 
@@ -163,6 +165,91 @@ defmodule KomkiMock.ServerTest do
   test "ports.json names both ports", %{ports: ports, tmp_dir: dir} do
     assert dir |> Path.join("ports.json") |> File.read!() |> JSON.decode!() ==
              %{"data" => ports.data, "control" => ports.control}
+  end
+
+  # ------------------------------------------------------------------------
+  # Rechte des Zustands (Ticket #481, Fund F9): alles, was der Mock
+  # persistiert, ist nur fuer die Eigentuemerin lesbar — wie die
+  # Kassetten des Recorders. Und Replay-Kassetten landen nie in einem
+  # Git-Repo (check_out des Recorders als Vorlage).
+  # ------------------------------------------------------------------------
+
+  @cassette %{
+    "request" => %{"method" => "GET", "path" => "/notes", "query" => nil, "headers" => []},
+    "response" => %{"status" => 200, "headers" => [], "body" => "{}"}
+  }
+
+  describe "Zustandsdateien mit 0600, Verzeichnis 0700 (#481)" do
+    test "Boot haertet Verzeichnis und Dateien", %{ports: ports, tmp_dir: dir} do
+      assert mode(dir) == 0o700
+      assert mode(Path.join(dir, "state.json")) == 0o600
+      assert mode(Path.join(dir, "ports.json")) == 0o600
+
+      assert {200, _} = get(ports.data, "/notes")
+
+      assert mode(Path.join(dir, "requests.jsonl")) == 0o600
+    end
+  end
+
+  describe "Replay-Kassetten: Zielverzeichnis (#481)" do
+    test "Zustandsverzeichnis im Git-Repo wird verweigert", %{tmp_dir: dir} do
+      repo = Path.join(dir, "repo")
+      File.mkdir_p!(Path.join(repo, ".git"))
+      cassettes = Path.join(dir, "kassetten")
+      File.mkdir_p!(cassettes)
+      File.write!(Path.join(cassettes, "aufnahme.json"), JSON.encode!(@cassette))
+
+      assert {:error, reason} =
+               Server.start_link(
+                 adapter: KomkiMock.Adapters.Replay,
+                 dir: Path.join(repo, "zustand"),
+                 seed: cassettes
+               )
+
+      assert reason =~ "Git-Repo"
+    end
+
+    test "weltlesbares Verzeichnis: Warnung, dann Haertung auf 0700", %{tmp_dir: dir} do
+      cassettes = Path.join(dir, "kassetten")
+      File.mkdir_p!(cassettes)
+      File.write!(Path.join(cassettes, "aufnahme.json"), JSON.encode!(@cassette))
+
+      # Zustandsverzeichnis außerhalb des Repos (ExUnits tmp_dir liegt hier
+      # im Checkout) und absichtlich weltlesbar.
+      state =
+        Path.join(
+          System.tmp_dir!(),
+          "komki-mock-weltlesbar-" <> Integer.to_string(System.unique_integer([:positive]))
+        )
+
+      File.mkdir_p!(state)
+      File.chmod!(state, 0o755)
+      on_exit(fn -> File.rm_rf(state) end)
+
+      test_pid = self()
+
+      err =
+        capture_io(:stderr, fn ->
+          send(
+            test_pid,
+            Server.start_link(
+              adapter: KomkiMock.Adapters.Replay,
+              dir: state,
+              seed: cassettes
+            )
+          )
+        end)
+
+      assert_received {:ok, _server}
+
+      assert err =~ "weltlesbar"
+      assert mode(state) == 0o700
+    end
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
   end
 
   defp get(port, path), do: decode(request(:get, port, path))

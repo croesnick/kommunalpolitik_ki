@@ -246,6 +246,33 @@ defmodule KomkiCli.LabelStore do
     end)
   end
 
+  @doc """
+  Traegt der Store nur Vorlagen-Inhalt (#513)? Das ist der Fall, wenn er
+  keine Objekte und keine Entscheidungen haelt, keine Bindung ausserhalb
+  der Vorlage registriert ist und die registry_id zur Vorlage passt —
+  dann ist sein gesamter Inhalt durch einen Import der Vorlage entstanden
+  und kann ohne Verlust durch die aktuelle Vorlage ersetzt werden. Ob der
+  Inhalt von der AKTUELLEN Vorlage abweicht (und der Import an R.2.1
+  scheitern wuerde), prueft der Aufrufer separat; hier geht es nur um
+  eigene Inhalte.
+  """
+  @spec template_only?(String.t(), map()) :: {:ok, boolean()} | {:error, String.t()}
+  def template_only?(db_path, seed) when is_binary(db_path) and is_map(seed) do
+    with_conn(db_path, fn conn ->
+      with {:ok, [objects]} <- fetch_row(conn, "SELECT COUNT(*) FROM objects", []),
+           {:ok, [decisions]} <- fetch_row(conn, "SELECT COUNT(*) FROM decisions", []),
+           {:ok, binding_rows} <- select(conn, "SELECT id FROM bindings"),
+           {:ok, registry_id} <- meta_value(conn, "registry_id") do
+        template_ids = Map.keys(seed["bindings"])
+        own_bindings = List.flatten(binding_rows) -- template_ids
+
+        {:ok,
+         objects == 0 and decisions == 0 and own_bindings == [] and
+           registry_id == seed["registry_id"]}
+      end
+    end)
+  end
+
   # ========================================================================
   # Import-Validierung (Engine als Schemainstanz + lokale Zusatzpruefung)
   # ========================================================================
@@ -1233,11 +1260,15 @@ WHERE object_id = ? AND version = ? ORDER BY id",
   # SQLite-Unterbau (Exqlite.Sqlite3 direkt, ohne Ecto)
   # ========================================================================
 
+  # Begleitdateien, die SQLite neben die Store-Datei legt; nach
+  # abgebrochenen Laeufen koennen sie mit umask-Default liegenbleiben.
+  @companions ~w(-wal -shm -journal)
+
   # Verbindungskontext: Verzeichnis anlegen (mkdir_p am Elternpfad),
   # Schema sicherstellen, fun ausfuehren, Verbindung schliessen. Jede
   # Oeffnung gilt Tabelle + Foreign-Key-PRAGMA neu (per-Connection).
   defp with_conn(db_path, fun) when is_function(fun, 1) do
-    File.mkdir_p!(Path.dirname(db_path))
+    :ok = prepare_store(db_path)
 
     case Sqlite3.open(db_path) do
       {:ok, conn} ->
@@ -1258,6 +1289,37 @@ WHERE object_id = ? AND version = ? ORDER BY id",
       {:error, reason} ->
         {:error, "SQLite open " <> db_path <> ": " <> db_error(reason)}
     end
+  end
+
+  # Store-Datei und Verzeichnis haerten wie ihre Schwestern (Token,
+  # Denials, Schluessel; Ticket #500, Fund F33/F34): exklusiv anlegen und
+  # chmod VOR Sqlite3.open — SQLite erzeugt fehlende Dateien sonst mit
+  # umask-Default, und der Store traegt das komplette Sicherheitsmodell
+  # samt Entscheidungs-Historie. Vorhandene zu offene Rechte werden
+  # korrigiert, wie es ensure_run_dirs! fuer die Verzeichnisse tut (#498).
+  defp prepare_store(db_path) do
+    dir = Path.dirname(db_path)
+    File.mkdir_p!(dir)
+    File.chmod!(dir, 0o700)
+
+    case File.open(db_path, [:write, :exclusive]) do
+      {:ok, fd} ->
+        :ok = File.close(fd)
+        File.chmod!(db_path, 0o600)
+
+      {:error, :eexist} ->
+        File.chmod!(db_path, 0o600)
+
+      {:error, _reason} ->
+        # Sqlite3.open meldet den fachlichen Grund (z. B. eisdir).
+        :ok
+    end
+
+    for suffix <- @companions, companion = db_path <> suffix, File.exists?(companion) do
+      File.chmod!(companion, 0o600)
+    end
+
+    :ok
   end
 
   # SELECT: prepare + bind + step-Schleife; Statement freigeben.
