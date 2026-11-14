@@ -1,8 +1,9 @@
 # komki_connector_ris
 
 RIS-Connector für den komki-Vermittler (Ticket #94). Er beantwortet die Operationen `search` und
-`show` der Fassung `komki-ris/2` über **öffentliche** Tagesordnungspunkte (TOPs) des
-Ratsinformationssystems der VG Buchloe. Vertrag, Frame-Protokoll und Ergebnisform:
+`show` über **öffentliche** Tagesordnungspunkte (TOPs) des Ratsinformationssystems der VG Buchloe,
+dazu seit der Fassung `komki-ris/3` (#516) `sessions` (Sitzungen eines Zeitraums aus dem öffentlichen
+Kalender) und `agenda` (die öffentlichen TOPs einer Sitzung, ohne Zahl oder Hinweis auf verborgene). Vertrag, Frame-Protokoll und Ergebnisform:
 [`apps/komki_connector/CONTRACT.md`](../komki_connector/CONTRACT.md) (§3, §4, §5.2).
 
 Das Label (`ris-oeffentlich@1`) vergibt der Vermittler, nicht der Connector.

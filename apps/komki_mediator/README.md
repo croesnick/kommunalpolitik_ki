@@ -11,9 +11,9 @@ im Journal; ein Permit schreibt zusaetzlich einen Vorbeleg, bevor
 irgendetwas vollzogen wird (Audit vor Wirkung). Ein Connector-Aufruf
 ergibt so mehrere Datensaetze mit derselben `call_id`.
 
-Fassung `komki-mediator/5` (Tickets #144, #218, #419): neben `ping`,
+Fassung `komki-mediator/6` (Tickets #144, #218, #419, #516): neben `ping`,
 `list_documents` und `admit_document` bietet der Vermittler die
-Connector-Tools `ris_search`, `ris_show`, `web_search`, `vault_search`,
+Connector-Tools `ris_sessions`, `ris_agenda`, `ris_search`, `ris_show`, `web_search`, `vault_search`,
 `vault_read`, `vault_write_test`, `rp_fakt_vorschlagen` und
 `rp_stand_lesen` an. Jeder Connector-Aufruf laeuft als
 emit → transfer → Vollzug → admit; jede Entscheidung steht sofort im
@@ -281,15 +281,17 @@ Aufruf hier ist Entwicklung und Debugging vorbehalten.
 | Route | Zweck |
 |---|---|
 | `GET /healthz` | Status + Fassung (`fassung_id`, `tools`, `registry_id`, `gamma_hash`) |
-| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/5` (siehe unten) |
+| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/6` (siehe unten) |
 
-## Tools (Fassung `komki-mediator/5`)
+## Tools (Fassung `komki-mediator/6`)
 
 | Tool | Ablauf | Parameter |
 |---|---|---|
 | `ping` | Gate (admit) gegen die Labels des Ping-Objekts | — |
 | `list_documents` | Gate: je Raumdokument eine admit-Entscheidung gegen B_W, nur `permit` erscheint; ein PDR (#218) | — |
 | `admit_document` | Gate (admit) gegen B_W des Raums (R.5.4, #213), Vollzug im Connector `documents` (#169) | `document_id` (max 64, `^[a-z0-9-]+$`) |
+| `ris_sessions` | ConnectorGate, Connector `ris` (#516) | `von` (`JJJJ-MM-TT`), `bis` (optional, höchstens 366 Tage), `gremium` (max 100, optional), `limit` (1..50, Default 20) |
+| `ris_agenda` | ConnectorGate, Connector `ris` (#516): nur öffentliche TOPs | `sitzung_id` (nur Ziffern, max 18) |
 | `ris_search` | ConnectorGate, Connector `ris` | `text` (max 200), `limit` (1..20, Default 10) |
 | `ris_show` | ConnectorGate, Connector `ris` | `top_id` (max 64, `^[A-Za-z0-9_-]+$`) |
 | `vault_read` | ConnectorGate, Connector `vault` | `note_id` (max 200, relativer `.md`-Pfad) |

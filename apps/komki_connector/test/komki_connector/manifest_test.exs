@@ -26,8 +26,11 @@ defmodule KomkiConnector.ManifestTest do
   test "Tools: eindeutig, by_tool, keine URL- oder Host-Parameter" do
     tools = Manifest.tools()
     assert tools == Enum.uniq(tools)
-    # DURCHSTICH #409 (Wegwerf): + rp_fakt_vorschlagen; #419: + rp_stand_lesen
-    assert length(tools) == 9
+    # DURCHSTICH #409 (Wegwerf): + rp_fakt_vorschlagen; #419: + rp_stand_lesen;
+    # #516: + ris_sessions, ris_agenda
+    assert length(tools) == 11
+    assert {:ok, %{id: "ris"}, "sessions"} = Manifest.by_tool("ris_sessions")
+    assert {:ok, %{id: "ris"}, "agenda"} = Manifest.by_tool("ris_agenda")
     assert {:ok, %{id: "documents"}, "read"} = Manifest.by_tool("admit_document")
     assert {:ok, %{id: "vault"}, "write_test"} = Manifest.by_tool("vault_write_test")
 

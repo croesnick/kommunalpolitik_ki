@@ -225,8 +225,30 @@ test("fremde Tools bleiben unberührt", () => {
 	assert.equal(callLine("mcp__other__x", {}, paint), undefined);
 });
 
+// #516: meetings of a day, and the public agenda of one meeting.
+test("RIS-Sitzungen und Tagesordnung: Datum, Gremium, TOPs mit Nummer", () => {
+	const sessions = flat(render("ris_sessions"));
+	assert.match(sessions, /2 Treffer/);
+	assert.match(sessions, /17\.11\.2026 7\. Sitzung des Stadtrates Stadtrat/);
+	assert.match(sessions, /Bauausschuss/);
+
+	const agenda = flat(render("ris_agenda"));
+	assert.match(agenda, /7\. Sitzung des Stadtrates Stadtrat · 17\.11\.2026/);
+	assert.match(agenda, /TOP 1 Tagesordnungspunkt 1/);
+	assert.match(agenda, /… 2 weitere/);
+	assert.match(flat(render("ris_agenda", true)), /TOP 7 Tagesordnungspunkt 7/);
+
+	assert.match(flat(render("ris_agenda_leer")), /Keine öffentlichen Tagesordnungspunkte veröffentlicht\./);
+});
+
 test("Aufrufzeilen in Klartext", () => {
 	assert.equal(strip(callLine("mcp__komki__ris_search", { text: "Radweg" }, paint)!), "RIS durchsuchen  »Radweg«");
+	assert.equal(strip(callLine("mcp__komki__ris_sessions", { von: "2026-11-17" }, paint)!), "RIS-Sitzungen  17.11.2026");
+	assert.equal(
+		strip(callLine("mcp__komki__ris_sessions", { von: "2026-11-01", bis: "2026-11-30", gremium: "Bau" }, paint)!),
+		"RIS-Sitzungen  01.11.2026 – 30.11.2026  »Bau«",
+	);
+	assert.equal(strip(callLine("mcp__komki__ris_agenda", { sitzung_id: "4711" }, paint)!), "RIS-Tagesordnung lesen  4711");
 	assert.equal(strip(callLine("mcp__komki__web_search", { query: "a\u001bb" }, paint)!), "Im Web suchen  »ab«");
 	assert.match(strip(callLine("mcp__komki__ping", { x: 1 }, paint)!), /^komki: ping/);
 });
