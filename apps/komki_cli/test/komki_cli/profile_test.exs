@@ -163,6 +163,9 @@ defmodule KomkiCli.ProfileTest do
                text,
                "(allow file-read* (subpath \"" <> store_root <> "/@\"))"
              )
+
+      # Wie beim komki-Paket: nur lesen, kein Schreiben auf dem Store.
+      refute text =~ ~r/file-write\* \(subpath "#{store_root}/
     end
   end
 
