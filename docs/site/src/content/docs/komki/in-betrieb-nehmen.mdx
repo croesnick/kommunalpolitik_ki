@@ -113,9 +113,11 @@ Soll dein Coding-Agent die Einrichtung übernehmen, gib ihm den Auftrag von [Mit
 
    **Fehlt der Brave-Schlüssel**, fragt `setup` ihn verdeckt ab: Die Eingabe erscheint nicht auf dem Bildschirm. komki versiegelt sie mit der Secure Enclave und legt nur das Siegel im Schlüsselbund ab. Du kannst die Frage mit Enter überspringen und ihn später mit `komki secret set brave` nachtragen. Liegt dort noch ein Schlüssel im Klartext aus einer älteren Version, bietet `setup` an, ihn zu versiegeln.
 
+   **Den RIS-Zugang brauchst du für die Texte der Tagesordnungspunkte.** Ohne Anmeldung liefert das RIS meist nur die Titel. `setup` fragt nach deinem Anmeldenamen im RIS (sichtbar) und nach dem Passwort (verdeckt, zweimal) und versiegelt beides zusammen. Nachtragen oder ändern kannst du ihn mit `komki secret set ris`. Auch mit Anmeldung liest komki nur öffentliche Tagesordnungspunkte. Nicht-öffentliche bleiben unsichtbar, bis es dafür eine eigene Freigabe gibt ([#198](https://github.com/croesnick/kommunalpolitik_ki/issues/198)).
+
    **Den Token für den ratsprojekte-Hub tippst du nicht ein, komki erzeugt ihn:** `komki secret erzeugen ratsprojekte-hub | ratsprojekte connector-token`. komki legt den neuen Token versiegelt im Schlüsselbund ab und gibt nur seinen SHA-256 aus, den sich der Hub merkt. Den Token selbst bekommt niemand zu sehen. Ein zweiter Aufruf ersetzt ihn, etwa nach `ratsprojekte recover`.
 
-   **Bei jedem Start fragt macOS einmal nach Touch ID oder deinem Passwort**, mit dem Grund „komki startet den Connector web“. Das ist der Schutz: Den Eintrag im Schlüsselbund kann jedes Programm deines Nutzers lesen, das Siegel öffnet aber nur die Secure Enclave, und die nur mit deiner Freigabe. Fragt macOS, ohne dass du gerade komki startest, lehnst du ab.
+   **Bei jedem Start fragt macOS je Schlüssel einmal nach Touch ID oder deinem Passwort**, mit dem Grund „komki startet den Connector web“ und, wenn du einen RIS-Zugang hinterlegt hast, „komki startet den Connector ris“. Der RIS-Connector meldet sich gleich danach an und behält nur die Anmeldung, nicht dein Passwort. Scheitert die Anmeldung oder läuft sie ab, meldet er „Zugangsdaten fehlen“. Der Rest von komki läuft weiter. Nach `komki down && komki up` und deiner Freigabe geht es weiter. Das ist der Schutz: Den Eintrag im Schlüsselbund kann jedes Programm deines Nutzers lesen, das Siegel öffnet aber nur die Secure Enclave, und die nur mit deiner Freigabe. Fragt macOS, ohne dass du gerade komki startest, lehnst du ab.
 
 4. ### Die erste Frage
 

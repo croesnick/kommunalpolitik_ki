@@ -74,10 +74,27 @@ defmodule KomkiConnectorRis.Http do
   @spec get_json(String.t(), [{String.t(), String.t()}], pos_integer()) ::
           {:ok, term()} | {:error, error()}
   def get_json(url, headers, timeout_ms) do
-    request = {String.to_charlist(url), Enum.map(headers, &charlist_header/1)}
+    request(
+      :get,
+      {String.to_charlist(url), Enum.map(headers, &charlist_header/1)},
+      url,
+      timeout_ms
+    )
+  end
 
+  @doc "POST eines JSON-Rumpfs mit JSON-Antwort. Nur Status 200 gilt als Erfolg."
+  @spec post_json(String.t(), [{String.t(), String.t()}], String.t(), pos_integer()) ::
+          {:ok, term()} | {:error, error()}
+  def post_json(url, headers, body, timeout_ms) do
+    request =
+      {String.to_charlist(url), Enum.map(headers, &charlist_header/1), ~c"application/json", body}
+
+    request(:post, request, url, timeout_ms)
+  end
+
+  defp request(method, request, url, timeout_ms) do
     case :httpc.request(
-           :get,
+           method,
            request,
            http_options(url, timeout_ms),
            [body_format: :binary],

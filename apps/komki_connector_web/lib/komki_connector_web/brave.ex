@@ -30,7 +30,7 @@ defmodule KomkiConnectorWeb.Brave do
 
   @doc """
   Anfrage-Header. Der Schluessel steht nur hier, nie in URL oder Log —
-  und geht nur auf Transporten raus, die `token_transport_ok?/1`
+  und geht nur auf Transporten raus, die `KomkiConnector.Transport.secret_ok?/1`
   zulassen. Jeden anderen Klartext verweigert `headers/2` mit
   `{:error, :cleartext}`, statt den Schluessel dorthin zu senden
   (Ticket #496): jeder lokale Prozess kann einen freien Loopback-Port
@@ -39,7 +39,7 @@ defmodule KomkiConnectorWeb.Brave do
   @spec headers(String.t(), String.t()) ::
           {:ok, [{charlist(), charlist()}]} | {:error, :cleartext}
   def headers(url, api_key) do
-    if token_transport_ok?(url) do
+    if KomkiConnector.Transport.secret_ok?(url) do
       {:ok,
        [
          {~c"accept", ~c"application/json"},
@@ -47,35 +47,6 @@ defmodule KomkiConnectorWeb.Brave do
        ]}
     else
       {:error, :cleartext}
-    end
-  end
-
-  @doc """
-  Zulaessiger Transport fuer den Subscription-Token: `https` immer,
-  `http` nur fuer Loopback-Hosts (`localhost`, `127.0.0.0/8`, `::1`) —
-  der Mock-Betrieb der Websuche. Klartext zu jedem anderen Host traege
-  den Schluessel an jeden lokalen Prozess, der den Port haelt (#496).
-  """
-  @spec token_transport_ok?(String.t()) :: boolean()
-  def token_transport_ok?(url) do
-    case URI.new(url) do
-      {:ok, %URI{scheme: "https", host: host}} when is_binary(host) and host != "" -> true
-      {:ok, %URI{scheme: "http", host: host}} -> loopback_host?(host)
-      _ -> false
-    end
-  end
-
-  defp loopback_host?("localhost"), do: true
-
-  defp loopback_host?(host) when is_binary(host), do: loopback_address?(host)
-
-  defp loopback_host?(_host), do: false
-
-  defp loopback_address?(host) do
-    case :inet.parse_address(String.to_charlist(host)) do
-      {:ok, {127, _, _, _}} -> true
-      {:ok, {0, 0, 0, 0, 0, 0, 0, 1}} -> true
-      _ -> false
     end
   end
 
