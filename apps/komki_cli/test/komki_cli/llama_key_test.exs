@@ -34,6 +34,24 @@ defmodule KomkiCli.LlamaKeyTest do
     assert models_key(path) == key
   end
 
+  # Ticket #493 (Audit #467 F24/F25): models.json ist eine Kopie des
+  # llama-API-Keys und tragt deshalb 0600 wie ihre Quelle llama.key —
+  # Standard-umask schriebe sie mit 0644 lesbar fuer andere lokale Konten,
+  # sobald die Basis traversierbar liegt (etwa KOMKI_HOME=/private/tmp/...).
+  test "models.json entsteht mit 0600, auch ueber eine 0644-Altdatei hinweg", %{cfg: cfg} do
+    path = Path.join([cfg.pi_home, ".pi", "agent", "models.json"])
+    Llama.write_key!(cfg)
+
+    Steps.write_models(cfg)
+    assert mode(path) == 0o600
+
+    # Alt-Instanz: eine vor #493 mit 0644 geschriebene Datei haertet der
+    # naechste Schreibvorgang (jedes `komki up` schreibt models.json neu).
+    File.chmod!(path, 0o644)
+    Steps.write_models(cfg)
+    assert mode(path) == 0o600
+  end
+
   describe "auth_required/1 gegen einen Fake-Server" do
     test "401 heisst Schlüssel verlangt, 200 heisst offen" do
       assert {:ok, true} = Llama.auth_required(fake_server("401 Unauthorized"))
@@ -44,6 +62,11 @@ defmodule KomkiCli.LlamaKeyTest do
   defp models_key(path) do
     {:ok, json} = path |> File.read!() |> JSON.decode()
     json["providers"]["pi-local"]["apiKey"]
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
   end
 
   # Antwortet genau einmal mit der Statuszeile und schliesst.
