@@ -250,6 +250,7 @@ defmodule RepoHooksTest do
             "gh pr create --title T --body \"#{body}\"",
             "gh pr create --title 'x -H fix' -F pr.md",
             "gh pr create --title T --body \"$(cat <<'EOF'\n#{body}Etwa: gh pr create -H \"fix\"\nEOF\n)\"",
+            "gh pr create --title T --body-file - <<'PR-BODY'\n#{body}Etwa: -H \"fix\"\nPR-BODY",
             "curl -s -H fix https://example.org && gh pr create -F pr.md"
           ] do
         assert pr(dir, command) == "", command
@@ -260,6 +261,23 @@ defmodule RepoHooksTest do
       sha = branch(dir, "fix")
       File.write!(Path.join(dir, "pr.md"), report(sha))
       assert pr(dir, "gh pr create --title 'see -H main' --head fix -F pr.md") == ""
+    end
+
+    # Escapes outside quotes must not throw the scan out of step, or a later
+    # quote would swallow the real flag and the directory's head would count.
+    test "escaped quotes before the real --head keep it a flag", %{dir: dir} do
+      branch(dir, "fix")
+      File.write!(Path.join(dir, "pr.md"), report(head(dir)))
+
+      for command <- [
+            "gh pr create --title 'it'\\''s' --head fix --label 'doc' -F pr.md",
+            "gh pr create --title a\\\"b --head fix --label \"doc\" -F pr.md",
+            "gh pr create --title $'it\\'s' --head fix --label 'x' -F pr.md",
+            "bash <<'EOF'\ngh pr create --head fix -F pr.md\nEOF"
+          ] do
+        decision = dir |> pr(command) |> JSON.decode!()
+        assert decision["hookSpecificOutput"]["permissionDecision"] == "deny", command
+      end
     end
 
     test "with several --head the last one counts, as in gh", %{dir: dir} do

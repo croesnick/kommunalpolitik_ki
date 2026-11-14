@@ -107,20 +107,22 @@ defmodule PrReport do
     end
   end
 
-  # Values of gh's own `--head`/`-H` flags (#540): only after `gh pr create`,
-  # with heredocs and quoted strings skipped as a whole, so a mention in the
-  # body, the title or another command is no flag. The scan alternates
-  # between a quoted string, consumed without a capture, and a flag.
-  @heredoc ~r/<<-?\s*(['"]?)(\w+)\1.*?\n\s*\2\s*(?=\n|\)|$)/s
-  @flag ~r/"(?:[^"\\]|\\.)*"|'[^']*'|(?<!\S)(?:--head|-H)(?:=|\s+)("[^"]*"|'[^']*'|[^\s;&|)]+)/
+  # Values of gh's own `--head`/`-H` flags (#540): from the first
+  # `gh pr create` on, with heredocs that follow it and quoted strings
+  # skipped as a whole, so a mention in the body or the title is no flag,
+  # and neither is one in a command before it. The scan alternates between
+  # an escape or a quoted string, consumed without a capture, and a flag.
+  @heredoc ~r/<<(?:-\s*(['"]?)(\w[\w-]*)\1.*?\n\t*\2|\s*(['"]?)(\w[\w-]*)\3.*?\n\4)(?=\n|\)|$)/s
+  @flag ~r/\\.|\$'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|'[^']*'|(?<!\S)(?:--head|-H)(?:=|\s+)("[^"]*"|'[^']*'|[^\s;&|)]+)/
 
   defp head_flags(command) do
-    command = Regex.replace(@heredoc, command, "")
-
     case Regex.run(@create, command, return: :index) do
       [{start, _}] ->
+        rest =
+          Regex.replace(@heredoc, binary_part(command, start, byte_size(command) - start), "")
+
         @flag
-        |> Regex.scan(binary_part(command, start, byte_size(command) - start))
+        |> Regex.scan(rest)
         |> Enum.flat_map(fn
           [_, value] -> [value]
           _ -> []
