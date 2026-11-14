@@ -27,7 +27,6 @@ defmodule KomkiMediator.TemplatesTest do
   # Vermittler-Start (#208). room.json und Dokumente muessen trotzdem kommen.
   test "nur registry.json vorhanden (Export): room.json und Dokumente werden angelegt" do
     base = KomkiMediator.TestHelpers.tmp_base("kmtpl-")
-    on_exit(fn -> File.rm_rf(base) end)
 
     mediator_dir = Path.join(base, "mediator")
     File.mkdir_p!(mediator_dir)
@@ -48,6 +47,28 @@ defmodule KomkiMediator.TemplatesTest do
 
       assert String.starts_with?(content, "# ")
       assert Templates.document_content(document_id) == content
+    end
+  end
+
+  # Regression F30/#498: Der Store der Raumdokumente entstand unter
+  # Standard-umask (022) mit 0755, die Vorlagedokumente mit 0644 — auf einem
+  # Multi-User-Host mit durchquerbarer Basis las jedes lokale Konto die
+  # Fraktionsraum-Dokumente direkt. Vor dem Fix rot: write_templates rief nur
+  # mkdir_p! und write!/1 ohne chmod. Wie im CLI (run/, connectors/, Token,
+  # denials) haerten Store und Elternverzeichnis auf 0700, Dateien auf 0600.
+  test "Dokumenten-Store 0700, Vermittler-Verzeichnis 0700, Vorlagedokumente 0600" do
+    base = KomkiMediator.TestHelpers.tmp_base("kmtpl-modi-")
+    on_exit(fn -> File.rm_rf(base) end)
+
+    assert Templates.provision!(base) == :ok
+
+    documents_dir = Path.join([base, "mediator", "documents"])
+
+    assert mode(Path.dirname(documents_dir)) == 0o700
+    assert mode(documents_dir) == 0o700
+
+    for document_id <- ["doc-oeffentlich", "doc-vertraulich", "doc-pending-freigabe"] do
+      assert mode(Path.join(documents_dir, document_id <> ".md")) == 0o600
     end
   end
 
@@ -106,15 +127,20 @@ defmodule KomkiMediator.TemplatesTest do
            }
   end
 
-  # Γ-Konventionen des Connector-Vertrags §7.
+  # Γ-Konventionen des Connector-Vertrags §7, dazu seit #423 die
+  # Fraktionsraum-Welt (Beobachter, Hub-Umgebung, Essenz-Befugnisse).
   test "Registry traegt Beobachter, Umgebungen und Connector-Bindungen nach §7" do
     registry = Templates.registry()
 
     assert registry["observers"] == [
              "brave-search",
+             "fraktion",
+             "nextcloud-betreiber",
              "nutzende-person",
              "pi-agent",
-             "ris-betreiber"
+             "ris-betreiber",
+             "sicherung",
+             "vorstand"
            ]
 
     assert registry["fact_fields"]["output_content_digest"] == "string"
@@ -154,6 +180,55 @@ defmodule KomkiMediator.TemplatesTest do
     assert {:ok, _} = KomkiPolicy.Registry.compile(registry)
   end
 
+  # Szene 13, #423: die Hub-Umgebung, die Bindungen des Fraktionsraums
+  # mit der Essenz-Befugnis und der gemeinsam gebundene Bestand.
+  test "Fraktionsraum-Welt: Hub-Umgebung, Befugnisse, ratsprojekte-Bestand" do
+    registry = Templates.registry()
+
+    hub = [
+      "fraktion",
+      "nextcloud-betreiber",
+      "nutzende-person",
+      "pi-agent",
+      "sicherung",
+      "vorstand"
+    ]
+
+    assert registry["environments"]["ratsprojekte-bestand@1"]["observers"] == hub
+
+    # ratsprojekte@1: admit+emit nach dem Γ-GO vom 2026-11-10, keine
+    # transfer-Regel — jede Speicherung bleibt GO-pflichtig.
+    assert registry["bindings"]["ratsprojekte@1"]["readers"] == hub
+
+    assert registry["bindings"]["ratsprojekte@1"]["operations"] == %{
+             "admit" => true,
+             "emit" => true
+           }
+
+    for binding <- ["fraktion-intern@1", "fraktionsprojekt-radweg@1"] do
+      assert registry["bindings"][binding]["readers"] == [
+               "fraktion",
+               "nextcloud-betreiber",
+               "nutzende-person",
+               "pi-agent"
+             ]
+
+      # Der Vorstand fehlt bewusst (ADR 0004); die Befugnis erlaubt Miriam
+      # die Lockerung fuer genau die Ausgabeart ratsprojekte-essenz.
+      assert registry["bindings"][binding]["relaxation_authorities"] == [
+               %{
+                 "authority" => "nutzende-person",
+                 "restriction" => "readers",
+                 "output" => "ratsprojekte-essenz"
+               }
+             ]
+    end
+
+    # ratsarbeit@1 bekommt die Befugnis nie (Szene 13, Gegenprobe 13.1).
+    assert registry["bindings"]["ratsarbeit@1"]["relaxation_authorities"] == []
+    assert {:ok, _} = KomkiPolicy.Registry.compile(registry)
+  end
+
   # `bindings` ersetzt B_W des Default-Raums (nil: recherche).
   defp room_decisions(base, bindings \\ nil) do
     {:ok, gamma} = Gamma.load(Path.join([base, "mediator", "registry.json"]))
@@ -181,5 +256,10 @@ defmodule KomkiMediator.TemplatesTest do
       {:ok, decision} = Derive.decide(gamma.compiled, snapshot, intent)
       {object_id, decision}
     end)
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
   end
 end

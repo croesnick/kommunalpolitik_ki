@@ -52,7 +52,7 @@ defmodule KomkiCli.SetupTest do
   describe "Keychain.store/3" do
     test "Wert geht nur über stdin an security -i, nie über argv; ganz, auch über 128 Byte" do
       {cmd, dir} = recording_fake!()
-      siegel = "ktv1." <> String.duplicate("A", 1000) <> "+/="
+      siegel = "ktv2." <> String.duplicate("A", 1000) <> "+/="
 
       assert :ok = Keychain.store("brave-search-api", siegel, command: cmd, account: "tester")
 
@@ -84,7 +84,7 @@ defmodule KomkiCli.SetupTest do
         """)
 
       _ = dir
-      assert {:error, :not_stored} = Keychain.store("x", "ktv1.lang", command: cmd, account: "t")
+      assert {:error, :not_stored} = Keychain.store("x", "ktv2.lang", command: cmd, account: "t")
     end
 
     test "Fehler von security wird {:failed, code}" do
@@ -111,8 +111,9 @@ defmodule KomkiCli.SetupTest do
       assert message =~ "versiegelt"
       refute message =~ @kanarie
       # In den Schluesselbund geht nur das Siegel, nie der Klartext.
-      {:ok, sealed} = KomkiCli.Tresor.seal(@kanarie)
-      assert File.read!(Path.join(dir, "value")) == sealed
+      stored = File.read!(Path.join(dir, "value"))
+      assert KomkiCli.Tresor.well_formed?(stored)
+      assert {:ok, @kanarie} = KomkiCli.Tresor.open(stored, "Test")
       refute File.read!(Path.join(dir, "stdin")) =~ @kanarie
     end
 
@@ -130,6 +131,31 @@ defmodule KomkiCli.SetupTest do
 
     test "leere Eingabe: nichts gespeichert" do
       assert Setup.store_secret(@entry, ui([{:error, :empty}])) =~ "leere Eingabe"
+    end
+
+    @ris %{name: "ris", service: "ris-zugang", connector: "ris", label: "RIS-Zugang"}
+
+    test "#148: RIS-Zugang fragt Anmeldename und Passwort ab, ein Siegel fuer beides" do
+      {cmd, dir} = recording_fake!()
+      Application.put_env(:komki_cli, :security, cmd)
+
+      ui =
+        [{:ok, @kanarie}, {:ok, @kanarie}]
+        |> ui()
+        |> Map.put(:ask, fn _question, _default -> " rat@example.org \n" end)
+
+      message = Setup.store_secret(@ris, ui)
+
+      assert message =~ "versiegelt"
+      refute message =~ @kanarie
+      stored = File.read!(Path.join(dir, "value"))
+      assert {:ok, json} = KomkiCli.Tresor.open(stored, "Test")
+      assert JSON.decode!(json) == %{"login" => "rat@example.org", "password" => @kanarie}
+    end
+
+    test "#148: leerer Anmeldename speichert nichts und fragt kein Passwort" do
+      ui = Map.put(ui([]), :ask, fn _question, _default -> "  " end)
+      assert Setup.store_secret(@ris, ui) =~ "leere Eingabe"
     end
   end
 
@@ -191,9 +217,16 @@ defmodule KomkiCli.SetupTest do
   end
 
   describe "Secrets" do
-    test "der Brave-Key kommt aus dem Web-Manifest und heisst kurz 'brave'" do
-      assert [%{name: "brave", service: "brave-search-api", connector: "web"}] = Secrets.all()
+    test "die Geheimnisse kommen aus den Manifesten (Brave kurz 'brave'; DURCHSTICH #409: Hub-Token)" do
+      assert [
+               %{name: "brave", service: "brave-search-api", connector: "web"},
+               %{name: "ratsprojekte-hub"},
+               %{name: "ris", service: "ris-zugang", connector: "ris"}
+             ] =
+               Secrets.all()
+
       assert {:ok, %{name: "brave"}} = Secrets.fetch("brave-search-api")
+      assert {:ok, %{name: "ratsprojekte-hub"}} = Secrets.fetch("ratsprojekte-hub-token")
       assert :error = Secrets.fetch("unbekannt")
     end
   end

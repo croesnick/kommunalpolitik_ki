@@ -117,25 +117,33 @@ Einzige Quelle für Fassung, Operationen, Netz, Dateisystem, Credentials und Imp
 
 | Feld | Bedeutung |
 |---|---|
-| `id` | `documents`, `ris`, `web`, `vault` |
-| `fassung` | `komki-documents/1`, `komki-ris/2`, `komki-web/1`, `komki-vault/1` |
+| `id` | `documents`, `ratsprojekte`, `ris`, `web`, `vault` |
+| `fassung` | `komki-documents/1`, `komki-ratsprojekte/2`, `komki-ris/2`, `komki-web/1`, `komki-vault/1` |
 | `binary` | Name des Escripts |
-| `ops` | Operation → Parameter-Schema (geschlossen, siehe unten) und `kind` (`read` oder `write`) |
+| `ops` | Operation → Parameter-Schema (geschlossen, siehe unten), `kind` (`read`, `write` oder `admit_only`, §6.4), optional `ausgabeart` (nur schreibend, siehe unten), `environment` (eigene Umgebung der Operation) und bei `admit_only` das feste `object` |
 | `egress_hosts` | Host-Allowlist für den Egress-Proxy (`host:port`). Leer heißt: kein Netz, kein Proxy-Port |
-| `fs` | Platzhalter-Pfade (`{vault_dir}`, `{documents_dir}` = `<base>/mediator/documents`) mit Modus `read` oder `write` |
-| `credentials` | Name → Keychain-Service. Der Eintrag enthält nur das Siegel (`ktv1.…`); `komki up` öffnet es mit `komki-tresor` über die Secure Enclave (Touch ID oder Passwort) und schreibt den Klartext nur in die stdin-Zeile. Ein Klartext-Eintrag wird nicht benutzt |
-| `environment` | Umgebung für `transfer` und `store` (modellierte Empfänger der Anfrage), z. B. `web-suche@1` |
-| `import_labels` | erlaubte Labels für Antworten. Bei RIS und Web genau eines. Bei Vault leer: die Notiz trägt ihre Labels im Frontmatter, und der Vermittler lässt jede Bindung aus Γ zu (Ticket #211); der Connector prüft nur die Form einer Bindungs-ID. Geschriebene Notizen tragen λ(y) = B_W (§6.3) |
+| `fs` | Platzhalter-Pfade (`{vault_dir}`, `{documents_dir}` = `<base>/mediator/documents`, `{ratsprojekte_stand}` = Stand-Datei des Hubs aus der config) mit Modus `read` oder `write`. Ein nicht gesetzter optionaler Platzhalter fällt samt Regel weg |
+| `credentials` | Name → Keychain-Service. Der Eintrag enthält nur das Siegel (`ktv2.…`); `komki up` öffnet es mit der Schlüsselvereinbarung von `komki-tresor` über die Secure Enclave (Touch ID oder Passwort) und schreibt den Klartext nur in die stdin-Zeile. Ein Klartext-Eintrag oder ein Siegel im alten Format `ktv1` wird nicht benutzt |
+| `environment` | Umgebung für `transfer` und `store` (modellierte Empfänger der Anfrage), z. B. `web-suche@1`. Eine Operation mit eigenem `environment` nimmt ihre (`Manifest.environment/2`) |
+| `import_labels` | erlaubte Labels für Antworten. Bei RIS und Web genau eines; bei ratsprojekte `ratsprojekte@1` für den Stand (der Schreibweg nimmt `assigned_label`). Bei Vault leer: die Notiz trägt ihre Labels im Frontmatter, und der Vermittler lässt jede Bindung aus Γ zu (Ticket #211); der Connector prüft nur die Form einer Bindungs-ID. Geschriebene Notizen tragen λ(y) = B_W (§6.3) |
 
-Parameter-Schemas sind geschlossen: Typ `string` (mit `max` Zeichen und optional `pattern`) oder `integer`
-(mit `min`/`max`). Unbekannte Felder sind ein Fehler. Kein Parameter nimmt eine URL, einen absoluten Pfad
-oder einen Host an.
+Parameter-Schemas sind geschlossen: Typ `string` (mit `max` Zeichen und optional `pattern`), `integer`
+(mit `min`/`max`) oder `list` (mit `min_items`/`max_items` und `items`, einem geschlossenen Schema von
+string/integer-Feldern je Element; unbekannte Felder je Element sind ein Fehler). Unbekannte Felder sind ein
+Fehler. Kein Parameter nimmt eine URL, einen absoluten Pfad oder einen Host an.
+
+`ausgabeart` (schreibende Operationen, #423): benennt das Ziel der Lockerungsbefugnisse dieser Operation —
+`ratsprojekte-essenz` für den ratsprojekte-Hub. Der Vermittler trägt sie in die GO-Anfrage; die Engine leitet
+die Ausgabeart aus der Zielumgebung ab und rechnet sie gegen die Offenlegungsfreigabe nach (komki_policy,
+CONTRACT.md § 4.9). Der Agent benennt keine Ausgabeart; das Manifest ist die einzige Quelle.
 
 ### 5.1 Fassungen
 
 | Connector | MCP-Tool (Vermittler) | Operation | Parameter | Art |
 |---|---|---|---|---|
 | documents | `admit_document` | `read` | `document_id` (string, max 64, pattern `^[a-z0-9-]+$`) | read |
+| ratsprojekte | `rp_fakt_vorschlagen` | `fakt_vorschlagen` | `titel` (string, max 120), `teile` (list, 1..8, je `aussage` string max 1000 Pflicht, `quelle` string max 400 Pflicht, `fundstelle` string max 200), `projekt_hinweis` (string, max 120, optional) | write |
+| ratsprojekte | `rp_stand_lesen` | `stand_lesen` | keine | admit_only (§6.4), Objekt `ratsprojekte-stand`, Umgebung `lokaler-arbeitsraum@1` |
 | ris | `ris_search` | `search` | `text` (string, max 200), `limit` (integer 1..20, optional, Default 10) | read |
 | ris | `ris_show` | `show` | `top_id` (string, max 64, pattern `^[A-Za-z0-9_-]+$`) | read |
 | web | `web_search` | `search` | `query` (string, max 400), `count` (integer 1..10, optional, Default 5) | read |
@@ -143,12 +151,13 @@ oder einen Host an.
 | vault | `vault_read` | `read` | `note_id` (string, max 200, pattern `^[A-Za-z0-9äöüÄÖÜß _./-]+\.md$`) | read |
 | vault | `vault_write_test` | `write_test` | `title` (string, max 120), `body` (string, max 20000) | write |
 
-Der Vermittler bietet damit `ping`, `list_documents` und diese sieben Tools an. `admit_document` ist ein
+Der Vermittler bietet damit `ping`, `list_documents` und diese neun Tools an (Fassung `komki-mediator/5`, seit
+`rp_stand_lesen`, #419). `admit_document` ist ein
 Sonderfall (Ticket #169): Der Vermittler entscheidet es über die Objekt-Labels aus `room.json` gegen das B_W
 des Raums (Regelzweig `admit`, `KomkiMediator.Gate`, R.5.4, #213), bevor er den Connector ruft. Der Connector
 führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Manifest gelten dafür nicht. `ping` und
 `list_documents` (#218) beantwortet der Vermittler selbst, ohne Connector. Das ist Fassung
-`komki-mediator/3`, und der D.9-Pin bricht absichtlich.
+`komki-mediator/4`, und der D.9-Pin bricht absichtlich.
 
 ### 5.2 Ergebnisformen (Connector → Vermittler)
 
@@ -160,15 +169,29 @@ führt nur das Lesen aus; Gate 1 (`emit`, `transfer`) und die Labels aus dem Man
   ergibt `not-found`, genau wie ein nicht existierender.
   `nummer` ist die TOP-Nummer aus der Tagesordnung, wie das RIS sie führt (`numbering`, etwa `4` oder `6.2`), seit
   `komki-ris/2`; `top_id` ist die interne Kennung der RIS-API (`<Sitzung>-<Punkt>`) und nur für `show` gedacht.
+- `ris` mit Anmeldung (#148): Mit dem optionalen Credential `RIS_ZUGANG` (JSON `{"login", "password"}`) meldet sich
+  der Connector vor dem Binden des Sockets an und liest Sitzung und TOP über die angemeldeten Endpunkte; nur dort
+  liefert das RIS die Texte öffentlicher TOPs. Ergebnisformen und Filter bleiben gleich: Auch angemeldet liefert
+  `komki-ris/2` nur öffentliche TOPs, und ein TOP, dessen Detail nicht ausdrücklich `restricted: false` trägt, ist
+  `not-found`. Scheitert die Anmeldung (abgelehnt, RIS nicht erreichbar, Zugang unvollständig), startet der
+  Connector trotzdem und beantwortet jede Operation mit `credential-missing`, ohne in den Gastmodus zu fallen; den
+  Grund schreibt er beim Start als Warnung ins Log, und `komki up` zeigt Warnungen aus dem Start-Log eines Connectors
+  an. Die Anmeldung geht nur über `https` oder `http` auf Loopback hinaus (`KomkiConnector.Transport.secret_ok?/1`).
+  Verweigert die nutzende Person die Touch-ID-Freigabe, gibt `komki up` kein `RIS_ZUGANG` mit und meldet das; der
+  Connector liest dann als Gast. Läuft das Token ab, antwortet er ebenso mit `credential-missing`, statt sich
+  neu anzumelden: Jede Anmeldung braucht eine eigene Freigabe per Touch ID.
 - `web.search`: `{"results": [{"title", "url", "snippet"}], "abrufdatum"}`
 - `vault.search`: `{"results": [{"note_id", "title", "labels"}]}`. Notizen ohne gültiges `komki_labels` erscheinen
   nicht.
 - `vault.read`: `{"note_id", "title", "content", "labels"}`
 - `vault.write_test`: `{"note_id", "labels"}`
+- `ratsprojekte.stand_lesen`: `{"stand"}` — der Inhalt der Stand-Datei als UTF-8-Text, unverändert. Welche Felder
+  darin stehen, entscheidet der Hub beim Ausgeben (Liste erlaubter Felder, #438). Keine Datei ergibt `not-found`, ein
+  Symlink `forbidden-path`, mehr als 1 MiB `too-large`.
 
 ## 6. Ablauf im Vermittler (Gate 1, Vollzug, Gate 2)
 
-Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine. Jede Entscheidung steht mit einem
+Jeder Connector-Aufruf besteht aus **drei Entscheidungen** der Engine (Ausnahme: Nur-Aufnahme-Operationen, §6.4). Jede Entscheidung steht mit einem
 eigenen PDR im Journal, sobald sie fällt, dazu der Vorbeleg vor dem Vollzug. Alle PDR eines Aufrufs tragen
 dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bzw. Speichern (`store`) in Gate 1, Aufnahme
 (`admit`) in Gate 2 (RFC R.5.5, R.5.6; Ticket #298).
@@ -191,14 +214,19 @@ dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bz
    ein GO-Beleg mit `outcome: released` direkt nach dem Verbrauch der Nonce (commit vor Wirkung,
    komki_policy CONTRACT §4.6). Der GO-Beleg ist die Entscheidung des Freigabe-Zweigs; für dasselbe Gate
    folgt kein `permitted`. So steht auch bei einem abgelehnten Aufruf jede Prüfung im Journal.
-6. Lehnt Schritt 3 **oder** Schritt 4 ab und kommt kein GO: Antwort mit Remedies, **kein Vollzug**. Die
+6. Lehnt Schritt 3 **oder** Schritt 4 ab und kommt kein GO: Antwort mit Remedies, **kein Vollzug**. Ausnahme:
+   Fällt bei `store` der Empfängertest, gibt es keinen GO-Weg (komki_policy CONTRACT §4.7, Ticket #417). Dann
+   trägt die Antwort nur den `hinweis`, dass nichts übertragen wurde, und `recipients_outside` aus dem Blocker
+   der Engine, ohne Remedies und Lockerungsbefugnisse; den vollen Katalog hält der PDR fest. Bei `store` mit
+   unbelegter Beobachterliste bietet die Engine ebenfalls kein GO an (komki_policy CONTRACT §4.7, Ticket #432) —
+   die Antwort behält dort die normale Form mit dem GO-losen Katalog, die GO-Runde entfällt. Die
    Antwort nennt keinen Vorbeleg (`emit_decision_id`), weil es keinen gibt. Nur wenn beide Schritte erlaubt
    sind (per Permit oder GO): der **Vorbeleg vor Wirkung** (`rule: emit`, `outcome: emitted`, `decision:
    null`, R.11), bevor der Connector aufgerufen wird. Er ist keine Entscheidung, die stehen schon im
    Journal. Seine `decision_id` ist die `call_id` im Frame, `authorized_by` nennt die `decision_id`s der
    beiden Entscheidungen, auf die er sich stützt (emit und transfer bzw. store samt Empfängerprüfung,
    jeweils `permitted` oder `released`), sein `payload_hash` bindet die ausgehende Anfrage. Das Antwortfeld `emit_decision_id` (Name aus Kompatibilität) verweist
-   auf ihn. PDR-Schema `komki-pdr/4`.
+   auf ihn. PDR-Schema `komki-pdr/5`.
 7. Die `call_id` entsteht nach der Vorprüfung (Schema, B_W). Jeder PDR des Aufrufs trägt sie:
    Entscheidungen, Ablehnungen, GO-Belege (`released`, `go_refused`, `go_timeout`, ein gescheiterter
    Commit), Vorbeleg und admit-PDR. Nur eine Ablehnung in der Vorprüfung hat keine, weil es noch keinen
@@ -227,10 +255,40 @@ dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bz
 `emit` in der Raumumgebung, danach `store` (komki_policy CONTRACT §4.7, Ticket #205) unter
 λ(y) = `assigned_label` mit `environment = vault-lokal@1`. Γ hat keine `store`-Regel: Jedes Schreiben ist ohne
 Aktionsfreigabe für genau diesen Call ein deny, der Vermittler fragt die nutzende Person wie beim GO für
-gesperrte Aufrufe (#98), ohne Zuhörer bleibt es beim deny. Erst nach store-Permit (oder Freigabe) schickt der
+gesperrte Aufrufe (#98), ohne Zuhörer bleibt es beim deny — sofern die Beobachterliste des Speichers belegt
+ist; sonst (Fakt `environment_observers_complete` nicht bekannt-`true`) bleibt es ohne GO-Runde beim deny
+(Ticket #432). Erst nach store-Permit (oder Freigabe) schickt der
 Vermittler `context.assigned_label = decision.assigned_label` (= B_W, aus der emit-Entscheidung) mit. Der Connector schreibt genau diese Labels als `komki_labels` in das
 Frontmatter (λ(y) = B_W, R.5.5) und gibt `note_id` und `labels` zurück. Gate 2 prüft, dass die
 zurückgemeldeten Labels gleich `assigned_label` sind.
+
+### 6.4 Nur-Aufnahme-Operationen (`kind: admit_only`, #419)
+
+Nach R.4.3 ist auch die Aufrufentscheidung eine Ausgabe. Davon gibt es eine eng begrenzte Ausnahme: Eine Anfrage, die
+nichts aus dem Raum trägt und die niemand außerhalb des Raums sieht, ist keine Ausgabe. Eine Operation darf nur dann
+`admit_only` sein, wenn **beides** gilt:
+
+1. Sie hat **keine Parameter** (leeres Schema). Die Anfrage ist eine Konstante; außer der Tatsache des Aufrufs trägt
+   sie nichts aus dem Raum.
+2. Die Beobachter ihrer Umgebung (`environment` der Operation) liegen **in den Beobachtern der Raumumgebung**
+   (`room.environment`). Niemand Neues sieht, dass gefragt wird.
+
+Der Vermittler prüft beides bei jedem Aufruf. Ist eines verletzt, antwortet er mit `decision: error` und einem PDR,
+ohne Entscheidung der Engine und ohne Vollzug. Gilt beides, entscheidet er wie bei `admit_document` nur die Aufnahme
+(`KomkiMediator.Gate`, Regelzweig `admit`), und zwar **vor** dem Vollzug: Objekt ist das feste `object` des Manifests,
+Version `v1`, Labels die `import_labels`; geprüft wird gegen B_W (R.5.4). Ein gleichnamiges Objekt in `room.json`
+ersetzt diese Labels nicht. Nur nach einem Permit ruft der Vermittler den Connector, und Gate 2 bindet die Antwort an
+das entschiedene Objekt. `emit` und `transfer` entfallen, es gibt keinen GO-Weg: Eine Ablehnung bleibt eine
+Ablehnung, und in einem Raum ohne die Bindung erfährt der Agent nicht einmal, ob es die Datei gibt.
+
+Journal eines erlaubten Aufrufs: `admit executing` → `admit admitted`. Abgelehnt: `admit not_admitted`.
+
+Einzige Operation dieser Art ist `ratsprojekte.stand_lesen`: Die Umgebung `lokaler-arbeitsraum@1` hat nur nutzende
+Person und Agent als Beobachter, das Label `ratsprojekte@1` steht im Manifest. Damit liest nur ein Raum mit
+`ratsprojekte@1` in B_W den Stand (Projektraum, Szene 12). Weil `ratsprojekte@1` keine `transfer`-Regel hat, brauchen
+alle Anfragen aus so einem Raum ein GO, und Websuche und RIS liegen zusätzlich außerhalb des Empfängerkreises. Eine
+`transfer`-Regel auf `ratsprojekte@1` wäre der falsche Weg gewesen, sie gäbe dem Projektraum einen freien Anfragekanal
+(Entscheidung vom 2026-11-12 in #419).
 
 ## 7. Γ-Konventionen (Default-Registry und Räume)
 
@@ -289,7 +347,12 @@ Zwei Referenzräume für Tests:
   (DNS-Rebinding-Schutz: auflösen, prüfen, mit genau dieser IP verbinden).
 - Log je Verbindung: Connector-Port, Host, Entscheidung, Bytes hin und zurück, Dauer. Keine Inhalte.
 - Für Mock-Betrieb (RIS-Mock auf Loopback) geht der Connector **nicht** über den Proxy. Sein Profil erlaubt
-  dann `localhost:<mock-port>`, und `komki_cli` setzt `--base-url http://127.0.0.1:<mock-port>/`.
+  dann `localhost:<mock-port>`, und `komki_cli` setzt `--base-url http://127.0.0.1:<mock-port>/`. Den echten
+  RIS-Zugang öffnet `komki up` dann nicht, sondern gibt den synthetischen Zugang des Mock-Seeds mit (#148, wie #496).
+- Der Web-Mock läuft auf Loopback im Klartext, und jeder lokale Prozess kann dessen Port binden. Deshalb
+  provisioniert `komki up` im Web-Mock statt des echten Brave-Schlüssels einen synthetischen Test-Key (#496),
+  und der Web-Connector sendet den Subscription-Token nur über `https` oder `http` auf Loopback; zu jedem
+  anderen Klartext-Ziel verweigert er die Suche.
 
 ## 10. Nicht in v1 (bewusst offen)
 

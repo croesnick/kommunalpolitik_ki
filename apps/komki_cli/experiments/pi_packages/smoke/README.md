@@ -105,6 +105,40 @@ die vorab registrierten Checklisten in [`grade-ab.mjs`](grade-ab.mjs) und
 `results.json` werden übersprungen. Protokoll und Ergebnisse:
 [Labbook 2026-10-31](../../../../../docs/research/2026-10-31-modell-ab.md).
 
+Das Build-A/B (#320) variiert statt des GGUFs die Binärdatei: Die Arme
+`V7`/`V8` in `ab-arms.mjs` tragen die Produktivkonfiguration nach #319
+(Thinking aus per `--reasoning off`, MTP-Drafter) je auf llama-server 0.7.0
+(Homebrew-Pin) und 0.8.0 (side-by-side aus dem Release-Bundle b11960). Ein
+Arm mit `bin` überschreibt `KOMKI_LLAMA_SERVER`; `run-ab.mjs` reicht ihn als
+`--bin` an `run-smoke.mjs` weiter und notiert Version und SHA-256 der
+Binärdatei je Arm im Provenance-Protokoll.
+
+```bash
+node smoke/run-ab.mjs --root <ab-root> --arms V7,V8 --preflight
+node smoke/run-ab.mjs --root <ab-root> --arms V7,V8 --runs 3 \
+  --timeout-factor 6 --seed-base 320000
+node smoke/grade-ab.mjs blind --root <ab-root>   # dann blind/grades.json ausfüllen
+node smoke/grade-ab.mjs report --root <ab-root> --reference V7
+```
+
+Das A/B zu 0.9.0 (#372) ergänzt den Arm `V9` (Release-Bundle b12110,
+side-by-side) und läuft mit `--arms V7,V8,V9 --seed-base 372000`. Seit #372
+liest der Harness die draft acceptance des MTP-Drafters aus dem llama-Log
+(gepoolt und je Aufgabe im Bericht). Der Bericht listet außerdem Läufe, in
+denen eine Messgröße fehlt, als Hinweis auf ein geändertes Log-Format.
+Der Arm `VB` ist das Homebrew-Bottle 0.9.0 samt ggml-Bottle, hergerichtet
+neben der Live-Instanz. Herkunft und Skript stehen im Labbook zu #372.
+
+Context-Checkpoints und den FA-Modus je Kontext zeigt das llama-Log nur mit
+`-lv 4`. Dafür gibt es die Debug-Arme `V7D`/`V9D` (V7/V9 plus `-lv 4`) und
+[`probe-lv4.mjs`](probe-lv4.mjs). Diese beschreibende Sonde geht in kein Gate
+ein:
+
+```bash
+node smoke/run-ab.mjs --root <probe-root> --arms V7D,V9D --runs 0 --seed-base 372800
+node smoke/probe-lv4.mjs --root <probe-root>   # probe.json, PROBE.md
+```
+
 Zusätzlich misst der Proxy seit #285 je Request die Zeit bis zum ersten
 Delta (`firstTokenMs`, Thinking eingeschlossen) und bis zur ersten sichtbaren
 Antwort (`firstAnswerMs`) und hält den Thinking-Text (`reasoning`) fest. Der

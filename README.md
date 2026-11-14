@@ -66,7 +66,7 @@ Vollständig stehen Prinzipien, Guardrails und Tooling-Vorgaben in [AGENTS.md](A
 | `apps/komki_egress` | einzige Tür ins Internet, je Connector nur zu freigegebenen Adressen | CLI |
 | `apps/komki_connector*` | Connectoren für RIS, Websuche, Vault und Sitzungsdokumente, plus gemeinsamer Vertrag | Connector-Socket |
 | `apps/ratsinfo` | RIS synchronisieren und volltextdurchsuchbar machen | CLI |
-| `apps/ratsprojekte` | Projekt-Dashboard: Realisierungsstränge, Vorbedingungen, Quellen, Antragsreife | LiveView und MCP |
+| `apps/ratsprojekte` | lokaler Hub für den Weg von der Idee zum Antrag (ADR 0004); Gerüst aus #435, Bau-Reihe #436–#440 läuft | LiveView |
 | `apps/shared` | gemeinsame Domain-Models der Elixir-Apps | Bibliothek |
 | `tools/allgaeuer_zeitung_mcp` | Allgäuer Zeitung durchsuchen und Artikel lesen | MCP |
 | `tools/pdf_ingest` | PDF-Text und Markierungen extrahieren, OCR für gescannte PDFs | MCP |
@@ -90,7 +90,7 @@ pre-commit install
 mix deps.get
 cd apps/ratsprojekte
 mix ecto.migrate
-mix phx.server   # Dashboard unter http://localhost:4000, MCP-Endpoint /mcp
+mix phx.server   # Hub-Oberfläche unter http://localhost:4000
 
 # ratsinfo systemweit (braucht ggf. sudo, Alternativen siehe Makefile)
 make install
@@ -118,7 +118,7 @@ Ohne laufenden `obsidian` CLI legen die Vault-Skills ihre Notizen unter `artifac
 
 - Der OpenCode-Weg hat die Sicherheitsgrenze von komki nicht. Nichtöffentliche Unterlagen gehören dort nicht hinein.
 - Beschlussnachverfolgung fehlt: ratsprojekte verknüpft Projekte noch nicht mit RIS-Sitzungen und trackt keine Fristen ([#32](https://github.com/croesnick/kommunalpolitik_ki/issues/32), [#33](https://github.com/croesnick/kommunalpolitik_ki/issues/33), [#34](https://github.com/croesnick/kommunalpolitik_ki/issues/34)).
-- Der Projektlebenszyklus ist teils Spezifikation. Im Code erzwungen ist die Proposal-Entscheidung, die übrigen Übergänge sichern bislang die Skills ([docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md)). Value Proposition und Success Metrics sind noch keine harten Gates ([#37](https://github.com/croesnick/kommunalpolitik_ki/issues/37)).
+- Der ratsprojekte-Hub erzwingt bewusst keinen Projektlebenszyklus: Phasen sind frei wechselbar, den Grund hält der Verlauf fest, und die Antragsreife ist eine Checkliste, die nichts sperrt ([docs/ratsprojekte-lifecycle.md](docs/ratsprojekte-lifecycle.md)). Stand ausgeben, Befragung und Vorschläge aus komki folgen ([#438](https://github.com/croesnick/kommunalpolitik_ki/issues/438), [#439](https://github.com/croesnick/kommunalpolitik_ki/issues/439), [#277](https://github.com/croesnick/kommunalpolitik_ki/issues/277)).
 - `obsidian_mcp` und `ratsinfo_mcp` liegen im Repo, `opencode.json` bindet sie nicht ein. Der Vault-Zugriff läuft über den `obsidian` CLI.
 - Für Öffentlichkeitsarbeit (Presse, Newsletter) gibt es noch kein Werkzeug.
 

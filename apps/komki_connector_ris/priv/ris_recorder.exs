@@ -1,7 +1,7 @@
-# Aufzeichnungs-Proxy fuer die RIS-API (risapi1.komuna.net/web/).
+# Aufzeichnungs-Proxy fuer die RIS-API (risapi3.komuna.net/web/).
 #
 #     elixir apps/komki_connector_ris/priv/ris_recorder.exs --port 4020 \
-#       [--upstream https://risapi1.komuna.net/web/] [--out <verzeichnis>]
+#       [--upstream https://risapi3.komuna.net/web/] [--out <verzeichnis>]
 #
 # Der Proxy nimmt Anfragen entgegen (komki-connector-ris mit --base-url
 # http://127.0.0.1:4020/ oder ratsinfo mit RIS_BASE_URL=http://127.0.0.1:4020/),
@@ -23,9 +23,10 @@
 #
 # Pfade ohne /web/-Praefix geben (Basis also http://127.0.0.1:<port>/, nicht
 # .../<port>/web/); der Proxy ergaenzt den Praefix upstream-seitig.
-# Zurueckspielen: priv/mock_ris.exs --port 4010 --mode replay --cassette <out>.
+# Zurueckspielen: Replay-Adapter der Mock-Runtime (apps/komki_mock),
+#   mix komki_mock.serve --adapter KomkiMock.Adapters.Replay --seed <out> --dir <zustand>
 #
-# Nur OTP (gen_tcp, httpc, ssl, json), keine Deps — wie mock_ris.exs.
+# Nur OTP (gen_tcp, httpc, ssl, json), keine Deps.
 
 Code.require_file("./ris_http.exs", __DIR__)
 
@@ -35,7 +36,7 @@ defmodule KomkiConnectorRis.RisRecorder do
   alias KomkiConnectorRis.RisHttp
 
   @redacted "<redacted>"
-  @default_upstream "https://risapi1.komuna.net/web/"
+  @default_upstream "https://risapi3.komuna.net/web/"
   @profile :ris_recorder
   @timeout_ms 60_000
 
@@ -117,33 +118,14 @@ defmodule KomkiConnectorRis.RisRecorder do
   @doc false
   @spec parse_cli([String.t()]) :: {:ok, keyword()} | {:error, String.t()}
   def parse_cli(argv) do
-    case parse_flags(argv, []) do
+    case RisHttp.parse_flags(argv, port: :integer, upstream: :string, out: :string) do
       {:ok, opts} ->
         if Keyword.has_key?(opts, :port), do: {:ok, opts}, else: {:error, @usage}
 
-      {:error, _} ->
+      :error ->
         {:error, @usage}
     end
   end
-
-  # Flags in beliebiger Reihenfolge; Unbekanntes oder Ungueltiges fuehrt zur
-  # Meldung statt zum stillen Nichtstun.
-  defp parse_flags([], acc), do: {:ok, acc}
-
-  defp parse_flags(["--port", value | rest], acc) do
-    case Integer.parse(value) do
-      {port, ""} -> parse_flags(rest, Keyword.put(acc, :port, port))
-      _ -> {:error, @usage}
-    end
-  end
-
-  defp parse_flags(["--upstream", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :upstream, value))
-
-  defp parse_flags(["--out", value | rest], acc),
-    do: parse_flags(rest, Keyword.put(acc, :out, value))
-
-  defp parse_flags(_other, _acc), do: {:error, @usage}
 
   @doc "Ersetzt die Werte der Kopfzeilen in `secret` durch \"<redacted>\"."
   @spec scrub_headers([{String.t(), String.t()}], [String.t()]) :: [{String.t(), String.t()}]
@@ -324,7 +306,7 @@ defmodule KomkiConnectorRis.RisRecorder do
   # (z. B. PDF-Downloads) bleibt bytetreu — ausser beim Login, dort wird ein
   # Nicht-JSON-Body ganz ersetzt.
   defp scrub_body(@auth_path, body) do
-    case decode_json(body) do
+    case RisHttp.decode_json(body) do
       {:ok, term} -> IO.iodata_to_binary(:json.encode(redact_all(term)))
       :error when body == "" -> body
       :error -> @redacted
@@ -332,16 +314,10 @@ defmodule KomkiConnectorRis.RisRecorder do
   end
 
   defp scrub_body(_path, body) do
-    case decode_json(body) do
+    case RisHttp.decode_json(body) do
       {:ok, term} -> IO.iodata_to_binary(:json.encode(redact_json(term, @secret_body_keys)))
       :error -> body
     end
-  end
-
-  defp decode_json(body) do
-    {:ok, :json.decode(body)}
-  rescue
-    _ -> :error
   end
 
   # :json.encode kennt keine Tupel: Kopfzeilen als [name, value]-Listen.
@@ -384,23 +360,15 @@ defmodule KomkiConnectorRis.RisRecorder do
 
   @doc """
   `:ok`, wenn `out` ausserhalb jedes Git-Repos liegt (auch Worktrees, deren
-  `.git` eine Datei ist), sonst `{:error, {:out_in_repo, repo}}`.
+  `.git` eine Datei ist, und Symlinks hinein — RisHttp.repo_free?/1), sonst
+  `{:error, {:out_in_repo, repo}}`.
   """
   @spec check_out(Path.t()) :: :ok | {:error, {:out_in_repo, Path.t()}}
   def check_out(out) do
-    out
-    |> Path.expand()
-    |> ancestors()
-    |> Enum.find(&File.exists?(Path.join(&1, ".git")))
-    |> case do
-      nil -> :ok
-      repo -> {:error, {:out_in_repo, repo}}
+    case RisHttp.repo_free?(out) do
+      :ok -> :ok
+      {:error, {:in_repo, repo}} -> {:error, {:out_in_repo, repo}}
     end
-  end
-
-  defp ancestors(path) do
-    parent = Path.dirname(path)
-    if parent == path, do: [path], else: [path | ancestors(parent)]
   end
 
   # Nur fuer den Eigentuemer: die Kassetten tragen nicht-oeffentliche Inhalte.

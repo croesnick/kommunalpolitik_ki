@@ -9,6 +9,11 @@ Ausnahme: `list_documents*.json` stammen aus `KomkiMediator.Gate.list_documents/
 mit dem Default-Raum (`list_documents`) und einem Raum, dessen B_W kein
 Dokument zulässt (`list_documents_leer`).
 
+`vault_write_test_empfaenger.json` stammt aus dem Raum vertraulich mit einem
+nur für den Test erweiterten Γ: Die Umgebung `vault-lokal@1` hat dort den
+zusätzlichen Beobachter `sync-dienst`, wie in
+`KomkiMediator.GoStoreTest` (Ticket #417). Der Default-Γ hat kein solches Ziel.
+
 Die Inhalte sind erfunden (Sitzungen, Titel, Notizen, Treffer). Nur die
 Antwortformen sind echt: zugelassen, abgelehnt (Gate 1 und Gate 2),
 zurückgehalten, Connector nicht erreichbar, nicht gefunden, Vorprüfung

@@ -1,0 +1,19 @@
+{
+  "ausgabeart": "ratsprojekte-essenz",
+  "authority": "nutzende-person",
+  "call_hash": "34a25b270f7564183f67fa254135f7c60dd91e54b81b48562758a18cab7e640f",
+  "content_digest": "5a3f9f5da4d9d2a0eacbd56c1d1b1cbaf74e2fbd0cb0a28f61f5f45cb71f1b3c",
+  "kind": "offenlegungsfreigabe",
+  "nonce": "n-offenlegung-a",
+  "object": "obj-essenz-a@v1",
+  "operation": "store",
+  "release_id": "go-offenlegung-a",
+  "schema": "komki-release/2",
+  "scope": "go-ws-fraktionsraum",
+  "valid_from": 1000,
+  "valid_until": 1100,
+  "workspace": "ws-fraktionsraum",
+  "ziellabel": [
+    "fraktion-intern@1"
+  ]
+}

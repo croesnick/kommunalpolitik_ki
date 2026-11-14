@@ -9,7 +9,16 @@
  * the llama-server default of 0.05. C carries the thinking-mode
  * recommendation of the Qwen3.8-27B model card (min_p 0, presence and
  * repetition penalties neutral).
+ *
+ * The server-build A/B (Ticket #320) keeps GGUF, drafter, sampling, flags
+ * and seed fixed and varies only the llama-server binary: arms with a
+ * `bin` override KOMKI_LLAMA_SERVER for their runs.
  */
+
+import path from "node:path";
+
+import { EXPERIMENTS_ROOT } from "../lib/config.mjs";
+import { DEFAULT_LLAMA_SERVER } from "./staging-server.mjs";
 
 const GEMMA_SAMPLING = { temp: 1.0, "top-p": 0.95, "top-k": 64 };
 
@@ -92,6 +101,55 @@ ARMS.A0M = {
   serverArgs: [...ARMS.A0.serverArgs, ...MTP_ARGS],
   port: 49618,
 };
+
+// Server-build arms (Ticket #320): the production configuration after #319
+// (thinking off via --reasoning, MTP drafter). GGUF, drafter, sampling,
+// flags and seed are identical for both arms — only the llama-server binary
+// varies. V7 is the Homebrew pin (the live instance's binary), V8 the
+// side-by-side v0.8.0 release build b11960, commit 8642541b2, extracted
+// from the release asset llama-b11960-bin-macos-arm64.tar.gz
+// (SHA-256 58e5a5e1d7c2bf66cedd9c29e0323f3e570660a70a1e2156d32eed08f4cc1e3c).
+const PRODUCTION_ARGS = ["--reasoning", "off", ...MTP_ARGS];
+
+ARMS.V7 = {
+  ...ARMS.A,
+  label: "Production config on llama-server 0.7.0 (build 11669, Homebrew pin)",
+  draft: DRAFTS.A,
+  serverArgs: PRODUCTION_ARGS,
+  bin: DEFAULT_LLAMA_SERVER,
+  port: 49619,
+};
+ARMS.V8 = {
+  ...ARMS.V7,
+  label: "Production config on llama-server 0.8.0 (build 11960, v0.8.0)",
+  bin: path.join(EXPERIMENTS_ROOT, "downloads", "b11960", "llama-b11960", "llama-server"),
+  port: 49620,
+};
+// Ticket #372: V9 is the v0.9.0 release build b12110, commit cd959bae9,
+// extracted from llama-b12110-bin-macos-arm64.tar.gz (SHA-256
+// 4f5b8de12e0b9516658ca6a5764c6ffb3d7c659c3dd538556b1413c7b4050662).
+// V8 runs along as a descriptive arm; the gates compare V9 against V7.
+ARMS.V9 = {
+  ...ARMS.V7,
+  label: "Production config on llama-server 0.9.0 (build 12110, v0.9.0)",
+  bin: path.join(EXPERIMENTS_ROOT, "downloads", "b12110", "llama-b12110", "llama-server"),
+  port: 49622,
+};
+// After the GO (#372): VB is the Homebrew bottle llama.cpp 0.9.0 (same commit
+// as b12110, SHA-256 a620e51b…d9c2) on its separate ggml 0.29.0 bottle
+// (SHA-256 d1b27be6…f6f2), relocated side by side like brew's pour (see the
+// labbook). Gated against V7 before the re-pin.
+ARMS.VB = {
+  ...ARMS.V7,
+  label: "Production config on llama-server 0.9.0 (Homebrew bottle, ggml 0.29.0)",
+  bin: path.join(EXPERIMENTS_ROOT, "downloads", "brew-0.9.0", "x", "llama.cpp", "0.9.0", "bin", "llama-server"),
+  port: 49623,
+};
+// Debug probe (#372, descriptive, no gate): V7 and V9 with debug logging,
+// which is the only way to see context-checkpoint restores and the FA mode
+// per context in the llama log. Evaluated by probe-lv4.mjs.
+ARMS.V7D = { ...ARMS.V7, label: `${ARMS.V7.label}, -lv 4`, serverArgs: [...PRODUCTION_ARGS, "-lv", "4"] };
+ARMS.V9D = { ...ARMS.V9, label: `${ARMS.V9.label}, -lv 4`, serverArgs: [...PRODUCTION_ARGS, "-lv", "4"] };
 
 /**
  * Seed per round: round 0 is the warm-up, 1..n are measured runs; all arms

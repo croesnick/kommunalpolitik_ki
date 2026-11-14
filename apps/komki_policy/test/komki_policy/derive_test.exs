@@ -416,8 +416,7 @@ defmodule KomkiPolicy.DeriveTest do
       assert ["lokale-fallverarbeitung", "nutzende-person"] =
                Calculus.allowed_recipients(reg, ["buergerfall-4711@1"])
 
-      assert ["eigene-rz-analyse", "lokale-fallverarbeitung", "nutzende-person", "webdienst-x"] =
-               Calculus.allowed_recipients(reg, [])
+      assert reg.observers == Calculus.allowed_recipients(reg, [])
     end
 
     test "actual_recipients und labels_subset?" do
@@ -479,6 +478,219 @@ defmodule KomkiPolicy.DeriveTest do
                Derive.decide(registry(), snapshot, intent)
 
       assert Enum.map(transitions, & &1["type"]) == ["neuer_raum", "aktionsfreigabe"]
+    end
+
+    # Ticket #417: when storing, no GO replaces the recipient test (R.5.7).
+    test "unzulässiger Empfänger: kein call-GO, auch nicht für missing_operation_rule daneben" do
+      snapshot = fixture("case_store_recipient/snapshot.json")
+      intent = fixture("case_store_recipient/intent.json")
+
+      assert {:ok, %{"decision" => "deny", "blockers" => blockers, "remedies" => remedies}} =
+               Derive.decide(registry(), snapshot, intent)
+
+      assert Enum.map(remedies, & &1["code"]) == [
+               "recipient_not_allowed",
+               "missing_operation_rule"
+             ]
+
+      for r <- remedies, do: assert([%{"type" => "neuer_raum"}] = r["transitions"])
+
+      # The check names who lies outside the recipient circle: webdienst-x
+      # observes the target but does not read buergerfall-4711@1.
+      assert [%{"recipients_outside" => ["webdienst-x"]}, _] = blockers
+      assert [%{"recipients_outside" => ["webdienst-x"]}, _] = remedies
+    end
+
+    test "Freigabe-Zweig: ein gültiges GO führt bei unzulässigem Empfänger nicht zu permit" do
+      snapshot = fixture("case_release_store_recipient/snapshot.json")
+      intent = fixture("case_release_store_recipient/intent.json")
+      release = fixture("case_release_store_recipient/release.json")
+      stand = fixture("case_release_store_recipient/stand.json")
+
+      # The same release permits the store into the local environment.
+      permitted = put_in(snapshot, ["workspace", "environment"], "lokale-fallverarbeitung@1")
+
+      assert {:ok, %{"decision" => "permit"}} =
+               Derive.decide_with_release(registry(), permitted, intent, release, stand)
+
+      assert {:ok,
+              %{
+                "decision" => "deny",
+                "blockers" => [%{"code" => "recipient_not_allowed"}],
+                "release" => nil
+              }} = Derive.decide_with_release(registry(), snapshot, intent, release, stand)
+    end
+
+    test "Freigabe-Zweig: neben recipient_not_allowed auch für Release-Blocker nur neuer_raum" do
+      snapshot = fixture("case_release_store_recipient/snapshot.json")
+      intent = fixture("case_release_store_recipient/intent.json")
+      release = fixture("case_release_store_recipient/release.json")
+      stand = fixture("case_release_store_recipient/stand.json")
+
+      expired = Map.put(stand, "as_of", release["valid_until"] + 1)
+
+      assert {:ok, %{"decision" => "deny", "remedies" => remedies}} =
+               Derive.decide_with_release(registry(), snapshot, intent, release, expired)
+
+      assert Enum.map(remedies, & &1["code"]) == ["recipient_not_allowed", "release_expired"]
+
+      for r <- remedies, do: assert([%{"type" => "neuer_raum"}] = r["transitions"])
+    end
+
+    # Ticket #432: no GO bridges an unproven observer list when storing —
+    # a GO cannot prove who reads along (Gegenprobe 11.15).
+    test "unbelegte Beobachterliste: kein call-GO, auch nicht für missing_operation_rule daneben" do
+      snapshot = fixture("case_store_observers_unproven/snapshot.json")
+      intent = fixture("case_store_observers_unproven/intent.json")
+
+      assert {:ok, %{"decision" => "deny", "blockers" => blockers, "remedies" => remedies}} =
+               Derive.decide(registry(), snapshot, intent)
+
+      assert Enum.map(blockers, & &1["code"]) == ["missing_operation_rule"]
+
+      for r <- remedies, do: assert([%{"type" => "neuer_raum"}] = r["transitions"])
+    end
+
+    test "Freigabe-Zweig: ein gültiges GO führt bei unbelegter Beobachterliste nicht zu permit" do
+      snapshot = fixture("case_release_store_observers/snapshot.json")
+      intent = fixture("case_release_store_observers/intent.json")
+      release = fixture("case_release_store_observers/release.json")
+      stand = fixture("case_release_store_observers/stand.json")
+
+      # Gegenprobe 11.15, the other direction: the very same GO permits the
+      # store once the observer list is proven — the flag decides, not the GO.
+      proven = put_in(snapshot, ["facts", "environment_observers_complete", "value"], true)
+
+      assert {:ok, %{"decision" => "permit"}} =
+               Derive.decide_with_release(registry(), proven, intent, release, stand)
+
+      assert {:ok,
+              %{
+                "decision" => "deny",
+                "blockers" => [%{"code" => "recipients_unproven"}],
+                "release" => nil,
+                "remedies" => remedies
+              }} = Derive.decide_with_release(registry(), snapshot, intent, release, stand)
+
+      for r <- remedies, do: assert([%{"type" => "neuer_raum"}] = r["transitions"])
+    end
+
+    test "Freigabe-Zweig: fehlt der Fakt völlig, gilt dasselbe wie bei false" do
+      snapshot = fixture("case_release_store_observers/snapshot.json")
+      intent = fixture("case_release_store_observers/intent.json")
+      release = fixture("case_release_store_observers/release.json")
+      stand = fixture("case_release_store_observers/stand.json")
+
+      without_fact =
+        put_in(
+          snapshot,
+          ["facts"],
+          Map.delete(snapshot["facts"], "environment_observers_complete")
+        )
+
+      assert {:ok, %{"decision" => "deny", "blockers" => [%{"code" => "recipients_unproven"}]}} =
+               Derive.decide_with_release(registry(), without_fact, intent, release, stand)
+    end
+
+    # The release branch keeps the premise order of § 4.7 (P4 before P5 and
+    # P6), so a mixed deny lists the findings in that order — the same GO
+    # stays valid throughout: its hash binds digest, object, operation and
+    # workspace, none of which this constellation changes.
+    test "Freigabe-Zweig: Befundordnung wie § 4.7 — Flag vor Labelerhalt vor Empfängertest" do
+      snapshot = fixture("case_release_store_observers/snapshot.json")
+      intent = fixture("case_release_store_observers/intent.json")
+      release = fixture("case_release_store_observers/release.json")
+      stand = fixture("case_release_store_observers/stand.json")
+
+      mixed =
+        snapshot
+        |> put_in(["workspace", "bindings"], ["lizenz-namensnennung@1"])
+        |> put_in(["workspace", "environment"], "recherche-webdienst@1")
+
+      assert {:ok, %{"decision" => "deny", "blockers" => blockers}} =
+               Derive.decide_with_release(registry(), mixed, intent, release, stand)
+
+      assert Enum.map(blockers, & &1["code"]) ==
+               ["recipients_unproven", "label_not_preserved", "recipient_not_allowed"]
+    end
+
+    # The #432 × #423 seam: the Offenlegungsfreigabe replaces the
+    # Aktionsfreigabe on a store denial with matching Befugnisse — but not
+    # when the observer list is unproven. Both release kinds re-check the
+    # flag, so an unproven list leaves the catalog no GO of any kind.
+    test "unbelegte Beobachterliste: auch das Offenlegungs-Angebot entfällt (#423)" do
+      snapshot = fixture("case_offenlegung_offer/snapshot.json")
+      intent = fixture("case_offenlegung_offer/intent.json")
+
+      {:ok, proven} = Derive.decide(registry(), snapshot, intent)
+
+      types = for r <- proven["remedies"], t <- r["transitions"], do: t["type"]
+      assert "offenlegungsfreigabe" in types
+
+      unproven = put_in(snapshot, ["facts", "environment_observers_complete", "value"], false)
+
+      assert {:ok, %{"decision" => "deny", "remedies" => remedies}} =
+               Derive.decide(registry(), unproven, intent)
+
+      for r <- remedies do
+        assert [%{"type" => "neuer_raum"}] = r["transitions"]
+      end
+    end
+
+    test "Offenlegungsfreigabe: unbelegte Beobachterliste lehnt auch ein gültiges GO ab (§ 4.9)" do
+      snapshot = fixture("case_offenlegung_permit/snapshot.json")
+      intent = fixture("case_offenlegung_permit/intent.json")
+      release = fixture("case_offenlegung_permit/release.json")
+      stand = fixture("case_offenlegung_permit/stand.json")
+
+      unproven = put_in(snapshot, ["facts", "environment_observers_complete", "value"], false)
+
+      assert {:ok,
+              %{
+                "decision" => "deny",
+                "blockers" => [%{"code" => "recipients_unproven"}],
+                "release" => nil
+              }} = Derive.decide_with_release(registry(), unproven, intent, release, stand)
+    end
+  end
+
+  describe "unbelegte Beobachterliste: emit/transfer unverändert (#354)" do
+    test "emit: Katalog bietet das call-GO weiter an" do
+      snapshot = fixture("case_emit_deny_purpose/snapshot.json")
+      intent = fixture("case_emit_deny_purpose/intent.json")
+
+      unproven = put_in(snapshot, ["facts", "environment_observers_complete", "value"], false)
+
+      assert {:ok, %{"decision" => "deny", "remedies" => [remedy | _]}} =
+               Derive.decide(registry(), unproven, intent)
+
+      assert "aktionsfreigabe" in Enum.map(remedy["transitions"], & &1["type"])
+    end
+
+    test "transfer: Katalog bietet das call-GO weiter an" do
+      snapshot = fixture("case_transfer_recipient/snapshot.json")
+      intent = fixture("case_transfer_recipient/intent.json")
+
+      unproven = put_in(snapshot, ["facts", "environment_observers_complete", "value"], false)
+
+      assert {:ok, %{"decision" => "deny", "remedies" => [remedy | _]}} =
+               Derive.decide(registry(), unproven, intent)
+
+      assert "aktionsfreigabe" in Enum.map(remedy["transitions"], & &1["type"])
+    end
+
+    test "Freigabe-Zweig: emit und transfer erlauben ein gültiges GO weiter" do
+      for dir <- ["case_release_permit", "case_release_transfer_permit"] do
+        snapshot = fixture(Path.join(dir, "snapshot.json"))
+        intent = fixture(Path.join(dir, "intent.json"))
+        release = fixture(Path.join(dir, "release.json"))
+        stand = fixture(Path.join(dir, "stand.json"))
+
+        unproven = put_in(snapshot, ["facts", "environment_observers_complete", "value"], false)
+
+        assert {:ok, %{"decision" => "permit"}} =
+                 Derive.decide_with_release(registry(), unproven, intent, release, stand)
+      end
     end
   end
 

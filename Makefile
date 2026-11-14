@@ -1,4 +1,4 @@
-.PHONY: test lint format ci deps elixir-test python-test install komki komki-tresor komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview
+.PHONY: test lint format ci deps elixir-test python-test install ratsprojekte komki komki-tresor komki-paket komki-formel komki-tap komki-burrito docs docs-build docs-preview screenshot-install
 
 # Escript bauen und nach /usr/local/bin symlinken.
 # Workspace-Pattern: mix.exs der ratsinfo-App referenziert ../artifacts/deps
@@ -23,6 +23,43 @@ komki: komki-tresor
 	@echo ""
 	@echo "komki gebaut: $(KOMKI_LINK_DIR)/komki"
 	@echo "Weiter mit: komki setup"
+
+# ratsprojekte-Hub als Release aus dem Checkout (Ticket #440, ADR 0004): Assets,
+# Release, komki-tresor nach bin/ (der Hub versiegelt seinen Datenbank-Schlüssel
+# damit). Installiert wird eine Kopie nach RATSPROJEKTE_OPT, damit der Hub nicht
+# an einem Checkout oder Worktree hängt; der Befehl `ratsprojekte` zeigt dorthin.
+# Läuft der Hub schon (LaunchAgent eingerichtet), wird er angehalten, ersetzt und
+# gesperrt neu gestartet. Beim ersten Mal danach: ratsprojekte einrichten.
+RATSPROJEKTE_REL = $(PWD)/apps/ratsprojekte/_build/prod/rel/ratsprojekte
+RATSPROJEKTE_OPT ?= $(HOME)/.local/opt/ratsprojekte
+RATSPROJEKTE_PLIST = $(HOME)/Library/LaunchAgents/ratsprojekte.hub.plist
+ratsprojekte: komki-tresor
+	@cd apps/ratsprojekte && MIX_ENV=prod mix deps.get >/dev/null && MIX_ENV=prod mix compile \
+	  && MIX_ENV=prod mix assets.setup >/dev/null && MIX_ENV=prod mix assets.deploy >/dev/null \
+	  && MIX_ENV=prod mix release --overwrite --quiet
+	@cp apps/komki_cli/priv/komki-tresor "$(RATSPROJEKTE_REL)/bin/komki-tresor"
+	@if [ -f "$(RATSPROJEKTE_PLIST)" ]; then \
+	  launchctl bootout gui/$$(id -u)/ratsprojekte.hub 2>/dev/null || true; \
+	  while launchctl print gui/$$(id -u)/ratsprojekte.hub >/dev/null 2>&1; do sleep 0.2; done; \
+	fi
+	@mkdir -p "$(RATSPROJEKTE_OPT)" "$(KOMKI_LINK_DIR)"
+	@rsync -a --delete "$(RATSPROJEKTE_REL)/" "$(RATSPROJEKTE_OPT)/"
+	@ln -sf "$(RATSPROJEKTE_OPT)/bin/ratsprojekte-befehl" "$(KOMKI_LINK_DIR)/ratsprojekte"
+	@echo "ratsprojekte installiert: $(RATSPROJEKTE_OPT), Befehl $(KOMKI_LINK_DIR)/ratsprojekte"
+	@if [ -f "$(RATSPROJEKTE_PLIST)" ]; then "$(RATSPROJEKTE_OPT)/bin/ratsprojekte-befehl" launchagent an; \
+	  else echo "Weiter mit: ratsprojekte einrichten"; fi
+
+# Screenshot-Werkzeug (#510) an einen festen Ort außerhalb jedes Worktrees.
+# Interaktive Sessions starten nur den Starter bin/komki-screenshot außerhalb
+# ihrer Sandbox (.claude/settings.json); die Sandbox darf dort nicht schreiben,
+# Edit und Write sind dort gesperrt. Quelle ist der Stand von main auf GitHub
+# (gh api), nicht das lokale .git, das Sessions beschreiben dürfen; die
+# Laufzeit kommt aus dessen .tool-versions, ohne einen Interpreter zu starten.
+# Im Haupt-Checkout ausführen, nach dem Merge. Details: scripts/screenshot/install.sh.
+SCREENSHOT_HOME ?= $(HOME)/.local/share/komki-tools/screenshot
+SCREENSHOT_REF ?= main
+screenshot-install:
+	@sh scripts/screenshot/install.sh "$(SCREENSHOT_HOME)" "$(SCREENSHOT_REF)"
 
 # komki-tresor: versiegelt Geheimnisse mit der Secure Enclave (Swift, weil
 # Erlang die Enclave nicht erreicht; Quelle apps/komki_cli/native). komki
@@ -59,7 +96,7 @@ komki-paket: komki-tresor
 	@shasum -a 256 "$(KOMKI_PAKET).tar.gz"
 
 # Formel aus der Vorlage: Adresse, Version und Pruefsumme des Pakets.
-KOMKI_RELEASE_URL = https://github.com/croesnick/kommunalpolitik_ki/releases/download/komki-v$(KOMKI_VERSION)/komki-$(KOMKI_VERSION)-macos-arm64.tar.gz
+KOMKI_RELEASE_URL = https://github.com/croesnick/kommunalpolitik_ki/releases/download/komki/v$(KOMKI_VERSION)/komki-$(KOMKI_VERSION)-macos-arm64.tar.gz
 define komki_formel
 	sha=$$(shasum -a 256 "$(KOMKI_PAKET).tar.gz" | cut -d' ' -f1); \
 	  sed -e "s|@URL@|$(1)|" -e "s/@VERSION@/$(KOMKI_VERSION)/g" -e "s/@SHA256@/$$sha/" packaging/homebrew/komki.rb.in > "$(2)"

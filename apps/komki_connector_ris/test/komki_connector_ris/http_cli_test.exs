@@ -36,7 +36,7 @@ defmodule KomkiConnectorRis.HttpCliTest do
   end
 
   test "HTTPS-Optionen: verify_peer, CA-Zertifikate, Hostname-Pruefung, Timeout" do
-    opts = Http.http_options("https://risapi1.komuna.net/web/meetings/1", 5_000)
+    opts = Http.http_options("https://risapi3.komuna.net/web/meetings/1", 5_000)
     assert opts[:timeout] == 5_000
     assert opts[:connect_timeout] == 5_000
     assert opts[:autoredirect] == false
@@ -44,7 +44,7 @@ defmodule KomkiConnectorRis.HttpCliTest do
     ssl = opts[:ssl]
     assert ssl[:verify] == :verify_peer
     assert is_list(ssl[:cacerts]) and ssl[:cacerts] != []
-    assert ssl[:server_name_indication] == ~c"risapi1.komuna.net"
+    assert ssl[:server_name_indication] == ~c"risapi3.komuna.net"
     assert is_function(ssl[:customize_hostname_check][:match_fun])
 
     # Klartext: leere ssl-Option, damit httpc keinen Default ueber
@@ -54,7 +54,7 @@ defmodule KomkiConnectorRis.HttpCliTest do
 
   describe "CLI.parse" do
     test "Pflicht- und Optionsargumente" do
-      assert {:ok, %{socket: "/tmp/s", base_url: "https://risapi1.komuna.net/web/", proxy: nil}} =
+      assert {:ok, %{socket: "/tmp/s", base_url: "https://risapi3.komuna.net/web/", proxy: nil}} =
                CLI.parse(["--socket", "/tmp/s"])
 
       assert {:ok, %{base_url: "http://127.0.0.1:4010/", proxy: {"127.0.0.1", 49_600}}} =

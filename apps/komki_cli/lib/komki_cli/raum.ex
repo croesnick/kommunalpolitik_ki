@@ -1,7 +1,7 @@
 defmodule KomkiCli.Raum do
   @moduledoc """
   Raum anzeigen und wechseln (Ticket #268): `komki raum` und
-  `komki raum recherche|vertraulich`.
+  `komki raum recherche|vertraulich|fraktion|projektraum`.
 
   Ein Raum ist hier sein B_W, die `workspace_bindings` in
   `<base>/mediator/room.json`. Gewechselt wird nur zwischen den beiden
@@ -48,7 +48,13 @@ defmodule KomkiCli.Raum do
   @descriptions %{
     "recherche" => "RIS, Websuche und öffentliche Notizen. Vertrauliche Notizen sind unsichtbar.",
     "vertraulich" =>
-      "Auch vertrauliche Notizen. Nach draußen geht nichts ohne dein GO für den einzelnen Aufruf."
+      "Auch vertrauliche Notizen. Nach draußen geht nichts ohne dein GO für den einzelnen Aufruf.",
+    "fraktion" =>
+      "Interne Fraktionsarbeit und die Projektidee. In den ratsprojekte-Hub geht nur gegengelesene " <>
+        "Essenz — mit Offenlegung gegenüber dem Vorstand, Teile wählst du vorher ab.",
+    "projektraum" =>
+      "Wie recherche, dazu der Stand aus ratsprojekte. Websuche, RIS und Vault nur mit deinem GO " <>
+        "für den einzelnen Aufruf."
   }
 
   @typedoc "Abhängigkeiten, in Tests ersetzbar."
@@ -59,12 +65,20 @@ defmodule KomkiCli.Raum do
           restart: (Config.t() -> {:ok, term()} | {:error, String.t()})
         }
 
-  @doc "Namen und B_W der Referenzräume."
+  @doc """
+  Namen und B_W der Referenzräume. Der Fraktionsraum liefert seit #423
+  gegengelesene Essenz in den ratsprojekte-Hub — als Lockerung mit
+  Offenlegungsfreigabe über genau diesen Aufruf (Szene 13); der Vorstand
+  fehlt im Empfängerkreis fraktionsinterner Bindungen. Nur der Projektraum
+  (#419, Szene 12) nimmt den Stand aus ratsprojekte auf.
+  """
   @spec rooms() :: %{String.t() => [String.t()]}
   def rooms do
     %{
       "recherche" => Templates.recherche_bindings(),
-      "vertraulich" => Templates.vertraulich_bindings()
+      "vertraulich" => Templates.vertraulich_bindings(),
+      "fraktion" => Templates.fraktion_bindings(),
+      "projektraum" => Templates.projektraum_bindings()
     }
   end
 

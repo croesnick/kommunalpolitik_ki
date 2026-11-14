@@ -27,7 +27,8 @@ Als Markdown liest der Agent beide Seiten direkt aus dem Repo: [in-betrieb-nehme
 | Xcode Command Line Tools (`xcode-select --install`) | macOS zeigt ein Fenster, das nur du bestätigen kannst | Im Fenster auf „Installieren“ klicken |
 | Modell laden (17 GB) und MTP-Drafter laden (0,5 GB), Lizenz Apache-2.0 | Großer Download, du stimmst der Lizenz zu | Im Terminal `komki setup --demo` und beide Fragen mit `j` beantworten, oder dem Agenten den Pfad zu vorhandenen Dateien geben (`--gguf-from PFAD`, `--drafter-from PFAD`) |
 | Brave-Schlüssel für die Websuche | Ein Geheimnis gehört nicht in den Chat mit dem Agenten | Im Terminal `komki secret set brave`, oder überspringen: RIS und Vault laufen auch ohne |
-| Touch ID bei jedem Start | Nur du öffnest das Siegel des Schlüssels | Freigeben, wenn macOS mit „komki startet den Connector web“ fragt |
+| RIS-Zugang für die Texte der Tagesordnungspunkte | Dein Passwort gehört nicht in den Chat mit dem Agenten | Im Terminal `komki secret set ris`, oder überspringen: Dann liest komki im RIS meist nur die Titel |
+| Touch ID bei jedem Start | Nur du öffnest das Siegel des Schlüssels | Freigeben, wenn macOS mit „komki startet den Connector web“ oder „… ris“ fragt |
 | Veränderte Programme nach einem Neubau übernehmen | Nur wer selbst gebaut hat, weiß, dass die neue Prüfsumme stimmt | Im Terminal `komki setup` und die Frage mit `j` beantworten |
 
 Diese Fragen beantwortet komki ohne Terminal nie mit Ja. Auch eine hineingepipte Antwort wie `yes j | komki setup` zählt nicht. So sieht der Agent das in einem echten Lauf, wenn sich komki nach einem Neubau verändert hat:

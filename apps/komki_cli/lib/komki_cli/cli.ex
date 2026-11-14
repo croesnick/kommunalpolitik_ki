@@ -10,15 +10,15 @@ defmodule KomkiCli.CLI do
 
       komki version
       komki setup [--demo] [--vault-dir PATH] [--gguf-from PATH] [--drafter-from PATH] [--port N]
-      komki secret set NAME | komki secret list
+      komki secret set NAME | komki secret list | komki secret erzeugen NAME
       komki journal verify
       komki init  [--gguf-from PATH] [--drafter-from PATH] [--port N] [--ctx N]
-                  [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--force]
+                  [--vault-dir PATH] [--ris-base-url URL] [--ris-mock-port N] [--web-mock-port N] [--force]
       komki doctor
       komki up    [--ctx N]
       komki down
       komki status
-      komki raum [recherche|vertraulich]
+      komki raum [recherche|vertraulich|fraktion|projektraum]
       komki go
       komki run "PROMPT" [--mode text|json] [--scratch PATH] [--timeout SEKUNDEN] [--capture-denials]
       komki session [FILE ...] [--continue] [--detach] [--decided-by ID]
@@ -105,6 +105,8 @@ defmodule KomkiCli.CLI do
     halt(code)
   end
 
+  # ex_pdfium (#290) needs no bootstrap here: only the documents connector
+  # role uses it, and it cannot load from an escript anyway (#288).
   # Exqlite ist die einzige NIF-Abhaengigkeit (SQLite-Registry des
   # Label-Store). `Application.app_dir(:exqlite)/ebin` schaut auf dem
   # Code-Pfad; im Escript-Kontext ist exqlite im Zip und der Pfad zeigt in
@@ -228,7 +230,20 @@ defmodule KomkiCli.CLI do
               ]
             ]
           ],
-          list: [name: "list", description: "erwartete Schlüssel und ob sie vorhanden sind"]
+          list: [name: "list", description: "erwartete Schlüssel und ob sie vorhanden sind"],
+          erzeugen: [
+            name: "erzeugen",
+            description:
+              "Token neu erzeugen, versiegelt ablegen und nur seinen SHA-256 ausgeben " <>
+                "(z.B. 'komki secret erzeugen ratsprojekte-hub | ratsprojekte connector-token')",
+            args: [
+              name: [
+                value_name: "NAME",
+                required: true,
+                help: "Kurzname eines Tokens, den komki selbst erzeugt"
+              ]
+            ]
+          ]
         ]
       ],
       journal: [
@@ -278,13 +293,20 @@ defmodule KomkiCli.CLI do
           ris_base_url: [
             value_name: "URL",
             long: "ris-base-url",
-            help: "RIS-API-Basis (default https://risapi1.komuna.net/web/)"
+            help: "RIS-API-Basis (default https://risapi3.komuna.net/web/)"
           ],
           ris_mock_port: [
             value_name: "N",
             long: "ris-mock-port",
             parser: :integer,
             help: "RIS-Mock auf 127.0.0.1:N statt echter API (ohne Egress-Proxy)"
+          ],
+          web_mock_port: [
+            value_name: "N",
+            long: "web-mock-port",
+            parser: :integer,
+            help:
+              "Brave-Mock auf 127.0.0.1:N statt echter Websuche (ohne Egress-Proxy, synthetischer Test-Key statt des echten Schlüssels)"
           ]
         ],
         flags: [
@@ -321,12 +343,12 @@ defmodule KomkiCli.CLI do
       raum: [
         name: "raum",
         description:
-          "zeigt den Raum oder wechselt zwischen recherche und vertraulich (lockern nur ohne laufende Session)",
+          "zeigt den Raum oder wechselt den Referenzraum (lockern nur ohne laufende Session)",
         args: [
           name: [
             value_name: "NAME",
             required: false,
-            help: "recherche oder vertraulich; ohne Angabe nur anzeigen"
+            help: "recherche, vertraulich, fraktion oder projektraum; ohne Angabe nur anzeigen"
           ]
         ]
       ],
@@ -648,6 +670,7 @@ defmodule KomkiCli.CLI do
   defp dispatch_group(:label, tail, result), do: dispatch_label_tail(tail, result)
   defp dispatch_group(:secret, [:set], result), do: secret_set(result.args.name)
   defp dispatch_group(:secret, [:list], _result), do: secret_list()
+  defp dispatch_group(:secret, [:erzeugen], result), do: secret_erzeugen(result.args.name)
   defp dispatch_group(:journal, [:verify], _result), do: render(KomkiCli.Steps.journal_verify())
 
   defp dispatch_label_tail([sub], result) do
@@ -705,7 +728,8 @@ defmodule KomkiCli.CLI do
     do:
       KomkiCli.GoSteps.run(KomkiCli.Config.default_base(), %{
         say: &IO.puts/1,
-        confirm: &KomkiCli.Prompt.confirm/2
+        confirm: &KomkiCli.Prompt.confirm/2,
+        select: &KomkiCli.Prompt.select/1
       })
 
   defp dispatch_command(:setup, result),
@@ -769,6 +793,40 @@ defmodule KomkiCli.CLI do
     end
   end
 
+  # Only the hash goes to stdout, so it can be piped into the hub; notes go
+  # to stderr (#440).
+  defp secret_erzeugen(name) do
+    case KomkiCli.Secrets.fetch(name) do
+      {:ok, entry} -> secret_erzeugen(entry, KomkiCli.Secrets.erzeugen(entry))
+      :error -> {erzeugbar_hinweis("unbekannter Schlüssel '" <> name <> "'"), 2}
+    end
+  end
+
+  defp secret_erzeugen(entry, {:ok, hash}) do
+    IO.puts(
+      :stderr,
+      "Neuer Token versiegelt im Schlüsselbund ('" <>
+        entry.service <> "'); ausgegeben wird nur sein SHA-256"
+    )
+
+    {hash <> "\n", 0}
+  end
+
+  defp secret_erzeugen(entry, {:error, :not_generable}),
+    do: {erzeugbar_hinweis("'" <> entry.name <> "' erzeugt komki nicht selbst"), 2}
+
+  defp secret_erzeugen(entry, {:error, error}),
+    do: {KomkiCli.Secrets.describe(entry.service, error) <> "\n", 2}
+
+  defp erzeugbar_hinweis(text) do
+    names =
+      KomkiCli.Secrets.all()
+      |> Enum.filter(&(&1.service in KomkiCli.Secrets.erzeugbar()))
+      |> Enum.map_join(", ", & &1.name)
+
+    text <> "; erzeugen lassen sich: " <> names <> "\n"
+  end
+
   defp secret_list do
     lines =
       Enum.map(KomkiCli.Secrets.all(), fn entry ->
@@ -777,6 +835,7 @@ defmodule KomkiCli.CLI do
             :sealed -> green() <> "versiegelt"
             :unsealed -> red() <> "Klartext"
             :damaged -> red() <> "beschädigt"
+            :outdated -> red() <> "altes Siegel"
             {:error, _} -> red() <> "fehlt"
           end
 

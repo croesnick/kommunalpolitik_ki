@@ -6,7 +6,11 @@ defmodule Sidecar.Params do
 
       %{type: :string, max: 200, required: true, pattern: ~r/.../}
       %{type: :integer, min: 1, max: 20, required: false, default: 10}
+      %{type: :list, min_items: 1, max_items: 8, items: %{...}}
 
+  A `:list` field holds closed objects (Durchstich #409: one proposal
+  with parts). `items` is a schema of the same string/integer fields,
+  applied to every element; unknown keys inside an element are an error.
   Error texts come from the `texts` module (`Sidecar.Texts` by
   default), so a host can surface validation errors in its own
   language.
@@ -14,7 +18,7 @@ defmodule Sidecar.Params do
 
   alias Sidecar.Texts
 
-  @type field_spec :: %{required(:type) => :string | :integer, optional(atom()) => term()}
+  @type field_spec :: %{required(:type) => :string | :integer | :list, optional(atom()) => term()}
   @type schema :: %{String.t() => field_spec()}
 
   @doc """
@@ -84,8 +88,71 @@ defmodule Sidecar.Params do
     end
   end
 
+  # A closed list of objects (Durchstich #409): every element is checked
+  # against the same `items` schema, unknown keys inside an element are an
+  # error. Item fields reuse the string/integer clauses, so blank and
+  # pattern rules hold per element. Errors name the element, e.g.
+  # "teile[2].quelle", so the caller can point at the part that failed.
+  defp field(name, %{type: :list} = spec, {:ok, value}, texts) when is_list(value) do
+    items = Map.get(spec, :items, %{})
+    min_items = Map.get(spec, :min_items, 1)
+    max_items = Map.get(spec, :max_items, 8)
+
+    cond do
+      length(value) > max_items ->
+        fail(texts.params_error(:too_many_items, %{name: name, max: max_items}))
+
+      length(value) < min_items ->
+        fail(texts.params_error(:too_few_items, %{name: name, min: min_items}))
+
+      true ->
+        check_items(name, items, value, texts)
+    end
+  end
+
+  # Any other value against any other type (also a non-list against
+  # :list): wrong type, before defaults or patterns apply.
   defp field(name, %{type: type}, {:ok, _value}, texts),
     do: fail(texts.params_error(:wrong_type, %{name: name, type: type}))
+
+  defp check_items(name, items, values, texts) do
+    values
+    |> Enum.with_index(1)
+    |> Enum.reduce_while({:ok, []}, fn {value, index}, {:ok, acc} ->
+      case item(name, index, items, value, texts) do
+        {:ok, checked} -> {:cont, {:ok, acc ++ [checked]}}
+        {:error, _} = e -> {:halt, e}
+      end
+    end)
+  end
+
+  defp item(name, index, items, value, texts) do
+    if is_map(value) do
+      unknown = Map.keys(value) -- Map.keys(items)
+
+      if unknown != [] do
+        fail(
+          texts.params_error(:item_unknown_fields, %{name: "#{name}[#{index}]", names: unknown})
+        )
+      else
+        item_fields(name, index, items, value, texts)
+      end
+    else
+      fail(texts.params_error(:item_not_object, %{name: "#{name}[#{index}]"}))
+    end
+  end
+
+  defp item_fields(name, index, items, value, texts) do
+    items
+    |> Enum.sort()
+    |> Enum.reduce_while({:ok, %{}}, fn {key, spec}, {:ok, acc} ->
+      case field("#{name}[#{index}].#{key}", spec, Map.fetch(value, key), texts) do
+        {:ok, :absent} -> {:cont, {:ok, acc}}
+        {:ok, checked} -> {:cont, {:ok, Map.put(acc, key, checked)}}
+        {:error, _} = e -> {:halt, e}
+      end
+    end)
+  end
 
   defp fail(detail), do: {:error, {:params, detail}}
 end

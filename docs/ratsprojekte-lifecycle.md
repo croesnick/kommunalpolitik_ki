@@ -1,191 +1,196 @@
 # Projektlebenszyklus — ratsprojekte
 
 > **Kanonisches Lifecycle-Dokument.** Dieses Dokument ist der verbindliche
-> Bezug für alle Skills, MCP-Tools und AI-Workflows, die mit
-> ratsprojekte-Projekten arbeiten. Bei Änderungen am Lifecycle (neue States,
-> neue Übergänge, neue Gates) wird dieses Dokument aktualisiert — und nur
-> dieses.
+> Bezug für alle Skills, Connectoren und AI-Workflows, die mit Ratsprojekten
+> im Hub arbeiten. Bei Änderungen am Lebenszyklus (neue Phase, neue Ablage,
+> neue Regel für einen Wechsel) wird zuerst dieses Dokument aktualisiert,
+> danach Code und Skills.
 
-## Zustandsdiagramm
+Quelle jeder Aussage hier ist [ADR 0004](adr/0004-ratsprojekte-als-lokaler-hub.md).
+Der Hub ist der lokale Ort für den gemeinsamen Stand auf dem Weg von der Idee
+zum Antrag. Die Redaktion führt ihn, Fraktion und Vorstand bekommen den
+[ausgegebenen Stand](../GLOSSARY.md#ausgegebener-stand).
+
+## Phasen und Ablagen
+
+Ein Ratsprojekt steht immer in genau einer **Phase**. Daneben kann es in einer
+**Ablage** liegen. Dann ist es nicht mehr aktiv, behält aber seine Phase.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Vault_Idee: Notiz im Obsidian-Vault
+    direction LR
+    [*] --> Idee: Idee eintragen
+    Idee --> Meinungsbildung
+    Meinungsbildung --> Ausarbeitung
+    Ausarbeitung --> ImRat
+    ImRat --> Umsetzung
+    Meinungsbildung --> Idee
+    Ausarbeitung --> Meinungsbildung
+    ImRat --> Ausarbeitung
+    Umsetzung --> ImRat
+    state "Im Rat" as ImRat
 
-    Vault_Idee --> Proposal_Pending: ratsprojekt_proposal-Skill
-    note right of Vault_Idee
-        Noch nicht in ratsprojekte-DB.
-        Slug wird hier festgelegt: #ratsprojekt/{slug}
-    end note
-
-    state Proposal_Pending {
-        [*] --> AI_Vorschlag
-        AI_Vorschlag --> Mensch_GO: wartet auf Review
-        Mensch_GO --> approved: GO erteilt
-        Mensch_GO --> rejected: GO verweigert
+    state Ablage {
+        Ruht
+        Verworfen
+        Abgeschlossen
     }
-    note right of Proposal_Pending
-        pending_proposals (DB)
-        typ: add_projekt | add_realisierungsstrang | change_status
-        KI schlägt vor, Mensch entscheidet (GO-Prinzip).
-    end note
-
-    Proposal_Pending --> Vault_Idee: rejected → Rücklauf mit Begründung
-    Proposal_Pending --> Projekt_Idee: approved (typ=add_projekt)
-
-    Projekt_Idee --> Projekt_Aktiv: approved (typ=change_status → aktiv)
-    note right of Projekt_Idee
-        Projekt.status = :idee
-        Konsolidierte Vault-Notiz existiert.
-    end note
-
-    state Projekt_Aktiv {
-        [*] --> Strang_A
-        [*] --> Strang_B
-        [*] --> Strang_C
-        Strang_A --> Strang_A_reif: Vorbedingung.erfuellt = true
-        Strang_B --> Strang_B_reif: Vorbedingung.erfuellt = true
-        Strang_C --> Strang_C_reif: Vorbedingung.erfuellt = true
-    }
-    note right of Projekt_Aktiv
-        Projekt.status = :aktiv
-        Realisierungsstränge A/B/C mit Vorbedingungen.
-        check_antragsreife-MCP-Tool liest diesen Zustand.
-        Quellenpflicht + GO-Prinzip aktiv.
-    end note
-
-    Projekt_Aktiv --> Projekt_Abgeschlossen: Beschluss gefasst
-    Projekt_Aktiv --> Projekt_Verworfen: verworfen (mit Grund + Datum)
-    Projekt_Idee --> Projekt_Verworfen: verworfen (vor Aktivierung)
-
-    Projekt_Abgeschlossen --> [*]
-    Projekt_Verworfen --> [*]
-    note right of Projekt_Abgeschlossen
-        Projekt.status = :abgeschlossen
-        abgeschlossen_am muss gesetzt sein.
-    end note
-    note right of Projekt_Verworfen
-        Projekt.status = :verworfen
-        verworfen_am + verworfen_grund müssen gesetzt sein.
+    note right of Ablage
+        Ablegen geht aus jeder Phase, immer mit Grund.
+        Wieder aufnehmen geht aus jeder Ablage, ebenfalls mit Grund.
     end note
 ```
 
-## Legende: Statuswerte und ihre Bedeutung
+Das Diagramm zeigt die üblichen Schritte. **Jeder Wechsel zwischen zwei Phasen
+ist erlaubt**, auch über mehrere Phasen hinweg und zurück, weil der echte
+Ablauf Schleifen hat: Der Rat vertagt, die Fraktion will die Basis noch einmal
+hören, ein Antrag wird zurückgezogen und neu ausgearbeitet. Statt einer Sperre
+im Code steht der Grund im Verlauf.
 
-| Chart-State | `Projekt.status` in DB | Wo existiert es? |
+| Phase | Code (`Project.phase`) | Was in dieser Phase geschieht |
 |---|---|---|
-| `Vault_Idee` | *(nicht in ratsprojekte-DB)* | Nur im Obsidian-Vault |
-| `Proposal_Pending` | *(nicht in `projekte.status`, sondern in `pending_proposals.status`)* | `pending_proposals`-Tabelle |
-| `Projekt_Idee` | `:idee` | `projekte.status` |
-| `Projekt_Aktiv` | `:aktiv` | `projekte.status` |
-| `Projekt_Abgeschlossen` | `:abgeschlossen` | `projekte.status` |
-| `Projekt_Verworfen` | `:verworfen` | `projekte.status` |
+| Idee | `idea` | Eine Idee ist eingetragen. Sie darf im Hub entstehen, ohne dass es eine Vault-Notiz gibt. |
+| Meinungsbildung | `opinion_forming` | Fraktion, Vorstand, Basis oder Externe äußern sich, als Meinungsbild oder über eine Befragung. |
+| Ausarbeitung | `drafting` | Fakten, Varianten und Vorbedingungen werden geklärt, ein Antrag wird vorbereitet. Hier zeigt der Hub die Checkliste „Antragsreife“. |
+| Im Rat | `at_council` | Mindestens ein Antrag ist eingereicht oder wird beraten. |
+| Umsetzung | `implementation` | Der Beschluss ist gefasst, die Verwaltung setzt um, die Redaktion verfolgt nach. |
 
-## Legende: Übergänge und ihr Enforcement-Status
-
-Der Chart ist **teilweise deskriptiv, teilweise normativ** — er zeigt den
-gewünschten Lifecycle, nicht den heute vollständig enforcebaren.
-
-| Übergang | Im Code enforced? | Anmerkung |
+| Ablage | Code (`Project.disposition`) | Bedeutung |
 |---|---|---|
-| `Vault_Idee → Proposal_Pending` | nein | manueller Skill-Aufruf durch `ratsprojekt_proposal` |
-| `Proposal_Pending → Projekt_Idee` (nur via `approved`) | ✅ ja | via `decision_changeset`, `validate_inclusion(:status, [:approved, :rejected])` |
-| `Proposal_Pending → Vault_Idee` (rejected-Rücklauf) | ❌ nein | kein Reopen-Pfad im Code; Skill-Spezifikation |
-| `Projekt_Idee → Projekt_Aktiv` (nur via approved change_status) | ❌ nein | `Projekt.changeset` erlaubt jede Direction; Chart ist normativ |
-| `Projekt_Aktiv → Abgeschlossen/Verworfen` | ❌ nein | jede Direction erlaubt; Chart ist normativ |
-| `abgeschlossen_am` / `verworfen_am` gesetzt | ⚠️ soft warning | `validate_status_dates/1` in `projekt.ex` — nur Changeset-Error, keine DB-Constraint |
-| `Realisierungsstrang.bedingung_erfuellt` | ❌ nein | Boolean, frei setzbar; keine Guard-Logik, die es an Projekt.status koppelt |
+| Ruht | `resting` | Für jetzt zurückgestellt, kann jederzeit wieder aufgenommen werden. |
+| Verworfen | `rejected` | Wird nicht weiterverfolgt. |
+| Abgeschlossen | `completed` | Erledigt, etwa nach der Umsetzung oder weil der Zweck anders erreicht ist. |
 
-### Was im Code *heute* wirklich enforced ist
+Ein Projekt ohne Ablage ist **aktiv**. Ablegen setzt `disposition` und
+`disposed_on` und entfernt den nächsten Schritt, Wiederaufnehmen leert
+`disposition` und `disposed_on`. Die Phase bleibt dabei unverändert.
 
-- **`PendingProposal.status`:** `pending → approved | rejected` (einmalig, via
-  `decision_changeset`). Das ist die einzige genuinely enforced Lifecycle im
-  Codebase.
-- **`Projekt.status`:** ein flaches 4-Wert-Enum (`:idee`, `:aktiv`,
-  `:abgeschlossen`, `:verworfen`) **ohne Transition-Guards**. Jeder Status kann
-  heute in jeden anderen wechseln.
-- **Soft coupling:** `validate_status_dates/1` warnt, wenn
-  `abgeschlossen_am`/`verworfen_am` fehlt — aber nur als Changeset-Error, nicht
-  als DB-CHECK-Constraint.
+Phasen lassen sich nicht aus den Anträgen ableiten, weil ein Projekt mehrere
+Anträge haben kann. Wer die Phase wechselt, entscheidet selbst.
 
-Der Chart ist also **Spezifikation + Dokumentation**: er zeigt, wo der
-Lifecycle hin soll. Wenn Transitions-Guards später im Ecto-Changeset
-nachgezogen werden, ist dieser Chart die Referenz.
+## Wie ein Wechsel passiert
 
-## Querschnitts-Regel: Value Proposition + Success Metrics
+Die Kernhandlung des Hubs ist der neue Eintrag „Was ist passiert?“. Pflicht ist
+nur der Text, und genau dieser Text ist der Grund für alles, was der Eintrag
+mitnimmt:
 
-Jedes Projekt und jeder Proposal braucht beides:
+| Handlung | Weg im Hub | Was im Verlauf steht |
+|---|---|---|
+| Phase wechseln | Eintrag „Was ist passiert?“ mit aufgeklappter Phase | Entscheidung „Alt → Neu: Text“, immer im Stand |
+| Nächsten Schritt setzen | im selben Eintrag oder eigenes Formular | Zeile über den neuen Schritt |
+| Status oder Ergebnis eines Antrags | Eintrag am Antrag | Zeile über den Antragsstand |
+| Ablegen, Wiederaufnehmen | Formular mit Pflichtfeld Grund | Entscheidung mit Grund |
+| Variante wählen oder verwerfen | Formular mit Grund | Zeile über die Variante |
 
-- **Value Proposition**: Welches konkrete Problem löst das Projekt? Für wen?
-  Was ändert sich durch die Umsetzung? (Kein reines "Digitalisierung von X" —
-  sondern: "X wird messbar, Y wird schneller, Z wird transparenter".)
-- **Success Metrics**: Woran wird gemessen, ob das Projekt erfolgreich war?
-  Mindestens eine messbare Größe (z.B. "Bargeld-Anteil im Bäderbetrieb < 30%",
-  "Leckerkennung innerhalb 24h", "Bearbeitungszeit um 50% reduziert").
+Was die Redaktion im Hub tut, schreibt der Hub selbst in den Verlauf. Von Hand
+kommt nur dazu, was anderswo passiert ist. Der Verlauf wird nur ergänzt, nie
+geändert. Nur die Sichtbarkeit eines Eintrags (für den Stand oder „Nur ich“)
+lässt sich umstellen.
 
-Diese Regel ist **querschnittlich** — sie gilt nicht nur für ein einzelnes
-Projekt, sondern für alle Proposals und Projekte. Ein Proposal ohne VP+SM ist
-nicht antragsreif, auch wenn alle anderen Hard Gates passieren.
+## Wer entscheidet
 
-### Enforcement-Status
+Der Hub hält fest, wer entschieden hat, und erzwingt nichts. Die
+Entscheidungsrechte sind mit Fraktion und Vorstand abgestimmt:
 
-- **Policy-level (ab sofort verbindlich):** Die KI prüft VP+SM vor jedem
-  `propose_*`-Aufruf und trägt sie in die `begruendung` ein. Ein Proposal
-  ohne VP+SM wird nicht vorgeschlagen.
-- **Code-level (Roadmap):** Die Felder `value_proposition` und
-  `success_metrics` werden als Projekt-Spalten + Hard Gates in
-  `check_antragsreife` nachgezogen. Bis dahin ist die Regel dokumentenbasiert.
+| Entscheidung | Wer entscheidet | Wer beteiligt ist |
+|---|---|---|
+| Eine Idee aufnehmen | Fraktion oder Vorstand | Die Basis schlägt vor, die Redaktion trägt ein. |
+| Die Basis befragen | Vorstand, auch darüber, wer den Aufruf-Link bekommt | Die Fraktion wird vorher gehört, kann die Befragung aber nicht verhindern. Die Redaktion bereitet vor. |
+| Weiter ausarbeiten | Fraktion | Der Vorstand wird gehört. Das Meinungsbild der Basis bindet nicht und kennt keine Mindestzahl. |
+| Antrag einreichen | Fraktion allein, freies Mandat | Vorstand und Basis werden informiert. Die Redaktion reicht ein und trägt nach. |
+| Stand weitergeben | Redaktion, bei jeder Ausgabe | |
+| Vorschlag aus komki übernehmen | Redaktion | komki schlägt vor. |
 
-## Beziehung zum Vault-Workflow
+komki entscheidet keine davon.
 
+## Antragsreife
+
+Die Antragsreife ist eine **Checkliste, die nichts sperrt**. Der Hub zeigt sie
+in der Ausarbeitung:
+
+- Was ändert sich, für wen? (Nutzen)
+- Woran messen wir den Erfolg?
+- Ein Antrag ist begonnen, sein Beschlussvorschlag ist konkret.
+- Der Adressat steht fest.
+- Es gibt Fakten mit Beleg, und alle sind verifiziert.
+- Eine Variante ist gewählt, und ihre Vorbedingungen sind erfüllt. Ohne
+  Varianten ist das bei einfachen Anträgen in Ordnung.
+- Eine Festlegung der Fraktion ist eingetragen (nur ein Hinweis).
+
+Ein offener Punkt hält niemanden auf. Die Fraktion entscheidet, ob ein Antrag
+eingereicht wird.
+
+## Vorschläge aus komki
+
+Menschen schreiben direkt in den Hub, die KI schlägt nur vor. Ein Vorschlag aus
+einem komki-Raum ist genau ein Ereignis mit Teilen:
+
+```mermaid
+flowchart LR
+  R[komki-Raum] -->|GO in komki: darf das den Raum verlassen?| C[Connector]
+  C -->|Connector-Socket mit Token| V[offener Vorschlag im Hub]
+  V -->|Redaktion: passt das zum Stand?| E{Entscheidung}
+  E -->|Teile übernommen| F[Fakten im Projekt, nicht verifiziert]
+  E -->|abgelehnt| X[gelöscht, im Verlauf nur vermerkt]
 ```
-Obsidian-Vault (Source of Truth, roh)
-    │
-    │  ratsprojekt_proposal-Skill: sammeln → konsolidieren → Gates prüfen
-    ▼
-ratsprojekte (Destillat, strukturiert, antragsreif)
+
+- Das GO in komki deckt genau dieses eine Ereignis. Im Hub entscheidet die
+  Redaktion im Browser, ob die Teile zum heutigen Stand passen. Abgewählte
+  Teile werden gelöscht, der Verlauf hält nur fest, dass einer nicht übernommen
+  wurde.
+- Eine KI führt im Hub keine Entscheidung aus. Ein Annehmen aus dem Chat gibt
+  es nicht.
+- Übernommene Fakten gelten als nicht verifiziert, bis ein Mensch die
+  Fundstelle nachgeschlagen hat.
+- Die Projektangabe im Vorschlag ist nur ein Hinweis. Die Redaktion ordnet zu.
+- Aus komki erscheinen im Verlauf nur eingegangene, übernommene und abgelehnte
+  Vorschläge.
+
+Den Schreibweg beschreibt [`schnittstellen/connector-socket.md`](schnittstellen/connector-socket.md),
+das Lesen [`schnittstellen/stand.md`](schnittstellen/stand.md).
+
+## Vault und Hub
+
+Der Vault bleibt die Quelle für **Material**: Notizen, Recherchen, Mails,
+Gesprächsnotizen. Der Hub ist die Quelle für den **Stand**: welche Projekte es
+gibt, in welcher Phase, wer dran ist, was entschieden ist.
+
+```mermaid
+flowchart LR
+  V[(Vault: Material)] -->|Connector| K[komki: Recherche und Entwürfe]
+  K -->|Vorschlag nach GO| H[Hub: gemeinsamer Stand]
+  H -->|Stand als Druck| S([Fraktion und Vorstand])
+  H -->|maschinenlesbarer Stand| K
 ```
 
-- **Vault → ratsprojekte** ist strikt einseitig (AGENTS.md §10). Kein Rückfluss.
-- Der Slug ist der stabile Vertrag: `#ratsprojekt/{slug}` als Vault-Tag,
-  `/projekte/{slug}` als ratsprojekte-URL, `slug` als MCP-Parameter.
-- Eine `rejected`-Proposal geht konzeptionell in den Vault zurück (neuer
-  Erkenntnisstand), nicht zurück in `pending_proposals`.
+- Der Hub schreibt nie in den Vault und nie ins RIS.
+- Eine Idee darf im Hub entstehen, ohne dass es eine Vault-Notiz gibt.
+- Der Slug verbindet beide: `/projekte/{slug}` im Hub, `#ratsprojekt/{slug}`
+  als Vault-Tag. Ein Querverweis im Projekt zeigt auf die Vault-Notiz.
 
-## Lifecycle-Pflicht für Skills und AI-Workflows
+## Pflicht für Skills und AI-Workflows
 
-Jeder Skill, jedes MCP-Tool und jede AI-Session, die den Status eines
-Projekts berührt (lesen, vorschlagen, ändern), **muss**:
+Jeder Skill, Connector und jede AI-Session, die Ratsprojekte liest oder etwas
+vorschlägt:
 
-1. **Diesen Lifecycle kennen** — indem die Skill-Datei oder AGENTS.md auf dieses
-   Dokument verweist.
-2. **Sich danach richten** — keine Status-Übergänge vorschlagen, die der Chart
-   nicht zeigt. Beispiel: ein Skill darf nicht `abgeschlossen → idee`
-   vorschlagen, auch wenn der Code es heute erlaubt.
-3. **Bei Workflow-Änderungen dieses Dokument aktualisieren** — bevor ein neuer
-   Status, Übergang oder ein neues Gate in Code oder Skill gegossen wird,
-   wird er zuerst hier eingetragen. Das Dokument ist der Single Source of
-   Truth für den Lifecycle.
-
-### GO über `decide_proposal`-MCP-Tool
-
-GO wird im Chat erteilt, die KI führt es über das `decide_proposal`-MCP-Tool
-aus (`aktion: "accept" | "reject"`, mit Kommentar). Der Browser-Weg über die
-LiveView bleibt als Alternative. Die KI darf Proposals nicht selbst genehmigen
-— sie braucht für jede `decide_proposal`-Ausführung ein vorheriges, explizites
-GO im Chat. Das `entschieden_von`-Feld zeigt "stadtrat-via-ai" anstelle von
-"stadtrat" bei Chat-basierten Entscheidungen, um den Audit-Trail klar zu
-halten.
+1. **kennt diesen Lebenszyklus**, indem sie auf dieses Dokument verweist;
+2. **schlägt nur vor, entscheidet nichts**: Phasenwechsel, Ablagen, Varianten
+   und Anträge ändert ein Mensch im Hub;
+3. **aktualisiert bei Workflow-Änderungen zuerst dieses Dokument**, dann Code
+   und Skills.
 
 ### Wann das Dokument zu aktualisieren ist
 
-- Neuer `Projekt.status`-Wert oder neuer `PendingProposal`-Typ → Chart + Legende
-- Neue Transition oder neues Gate → Chart + Enforcement-Tabelle
-- Änderung am Vault→ratsprojekte-Datenfluss → Abschnitt "Beziehung zum Vault-Workflow"
-- Änderung an Slug-Konvention oder Quellenpflicht → entsprechenden Abschnitt
+- Neue Phase oder Ablage → Diagramm und Tabellen
+- Neue Regel für einen Wechsel oder ein neues Feld der Antragsreife → Abschnitte
+  „Wie ein Wechsel passiert“ und „Antragsreife“
+- Änderung an Entscheidungsrechten → Abschnitt „Wer entscheidet“
+- Änderung am Weg von komki in den Hub → Abschnitt „Vorschläge aus komki“ und
+  die Schnittstellen-Dokumente
+- Änderung am Verhältnis zum Vault → Abschnitt „Vault und Hub“
 
 ### Wann *nicht*
 
-- Reine UI-Änderungen, die keine neuen States/Transitions einführen
-- Refactoring, das das Verhalten unverändert lässt
-- Neue MCP-Tools, die nur lesen (keine Status-Mutation)
+- Reine Änderungen an der Oberfläche, die keine Phase, Ablage oder Regel
+  einführen
+- Refactoring ohne geänderte Verhaltensweise

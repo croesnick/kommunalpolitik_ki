@@ -9,6 +9,11 @@ defmodule KomkiConnectorWeb.Connector do
   das Feld ganz weg. Fehlt der Schluessel, liefert jede Suche
   `credential-missing`; der Socket bindet trotzdem (`komki doctor` sieht
   den Connector ueber `ping`).
+
+  Der Schluessel verlaesst den Connector nur auf verschluesselten
+  Transporten: `https` immer, `http` nur fuer Loopback — der Mock-Betrieb
+  (Ticket #496). Zu jedem anderen Klartext-Ziel verweigert die Suche
+  ebenfalls mit `credential-missing`, ohne die Anfrage zu stellen.
   """
 
   @behaviour Sidecar.Server
@@ -85,13 +90,30 @@ defmodule KomkiConnectorWeb.Connector do
   defp search(query, count, state) do
     url = Brave.url(state.base_url, query, count)
 
-    case Http.get(state.profile, url, Brave.headers(state.api_key.()), state.timeout) do
-      {:ok, 200, body} -> results(body, count)
-      {:ok, status, _body} -> error(Brave.status_error(status))
-      {:error, :timeout} -> {:error, "upstream-timeout", "Brave antwortet nicht rechtzeitig"}
-      {:error, :too_large} -> {:error, "upstream-error", "Antwort von Brave zu gross"}
-      {:error, :failed} -> {:error, "upstream-error", "Verbindung zu Brave fehlgeschlagen"}
+    case Brave.headers(url, state.api_key.()) do
+      {:ok, headers} ->
+        case Http.get(state.profile, url, headers, state.timeout) do
+          {:ok, 200, body} -> results(body, count)
+          {:ok, status, _body} -> error(Brave.status_error(status))
+          {:error, :timeout} -> {:error, "upstream-timeout", "Brave antwortet nicht rechtzeitig"}
+          {:error, :too_large} -> {:error, "upstream-error", "Antwort von Brave zu gross"}
+          {:error, :failed} -> {:error, "upstream-error", "Verbindung zu Brave fehlgeschlagen"}
+        end
+
+      # Kein Klartext-Ziel wie der Loopback-Mock: Der Schluessel wird
+      # gar nicht erst gesendet, die Anfrage nicht aufgebaut (#496).
+      {:error, :cleartext} ->
+        {:error, "credential-missing", cleartext_detail(url)}
     end
+  end
+
+  # Der Grund steht nur im Connector-Log; der Client (Sidecar) ersetzt das
+  # Detail durch den festen Text des Codes. Der Query steht hier nicht drin.
+  defp cleartext_detail(url) do
+    %URI{host: host} = URI.parse(url)
+
+    "Websuche verweigert: Klartext-HTTP nur fuer den Loopback-Mock, nicht fuer " <>
+      (host || "URL ohne Host")
   end
 
   defp results(body, count) do

@@ -82,13 +82,15 @@ Version in `packaging/pi/package.json` ändern, `pnpm install` dort, Lockfile
 prüfen und committen (Renovate schlägt das auch vor). Erlang und Elixir des Repos (`.tool-versions`)
 folgen deshalb Homebrews aktueller `erlang`-Version.
 
-Ein Release in drei Schritten:
+Ein Release in drei Schritten (veröffentlicht wird noch nicht, siehe
+[docs/release.md](../../docs/release.md)):
 
-1. Version in `apps/komki_cli/mix.exs` erhöhen und mergen.
-2. Tag setzen: `git tag komki-v<version> && git push origin komki-v<version>`.
-   Der Workflow `komki-release` baut auf Apple Silicon das Paket
-   (`make komki-paket`) und die Formel (`make komki-formel`) und hängt
-   beides an das GitHub-Release.
+1. Version und Tag entstehen über ein Changeset und den Version-PR
+   ([docs/agents/changesets.md](../../docs/agents/changesets.md)): Nach dem
+   Merge trägt der Commit den Tag `komki/v<version>`.
+2. Workflow von Hand starten: `gh workflow run komki-release.yml -f tag=komki/v<version>`.
+   Er baut auf Apple Silicon das Paket (`make komki-paket`) und die Formel
+   (`make komki-formel`) und hängt beides an das GitHub-Release.
 3. `komki.rb` aus dem Release als `Formula/komki.rb` ins Tap-Repo
    `croesnick/homebrew-tap` legen.
 
@@ -214,9 +216,13 @@ Hinweise zu den einzelnen Schritten:
   Vault-Connector ab.
 * **RIS:** Ohne Zugangsdaten nutzt der Connector die öffentlichen
   Gast-Endpunkte; die liefern nur Titel, keine Texte (#148). Zum Üben ohne
-  Netz gibt es einen Mock:
-  `elixir apps/komki_connector_ris/priv/mock_ris.exs --port 49640` und
-  `komki init --force --ris-mock-port 49640`.
+  Netz gibt es einen Mock auf der Mock-Runtime:
+  `cd apps/komki_mock && mix komki_mock.serve --adapter KomkiMock.Adapters.Ris --dir /tmp/mock-ris --data-port 49640`
+  und `komki init --force --ris-mock-port 49640`.
+* **Websuche ohne Netz:** Der Brave-Mock läuft genauso
+  (`--adapter KomkiMock.Adapters.Brave --data-port 49641`), dazu
+  `komki init --force --web-mock-port 49641`. Der Web-Connector spricht dann
+  direkt mit dem Mock statt über den Egress-Proxy mit `api.search.brave.com`.
 * **Raum wechseln:** `komki raum` zeigt den Raum, `komki raum vertraulich`
   bzw. `komki raum recherche` wechselt (Ticket #268). Default ist
   **recherche** (`doc-oeffentlich@2`, `ris-oeffentlich@1`,
@@ -427,22 +433,26 @@ selbst alle Prozesse, und nur der Egress-Proxy darf nach außen:
   Erlang-Pfad (`escript_bin`), weil der asdf-Shim unter der Sandbox scheitert.
   Die Escripts findet komki wie den Vermittler: erst `PATH`, dann `<base>/bin`.
 * **Credentials** (heute nur `BRAVE_API_KEY` für die Websuche) liegen im
-  Schlüsselbund nur als Siegel (`ktv1.…`). komki liest es mit
-  `security find-generic-password -s brave-search-api -w`, öffnet es mit
-  `komki-tresor open` über die Secure Enclave (Touch ID oder Passwort) und
-  schreibt den Klartext als eine JSON-Zeile in stdin des Web-Connectors,
+  Schlüsselbund nur als Siegel (`ktv2.…`, Format aus `apps/sealed_envelope`).
+  komki liest es mit `security find-generic-password -s brave-search-api -w`,
+  öffnet es nach der Schlüsselvereinbarung mit `komki-tresor agree` über die
+  Secure Enclave (Touch ID oder Passwort) und schreibt den Klartext als eine JSON-Zeile in stdin des Web-Connectors,
   danach schließt es stdin. Sie stehen nie in argv, Umgebung, Log oder Status.
+  Ein Siegel im alten Format `ktv1` öffnet komki nicht mehr; den Wert gibst du
+  mit `komki secret set` neu ein.
   Fehlt der Eintrag, wird die Freigabe verweigert oder liegt er im Klartext vor,
   startet der Connector ohne Key und meldet `credential-missing`; `up` nennt
   den Grund, `komki doctor` warnt.
 * **komki-tresor** (`native/komki-tresor/main.swift`, bei `mix compile` nach
   `priv/` gebaut und von `make komki`/`make komki-paket` neben komki kopiert):
   ein kleines Swift-Programm, weil
-  Erlang die Secure Enclave nicht erreicht. `seal` erzeugt je Geheimnis einen
-  P-256-Schlüssel in der Secure Enclave mit der Zugriffsregel „userPresence“
-  (nur dieses Gerät, nur entsperrt) und verschlüsselt per ECIES (ECDH,
-  HKDF-SHA256, AES-GCM); der private Schlüssel verlässt die Enclave nie.
-  `open` braucht die Enclave und damit die Freigabe. Ein Siegel lässt sich auf
+  Erlang die Secure Enclave nicht erreicht. Es macht nur die Hardware:
+  `recipient` erzeugt je Geheimnis einen P-256-Schlüssel in der Secure Enclave
+  mit der Zugriffsregel „userPresence“ (nur dieses Gerät, nur entsperrt) und
+  gibt dessen öffentlichen Schlüssel aus; der private Schlüssel verlässt die
+  Enclave nie. `agree` liefert nach der Freigabe das gemeinsame ECDH-Geheimnis.
+  Verschlüsselt wird in Elixir (`apps/sealed_envelope`: ECDH, HKDF-SHA256,
+  AES-256-GCM), Klartext erreicht das Programm nicht. Ein Siegel lässt sich auf
   keinem anderen Mac öffnen.
 * **Connector-Token:** Vor jedem Connector-Start erzeugt `up` ein Token
   (`run/connectors/<id>.token`, `0600`) und gibt es dem Connector über stdin.
@@ -453,7 +463,7 @@ selbst alle Prozesse, und nur der Egress-Proxy darf nach außen:
   (`{"ris": 49531, "web": 49532}`; `init --port N` legt sie auf `N + 7` und
   `N + 8`, damit eine Wegwerf-Instanz neben der Hauptinstanz startet; eine
   bestehende `config.json` behält ihre Ports, Ticket #203), `ris_base_url`
-  (`https://risapi1.komuna.net/web/`), `ris_mock_port` (aus; gesetzt spricht der
+  (`https://risapi3.komuna.net/web/`), `ris_mock_port` (aus; gesetzt spricht der
   RIS-Connector direkt mit `http://127.0.0.1:<port>/`, ohne Proxy), `vault_dir`
   (`<base>/vault`, anfangs leer, Test-Vault siehe Schnellstart; leer gesetzt: Vault-Connector aus).
 * **Bereit** ist ein Connector, wenn die reservierte Operation `ping` die
@@ -555,16 +565,27 @@ Je Datei:
    mit demselben Γ wie der Vermittler (Label-Store, #208). Ablehnungen tragen
    den Remedy-Katalog.
 3. Nur wenn **alle** Dateien `permit` sind, legt komki sie als
-   `<base>/mediator/documents/<objekt>.md` ab, trägt jedes Objekt mit Typ
-   `document`, Version und Labels in `room.json` ein und startet den
-   Vermittler neu. Sonst endet der Start mit Exit 3, und nichts wird
-   abgelegt.
+   `<base>/mediator/documents/<objekt>.md` ab — PDF-Quellen als
+   `<objekt>.pdf` (#290) —, trägt jedes Objekt mit Typ `document`, Version
+   und Labels in `room.json` ein und startet den Vermittler neu. Sonst
+   endet der Start mit Exit 3, und nichts wird abgelegt.
 
 pi liest die Dokumente danach nur über `admit_document`; der Vermittler
-entscheidet jede Aufnahme erneut, der Dokument-Connector liest (#169). Nur
-UTF-8-Text taugt als Raumdokument. Dateien aus dem pi-Home, dem Vermittler-
-Verzeichnis oder der Registry nimmt komki nicht an. Aufnahme gibt es nur bei
-einem neuen Start, nicht mit `--continue` und nicht in eine laufende Session.
+entscheidet jede Aufnahme erneut, der Dokument-Connector liest (#169). Als
+Raumdokument taugt UTF-8-Text; PDFs (an der Endung und am `%PDF`-Header
+erkannt) liest der Connector über ex_pdfium als Text je Seite mit
+Seitenanker `[Seite N]`, dazu die Highlights mit Kommentar und markiertem
+Text — ein PDF ohne Textebene (Scan) ist ein klarer Fehler, es gibt kein
+OCR (#289). Eine Objekt-ID liegt in genau einer Form im Raum: Eine
+Markdown- und eine PDF-Fassung derselben Objekt-ID lehnt die Aufnahme ab,
+denn der Connector liest nur eine Form je Objekt. **PDF-Lesung braucht die
+NIF-Form des Programms** (Einzeldatei per `make komki-burrito` oder
+Release): Im Escript-Betrieb (`make komki`, Homebrew-Paket) antwortet jede
+PDF-Lesung mit einem klaren Fehler, bis #288 die Programmform für
+NIF-Connectoren entscheidet; `doctor` bleibt dabei grün, weil `ping` den
+NIF nicht berührt. Dateien aus dem pi-Home, dem Vermittler-Verzeichnis oder
+der Registry nimmt komki nicht an. Aufnahme gibt es nur bei einem neuen
+Start, nicht mit `--continue` und nicht in eine laufende Session.
 
 ## So sieht eine Session aus
 

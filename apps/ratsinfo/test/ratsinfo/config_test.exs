@@ -16,7 +16,7 @@ defmodule Ratsinfo.ConfigTest do
 
   test "ohne RIS_BASE_URL gilt das echte RIS" do
     System.delete_env("RIS_BASE_URL")
-    assert Config.base_url() == "https://risapi1.komuna.net/web/"
+    assert Config.base_url() == "https://risapi3.komuna.net/web/"
   end
 
   test "RIS_BASE_URL auf Loopback, fehlender Schraegstrich wird ergaenzt" do

@@ -20,6 +20,8 @@ apps/komki_cli/.build-report.md
 /docs/rfcs/0001-scratchpad.md
 cover/
 apps/*/cover/
+# ExUnit @tmp_dir output
+apps/*/tmp/
 
 # Python
 __pycache__/
@@ -63,8 +65,9 @@ vault_suche-workspace/
 # Internes Threat-Modell (private Infrastruktur-Topologie, bleibt lokal)
 /docs/rfcs/0000-sandbox-threat-modell.md
 
-# Interne Seed-Datensätze (echte Ratsprojekte, bleiben lokal)
-/apps/ratsprojekte/priv/repo/seeds.exs
+# Seeds der ratsprojekte-App sind getrackt und zeigen ausschließlich erfundene
+# Gartenstadt-Projekte (Ticket #435). Echte Bestände gehören in den Hub
+# (ADR 0004: „Der Hub startet leer‟), nie in Seed-Dateien.
 
 # Deepwork orchestrator state (local progress files)
 .slim/deepwork/
@@ -72,3 +75,9 @@ dist/
 
 # pi fuers komki-Paket (make komki-paket installiert es hier)
 packaging/pi/node_modules/
+
+# Dev loop (#389): agent hand-off files inside loop worktrees
+.dev-loop/
+
+# screenshot tool (#510): default output in a worktree
+.screenshots/

@@ -7,6 +7,6 @@ defmodule Shared do
   wie `ratsinfo` oder `pdf_ingest`.
 
   Diese Structs spiegeln die Datenstruktur der RIS-API
-  (risapi1.komuna.net/web/) wider.
+  (risapi3.komuna.net/web/) wider.
   """
 end

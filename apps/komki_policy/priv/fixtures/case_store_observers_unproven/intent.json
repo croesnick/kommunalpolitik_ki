@@ -1,0 +1,7 @@
+{
+  "intent_id": "intent-case-store-observers-unproven",
+  "object": "obj-ausgabe-a@v1",
+  "operation": "store",
+  "schema": "komki-intent/1",
+  "workspace": "ws-fall-4711"
+}

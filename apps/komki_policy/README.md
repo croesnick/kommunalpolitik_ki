@@ -96,8 +96,11 @@ Ein erzeugtes Objekt landet in einem dauerhaften Speicher. Entschieden wird
 unter seinem Ausgabelabel λ(y), nicht unter B_W; B_W ⊆ λ(y) ist eine eigene
 Prämisse (`label_preservation`). Hat keine Bindung eine `store`-Regel, ist
 jedes Speichern verboten und nur mit einer Aktionsfreigabe für genau diesen
-Call zulässig. Die Operation steckt im Call-Hash: ein GO für `emit` gilt
-nicht für `store`.
+Call zulässig — sofern die Beobachterliste des Speichers belegt ist: Ist
+`environment_observers_complete` nicht bekannt-`true`, bietet der Katalog
+kein GO an und auch ein gültiges GO ergibt `deny` (Gegenprobe 11.15, #432 —
+ein GO kann nicht belegen, wer mitliest). Die Operation steckt im Call-Hash:
+ein GO für `emit` gilt nicht für `store`.
 
 ### `transfer` übergibt unter dem Ausgabelabel (RFC R.5.6, § 4.8)
 
@@ -118,16 +121,22 @@ Payload-Formen): `fakt_nachreichen` (facts), `registrierte_transformation`
 `aktionsfreigabe` (scope `call` mit call_hash / scope `object` für die
 Erstklassifikation). Ordnung normativ: fakt < transformation < neuer Raum <
 aktionsfreigabe. Bei `admit` erscheint kein call-GO (bewusste Lücke, § 9);
-bei `emit`, `store` und `transfer` zusätzlich das call-GO für die fünf weichen Blocker,
+bei `emit`, `store` und `transfer` zusätzlich das call-GO für die weichen Blocker,
 außer die Entscheidung enthält einen unüberbrückbaren Blocker (`workspace_invalid`,
-`label_not_preserved`). Für `indeterminate` nie ein GO — ein GO kann keine
-Belege herstellen.
+`label_not_preserved`, bei `store` auch `recipient_not_allowed`: kein GO ersetzt
+dort den Empfängertest, #417) oder entscheidet `store` bei unbelegter
+Beobachterliste (#432: kein Befund bietet dann ein call-GO an, ein GO kann
+nicht belegen, wer mitliest). Für `indeterminate` nie ein GO — ein GO kann keine
+Belege herstellen. Der Blocker `recipient_not_allowed` und sein Katalog-Eintrag
+nennen in `recipients_outside` die Empfänger außerhalb des Empfängerkreises.
 
 ### Aktionsfreigabe trennt Urteil und Vollzug (§ 4.6)
 
 Der Freigabe-Zweig ist ein eigener Regelzweig, nie ein stiller Fallback.
 `workspace_contract_valid` bleibt Prämisse (ein GO belebt keinen ungültigen
-Vertrag); die Release-Prüfungen laufen in fester Ordnung (call hash → Fenster
+Vertrag), bei `store` und `transfer` auch `label_preservation`, bei `store`
+zudem der Empfängertest und die Beobachterliste (`recipients_unproven`: ein
+gültiges GO ergibt `deny`, #432); die Release-Prüfungen laufen in fester Ordnung (call hash → Fenster
 → Nonce → scope → authority). Permit trägt `proof: null` und das
 `release`-Objekt als **deklarative** Wirkung; der Verbrauch committet über
 `advance` (commit-before-effect, B.8, PACE-Nonce). Eine Aktionsfreigabe ist

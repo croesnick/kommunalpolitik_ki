@@ -28,13 +28,26 @@ defmodule KomkiConnectorWeb.Brave do
     |> URI.to_string()
   end
 
-  @doc "Anfrage-Header. Der Schluessel steht nur hier, nie in URL oder Log."
-  @spec headers(String.t()) :: [{charlist(), charlist()}]
-  def headers(api_key) do
-    [
-      {~c"accept", ~c"application/json"},
-      {~c"x-subscription-token", String.to_charlist(api_key)}
-    ]
+  @doc """
+  Anfrage-Header. Der Schluessel steht nur hier, nie in URL oder Log —
+  und geht nur auf Transporten raus, die `KomkiConnector.Transport.secret_ok?/1`
+  zulassen. Jeden anderen Klartext verweigert `headers/2` mit
+  `{:error, :cleartext}`, statt den Schluessel dorthin zu senden
+  (Ticket #496): jeder lokale Prozess kann einen freien Loopback-Port
+  binden, ein bezahlter Schluessel im Klartext waere an jeden weg.
+  """
+  @spec headers(String.t(), String.t()) ::
+          {:ok, [{charlist(), charlist()}]} | {:error, :cleartext}
+  def headers(url, api_key) do
+    if KomkiConnector.Transport.secret_ok?(url) do
+      {:ok,
+       [
+         {~c"accept", ~c"application/json"},
+         {~c"x-subscription-token", String.to_charlist(api_key)}
+       ]}
+    else
+      {:error, :cleartext}
+    end
   end
 
   @doc """

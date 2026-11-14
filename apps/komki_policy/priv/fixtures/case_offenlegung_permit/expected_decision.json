@@ -1,0 +1,32 @@
+{
+  "blockers": null,
+  "checked_label": [
+    "fraktion-intern@1",
+    "web-oeffentlich-fall@1"
+  ],
+  "content_digest": "5a3f9f5da4d9d2a0eacbd56c1d1b1cbaf74e2fbd0cb0a28f61f5f45cb71f1b3c",
+  "decision": "permit",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-offenlegung",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-essenz-a",
+    "version": "v1"
+  },
+  "registry_ref": "reg-fall-4711-test",
+  "release": {
+    "ausgabeart": "ratsprojekte-essenz",
+    "call_hash": "34a25b270f7564183f67fa254135f7c60dd91e54b81b48562758a18cab7e640f",
+    "nonce": "n-offenlegung-a",
+    "release_id": "go-offenlegung-a",
+    "stand_ref": "stand-fall@7",
+    "stand_version_after": 8,
+    "ziellabel": [
+      "ratsprojekte@1"
+    ]
+  },
+  "remedies": null,
+  "rule": "store",
+  "snapshot_ref": "snap-offenlegung",
+  "workspace": "ws-fraktionsraum"
+}

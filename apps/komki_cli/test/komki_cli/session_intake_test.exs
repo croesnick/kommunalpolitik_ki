@@ -59,6 +59,37 @@ defmodule KomkiCli.SessionIntakeTest do
            }
   end
 
+  # ========================================================================
+  # Dateimodi des Dokumenten-Stores (Ticket #498, Fund F30)
+  # ========================================================================
+
+  # Regression F30/#498: Unter Standard-umask (022) entstanden Store und
+  # Elternverzeichnis mit 0755 und das Raumdokument mit dem Quellmodus der
+  # File.cp-Kopie (0644) — jedes lokale Konto auf der Maschine las die
+  # Fraktionsraum-Dokumente direkt. Vor dem Fix rot: plan haertete nur mit
+  # mkdir_p!, stage liess File.cp den Quellmodus stehen.
+  test "plan haertet Verzeichnisse auf 0700, stage schreibt Dokumente mit 0600", %{
+    base: base,
+    db: db
+  } do
+    file = write_source!(base, "brief-modi.txt", "Ratsunterlage")
+    register_classified!(db, "brief-modi", file, ["ratsarbeit@1"])
+
+    contract =
+      contract_json(["ratsarbeit@1"], ["brief-modi@v1"], purpose: "sitzungsvorbereitung")
+
+    room = load_room!(base, contract)
+
+    assert {:ok, intake} = plan(db, base, room, [file])
+    documents = Path.join([base, "mediator", "documents"])
+
+    stage!(intake)
+
+    assert mode(documents) == 0o700
+    assert mode(Path.dirname(documents)) == 0o700
+    assert mode(Path.join(documents, "brief-modi.md")) == 0o600
+  end
+
   test "kein UTF-8-Text -> Fehler, nichts abgelegt", %{base: base, db: db} do
     file = write_source!(base, "scan.txt", <<0xFF, 0xFE, 0x00, 0x41>>)
     register_classified!(db, "scan", file, ["ratsarbeit@1"])
@@ -68,6 +99,91 @@ defmodule KomkiCli.SessionIntakeTest do
     assert {:error, reason} = plan(db, base, room, [file])
     assert reason =~ "kein UTF-8-Text"
     refute File.exists?(Path.join([base, "mediator", "documents", "scan.md"]))
+  end
+
+  # ========================================================================
+  # PDF intake (#290)
+  # ========================================================================
+
+  test "PDF-Quelle: permit landet als <objekt>.pdf, Header nennt die document_id", %{
+    base: base,
+    db: db
+  } do
+    file = write_source!(base, "drucksache-4711.pdf", pdf_bytes())
+    register_classified!(db, "drucksache-4711", file, ["ratsarbeit@1"])
+
+    contract =
+      contract_json(["ratsarbeit@1"], ["drucksache-4711@v1"], purpose: "sitzungsvorbereitung")
+
+    room = load_room!(base, contract)
+
+    assert {:ok, intake} = plan(db, base, room, [file])
+
+    [entry] = intake.entries
+    assert entry.status == "permit"
+    assert entry.destination == Path.join([base, "mediator", "documents", "drucksache-4711.pdf"])
+
+    lines = Enum.join(SessionIntake.entry_lines(intake.entries), "\n")
+    assert lines =~ "ziel: " <> entry.destination
+    assert lines =~ "(admit_document drucksache-4711)"
+
+    refute File.exists?(entry.destination)
+    stage!(intake)
+    assert File.read!(entry.destination) == pdf_bytes()
+  end
+
+  # The store allows two versions of one object ID (R.2.1); as .md and .pdf
+  # they would be one room document in two formats, so intake refuses.
+  test "eine Objekt-ID als md (v1) und pdf (v2) -> Fehler", %{
+    base: base,
+    db: db
+  } do
+    md = write_source!(base, "vorlage.md", "# Erste Fassung\n")
+    pdf = write_source!(base, "vorlage.pdf", pdf_bytes())
+    register_classified!(db, "vorlage", "v1", md, ["ratsarbeit@1"])
+    register_classified!(db, "vorlage", "v2", pdf, ["ratsarbeit@1"])
+
+    contract =
+      contract_json(["ratsarbeit@1"], ["vorlage@v1", "vorlage@v2"],
+        purpose: "sitzungsvorbereitung"
+      )
+
+    room = load_room!(base, contract)
+
+    assert {:error, reason} = plan(db, base, room, [md, pdf])
+    assert reason =~ "dasselbe Raumdokument"
+    refute File.exists?(Path.join([base, "mediator", "documents", "vorlage.md"]))
+    refute File.exists?(Path.join([base, "mediator", "documents", "vorlage.pdf"]))
+  end
+
+  # Across sessions: an earlier run left vorlage-alt.md behind.
+  test "PDF-Fassung einer vorhandenen Markdown-Fassung -> Fehler", %{base: base, db: db} do
+    documents = Path.join([base, "mediator", "documents"])
+    File.mkdir_p!(documents)
+    File.write!(Path.join(documents, "vorlage-alt.md"), "# Alte Fassung\n")
+
+    file = write_source!(base, "vorlage-alt.pdf", pdf_bytes())
+    register_classified!(db, "vorlage-alt", file, ["ratsarbeit@1"])
+
+    contract =
+      contract_json(["ratsarbeit@1"], ["vorlage-alt@v1"], purpose: "sitzungsvorbereitung")
+
+    room = load_room!(base, contract)
+
+    assert {:error, reason} = plan(db, base, room, [file])
+    assert reason =~ "liegt bereits als .md vor"
+    refute File.exists?(Path.join(documents, "vorlage-alt.pdf"))
+  end
+
+  test "PDF-Endung ohne %-Header -> Fehler, nichts abgelegt", %{base: base, db: db} do
+    file = write_source!(base, "faelschung.pdf", "nur Text mit PDF-Endung")
+    register_classified!(db, "faelschung", file, ["ratsarbeit@1"])
+    contract = contract_json(["ratsarbeit@1"], ["faelschung@v1"], purpose: "sitzungsvorbereitung")
+    room = load_room!(base, contract)
+
+    assert {:error, reason} = plan(db, base, room, [file])
+    assert reason =~ "kein PDF trotz Endung"
+    refute File.exists?(Path.join([base, "mediator", "documents", "faelschung.pdf"]))
   end
 
   # ========================================================================
@@ -706,6 +822,30 @@ defmodule KomkiCli.SessionIntakeTest do
 
   defp seed_term, do: @seed_path |> File.read!() |> JSON.decode!()
 
+  # Intake only checks the %PDF- header, but these bytes are a real PDF
+  # that pdfium opens (it repairs the missing xref).
+  defp pdf_bytes,
+    do: """
+    %PDF-1.4
+    1 0 obj
+    << /Type /Catalog /Pages 2 0 R >>
+    endobj
+    2 0 obj
+    << /Type /Pages /Kids [3 0 R] /Count 1 >>
+    endobj
+    3 0 obj
+    << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Contents 4 0 R >>
+    endobj
+    4 0 obj
+    << /Length 38 >>
+    stream
+    BT /F1 12 Tf 72 700 Td (Minimal) Tj ET
+    endstream
+    endobj
+    trailer
+    << /Size 5 /Root 1 0 R >>
+    """
+
   defp write_source!(base, name, content) do
     dir = Path.join(base, "quellen")
     File.mkdir_p!(dir)
@@ -714,17 +854,21 @@ defmodule KomkiCli.SessionIntakeTest do
     Config.canonical(path)
   end
 
-  defp register_classified!(db, object_id, path, labels) do
-    register_with_content_ref!(db, object_id, content_sha(path), labels)
+  defp register_classified!(db, object_id, path, labels),
+    do: register_classified!(db, object_id, "v1", path, labels)
+
+  # Same object ID, another version, other content (R.2.1).
+  defp register_classified!(db, object_id, version, path, labels) do
+    register_with_content_ref!(db, object_id, version, content_sha(path), labels)
   end
 
   # Nur fuer die B1-Regression: Altbestand mit Pfad-content_ref (#91).
   defp register_with_path_ref!(db, object_id, path, labels) do
-    register_with_content_ref!(db, object_id, path, labels)
+    register_with_content_ref!(db, object_id, "v1", path, labels)
   end
 
-  defp register_with_content_ref!(db, object_id, content_ref, labels) do
-    {:ok, ref} = ObjectRef.parse(object_id <> "@v1")
+  defp register_with_content_ref!(db, object_id, version, content_ref, labels) do
+    {:ok, ref} = ObjectRef.parse(object_id <> "@" <> version)
 
     {:ok, _} =
       LabelStore.quarantine(db, ref, %{
@@ -849,6 +993,11 @@ defmodule KomkiCli.SessionIntakeTest do
 
   defp stage!(intake) do
     assert :ok = SessionIntake.stage(intake)
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
   end
 
   # Steps-Testnaht: echte cfg, injizierter Doctor und tmux-Status.

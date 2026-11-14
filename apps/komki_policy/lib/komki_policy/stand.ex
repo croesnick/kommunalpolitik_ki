@@ -190,10 +190,17 @@ defmodule KomkiPolicy.Stand do
   # Validierung: Verbrauchs-Vorschlag (Form § 4.6, geschlossene Feldmenge)
   # -------------------------------------------------------------------------
 
+  # § 4.6-Form; seit #423 (§ 4.9) darf ein Vorschlag zusaetzlich die
+  # Offenlegung benennen: `ausgabeart` und `ziellabel` der Lockerung —
+  # optional, nur zusammen, nur gueltig geprueft (R.6.2: der Verbrauch
+  # dokumentiert, wofuer die Freigabe galt). Der fortgeschriebene Stand
+  # selbst speichert nur die Nonce.
   @proposal_fields ["release_id", "nonce", "stand_ref", "stand_version_after", "call_hash"]
+  @offenlegung_fields ["ausgabeart", "ziellabel"]
 
   defp validate_proposal(term) when is_map(term) do
-    with :ok <- closed_proposal_fields(term) do
+    with :ok <- closed_proposal_fields(term),
+         :ok <- validate_offenlegung_fields(term) do
       case Enum.reject(@proposal_fields, &Map.has_key?(term, &1)) do
         [] ->
           proposal_shape(term)
@@ -209,16 +216,71 @@ defmodule KomkiPolicy.Stand do
     {:error, {:invalid_proposal, "$", "expected an object, got " <> Kernel.inspect(term)}}
   end
 
-  # Geschlossene Feldmenge nach der § 4.6-Form; Extra-Felder sind Eingabefehler
-  # (`unknown_field`) — dieselbe Strenge wie bei allen Schemata des Vertrags.
+  # Geschlossene Feldmenge nach der § 4.6-Form, zusaetzlich die beiden
+  # optionalen Offenlegungsfelder (§ 4.9, #423); jede andere Extra-Feld
+  # ist ein Eingabefehler (`unknown_field`) — dieselbe Strenge wie bei
+  # allen Schemata des Vertrags.
   defp closed_proposal_fields(term) do
-    case Enum.sort(Enum.reject(Map.keys(term), &(&1 in @proposal_fields))) do
+    case Enum.sort(
+           Enum.reject(Map.keys(term), &(&1 in (@proposal_fields ++ @offenlegung_fields)))
+         ) do
       [] ->
         :ok
 
       [first | _] ->
         {:error, {:unknown_field, "$." <> first, "field not part of the closed proposal schema"}}
     end
+  end
+
+  # Die Offenlegungsfelder sind optional, aber nur zusammen gueltig: Beide
+  # da — `ausgabeart` aus dem geschlossenen Vokabular, `ziellabel` als
+  # sortierte, eindeutige Bindungsreferenzen —; keines da; eines allein
+  # ist ein Eingabefehler.
+  defp validate_offenlegung_fields(term) do
+    case {Map.has_key?(term, "ausgabeart"), Map.has_key?(term, "ziellabel")} do
+      {false, false} ->
+        :ok
+
+      {true, true} ->
+        require_proposal_offenlegung(term)
+
+      _eins_allein ->
+        {:error, {:invalid_proposal, "$", "ausgabeart and ziellabel belong together"}}
+    end
+  end
+
+  defp require_proposal_offenlegung(term) do
+    with :ok <- require_proposal_ausgabeart(term["ausgabeart"]),
+         do: require_proposal_ziellabel(term["ziellabel"])
+  end
+
+  defp require_proposal_ausgabeart(value) when is_binary(value) do
+    if value in Registry.output_kinds() do
+      :ok
+    else
+      {:error,
+       {:invalid_proposal, "$.ausgabeart",
+        "expected one of " <> inspect(Registry.output_kinds()) <> ", got " <> inspect(value)}}
+    end
+  end
+
+  defp require_proposal_ausgabeart(value) do
+    {:error,
+     {:invalid_proposal, "$.ausgabeart",
+      "expected one of " <> inspect(Registry.output_kinds()) <> ", got " <> inspect(value)}}
+  end
+
+  defp require_proposal_ziellabel(labels) when is_list(labels) do
+    if labels == Enum.sort(Enum.uniq(labels)) and labels != [] and
+         Enum.all?(labels, &Registry.reference_id?/1) do
+      :ok
+    else
+      {:error, {:invalid_proposal, "$.ziellabel", "expected sorted, unique binding references"}}
+    end
+  end
+
+  defp require_proposal_ziellabel(_other) do
+    {:error, {:invalid_proposal, "$.ziellabel", "expected an array of binding references"}}
   end
 
   # Intake nach der geschlossenen § 4.6-Form (#120): `release_id` und `nonce`
@@ -240,15 +302,25 @@ defmodule KomkiPolicy.Stand do
              :invalid_proposal
            ) do
       {:ok,
-       %{
-         release_id: term["release_id"],
-         nonce: term["nonce"],
-         stand_ref: term["stand_ref"],
-         stand_version_after: term["stand_version_after"],
-         call_hash: term["call_hash"]
-       }}
+       Map.merge(
+         %{
+           release_id: term["release_id"],
+           nonce: term["nonce"],
+           stand_ref: term["stand_ref"],
+           stand_version_after: term["stand_version_after"],
+           call_hash: term["call_hash"]
+         },
+         proposal_offenlegung(term)
+       )}
     end
   end
+
+  # Die Offenlegung des Vorschlags (§ 4.9): nur da, wenn beide Felder
+  # da sind; sonst bleibt der Vorschlag die reine § 4.6-Form.
+  defp proposal_offenlegung(%{"ausgabeart" => ausgabeart, "ziellabel" => ziellabel}),
+    do: %{ausgabeart: ausgabeart, ziellabel: ziellabel}
+
+  defp proposal_offenlegung(_term), do: %{}
 
   defp require_stand_ref(value) do
     if Registry.reference_id?(value) do

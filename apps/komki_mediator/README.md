@@ -11,20 +11,33 @@ im Journal; ein Permit schreibt zusaetzlich einen Vorbeleg, bevor
 irgendetwas vollzogen wird (Audit vor Wirkung). Ein Connector-Aufruf
 ergibt so mehrere Datensaetze mit derselben `call_id`.
 
-Fassung `komki-mediator/3` (Tickets #144, #218): neben `ping`,
-`list_documents` und `admit_document` bietet der Vermittler die sechs
+Fassung `komki-mediator/5` (Tickets #144, #218, #419): neben `ping`,
+`list_documents` und `admit_document` bietet der Vermittler die
 Connector-Tools `ris_search`, `ris_show`, `web_search`, `vault_search`,
-`vault_read` und `vault_write_test` an. Jeder Connector-Aufruf laeuft als
+`vault_read`, `vault_write_test`, `rp_fakt_vorschlagen` und
+`rp_stand_lesen` an. Jeder Connector-Aufruf laeuft als
 emit → transfer → Vollzug → admit; jede Entscheidung steht sofort im
 Journal, dazu der Vorbeleg vor dem Vollzug, im Permit-Fall also vier PDR
 (`apps/komki_connector/CONTRACT.md` §6, Ticket #298); ein schreibender
 mit `store` statt `transfer`, das ohne GO der nutzenden Person abgelehnt
-wird (Ticket #205).
+wird (Ticket #205). Ausnahme ist `rp_stand_lesen` (§6.4, #419): ohne
+Parameter und ohne neue Beobachter entscheidet der Vermittler nur die
+Aufnahme, vor dem Vollzug und ohne GO-Weg.
 
 Gesperrte Aufrufe (`deny`, `indeterminate`, abgelehntes oder ausgebliebenes
 GO) tragen neben dem Remedy-Katalog das Feld `hinweis`: ein fester Satz an
 das Modell, dass Umwege nicht zum Ziel fuehren (Ticket #166,
-`KomkiMediator.Hinweis`).
+`KomkiMediator.Hinweis`). Liegt beim Speichern ein Empfaenger ausserhalb
+des Empfaengerkreises, bietet die Engine kein GO an (Ticket #417): Dann
+traegt die Antwort nur den `hinweis`, dass nichts uebertragen wurde, und
+`recipients_outside` aus dem Blocker der Engine, aus dem die pi-Anzeige
+ihren Satz fuer die nutzende Person baut. Remedies und
+Lockerungsbefugnisse stehen dann nur im Journal. Bei unbelegter
+Beobachterliste gibt es ebenfalls kein GO und kein Fenster (Ticket #432):
+Der Katalog haelt das call-GO dann fuer jeden Befund der Entscheidung
+zurueck, es entsteht keine GO-Anfrage — die Antwort behaelt die normale
+Form mit dem GO-losen Katalog, denn ein GO kann nicht belegen, wer
+mitliest.
 
 ## Architektur im komki-Lauf
 
@@ -216,7 +229,11 @@ Freigabe-Zweigs; fuer dasselbe Gate folgt kein `permitted`-PDR. Ein Nein
 ergibt `go_refused`, keine Antwort `go_timeout`,
 jeweils mit PDR. Die Antwort bleibt das deny samt Katalog, ergaenzt um
 `"go"`. Eine ungueltige Freigabe (falscher Call, abgelaufen, Nonce
-verbraucht) ist ein neues deny des Freigabe-Zweigs.
+verbraucht) ist ein neues deny des Freigabe-Zweigs. Bei `store` mit
+unbelegter Beobachterliste waere auch eine gueltige Freigabe ein deny
+(`recipients_unproven`, Ticket #432) — so weit kommt es ueber den
+Vermittler aber nie: Der Katalog haelt das GO unter derselben Bedingung
+zurueck, eine Anfrage entsteht nicht.
 
 ### Bewusste Grenzen
 
@@ -264,9 +281,9 @@ Aufruf hier ist Entwicklung und Debugging vorbehalten.
 | Route | Zweck |
 |---|---|
 | `GET /healthz` | Status + Fassung (`fassung_id`, `tools`, `registry_id`, `gamma_hash`) |
-| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/3` (siehe unten) |
+| `/mcp` | MCP StreamableHTTP (anubis_mcp) mit den Tools der Fassung `komki-mediator/5` (siehe unten) |
 
-## Tools (Fassung `komki-mediator/3`)
+## Tools (Fassung `komki-mediator/5`)
 
 | Tool | Ablauf | Parameter |
 |---|---|---|
@@ -279,6 +296,8 @@ Aufruf hier ist Entwicklung und Debugging vorbehalten.
 | `vault_search` | ConnectorGate, Connector `vault` | `text` (max 200) |
 | `vault_write_test` | ConnectorGate, Connector `vault` (schreibend) | `title` (max 120), `body` (max 20000) |
 | `web_search` | ConnectorGate, Connector `web` | `query` (max 400), `count` (1..10, Default 5) |
+| `rp_fakt_vorschlagen` | ConnectorGate, Connector `ratsprojekte` (schreibend, `store`): ein Ereignis mit Teilen an den Hub; aus dem Fraktionsraum ist die Übergabe eine Lockerung mit Offenlegungsfreigabe, die Teile wählt die nutzende Person vor dem GO ab (#423) | `titel` (max 120), `teile` (1..8, je `aussage` max 1000 Pflicht, `quelle` max 400 Pflicht, `fundstelle` max 200), `projekt_hinweis` (max 120) |
+| `rp_stand_lesen` | ConnectorGate, Nur-Aufnahme (§6.4, #419): Gate (admit) des Objekts `ratsprojekte-stand` (Label `ratsprojekte@1` aus dem Manifest) gegen B_W, vor dem Vollzug, ohne GO; Vollzug im Connector `ratsprojekte` liest die Stand-Datei | — |
 
 Schemas und Beschreibungen der Connector-Tools entstehen zur Compile-Zeit aus
 `KomkiConnector.Manifest` (`KomkiMediator.Tools.Connector`); ein Test
@@ -414,11 +433,22 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
     `output_content_digest = intent_hash`; die Engine ordnet λ(y) = B_W zu.
   * Gate 1b `transfer` (lesend, #298) bzw. `store` (schreibend, #205):
     nach dem emit-Permit, unter λ(y) = `assigned_label` in der
-    Manifest-Umgebung (`ris-abruf@1`, `web-suche@1`, `vault-lokal@1`). Hier
+    Manifest-Umgebung (`ris-abruf@1`, `web-suche@1`, `vault-lokal@1`,
+    `ratsprojekte-bestand@1`). Hier
     faellt der Empfaengertest. Γ hat keine `store`-Regel, also ist jedes
     Schreiben ein deny mit Aktionsfreigabe fuer den exakten Call; mit
     Zuhoerer fragt der Vermittler (GO-Anfrage mit `operation: store`
-    bzw. `transfer`), sonst bleibt es beim deny.
+    bzw. `transfer`), sonst bleibt es beim deny. Faellt beim Speichern der
+    Empfaengertest, gibt es kein GO und kein Fenster (#417) — es sei denn,
+    der Katalog bietet eine Offenlegungsfreigabe an (#423, Szene 13):
+    Jede Bindung, deren Empfaengerkreis das Ziel nicht abdeckt, braucht
+    dann eine Befugnis fuer die Ausgabeart des Ziels. Die Anfrage zeigt
+    den genauen Text, alle Empfaenger und den Hinweis auf die Offenlegung
+    und bietet die Teile zur Abwahl an — eine Abwahl leitet den Call neu
+    ab und die Freigabe bindet den neuen Hash (R.6.2). Bei unbelegter
+    Beobachterliste (`environment_observers_complete` nicht bekannt-`true`)
+    gilt die Ausnahme nicht: kein GO irgendeiner Art, kein Fenster
+    (Ticket #432).
   * Journal: jede Entscheidung kommt sofort ins Journal (`permitted`,
     Ablehnung oder `released`), auch wenn danach nichts vollzogen wird.
     Bei permit folgt der Vorbeleg (`rule: emit`, `outcome: emitted`),
@@ -444,7 +474,7 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
   (separater Writer-Prozess; stirbt er, stirbt die Vermittlung — die
   Auditkette dunkelt nie still ab) und bettet die `decision_id` in die
   Antwort ein. `payload_hash` ist der SHA-256 der kanonischen Antwortbasis
-  (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/4` (seit #298:
+  (Options-Recherche §5, nicht R.4.4). Schema `komki-pdr/5` (seit #423: Offenlegung; #298:
   jede Entscheidung als eigener PDR, Vorbeleg mit `decision: null` und
   `authorized_by`, den `decision_id`s der emit- und der transfer- bzw.
   store-Entscheidung); seit `komki-pdr/3`
@@ -465,7 +495,7 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
 | `KomkiMediator.Go` | GO-Anfragen und -Antworten unter `mediator/go` (Ticket #98) |
 | `KomkiMediator.GoStand` | Offenlegungsstand der GO-Noncen, commit vor Wirkung |
 | `KomkiMediator.ResultShape` | Ergebnisformen der Connectoren (§5.2) |
-| `KomkiMediator.PDR` | Form der PDR-Datensaetze (`komki-pdr/4`) |
+| `KomkiMediator.PDR` | Form der PDR-Datensaetze (`komki-pdr/5`) |
 | `KomkiMediator.Tools.Connector` | Tool-Baustein aus dem Manifest |
 | `KomkiMediator.Gamma` | Registry-Snapshot + Stand-Hash |
 | `KomkiMediator.Room` | Raum-Zustand, Objekt-/Snapshot-Bildung |

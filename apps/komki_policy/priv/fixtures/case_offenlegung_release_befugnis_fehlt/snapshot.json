@@ -1,0 +1,53 @@
+{
+  "facts": {
+    "audit_path_ready": {
+      "source": "journal-verwaltung",
+      "source_kind": "technical",
+      "value": true
+    },
+    "environment_observers_complete": {
+      "source": "umgebungs-verwaltung",
+      "source_kind": "assumption",
+      "value": true
+    },
+    "has_operation_right": {
+      "source": "rechte-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    "output_content_digest": {
+      "source": "ausgabe-diagnose",
+      "source_kind": "technical",
+      "value": "5a3f9f5da4d9d2a0eacbd56c1d1b1cbaf74e2fbd0cb0a28f61f5f45cb71f1b3c"
+    },
+    "purpose": {
+      "source": "auftrags-verwaltung",
+      "source_kind": "administered",
+      "value": "fraktionsarbeit"
+    }
+  },
+  "identity": "nutzende-person",
+  "object": {
+    "classification": "classified",
+    "labels": [
+      "fraktion-intern@1",
+      "ratsarbeit@1",
+      "web-oeffentlich-fall@1"
+    ],
+    "object_id": "obj-essenz-a",
+    "version": "v1"
+  },
+  "registry_ref": "reg-fall-4711-test",
+  "schema": "komki-snapshot/1",
+  "snapshot_id": "snap-offenlegung",
+  "workspace": {
+    "bindings": [
+      "fraktion-intern@1",
+      "ratsarbeit@1",
+      "web-oeffentlich-fall@1"
+    ],
+    "environment": "ratsprojekte-bestand@1",
+    "valid": true,
+    "workspace_id": "ws-fraktionsraum"
+  }
+}

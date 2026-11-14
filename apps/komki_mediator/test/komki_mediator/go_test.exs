@@ -250,6 +250,10 @@ defmodule KomkiMediator.GoTest do
     assert response["decision"] == "deny"
     refute Map.has_key?(response, "go")
     assert micros < 1_000_000
+
+    # transfer keeps its GO and its note (#417 changes only store).
+    assert Go.offered(response["remedies"])
+    assert response["hinweis"] == KomkiMediator.Hinweis.text(:deny)
   end
 
   test "veralteter Herzschlag zaehlt nicht", %{env: env} do

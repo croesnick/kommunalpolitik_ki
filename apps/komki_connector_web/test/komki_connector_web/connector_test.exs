@@ -156,6 +156,34 @@ defmodule KomkiConnectorWeb.ConnectorTest do
     assert {:error, %{"code" => "credential-missing"}} = search(path, %{"query" => "x"})
   end
 
+  # Regression #496: Vor dem Fix ging zu jedem http://-Ziel eine echte
+  # Klartext-Anfrage mit dem Subscription-Token raus (hier dann:
+  # upstream-error nach dem Verbindungsversuch). Nach dem Fix wird sie
+  # vor dem Transport verweigert — credential-missing, kein Verbindungsaufbau.
+  test "Klartext zu fremdem Host: Suche verweigert, Token verlaesst den Connector nicht" do
+    # 192.0.2.1: RFC-5737-TEST-NET-1 — nicht Loopback, nicht routbar
+    path =
+      socket_listen(
+        %{
+          credentials: %{"BRAVE_API_KEY" => @key},
+          base_url: "http://192.0.2.1:9/",
+          timeout: 300
+        },
+        fn -> :ok end
+      )
+
+    Logger.configure(level: :info)
+    on_exit(fn -> Logger.configure(level: :warning) end)
+
+    log =
+      capture_log(fn ->
+        assert {:error, %{"code" => "credential-missing"}} = search(path, %{"query" => "x"})
+      end)
+
+    assert log =~ "Klartext"
+    refute log =~ @key
+  end
+
   test "HTTP-Status 401, 403, 429, 500" do
     path =
       start(fn req ->

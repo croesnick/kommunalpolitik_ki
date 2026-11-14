@@ -404,8 +404,18 @@ defmodule KomkiPolicy.CLITest do
     assert parsed["code"] == "usage"
   end
 
-  test "decide Freigabe kind offenlegungsfreigabe -> Exit 3, unsupported (kein deny)" do
-    release = Map.put(fixture("case_release_permit/release.json"), "kind", "offenlegungsfreigabe")
+  test "decide Freigabe kind offenlegungsfreigabe bei emit -> Exit 3, unsupported (kein deny; #423: store ist entscheidbar)" do
+    # Ein Vollständige Offenlegungsfreigabe-Form (§ 2.6, komki-release/2),
+    # hier gegen einen emit-Intent: Für emit bleibt die Lockerung
+    # undecidable (§ 4.9 entscheidet nur store, Ticket #423).
+    release =
+      Map.merge(fixture("case_release_permit/release.json"), %{
+        "kind" => "offenlegungsfreigabe",
+        "schema" => "komki-release/2",
+        "ausgabeart" => "ratsprojekte-essenz",
+        "ziellabel" => ["ratsprojekte@1"]
+      })
+
     path = Path.join(System.tmp_dir!(), "komki-policy-offenlegungsfreigabe.json")
     File.write!(path, JSON.canonical(release))
 

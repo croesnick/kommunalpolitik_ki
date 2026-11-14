@@ -208,6 +208,10 @@ function callGoOffered(r: Json): boolean {
 
 function remedyRows(r: Json, p: Paint): Row[] {
 	const rows: Row[] = [];
+	// Store outside the recipient circle (#417): the mediator sends only who lies outside, no catalog.
+	const outside = (Array.isArray(r.recipients_outside) ? r.recipients_outside : []).map((name: unknown) => clean(String(name)));
+	if (outside.length > 0)
+		rows.push(labelled("Grund", `Inhalte dieses Arbeitsraums dürfen nicht an ${outside.join(", ")} gehen. Ein GO ändert daran nichts.`, p));
 	for (const remedy of Array.isArray(r.remedies) ? r.remedies : []) {
 		rows.push(labelled("Grund", blocker(remedy), p));
 		const ways = (Array.isArray(remedy.transitions) ? remedy.transitions : []).map(transition);

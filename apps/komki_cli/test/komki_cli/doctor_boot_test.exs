@@ -7,9 +7,17 @@ defmodule KomkiCli.DoctorBootTest do
   verifizierte GGUF-Artefakt der Sandbox-Forschung am erwarteten Pfad
   liegt (seit Ticket #318 auch der MTP-Drafter); ohne beides findet dieser
   Modul keine Tests statt.
+
+  Der Test kopiert etwa 17 GB und bootet einen echten llama-server (Port
+  59999). Deshalb ist er mit `:llama_boot` getaggt und im Standardlauf
+  ausgeschlossen (`test_helper.exs`, Ticket #392). Ausführen:
+
+      cd apps/komki_cli && mix test --include llama_boot
   """
 
   use ExUnit.Case, async: false
+
+  @moduletag :llama_boot
 
   alias KomkiCli.Config
 
@@ -94,6 +102,10 @@ defmodule KomkiCli.DoctorBootTest do
     # Ticket #176: run startet fehlende Prozesse selbst (wie up). In diesem
     # Testumfeld scheitert der Start; die Ursache kommt mit Runtime-Exit 4,
     # statt dass run auf 'komki up' verweist.
+    #
+    # Boots the real llama-server with the 17 GB model (~45 s on this host),
+    # so ExUnit's default 60 s limit flakes under parallel load.
+    @tag timeout: 180_000
     test "run ohne laufenden llama-server startet selbst; scheitert der Start, kommt die Ursache (Exit 4)" do
       # Der Startversuch kann einen echten llama-server hochfahren: danach
       # immer stoppen, sonst bleibt er als Waise auf dem Testport.

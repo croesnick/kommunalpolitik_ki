@@ -316,6 +316,47 @@ Commit nicht wieder knallt.
 
 ---
 
+## `chrome-headless-shell` (Screenshot-Werkzeug)
+
+**Zweck:** Headless-Browser für `scripts/screenshot.exs` (#510), das Prüfpunkte
+der Hub-Oberfläche mit Screenshots belegt. Das Werkzeug steuert ihn über das
+DevTools-Protokoll und startet ihn nur unter seinem eigenen Seatbelt-Profil.
+
+**Install:** über Playwright, mit pnpm (nie plain npm). `--only-shell` lädt für
+Chromium nur die Headless-Shell (https://playwright.dev/docs/browsers, Abschnitt
+„Chromium: headless shell“, abgerufen am 2026-11-13; dort mit `npx` und
+`--with-deps`, das nur unter Linux Systempakete nachzieht):
+
+```bash
+pnpm dlx playwright install --only-shell
+```
+
+Der Browser landet unter `~/Library/Caches/ms-playwright/chromium_headless_shell-<Revision>/`.
+`scripts/screenshot/pins.json` pinnt Pfad und Prüfsumme des Paketordners. Eine
+andere Revision weist das Werkzeug ab und nennt die neue Prüfsumme. Wer das
+Update geprüft hat, trägt sie dort ein.
+
+Interaktive Sessions starten eine installierte Kopie des Werkzeugs
+(`make screenshot-install`, siehe
+[interaktive-sessions.md](agents/interaktive-sessions.md#screenshots-der-hub-oberfläche)).
+Eine neue Prüfsumme gilt dort erst nach Merge und neuer Installation. Die
+Installation holt den Stand über `gh api` von GitHub und braucht dafür ein
+angemeldetes `gh`.
+
+**Benötigt von:**
+
+| Skill / Workflow | Anmerkung |
+|---|---|
+| `scripts/screenshot.exs` | interaktive Sessions und Dev-Loop (Review von UI-Tickets) |
+
+esbuild und tailwind für die Assets des Hubs lädt das Werkzeug selbst (gepinnt in
+derselben Datei, Cache `~/.local/share/komki-tools/cache/`).
+
+**Fallback:** Ohne Browser keine Screenshots. Der Prüfpunkt „Light und Dark,
+ab Handybreite“ steht dann auf `nicht geprüft`.
+
+---
+
 ## `lychee` CLI (Markdown-Link-Check)
 
 **Zweck:** Offline-Link-Check für Markdown-Dateien: verifiziert lokale
@@ -346,6 +387,33 @@ externe URLs gibt es nicht.
 
 ---
 
+## `shfmt` (Shell-Parser für den PR-Hook)
+
+**Zweck:** Der PreToolUse-Hook vor `gh pr create` liest damit den Befehl
+als Syntaxbaum (`shfmt --to-json`), um `--head` so zu verstehen wie die
+Shell und gh. Erwähnungen in Titel, Body oder Heredoc zählen dann nicht
+als Flag ([#540](https://github.com/croesnick/kommunalpolitik_ki/issues/540)).
+shfmt (BSD-3-Clause) führt nichts aus, es parst nur.
+
+**Install:**
+
+```bash
+brew install shfmt
+```
+
+**Benötigt von:**
+
+| Skill / Workflow | Anmerkung |
+|---|---|
+| `.claude/hooks/pr_report.exs` | Liest `--head` aus dem Aufruf von `gh pr create` |
+| CI-Schritt „Tests (Hooks)“ | Installiert eine gepinnte Binary (Version und SHA-256 in `.github/workflows/ci.yml`) |
+
+**Fallback (wenn `shfmt` nicht verfügbar):** Der Hook liest wie vor #540
+den ersten `--head` im ganzen Befehl. Eine Erwähnung im Body-Text kann dann
+zu einer Ablehnung führen; Ausweg ist `--body-file`.
+
+---
+
 ## KomKI-CLI (`apps/komki_cli`)
 
 **Zweck:** Lokal gesandboxter KI-Arbeitsraum (`komki`): Seatbelt-Profil,
@@ -372,13 +440,22 @@ Pfad vor, etwa `/private/tmp/komki-test` für eine Wegwerf-Instanz (#246).
 **komki-tresor (Secure Enclave):** `mix compile` baut das kleine Swift-Programm
 `komki-tresor` (`apps/komki_cli/native/komki-tresor/main.swift`) nach
 `apps/komki_cli/priv/`; `make komki` kopiert es neben das Escript.
-Es versiegelt Geheimnisse wie den Brave-Key mit einem Schlüssel der Secure
-Enclave; Öffnen geht nur mit Touch ID oder dem Passwort des Macs. Erlang
+Es hält den Schlüssel der Secure Enclave, mit dem komki Geheimnisse wie den
+Brave-Key versiegelt; das Siegel selbst baut und öffnet `apps/sealed_envelope`
+in Elixir, das Programm sieht keinen Klartext. Öffnen geht nur mit Touch ID
+oder dem Passwort des Macs. Erlang
 erreicht die Secure Enclave nicht, deshalb Swift (Apple-Frameworks CryptoKit,
 LocalAuthentication, Security; keine Fremdbibliothek). Bauen braucht `swiftc`
 aus den Xcode Command Line Tools; das Homebrew-Paket bringt das fertige
 Programm mit. Ohne Secure Enclave (Intel-Mac ohne T2) gibt es keine
 versiegelten Geheimnisse, die Websuche bleibt dann aus.
+
+Dieselbe Binary hält auch den Schlüssel, mit dem der Schlüssel der RIS-Kassetten
+versiegelt ist:
+`apps/komki_connector_ris/priv/ris_cassettes.exs` ruft `komki-tresor` über den
+PATH auf (Override mit `--tresor <pfad>`, aus dem Checkout gebaut liegt es in
+`apps/komki_cli/priv/`). `init` und jedes `seal`/`unseal` brauchen Touch ID auf
+diesem Mac; Details im Connector-README, Abschnitt „Kassetten verschlüsseln“.
 
 **Programm-Pins:** `komki setup` hält die SHA-256 der gestarteten Programme
 fest (komki, escript, node, llama-server, komki-tresor, das pi-Paket);
@@ -476,6 +553,69 @@ als `custom_erts` ein (Variable `KOMKI_CUSTOM_ERTS` in `apps/komki_cli/mix.exs`)
 | Tool / Workflow | Anmerkung |
 |---|---|
 | komki-Standalone-Release (Ticket #75) | Nur der Release-Bau; die verteilte Datei selbst hat keine Runtime-Abhängigkeiten |
+
+---
+
+## `sqlcipher` (Verschlüsselung für die SQLite-NIF)
+
+**Zweck:** Der Workspace baut exqlite gegen die SQLCipher-Systembibliothek
+(ADR 0004 „Betrieb‟, Ticket #435). Betroffen sind alle drei exqlite-Apps:
+`ratsprojekte` (Hub, eigene Datenbankdatei), `ratsinfo` (Volltextsuche) und
+`komki_cli` (Label-Registry). Ohne Schlüssel verhält sich SQLCipher wie
+normales SQLite — nichts ändert sich für Bestandsdatenbanken, erst mit
+Schlüssel wird verschlüsselt (Schreibweg im Release: Ticket #440).
+
+**Install (macOS):**
+
+```bash
+brew install sqlcipher
+```
+
+**Wie der Build greift:** In `config/config.exs` der drei Apps steht
+
+```elixir
+config :exqlite,
+  force_build: true,
+  make_env: %{
+    "EXQLITE_USE_SYSTEM" => "1",
+    "EXQLITE_SYSTEM_CFLAGS" => "-I#{prefix}/include/sqlcipher",
+    "EXQLITE_SYSTEM_LDFLAGS" => "-L#{prefix}/lib -lsqlcipher"
+  }
+```
+
+`force_build` verhindert die vorcompilierten cc_precompiler-Artefakte (sie
+enthalten ein ungepatchtes SQLite), `make_env` reicht die Variablen an den
+make-Prozess durch. `SQLCIPHER_PREFIX` überschreibt den pro OS ermittelten
+Präfix (macOS: Homebrew, Linux: `/usr`). Ändern sich die Flags, muss exqlite
+erneut kompiliert werden:
+
+```bash
+cd apps/<app> && mix deps.compile exqlite --force
+```
+
+**Prüfung:** `Ratsprojekte.SqlcipherTest` schlägt fehl, wenn exqlite doch
+ungepatcht gebaut wurde (`PRAGMA cipher_version` liefert dann keine Zeile);
+`otool -L _build/<env>/lib/exqlite/priv/sqlite3_nif.so` (macOS) zeigt die
+Verlinkung gegen `libsqlcipher.dylib`.
+
+**CI:** GitHub Actions (ubuntu-latest, 24.04) baut SQLCipher v4.20.0 aus der
+Quelle mit den Configure-Flags der Homebrew-Formel (das apt-Paket 4.5.6
+dort hätte kein FTS5 — ratsinfos Volltextsuche bräche). Der Schritt steht
+in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+
+**Konsequenz für komki:** Die gepackte exqlite-NIF im Homebrew-Paket verlinkt
+`libsqlcipher.dylib` — die Formel
+([`packaging/homebrew/komki.rb.in`](../packaging/homebrew/komki.rb.in)) hängt
+`sqlcipher` als Abhängigkeit ein.
+
+**Lizenz:** SQLCipher steht unter BSD 3-Clause (ZETETIC); die Homebrew-Formel
+deklariert zusätzlich das SQLite-Blessing für die enthaltene SQLite-Basis.
+
+**Fallback:** Keiner, und das ist beabsichtigt — ohne die Systembibliothek
+bricht der exqlite-Bau beim Kompilieren ab (force_build schaltet die
+vorcompilierten Artefakte bewusst ab) und `Ratsprojekte.SqlcipherTest` schlägt
+fehl. Wer die Datenbank der drei Apps ohne Verschlüsselungsbau weiter nutzen
+will, bleibt auf einem Stand vor #435.
 
 ---
 

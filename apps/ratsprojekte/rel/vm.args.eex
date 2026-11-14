@@ -1,0 +1,10 @@
+## VM flags of the ratsprojekte release (#440, ADR 0004 „Betrieb“).
+
+## Schedulers sleep at once instead of busy-waiting, including the dirty
+## CPU and IO schedulers: the idle hub should cost (almost) no CPU.
++sbwt none
++sbwtdcpu none
++sbwtdio none
+
+## Enable deployment without epmd (no distribution, see env.sh.eex)
+-start_epmd false

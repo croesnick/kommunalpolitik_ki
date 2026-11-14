@@ -33,6 +33,7 @@ defmodule KomkiMediator.FakeConnector do
   end
 
   defp module("documents"), do: KomkiMediator.FakeConnector.Documents
+  defp module("ratsprojekte"), do: KomkiMediator.FakeConnector.Ratsprojekte
   defp module("ris"), do: KomkiMediator.FakeConnector.Ris
   defp module("web"), do: KomkiMediator.FakeConnector.Web
   defp module("vault"), do: KomkiMediator.FakeConnector.Vault
@@ -82,5 +83,15 @@ defmodule KomkiMediator.FakeConnector do
 
     def handle_op(op, params, context, state),
       do: KomkiMediator.FakeConnector.handle_op("vault", op, params, context, state)
+  end
+
+  defmodule Ratsprojekte do
+    @moduledoc false
+    @behaviour Sidecar.Server
+    def manifest, do: Manifest.sidecar!("ratsprojekte")
+    def init(arg), do: {:ok, arg}
+
+    def handle_op(op, params, context, state),
+      do: KomkiMediator.FakeConnector.handle_op("ratsprojekte", op, params, context, state)
   end
 end

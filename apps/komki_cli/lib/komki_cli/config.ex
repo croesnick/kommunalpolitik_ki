@@ -27,6 +27,8 @@ defmodule KomkiCli.Config do
       49531/49532). Eine bestehende config.json behaelt ihre Ports (#203).
     * `ris_base_url` — Default die echte RIS-API; `ris_mock_port` schaltet auf
       `http://127.0.0.1:<port>/` ohne Proxy um.
+    * `web_mock_port` — schaltet den Web-Connector auf einen Brave-Mock unter
+      `http://127.0.0.1:<port>/` ohne Proxy um; ohne ihn gilt die echte API.
     * `vault_dir` — Default `<base>/vault` (synthetischer Test-Vault); leer
       oder fehlend: Vault-Connector startet nicht.
 
@@ -68,7 +70,16 @@ defmodule KomkiCli.Config do
                 :escript_bin,
                 :egress_bin,
                 :ris_mock_port,
+                # Brave-Mock (Ticket #340): Web-Connector direkt auf Loopback
+                :web_mock_port,
                 :vault_dir,
+                # Durchstich #409, belegt im Wegwerf-Lauf: Socket des ratsprojekte-Hubs;
+                # nil heisst: kein Schreibweg in den Hub.
+                :ratsprojekte_socket,
+                # Stand-Datei des Hubs (#419, Szene 12), in Kernel-Form;
+                # nil heisst: kein Stand lesen. Ohne beide startet der
+                # ratsprojekte-Connector nicht.
+                :ratsprojekte_stand,
                 connector_bins: %{},
                 egress_ports: %{},
                 # Programm-Pins (KomkiCli.Pins): Name -> %{"path", "sha256"}
@@ -105,7 +116,10 @@ defmodule KomkiCli.Config do
           egress_ports: %{String.t() => pos_integer()},
           ris_base_url: String.t() | nil,
           ris_mock_port: pos_integer() | nil,
+          web_mock_port: pos_integer() | nil,
           vault_dir: String.t() | nil,
+          ratsprojekte_socket: String.t() | nil,
+          ratsprojekte_stand: String.t() | nil,
           pins: %{String.t() => %{String.t() => String.t()}}
         }
 
@@ -142,7 +156,10 @@ defmodule KomkiCli.Config do
   @default_egress_ports %{"ris" => @default_port + 7, "web" => @default_port + 8}
   # Echte RIS-API (dieselbe Basis wie apps/ratsinfo); der Host steht im
   # Manifest als egress_hosts-Eintrag.
-  @default_ris_base_url "https://risapi1.komuna.net/web/"
+  @default_ris_base_url "https://risapi3.komuna.net/web/"
+  # Earlier defaults of the RIS API (#515: moved to risapi3 in November
+  # 2026); an instance that still carries one loads the current default.
+  @retired_ris_base_urls ["https://risapi1.komuna.net/web/"]
   @pi_bundle_rel "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js"
 
   @spec expected_gguf_sha256 :: String.t()
@@ -508,8 +525,13 @@ defmodule KomkiCli.Config do
       egress_ports: egress_ports_for(port),
       ris_base_url: opts[:ris_base_url] || @default_ris_base_url,
       ris_mock_port: opts[:ris_mock_port],
+      web_mock_port: opts[:web_mock_port],
       # Default: synthetischer Test-Vault unter der Basis (init legt ihn an)
-      vault_dir: vault_dir_opt(opts[:vault_dir], base)
+      vault_dir: vault_dir_opt(opts[:vault_dir], base),
+      # Durchstich #409, belegt im Wegwerf-Lauf: Socket des ratsprojekte-Hubs, nur gesetzt,
+      # wenn die Instanz einen kennt.
+      ratsprojekte_socket: blank_to_nil(opts[:ratsprojekte_socket]),
+      ratsprojekte_stand: blank_to_nil(opts[:ratsprojekte_stand])
     }
   end
 
@@ -530,6 +552,26 @@ defmodule KomkiCli.Config do
     do: "http://127.0.0.1:" <> Integer.to_string(port) <> "/"
 
   def ris_url(%__MODULE__{ris_base_url: url}), do: url || @default_ris_base_url
+
+  # A missing or retired URL becomes the current default (in memory; the
+  # next save writes it); any other URL stays.
+  defp ris_base_url(url) when url in [nil | @retired_ris_base_urls], do: @default_ris_base_url
+  defp ris_base_url(url), do: url
+
+  @doc """
+  Web-Connector gegen einen Brave-Mock (Ticket #340)? Dann spricht er
+  direkt mit `http://127.0.0.1:<web_mock_port>/` statt ueber den
+  Egress-Proxy; ohne Mock nimmt er seine eigene Default-URL (echte API).
+  """
+  @spec web_mock?(t()) :: boolean()
+  def web_mock?(%__MODULE__{web_mock_port: port}), do: is_integer(port)
+
+  @doc "Basis-URL des Brave-Mocks; nil ohne Mock."
+  @spec web_mock_url(t()) :: String.t() | nil
+  def web_mock_url(%__MODULE__{web_mock_port: port}) when is_integer(port),
+    do: "http://127.0.0.1:" <> Integer.to_string(port) <> "/"
+
+  def web_mock_url(%__MODULE__{}), do: nil
 
   @doc "Pfad der config.json für ein Basisverzeichnis."
   @spec config_path(String.t()) :: String.t()
@@ -600,7 +642,12 @@ defmodule KomkiCli.Config do
     :egress_ports,
     :ris_base_url,
     :ris_mock_port,
+    :web_mock_port,
     :vault_dir,
+    # Durchstich #409, belegt im Wegwerf-Lauf
+    :ratsprojekte_socket,
+    # Stand lesen (#419)
+    :ratsprojekte_stand,
     :pins
   ]
 
@@ -653,9 +700,12 @@ defmodule KomkiCli.Config do
       egress_bin: Map.get(map, "egress_bin"),
       connector_bins: Map.get(map, "connector_bins") || %{},
       egress_ports: ports(Map.get(map, "egress_ports", @default_egress_ports)),
-      ris_base_url: Map.get(map, "ris_base_url") || @default_ris_base_url,
+      ris_base_url: ris_base_url(Map.get(map, "ris_base_url")),
       ris_mock_port: optional_pos(:ris_mock_port, Map.get(map, "ris_mock_port")),
+      web_mock_port: optional_pos(:web_mock_port, Map.get(map, "web_mock_port")),
       vault_dir: blank_to_nil(Map.get(map, "vault_dir")),
+      ratsprojekte_socket: blank_to_nil(Map.get(map, "ratsprojekte_socket")),
+      ratsprojekte_stand: blank_to_nil(Map.get(map, "ratsprojekte_stand")),
       pins: Map.get(map, "pins") || %{}
     }
   end

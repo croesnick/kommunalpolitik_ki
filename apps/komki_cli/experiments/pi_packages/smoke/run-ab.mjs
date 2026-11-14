@@ -23,6 +23,10 @@
  * is skipped on the next invocation. Provenance (hardware, versions,
  * SHA-256 of binary and GGUFs, git state) and the schedule with the system
  * state per run go to <root>/provenance.json and <root>/schedule.json.
+ *
+ * Idle sleep is held off with `caffeinate -i` for as long as this process
+ * lives (#372: an idle-sleeping Mac stalled the server for minutes and
+ * spoiled the timing of a whole measurement).
  */
 import { execFileSync, spawn } from "node:child_process";
 import { createWriteStream, existsSync, realpathSync } from "node:fs";
@@ -109,7 +113,14 @@ async function provenance(args) {
     if (actual !== ARMS[arm].sha256) {
       throw new Error(`Arm ${arm}: ${file} fehlt oder SHA-256 ${actual} ≠ Pin — erst stage-gguf.mjs`);
     }
-    ggufs[arm] = { ...ARMS[arm], path: file, sha256Verified: actual };
+    const armBin = realpathSync(ARMS[arm].bin ?? process.env.KOMKI_LLAMA_SERVER ?? DEFAULT_LLAMA_SERVER);
+    ggufs[arm] = {
+      ...ARMS[arm],
+      path: file,
+      sha256Verified: actual,
+      // #320: version and SHA-256 of the binary this arm actually runs.
+      bin: { path: armBin, version: llamaVersion(armBin), sha256: await sha256File(armBin) },
+    };
     const draft = ARMS[arm].draft;
     if (draft) {
       const draftFile = stagedPath(draft.as);
@@ -173,6 +184,8 @@ function runSmoke(entry, args, root) {
     "--only", args.only,
     "--root", runDir,
   ];
+  // #320: an arm with `bin` runs on its own llama-server build.
+  if (arm.bin) smokeArgs.push("--bin", arm.bin);
   return new Promise((resolve) => {
     const log = createWriteStream(path.join(runDir, "run.log"));
     const child = spawn(process.execPath, smokeArgs, { stdio: ["ignore", "pipe", "pipe"] });
@@ -196,6 +209,7 @@ async function preflight(args, root) {
         port: ARMS[arm].port,
         sampling: ARMS[arm].sampling,
         extraArgs: serverArgsOf(arm),
+        bin: ARMS[arm].bin,
         dir: path.join(root, "preflight", arm),
       });
       results[arm] = { ok: true, loadMs: llama.staging.loadMs };
@@ -214,6 +228,7 @@ async function main() {
   const root = args.root ?? path.join(EXPERIMENTS_ROOT, "ab-285", timestamp());
   await mkdir(root, { recursive: true });
   console.log(`A/B-Root: ${root}`);
+  spawn("/usr/bin/caffeinate", ["-i", "-w", String(process.pid)], { stdio: "ignore", detached: true }).unref();
 
   const prov = await provenance(args);
   await writeFile(path.join(root, `provenance-${timestamp()}.json`), JSON.stringify(prov, null, 2));

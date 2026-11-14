@@ -11,6 +11,7 @@ defmodule KomkiCli.MixProject do
     :komki_connector_vault,
     :komki_connector_documents,
     :seatbelt,
+    :sealed_envelope,
     :sidecar
   ]
 
@@ -26,6 +27,8 @@ defmodule KomkiCli.MixProject do
       # NACH den Standard-Compilern, damit der Task selbst schon kompiliert ist.
       # Ohne macOS/swiftc ueberspringt der Task mit Info statt Fehler.
       compilers: Mix.compilers() ++ [:komki_tresor],
+      # test/support holds compiled helpers and the fake tresor script, no tests.
+      test_ignore_filters: [&String.starts_with?(&1, "test/support/")],
       deps_path: "../artifacts/deps",
       lockfile: "../workspace.lock",
       start_permanent: Mix.env() == :prod,
@@ -127,7 +130,7 @@ defmodule KomkiCli.MixProject do
     [
       {:optimus, "~> 0.6"},
       {:burrito, "~> 1.6"},
-      {:exqlite, "~> 0.42"},
+      {:exqlite, "~> 0.43"},
       {:komki_policy, path: "../komki_policy"},
       # Connector-Manifeste und Frame-Client (Ticket #146): Profilgenerator,
       # Start-Argumente und der ping im Doctor lesen dasselbe Modul wie der
@@ -143,10 +146,15 @@ defmodule KomkiCli.MixProject do
       {:komki_connector_web, path: "../komki_connector_web"},
       {:komki_connector_vault, path: "../komki_connector_vault"},
       {:komki_connector_documents, path: "../komki_connector_documents"},
+      # DURCHSTICH #409 (Wegwerf): ratsprojekte-Connector als Rolle.
+      {:komki_connector_ratsprojekte, path: "../komki_connector_ratsprojekte"},
       # Seatbelt-Kern (Ticket #226): Profil-Emitter, Presets, Escript-Schicht,
       # Boot-Gate-Sonde, Pins — komki-unabhaengige Library, Path-Dep auf die
       # Workspace-Schwester ohne Hex-Lock-Eintrag (wie komki_policy).
       {:seatbelt, path: "../seatbelt"},
+      # Siegel-Format und -Krypto (ktv2): KomkiCli.Tresor.Core liefert nur die
+      # Schluesselvereinbarung ueber komki-tresor.
+      {:sealed_envelope, path: "../sealed_envelope"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]

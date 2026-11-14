@@ -2,14 +2,14 @@ defmodule KomkiConnectorRis.RisRecorderTest do
   # Nicht async: das httpc-Profil ist knotenweit.
   use ExUnit.Case, async: false
 
-  alias KomkiConnectorRis.{Http, MockRis, RisHttp, RisRecorder}
+  alias KomkiConnectorRis.{Http, RisHttp, RisMock, RisRecorder}
 
   @headers [{"accept", "application/json"}]
   @pdf <<"%PDF-1.7\n", 0, 255, 254, 13, 10>>
 
   test "zeichnet den Austausch auf und reicht die Antwort bytetreu weiter" do
     # Upstream ist der synthetische Mock: echte Daten kommen hier nie vor.
-    {:ok, upstream, upstream_port} = MockRis.start()
+    {_upstream, upstream_port} = RisMock.start(:ok)
     out = tmp_out()
 
     {:ok, rec, port, _out} =
@@ -17,7 +17,6 @@ defmodule KomkiConnectorRis.RisRecorderTest do
 
     on_exit(fn ->
       RisRecorder.stop(rec)
-      MockRis.stop(upstream)
       File.rm_rf(out)
     end)
 
@@ -45,9 +44,10 @@ defmodule KomkiConnectorRis.RisRecorderTest do
   end
 
   test "zeichnet auch POST-Anfragen mit Body auf (Login)" do
-    # Upstream ist der synthetische Mock; der antwortet auf POST mit 405 —
-    # fuer den Austausch genuegt das: Methode, Body und Redaktion werden geprueft.
-    {:ok, upstream, upstream_port} = MockRis.start()
+    # Upstream ist der synthetische Mock; fremde Zugangsdaten lehnt er mit
+    # 401 ab — fuer den Austausch genuegt das: Methode, Body und Redaktion
+    # werden geprueft.
+    {_upstream, upstream_port} = RisMock.start(:ok)
     out = tmp_out()
 
     {:ok, rec, port, _out} =
@@ -55,7 +55,6 @@ defmodule KomkiConnectorRis.RisRecorderTest do
 
     on_exit(fn ->
       RisRecorder.stop(rec)
-      MockRis.stop(upstream)
       File.rm_rf(out)
     end)
 
@@ -69,7 +68,7 @@ defmodule KomkiConnectorRis.RisRecorderTest do
         fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end
       )
 
-    {:ok, {{_, 405, _}, _, _}} =
+    {:ok, {{_, 401, _}, _, _}} =
       :httpc.request(
         :post,
         {"http://127.0.0.1:#{port}/auth", headers, ~c"application/json", body},
@@ -90,16 +89,15 @@ defmodule KomkiConnectorRis.RisRecorderTest do
     assert request["body_b64"] |> Base.decode64!() |> :json.decode() ==
              %{"login" => "<redacted>", "password" => "<redacted>"}
 
-    assert response["status"] == 405
+    assert response["status"] == 401
   end
 
   test "Nummerierung schliesst an vorhandene Kassetten an" do
-    {:ok, upstream, upstream_port} = MockRis.start()
+    {_upstream, upstream_port} = RisMock.start(:ok)
     upstream_url = "http://127.0.0.1:#{upstream_port}/"
     out = tmp_out()
 
     on_exit(fn ->
-      MockRis.stop(upstream)
       File.rm_rf(out)
     end)
 
@@ -123,7 +121,7 @@ defmodule KomkiConnectorRis.RisRecorderTest do
   test "Upstream ohne abschliessenden Schraegstrich funktioniert" do
     # Tippfehler-Klasse wie bei Ratsinfo.Config.base_url/0: der Recorder
     # ergaenzt den Slash, statt jeden Pfad ins Leere laufen zu lassen.
-    {:ok, upstream, upstream_port} = MockRis.start()
+    {_upstream, upstream_port} = RisMock.start(:ok)
     out = tmp_out()
 
     {:ok, rec, port, _out} =
@@ -131,7 +129,6 @@ defmodule KomkiConnectorRis.RisRecorderTest do
 
     on_exit(fn ->
       RisRecorder.stop(rec)
-      MockRis.stop(upstream)
       File.rm_rf(out)
     end)
 
@@ -193,7 +190,7 @@ defmodule KomkiConnectorRis.RisRecorderTest do
   end
 
   test "Kassetten sind nur fuer den Eigentuemer lesbar" do
-    {:ok, upstream, upstream_port} = MockRis.start()
+    {_upstream, upstream_port} = RisMock.start(:ok)
     out = tmp_out()
 
     {:ok, rec, port, _out} =
@@ -201,7 +198,6 @@ defmodule KomkiConnectorRis.RisRecorderTest do
 
     on_exit(fn ->
       RisRecorder.stop(rec)
-      MockRis.stop(upstream)
       File.rm_rf(out)
     end)
 
@@ -236,6 +232,27 @@ defmodule KomkiConnectorRis.RisRecorderTest do
                "token" => "<redacted>",
                "items" => [%{"jwt" => "<redacted>", "name" => "Beispiel"}]
              }
+  end
+
+  test "parse_cli nimmt Flaggen in jeder Reihenfolge, Port nur ganz" do
+    assert {:ok, opts} =
+             RisRecorder.parse_cli([
+               "--upstream",
+               "http://127.0.0.1:9/",
+               "--port",
+               "4020",
+               "--out",
+               "/tmp/kassetten"
+             ])
+
+    assert Keyword.get(opts, :port) == 4020
+    assert Keyword.get(opts, :upstream) == "http://127.0.0.1:9/"
+    assert Keyword.get(opts, :out) == "/tmp/kassetten"
+
+    for argv <- [["--port", "abc"], ["--upstream", "http://x/"], ["--kein-flag", "y"]] do
+      assert {:error, usage} = RisRecorder.parse_cli(argv)
+      assert usage =~ "Aufruf"
+    end
   end
 
   # --- Hilfen -------------------------------------------------------------------

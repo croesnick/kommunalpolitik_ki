@@ -115,9 +115,10 @@ defmodule KomkiMediator.Room do
   @doc """
   Objektbildung je Toolaufruf: `"ping"` → das Ping-Objekt,
   `"admit_document"` → das Dokument aus `params["document_id"]`, nur wenn
-  das Objekt den Typ `"document"` traegt (#134). Ein an
-  `room.json` unbekanntes Objekt bleibt ein strukturierter Fehler, nicht
-  ein Crash.
+  das Objekt den Typ `"document"` traegt (#134); das Tool einer
+  Nur-Aufnahme-Operation (`kind: :admit_only`, #419) → ihr festes Objekt
+  aus dem Manifest. Ein unbekanntes Objekt bleibt ein strukturierter
+  Fehler, nicht ein Crash.
   """
   @spec object_for_call(t(), String.t(), %{String.t() => term()}) ::
           {:ok, Object.t()} | {:error, :unknown_object, String.t() | nil}
@@ -135,6 +136,31 @@ defmodule KomkiMediator.Room do
     end
   end
 
+  # Admit-only connector operations (#419): the object and its labels come
+  # from the manifest, never from room.json.
+  def object_for_call(_room, tool, _params) do
+    case connector_object(&(&1.tool == tool)) do
+      {:ok, object} -> {:ok, object}
+      :error -> {:error, :unknown_object, nil}
+    end
+  end
+
+  # The fixed object of an admit-only operation (connector contract §6.4):
+  # its id from the manifest, version `v1`, labels = `import_labels`.
+  defp connector_object(match?) do
+    objects =
+      for manifest <- KomkiConnector.Manifest.all(),
+          {_op, %{kind: :admit_only} = spec} <- manifest.ops,
+          match?.(spec) do
+        %Object{object_id: spec.object, version: "v1", labels: Enum.sort(manifest.import_labels)}
+      end
+
+    case objects do
+      [object | _] -> {:ok, object}
+      [] -> :error
+    end
+  end
+
   defp entry(room, object_id) do
     case room.objects[object_id] do
       %{"version" => version, "labels" => labels} ->
@@ -147,11 +173,19 @@ defmodule KomkiMediator.Room do
 
   @doc """
   Loest einen Objekt-Claim aus dem realisierten Payload gegen room.json
-  auf: zum Claim eine Objektbelegung (Objekt-ID, Version, Labels).
+  auf: zum Claim eine Objektbelegung (Objekt-ID, Version, Labels). Das
+  Objekt einer Nur-Aufnahme-Operation (#419) kommt aus dem Manifest und
+  geht vor: Ein gleichnamiges Objekt in room.json kann seine Labels nicht
+  ersetzen.
   """
   @spec object_for_claim(t(), String.t()) ::
           {:ok, Object.t()} | {:error, :unknown_object, String.t()}
-  def object_for_claim(room, object_id), do: entry(room, object_id)
+  def object_for_claim(room, object_id) do
+    case connector_object(&(&1.object == object_id)) do
+      {:ok, object} -> {:ok, object}
+      :error -> entry(room, object_id)
+    end
+  end
 
   @doc """
   Die Bindungen, gegen die ein Raum-Tool entscheidet: `ping` gegen die

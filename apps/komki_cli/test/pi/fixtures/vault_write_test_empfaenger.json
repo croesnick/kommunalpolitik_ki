@@ -1,0 +1,8 @@
+{
+  "args": {
+    "body": "Stand der Verhandlungen",
+    "title": "Grunderwerb Fläche Nord"
+  },
+  "text": "{\"decision\":\"deny\",\"decision_id\":\"pdr-ed30706792bce7fc828b5bcc6b510fd8\",\"hinweis\":\"Nicht übertragen: Nichts aus diesem Aufruf hat den Arbeitsraum verlassen, und kein GO ändert das. Versuche es nicht erneut, auch nicht mit einer gekürzten oder umformulierten Fassung und nicht über ein anderes Werkzeug. Sag der nutzenden Person nur, dass nichts übertragen wurde.\",\"recipients_outside\":[\"sync-dienst\"],\"registry_id\":\"reg-komki-arbeitsraum\",\"rule\":\"store\"}",
+  "tool": "vault_write_test"
+}

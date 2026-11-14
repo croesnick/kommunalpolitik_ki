@@ -5,7 +5,7 @@ defmodule KomkiConnectorRisTest do
   import ExUnit.CaptureLog
 
   alias KomkiConnector.Text
-  alias KomkiConnectorRis.MockRis
+  alias KomkiConnectorRis.RisMock
   alias Sidecar.{Client, Server}
 
   @search_keys ~w(datum nummer sitzung titel top_id url)
@@ -14,7 +14,7 @@ defmodule KomkiConnectorRisTest do
   # Startet Mock (im gegebenen Modus) und Connector auf einem echten
   # Unix-Socket unter /tmp (macOS: Pfad < 104 Byte).
   defp start_stack(mode, overrides \\ %{}) do
-    {:ok, mock, port} = MockRis.start(mode: mode)
+    {mock, port} = RisMock.start(mode)
     base_url = "http://127.0.0.1:#{port}/"
     path = "/tmp/kmX#{System.unique_integer([:positive])}.sock"
 
@@ -26,11 +26,10 @@ defmodule KomkiConnectorRisTest do
 
     on_exit(fn ->
       Process.exit(pid, :kill)
-      MockRis.stop(mock)
       File.rm(path)
     end)
 
-    %{path: path, base_url: base_url}
+    %{path: path, base_url: base_url, mock: mock}
   end
 
   # So ruft auch der Vermittler: die deutschen Texte der komki-Seite.
@@ -45,6 +44,27 @@ defmodule KomkiConnectorRisTest do
   describe "gegen den Mock" do
     setup do
       start_stack(:ok)
+    end
+
+    test "ein eingespielter Zustand gilt bis zum Reset", %{path: path, mock: mock} do
+      %{"data" => %{"meetings" => [meeting | rest]} = data} = KomkiMock.Server.state(mock)
+
+      top = %{
+        "id" => "1001-9",
+        "nr" => "9",
+        "name" => "Kreisverkehr am Rathausplatz",
+        "restricted" => false,
+        "text" => "Neu eingespielt."
+      }
+
+      meeting = Map.update!(meeting, "tops", &(&1 ++ [top]))
+      {:ok, _} = KomkiMock.Server.put_data(mock, %{data | "meetings" => [meeting | rest]})
+
+      assert {:ok, result} = search(path, %{"text" => "Kreisverkehr"})
+      assert ids(result) == ["1001-9"]
+
+      {:ok, _} = KomkiMock.Server.reset(mock)
+      assert {:ok, %{"results" => []}} = search(path, %{"text" => "Kreisverkehr"})
     end
 
     test "search findet oeffentliche TOPs in Titel und Text", %{path: path, base_url: base_url} do
@@ -183,6 +203,17 @@ defmodule KomkiConnectorRisTest do
     assert {:error, %{"code" => "upstream-error"}} = show(path, "1001-1")
   end
 
+  # Ticket #515: after the RIS moved, the old address answered every list
+  # request with 404 ("Tenant unknown"), and search reported "no hits".
+  test "404 auf die Sitzungsliste ist upstream-error, nicht leere Treffer" do
+    empty = Path.join(System.tmp_dir!(), "kmris-leer-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(empty)
+    on_exit(fn -> File.rm_rf(empty) end)
+
+    %{path: path} = start_stack({:replay, empty})
+    assert {:error, %{"code" => "upstream-error"}} = search(path, %{"text" => "x"})
+  end
+
   test "Zeitueberschreitung wird auf upstream-timeout abgebildet" do
     %{path: path} = start_stack(:slow, %{timeout_ms: 300})
     assert {:error, %{"code" => "upstream-timeout"}} = search(path, %{"text" => "x"})
@@ -194,5 +225,179 @@ defmodule KomkiConnectorRisTest do
 
     assert {:error, "upstream-error", _} =
              KomkiConnectorRis.handle_op("show", %{"top_id" => "1-1"}, %{}, cfg)
+  end
+
+  # Ticket #148: like the real API, the mock withholds texts from guests
+  # (guest_texts false); only the signed-in endpoints carry them.
+  describe "mit Anmeldung" do
+    @zugang JSON.encode!(%{
+              "login" => "ratsmitglied@komki.example",
+              "password" => "mock-passwort"
+            })
+
+    defp signed_in_stack(zugang \\ @zugang) do
+      stack = start_stack(:ok, %{credentials: %{"RIS_ZUGANG" => zugang}})
+      without_guest_texts(stack.mock)
+      stack
+    end
+
+    defp without_guest_texts(mock) do
+      %{"data" => data} = KomkiMock.Server.state(mock)
+      {:ok, _} = KomkiMock.Server.put_data(mock, Map.put(data, "guest_texts", false))
+    end
+
+    test "ohne Anmeldung fehlen die Texte, mit Anmeldung sind sie da" do
+      guest = start_stack(:ok)
+      without_guest_texts(guest.mock)
+      assert {:ok, %{"text" => ""}} = show(guest.path, "1001-1")
+      assert {:ok, result} = search(guest.path, %{"text" => "Bahnhofstraße"})
+      assert ids(result) == ["1001-1"]
+
+      %{path: path} = signed_in_stack()
+      assert {:ok, %{"text" => text}} = show(path, "1001-1")
+      assert text =~ "zwei Bauabschnitten"
+      assert {:ok, result} = search(path, %{"text" => "Bahnhofstraße"})
+      assert ids(result) == ["1001-1", "1002-1"]
+    end
+
+    test "angemeldet bleiben nicht-oeffentliche TOPs unsichtbar" do
+      %{path: path} = signed_in_stack()
+
+      assert {:ok, %{"results" => []}} = search(path, %{"text" => "Flurstück"})
+      assert {:ok, result} = search(path, %{"text" => "Bahnhofstraße", "limit" => 20})
+      assert ids(result) == ["1001-1", "1002-1"]
+
+      for top_id <- ["1001-2", "1002-2", "1002-3", "1001-9"] do
+        assert {:error, %{"code" => "not-found"}} = show(path, top_id)
+      end
+    end
+
+    test "angemeldet liest der Connector die angemeldeten Endpunkte" do
+      %{path: path, mock: mock} = signed_in_stack()
+      assert {:ok, _} = show(path, "1001-1")
+
+      paths = mock |> KomkiMock.Server.log() |> Enum.map(& &1["path"])
+      assert "/auth" in paths
+      assert "/meetings/1001" in paths
+      assert "/agendaitems/1001-1" in paths
+      refute "/guestagendaitems/1001-1" in paths
+    end
+
+    # A failed sign-in must not take the rest of `komki up` down with it, and
+    # must not fall back to guest mode either: every operation answers
+    # credential-missing, the reason goes to the log once, without values.
+    defp failed_sign_in(base_url, zugang) do
+      log =
+        capture_log(fn ->
+          {:ok, cfg} =
+            KomkiConnectorRis.init(%{base_url: base_url, credentials: %{"RIS_ZUGANG" => zugang}})
+
+          send(self(), {:cfg, cfg})
+        end)
+
+      assert_received {:cfg, cfg}
+      {cfg, log}
+    end
+
+    test "abgelehnte Anmeldung: Start ja, jede Operation credential-missing, keine Werte" do
+      {mock, port} = RisMock.start(:ok)
+
+      falsch =
+        JSON.encode!(%{"login" => "ratsmitglied@komki.example", "password" => "Geheim4711"})
+
+      {cfg, log} = failed_sign_in("http://127.0.0.1:#{port}/", falsch)
+
+      assert log =~ "RIS-Anmeldung fehlgeschlagen"
+      refute log =~ "Geheim4711"
+      refute log =~ "ratsmitglied@"
+      refute inspect(cfg) =~ "Geheim4711"
+
+      for {op, params} <- [
+            {"show", %{"top_id" => "1001-1"}},
+            {"search", %{"text" => "Bahnhofstraße", "limit" => 5}}
+          ] do
+        assert {:error, "credential-missing", _} =
+                 KomkiConnectorRis.handle_op(op, params, %{}, cfg)
+      end
+
+      # No silent guest fallback: after the failed login nothing reaches the RIS.
+      paths = mock |> KomkiMock.Server.log() |> Enum.map(& &1["path"])
+      assert paths == ["/auth"]
+    end
+
+    test "unvollstaendiger Zugang: Hinweis auf komki secret set ris" do
+      {_mock, port} = RisMock.start(:ok)
+
+      for zugang <- ["kein json", ~s({"login": "a"}), ~s({"login": "", "password": "x"})] do
+        {cfg, log} = failed_sign_in("http://127.0.0.1:#{port}/", zugang)
+        assert log =~ "komki secret set ris"
+
+        assert {:error, "credential-missing", _} =
+                 KomkiConnectorRis.handle_op("show", %{"top_id" => "1001-1"}, %{}, cfg)
+      end
+    end
+
+    test "RIS beim Start nicht erreichbar: Start ja, Operationen credential-missing" do
+      {cfg, log} = failed_sign_in("http://127.0.0.1:1/", @zugang)
+      assert log =~ "RIS nicht erreichbar"
+
+      assert {:error, "credential-missing", _} =
+               KomkiConnectorRis.handle_op("show", %{"top_id" => "1001-1"}, %{}, cfg)
+    end
+
+    test "abgelaufenes Token: Fehler statt neuer Anmeldung" do
+      %{path: path, mock: mock} = signed_in_stack()
+      %{"data" => data} = KomkiMock.Server.state(mock)
+      account = Map.put(data["account"], "token", "neues-token")
+      {:ok, _} = KomkiMock.Server.put_data(mock, Map.put(data, "account", account))
+
+      assert {:error, %{"code" => "credential-missing"}} = show(path, "1001-1")
+      auth_calls = mock |> KomkiMock.Server.log() |> Enum.count(&(&1["path"] == "/auth"))
+      assert auth_calls == 1
+    end
+
+    test "Passwort und Token erscheinen weder im Zustand noch im Log" do
+      {_mock, port} = RisMock.start(:ok)
+
+      log =
+        capture_log(fn ->
+          {:ok, cfg} =
+            KomkiConnectorRis.init(%{
+              base_url: "http://127.0.0.1:#{port}/",
+              credentials: %{"RIS_ZUGANG" => @zugang}
+            })
+
+          refute inspect(cfg) =~ "mock-ris-token"
+          refute inspect(cfg) =~ "mock-passwort"
+          assert {:ok, _} = KomkiConnectorRis.handle_op("show", %{"top_id" => "1001-1"}, %{}, cfg)
+        end)
+
+      refute log =~ "mock-ris-token"
+      refute log =~ "mock-passwort"
+    end
+
+    test "Anmeldung nur ueber https oder Loopback; sonst geht keine Anfrage raus" do
+      {cfg, log} = failed_sign_in("http://ris.example.org/web/", @zugang)
+      assert log =~ "nur über https"
+      refute log =~ "mock-passwort"
+
+      assert {:error, "credential-missing", _} =
+               KomkiConnectorRis.handle_op("show", %{"top_id" => "1001-1"}, %{}, cfg)
+    end
+
+    test "expires_at liest den exp-Claim, ohne Claim nil" do
+      segment = fn map -> map |> JSON.encode!() |> Base.url_encode64(padding: false) end
+
+      jwt = fn claims ->
+        token = Enum.join([segment.(%{"alg" => "none"}), segment.(claims), "signatur"], ".")
+        fn -> token end
+      end
+
+      assert KomkiConnectorRis.Api.expires_at(jwt.(%{"exp" => 1_794_700_000})) ==
+               DateTime.from_unix!(1_794_700_000)
+
+      assert KomkiConnectorRis.Api.expires_at(jwt.(%{"sub" => "x"})) == nil
+      assert KomkiConnectorRis.Api.expires_at(fn -> "mock-ris-token" end) == nil
+    end
   end
 end
