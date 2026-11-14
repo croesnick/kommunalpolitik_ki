@@ -23,7 +23,7 @@ If a section is missing, derive the acceptance criteria from the sources the tic
 
 ## Gates
 
-Run the gates from the tooling table in [AGENTS.md](../../AGENTS.md) before you close a ticket: format, compile with warnings as errors, credo strict, dialyzer, and tests. A red gate means the ticket stays open. Record what failed and what remains in a comment on the ticket.
+Run the gates from the tooling section in [AGENTS.md](../../AGENTS.md) before you close a ticket: format, compile with warnings as errors, credo strict, dialyzer, and tests. A red gate means the ticket stays open. Record what failed and what remains in a comment on the ticket.
 
 ## Prüfbericht: the verification report
 

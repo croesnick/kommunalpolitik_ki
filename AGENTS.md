@@ -129,7 +129,7 @@ cd apps/<app> && mix dialyzer                             # Root-Dispatch crasht
 
 ### Python
 
-Pro Tool unter `tools/`: `uv sync`, `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src/`, `uv run pytest`. Lose Python-Skripte in `skills/*/scripts` (Config: `ruff.toml` am Root): `uvx ruff@0.15.21 check skills/*/scripts`.
+Pro Tool unter `tools/`: `uv sync`, `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src/`, `uv run pytest`. Lose Python-Skripte in `skills/*/scripts` (Config: `ruff.toml` am Root): `uvx ruff@0.15.21 check skills/*/scripts` und `uvx ruff@0.15.21 format --check skills/*/scripts`.
 
 ### Versionen
 
