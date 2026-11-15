@@ -14,6 +14,8 @@ defmodule KomkiConnectorDocuments.TestPDF do
     * `invalid/1`: a file with a PDF extension but broken bytes.
     * `tight_lines/1`: five lines of 12 pt text at 14.4 pt line spacing with
       a single-line and a two-line highlight (ticket #368).
+    * `bomb/2`: a small file whose Flate stream expands to a given amount
+      of text operators (ticket #488), for the helper bounds.
 
   The PDF syntax is handwritten and deliberately minimal: catalog, pages,
   one Helvetica Type1 font, one content stream per page with an absolute
@@ -132,6 +134,39 @@ defmodule KomkiConnectorDocuments.TestPDF do
   def invalid(path), do: File.write!(path, "kein PDF, nur Bytes mit Endung\n")
 
   @doc """
+  One page whose content stream is a Flate bomb (ticket #488): the file
+  stays small, but the stream decompresses to about `expansion_bytes` of
+  repeated text operators. Rendering it alone exceeds any short wallclock
+  budget — only use it together with one (`Pdf.render/2`, `timeout_ms:`).
+  The repeat unit stays below zlib's 32 KiB window, so the stream actually
+  shrinks (a larger unit compresses poorly: factor 14 instead of ~170,
+  measured). pdfium's own zlib does the decompression; the file is a
+  regular readable PDF.
+  """
+  @spec bomb(Path.t(), pos_integer()) :: :ok
+  def bomb(path, expansion_bytes) do
+    unit =
+      Enum.map_join(0..49, fn line ->
+        y = 700 - line * 0.2
+        "1 0 0 1 72 #{y} Tm\n(Bombe Zeile #{line} des Expansions-PDFs.) Tj\n"
+      end)
+
+    stream =
+      "BT\n/F1 12 Tf\n" <>
+        String.duplicate(unit, max(div(expansion_bytes, byte_size(unit)), 1)) <> "ET\n"
+
+    objects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      page(parent: "2 0 R", contents: "4 0 R"),
+      {:stream, :zlib.compress(stream), " /Filter /FlateDecode"},
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    ]
+
+    File.write!(path, assemble(objects))
+  end
+
+  @doc """
   One page with more than 1 MiB of extractable text, for the protocol's
   frame limit. pdfium truncates overlong lines, so the text comes from many
   short lines spread over distinct baselines that pdfium cannot merge.
@@ -214,6 +249,12 @@ defmodule KomkiConnectorDocuments.TestPDF do
 
   defp object_chunk(number, {:stream, data}) do
     "#{number} 0 obj\n<< /Length #{byte_size(data)} >>\nstream\n#{data}endstream\nendobj\n"
+  end
+
+  # A stream object with extra dictionary entries, e.g. the Flate filter of
+  # bomb/2.
+  defp object_chunk(number, {:stream, data, dict_extra}) do
+    "#{number} 0 obj\n<< /Length #{byte_size(data)}#{dict_extra} >>\nstream\n#{data}endstream\nendobj\n"
   end
 
   defp object_chunk(number, content) do

@@ -1,6 +1,8 @@
 defmodule KomkiConnectorDocuments.ConnectorTest do
   use ExUnit.Case, async: true
 
+  alias KomkiConnectorDocuments.Pdf
+  alias KomkiConnectorDocuments.Pdf.Helper
   alias KomkiConnectorDocuments.TestPDF
   alias Sidecar.{Client, Server}
 
@@ -74,6 +76,103 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
     assert {:ok, content} = KomkiConnectorDocuments.Pdf.render(path)
     assert content =~ "- Seite 1: „Gamma drei“ — Kommentar: Einzeilig\n"
     assert content =~ "- Seite 1: „Delta vier Epsilon fuenf“ — Kommentar: Zweizeilig"
+  end
+
+  # #488 (F17): the pdfium render runs in a helper process. The bomb is a
+  # regular readable PDF (the small variant proves pdfium decompresses it),
+  # but its expansion alone exceeds the short wallclock budget: the helper
+  # dies controlled, the call gets upstream-error and the connector VM
+  # stays alive and answers the next PDF normally.
+  test "Flate-Bombe: Helper stirbt kontrolliert, Aufruf erhaelt upstream-error", %{dir: dir} do
+    klein = Path.join(dir, "doc-bombe-klein.pdf")
+    TestPDF.bomb(klein, 2_000_000)
+
+    assert {:error, "too-large", _detail} = Pdf.render(klein)
+
+    bombe = Path.join(dir, "doc-bombe.pdf")
+    TestPDF.bomb(bombe, 200_000_000)
+
+    assert {:error, "upstream-error", _detail} = Pdf.render(bombe, timeout_ms: 1500)
+
+    normal = Path.join(dir, "doc-eng.pdf")
+    TestPDF.tight_lines(normal)
+
+    assert {:ok, content} = Pdf.render(normal)
+    assert content =~ "- Seite 1: „Gamma drei“ — Kommentar: Einzeilig\n"
+  end
+
+  # #488: the spawn line carries the rlimit attempt, the fixed eval and the
+  # PDF path as a plain argument; only real directories are on the path.
+  test "Helper-Anrufzeile: rlimit-Versuch, fester Eval, Pfad als Argument" do
+    argv = Helper.command("/tmp/docs/raum.pdf")
+    ["-c", wrapper, erl | rest] = argv
+
+    assert wrapper =~ "ulimit -v "
+    assert wrapper =~ ~s(exec "$0" "$@")
+    # The erl of the running beam: under a Burrito release it lives in
+    # <root>/erts-<vsn>/bin, in dev in the root's bin — the init argument
+    # bindir names the right one in every context.
+    {:ok, [[bindir | _] | _]} = :init.get_argument(:bindir)
+    assert erl == Path.join(bindir, "erl")
+    assert File.exists?(erl)
+    assert Enum.at(rest, -1) == "/tmp/docs/raum.pdf"
+
+    eval_index = Enum.find_index(rest, &(&1 == "-e"))
+    assert Enum.at(rest, eval_index + 1) == "KomkiConnectorDocuments.Pdf.Helper.run()"
+
+    # Walk the flat flag list instead of pairing by position: the flags
+    # before -pa have mixed arities (-env takes one value, -boot_var two).
+    pa_dirs =
+      rest
+      |> Enum.zip(Enum.drop(rest, 1))
+      |> Enum.filter(fn {flag, _value} -> flag == "-pa" end)
+      |> Enum.map(fn {_flag, value} -> value end)
+      |> Enum.uniq()
+
+    assert pa_dirs != []
+    Enum.each(pa_dirs, fn dir -> assert File.dir?(dir) end)
+
+    # Boot flags of the child (wegwerf-Lauf, ticket #488): a Burrito
+    # release unpacks no <root>/bin/start.boot, so the child explicitly
+    # boots the release's start_clean — command/1 carries exactly the
+    # boot_args/1 of the running root, right after the crash-dump env.
+    assert Enum.take(rest, 4) == ["-noshell", "-env", "ERL_CRASH_DUMP", "/dev/null"]
+    boot = Helper.boot_args(to_string(:code.root_dir()))
+    assert Enum.take(Enum.drop(rest, 4), length(boot)) == boot
+  end
+
+  # #488: under a Burrito release no <root>/bin/start.boot exists; the
+  # child boots the release's start_clean (no release applications — those
+  # would claim argv and halt, KomkiCli.Application) and needs RELEASE_LIB.
+  test "Helper-Boot: start_clean aus dem Release, RELEASE_LIB mitgegeben" do
+    root = Path.join(System.tmp_dir!(), "kcd-boot-" <> random_suffix())
+    boot_dir = Path.join([root, "releases", "0.1.0"])
+    File.mkdir_p!(boot_dir)
+    File.write!(Path.join(boot_dir, "start_clean.boot"), "fake")
+
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    assert ["-boot", boot, "-boot_var", "RELEASE_LIB", lib] = Helper.boot_args(root)
+    assert boot == Path.join([root, "releases", "0.1.0", "start_clean"])
+    assert lib == Path.join(root, "lib")
+    assert Helper.boot_args(Path.join(root, "gibt-es-nicht")) == []
+  end
+
+  # #488: classification keeps the closed set of error codes — a death
+  # inside the render is upstream-error, a child that never became
+  # runnable and a malformed reply are internal.
+  test "Helper-Klassifikation: Crash nach Marker ist upstream-error" do
+    assert {:ok, "inhalt"} =
+             Helper.classify({:done, 0, "H" <> :erlang.term_to_binary({:ok, "inhalt"})}, 12_000)
+
+    assert {:error, "upstream-error", _detail} = Helper.classify({:done, 139, "H"}, 12_000)
+
+    assert {:error, "internal", _detail} = Helper.classify({:done, 1, ""}, 12_000)
+    assert {:error, "internal", _detail} = Helper.classify({:done, 0, ""}, 12_000)
+    assert {:error, "internal", _detail} = Helper.classify({:done, 0, "HX"}, 12_000)
+
+    assert {:error, "upstream-error", _detail} = Helper.classify(:timeout, 12_000)
+    assert {:error, "internal", _detail} = Helper.classify(:overflow, 12_000)
   end
 
   test "PDF ohne Textebene: klarer Fehler statt leerem Text", %{socket: socket} do
