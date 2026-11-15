@@ -35,7 +35,9 @@ defmodule KomkiMediator.ConnectorGate do
     `<connectors_dir>/<id>.sock`. Write operations send
     `context.assigned_label` (= B_W).
   * Gate 2 (`admit`): result shape (§5.2), labels from the manifest only
-    (vault: note labels ⊆ bindings in Γ, #211; `write_test`: returned
+    (vault: note labels ⊆ bindings in Γ, #211 — a note outside Γ stays
+    invisible: search drops its hits silently, a single read answers
+    like not-found, #482; `write_test`: returned
     labels = `assigned_label`), object `in-<digest12>` in
     `room.environment`, `Derive.decide` and `Verify.check`.
 
@@ -840,9 +842,12 @@ defmodule KomkiMediator.ConnectorGate do
   # Gate 2: admit
   # -------------------------------------------------------------------------
 
+  # The silent B_W filter runs BEFORE the label check (#482): a hit
+  # outside Γ is thereby also a hit outside B_W and drops out quietly,
+  # instead of poisoning the whole answer with a distinguishable
+  # redaction (F10). Gate 2 then only sees the surviving hits.
   defp admit(env, call, call_id, emit_decision, result) do
     with :ok <- shape(call, result),
-         {:ok, _labels} <- labels(env, call, emit_decision, result),
          result = visible(call, env.room, result),
          {:ok, labels} <- labels(env, call, emit_decision, result) do
       d12 = Hash.digest12(PDR.payload_hash(result))
@@ -867,17 +872,23 @@ defmodule KomkiMediator.ConnectorGate do
       end
     else
       {:redact, reason, codes} -> redact(env, call, call_id, reason, codes)
+      {:conceal, :not_found} -> concealed_not_found(env, call, call_id)
     end
   end
 
   # Search hits outside B_W are dropped silently BEFORE Gate 2 (labbook
   # L-109): otherwise "deny" versus "permit, 0 hits" would be an existence
   # oracle for confidential content. The answer then looks like a search
-  # without those hits; their number reveals nothing. Single reads
+  # without those hits; their number reveals nothing. A hit without any
+  # label counts as outside B_W too (#482): `Enum.all?/2` over an empty
+  # list is vacuously true, but a note without labels is not governed by
+  # the room and stays invisible like one outside Γ. Single reads
   # (`read`) stay a decision with remedies.
   defp visible(%{manifest: %{id: "vault"}, op: "search"}, %Room{workspace_bindings: b_w}, result) do
     Map.update!(result, "results", fn hits ->
-      Enum.filter(hits, fn hit -> Enum.all?(hit["labels"], &(&1 in b_w)) end)
+      Enum.filter(hits, fn hit ->
+        hit["labels"] != [] and Enum.all?(hit["labels"], &(&1 in b_w))
+      end)
     end)
   end
 
@@ -900,17 +911,31 @@ defmodule KomkiMediator.ConnectorGate do
   end
 
   # Vault notes carry their own labels (front matter). Since Γ comes from
-  # the label store (#208), any binding in Γ is accepted; a label outside
-  # it withholds the answer (ticket #211).
+  # the label store (#208), any binding in Γ is accepted. A note outside Γ
+  # is invisible to the model: the search drops its hits silently
+  # (visible/3, #482), a single read answers like not-found (#482) —
+  # both indistinguishable from an absent note, so no answer form reveals
+  # its existence. Ticket #211 introduced the Γ check; #482 replaces the
+  # distinguishable redaction on the read path.
   defp labels(env, %{manifest: %{id: "vault"}, op: op}, _emit_decision, result) do
     notes =
       if op == "search", do: Enum.map(result["results"], & &1["labels"]), else: [result["labels"]]
 
     bindings = Map.keys(env.gamma.term["bindings"])
 
-    if Enum.all?(notes, &note_labels_ok?(&1, bindings)),
-      do: {:ok, notes |> List.flatten() |> Enum.uniq() |> Enum.sort()},
-      else: {:redact, "Labels der Notiz ausserhalb von Γ", ["label_not_in_gamma"]}
+    cond do
+      Enum.all?(notes, &note_labels_ok?(&1, bindings)) ->
+        {:ok, notes |> List.flatten() |> Enum.uniq() |> Enum.sort()}
+
+      # Beyond the silent drop this is reachable only in a room whose B_W
+      # names bindings outside Γ (misconfiguration): fail-closed with a
+      # redaction, visibly for the nutzende Person.
+      op == "search" ->
+        {:redact, "Labels der Notiz ausserhalb von Γ", ["label_not_in_gamma"]}
+
+      true ->
+        {:conceal, :not_found}
+    end
   end
 
   defp labels(_env, %{manifest: manifest}, _emit_decision, _result),
@@ -1103,6 +1128,39 @@ defmodule KomkiMediator.ConnectorGate do
       "decision" => "permit",
       "outcome" => "error",
       "admitted" => false,
+      "intent_hash" => call.intent_hash,
+      "payload_hash" => PDR.payload_hash(response)
+    })
+
+    response
+  end
+
+  # A note outside Γ answers like the connector's own not-found (#482):
+  # same closed error shape as connector_failed builds for a real
+  # not-found, so the model cannot tell a hidden note from an absent one.
+  # The journal keeps the truth (outcome redacted) — the nutzende Person
+  # sees in the audit that the hidden note was probed, the model does not
+  # see the note.
+  defp concealed_not_found(env, call, call_id) do
+    decision_id = PDR.new_id()
+
+    response = %{
+      "decision" => "permit",
+      "rule" => "admit",
+      "admitted" => false,
+      "decision_id" => decision_id,
+      "emit_decision_id" => call_id,
+      "error" => %{"code" => "not-found", "detail" => Text.describe("not-found")}
+    }
+
+    PDR.append(env, %{
+      "decision_id" => decision_id,
+      "call_id" => call_id,
+      "tool" => call.tool,
+      "rule" => "admit",
+      "decision" => "permit",
+      "outcome" => "redacted",
+      "admitted" => "redacted",
       "intent_hash" => call.intent_hash,
       "payload_hash" => PDR.payload_hash(response)
     })

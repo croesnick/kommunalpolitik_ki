@@ -11,6 +11,10 @@ defmodule KomkiMediator.Gate do
     (`KomkiPolicy.Remedies`, CONTRACT § 2.8): die Ordnung der behebbaren
     Schritte IST die Antwort. Der Vermittler bildet keine eigene
     Abbildung Blocker/Belege -> Fortsetzung mehr (Single-Sourcing, #115).
+    Ausnahme `admit_document` (#484): ein existierendes, nicht
+    zulaessiges Raumdokument antwortet wie ein unbekanntes Objekt —
+    Existenz, Labels und λ(x) bleiben dem Modell verborgen, das
+    Journal fuehrt die wahre Entscheidung weiter.
   * Gate 2 - Beweispruefung NACH dem Vollzug: das vollzogene Ergebnis wird
     gehasht und unabhaengig durch `KomkiPolicy.Verify.check/4` neu
     geprueft, und das realisierte Payload wird gegen den Gamma-Snapshot
@@ -189,7 +193,11 @@ defmodule KomkiMediator.Gate do
         admit_result(env, tool, intent_hash, intent, snapshot, decision, executor.())
 
       {:ok, %{"decision" => kind} = decision} when kind in ["deny", "indeterminate"] ->
-        not_admitted(env, tool, intent_hash, intent, snapshot, kind, decision)
+        if tool == "admit_document" do
+          concealed_object(env, tool, intent_hash, intent, snapshot, kind, decision, object)
+        else
+          not_admitted(env, tool, intent_hash, intent, snapshot, kind, decision)
+        end
 
       {:unsupported, info} ->
         error_path(
@@ -389,18 +397,52 @@ defmodule KomkiMediator.Gate do
 
   defp unknown_object(env, tool, intent_hash, object_id) do
     decision_id = new_decision_id()
-
-    response = %{
-      "decision" => "error",
-      "decision_id" => decision_id,
-      "detail" => "unbekanntes Objekt: " <> Kernel.inspect(object_id)
-    }
+    response = unknown_object_response(decision_id, object_id)
 
     journal_pdr(
       env,
       pdr(tool, "error", "not_admitted", false, intent_hash, %{
         decision_id: decision_id,
         remedies: nil,
+        payload_hash: payload_hash(response)
+      })
+    )
+
+    response
+  end
+
+  # The closed shape unknown and concealed objects answer with (#484):
+  # one source, so the two stay identical in form.
+  defp unknown_object_response(decision_id, object_id) do
+    %{
+      "decision" => "error",
+      "decision_id" => decision_id,
+      "detail" => "unbekanntes Objekt: " <> Kernel.inspect(object_id)
+    }
+  end
+
+  # F12 (#484): a document that exists but is not admissible answers like
+  # an unknown object (R.8.4) — the model learns neither its existence
+  # nor its labels, and λ(x) does not travel into the answer. The journal
+  # keeps the true decision with the full remedy catalog (R.11): the
+  # nutzende Person sees in the audit that the model probed a blocked
+  # document; the model does not see the blockers. Only `admit_document`
+  # conceals: its documents are the room's confidential material
+  # (list_documents already hides the blocked ones); ping and the
+  # admit-only connector objects are public infrastructure whose denials
+  # keep their remedies.
+  defp concealed_object(env, tool, intent_hash, intent, snapshot, kind, decision, object) do
+    decision_id = new_decision_id()
+    response = unknown_object_response(decision_id, object.object_id)
+
+    journal_pdr(
+      env,
+      pdr(tool, kind, "not_admitted", false, intent_hash, %{
+        decision_id: decision_id,
+        intent_id: intent["intent_id"],
+        snapshot_id: snapshot["snapshot_id"],
+        checked_label: decision["checked_label"],
+        remedies: decision["remedies"],
         payload_hash: payload_hash(response)
       })
     )

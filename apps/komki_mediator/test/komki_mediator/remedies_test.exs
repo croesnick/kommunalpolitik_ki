@@ -3,9 +3,12 @@ defmodule KomkiMediator.RemediesTest do
   Single-Sourcing des Remedy-Katalogs (#115): der Vermittler haelt keine
   eigene Abbildung Blocker/Belege -> Fortsetzung. Der Katalog entsteht
   allein in der Engine (`KomkiPolicy.Remedies`, CONTRACT § 2.8) und reist
-  in der Entscheidung. Diese Tests pinnen, dass die Vermittler-Antwort
-  exakt den Engine-Katalog traegt — durchgerechnet gegen das Engine-Modul
-  selbst, nicht gegen eine im Test nachgebaute Form.
+  in der Entscheidung. Diese Tests pinnen, dass der Vermittler den
+  Engine-Katalog unveraendert weiterfuehrt — durchgerechnet gegen das
+  Engine-Modul selbst, nicht gegen eine im Test nachgebaute Form. Seit
+  #484 verschweigt admit_document Katalog und Autoritaeten im Modellkontext
+  (verborgen wie ein unbekanntes Objekt); die Tests lesen den Katalog aus
+  dem Journal, wo die nutzende Person ihn sieht.
   """
 
   use ExUnit.Case, async: false
@@ -24,7 +27,7 @@ defmodule KomkiMediator.RemediesTest do
   # Passthrough: Antwort-Katalog == Engine-Katalog (byte-gleich)
   # -----------------------------------------------------------------------
 
-  test "deny: Antwort-Katalog ist byte-gleich dem Katalog aus KomkiPolicy.Remedies", %{
+  test "deny: Journal-Katalog ist byte-gleich dem Katalog aus KomkiPolicy.Remedies (#484)", %{
     env: env,
     gamma: gamma
   } do
@@ -39,7 +42,10 @@ defmodule KomkiMediator.RemediesTest do
         TestHelpers.admit_executor(room, "doc-vertraulich")
       )
 
-    assert response["decision"] == "deny"
+    # #484: die Antwort verschweigt die Entscheidung (verborgen wie ein
+    # unbekanntes Objekt); der Katalog reist nur ins Journal.
+    assert response["decision"] == "error"
+    refute Map.has_key?(response, "remedies")
 
     {:ok, decision} = derive_decision(gamma, room, "doc-vertraulich")
 
@@ -51,15 +57,18 @@ defmodule KomkiMediator.RemediesTest do
       )
 
     # Drei Mal derselbe Katalog: Engine-Entscheidung, Engine-Modul
-    # direkt gerechnet, Vermittler-Antwort.
-    assert response["remedies"] == decision["remedies"]
-    assert response["remedies"] == expected
+    # direkt gerechnet, Journal-PDR der Vermittler-Entscheidung.
+    [pdr] = TestHelpers.journal_records(env.journal_path)
+    assert pdr["decision"] == "deny"
+    assert pdr["remedies"] == decision["remedies"]
+    assert pdr["remedies"] == expected
   end
 
-  test "indeterminate: Antwort-Katalog ist byte-gleich dem Katalog aus KomkiPolicy.Remedies", %{
-    env: env,
-    gamma: gamma
-  } do
+  test "indeterminate: Journal-Katalog ist byte-gleich dem Katalog aus KomkiPolicy.Remedies (#484)",
+       %{
+         env: env,
+         gamma: gamma
+       } do
     env = own_room(env, "doc-pending-freigabe")
     room = env.room
 
@@ -71,7 +80,8 @@ defmodule KomkiMediator.RemediesTest do
         TestHelpers.admit_executor(room, "doc-pending-freigabe")
       )
 
-    assert response["decision"] == "indeterminate"
+    assert response["decision"] == "error"
+    refute Map.has_key?(response, "remedies")
 
     {:ok, decision} = derive_decision(gamma, room, "doc-pending-freigabe")
 
@@ -82,8 +92,10 @@ defmodule KomkiMediator.RemediesTest do
         decision["missing_evidence"]
       )
 
-    assert response["remedies"] == decision["remedies"]
-    assert response["remedies"] == expected
+    [pdr] = TestHelpers.journal_records(env.journal_path)
+    assert pdr["decision"] == "indeterminate"
+    assert pdr["remedies"] == decision["remedies"]
+    assert pdr["remedies"] == expected
   end
 
   # -----------------------------------------------------------------------
@@ -96,22 +108,19 @@ defmodule KomkiMediator.RemediesTest do
   } do
     env = own_room(env, "doc-vertraulich")
 
-    response =
-      Gate.call(
-        env,
-        "admit_document",
-        %{"document_id" => "doc-vertraulich"},
-        fn -> {:ok, %{"content" => "egal"}} end
-      )
+    Gate.call(env, "admit_document", %{"document_id" => "doc-vertraulich"}, fn ->
+      {:ok, %{"content" => "egal"}}
+    end)
 
-    [entry] = response["remedies"]
+    [pdr] = TestHelpers.journal_records(env.journal_path)
+    [entry] = pdr["remedies"]
 
     assert Enum.map(entry["transitions"], & &1["type"]) == [
              "fakt_nachreichen",
              "neuer_raum"
            ]
 
-    assert Enum.all?(response["remedies"], fn remedy ->
+    assert Enum.all?(pdr["remedies"], fn remedy ->
              not Enum.any?(remedy["transitions"], &(&1["type"] == "aktionsfreigabe"))
            end)
   end
@@ -121,15 +130,12 @@ defmodule KomkiMediator.RemediesTest do
   } do
     env = own_room(env, "doc-pending-freigabe")
 
-    response =
-      Gate.call(
-        env,
-        "admit_document",
-        %{"document_id" => "doc-pending-freigabe"},
-        fn -> {:ok, %{"content" => "egal"}} end
-      )
+    Gate.call(env, "admit_document", %{"document_id" => "doc-pending-freigabe"}, fn ->
+      {:ok, %{"content" => "egal"}}
+    end)
 
-    [entry] = response["remedies"]
+    [pdr] = TestHelpers.journal_records(env.journal_path)
+    [entry] = pdr["remedies"]
 
     assert Enum.map(entry["transitions"], & &1["type"]) == [
              "fakt_nachreichen",
@@ -179,10 +185,14 @@ defmodule KomkiMediator.RemediesTest do
         fn -> {:ok, %{"content" => "egal"}} end
       )
 
-    # admit-Ablehnungen nennen nur die Autoritaeten (WER lockern darf),
-    # keine Ausgabearten und keine Ziele.
-    assert pending["relaxation_authorities"] == ["nutzende-person"]
-    assert vertraulich["relaxation_authorities"] == []
+    # #484: admit_document verschweigt die Autoritaeten in der Antwort
+    # komplett (verborgen wie ein unbekanntes Objekt). Wer lockern darf,
+    # bleibt Γ-L1-Metadatum aus dem Registry-Term (oben) und reist im
+    # Journal-Katalog mit.
+    assert pending["decision"] == "error"
+    assert vertraulich["decision"] == "error"
+    refute Map.has_key?(pending, "relaxation_authorities")
+    refute Map.has_key?(vertraulich, "relaxation_authorities")
   end
 
   # -----------------------------------------------------------------------
