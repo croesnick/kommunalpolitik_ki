@@ -113,7 +113,11 @@ defmodule KomkiCli.SetupTest do
       # In den Schluesselbund geht nur das Siegel, nie der Klartext.
       stored = File.read!(Path.join(dir, "value"))
       assert KomkiCli.Tresor.well_formed?(stored)
-      assert {:ok, @kanarie} = KomkiCli.Tresor.open(stored, "Test")
+
+      {result, _abgleich_zeile} =
+        ExUnit.CaptureIO.with_io(fn -> KomkiCli.Tresor.open(stored, "Test") end)
+
+      assert {:ok, @kanarie} = result
       refute File.read!(Path.join(dir, "stdin")) =~ @kanarie
     end
 
@@ -149,7 +153,11 @@ defmodule KomkiCli.SetupTest do
       assert message =~ "versiegelt"
       refute message =~ @kanarie
       stored = File.read!(Path.join(dir, "value"))
-      assert {:ok, json} = KomkiCli.Tresor.open(stored, "Test")
+
+      {result, _abgleich_zeile} =
+        ExUnit.CaptureIO.with_io(fn -> KomkiCli.Tresor.open(stored, "Test") end)
+
+      assert {:ok, json} = result
       assert JSON.decode!(json) == %{"login" => "rat@example.org", "password" => @kanarie}
     end
 

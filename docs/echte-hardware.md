@@ -24,7 +24,11 @@ nur mit echter Hardware geht, gehört er in diese Liste.
 Der Test versiegelt einen zufälligen Testwert mit dem echten `komki-tresor`
 aus `apps/komki_cli/priv` (nie mit einem aus dem `PATH`) und öffnet ihn wieder. Das Versiegeln fragt nicht, das Öffnen fragt einmal
 nach Touch ID oder dem Passwort des Macs. Ein grüner Lauf zeigt also genau
-eine Rückfrage, mit dem Text „komki Live-Gegenprobe: Test-Siegel öffnen“. In
+eine Rückfrage. Vorher schreibt der Test die Zeile „Freigabe erbeten:
+Siegel …, Anfrage … (im Touch-ID-Dialog abgleichen)“ ins Terminal; der
+Dialog muss danach mit derselben Kombination „Siegel …, Anfrage …“ beginnen
+und dahinter den Grund „komki Live-Gegenprobe: Test-Siegel öffnen“ als
+unvertrauten Aufrufertext zeigen. In
 den Schlüsselbund schreibt der Test nichts.
 
 ```bash
