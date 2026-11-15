@@ -23,6 +23,11 @@ defmodule KomkiPolicy.Verify do
     is not trusted. If the binding has no entry for the rule,
     `expression_mismatch` fires before re-evaluation or the `fact_refs`
     comparison (no crash, § 5 step 8).
+  * Fact premises discharge their slot only with the fact their name
+    names (§ 2.5); a redirected payload is an unknown premise. Every
+    re-checked premise of the permit tree must claim and yield `true` —
+    a non-true claim or recomputed non-true value fires
+    `premise_not_true` (§ 5 steps 3 and 9).
 
   Checks run in the fixed order of § 5; findings come in check order.
   Structural findings from steps 1–3 end the check at once (exactly that
@@ -59,6 +64,7 @@ defmodule KomkiPolicy.Verify do
 
   # Name↔Art-Tabelle § 2.5: jeder feste Prämissenname trägt genau eine Art;
   # Art-Tarnung (richtiger Name, falsche Art) ist eine unbekannte Prämisse.
+  # Fakt-Slots füllt nur die Tatsache, die der Name benennt (fact == name).
   @premise_kinds_by_name %{
     "not_quarantine" => "object_check",
     "workspace_contract_valid" => "fact",
@@ -275,6 +281,7 @@ defmodule KomkiPolicy.Verify do
          :ok <- require_premise_name(premise, path),
          :ok <- premise_shape_keys(premise, kind, path),
          :ok <- required_premise_keys(premise, kind, path),
+         :ok <- require_condition_expression(premise, kind, path),
          :ok <- required_premise_value(premise, path),
          :ok <- require_binary_values(premise, path, "binding") do
       require_binary_values(premise, path, "fact")
@@ -388,6 +395,31 @@ defmodule KomkiPolicy.Verify do
         )
     end
   end
+
+  # § 2.5: `expression` ist der Registry-AST (Boolean oder Objekt) — null
+  # kann den AST nicht imitieren (#477: eine geschmiedete Prämisse mit
+  # expression:null unterdrückte sonst den zwingenden expression_mismatch
+  # für Bindungen ohne Operationsregel, weil nil == nil vergleichbar war).
+  # Läuft nach required_premise_keys, das das Feld für conditions
+  # durchsetzt — daher fetch!.
+  defp require_condition_expression(%{"kind" => "condition"} = premise, _kind, path) do
+    case Map.fetch!(premise, "expression") do
+      expr when is_boolean(expr) ->
+        :ok
+
+      expr when is_map(expr) ->
+        :ok
+
+      other ->
+        input_error(
+          :invalid_entry,
+          path <> ".expression",
+          "expected a boolean or an expression object, got " <> Kernel.inspect(other)
+        )
+    end
+  end
+
+  defp require_condition_expression(_premise, _kind, _path), do: :ok
 
   # =========================================================================
   # Prüfschritte § 5 — fester Ordnung; erster Befund-Schritt unter 1–3
@@ -522,8 +554,18 @@ defmodule KomkiPolicy.Verify do
     name = Map.fetch!(premise, "name")
     kind = Map.fetch!(premise, "kind")
 
-    name in allowed_names and kind == expected_kind(name)
+    name in allowed_names and kind == expected_kind(name) and fact_bound?(premise, kind)
   end
+
+  # § 2.5: eine Fakt-Prämisse entlädt ihren Slot nur mit der Tatsache, die
+  # ihr Name benennt (fact == name). Eine umgelenkte payload würde die
+  # falsche Tatsache prüfen — das ist eine unbekannte Prämisse, kein
+  # Basisfakten-Befund (#479; deckt auch den workspace_contract_valid-Slot).
+  defp fact_bound?(%{"kind" => "fact"} = premise, _kind) do
+    Map.fetch!(premise, "fact") == Map.fetch!(premise, "name")
+  end
+
+  defp fact_bound?(_premise, _kind), do: true
 
   defp unexpected_reason(premise) do
     binding = premise["binding"]
@@ -579,7 +621,9 @@ defmodule KomkiPolicy.Verify do
     fact_name = Map.fetch!(premise, "fact")
 
     if fact_name == "workspace_contract_valid" do
-      mismatch_if(premise["value"] != ctx.workspace["valid"], "fact_value_mismatch")
+      # § 2.2: workspace.valid ist ein Vertragsfeld, kein Snapshot-Fakt —
+      # nachgerechnet gegen ctx.workspace wie ein Fakt gegen die Facts.
+      fact_entry_reason("workspace_contract_valid", premise, ctx.workspace["valid"])
     else
       fact_entry_finding(ctx.facts, fact_name, premise)
     end
@@ -588,15 +632,37 @@ defmodule KomkiPolicy.Verify do
   defp fact_entry_finding(facts, fact_name, premise) do
     case Map.get(facts, fact_name) do
       nil -> reason("fact_missing", nil, fact_name)
-      entry -> mismatch_if(premise["value"] != Map.fetch!(entry, "value"), "fact_value_mismatch")
+      entry -> fact_entry_reason(fact_name, premise, Map.fetch!(entry, "value"))
     end
   end
 
-  defp quarantine_reasons(ctx, proof) do
-    for %{"kind" => "object_check"} = _p <- proof["premises"],
-        ctx.object["classification"] != "classified" do
-      reason("object_quarantine", nil, nil)
+  # § 5 Schritt 4/9: Die Behauptung muss dem nachgerechneten Wert
+  # entsprechen (fact_value_mismatch) — und der nachgerechnete Wert muss
+  # true sein, sonst trägt die Prämisse die permit-Conclusion nicht. Eine
+  # treu gespiegelte false-Prämisse ist kein Permit-Beleg (#480).
+  defp fact_entry_reason(fact_name, premise, snapshot_value) do
+    cond do
+      premise["value"] != snapshot_value -> reason("fact_value_mismatch", nil, fact_name)
+      snapshot_value != true -> reason("premise_not_true", nil, fact_name)
+      true -> nil
     end
+  end
+
+  # § 5 Schritt 5/9: not_quarantine wird nachgerechnet (Klassifikation
+  # "classified"); der behauptete Wert wird mitverglichen. Ein
+  # Quarantäne-Objekt (object_quarantine) und eine false-Behauptung
+  # (premise_not_true) tragen die permit-Conclusion nicht (#480).
+  defp quarantine_reasons(ctx, proof) do
+    for %{"kind" => "object_check"} = premise <- proof["premises"] do
+      verdict = ctx.object["classification"] == "classified"
+
+      cond do
+        not verdict -> reason("object_quarantine", nil, nil)
+        premise["value"] != true -> reason("premise_not_true", nil, nil)
+        true -> nil
+      end
+    end
+    |> Enum.reject(&is_nil/1)
   end
 
   defp label_inclusion_reasons(ctx, proof) do
@@ -706,7 +772,11 @@ defmodule KomkiPolicy.Verify do
   end
 
   defp expression_check(premise, registry_expr, binding) do
-    if premise["expression"] != registry_expr,
+    # § 5 Schritt 8: fehlt der Registry-Eintrag, feuert der Befund immer —
+    # auch fuer eine behauptete null-Expression, deren nil == nil-Vergleich
+    # die fehlende Regel sonst kaschierte (#477). Die Eingabevalidierung
+    # lehnt null zusaetzlich ab; das hier ist die Tiefenabwehr.
+    if is_nil(registry_expr) or premise["expression"] != registry_expr,
       do: reason("expression_mismatch", binding, nil),
       else: nil
   end
