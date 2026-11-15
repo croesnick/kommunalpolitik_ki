@@ -9,6 +9,12 @@ sandbox? =
 
 exclude = if sandbox?, do: exclude, else: [:sandbox | exclude]
 
+# Ticket #135: Der Seatbelt-Regressionstest in pi_test braucht ein echtes
+# node (Spawn-Kind der Kette); Runner ohne node ueberspringen ihn.
+node? = is_binary(KomkiCli.Config.resolve_node_bin())
+
+exclude = if node?, do: exclude, else: [:node | exclude]
+
 # Echter llama-server-Boot (DoctorBootTest, Ticket #392): nur mit
 # `mix test --include llama_boot`, nie im Standardlauf.
 exclude = [:llama_boot | exclude]

@@ -37,6 +37,10 @@ defmodule KomkiCli.Pi do
   `/bin/sh -c 'exec "$0" "$@" < /dev/null'` — argv-Einzelwerte, keine
   Shell-Interpolation des Prompts. Die interaktive Session umgeht das:
   tmux stellt eine echte Pty; dort wuerde ein Redirect die Eingabe kappen.
+  stderr laeuft im Einmal-Lauf in die Port-stdout-Pipe (Ticket #135):
+  geerbt als Datei haette es node unter dem Profil beim Init mit SIGABRT
+  getoetet, und die Ausgabe landet so gesammelt beim Lauf-Ergebnis statt
+  ungeordnet im Terminal.
   pi wird in beiden Faellen ueber die aufgeloeste Direktkette
   node -> cli.js gestartet (der asdf-Shim scheitert unter dem Profil stumm).
   """
@@ -80,8 +84,9 @@ defmodule KomkiCli.Pi do
 
   @doc """
   Startet `program` als Port-Kind (der Weg, auf dem node unter dem
-  macOS-27.2-Beta bootet), sammelt stdout und beendet den Prozess nach
-  `timeout_ms` per SIGTERM (Status 124). Public als Testnaht.
+  macOS-27.2-Beta bootet), sammelt stdout — zusammen mit stderr, siehe
+  Ticket #135 — und beendet den Prozess nach `timeout_ms` per SIGTERM
+  (Status 124). Public als Testnaht.
   """
   @spec run_with_timeout(
           String.t(),
@@ -98,6 +103,15 @@ defmodule KomkiCli.Pi do
       Port.open({:spawn_executable, program}, [
         :binary,
         :exit_status,
+        # Ticket #135: node statet beim Init seinen geerbten stderr; verweigert
+        # das Seatbelt-Profil den Metadaten-Lesezugriff auf das dahinterliegende
+        # Datei-Objekt, stirbt node mit SIGABRT (exit 134) — genau in den
+        # Kontexten von `komki run … > datei`, Hintergrund-Subshells und
+        # Agenten-Werkzeugen. stderr in die Port-Pipe gefaltet, erbt node
+        # fd 2 als Pipe ohne Pfad-Ziel und bootet in jedem Spawn-Kontext.
+        # Diagnose-Nachweis im Ticket #135; die Empfehlung `2>&1 | cat` aus
+        # docs/release.md macht derselbe Mechanismus entbehrlich.
+        :stderr_to_stdout,
         {:args, args},
         {:env, env},
         {:cd, cwd}

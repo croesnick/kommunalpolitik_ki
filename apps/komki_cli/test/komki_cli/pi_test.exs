@@ -66,7 +66,93 @@ defmodule KomkiCli.PiTest do
       assert out =~ "Laufzeit-Limit"
       assert micros < 5_000_000
     end
+
+    # Ticket #135: `komki run … > datei` und Hintergrund-Läufe ließen node in
+    # der Seatbelt-Kette beim Init mit SIGABRT (Exit 134) sterben. Diagnose der
+    # Lane (Beweisverzeichnis): node statet beim Init seinen geerbten stderr;
+    # verweigert das Profil den Metadaten-Lesezugriff auf das dahinterliegende
+    # Datei-Objekt, bricht node mit SIGABRT ab. Terminals und die Port-Pipe
+    # (kein Pfad-Ziel) überleben den Stat. Der Fix faltet stderr per
+    # :stderr_to_stdout in die Port-stdout-Pipe. Der Test baut den Crash-Kontext
+    # deterministisch nach: ein eigener BEAM mit stdout und stderr auf Dateien —
+    # die Redirects eines Skript- oder Cron-Laufs — startet über
+    # run_with_timeout dieselbe Seatbelt-Kette wie der Einmal-Lauf, mit einem
+    # echten generierten Lauf-Profil. Ohne Fix erbt node die stderr-Datei und
+    # stirbt mit 134; mit Fix sieht es die gefaltete Port-Pipe und läuft.
+    @tag :sandbox
+    @tag :node
+    test "Seatbelt-Kette: node überlebt geerbtes stderr auf Datei (Ticket #135)" do
+      area = TestSupport.tmp_area!("pi-sigabrt")
+      result = Path.join(area, "result.txt")
+      script = Path.join(area, "nested.exs")
+
+      File.write!(script, """
+      alias KomkiCli.{Config, Profile, Pi, TestSupport}
+
+      area = System.fetch_env!("KOMKI_PROBE_AREA")
+      result = System.fetch_env!("KOMKI_PROBE_RESULT")
+
+      node = Config.resolve_node_bin()
+      cfg = %{TestSupport.fixture_cfg(area) | node_bin: node}
+      scratch = Path.join(area, "scratch")
+      File.mkdir_p!(scratch)
+      profile_path = Path.join(area, "probe-run.sb")
+      Profile.write!(profile_path, Profile.generate(cfg, scratch))
+
+      args = [
+        "-f", profile_path, "--",
+        "/bin/sh", "-c", ~s(exec "$0" "$@" < /dev/null),
+        node, "-e", "console.log('node-ok')"
+      ]
+
+      {status, out} =
+        case Pi.run_with_timeout(cfg.sandbox_exec, args, Pi.env_for(cfg), scratch, 20_000) do
+          {:ok, out} -> {0, out}
+          {:error, out, status} -> {status, out}
+        end
+
+      File.write!(result, to_string(status) <> "\n" <> out)
+      """)
+
+      app_dir = Path.expand("../..", __DIR__)
+      out_log = Path.join(area, "nested-stdout.log")
+      err_log = Path.join(area, "nested-stderr.log")
+
+      # Der eigene BEAM erzeugt den Crash-Kontext: stdout und stderr auf
+      # Dateien — die Redirects, unter denen `komki run` in Skripten und
+      # Cron-Läufen startet (Ticket #135).
+      {_out, 0} =
+        System.cmd(
+          "/bin/sh",
+          [
+            "-c",
+            "MIX_ENV=test elixir -S mix run --no-start " <>
+              sq(script) <> " > " <> sq(out_log) <> " 2> " <> sq(err_log)
+          ],
+          cd: app_dir,
+          env: %{
+            "PATH" => System.get_env("PATH"),
+            "HOME" => System.get_env("HOME"),
+            "MIX_ENV" => "test",
+            "KOMKI_PROBE_AREA" => area,
+            "KOMKI_PROBE_RESULT" => result
+          }
+        )
+
+      [status_line | out_rest] = result |> File.read!() |> String.split("\n")
+      status = String.to_integer(status_line)
+      out = Enum.join(out_rest, "\n")
+
+      assert status == 0,
+             "node starb in der Seatbelt-Kette mit Status #{status} " <>
+               "(Ticket #135: SIGABRT beim Init, erwartet 0)"
+
+      assert out =~ "node-ok"
+    end
   end
+
+  # sh-Quote für die Redirect-Zeile des verschachtelten Laufs.
+  defp sq(path), do: "'" <> String.replace(path, "'", "'\\''") <> "'"
 
   describe "Kontextdateien (Ticket #133)" do
     test "run und session schalten AGENTS.md/CLAUDE.md-Discovery ab", %{cfg: cfg} do
