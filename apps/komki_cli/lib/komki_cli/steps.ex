@@ -1090,11 +1090,29 @@ defmodule KomkiCli.Steps do
   @doc """
   Journal pruefen (Ticket #176): ruft `komki-mediator verify-journal` fuer
   die Instanz auf und liefert dessen JSON-Ergebnis strukturiert.
+
+  Davor derselbe Pin-Gate wie bei up/run/session (Ticket #499, Audit-Fund
+  F32): Ein am gepinnten Pfad getauschtes Vermittler-Programm druckt sonst
+  ein gueltig aussehendes Urteil, das komki als „Journal ok" ausgibt — der
+  Pin-Check verweigert die Ausführung bei Drift.
   """
   @spec journal_verify() :: {:journal, map()} | {:error, String.t(), 2..4}
   def journal_verify do
     cfg = load_cfg!()
 
+    # Spiegel des Start-Gates (doctor_quick nimmt Pins.checks in den
+    # Kurz-Scope auf): erst wenn jedes Programm seinem Pin entspricht,
+    # wird der Vermittler ausgefuehrt.
+    checks = Pins.checks(cfg)
+
+    if Enum.all?(checks, & &1.ok) do
+      verify_journal_with(cfg)
+    else
+      {:error, "Journal-Prüfung verweigert: " <> not_green(checks), 3}
+    end
+  end
+
+  defp verify_journal_with(cfg) do
     args =
       KomkiCli.Roles.prefix(cfg, cfg.mediator_bin, "komki-mediator") ++
         ["verify-journal", "--base", cfg.base_dir]
