@@ -418,7 +418,7 @@ defmodule KomkiCli.ConnectorsTest do
       assert {:ok, reason} = Connectors.nif_check(cfg, Manifest.fetch!("documents"), runner)
 
       assert reason ==
-               "pdfium lädt unter dem Profil: " <>
+               "NIF ex_pdfium lädt unter dem Profil: " <>
                  TestSupport.readlink!(Path.join([Path.dirname(program), "lib", "ex_pdfium"]))
     end
 

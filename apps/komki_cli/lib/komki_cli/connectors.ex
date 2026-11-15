@@ -579,7 +579,7 @@ defmodule KomkiCli.Connectors do
   (#288, CONTRACT.md §4): startet `<rolle> --nif-check` genau wie ein
   echter Start — `env -i … sandbox-exec -f <profil>`, cwd `/` — und
   wertet Exit-Code und Ausgabe aus. Exit 0 heisst: Das Profil erlaubt das
-  Laden, die nativen Dateien sind da und pdfium initialisiert. Der
+  Laden, die nativen Dateien sind da und die NIF initialisiert. Der
   Doctor ruft das fuer jeden Connector mit Manifest-Feld `nif`; `ping`
   beweist das nicht (der Connector startet auch mit kaputter NIF).
   `run` ersetzt `System.cmd/3` (Testnaht).
@@ -601,16 +601,7 @@ defmodule KomkiCli.Connectors do
     profile = profile_path(cfg, manifest.id)
 
     if File.exists?(profile) do
-      # Erste Fundstelle wie im Profil (KomkiConnector.Nif); ohne sie ist der
-      # Lauf ueberfluessig — der Doctor nennt die Ursache statt des Exit-Codes.
-      case Nif.app_dir(binary, app) do
-        nil ->
-          {:error,
-           "Verzeichnis der NIF-Anwendung fehlt — neu bauen ('make komki'), dann 'komki setup'"}
-
-        dir ->
-          nif_check_run(cfg, manifest, binary, profile, dir, run)
-      end
+      nif_check_with_tree(cfg, manifest, binary, profile, app, run)
     else
       {:error, "Profil fehlt — 'komki setup' schreibt es"}
     end
@@ -619,6 +610,26 @@ defmodule KomkiCli.Connectors do
     # sondern ein roter Check mit der Meldung (binary_checks meldet sie auch).
     e in ArgumentError -> {:error, Exception.message(e)}
   end
+
+  # Erste Fundstelle wie im Profil (KomkiConnector.Nif); ohne sie ist der
+  # Lauf ueberfluessig — der Doctor nennt die Ursache statt des Exit-Codes.
+  defp nif_check_with_tree(cfg, manifest, binary, profile, app, run) do
+    case Nif.app_dir(binary, app) do
+      nil ->
+        {:error,
+         "Verzeichnis der NIF-Anwendung fehlt — Programm neu bauen ('make komki' bzw. 'make komki-tap'), dann 'komki setup'"}
+
+      dir ->
+        nif_check_wrap(nif_check_run(cfg, manifest, binary, profile, dir, run), app, dir)
+    end
+  end
+
+  # Erfolgsmeldung aus dem App-Namen des Manifests, nicht fest "pdfium": Ein
+  # kuenftiger NIF-Connector loge sonst falsch.
+  defp nif_check_wrap({:ok, _dir}, app, dir),
+    do: {:ok, "NIF " <> to_string(app) <> " lädt unter dem Profil: " <> dir}
+
+  defp nif_check_wrap({:error, reason}, _app, _dir), do: {:error, reason}
 
   # Der Lauf selbst: gleiche Startform wie `launch/6` (env -i, LANG=C,
   # Profil der Instanz, cwd `/`), aber ohne Socket zu binden und ohne
@@ -632,7 +643,7 @@ defmodule KomkiCli.Connectors do
 
     case code do
       0 ->
-        {:ok, "pdfium lädt unter dem Profil: " <> dir}
+        {:ok, dir}
 
       code when is_integer(code) ->
         {:error, "Exit " <> Integer.to_string(code) <> ": " <> String.trim(out)}

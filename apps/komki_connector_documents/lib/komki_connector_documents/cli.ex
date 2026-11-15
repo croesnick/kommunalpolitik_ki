@@ -20,12 +20,12 @@ defmodule KomkiConnectorDocuments.CLI do
   alias KomkiConnector.{Launch, Nif}
   alias Sidecar.Server
 
-  @nif :ex_pdfium
-
   @spec main([String.t()]) :: no_return()
   def main(argv) do
     log_to_stderr()
-    Nif.bootstrap(program_path(), @nif)
+    # Die NIF-Anwendung kommt aus dem eigenen Manifest (CONTRACT.md §5): kein
+    # zweiter Ort, an dem ex_pdfium stehen koennte.
+    Nif.bootstrap(program_path(), KomkiConnectorDocuments.manifest().nif)
 
     case parse(argv) do
       {:ok, :nif_check} -> run_nif_check()

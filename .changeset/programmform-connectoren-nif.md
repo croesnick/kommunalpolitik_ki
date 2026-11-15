@@ -15,5 +15,6 @@ Dazu passt sich die Sicherheitskette an: Das Connector-Profil erlaubt das Laden 
 genau diesem Verzeichnis, die nativen Dateien stehen als eigener Programm-Pin
 (`pin komki-connector-documents-nif`, Baum-Hash), und `komki doctor` lädt den Baustein bei
 jedem Lauf wirklich — unter dem Profil der Instanz, nicht nur als Ping. Fehlt das
-Verzeichnis, etwa nach einem Update ohne `komki setup`, meldet der Doctor `nif documents`
-rot, und `komki up` startet erst nach `komki setup`.
+Verzeichnis, meldet der Doctor `nif documents` rot (der Connector startet dann trotzdem,
+aber jede PDF-Lesung scheitert); haben sich die Bytes seit dem Festhalten geändert,
+verweigert `komki up` den Start, bis `komki setup` den neuen Pin bestätigt.

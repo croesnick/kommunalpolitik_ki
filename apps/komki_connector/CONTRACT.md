@@ -104,13 +104,14 @@ Ein Connector läuft in einer von zwei Programmformen (Entscheidung #288, ADR 00
    Escript-Datei; das Profil kennt außer der Laufzeit nur Socket, Log und die `fs`-Pfade des Manifests.
 2. **Escript + NIF von der Platte** (`documents`, Manifest-Feld `nif`): das Programm bleibt dasselbe
    Escript, aber seine NIF-Anwendung lädt von der Platte — aus `lib/<app>/` neben dem Programm (Paket,
-   #180) oder aus dem Build-Baum (`_build/dev/lib/<app>/`), so wie komki selbst exqlite lädt (#91). Im
+   #180) oder aus dem Build-Baum (`_build/dev/lib/<app>/`; bei einem eigenständigen Connector-Escript
+   auch dem des App-Ordners), so wie komki selbst exqlite lädt (#91). Im
    Escript-Archiv ist `priv/` gezippt, `dlopen` scheitert mit `errno=20` (Probe #278). Der Connector bringt
    das physische ebin auf den Code-Pfad (`KomkiConnector.Nif`); `libpdfium` liegt als Geschwister neben
    der NIF. Das Profil erlaubt das Laden nur aus genau dem Verzeichnis der NIF-Anwendung, die nativen
    Dateien stehen als eigener Programm-Pin (`komki-connector-<id>-nif`, Baum-Hash), und `komki doctor`
-   prüft das Laden unter dem Profil mit `<binary> --nif-check` wirklich: die Rolle lädt pdfium und
-   beendet sich mit dem Ergebnis, ohne Socket zu binden. Fehlt das Verzeichnis, startet der Connector
+   prüft das Laden unter dem Profil mit `<binary> --nif-check` wirklich: die Rolle lädt die NIF-Anwendung
+   und beendet sich mit dem Ergebnis, ohne Socket zu binden. Fehlt das Verzeichnis, startet der Connector
    trotzdem, aber jede PDF-Lesung scheitert mit `internal` (Grund im Log); der Doctor meldet es. Unter
    der Burrito-Einzeldatei lädt der NIF aus dem entpackten Payload, der Pin bleibt die Einzeldatei.
 

@@ -37,6 +37,18 @@ defmodule KomkiCli.SandboxProfileTest do
     File.write!(Path.join([base, "mediator", "documents", "doc-oeffentlich.md"]), "# Doc\n")
     File.write!(Path.join([base, "mediator", "room.json"]), "{}\n")
 
+    # Zweite Programmform (#288): Fundstelle der NIF-Anwendung neben der
+    # Probe anlegen (wird am Ende wieder entfernt) — nur das documents-
+    # Profil kennt dadurch das Verzeichnis (Manifest-Feld `nif`).
+    nif_app = Path.join([Path.dirname(probe), "lib", "ex_pdfium"])
+    File.mkdir_p!(Path.join([nif_app, "ebin"]))
+    File.mkdir_p!(Path.join([nif_app, "priv", "native"]))
+    nif_file = Path.join([nif_app, "priv", "native", "nif.so"])
+    File.write!(nif_file, "nif\n")
+    beside = Path.join([Path.dirname(probe), "lib", "neben-dem-baum.txt"])
+    File.write!(beside, "neben\n")
+    on_exit(fn -> File.rm_rf!(Path.join(Path.dirname(probe), "lib")) end)
+
     cfg = %{
       Config.defaults(base)
       | escript_bin: Config.resolve_escript_bin(),
@@ -62,7 +74,13 @@ defmodule KomkiCli.SandboxProfileTest do
     File.write!(canary, "canary\n")
     on_exit(fn -> File.rm(canary) end)
 
-    {:ok, cfg: cfg, profiles: profiles, canary: canary, probe: probe}
+    {:ok,
+     cfg: cfg,
+     profiles: profiles,
+     canary: canary,
+     probe: probe,
+     nif_file: nif_file,
+     beside: beside}
   end
 
   defp write(cfg, name, text) do
@@ -119,6 +137,17 @@ defmodule KomkiCli.SandboxProfileTest do
       denied(ctx, p, ["read", ctx.canary])
       denied(ctx, p, ["list", ssh])
     end
+  end
+
+  # Zweite Programmform (#288): Die NIF-Regel des Dokument-Connectors ist
+  # lasttragend — innerhalb der Fundstelle lesen erlaubt, daneben und fuer
+  # die anderen Connectoren verweigert, Schreiben nie.
+  test "Dokument-Connector: NIF-Fundstelle lesen ja, daneben und andere Connectoren nein", ctx do
+    allowed(ctx, "documents", ["read", ctx.nif_file])
+    denied(ctx, "documents", ["read", ctx.beside])
+    denied(ctx, "documents", ["write", ctx.nif_file])
+    denied(ctx, "ris", ["read", ctx.nif_file])
+    denied(ctx, "web", ["read", ctx.nif_file])
   end
 
   test "kein connect zu example.com:443 aus Connector- und Vermittler-Profilen", ctx do
