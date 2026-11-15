@@ -76,8 +76,11 @@ komki-tresor:
 	@cp apps/komki_cli/priv/komki-tresor apps/komki_cli/komki-tresor
 
 # Paket fuer die Homebrew-Formel (Ticket #180): das Escript (prod), die
-# SQLite-NIF von exqlite und pi mit allen Abhaengigkeiten nebeneinander, als
-# dist/komki-<version>-macos-arm64.tar.gz. pi installiert pnpm nach der
+# SQLite-NIF von exqlite, die PDF-NIF von ex_pdfium (#288) und pi mit allen
+# Abhaengigkeiten nebeneinander, als dist/komki-<version>-macos-arm64.tar.gz.
+# Die NIFs liegen physisch neben dem Escript (lib/<app>/), weil dlopen aus
+# dem Escript-Archiv scheitert (Probe #278); komki und der Dokument-Connector
+# finden sie dort (#91, CONTRACT.md §4). pi installiert pnpm nach der
 # Lockfile in packaging/pi, ohne Installationsskripte; die Formel kopiert nur
 # noch und laedt nichts nach. Vorgebaute Module fuer andere Plattformen und
 # die .bin-Links fallen weg.
@@ -85,9 +88,10 @@ KOMKI_VERSION = $(shell grep -m1 'version:' apps/komki_cli/mix.exs | sed 's/.*"\
 KOMKI_PAKET = dist/komki-$(KOMKI_VERSION)-macos-arm64
 komki-paket: komki-tresor
 	@cd apps/komki_cli && MIX_ENV=prod mix deps.get >/dev/null && MIX_ENV=prod mix escript.build
-	@rm -rf "$(KOMKI_PAKET)" && mkdir -p "$(KOMKI_PAKET)/lib/exqlite"
+	@rm -rf "$(KOMKI_PAKET)" && mkdir -p "$(KOMKI_PAKET)/lib/exqlite" "$(KOMKI_PAKET)/lib/ex_pdfium"
 	@cp apps/komki_cli/komki apps/komki_cli/komki-tresor "$(KOMKI_PAKET)/"
 	@cp -R apps/komki_cli/_build/prod/lib/exqlite/ebin apps/komki_cli/_build/prod/lib/exqlite/priv "$(KOMKI_PAKET)/lib/exqlite/"
+	@cp -R apps/komki_cli/_build/prod/lib/ex_pdfium/ebin apps/komki_cli/_build/prod/lib/ex_pdfium/priv "$(KOMKI_PAKET)/lib/ex_pdfium/"
 	@cd packaging/pi && pnpm install --frozen-lockfile --prod --ignore-scripts >/dev/null
 	@cp -R packaging/pi/node_modules "$(KOMKI_PAKET)/lib/node_modules"
 	@rm -rf "$(KOMKI_PAKET)/lib/node_modules/.bin"

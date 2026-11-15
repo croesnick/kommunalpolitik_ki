@@ -36,7 +36,9 @@ defmodule KomkiConnector.Manifest do
           fs: [{String.t(), :read | :write}],
           credentials: %{String.t() => String.t()},
           environment: String.t(),
-          import_labels: [String.t()]
+          import_labels: [String.t()],
+          # Zweite Programmform (CONTRACT.md §4, #288): nil = reines Elixir.
+          nif: atom() | nil
         }
 
   @ids ["documents", "ratsprojekte", "ris", "vault", "web"]
@@ -87,7 +89,10 @@ defmodule KomkiConnector.Manifest do
       fs: [{"{documents_dir}", :read}],
       credentials: %{},
       environment: "lokaler-arbeitsraum@1",
-      import_labels: []
+      import_labels: [],
+      # Zweite Programmform (CONTRACT.md §4, #288): ex_pdfium und libpdfium
+      # laden von der Platte; Profil, Pin und Doctor folgen diesem Feld.
+      nif: :ex_pdfium
     }
   end
 
@@ -158,7 +163,8 @@ defmodule KomkiConnector.Manifest do
       # connector stays with the guest endpoints (mostly without texts).
       credentials: %{"RIS_ZUGANG" => "ris-zugang"},
       environment: "ris-abruf@1",
-      import_labels: ["ris-oeffentlich@1"]
+      import_labels: ["ris-oeffentlich@1"],
+      nif: nil
     }
   end
 
@@ -230,7 +236,8 @@ defmodule KomkiConnector.Manifest do
       environment: "ratsprojekte-bestand@1",
       # Label der Stand-Datei (stand_lesen). Der Schreibweg nimmt seine
       # Labels aus assigned_label, nicht von hier.
-      import_labels: ["ratsprojekte@1"]
+      import_labels: ["ratsprojekte@1"],
+      nif: nil
     }
   end
 
@@ -255,7 +262,8 @@ defmodule KomkiConnector.Manifest do
       fs: [],
       credentials: %{"BRAVE_API_KEY" => "brave-search-api"},
       environment: "web-suche@1",
-      import_labels: ["web-oeffentlich@1"]
+      import_labels: ["web-oeffentlich@1"],
+      nif: nil
     }
   end
 
@@ -302,7 +310,8 @@ defmodule KomkiConnector.Manifest do
       # Leer: Vault-Notizen tragen ihre Labels selbst, und es gilt jede
       # Bindung aus Γ (Gate 2 im Vermittler, Ticket #211). Eine von komki
       # geschriebene Notiz traegt lambda(y) = B_W (CONTRACT §6.3).
-      import_labels: []
+      import_labels: [],
+      nif: nil
     }
   end
 

@@ -14,11 +14,14 @@ defmodule KomkiCli.Pins do
   Gepinnt werden die Einstiegsprogramme (komki mit seinen Rollen, escript,
   node, llama-server, komki-tresor) und fuer pi das ganze Paketverzeichnis
   (`@earendil-works/pi-coding-agent`, Baum-Hash ueber Pfade, Dateiinhalte
-  und Symlink-Ziele). Nicht gepinnt sind die Laufzeit-Baeume hinter den
+  und Symlink-Ziele). Ein Connector mit NIF (#288) bringt das Verzeichnis
+  seiner NIF-Anwendung als eigenen Pin mit — seine nativen Dateien sind
+  Teil des Programms. Nicht gepinnt sind die Laufzeit-Baeume hinter den
   Einstiegsprogrammen (Erlang-`lib`, dylibs von llama.cpp, Systembibliotheken).
   """
 
-  alias KomkiCli.{Config, Tresor}
+  alias KomkiCli.{Config, Connectors, Tresor}
+  alias KomkiConnector.{Manifest, Nif}
 
   @type pin :: %{String.t() => String.t()}
   @type pins :: %{String.t() => pin()}
@@ -26,7 +29,9 @@ defmodule KomkiCli.Pins do
 
   @doc """
   Die zu pinnenden Programme als `[{name, pfad}]`. komki traegt alle
-  Rollen; ein Pfad, der schon unter anderem Namen steht, faellt weg.
+  Rollen; ein Pfad, der schon unter anderem Namen steht, faellt weg. Ein
+  Connector mit NIF (#288, zweite Programmform) bringt das Verzeichnis
+  seiner NIF-Anwendung als eigenen Pin mit (Baum-Hash, `komki-connector-<id>-nif`).
   """
   @spec artifacts(Config.t()) :: [{String.t(), String.t()}]
   def artifacts(%Config{} = cfg) do
@@ -37,6 +42,7 @@ defmodule KomkiCli.Pins do
         end)
 
     (roles ++
+       nif_pins(cfg) ++
        [
          {"escript", cfg.escript_bin},
          {"node", cfg.node_bin},
@@ -46,6 +52,23 @@ defmodule KomkiCli.Pins do
        ])
     |> Enum.reject(fn {_name, path} -> is_nil(path) end)
     |> Enum.uniq_by(fn {_name, path} -> path end)
+  end
+
+  # Zweite Programmform (#288): Zu einem Connector mit NIF-Anwendung
+  # (Manifest-Feld `nif`) gehoert das physische Verzeichnis der Anwendung
+  # zum Programm — dieselbe Fundstelle wie im Profil (KomkiConnector.Nif).
+  # Ohne Fundstelle (nicht gebaut) entfaellt der Pin; der Doctor meldet
+  # die fehlenden Dateien. Unter der Burrito-Einzeldatei gibt es keine
+  # Fundstelle, der Pin bleibt die Einzeldatei selbst.
+  defp nif_pins(%Config{} = cfg) do
+    for id <- Manifest.ids(),
+        app = Manifest.fetch!(id).nif,
+        not is_nil(app),
+        bin = Connectors.binary(cfg, id),
+        is_binary(bin),
+        dir = Nif.app_dir(bin, app),
+        is_binary(dir),
+        do: {"komki-connector-" <> id <> "-nif", dir}
   end
 
   # cli.js liegt unter <paket>/dist/bundle/cli.js

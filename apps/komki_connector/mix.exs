@@ -19,7 +19,9 @@ defmodule KomkiConnector.MixProject do
   end
 
   # Bibliothek ohne Application-Callback: Frame-Protokoll, Client, Server und
-  # Manifeste. Keine Runtime-Deps — JSON kommt aus OTP (:json, OTP 27+).
+  # Manifeste. Keine Hex-Dep — JSON kommt aus OTP (:json, OTP 27+); die
+  # Workspace-Schwester seatbelt liefert die Pfad-Kanonisierung für die
+  # zweite Programmform (KomkiConnector.Nif, #288).
   def application do
     [extra_applications: [:logger, :crypto, :public_key]]
   end
@@ -27,6 +29,7 @@ defmodule KomkiConnector.MixProject do
   defp deps do
     [
       {:sidecar, path: "../sidecar"},
+      {:seatbelt, path: "../seatbelt"},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]

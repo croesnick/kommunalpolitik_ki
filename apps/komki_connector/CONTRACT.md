@@ -98,6 +98,23 @@ macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge.
 sandbox-exec -f <base>/profile/connector-<id>.sb <binary> --socket <base>/run/connectors/<id>.sock [--proxy 127.0.0.1:<port>] [--base-url <url>] [--vault-dir <pfad>] [--documents-dir <pfad>]
 ```
 
+Ein Connector läuft in einer von zwei Programmformen (Entscheidung #288, ADR 0002):
+
+1. **Reines Elixir** (`ris`, `web`, `vault`, `ratsprojekte`): das Escript trägt alles. Der Pin ist die
+   Escript-Datei; das Profil kennt außer der Laufzeit nur Socket, Log und die `fs`-Pfade des Manifests.
+2. **Escript + NIF von der Platte** (`documents`, Manifest-Feld `nif`): das Programm bleibt dasselbe
+   Escript, aber seine NIF-Anwendung lädt von der Platte — aus `lib/<app>/` neben dem Programm (Paket,
+   #180) oder aus dem Build-Baum (`_build/dev/lib/<app>/`; bei einem eigenständigen Connector-Escript
+   auch dem des App-Ordners), so wie komki selbst exqlite lädt (#91). Im
+   Escript-Archiv ist `priv/` gezippt, `dlopen` scheitert mit `errno=20` (Probe #278). Der Connector bringt
+   das physische ebin auf den Code-Pfad (`KomkiConnector.Nif`); `libpdfium` liegt als Geschwister neben
+   der NIF. Das Profil erlaubt das Laden nur aus genau dem Verzeichnis der NIF-Anwendung, die nativen
+   Dateien stehen als eigener Programm-Pin (`komki-connector-<id>-nif`, Baum-Hash), und `komki doctor`
+   prüft das Laden unter dem Profil mit `<binary> --nif-check` wirklich: die Rolle lädt die NIF-Anwendung
+   und beendet sich mit dem Ergebnis, ohne Socket zu binden. Fehlt das Verzeichnis, startet der Connector
+   trotzdem, aber jede PDF-Lesung scheitert mit `internal` (Grund im Log); der Doctor meldet es. Unter
+   der Burrito-Einzeldatei lädt der NIF aus dem entpackten Payload, der Pin bleibt die Einzeldatei.
+
 - **Credentials kommen über stdin**: genau eine JSON-Zeile `{"KOMKI_CONNECTOR_TOKEN": "<token>", "<NAME>":
   "<wert>", ...}`, danach schließt `komki up` stdin. Das Token ist Pflicht; ohne gültiges Token startet der
   Connector nicht. Credentials und Token stehen nie in argv, nie in der Umgebung, nie in Logs und nie in
@@ -120,6 +137,7 @@ Einzige Quelle für Fassung, Operationen, Netz, Dateisystem, Credentials und Imp
 | `id` | `documents`, `ratsprojekte`, `ris`, `web`, `vault` |
 | `fassung` | `komki-documents/1`, `komki-ratsprojekte/2`, `komki-ris/3`, `komki-web/1`, `komki-vault/1` |
 | `binary` | Name des Escripts |
+| `nif` | NIF-Anwendung der zweiten Programmform (§4): `:ex_pdfium` für `documents`, sonst `nil` = reines Elixir. Profilgenerator, Programm-Pins und Doctor leiten daraus das physische Verzeichnis ab (`KomkiConnector.Nif`) |
 | `ops` | Operation → Parameter-Schema (geschlossen, siehe unten), `kind` (`read`, `write` oder `admit_only`, §6.4), optional `ausgabeart` (nur schreibend, siehe unten), `environment` (eigene Umgebung der Operation) und bei `admit_only` das feste `object` |
 | `egress_hosts` | Host-Allowlist für den Egress-Proxy (`host:port`). Leer heißt: kein Netz, kein Proxy-Port |
 | `fs` | Platzhalter-Pfade (`{vault_dir}`, `{documents_dir}` = `<base>/mediator/documents`, `{ratsprojekte_stand}` = Stand-Datei des Hubs aus der config) mit Modus `read` oder `write`. Ein nicht gesetzter optionaler Platzhalter fällt samt Regel weg |

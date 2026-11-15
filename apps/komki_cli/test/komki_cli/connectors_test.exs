@@ -365,6 +365,101 @@ defmodule KomkiCli.ConnectorsTest do
     end
   end
 
+  describe "NIF-Pruefung unter Profil (#288)" do
+    # Paket-Layout neben dem Multicall-Programm, Profil vorhanden: Der
+    # Doctor-Lauf hat dieselbe Form wie ein echter Start (env -i, Rolle,
+    # --nif-check, cwd /), nur der Ausfuehrer ist gefaked.
+    defp nif_cfg do
+      dir = TestSupport.tmp_area!("komki-nif")
+      program = Path.join([dir, "bin", "komki"])
+      File.mkdir_p!(Path.dirname(program))
+      File.write!(program, "")
+      File.mkdir_p!(Path.join([dir, "bin", "lib", "ex_pdfium", "ebin"]))
+
+      cfg =
+        cfg(
+          komki_bin: program,
+          connector_bins: %{"documents" => program}
+        )
+
+      profile = Connectors.profile_path(cfg, "documents")
+      File.mkdir_p!(Path.dirname(profile))
+      File.write!(profile, "(version 1)\n(deny default)\n")
+
+      {cfg, program, profile}
+    end
+
+    test "Start wie ein echter Start: Rolle, --nif-check, cwd /" do
+      {cfg, program, profile} = nif_cfg()
+
+      runner = fn "/usr/bin/env" = bin, args, opts ->
+        assert bin == "/usr/bin/env"
+
+        assert args == [
+                 "-i",
+                 "HOME=" <> Connectors.run_dir(cfg),
+                 "PATH=/usr/bin:/bin",
+                 "LANG=C",
+                 cfg.sandbox_exec,
+                 "-f",
+                 profile,
+                 cfg.escript_bin,
+                 program,
+                 "komki-connector-documents",
+                 "--nif-check"
+               ]
+
+        assert opts[:cd] == "/"
+        assert opts[:stderr_to_stdout] == true
+
+        {"pdfium ok (pdfium loaded)\n", 0}
+      end
+
+      assert {:ok, reason} = Connectors.nif_check(cfg, Manifest.fetch!("documents"), runner)
+
+      assert reason ==
+               "NIF ex_pdfium lädt unter dem Profil: " <>
+                 TestSupport.readlink!(Path.join([Path.dirname(program), "lib", "ex_pdfium"]))
+    end
+
+    test "Fehlschlag: Exit-Code und Ausgabe der Rolle" do
+      {cfg, _program, _profile} = nif_cfg()
+      runner = fn _bin, _args, _opts -> {"pdfium fehlt: nif_not_loaded\n", 1} end
+
+      assert {:error, "Exit 1: pdfium fehlt: nif_not_loaded"} =
+               Connectors.nif_check(cfg, Manifest.fetch!("documents"), runner)
+    end
+
+    test "ohne Fundstelle: die Ursache statt eines Laufs" do
+      {cfg, program, _profile} = nif_cfg()
+      # Baum wieder entfernen: Programm und Profil bleiben, die NIF fehlt.
+      File.rm_rf!(Path.join([Path.dirname(program), "lib"]))
+      runner = fn _bin, _args, _opts -> flunk("ohne Fundstelle wird nichts gestartet") end
+
+      assert {:error, reason} = Connectors.nif_check(cfg, Manifest.fetch!("documents"), runner)
+      assert reason =~ "Verzeichnis der NIF-Anwendung fehlt"
+    end
+
+    test "ohne Profil: Hinweis auf setup" do
+      {cfg, _program, profile} = nif_cfg()
+      File.rm!(profile)
+      runner = fn _bin, _args, _opts -> flunk("ohne Profil wird nichts gestartet") end
+
+      assert {:error, reason} = Connectors.nif_check(cfg, Manifest.fetch!("documents"), runner)
+      assert reason =~ "Profil fehlt"
+    end
+
+    test "Connector ohne NIF-Anwendung ist ein Fehler" do
+      {cfg, _program, _profile} = nif_cfg()
+
+      assert_raise ArgumentError, ~r/ohne NIF-Anwendung/, fn ->
+        Connectors.nif_check(cfg, Manifest.fetch!("ris"), fn _bin, _args, _opts ->
+          flunk("ris")
+        end)
+      end
+    end
+  end
+
   describe "Socket-Pfadlaenge (103 Byte)" do
     test "kurze Basis ok, lange Basis abgelehnt" do
       assert :ok = Connectors.socket_length("/tmp/komki")

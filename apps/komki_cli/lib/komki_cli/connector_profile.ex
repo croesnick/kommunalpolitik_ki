@@ -12,7 +12,11 @@ defmodule KomkiCli.ConnectorProfile do
       RIS-Mock-Betrieb), und nur, wenn das Manifest `egress_hosts` hat,
     * Dateisystem nur nach `fs` des Manifests (`{vault_dir}` lesen,
       `{vault_dir}/komki-test` schreiben, `{documents_dir}` lesen,
-      `{ratsprojekte_stand}` lesen, #419).
+      `{ratsprojekte_stand}` lesen, #419),
+    * NIF von der Platte (#288, zweite Programmform §4): Bei Manifest-Feld
+      `nif` das Lesen (dlopen) genau aus dem Verzeichnis der NIF-Anwendung —
+      Paket oder Build-Baum, dieselbe Fundstelle, die der Bootstrap des
+      Connectors auf den Code-Pfad bringt (`KomkiConnector.Nif`).
 
   Kein Home, kein `~/.ssh`, kein DNS: Ein Connector kennt nur Loopback.
 
@@ -35,6 +39,7 @@ defmodule KomkiCli.ConnectorProfile do
     log = Connectors.log_path(cfg, manifest.id)
     fs = fs_paths(cfg, manifest)
     hub = hub_rules(cfg, manifest)
+    {nif_rules, nif_paths} = nif_layer(cfg, manifest)
 
     EscriptProfile.render(
       EscriptProfile.header([
@@ -47,14 +52,48 @@ defmodule KomkiCli.ConnectorProfile do
         connector_net_rules(Connectors.upstream(cfg, manifest)) ++
         hub ++
         fs_rules(fs) ++
+        nif_rules ++
         EscriptProfile.meta_ancestors(
-          [root, binary, socket, log] ++ hub_paths(cfg, manifest) ++ Enum.map(fs, &elem(&1, 0))
+          [root, binary, socket, log] ++
+            hub_paths(cfg, manifest) ++
+            Enum.map(fs, &elem(&1, 0)) ++ nif_paths
         ) ++
         [
           "; Bewusst NICHT erlaubt: Netz ausser dem einen Loopback-Port, DNS, Home-Verzeichnis,",
           "; Schreiben ausserhalb von Socket, Log und den fs-Pfaden des Manifests."
         ]
     )
+  end
+
+  # Zweite Programmform (#288, CONTRACT.md §4): Bei Manifest-Feld `nif`
+  # erlaubt das Profil das Laden (dlopen) genau aus dem Verzeichnis der
+  # NIF-Anwendung — dieselbe Fundstelle, die der Bootstrap des Connectors
+  # auf den Code-Pfad bringt (KomkiConnector.Nif; Profil, Pin und Doctor
+  # teilen sie). Ohne Fundstelle faellt die Regel weg und der Doctor
+  # meldet die fehlenden Dateien; der Profiltext haengt damit am Host wie
+  # die crypto-dylibs der Grundschicht (Golden-Fixtur ohne Fundstelle).
+  defp nif_layer(%Config{} = cfg, manifest) do
+    case manifest.nif do
+      nil ->
+        {[], []}
+
+      app ->
+        binary = Connectors.binary!(cfg, manifest.id)
+
+        case KomkiConnector.Nif.app_dir(binary, app) do
+          nil ->
+            {[], []}
+
+          dir ->
+            {
+              [
+                "; NIF von der Platte (#288): Laden nur aus dem Verzeichnis der NIF-Anwendung",
+                SBPL.read_subpath(dir)
+              ],
+              [dir]
+            }
+        end
+    end
   end
 
   # Durchstich #409, belegt im Wegwerf-Lauf: Der ratsprojekte-Connector ist der einzige

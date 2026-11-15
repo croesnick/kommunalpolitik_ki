@@ -22,9 +22,10 @@ class Komki < Formula
 
   def install
     # Escript mit allen Rollen, daneben komki-tresor (Secure Enclave, im Paket
-    # gebaut), die SQLite-NIF (lib/exqlite) und pi in fester Version samt
-    # Abhaengigkeiten (lib/node_modules, im Paket per pnpm-Lockfile gebaut;
-    # komki sucht pi dort zuerst). Nichts wird nachgeladen.
+    # gebaut), die SQLite-NIF (lib/exqlite), die PDF-NIF von ex_pdfium
+    # (lib/ex_pdfium, #288) und pi in fester Version samt Abhaengigkeiten
+    # (lib/node_modules, im Paket per pnpm-Lockfile gebaut; komki sucht pi
+    # dort zuerst). Nichts wird nachgeladen.
     libexec.install "komki", "komki-tresor", "lib"
     # Das Escript startet mit Homebrews Erlang, auch wenn ein anderes im PATH liegt
     (bin/"komki").write_env_script libexec/"komki", PATH: "#{formula_opt_bin("erlang")}:$PATH"

@@ -36,8 +36,9 @@ komki session
 ```
 
 Der Link liegt in `KOMKI_LINK_DIR` (Standard `~/.local/bin`). Das Escript
-bleibt im Clone und findet dort seinen Build-Baum (die SQLite-NIF). Den
-Clone deshalb nicht löschen oder verschieben, solange der Link benutzt wird.
+bleibt im Clone und findet dort seinen Build-Baum (die SQLite-NIF von
+exqlite und die PDF-NIF von ex_pdfium, #288). Den Clone deshalb nicht
+löschen oder verschieben, solange der Link benutzt wird.
 
 Aktualisieren: `git pull && make komki && komki setup`. `setup` fragt, ob es
 das veränderte komki übernehmen soll (Programm-Pin), und frischt Pfade und

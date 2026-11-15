@@ -30,7 +30,7 @@ defmodule KomkiCli.Connectors do
   """
 
   alias KomkiCli.{Config, ConnectorProfile, Proc, Profile, Secrets}
-  alias KomkiConnector.{Launch, Manifest, Text}
+  alias KomkiConnector.{Launch, Manifest, Nif, Text}
   alias Sidecar.{Client, Token}
 
   @ready_timeout_ms 15_000
@@ -571,6 +571,85 @@ defmodule KomkiCli.Connectors do
 
       {:error, %{"code" => code, "detail" => detail}} ->
         {:error, "ping: " <> code <> " " <> detail}
+    end
+  end
+
+  @doc """
+  NIF-Pruefung der zweiten Programmform unter dem Profil der Instanz
+  (#288, CONTRACT.md §4): startet `<rolle> --nif-check` genau wie ein
+  echter Start — `env -i … sandbox-exec -f <profil>`, cwd `/` — und
+  wertet Exit-Code und Ausgabe aus. Exit 0 heisst: Das Profil erlaubt das
+  Laden, die nativen Dateien sind da und die NIF initialisiert. Der
+  Doctor ruft das fuer jeden Connector mit Manifest-Feld `nif`; `ping`
+  beweist das nicht (der Connector startet auch mit kaputter NIF).
+  `run` ersetzt `System.cmd/3` (Testnaht).
+  """
+  @spec nif_check(Config.t(), Manifest.t(), (String.t(), [String.t()], keyword() ->
+                                               {String.t(), term()})) ::
+          {:ok, String.t()} | {:error, String.t()}
+  def nif_check(%Config{} = cfg, manifest, run \\ &System.cmd/3) do
+    # Programmierfehler (Aufruf fuer einen Connector ohne NIF) bleibt eine
+    # Exception — das rescue unten darf ihn nicht schlucken.
+    app =
+      manifest.nif || raise(ArgumentError, "Connector " <> manifest.id <> " ohne NIF-Anwendung")
+
+    guarded_nif_check(cfg, manifest, app, run)
+  end
+
+  defp guarded_nif_check(%Config{} = cfg, manifest, app, run) do
+    binary = binary!(cfg, manifest.id)
+    profile = profile_path(cfg, manifest.id)
+
+    if File.exists?(profile) do
+      nif_check_with_tree(cfg, manifest, binary, profile, app, run)
+    else
+      {:error, "Profil fehlt — 'komki setup' schreibt es"}
+    end
+  rescue
+    # fehlendes Binary oder fehlende Erlang-Laufzeit: kein Crash des Doctor,
+    # sondern ein roter Check mit der Meldung (binary_checks meldet sie auch).
+    e in ArgumentError -> {:error, Exception.message(e)}
+  end
+
+  # Erste Fundstelle wie im Profil (KomkiConnector.Nif); ohne sie ist der
+  # Lauf ueberfluessig — der Doctor nennt die Ursache statt des Exit-Codes.
+  defp nif_check_with_tree(cfg, manifest, binary, profile, app, run) do
+    case Nif.app_dir(binary, app) do
+      nil ->
+        {:error,
+         "Verzeichnis der NIF-Anwendung fehlt — Programm neu bauen ('make komki' bzw. 'make komki-tap'), dann 'komki setup'"}
+
+      dir ->
+        nif_check_wrap(nif_check_run(cfg, manifest, binary, profile, dir, run), app, dir)
+    end
+  end
+
+  # Erfolgsmeldung aus dem App-Namen des Manifests, nicht fest "pdfium": Ein
+  # kuenftiger NIF-Connector loge sonst falsch.
+  defp nif_check_wrap({:ok, _dir}, app, dir),
+    do: {:ok, "NIF " <> to_string(app) <> " lädt unter dem Profil: " <> dir}
+
+  defp nif_check_wrap({:error, reason}, _app, _dir), do: {:error, reason}
+
+  # Der Lauf selbst: gleiche Startform wie `launch/6` (env -i, LANG=C,
+  # Profil der Instanz, cwd `/`), aber ohne Socket zu binden und ohne
+  # Credentials — die Rolle beendet sich nach der NIF-Pruefung selbst.
+  # Ohne Zeitlimit wie bei journal_verify: Die Rolle haelt sich selbst
+  # kurz (Start, NIF laden, halt).
+  defp nif_check_run(cfg, manifest, binary, profile, dir, run) do
+    args = KomkiCli.Roles.prefix(cfg, binary, manifest.binary) ++ ["--nif-check"]
+    words = Proc.role_cmd(cfg, profile, binary, args, run_dir(cfg))
+    {out, code} = run.(hd(words), tl(words), stderr_to_stdout: true, cd: "/")
+
+    case code do
+      0 ->
+        {:ok, dir}
+
+      code when is_integer(code) ->
+        {:error, "Exit " <> Integer.to_string(code) <> ": " <> String.trim(out)}
+
+      other ->
+        {:error, "kein Ergebnis (" <> Kernel.inspect(other) <> "): " <> String.trim(out)}
     end
   end
 

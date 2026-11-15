@@ -107,4 +107,64 @@ defmodule KomkiCli.PinsTest do
     File.rm!(cfg.node_bin)
     assert "pin node" in failing(cfg)
   end
+
+  # Zweite Programmform (#288): Das Verzeichnis der NIF-Anwendung gehoert
+  # zum Programm des Dokument-Connectors — als eigener Pin (Baum-Hash). Der
+  # Pin findet die Fundstelle auch ueber das Multicall-Programm
+  # (Connectors.binary/2), wenn connector_bins keinen Eintrag traegt.
+  test "Connector mit NIF: Verzeichnis der NIF-Anwendung als eigener Pin" do
+    dir = TestSupport.tmp_area!("komki-pins-nif")
+    program = place!(Path.join([dir, "bin", "komki"]), "#!/bin/sh\n# komki\n")
+    File.mkdir_p!(Path.join([dir, "bin", "lib", "ex_pdfium", "ebin"]))
+    File.mkdir_p!(Path.join([dir, "bin", "lib", "ex_pdfium", "priv", "native"]))
+
+    File.write!(
+      Path.join([dir, "bin", "lib", "ex_pdfium", "priv", "native", "libpdfium.dylib"]),
+      "dylib\n"
+    )
+
+    nif = TestSupport.readlink!(Path.join([dir, "bin", "lib", "ex_pdfium"]))
+
+    # Fixture-Werkzeugpfade existieren nicht: ohne sie bleibt der Pin-Satz
+    # auf komki und den NIF beschraenkt (place! legt nur dieses Programm an).
+    cfg =
+      struct!(TestSupport.fixture_cfg(Path.join(dir, "base")),
+        komki_bin: program,
+        mediator_bin: nil,
+        egress_bin: nil,
+        connector_bins: %{},
+        escript_bin: nil,
+        node_bin: nil,
+        cli_js: nil,
+        llama_server_bin: nil
+      )
+
+    assert {"komki-connector-documents-nif", nif} in Pins.artifacts(cfg)
+
+    cfg = %{cfg | pins: Pins.compute(cfg)}
+    assert %{"path" => ^nif, "sha256" => sha} = cfg.pins["komki-connector-documents-nif"]
+    assert sha =~ ~r/^[0-9a-f]{64}$/
+    assert failing(cfg) == []
+
+    # Veraenderte native Datei haelt den Start an: neue Bytes, neuer Baum-Hash.
+    File.write!(
+      Path.join([dir, "bin", "lib", "ex_pdfium", "priv", "native", "libpdfium.dylib"]),
+      "boese\n"
+    )
+
+    assert failing(cfg) == ["pin komki-connector-documents-nif"]
+  end
+
+  test "Connector mit NIF, ohne Verzeichnis: kein Pin-Eintrag" do
+    dir = TestSupport.tmp_area!("komki-pins-ohne-nif")
+    program = place!(Path.join([dir, "bin", "komki"]), "#!/bin/sh\n# komki\n")
+
+    cfg =
+      struct!(TestSupport.fixture_cfg(Path.join(dir, "base")),
+        komki_bin: program,
+        connector_bins: %{}
+      )
+
+    refute Enum.any?(Pins.artifacts(cfg), fn {name, _} -> String.ends_with?(name, "-nif") end)
+  end
 end
