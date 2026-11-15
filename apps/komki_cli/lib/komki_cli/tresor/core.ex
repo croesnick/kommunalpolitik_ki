@@ -9,9 +9,12 @@ defmodule KomkiCli.Tresor.Core do
   program does hardware only: it creates the enclave key, hands out its
   public key and returns the ECDH shared secret after Touch ID or the Mac's
   password. Plaintext stays in this process. Key material goes over
-  stdin/stdout, never over argv, environment or log; only the prompt reason
-  is an argument. komki-specific program discovery lives in the adapter
-  `KomkiCli.Tresor`.
+  stdin/stdout, never over argv, environment or log; the prompt reason and
+  the per-agreement nonce are arguments (#475). The program composes the
+  dialog text itself — seal fingerprint, nonce, then the caller's reason
+  labelled as untrusted — and this module prints fingerprint and nonce to
+  the terminal, so the person can compare both (#475). komki-specific
+  program discovery lives in the adapter `KomkiCli.Tresor`.
 
   Seals in the old format `ktv1` are recognised and refused (`:outdated`).
   There is no fallback: the program that could open them is gone, and the way
@@ -30,6 +33,7 @@ defmodule KomkiCli.Tresor.Core do
   # The key agreement waits for Touch ID or the password.
   @agree_timeout_ms 120_000
   @shared_secret_bytes 32
+  @nonce_bytes 5
 
   @type error ::
           :missing_bin
@@ -142,15 +146,61 @@ defmodule KomkiCli.Tresor.Core do
 
   @impl SealedEnvelope.KeyAgreement
   def agree(key_ref, peer_public, opts) do
-    args = ["agree", "--reason", Keyword.fetch!(opts, :reason)]
-    input = Base.encode64(key_ref) <> " " <> Base.encode64(peer_public)
-
-    with {:ok, out} <- run(args, input, Keyword.get(opts, :timeout, @agree_timeout_ms), opts) do
-      case Base.decode64(out) do
-        {:ok, <<_::binary-size(@shared_secret_bytes)>> = shared} -> {:ok, shared}
-        _ -> {:error, :invalid}
-      end
+    case Keyword.get_lazy(opts, :command, &binary/0) do
+      nil -> {:error, :missing_bin}
+      command -> request(key_ref, peer_public, opts, command)
     end
+  end
+
+  # One fresh nonce per agreement (#475): the dialog shows it next to the
+  # seal fingerprint, and the terminal line below shows the same pair for the
+  # person to compare. The caller's reason is display text, not the consent
+  # basis.
+  defp request(key_ref, peer_public, opts, command) do
+    nonce = nonce()
+    show_crosscheck(key_ref, peer_public, nonce)
+
+    args = ["agree", "--reason", Keyword.fetch!(opts, :reason), "--nonce", nonce]
+    input = Base.encode64(key_ref) <> " " <> Base.encode64(peer_public)
+    timeout = Keyword.get(opts, :timeout, @agree_timeout_ms)
+
+    case spawn(command, args, input, timeout) do
+      {:ok, out} -> shared_secret(out)
+      {:error, _} = error -> error
+    end
+  end
+
+  defp shared_secret(out) do
+    case Base.decode64(out) do
+      {:ok, <<_::binary-size(@shared_secret_bytes)>> = shared} -> {:ok, shared}
+      _ -> {:error, :invalid}
+    end
+  end
+
+  # Fresh request tag for one agreement (#475): 8 readable characters, 40
+  # unpredictable bits. Not secret — its job is that the person can tell
+  # this request's dialog apart from every other.
+  defp nonce, do: @nonce_bytes |> :crypto.strong_rand_bytes() |> Base.encode32(padding: false)
+
+  # The terminal line for the person (#475): the dialog shows the same
+  # fingerprint and nonce; the caller's reason alone never identifies the
+  # requester. Fingerprint: first 8 hex characters of SHA-256 over ref and
+  # eph, as the program composes them for the dialog.
+  defp show_crosscheck(key_ref, peer_public, nonce) do
+    IO.puts(
+      "Freigabe erbeten: Siegel " <>
+        fingerprint(key_ref, peer_public) <>
+        ", Anfrage " <>
+        nonce <>
+        " (im Touch-ID-Dialog abgleichen)"
+    )
+  end
+
+  defp fingerprint(key_ref, peer_public) do
+    :sha256
+    |> :crypto.hash(key_ref <> peer_public)
+    |> Base.encode16(case: :lower)
+    |> binary_part(0, 8)
   end
 
   defp provider(opts), do: Keyword.get(opts, :provider, {__MODULE__, opts})

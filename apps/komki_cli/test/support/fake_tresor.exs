@@ -19,7 +19,7 @@ case System.argv() do
     {public, private} = :crypto.generate_key(:ecdh, curve)
     IO.puts(Base.encode64(private) <> " " <> Base.encode64(public))
 
-  ["agree", "--reason", reason] when reason != "" ->
+  ["agree", "--reason", reason, "--nonce", nonce] when reason != "" and nonce != "" ->
     with line when is_binary(line) <- IO.read(:stdio, :line),
          [ref, peer] <- line |> String.trim_trailing() |> String.split(" "),
          {:ok, private} <- Base.decode64(ref),
@@ -37,5 +37,5 @@ case System.argv() do
     end
 
   _other ->
-    fail.(2, "Aufruf: check | recipient | agree --reason <text>")
+    fail.(2, "Aufruf: check | recipient | agree --reason <text> --nonce <kennung>")
 end

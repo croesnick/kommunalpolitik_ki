@@ -450,8 +450,14 @@ selbst alle Prozesse, und nur der Egress-Proxy darf nach außen:
   `recipient` erzeugt je Geheimnis einen P-256-Schlüssel in der Secure Enclave
   mit der Zugriffsregel „userPresence“ (nur dieses Gerät, nur entsperrt) und
   gibt dessen öffentlichen Schlüssel aus; der private Schlüssel verlässt die
-  Enclave nie. `agree` liefert nach der Freigabe das gemeinsame ECDH-Geheimnis.
-  Verschlüsselt wird in Elixir (`apps/sealed_envelope`: ECDH, HKDF-SHA256,
+  Enclave nie. `agree` setzt den Dialogtext selbst zusammen — Fingerabdruck
+  des Siegels (erste 8 Hexzeichen von SHA-256 über ref und eph), frische
+  Anfrage-Kennung (`--nonce`, je Freigabe neu, auch im Terminal der
+  aufrufenden Stelle), dann der als unvertraut gekennzeichnete Aufrufertext
+  (`--reason`, #475) — und liefert nach der Freigabe das gemeinsame
+  ECDH-Geheimnis. `prompt` setzt denselben Text ohne Enclave und ohne
+  Rückfrage zusammen (Tests, Doku). Verschlüsselt wird in Elixir
+  (`apps/sealed_envelope`: ECDH, HKDF-SHA256,
   AES-256-GCM), Klartext erreicht das Programm nicht. Ein Siegel lässt sich auf
   keinem anderen Mac öffnen.
 * **Connector-Token:** Vor jedem Connector-Start erzeugt `up` ein Token

@@ -7,6 +7,8 @@ defmodule KomkiCli.TresorTest do
 
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureIO, only: [capture_io: 1, with_io: 1]
+
   alias KomkiCli.{Secrets, TestSupport, Tresor}
   alias KomkiCli.Tresor.Core
   alias SealedEnvelope.KeyAgreement.FileTestDouble
@@ -60,6 +62,18 @@ defmodule KomkiCli.TresorTest do
   end
 
   defp provider!, do: {FileTestDouble, path: Path.join(TestSupport.tmp_area!("komki-key"), "key")}
+
+  # Erste 8 Hexzeichen von SHA-256 ueber ref und eph des Siegels (#475): der
+  # Test pinnt das Format unabhaengig von der Implementierung.
+  defp fingerprint_of(sealed) do
+    assert "ktv2." <> rest = sealed
+    assert {:ok, json} = Base.decode64(rest)
+    assert {:ok, %{"key" => key, "eph" => eph}} = JSON.decode(json)
+    assert {:ok, ref} = Base.decode64(key)
+    assert {:ok, eph} = Base.decode64(eph)
+
+    :sha256 |> :crypto.hash(ref <> eph) |> Base.encode16(case: :lower) |> binary_part(0, 8)
+  end
 
   defmodule Refusing do
     @moduledoc "Provider that hands out a real key but always answers with `opts[:error]`."
@@ -125,18 +139,26 @@ defmodule KomkiCli.TresorTest do
       assert {:ok, sealed} = Tresor.seal(@kanarie)
       assert Tresor.sealed?(sealed)
       refute sealed =~ @kanarie
-      assert {:ok, @kanarie} = Tresor.open(sealed, "Test")
+
+      capture_io(fn ->
+        assert {:ok, @kanarie} = Tresor.open(sealed, "Test")
+      end)
     end
 
-    test "Klartext und Siegel erreichen das Programm nicht, der Grund geht ueber argv" do
+    test "Klartext und Siegel erreichen das Programm nicht, Grund und Kennung gehen ueber argv" do
       {cmd, dir} = recording_tresor!()
 
       assert {:ok, sealed} = Tresor.seal(@kanarie, command: cmd)
-      assert {:ok, @kanarie} = Tresor.open(sealed, "Der Grund", command: cmd)
+
+      capture_io(fn ->
+        assert {:ok, @kanarie} = Tresor.open(sealed, "Der Grund", command: cmd)
+      end)
 
       argv = File.read!(Path.join(dir, "argv"))
       stdin = File.read!(Path.join(dir, "stdin"))
-      assert argv == "recipient\nagree --reason Der Grund\n"
+
+      assert ["recipient", agree] = String.split(argv, "\n", trim: true)
+      assert agree =~ ~r/\Aagree --reason Der Grund --nonce [A-Z2-7]{8}\z/
 
       for seen <- [argv, stdin] do
         refute seen =~ @kanarie
@@ -147,12 +169,63 @@ defmodule KomkiCli.TresorTest do
       assert [_one_line] = String.split(stdin, "\n", trim: true)
     end
 
+    test "Terminal und Dialog zeigen denselben Fingerabdruck und dieselbe Anfrage-Kennung" do
+      {cmd, dir} = recording_tresor!()
+
+      assert {:ok, sealed} = Tresor.seal(@kanarie, command: cmd)
+
+      # Der Aufrufer kontrolliert nur seinen Text: Fingerabdruck und
+      # Anfrage-Kennung kommen aus dem Siegel bzw. aus dem Tresor (#475).
+      output =
+        capture_io(fn ->
+          assert {:ok, @kanarie} = Tresor.open(sealed, "Der Grund", command: cmd)
+        end)
+
+      assert [_recipient, agree] =
+               String.split(File.read!(Path.join(dir, "argv")), "\n", trim: true)
+
+      [nonce] = Regex.run(~r/--nonce ([A-Z2-7]{8})\z/, agree, capture: :all_but_first)
+
+      assert output ==
+               "Freigabe erbeten: Siegel " <>
+                 fingerprint_of(sealed) <>
+                 ", Anfrage " <>
+                 nonce <>
+                 " (im Touch-ID-Dialog abgleichen)\n"
+    end
+
+    test "jede Freigabe erhaelt eine frische Anfrage-Kennung" do
+      {cmd, dir} = recording_tresor!()
+      {:ok, sealed} = Tresor.seal(@kanarie, command: cmd)
+
+      for _ <- 1..2 do
+        capture_io(fn ->
+          assert {:ok, @kanarie} = Tresor.open(sealed, "Der Grund", command: cmd)
+        end)
+      end
+
+      argv = File.read!(Path.join(dir, "argv"))
+
+      nonces =
+        argv
+        |> String.split("\n", trim: true)
+        |> Enum.flat_map(
+          &(Regex.run(~r/--nonce ([A-Z2-7]{8})\z/, &1, capture: :all_but_first) || [])
+        )
+
+      assert [erste, zweite] = nonces
+      assert erste != zweite
+    end
+
     test "Exit-Codes werden zu Gruenden" do
       {:ok, sealed} = Tresor.seal(@kanarie)
 
       for {code, error} <- [{3, :no_enclave}, {4, :refused}, {5, :invalid}, {9, {:failed, 9}}] do
         cmd = script!("tresor", "read -r v; exit #{code}")
-        assert {:error, ^error} = Tresor.open(sealed, "Test", command: cmd)
+
+        capture_io(fn ->
+          assert {:error, ^error} = Tresor.open(sealed, "Test", command: cmd)
+        end)
       end
 
       cmd = script!("tresor", "exit 3")
@@ -164,7 +237,10 @@ defmodule KomkiCli.TresorTest do
 
       for out <- ["kein-base64!", Base.encode64("zu kurz")] do
         cmd = script!("tresor", "read -r v; echo '#{out}'")
-        assert {:error, :invalid} = Tresor.open(sealed, "Test", command: cmd)
+
+        capture_io(fn ->
+          assert {:error, :invalid} = Tresor.open(sealed, "Test", command: cmd)
+        end)
       end
 
       assert {:error, :invalid} = Tresor.seal(@kanarie, command: script!("tresor", "echo kaputt"))
@@ -185,7 +261,10 @@ defmodule KomkiCli.TresorTest do
     test "Timeout beendet das Programm (keine Freigabe)" do
       {:ok, sealed} = Tresor.seal(@kanarie)
       cmd = script!("tresor", "exec sleep 30")
-      assert {:error, :timeout} = Tresor.open(sealed, "Test", command: cmd, timeout: 300)
+
+      capture_io(fn ->
+        assert {:error, :timeout} = Tresor.open(sealed, "Test", command: cmd, timeout: 300)
+      end)
     end
 
     test "check meldet die Secure-Enclave-Verfuegbarkeit (Exit 0/3/9)" do
@@ -199,7 +278,10 @@ defmodule KomkiCli.TresorTest do
     test "reveal oeffnet ein Siegel aus dem Schluesselbund" do
       {:ok, sealed} = Tresor.seal(@kanarie)
       {cmd, _dir} = keychain!(sealed)
-      assert {:ok, @kanarie} = Secrets.reveal("brave-search-api", command_kc(cmd))
+
+      capture_io(fn ->
+        assert {:ok, @kanarie} = Secrets.reveal("brave-search-api", command_kc(cmd))
+      end)
     end
 
     test "reveal benutzt keinen Klartext-Eintrag" do
@@ -254,7 +336,11 @@ defmodule KomkiCli.TresorTest do
 
       stored = File.read!(Path.join(dir, "stored"))
       assert Tresor.well_formed?(stored)
-      assert {:ok, token} = Secrets.reveal("ratsprojekte-hub-token", command_kc(cmd))
+
+      {result, _abgleich_zeile} =
+        with_io(fn -> Secrets.reveal("ratsprojekte-hub-token", command_kc(cmd)) end)
+
+      assert {:ok, token} = result
       assert {:ok, _} = Base.url_decode64(token, padding: false)
       assert Base.encode16(:crypto.hash(:sha256, token), case: :lower) == hash
       refute stored =~ token

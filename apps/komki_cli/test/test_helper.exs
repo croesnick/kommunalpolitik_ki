@@ -16,6 +16,17 @@ exclude = [:llama_boot | exclude]
 # Real Secure Enclave with a Touch ID prompt (TresorLiveTest, ticket #337):
 # only with `mix test --include touch_id`, never in a standard run or on CI.
 exclude = [:touch_id | exclude]
+
+# Echtes komki-tresor-Programm (TresorNativeTest, Ticket #475): nur lauffaehig,
+# wo mix compile es gebaut hat (macOS mit swiftc). Die Linux-CI hat keins —
+# ein `skip`-Tag aus setup/setup_all wird von ExUnit nicht als Laufzeit-Skip
+# honoriert (nachgemessen: der Test liefe trotzdem), also ueber den Tag
+# ausschliessen, wie die Nachbarn oben.
+exclude =
+  if is_nil(KomkiCli.Tresor.Core.binary(:komki_cli)),
+    do: [:tresor_native | exclude],
+    else: exclude
+
 ExUnit.start(exclude: exclude)
 
 # Ticket #146: kein Test fragt den echten Schluesselbund ab (auch nicht der
