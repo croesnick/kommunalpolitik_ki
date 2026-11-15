@@ -227,10 +227,44 @@ defmodule KomkiConnectorRisTest do
       end
     end
 
-    test "ping meldet die Fassung", %{path: path} do
+    test "ping meldet die Fassung und die Probe der Gegenstelle (Ticket #515)", %{path: path} do
       assert {:ok,
-              %{"version" => "komki-ris/3", "ops" => ["agenda", "search", "sessions", "show"]}} =
+              %{
+                "version" => "komki-ris/3",
+                "ops" => ["agenda", "search", "sessions", "show"],
+                "upstream" => "ok"
+              }} =
                Client.call(path, "c", "ping", %{})
+    end
+
+    # Ticket #515: Eine unbekannte Gegenstelle — der Mock kennt den Pfad
+    # nicht, die Sitzungsliste kommt mit 404 zurueck (dasselbe Bild wie ein
+    # umgezogener Mandant) — faellt schon beim Start auf: ping meldet den
+    # geschlossenen Fehler-Code statt "ok", und der Connector startet trotzdem.
+    test "ping meldet eine unbekannte Gegenstelle als Fehler-Code (Ticket #515)" do
+      {_mock, port} = RisMock.start(:ok)
+
+      wrong_tenant = "http://127.0.0.1:#{port}/falscher-mandant/"
+      {:ok, cfg} = KomkiConnectorRis.init(%{base_url: wrong_tenant})
+      assert cfg.probe == {:error, "upstream-error"}
+
+      path = "/tmp/kmP#{System.unique_integer([:positive])}.sock"
+      {:ok, listener} = Server.listen(path)
+      token = Sidecar.Token.provision!(path)
+      pid = spawn(fn -> Server.accept_loop(listener, KomkiConnectorRis, cfg, token) end)
+      :ok = :socket.setopt(listener, {:otp, :controlling_process}, pid)
+
+      on_exit(fn ->
+        Process.exit(pid, :kill)
+        File.rm(path)
+      end)
+
+      assert {:ok, %{"version" => "komki-ris/3", "upstream" => "upstream-error"}} =
+               Client.call(path, "c", "ping", %{})
+
+      # Ops bleiben trotz gescheiterter Probe aufrufbar: handle_op verhaelt
+      # sich unveraendert, nur die Probe meldet rot.
+      assert {:error, %{"code" => "upstream-error"}} = search(path, %{"text" => "Bahnhofstraße"})
     end
 
     # Ticket #516: find the meeting by date, then read its public agenda.
@@ -457,8 +491,9 @@ defmodule KomkiConnectorRisTest do
       end
 
       # No silent guest fallback: after the failed login nothing reaches the RIS.
-      paths = mock |> KomkiMock.Server.log() |> Enum.map(& &1["path"])
-      assert paths == ["/auth"]
+      # (The guest meeting list before it is the start probe, Ticket #515.)
+      ["/guestmeetings" | nach_probe] = mock |> KomkiMock.Server.log() |> Enum.map(& &1["path"])
+      assert nach_probe == ["/auth"]
     end
 
     test "unvollstaendiger Zugang: Hinweis auf komki secret set ris" do

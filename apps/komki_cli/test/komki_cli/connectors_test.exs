@@ -472,6 +472,114 @@ defmodule KomkiCli.ConnectorsTest do
     end
   end
 
+  describe "up/2 bei Fassungsdrift (Ticket #553)" do
+    # Fake-Connector des Tickets: ein echter Listener auf dem Connector-Socket,
+    # der die reservierte Operation `ping` mit einer ALTEREN Fassung als das
+    # Manifest beantwortet. Nach einem Update darf `up` einen laufenden
+    # Connector nicht unberuehrt lassen, nur weil Token und pidfile stimmen.
+    defp ping_listener(socket, answer) do
+      Task.async(fn ->
+        {:ok, listen} =
+          :gen_tcp.listen(0, [
+            :binary,
+            packet: 4,
+            packet_size: Sidecar.Frame.max_bytes(),
+            ifaddr: {:local, String.to_charlist(socket)},
+            active: false
+          ])
+
+        listener_loop(listen, answer)
+      end)
+    end
+
+    # Eine Anfrage pro Verbindung (CONTRACT.md §3): Frame lesen, `ping` mit
+    # `answer` beantworten, schliessen — solange Verbindungen kommen.
+    defp listener_loop(listen, answer) do
+      case :gen_tcp.accept(listen, 10_000) do
+        {:ok, sock} ->
+          reply =
+            with {:ok, frame} <- :gen_tcp.recv(sock, 0, 5_000),
+                 {:ok, %{"call_id" => call_id}} <- Sidecar.Frame.decode(frame) do
+              {:ok, bin} = Sidecar.Frame.encode(Sidecar.Frame.ok(call_id, answer))
+              bin
+            else
+              _ -> nil
+            end
+
+          if reply, do: :gen_tcp.send(sock, reply)
+          :gen_tcp.close(sock)
+          listener_loop(listen, answer)
+
+        {:error, _} ->
+          :gen_tcp.close(listen)
+      end
+    end
+
+    defp running?(pid),
+      do: match?({_, 0}, System.cmd("/bin/kill", ["-0", Integer.to_string(pid)]))
+
+    test "ping meldet eine alte Fassung: up startet den laufenden Connector neu" do
+      # Kurze Basis: der Fake-Listener bindet den Connector-Socket wirklich,
+      # macOS begrenzt Unix-Socket-Pfade auf 103 Byte.
+      short = "/tmp/k553c-" <> TestSupport.unique_suffix()
+      File.mkdir_p!(short)
+      cfg = cfg(base_dir: short)
+      Connectors.ensure_run_dirs!(cfg)
+      File.mkdir_p!(Path.join(cfg.base_dir, "tmp"))
+      File.touch!(Connectors.egress_log_path(cfg))
+
+      # Attrappe des laufenden RIS-Connectors (Marker + Socket-Anker in der
+      # ps-Zeile), sein Socket bedient der Fake-Listener.
+      ris_socket = Manifest.socket_path(cfg.base_dir, "ris")
+      old_pid = TestSupport.spawn_fake(Manifest.fetch!("ris").binary, ris_socket)
+      File.write!(Connectors.pidfile(cfg, "ris"), Integer.to_string(old_pid) <> "\n")
+      listener = ping_listener(ris_socket, %{"version" => "komki-ris/2"})
+      Sidecar.Token.provision!(ris_socket)
+
+      # Egress und die uebrigen Connectoren laufen unverändert (kein Drift).
+      others =
+        for {pidfile, marker, anchor, opts} <-
+              [
+                {Connectors.egress_pidfile(cfg), "komki-egress", nil,
+                 [open_file: Connectors.egress_log_path(cfg)]}
+              ] ++
+                for(
+                  id <- ["documents", "vault", "web"],
+                  do:
+                    {Connectors.pidfile(cfg, id), Manifest.fetch!(id).binary,
+                     Manifest.socket_path(cfg.base_dir, id), []}
+                ) do
+          pid = TestSupport.spawn_fake(marker, anchor, opts)
+          File.write!(pidfile, Integer.to_string(pid) <> "\n")
+
+          if anchor do
+            # Socket als Datei + Token wie ein laufender Connector sie hat;
+            # ping scheitert am Transport (kein Drift) — Verhalten wie bisher.
+            File.write!(anchor, "")
+            Sidecar.Token.provision!(anchor)
+          end
+
+          pid
+        end
+
+      try do
+        # Manifest erwartet komki-ris/3, der Fake meldet komki-ris/2: up muss
+        # den laufenden Connector neu starten. Der Attrappe-Prozess wird vom
+        # Neustart beendet; der frische Start des Test-Binaries scheitert
+        # danach kontrolliert (Testumgebung ohne echten Connector).
+        assert {:error, reason} = Connectors.up(cfg, fetch: fn _ -> {:error, :missing} end)
+        assert reason =~ "komki-connector-ris"
+        refute running?(old_pid)
+        refute File.exists?(Connectors.pidfile(cfg, "ris"))
+      after
+        for pid <- others, do: TestSupport.kill_fake(pid)
+        TestSupport.kill_fake(old_pid)
+        Task.shutdown(listener)
+        File.rm_rf(short)
+      end
+    end
+  end
+
   describe "ensure_run_dirs!/1: Modus-Haertung des Dokumenten-Stores" do
     # Regression F30/#498: Der Dokumenten-Store der Raumdokumente entstand
     # mit umask-Default (0755 unter 022), waehrend run/ und connectors/ zwei

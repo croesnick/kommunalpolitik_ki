@@ -202,6 +202,137 @@ defmodule KomkiCli.MediatorTest do
     end
   end
 
+  describe "Fassungs-Drift des Vermittlers (Ticket #553)" do
+    test "fassung_stale?: ohne erwartbare Fassung nie, sonst nur bei Abweichung" do
+      # Kein --version vom Programm: laufenden Vermittler unberuehrt lassen.
+      refute Mediator.fassung_stale?(nil, %{"fassung_id" => "komki-mediator/5"})
+
+      # Aktuelle Fassung: kein Neustart. Abweichung: Neustart (Ticket #553).
+      refute Mediator.fassung_stale?("komki-mediator/6", %{"fassung_id" => "komki-mediator/6"})
+      assert Mediator.fassung_stale?("komki-mediator/6", %{"fassung_id" => "komki-mediator/5"})
+
+      # Health ohne fassung_id: kein Drift urteilen (kein Neustart aus Dunst).
+      refute Mediator.fassung_stale?("komki-mediator/6", %{})
+    end
+
+    test "program_fassung: Multicall-Binary (Burrito) meldet --version" do
+      base = TestSupport.tmp_area!("komki-med-fassung")
+      stub = Path.join([base, "komki"])
+      File.write!(stub, "#!/bin/sh\necho 'komki-mediator/6'\n")
+      File.chmod!(stub, 0o755)
+
+      cfg = %{
+        TestSupport.fixture_cfg(base)
+        | komki_bin: stub,
+          mediator_bin: stub,
+          launcher: "burrito"
+      }
+
+      assert Mediator.program_fassung(cfg) == "komki-mediator/6"
+    end
+
+    test "program_fassung: Escript-Zweig ueber die echte escript-Laufzeit" do
+      base = TestSupport.tmp_area!("komki-med-fassung-escript")
+      escript_file = Path.join([base, "komki-mediator"])
+
+      File.write!(escript_file, """
+      #!/usr/bin/env escript
+      main(["--version"]) ->
+          io:format("komki-mediator/6~n"),
+          halt(0).
+      """)
+
+      cfg = %{
+        TestSupport.fixture_cfg(base)
+        | komki_bin: nil,
+          mediator_bin: escript_file,
+          launcher: "escript",
+          escript_bin: KomkiCli.Config.resolve_escript_bin()
+      }
+
+      assert Mediator.program_fassung(cfg) == "komki-mediator/6"
+    end
+
+    test "program_fassung: ohne Programm oder ohne Laufzeit nil; Fehlerfall nil" do
+      base = TestSupport.tmp_area!("komki-med-fassung-nil")
+
+      cfg = %{TestSupport.fixture_cfg(base) | mediator_bin: nil}
+      refute Mediator.program_fassung(cfg)
+
+      failing = Path.join([base, "komki"])
+      File.write!(failing, "#!/bin/sh\nexit 1\n")
+      File.chmod!(failing, 0o755)
+
+      cfg = %{
+        TestSupport.fixture_cfg(base)
+        | komki_bin: failing,
+          mediator_bin: failing,
+          launcher: "burrito"
+      }
+
+      refute Mediator.program_fassung(cfg)
+    end
+
+    # Laeuft der Vermittler in der erwarteten Fassung, bleibt er unberuehrt
+    # (kein Neustart, Token bleibt): der Weg gegen einen uebereifrigen
+    # Neustart. Der Drift-Fall selbst startet neu und braucht echte Binaries
+    # — der Restart-Pfad ist wie alle Lifecycle-Laeufe nicht in der Suite.
+    test "up: laufender Vermittler mit aktueller Fassung bleibt unberuehrt" do
+      base = Path.join("/tmp", "k553m-" <> TestSupport.unique_suffix())
+      File.mkdir_p!(base)
+
+      stub = Path.join([base, "komki"])
+      File.write!(stub, "#!/bin/sh\necho 'komki-mediator/6'\n")
+      File.chmod!(stub, 0o755)
+
+      cfg = %{
+        TestSupport.fixture_cfg(base)
+        | komki_bin: stub,
+          mediator_bin: stub,
+          launcher: "burrito"
+      }
+
+      # Erst Gamma.sync einmal laufen lassen: auf einer frischen Basis
+      # schreibt up selbst Γ (:written) und startet dann ohnehin neu —
+      # der Keep-Zweig verlangt :unchanged.
+      assert KomkiCli.Gamma.sync(cfg) in [:unchanged, :written]
+
+      Channel.write_token!(cfg)
+      socket = Channel.socket_path(cfg)
+      File.mkdir_p!(Path.dirname(socket))
+
+      health =
+        JSON.encode!(%{
+          "status" => "ok",
+          "fassung_id" => "komki-mediator/6",
+          "tools" => ["ping"],
+          "registry_id" => "r-1",
+          "gamma_hash" => "g-1"
+        })
+
+      resp =
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n" <> health
+
+      {:ok, listen} =
+        :gen_tcp.listen(0, [:binary, ifaddr: {:local, String.to_charlist(socket)}, active: false])
+
+      server =
+        Task.async(fn ->
+          {:ok, sock} = :gen_tcp.accept(listen, 5_000)
+          {:ok, _req} = :gen_tcp.recv(sock, 0, 5_000)
+          :ok = :gen_tcp.send(sock, resp)
+          :gen_tcp.close(sock)
+        end)
+
+      assert {:ok, {:already, got}} = Mediator.up(cfg)
+      assert got["fassung_id"] == "komki-mediator/6"
+
+      Task.shutdown(server)
+      :gen_tcp.close(listen)
+      File.rm_rf(base)
+    end
+  end
+
   # macOS begrenzt Unix-Socket-Pfade auf 103 Byte; System.tmp_dir!/0 ist dort tief.
   defp short_socket do
     "/tmp/kct-" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower) <> ".sock"

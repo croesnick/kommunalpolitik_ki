@@ -68,6 +68,17 @@ defmodule Sidecar.Server do
               {:ok, map()} | {:error, String.t(), String.t()}
 
   @doc """
+  Extra entries in the `ping` answer (reserved operation), merged over
+  `version` and `ops`. Optional: without the callback the answer is
+  unchanged. Values are the sidecar's own data — hosts map them to their
+  own fixed texts, never rendering them raw (e.g. a start probe of the
+  sidecar's upstream, #515: `"ok"` or a closed error code).
+  """
+  @callback ping_extra(state :: term()) :: map()
+
+  @optional_callbacks ping_extra: 1
+
+  @doc """
   Reads exactly one JSON line of credentials from stdin. Empty input
   gives `%{}`. Values must be strings.
   """
@@ -301,10 +312,11 @@ defmodule Sidecar.Server do
 
   defp shape(frame), do: {:error, to_string(frame["call_id"] || ""), "frame fields missing"}
 
-  defp dispatch(module, call_id, "ping", _params, _context, _state) do
+  defp dispatch(module, call_id, "ping", _params, _context, state) do
     manifest = module.manifest()
 
-    Frame.ok(call_id, %{"version" => manifest.version, "ops" => Enum.sort(Map.keys(manifest.ops))})
+    answer = %{"version" => manifest.version, "ops" => Enum.sort(Map.keys(manifest.ops))}
+    Frame.ok(call_id, Map.merge(answer, ping_extra(module, state)))
   end
 
   defp dispatch(module, call_id, op, params, context, state) do
@@ -316,6 +328,20 @@ defmodule Sidecar.Server do
     else
       {:error, :unknown_op} -> Frame.error(call_id, "unknown-op", "unknown operation: #{op}")
       {:error, {:params, detail}} -> Frame.error(call_id, "bad-request", detail)
+    end
+  end
+
+  # Optional callback (#515): a sidecar that probed its upstream at start
+  # reports here. A missing or malformed extra leaves the answer as-is —
+  # ping is the doctor's channel and must answer.
+  defp ping_extra(module, state) do
+    if function_exported?(module, :ping_extra, 1) do
+      case module.ping_extra(state) do
+        extra when is_map(extra) -> extra
+        _ -> %{}
+      end
+    else
+      %{}
     end
   end
 

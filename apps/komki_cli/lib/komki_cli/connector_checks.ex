@@ -245,11 +245,51 @@ defmodule KomkiCli.ConnectorChecks do
 
     if File.exists?(Manifest.socket_path(cfg.base_dir, manifest.id)) do
       case Connectors.ping(cfg, manifest) do
-        {:ok, %{"version" => fassung}} -> %{name: name, ok: true, reason: fassung}
-        {:error, reason} -> %{name: name, ok: false, reason: reason}
+        {:ok, %{"version" => fassung} = result} ->
+          gegenstelle(name, fassung, result)
+
+        # Ticket #553: Bleibt die Fassung falsch (etwa weil `up` am Ende das
+        # alte Programm wiederfand), nennt der Doctor den nächsten Schritt,
+        # statt nur rot zu enden.
+        {:error, reason} ->
+          %{name: name, ok: false, reason: fassung_hint(reason)}
       end
     else
       %{name: name, ok: true, reason: "nicht aktiv"}
+    end
+  end
+
+  # Ticket #553: Bleibt die Fassung falsch (etwa weil `up` am Ende das alte
+  # Programm wiederfand), nennt der Doctor den nächsten Schritt, statt nur
+  # rot zu enden.
+  defp fassung_hint(reason) do
+    if Connectors.fassung_drift?({:error, reason}) do
+      reason <> " — 'komki down && komki up' startet die neue Fassung"
+    else
+      reason
+    end
+  end
+
+  # Ticket #515: Der RIS-Connector sondiert seine Gegenstelle beim Start und
+  # meldet das Ergebnis auf `ping` ("upstream": "ok" oder ein geschlossener
+  # Fehler-Code). Der Doctor uebersetzt den Code in seinen festen Text —
+  # Connector-Freitext erreicht niemanden — und erkennt eine unbekannte
+  # Gegenstelle (falscher Mandant, umgezogen, tot) so schon beim Start.
+  # Ohne den Schluessel (aelterer Connector ohne Sonde) bleibt alles wie vorher.
+  defp gegenstelle(name, fassung, result) do
+    case result do
+      %{"upstream" => "ok"} ->
+        %{name: name, ok: true, reason: fassung <> " — Gegenstelle ok"}
+
+      %{"upstream" => code} when is_binary(code) ->
+        %{
+          name: name,
+          ok: false,
+          reason: fassung <> " — falsche Gegenstelle: " <> KomkiConnector.Text.describe(code)
+        }
+
+      _ ->
+        %{name: name, ok: true, reason: fassung}
     end
   end
 end

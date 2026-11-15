@@ -417,8 +417,12 @@ defmodule KomkiCli.Connectors do
   # Ein laufender Connector ohne Tokendatei stammt aus einer komki-Version
   # vor den Connector-Tokens (oder hat sein Token verloren); der Vermittler
   # erreicht ihn nicht mehr. Er wird neu gestartet statt als laufend zu gelten.
-  defp keep_or_restart(cfg, {:connector, _} = step, comp, pid, fetch) do
-    if File.exists?(Token.for_socket(comp.socket)) do
+  # Ticket #553: Dasselbe gilt, wenn sein `ping` eine andere Fassung meldet
+  # als das Manifest — nach einem Update läuft sonst weiter, was das alte
+  # komki gestartet hat, und `setup` endet rot, ohne zu sagen, was zu tun ist.
+  defp keep_or_restart(cfg, {:connector, manifest} = step, comp, pid, fetch) do
+    if File.exists?(Token.for_socket(comp.socket)) and
+         not fassung_drift?(ping(cfg, manifest)) do
       {:ok, {comp.name, {:already, pid}}}
     else
       _ = stop(comp)
@@ -573,6 +577,17 @@ defmodule KomkiCli.Connectors do
         {:error, "ping: " <> code <> " " <> detail}
     end
   end
+
+  @doc """
+  Meldet das `ping`-Ergebnis eine andere Fassung als das Manifest? (Ticket #553)
+
+  `up` startet einen laufenden Connector nur dann nicht neu, wenn Token,
+  pidfile UND Fassung stimmen. Andere ping-Fehler (Transport, Timeout)
+  lösen keinen Neustart aus — dafür bleibt es beim bisherigen Verhalten.
+  """
+  @spec fassung_drift?({:ok, map()} | {:error, String.t()}) :: boolean()
+  def fassung_drift?({:error, "ping: falsche Fassung " <> _}), do: true
+  def fassung_drift?(_), do: false
 
   # komki-egress meldet nach dem Binden aller Ports eine Zeile
   # {"komki_egress":"listening",...} auf stdout (hier: im Log).
