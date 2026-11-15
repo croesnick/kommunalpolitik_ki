@@ -12,8 +12,8 @@ defmodule KomkiConnectorRis.Top do
   Bytes begrenzt, einzeln und als Summe einer Antwort; ein Block ueber
   dem Budget lehnt die ganze Antwort ab, statt still gekuerzt zu werden.
   `text/2` fragt vor jedem Block die Restfrist ab, und alle
-  Upstream-Felder verlieren ihre C0/C1-Steuerzeichen und eine
-  ueberlange Laenge.
+  Upstream-Felder verlieren ihre C0/C1-Steuerzeichen (CR wird
+  normalisiert, nicht verschluckt) und eine ueberlange Laenge.
   """
 
   @id_pattern ~r/^[A-Za-z0-9_-]{1,64}$/
@@ -33,11 +33,13 @@ defmodule KomkiConnectorRis.Top do
   # zeigt (#487).
   @max_field_chars 1_000
 
-  # C0-Steuerzeichen ausser Tab/CR/LF, DEL und die C1-Gruppe — derselbe
-  # Vorrat wie KomkiCli.Terminal.sanitize/1 (#487): was eine
-  # Terminal-Ausgabe faelschen koennte, soll im Kontext gar nicht erst
-  # ankommen.
-  @controls ~r/[\x00-\x08\x0B-\x1F\x7F\x{80}-\x{9F}]/u
+  # C0-Steuerzeichen ausser Tab/CR/LF, DEL und die C1-Gruppe — fast der
+  # Vorrat von KomkiCli.Terminal.sanitize/1 (#487), nur ohne CR: die alte
+  # Pipeline faltete CR per \s+ zu einem Leerzeichen, und ein Strip liess
+  # Woerter an lone CR kleben („a\rb“ -> „ab“ statt „a b“). CR wird
+  # stattdessen normalisiert — in plain/1 durch die \s+-Faltung, in
+  # Kurzfeldern durch normalize_cr/1 — und erreicht das Ergebnis nie roh.
+  @controls ~r/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\x{80}-\x{9F}]/u
 
   # Entity-Syntax fuer decode_entities/1: die Zahl-Formen und Namen, die
   # Grossbuchstaben und Ziffern tragen duerfen (&Uuml;, &sup2;, &frac12;).
@@ -128,12 +130,19 @@ defmodule KomkiConnectorRis.Top do
 
   @doc """
   String-Wert oder leer (Upstream-Felder koennen fehlen); C0/C1-Steuerzeichen
-  entfallen und ueberlange Felder werden mit Marker gekappt (#487):
-  Upstream-Felder sind unbegrenzt und nicht neutralisiert.
+  entfallen, CR wird normalisiert und ueberlange Felder werden mit Marker
+  gekappt (#487): Upstream-Felder sind unbegrenzt und nicht neutralisiert.
   """
   @spec string(term()) :: String.t()
-  def string(value) when is_binary(value), do: value |> utf8() |> strip_controls() |> cap()
+  def string(value) when is_binary(value),
+    do: value |> utf8() |> strip_controls() |> normalize_cr() |> cap()
+
   def string(_), do: ""
+
+  # CR steht nicht im Strip-Vorrat (s. @controls), darf aber nicht roh im
+  # Ergebnis stehen: \r\n bleibt ein Zeilenende (LF bleibt wie bisher), ein
+  # lone CR wird — wie in der alten Pipeline — zu einem Leerzeichen.
+  defp normalize_cr(text), do: text |> String.replace("\r\n", "\n") |> String.replace("\r", " ")
 
   # Kappen erst nach dem Control-Strip, damit Steuerzeichen nicht als
   # Feldlaenge zaehlen. Der Byte-Test ist der schnelle Pfad: bis 1 000
@@ -343,7 +352,14 @@ defmodule KomkiConnectorRis.Top do
   # &shy;: Sie entfaellt, egal ob als Dezimal- oder Hex-Form geschrieben.
   defp codepoint(0xAD), do: ""
 
-  defp codepoint(n) when n in 0x20..0xD7FF or n in 0xE000..0x10FFFF, do: <<n::utf8>>
+  # C0 (0x00-0x1F), DEL (0x7F) und C1 (0x80-0x9F) dekodiert decode_entities/1
+  # absichtlich nicht: es laeuft NACH strip_controls/1, und eine Dekodierung
+  # schleuste die gerade entfernten Steuerzeichen erneut ein (&#155; waere
+  # wieder U+009B, #487). Solche Entities bleiben roh stehen — inert als
+  # Klartext, unescaped wie unbekannte Entities.
+  defp codepoint(n) when n in 0x20..0x7E, do: <<n::utf8>>
+
+  defp codepoint(n) when n in 0xA0..0xD7FF or n in 0xE000..0x10FFFF, do: <<n::utf8>>
   defp codepoint(_), do: nil
 
   # JSON verlangt UTF-8; Altbestaende in Latin-1 werden umkodiert.

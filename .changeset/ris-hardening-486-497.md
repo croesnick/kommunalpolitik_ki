@@ -13,9 +13,12 @@ Regex, die bei großen Blöcken in der Engine entgleiste, und die Frist des Aufr
 vor jedem Block geprüft — ein feindliches RIS kann den Connector damit nicht mehr
 minutenlang auf CPU festnageln.
 
-Aus allen RIS-Feldern verschwinden Steuerzeichen (C0/C1, wie `KomkiCli.Terminal`), und
-Nummer, Titel, Sitzung und Block-Überschriften werden auf 1 000 Zeichen mit „…"-Marker
-gekappt — Sequenzen aus Tagesordnungstexten können keine Terminal-Ausgaben mehr fälschen.
+Aus allen RIS-Feldern verschwinden Steuerzeichen (C0/C1; ein einzelnes CR kollabiert dabei
+wie bisher zu einem Leerzeichen, statt Wörter zu verkleben), und Zahl-Entities auf
+Steuerzeichen — etwa `&#155;` für CSI — werden nicht dekodiert, sondern bleiben als Klartext
+stehen. Nummer, Titel, Sitzung und Block-Überschriften werden auf 1 000 Zeichen mit
+„…"-Marker gekappt — Sequenzen aus Tagesordnungstexten können keine Terminal-Ausgaben mehr
+fälschen.
 
 `url` in Treffern, `ris show`, `ris sessions` und `ris agenda` zeigt jetzt auf die
 Weboberfläche des RIS statt auf den API-Endpunkt, der im Browser nicht auflöst: Sitzungen

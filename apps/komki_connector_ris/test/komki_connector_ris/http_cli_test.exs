@@ -156,6 +156,31 @@ defmodule KomkiConnectorRis.HttpCliTest do
       assert Top.string("\u009B") == ""
     end
 
+    test "Zahl-Entities schleusen keine Steuerzeichen nach dem Strip ein (#487)" do
+      # decode_entities laeuft NACH strip_controls: &#155;/&#x9B;/&#127; wuerden
+      # sonst CSI/DEL zurueckbringen (Entity-Bypass des Strips). Die Entities
+      # bleiben roh stehen — inert als Klartext, unescaped wie unbekannte.
+      content = Base.encode64("<p>&#155;[99mFarbe und &#127; und &#x9B; und &#0155;</p>")
+
+      assert {:ok, text} = Top.text(%{"textblocks" => [%{"content" => content}]})
+
+      refute text =~ "\u009B"
+      refute text =~ "\u007F"
+      assert text == "&#155;[99mFarbe und &#127; und &#x9B; und &#0155;"
+    end
+
+    test "CR bleibt kein Rohzeichen und klebt keine Woerter (#487)" do
+      # Lone CR kollabiert wie in der alten Pipeline zu einem Leerzeichen,
+      # \r\n bleibt ein Zeilenende (\n bleibt wie bisher).
+      assert {:ok, "a b"} = Top.text(%{"textblocks" => [%{"content" => Base.encode64("a\rb")}]})
+
+      assert {:ok, "Eins Zwei"} =
+               Top.text(%{"textblocks" => [%{"content" => Base.encode64("Eins\r\nZwei")}]})
+
+      assert Top.string("Antrag\rdraft") == "Antrag draft"
+      assert Top.string("Antrag\r\nDraft") == "Antrag\nDraft"
+    end
+
     test "Feldlaengen kappen mit Marker, Bytes sind keine Zeichen (#487)" do
       assert Top.string(String.duplicate("T", 1_000)) == String.duplicate("T", 1_000)
       assert Top.string(String.duplicate("T", 1_001)) == String.duplicate("T", 1_000) <> "…"

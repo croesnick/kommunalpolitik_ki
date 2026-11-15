@@ -405,11 +405,15 @@ Befund (keine Sitzung am Tag, Lesefehler, ungelöste Entities), 2 Aufruf falsch.
   (`&shy;`, `&#173;`) sind Layout, kein Text, und entfallen in jeder Schreibweise. Dekodiert werden
   nur die Inhalte der Textblöcke — Titel und Block-Überschriften bleiben, wie das RIS sie liefert.
 - **RIS-Text ist Angreifer-text (#487, Restrisiko).** Der Connector entfernt C0/C1-Steuerzeichen
-  aus allen Feldern, kapt Kurzfelder auf 1 000 Zeichen und lehnt Textblöcke über dem Byte-Budget
-  als `upstream-error` ab (#486/#497). Was bleibt: Anweisungen in öffentlichem RIS-Text erreichen
-  das Modell weiterhin als Daten und können es im Raum steuern; die Wirkung an der Grenze stoppt
-  Γ. Die Rahmung als untrusted (Provenanz-Delimiter, Sitzungs-Prompt-Politik) ist Vermittler-
-  Arbeit und steht als Entwurf im Ticket #487.
+  aus allen Feldern. CR normalisiert er dabei statt es zu verschlucken: Ein einzelnes CR wird zum
+  Leerzeichen (wie bisher, Wörter kleben nicht), `\r\n` bleibt ein Zeilenende. Zahl-Entities auf
+  Steuerzeichen (etwa `&#155;` für CSI oder `&#127;` für DEL) dekodiert er nicht — sie bleiben
+  als Klartext stehen und umgehen den Strip nicht. Kurzfelder kapt er auf 1 000 Zeichen, und
+  Textblöcke über dem Byte-Budget lehnt er als `upstream-error` ab (#486/#497). Was bleibt:
+  Anweisungen in öffentlichem RIS-Text erreichen das Modell weiterhin als Daten und können es im
+  Raum steuern; die Wirkung an der Grenze stoppt Γ. Die Rahmung als untrusted
+  (Provenanz-Delimiter, Sitzungs-Prompt-Politik) ist Vermittler-Arbeit und steht als Entwurf im
+  Ticket #487.
 - Der Mock ignoriert das Zeitfenster (`from`/`until`) und liefert immer alle Sitzungen.
 
 ## Entwicklung

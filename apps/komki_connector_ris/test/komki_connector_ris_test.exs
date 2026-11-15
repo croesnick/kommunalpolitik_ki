@@ -265,7 +265,8 @@ defmodule KomkiConnectorRisTest do
         "nr" => "9",
         "name" => "Antrag \u001B[31mrot\u009B",
         "restricted" => false,
-        "text" => "Sachverhalt mit \u001B[31mFarbe\u001B[0m und \u009B99m Ende."
+        "text" =>
+          "Sachverhalt mit \u001B[31mFarbe\u001B[0m und \u009B99m Ende. Per Entity: &#155;[99m und &#127;."
       })
 
       assert {:ok, top} = show(path, "1001-9")
@@ -275,6 +276,11 @@ defmodule KomkiConnectorRisTest do
       refute top["text"] =~ "\u001B"
       refute top["text"] =~ "\u009B"
       assert top["text"] =~ "Farbe"
+
+      # Zweiter Kanal desselben Angriffs: Zahl-Entities (decode_entities
+      # laeuft nach dem Strip). Sie bleiben roh stehen — inert als Klartext.
+      refute top["text"] =~ "\u007F"
+      assert top["text"] =~ "Per Entity: &#155;[99m und &#127;."
     end
 
     test "show dekodiert benannte Entities, unbekannte bleiben roh stehen", %{
