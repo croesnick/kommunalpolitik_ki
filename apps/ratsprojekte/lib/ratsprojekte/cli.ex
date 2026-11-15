@@ -14,10 +14,11 @@ defmodule Ratsprojekte.CLI do
       ratsprojekte recover           seal the key again from the recovery code
 
   `run/4` returns `{text, exit code}`; `main/1` prints and halts. `io`
-  replaces the outside world in tests (`:browser`, `:gets`, `:launchagent`).
+  replaces the outside world in tests (`:browser`, `:gets`, `:launchagent`,
+  `:secret`).
   """
 
-  alias Ratsprojekte.{LaunchAgent, Ort, Schluessel}
+  alias Ratsprojekte.{LaunchAgent, Ort, Prompt, Schluessel}
 
   @adresse "http://localhost:4100"
 
@@ -105,13 +106,17 @@ defmodule Ratsprojekte.CLI do
   end
 
   def run(["recover"], home, provider, io) do
-    gets = Keyword.get(io, :gets, &IO.gets/1)
     db = Ort.datenbank(home)
+    # Ticket #492: the code is the database's master key — it is read with
+    # the echo suppressed (Ratsprojekte.Prompt.secret/1), never with the
+    # plain `IO.gets/1` echo, and not at all without a terminal.
+    secret = Keyword.get(io, :secret, &Prompt.secret/1)
 
     with true <-
            File.exists?(db) ||
              {:error, "keine Datenbank: erst ratsprojekte.db aus Time Machine zurückholen"},
-         {:ok, key} <- Schluessel.aus_code(to_string(gets.("Wiederherstellungscode: "))),
+         {:ok, code} <- secret.("Wiederherstellungscode: "),
+         {:ok, key} <- Schluessel.aus_code(code),
          :ok <- Schluessel.pruefen(key, db),
          :ok <- Schluessel.versiegeln(key, home, provider) do
       {"""
@@ -119,8 +124,17 @@ defmodule Ratsprojekte.CLI do
          komki secret erzeugen ratsprojekte-hub | ratsprojekte connector-token
        """, 0}
     else
-      {:error, text} when is_binary(text) -> fehler(text)
-      {:error, reason} -> fehler(Schluessel.beschreiben(reason))
+      {:error, :no_tty} ->
+        fehler("kein Terminal: ratsprojekte recover in einem Terminal ausführen")
+
+      {:error, :empty} ->
+        fehler("leere Eingabe; nichts wiederhergestellt")
+
+      {:error, text} when is_binary(text) ->
+        fehler(text)
+
+      {:error, reason} ->
+        fehler(Schluessel.beschreiben(reason))
     end
   end
 
