@@ -20,6 +20,11 @@ defmodule KomkiCli.Tresor.Core do
   Options: `:command` replaces the program (default `binary/0`), `:timeout`
   bounds its runtime, `:provider` replaces the key agreement altogether
   (`{module, opts}`, tests).
+
+  The program runs only with a matching program pin (ticket #489): `run/4`
+  refuses a `komki-tresor` whose recorded pin is missing or mismatched before
+  spawning, mirroring the `up` gate. The pin policy lives in
+  `KomkiCli.Pins.tresor_gate/1`; this is the choke point every spawn passes.
   """
 
   @behaviour SealedEnvelope.KeyAgreement
@@ -38,6 +43,7 @@ defmodule KomkiCli.Tresor.Core do
           | :invalid
           | :outdated
           | :timeout
+          | {:unpinned, String.t()}
           | {:failed, integer()}
 
   @doc "Does `text` claim to be a seal in the current format (and is it not plaintext)?"
@@ -123,6 +129,10 @@ defmodule KomkiCli.Tresor.Core do
   def describe(:outdated), do: "Siegel im alten Format ktv1; Wert neu eingeben"
   def describe(:timeout), do: "keine Freigabe innerhalb von zwei Minuten"
 
+  # Ticket #489: Die Begruendung des Pin-Gates (Doctor-Wortlaut aus
+  # KomkiCli.Pins) kommt unverfaelscht an; der Programmname fehlt dort.
+  def describe({:unpinned, reason}), do: "komki-tresor: " <> reason
+
   def describe({:failed, code}),
     do: "komki-tresor fehlgeschlagen (exit " <> to_string(code) <> ")"
 
@@ -166,13 +176,30 @@ defmodule KomkiCli.Tresor.Core do
        when reason in [:missing_bin, :no_enclave, :refused, :invalid, :timeout],
        do: reason
 
+  defp agreement_error({:unpinned, _reason} = reason), do: reason
   defp agreement_error({:failed, _code} = reason), do: reason
   defp agreement_error(_reason), do: :invalid
 
   defp run(args, input, timeout, opts) do
     case Keyword.get_lazy(opts, :command, &binary/0) do
-      nil -> {:error, :missing_bin}
-      command -> spawn(command, args, input, timeout)
+      nil ->
+        {:error, :missing_bin}
+
+      command ->
+        with :ok <- gate(command) do
+          spawn(command, args, input, timeout)
+        end
+    end
+  end
+
+  # Ticket #489: komki-tresor runs only with the recorded program pin; a
+  # planted binary must not seal or open secrets. Every execution passes
+  # here, so the check sits between command resolution and the port — the
+  # program never starts on a refusal.
+  defp gate(command) do
+    case KomkiCli.Pins.tresor_gate(command) do
+      :ok -> :ok
+      {:error, reason} -> {:error, {:unpinned, reason}}
     end
   end
 

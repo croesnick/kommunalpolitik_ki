@@ -5,7 +5,10 @@ defmodule KomkiCli.TresorTest do
   Schluesselbund werden nie gefragt.
   """
 
-  use ExUnit.Case, async: true
+  # async: false (Ticket #489): Die Pin-Gate-Tests setzen KOMKI_HOME und die
+  # Application-Env `:tresor_pin` global; andere Tests desselben Laufs lesen
+  # beides.
+  use ExUnit.Case, async: false
 
   alias KomkiCli.{Secrets, TestSupport, Tresor}
   alias KomkiCli.Tresor.Core
@@ -60,6 +63,17 @@ defmodule KomkiCli.TresorTest do
   end
 
   defp provider!, do: {FileTestDouble, path: Path.join(TestSupport.tmp_area!("komki-key"), "key")}
+
+  # Ticket #489: Der Pin-Gate (KomkiCli.Pins.tresor_gate/1) prueft jedes
+  # Ausfuehren, auch das expliziter `:command`-Fakes. Tests, die ihr eigenes
+  # ProgrammSkript starten, pinnen es hier; sonst verweigert der Gate.
+  defp pin!(command) do
+    previous = Application.get_env(:komki_cli, :tresor_pin)
+    {:ok, sha} = KomkiCli.Pins.hash(command)
+
+    Application.put_env(:komki_cli, :tresor_pin, %{"path" => command, "sha256" => sha})
+    on_exit(fn -> Application.put_env(:komki_cli, :tresor_pin, previous) end)
+  end
 
   defmodule Refusing do
     @moduledoc "Provider that hands out a real key but always answers with `opts[:error]`."
@@ -130,6 +144,7 @@ defmodule KomkiCli.TresorTest do
 
     test "Klartext und Siegel erreichen das Programm nicht, der Grund geht ueber argv" do
       {cmd, dir} = recording_tresor!()
+      pin!(cmd)
 
       assert {:ok, sealed} = Tresor.seal(@kanarie, command: cmd)
       assert {:ok, @kanarie} = Tresor.open(sealed, "Der Grund", command: cmd)
@@ -152,10 +167,12 @@ defmodule KomkiCli.TresorTest do
 
       for {code, error} <- [{3, :no_enclave}, {4, :refused}, {5, :invalid}, {9, {:failed, 9}}] do
         cmd = script!("tresor", "read -r v; exit #{code}")
+        pin!(cmd)
         assert {:error, ^error} = Tresor.open(sealed, "Test", command: cmd)
       end
 
       cmd = script!("tresor", "exit 3")
+      pin!(cmd)
       assert {:error, :no_enclave} = Tresor.seal(@kanarie, command: cmd)
     end
 
@@ -164,10 +181,13 @@ defmodule KomkiCli.TresorTest do
 
       for out <- ["kein-base64!", Base.encode64("zu kurz")] do
         cmd = script!("tresor", "read -r v; echo '#{out}'")
+        pin!(cmd)
         assert {:error, :invalid} = Tresor.open(sealed, "Test", command: cmd)
       end
 
-      assert {:error, :invalid} = Tresor.seal(@kanarie, command: script!("tresor", "echo kaputt"))
+      cmd = script!("tresor", "echo kaputt")
+      pin!(cmd)
+      assert {:error, :invalid} = Tresor.seal(@kanarie, command: cmd)
     end
 
     test "Klartext wird nicht als Siegel geoeffnet, das Programm laeuft nicht" do
@@ -185,6 +205,7 @@ defmodule KomkiCli.TresorTest do
     test "Timeout beendet das Programm (keine Freigabe)" do
       {:ok, sealed} = Tresor.seal(@kanarie)
       cmd = script!("tresor", "exec sleep 30")
+      pin!(cmd)
       assert {:error, :timeout} = Tresor.open(sealed, "Test", command: cmd, timeout: 300)
     end
 
@@ -192,6 +213,156 @@ defmodule KomkiCli.TresorTest do
       assert :ok = Core.check(script!("tresor", "exit 0"))
       assert {:error, :no_enclave} = Core.check(script!("tresor", "exit 3"))
       assert {:error, {:failed, 9}} = Core.check(script!("tresor", "exit 9"))
+    end
+  end
+
+  # Ticket #489: komki-tresor laeuft nur mit passendem Programmpin — wie der
+  # Doctor-Pin beim `up`, aber vor dem Ausfuehren. Der Gate liest den Pin aus
+  # der config.json der Wegwerf-Basis (KOMKI_HOME), der Productivweg ohne
+  # Test-Seams; das Suite-Fake aus test_helper.exs steht dazu nicht in der
+  # Application-Env.
+  describe "Programmpin vor der Ausfuehrung (Ticket #489)" do
+    setup do
+      previous_pin = Application.get_env(:komki_cli, :tresor_pin)
+      home = TestSupport.tmp_area!("komki-pin-home")
+
+      Application.delete_env(:komki_cli, :tresor_pin)
+      System.put_env("KOMKI_HOME", home)
+
+      on_exit(fn ->
+        System.delete_env("KOMKI_HOME")
+        Application.put_env(:komki_cli, :tresor_pin, previous_pin)
+      end)
+
+      {:ok, home: home}
+    end
+
+    # Wegwerf-Basis mit config.json, die genau den komki-tresor-Pin haelt.
+    defp pin_home!(home, pin) do
+      home
+      |> TestSupport.fixture_cfg()
+      |> then(&%{&1 | pins: pin})
+      |> KomkiCli.Config.save()
+    end
+
+    # Gepflanztes komki-tresor (#489): schreibt eine Marke und spricht sonst
+    # das echte Protokoll (support/fake_tresor.exs). Die Marke beweist die
+    # Ausfuehrung, das Siegel den Erfolg des Angriffs.
+    defp planted! do
+      dir = TestSupport.tmp_area!("komki-pin-pflanz")
+      fake = Path.join(dir, "komki-tresor")
+      marker = Path.join(dir, "marke")
+
+      File.write!(fake, """
+      #!/bin/sh
+      echo ausgefuehrt >> #{marker}
+      PATH='#{System.get_env("PATH")}' exec elixir #{Path.expand("../support/fake_tresor.exs", __DIR__)} "$@"
+      """)
+
+      File.chmod!(fake, 0o755)
+      {fake, marker}
+    end
+
+    test "gepflanztes komki-tresor im Pfad versiegelt nichts: Verweigerung vor dem Start", %{
+      home: home
+    } do
+      {fake, marker} = planted!()
+
+      # Die config.json haelt einen anderen Programmstand fest (falscher Pin).
+      pin_home!(home, %{
+        "komki-tresor" => %{
+          "path" => KomkiCli.Config.canonical(fake),
+          "sha256" => String.duplicate("ab", 32)
+        }
+      })
+
+      # Der Angriff: komki findet das Programm im Pfad, ohne Test-Seam.
+      tresor_env = Application.get_env(:komki_cli, :tresor)
+      path_env = System.get_env("PATH")
+      Application.delete_env(:komki_cli, :tresor)
+      System.put_env("PATH", Path.dirname(fake) <> ":" <> path_env)
+
+      on_exit(fn ->
+        Application.put_env(:komki_cli, :tresor, tresor_env)
+        System.put_env("PATH", path_env)
+      end)
+
+      assert {:error, {:unpinned, reason}} = Tresor.seal(@kanarie)
+      assert reason =~ "verändert seit dem Festhalten"
+      assert reason =~ "komki setup"
+      # Verweigert VOR dem Start: Das Programm lief nie, keine Marke.
+      refute File.exists?(marker)
+    end
+
+    test "ohne festgehaltenen Pin wird verweigert", %{home: home} do
+      {fake, marker} = planted!()
+      pin_home!(home, %{})
+
+      assert {:error, {:unpinned, reason}} = Tresor.seal(@kanarie, command: fake)
+      assert reason =~ "nicht festgehalten"
+      refute File.exists?(marker)
+    end
+
+    test "Programm an anderem Pfad wird verweigert", %{home: home} do
+      {fake, marker} = planted!()
+      {:ok, sha} = KomkiCli.Pins.hash(fake)
+
+      pin_home!(home, %{
+        "komki-tresor" => %{"path" => "/usr/local/bin/komki-tresor", "sha256" => sha}
+      })
+
+      assert {:error, {:unpinned, reason}} = Tresor.seal(@kanarie, command: fake)
+      assert reason =~ "neuer Pfad"
+      refute File.exists?(marker)
+    end
+
+    test "ohne config.json (nie eingerichtet) wird verweigert" do
+      {fake, marker} = planted!()
+
+      assert {:error, {:unpinned, reason}} = Tresor.seal(@kanarie, command: fake)
+      assert reason =~ "config"
+      refute File.exists?(marker)
+    end
+
+    test "passender Pin: das Programm laeuft und versiegelt", %{home: home} do
+      {fake, marker} = planted!()
+      {:ok, sha} = KomkiCli.Pins.hash(fake)
+      pin_home!(home, %{"komki-tresor" => %{"path" => fake, "sha256" => sha}})
+
+      assert {:ok, sealed} = Tresor.seal(@kanarie, command: fake)
+      assert Tresor.sealed?(sealed)
+      assert File.exists?(marker)
+    end
+
+    test "Secrets.store meldet die Pin-Verweigerung mit klarem Text", %{home: home} do
+      suite = Application.fetch_env!(:komki_cli, :tresor)
+      {kc, _dir} = keychain!("alter-wert")
+
+      pin_home!(home, %{
+        "komki-tresor" => %{"path" => suite, "sha256" => String.duplicate("ab", 32)}
+      })
+
+      assert {:error, {:tresor, {:unpinned, reason}}} =
+               Secrets.store(@entry, @kanarie, command: kc)
+
+      text = Secrets.describe(@entry.service, {:tresor, {:unpinned, reason}})
+      assert text =~ "komki-tresor"
+      assert text =~ "komki setup"
+    end
+
+    test "Application-Env ersetzt den Config-Lookup (Test-Seam)", %{home: home} do
+      {fake, marker} = planted!()
+
+      pin_home!(home, %{
+        "komki-tresor" => %{"path" => fake, "sha256" => String.duplicate("ab", 32)}
+      })
+
+      {:ok, sha} = KomkiCli.Pins.hash(fake)
+      Application.put_env(:komki_cli, :tresor_pin, %{"path" => fake, "sha256" => sha})
+
+      assert {:ok, sealed} = Tresor.seal(@kanarie, command: fake)
+      assert Tresor.sealed?(sealed)
+      assert File.exists?(marker)
     end
   end
 

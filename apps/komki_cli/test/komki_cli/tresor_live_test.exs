@@ -25,6 +25,24 @@ defmodule KomkiCli.TresorLiveTest do
 
   alias KomkiCli.Tresor.Core
 
+  # Ticket #489: Der Pin-Gate prueft jedes Ausfuehren. Diese Gegenprobe
+  # laeuft aus einem Checkout heraus (priv-Programm), nicht aus der
+  # eingerichteten Instanz, deshalb pinnt sie ihr Programm ueber die
+  # Application-Env — wie es test_helper.exs fuer das Suite-Fake tut; der
+  # Productivlauf liest den Pin aus der config.json der Instanz.
+  setup do
+    command = Path.join(:code.priv_dir(:komki_cli), "komki-tresor")
+    previous = Application.get_env(:komki_cli, :tresor_pin)
+
+    if File.exists?(command) do
+      {:ok, sha} = KomkiCli.Pins.hash(command)
+      Application.put_env(:komki_cli, :tresor_pin, %{"path" => command, "sha256" => sha})
+    end
+
+    on_exit(fn -> Application.put_env(:komki_cli, :tresor_pin, previous) end)
+    :ok
+  end
+
   test "seals and opens a canary through the Secure Enclave" do
     command = Path.join(:code.priv_dir(:komki_cli), "komki-tresor")
 

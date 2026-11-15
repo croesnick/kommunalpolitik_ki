@@ -37,6 +37,17 @@ PATH='#{System.get_env("PATH")}' exec elixir #{Path.expand("support/fake_tresor.
 File.chmod!(fake_tresor, 0o755)
 Application.put_env(:komki_cli, :tresor, fake_tresor)
 
+# Ticket #489: Der Pin-Gate (KomkiCli.Pins.tresor_gate/1) prueft jedes
+# Ausfuehren von komki-tresor gegen den festgehaltenen Pin. Tests pinnen das
+# Suite-Fake hier; der Productivlauf liest ihn aus der config.json der Instanz
+# (KOMKI_HOME). Wer den Config-Weg prueft, loescht diese Env (tresor_test).
+{:ok, fake_tresor_sha} = KomkiCli.Pins.hash(fake_tresor)
+
+Application.put_env(:komki_cli, :tresor_pin, %{
+  "path" => fake_tresor,
+  "sha256" => fake_tresor_sha
+})
+
 # Ticket #509: Der Fake-Tresor ist eine Wegwerf-Datei im TMPDIR, das sich
 # alle Sessions des Kontos teilen; nach dem Lauf wird sie entfernt.
 ExUnit.after_suite(fn _suite -> File.rm_rf(fake_tresor) end)
