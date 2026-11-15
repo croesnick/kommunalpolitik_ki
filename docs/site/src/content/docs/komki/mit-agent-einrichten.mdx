@@ -48,7 +48,7 @@ Start verweigert: nicht grün: pin komki — 'komki doctor' nennt die Gründe
 - **Lange Befehle im Hintergrund laufen lassen.** `asdf install erlang` baut Erlang aus den Quellen, der Modell-Download hat 17 GB (dazu 0,5 GB MTP-Drafter). Beides dauert länger als übliche Zeitgrenzen für einen Befehl.
 - **Kein neues Terminal nötig nach `pnpm setup`.** In derselben Shell weiter mit `export PNPM_HOME="$HOME/Library/pnpm"` und `export PATH="$PNPM_HOME:$PATH"`.
 - **`komki session` nicht starten.** Die Session ist interaktiv und gehört der Person. Prüfen kannst du mit `komki run`, `komki status` und `komki journal verify`.
-- **Bei `komki run` stdout und stderr zusammen durch eine Pipe leiten** (`2>&1 | cat`). Hängt die Ausgabe an keinem Terminal, bricht pi sonst ab ([#135](https://github.com/croesnick/kommunalpolitik_ki/issues/135)).
+- **`komki run` direkt aufrufen.** Auch ohne Terminal — Ausgabe in eine Datei, in Pipes oder im Hintergrund — bricht pi nicht mehr ab ([#135](https://github.com/croesnick/kommunalpolitik_ki/issues/135) ist gefixt).
 - **Nichts entfernen.** Den Abschnitt „komki ganz entfernen“ auf der Anleitungsseite nur auf ausdrücklichen Wunsch der Person ausführen.
 
 ## Der Erfolgsnachweis
@@ -56,7 +56,7 @@ Start verweigert: nicht grün: pin komki — 'komki doctor' nennt die Gründe
 Die Einrichtung ist fertig, wenn alle drei Prüfungen stimmen:
 
 1. `komki setup --demo` endet mit `Prüfung     doctor ok`.
-2. `komki run "Was steht im RIS zum Radverkehrskonzept?" 2>&1 | cat` liefert eine Antwort mit Quellen.
+2. `komki run "Was steht im RIS zum Radverkehrskonzept?"` liefert eine Antwort mit Quellen.
 3. `komki journal verify` meldet `Journal ok: … Einträge, lückenlos verkettet und unverändert`.
 
 Danach übergibt der Agent an dich: `komki session` startest du selbst.
