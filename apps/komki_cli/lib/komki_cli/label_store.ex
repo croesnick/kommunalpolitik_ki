@@ -1268,8 +1268,16 @@ WHERE object_id = ? AND version = ? ORDER BY id",
   # Schema sicherstellen, fun ausfuehren, Verbindung schliessen. Jede
   # Oeffnung gilt Tabelle + Foreign-Key-PRAGMA neu (per-Connection).
   defp with_conn(db_path, fun) when is_function(fun, 1) do
-    :ok = prepare_store(db_path)
+    case prepare_store(db_path) do
+      :ok ->
+        open_conn(db_path, fun)
 
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp open_conn(db_path, fun) do
     case Sqlite3.open(db_path) do
       {:ok, conn} ->
         result =
@@ -1291,35 +1299,65 @@ WHERE object_id = ? AND version = ? ORDER BY id",
     end
   end
 
-  # Store-Datei und Verzeichnis haerten wie ihre Schwestern (Token,
+  # Store-Datei und Begleitdateien haerten wie ihre Schwestern (Token,
   # Denials, Schluessel; Ticket #500, Fund F33/F34): exklusiv anlegen und
   # chmod VOR Sqlite3.open — SQLite erzeugt fehlende Dateien sonst mit
   # umask-Default, und der Store traegt das komplette Sicherheitsmodell
   # samt Entscheidungs-Historie. Vorhandene zu offene Rechte werden
   # korrigiert, wie es ensure_run_dirs! fuer die Verzeichnisse tut (#498).
+  #
+  # Das Elternverzeichnis bleibt unangetastet (Review zu #500): --db ist
+  # eine freie Pfadnaht (cli.ex db_opt) — ein beliebiges Verzeichnis nur
+  # deshalb auf 0700 zu ziehen, weil ein Store darin liegt, greift neben
+  # die Instanz hinaus (Not-Owner-Crash, stille Rechteaenderung fremder
+  # Verzeichnisse). Die Instanzbasis haertet stattdessen Gamma.sync.
+  # Schlaegt ein chmod fehl (z. B. fremde Datei), wird der Store nicht
+  # geoeffnet, sondern der Fehler gemeldet — kein Crash.
   defp prepare_store(db_path) do
-    dir = Path.dirname(db_path)
-    File.mkdir_p!(dir)
-    File.chmod!(dir, 0o700)
+    File.mkdir_p!(Path.dirname(db_path))
 
+    with :ok <- ensure_file(db_path) do
+      harden_companions(db_path)
+    end
+  end
+
+  # Exklusiv anlegen oder vorhandene Datei korrigierend haerten; kann
+  # Sqlite3 die Datei nicht einmal anfassen, meldet Sqlite3.open den
+  # fachlichen Grund (z. B. eisdir).
+  defp ensure_file(db_path) do
     case File.open(db_path, [:write, :exclusive]) do
       {:ok, fd} ->
         :ok = File.close(fd)
-        File.chmod!(db_path, 0o600)
+        harden(db_path)
 
       {:error, :eexist} ->
-        File.chmod!(db_path, 0o600)
+        harden(db_path)
 
       {:error, _reason} ->
-        # Sqlite3.open meldet den fachlichen Grund (z. B. eisdir).
         :ok
     end
+  end
 
-    for suffix <- @companions, companion = db_path <> suffix, File.exists?(companion) do
-      File.chmod!(companion, 0o600)
+  defp harden_companions(db_path) do
+    Enum.reduce_while(@companions, :ok, fn suffix, :ok ->
+      companion = db_path <> suffix
+
+      case harden_if_exists(companion) do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp harden_if_exists(path) do
+    if File.exists?(path), do: harden(path), else: :ok
+  end
+
+  defp harden(path) do
+    case File.chmod(path, 0o600) do
+      :ok -> :ok
+      {:error, reason} -> {:error, "chmod " <> path <> ": " <> db_error(reason)}
     end
-
-    :ok
   end
 
   # SELECT: prepare + bind + step-Schleife; Statement freigeben.

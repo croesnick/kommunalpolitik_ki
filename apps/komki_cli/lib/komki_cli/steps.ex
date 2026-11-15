@@ -89,7 +89,9 @@ defmodule KomkiCli.Steps do
              %{
                llama: pos_integer(),
                connectors: [{String.t(), Connectors.up_state()}],
-               mediator: mediator_state()
+               mediator: mediator_state(),
+               # Store-Migration (#513): Pfad der Sicherung, nil ohne Ersetzung.
+               store: String.t() | nil
              }}
           | {:down,
              %{

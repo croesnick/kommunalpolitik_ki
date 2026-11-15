@@ -13,10 +13,13 @@ weiter ab, und die Meldung nennt den nächsten Schritt (registry.db
 beiseitelegen, setup erneut).
 
 Zugleich entstehen die Zustandsdateien des Vermittlers und des Label-Stores
-nur noch für die Eigentümerin lesbar: `mediator/`, `go/`, `journal/` und
-`documents/` mit 0700, registry.db samt Begleitdateien, registry.json,
-room.json, GO-Anfragen, stand.json und das PDR-Journal mit 0600 — wie es
-für run/ und die Token bereits galt. Der RIS-Mock härtet sein
+nur noch für die Eigentümerin lesbar: die Instanzbasis, `mediator/`, `go/`,
+`journal/` und `documents/` mit 0700, registry.db samt Begleitdateien,
+registry.json, room.json, GO-Anfragen, stand.json und das PDR-Journal mit
+0600 — wie es für run/ und die Token bereits galt. Vorhandene zu offene
+Rechte werden beim nächsten Start korrigiert. Ein über `--db` frei gewählter
+Store-Pfad härtet nur seine eigenen Dateien und lässt das umgebende
+Verzeichnis unangetastet. Der RIS-Mock härtet sein
 Zustandsverzeichnis genauso (0700/0600) und verweigert für Replay-Kassetten
 ein `--dir` innerhalb eines Git-Repos, wie es der Recorder für seine
 Kassetten schon tut.

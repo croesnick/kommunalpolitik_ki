@@ -39,7 +39,8 @@ defmodule KomkiCli.Gamma do
     db = db_path(cfg)
     path = registry_path(cfg)
 
-    with {:ok, _counts} <-
+    with :ok <- harden_base(cfg),
+         {:ok, _counts} <-
            LabelStore.import_registry(db, KomkiMediator.Templates.label_store_seed()),
          {:ok, export} <- LabelStore.export(db),
          {:ok, term} <- parse(export) do
@@ -73,6 +74,20 @@ defmodule KomkiCli.Gamma do
 
     File.chmod!(path, 0o600)
     File.write!(path, json)
+  end
+
+  # Die Instanzbasis haerten wie mediator/ (Ticket #500, Fund: „consider
+  # 0700 for <base>“): Der Store-Unterbau haertet nur Dateien und nie
+  # Verzeichnisse — --db ist eine freie Pfadnaht —, deshalb sitzt die
+  # Basis-Haertung hier, wo die Instanz gemeint ist. Korrigierend wie
+  # write_export: vorhandene 0755-Basen heilen beim naechsten Lauf.
+  defp harden_base(%Config{base_dir: base}) do
+    case File.chmod(base, 0o700) do
+      :ok -> :ok
+      # Ohne Basis legt der Import sie an; die naechste Sync haertet sie.
+      {:error, :enoent} -> :ok
+      {:error, reason} -> {:error, "chmod " <> base <> ": " <> Kernel.inspect(reason)}
+    end
   end
 
   # Abweichende Registrierungen (R.2.1) ohne Migrationsweg brauchen den

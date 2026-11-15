@@ -111,6 +111,17 @@ defmodule KomkiCli.GammaTest do
     assert mode(Gamma.registry_path(cfg)) == 0o600
   end
 
+  # Review zu #500: Die Basis haertet Gamma.sync (korrigierend), nicht
+  # LabelStore.with_conn — --db ist eine freie Pfadnaht und darf
+  # beliebige Verzeichnisse nie auf 0700 ziehen.
+  test "Instanzbasis wird korrigierend auf 0700 gehärtet (#500)", %{cfg: cfg} do
+    File.chmod!(cfg.base_dir, 0o755)
+
+    assert :written = Gamma.sync(cfg)
+
+    assert mode(cfg.base_dir) == 0o700
+  end
+
   defp mode(path) do
     {:ok, stat} = File.stat(path)
     Bitwise.band(stat.mode, 0o777)
