@@ -62,6 +62,10 @@ defmodule KomkiConnectorRis do
 
   @defaults %{
     base_url: "https://risapi3.komuna.net/web/",
+    # Web base of the RIS UI that the results link to (#518); the mandant
+    # is part of the base. The link schema was verified against the real
+    # UI (owner comment in #518, 2026-11-14).
+    web_base_url: "https://ris.komuna.net/vgbuchloe/",
     proxy: nil,
     # Einzelanfrage und Gesamtfrist bleiben unter den 15 s des Vermittlers.
     timeout_ms: 5_000,
@@ -72,6 +76,12 @@ defmodule KomkiConnectorRis do
   }
 
   @not_found {:error, "not-found", "TOP nicht gefunden"}
+
+  # The text budgets and the call deadline apply to text processing, too
+  # (#486): an oversized or late text block ends the operation with the
+  # same closed codes as an upstream failure.
+  @budget_error {:error, "upstream-error", "RIS-Textblöcke übersteigen das Byte-Budget"}
+  @deadline_error {:error, "upstream-timeout", "Frist des Aufrufs abgelaufen"}
 
   @doc "Standardwerte der Konfiguration."
   @spec defaults() :: map()
@@ -232,18 +242,27 @@ defmodule KomkiConnectorRis do
 
   defp scan_text(top, meeting, acc, cfg) do
     case Api.agendaitem(cfg, top["id"]) do
-      {:ok, detail} ->
-        if public_detail?(detail) and matches?(Top.text(detail), acc.needle),
-          do: {:ok, hit(acc, top, meeting, cfg)},
-          else: {:ok, acc}
-
-      :not_found ->
-        {:ok, acc}
-
-      {:error, _, _} = e ->
-        e
+      {:ok, detail} -> scan_detail(detail, top, meeting, acc, cfg)
+      :not_found -> {:ok, acc}
+      {:error, _, _} = e -> e
     end
   end
+
+  defp scan_detail(detail, top, meeting, acc, cfg) do
+    with true <- public_detail?(detail),
+         {:ok, text} <- Top.text(detail, remaining(cfg)) do
+      if matches?(text, acc.needle),
+        do: {:ok, hit(acc, top, meeting, cfg)},
+        else: {:ok, acc}
+    else
+      false -> {:ok, acc}
+      {:error, :budget} -> @budget_error
+      {:error, :deadline} -> @deadline_error
+    end
+  end
+
+  # Api.remaining also guards text processing, not only HTTP (#486).
+  defp remaining(cfg), do: fn -> Api.remaining(cfg) end
 
   defp full?(acc), do: length(acc.hits) >= acc.limit
   defp stop?(acc, cfg), do: full?(acc) or acc.left <= 0 or Api.remaining(cfg) == 0
@@ -278,7 +297,8 @@ defmodule KomkiConnectorRis do
          {:ok, meeting} <- Api.meeting(Map.put(cfg, :token, nil), meeting_id),
          {:ok, top} <- find_public(meeting, top_id),
          {:ok, detail} <- Api.agendaitem(cfg, top_id),
-         true <- public_detail?(detail) do
+         true <- public_detail?(detail),
+         {:ok, text} <- Top.text(detail, remaining(cfg)) do
       {:ok,
        %{
          "top_id" => top_id,
@@ -286,12 +306,14 @@ defmodule KomkiConnectorRis do
          "titel" => Top.string(top["name"]),
          "sitzung" => Top.string(meeting["name"]),
          "datum" => Top.date(meeting["meetingdate"]),
-         "text" => Top.text(detail),
+         "text" => text,
          "url" => url(cfg, top_id),
          "abrufdatum" => abrufdatum()
        }}
     else
       {:error, _, _} = e -> e
+      {:error, :budget} -> @budget_error
+      {:error, :deadline} -> @deadline_error
       _ -> @not_found
     end
   end
@@ -417,9 +439,22 @@ defmodule KomkiConnectorRis do
 
   # ---------------------------------------------------------------------------
 
-  # Link aus Basis-URL und gepruefter ID, nie aus Upstream-Freitext.
-  defp url(cfg, top_id), do: cfg.base_url <> "guestagendaitems/" <> top_id
-  defp meeting_url(cfg, sitzung_id), do: cfg.base_url <> "guestmeetings/" <> sitzung_id
+  # Link to the web UI instead of the API endpoint (#518), built from the
+  # web base and the checked ID only, never from upstream text (same rule
+  # as the previous url/2). Schema verified against the real UI (owner
+  # comment in #518, 2026-11-14):
+  # https://ris.komuna.net/<mandant>/app/sitzungen/<meeting-id> and
+  # https://ris.komuna.net/<mandant>/app/sitzungen/<meeting-id>/<top-id>.
+  # top_id has the form "<meeting-id>-<item-id>", so the meeting segment
+  # is the part before the first dash.
+  defp url(cfg, top_id) do
+    [meeting_id | _] = String.split(top_id, "-", parts: 2)
+    meeting_url(cfg, meeting_id) <> "/" <> top_id
+  end
+
+  # Session links share the same web base; the session form was verified
+  # in the same owner comment (#518).
+  defp meeting_url(cfg, sitzung_id), do: cfg.web_base_url <> "app/sitzungen/" <> sitzung_id
 
   defp abrufdatum do
     DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()

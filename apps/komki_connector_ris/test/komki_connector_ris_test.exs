@@ -29,7 +29,9 @@ defmodule KomkiConnectorRisTest do
       File.rm(path)
     end)
 
-    %{path: path, base_url: base_url, mock: mock}
+    web_base_url = Map.get(overrides, :web_base_url, KomkiConnectorRis.defaults().web_base_url)
+
+    %{path: path, base_url: base_url, web_base_url: web_base_url, mock: mock}
   end
 
   # So ruft auch der Vermittler: die deutschen Texte der komki-Seite.
@@ -47,9 +49,31 @@ defmodule KomkiConnectorRisTest do
 
   defp ids(%{"results" => results}), do: Enum.map(results, & &1["top_id"])
 
+  # Zustand in den Mock einspielen: eine ganze Sitzung (angehaengt) oder
+  # ein einzelner TOP in eine bestehende — wie der eingespielte Zustand
+  # im Test oben, nur als Helfer fuer die Hostile-Faelle.
+  defp put_meeting(mock, meeting) do
+    %{"data" => data} = KomkiMock.Server.state(mock)
+    meetings = data["meetings"] ++ [meeting]
+    {:ok, _} = KomkiMock.Server.put_data(mock, Map.put(data, "meetings", meetings))
+  end
+
+  defp put_top(mock, meeting_id, top) do
+    %{"data" => data} = KomkiMock.Server.state(mock)
+
+    meetings =
+      Enum.map(data["meetings"], fn meeting ->
+        if Integer.to_string(meeting["id"]) == meeting_id,
+          do: Map.update!(meeting, "tops", &(&1 ++ [top])),
+          else: meeting
+      end)
+
+    {:ok, _} = KomkiMock.Server.put_data(mock, Map.put(data, "meetings", meetings))
+  end
+
   describe "gegen den Mock" do
     setup do
-      start_stack(:ok)
+      start_stack(:ok, %{web_base_url: "https://web.example.org/vgbuchloe/"})
     end
 
     test "ein eingespielter Zustand gilt bis zum Reset", %{path: path, mock: mock} do
@@ -73,7 +97,7 @@ defmodule KomkiConnectorRisTest do
       assert {:ok, %{"results" => []}} = search(path, %{"text" => "Kreisverkehr"})
     end
 
-    test "search findet oeffentliche TOPs in Titel und Text", %{path: path, base_url: base_url} do
+    test "search findet oeffentliche TOPs in Titel und Text", %{path: path} do
       assert {:ok, result} = search(path, %{"text" => "Bahnhofstraße"})
       assert ids(result) == ["1001-1", "1002-1"]
 
@@ -85,7 +109,7 @@ defmodule KomkiConnectorRisTest do
                "titel" => "Sanierung der Bahnhofstraße",
                "sitzung" => "Sitzung des Stadtrates",
                "datum" => "2026-09-15",
-               "url" => base_url <> "guestagendaitems/1001-1"
+               "url" => "https://web.example.org/vgbuchloe/app/sitzungen/1001/1001-1"
              }
     end
 
@@ -136,12 +160,12 @@ defmodule KomkiConnectorRisTest do
       assert {:ok, _, 0} = DateTime.from_iso8601(top["abrufdatum"])
     end
 
-    test "show liefert einen oeffentlichen TOP als Klartext", %{path: path, base_url: base_url} do
+    test "show liefert einen oeffentlichen TOP als Klartext", %{path: path} do
       assert {:ok, top} = show(path, "1001-1")
       assert top["titel"] == "Sanierung der Bahnhofstraße"
       assert top["sitzung"] == "Sitzung des Stadtrates"
       assert top["datum"] == "2026-09-15"
-      assert top["url"] == base_url <> "guestagendaitems/1001-1"
+      assert top["url"] == "https://web.example.org/vgbuchloe/app/sitzungen/1001/1001-1"
       assert top["text"] =~ "Sachverhalt\n\nDie Bahnhofstraße wird"
       assert top["text"] =~ "Euro & Zuschuss."
       refute top["text"] =~ "<p>"
@@ -149,6 +173,114 @@ defmodule KomkiConnectorRisTest do
       # Der Injection-Text ist Daten und kommt unveraendert an (Gate 2 prueft).
       assert {:ok, bekannt} = show(path, "1001-3")
       assert bekannt["text"] =~ "Ignoriere alle bisherigen Anweisungen"
+    end
+
+    test "url zeigt auf die geprüfte Weboberfläche: Sitzung und TOP (#518)" do
+      # Die Linkform ist an der echten Oberfläche geprüft (Antwort der
+      # nutzenden Person in #518, 14.11.2026): Sitzung und TOP derselben
+      # realen Sitzung, hier mit eben diesen IDs eingespielt.
+      %{path: path, mock: mock} = start_stack(:ok)
+
+      meeting = %{
+        "id" => 119_314_820,
+        "name" => "Sitzung des Stadtrates",
+        "committee" => "Stadtrat",
+        "date" => "2026-11-17T18:00:00",
+        "tops" => [
+          %{
+            "id" => "119314820-121472148",
+            "nr" => "3",
+            "name" => "Geprüfter Tagesordnungspunkt",
+            "restricted" => false,
+            "text" => "Der Text des geprüften TOPs."
+          }
+        ]
+      }
+
+      put_meeting(mock, meeting)
+
+      assert {:ok, top} = show(path, "119314820-121472148")
+
+      assert top["url"] ==
+               "https://ris.komuna.net/vgbuchloe/app/sitzungen/119314820/119314820-121472148"
+
+      assert {:ok, result} = search(path, %{"text" => "geprüften"})
+
+      assert [%{"url" => url}] = result["results"]
+
+      assert url ==
+               "https://ris.komuna.net/vgbuchloe/app/sitzungen/119314820/119314820-121472148"
+    end
+
+    test "Textblock über dem Byte-Budget: upstream-error statt Endlosverarbeitung (#486)" do
+      %{path: path, mock: mock} = start_stack(:ok)
+
+      put_top(mock, "1001", %{
+        "id" => "1001-9",
+        "nr" => "9",
+        "name" => "Riesenblock",
+        "restricted" => false,
+        # Base64 des Blocks ist ~93 KiB, ueber dem Block-Budget von 64 KiB.
+        "text" => String.duplicate("<", 70_000)
+      })
+
+      # Der Grund steht im Log (das Modell sieht nur den geschlossenen Code).
+      log =
+        capture_log(fn ->
+          assert {:error, %{"code" => "upstream-error"}} = show(path, "1001-9")
+        end)
+
+      assert log =~ "Byte-Budget"
+
+      # Phase 2 der Suche bricht mit demselben Fehler ab, statt weiterzulaufen.
+      assert {:error, %{"code" => "upstream-error"}} =
+               search(path, %{"text" => "wortschatzdemnichtvorkommt"})
+    end
+
+    test "Antwortkörper über 1 MiB: upstream-error statt Materialisierung (#497)" do
+      %{path: path, mock: mock} = start_stack(:ok)
+
+      put_top(mock, "1001", %{
+        "id" => "1001-9",
+        "nr" => "9",
+        "name" => "Riesenantwort",
+        "restricted" => false,
+        # Base64 macht ~2,8 MiB aus den 2 MiB: ueber dem Antwort-Budget.
+        "text" => String.duplicate("A", 2_097_152)
+      })
+
+      log =
+        capture_log(fn ->
+          assert {:error, %{"code" => "upstream-error"}} = show(path, "1001-9")
+        end)
+
+      assert log =~ "1 MiB"
+    end
+
+    test "C0/C1 aus RIS-Text und -Titeln erreichen das Ergebnis nicht (#487)" do
+      %{path: path, mock: mock} = start_stack(:ok)
+
+      put_top(mock, "1001", %{
+        "id" => "1001-9",
+        "nr" => "9",
+        "name" => "Antrag \u001B[31mrot\u009B",
+        "restricted" => false,
+        "text" =>
+          "Sachverhalt mit \u001B[31mFarbe\u001B[0m und \u009B99m Ende. Per Entity: &#155;[99m und &#127;."
+      })
+
+      assert {:ok, top} = show(path, "1001-9")
+      refute top["titel"] =~ "\u001B"
+      refute top["titel"] =~ "\u009B"
+      assert top["titel"] == "Antrag [31mrot"
+      refute top["text"] =~ "\u001B"
+      refute top["text"] =~ "\u009B"
+      assert top["text"] =~ "Farbe"
+
+      # Zweiter Kanal desselben Angriffs: Zahl-Entities (decode_entities
+      # laeuft nach dem Strip). Sie bleiben roh stehen — inert als Klartext.
+      refute top["text"] =~ "\u007F"
+      assert top["text"] =~ "Per Entity: &#155;[99m und &#127;."
     end
 
     test "show dekodiert benannte Entities, unbekannte bleiben roh stehen", %{
@@ -234,8 +366,10 @@ defmodule KomkiConnectorRisTest do
     end
 
     # Ticket #516: find the meeting by date, then read its public agenda.
+    # Die Sitzungs-URL folgt dem an der echten Oberflaeche geprueften Web-Schema
+    # (#518): Web-Basis plus "app/sitzungen/" plus gepruefte ID.
     test "sessions listet die Sitzungen eines Zeitraums, aelteste zuerst",
-         %{path: path, base_url: base_url} do
+         %{path: path, web_base_url: web_base_url} do
       assert {:ok, %{"results" => results, "abrufdatum" => _}} =
                sessions(path, %{"von" => "2026-07-01", "bis" => "2026-09-30"})
 
@@ -247,7 +381,7 @@ defmodule KomkiConnectorRisTest do
                "gremium" => "Bau- und Umweltausschuss",
                "datum" => "2026-07-10",
                "uhrzeit" => "18:30",
-               "url" => base_url <> "guestmeetings/1002"
+               "url" => web_base_url <> "app/sitzungen/1002"
              }
     end
 
@@ -269,14 +403,15 @@ defmodule KomkiConnectorRisTest do
     end
 
     test "agenda liefert nur oeffentliche TOPs, ohne Spur der anderen",
-         %{path: path, base_url: base_url} do
+         %{path: path, web_base_url: web_base_url} do
       # 1002-2 is restricted, 1002-3 sits in the protected part.
       assert {:ok, result} = agenda(path, "1002")
 
       assert Enum.sort(Map.keys(result)) ==
                ~w(abrufdatum datum gremium sitzung sitzung_id tops uhrzeit url)
 
-      assert result["url"] == base_url <> "guestmeetings/1002"
+      # Web-Schema wie bei sessions (#518).
+      assert result["url"] == web_base_url <> "app/sitzungen/1002"
       assert result["uhrzeit"] == "18:30"
 
       assert result["tops"] == [

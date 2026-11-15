@@ -179,6 +179,8 @@ defmodule KomkiConnectorRis.Api do
     do: {:error, "upstream-error", "RIS antwortet mit HTTP #{status}"}
 
   defp failure(:bad_json), do: bad_response()
+  defp failure(:too_large), do: {:error, "upstream-error", "RIS-Antwort übersteigt 1 MiB"}
+  defp failure(:too_deep), do: {:error, "upstream-error", "RIS-Antwort zu tief verschachtelt"}
   defp failure(:not_found), do: {:error, "upstream-error", "RIS antwortet mit HTTP 404"}
   defp failure(:unreachable), do: {:error, "upstream-error", "RIS nicht erreichbar"}
 

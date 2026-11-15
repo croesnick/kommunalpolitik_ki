@@ -14,11 +14,13 @@ Jeder Treffer trägt die TOP-Nummer aus der Tagesordnung (`nummer`, aus `numberi
 
 ```bash
 cd apps/komki_connector_ris && mix escript.build
-echo '{}' | ./komki-connector-ris --socket /tmp/kmris.sock [--base-url <url>] [--proxy 127.0.0.1:<port>]
+echo '{}' | ./komki-connector-ris --socket /tmp/kmris.sock [--base-url <url>] [--web-url <url>] [--proxy 127.0.0.1:<port>]
 ```
 
 - `--socket`: Unix-Socket, den der Connector bindet (Rechte `0600`). macOS erlaubt höchstens 103 Byte Pfadlänge.
 - `--base-url`: Basis der RIS-API, Default `https://risapi3.komuna.net/web/`.
+- `--web-url`: Web-Basis der RIS-Weboberfläche für die Quell-URLs der Ergebnisse, Default
+  `https://ris.komuna.net/vgbuchloe/` (Mandant ist Teil der Basis, #518).
 - `--proxy`: HTTPS läuft dann per CONNECT über diesen Proxy (`komki-egress`). Klartext-HTTP (nur der
   Mock auf Loopback) geht direkt.
 - stdin: genau eine Credentials-Zeile mit dem Connector-Token und optional `RIS_ZUGANG` (JSON
@@ -60,8 +62,15 @@ darf höchstens 5 s dauern, sodass ein Aufruf unter den 15 s des Vermittlers ble
 `upstream-timeout`, jeder andere HTTP- oder Verbindungsfehler `upstream-error`. Fehlermeldungen
 enthalten keinen Upstream-Text, und das Log enthält weder Suchtexte noch Ergebnisse.
 
-`url` im Ergebnis ist `<base-url>guestagendaitems/<top_id>`. Der Connector baut sie aus der
-Basis-URL und der geprüften ID, nie aus Upstream-Text. `abrufdatum` ist ISO-8601 in UTC.
+`url` im Ergebnis zeigt auf die Weboberfläche des RIS, nicht auf die API-Ressource (#518):
+`<web-base>app/sitzungen/<sitzungs-id>` bzw. `<web-base>app/sitzungen/<sitzungs-id>/<top-id>`,
+mit Sitzungs- und TOP-Nummer aus der geprüften ID (`top_id` hat die Form
+`<sitzungs-id>-<punkt-id>`); `sessions` und `agenda` zitieren die Sitzungsform, `search` und
+`show` die TOP-Form. Die Linkform ist an der echten Oberfläche geprüft (Kommentar in
+#518, 14.11.2026). Der Connector baut sie aus der Web-Basis (`--web-url`, Default
+`https://ris.komuna.net/vgbuchloe/`) und der geprüften ID, nie aus Upstream-Text.
+`abrufdatum` ist ISO-8601 in UTC. Gegen den Mock läuft die Web-URL weiter auf den Default —
+`--web-url` stellt sie für einen Mock-Lauf um.
 
 ## Mock
 
@@ -395,8 +404,16 @@ Befund (keine Sitzung am Tag, Lesefehler, ungelöste Entities), 2 Aufruf falsch.
   bleiben roh stehen; `priv/ris_tagesordnung.exs` zählt sie als ungelöst. Weiche Trennstellen
   (`&shy;`, `&#173;`) sind Layout, kein Text, und entfallen in jeder Schreibweise. Dekodiert werden
   nur die Inhalte der Textblöcke — Titel und Block-Überschriften bleiben, wie das RIS sie liefert.
-- **`url` zeigt auf die API-Ressource**, nicht auf eine Seite der RIS-Weboberfläche. Deren
-  Link-Schema ist nicht dokumentiert.
+- **RIS-Text ist Angreifer-text (#487, Restrisiko).** Der Connector entfernt C0/C1-Steuerzeichen
+  aus allen Feldern. CR normalisiert er dabei statt es zu verschlucken: Ein einzelnes CR wird zum
+  Leerzeichen (wie bisher, Wörter kleben nicht), `\r\n` bleibt ein Zeilenende. Zahl-Entities auf
+  Steuerzeichen (etwa `&#155;` für CSI oder `&#127;` für DEL) dekodiert er nicht — sie bleiben
+  als Klartext stehen und umgehen den Strip nicht. Kurzfelder kapt er auf 1 000 Zeichen, und
+  Textblöcke über dem Byte-Budget lehnt er als `upstream-error` ab (#486/#497). Was bleibt:
+  Anweisungen in öffentlichem RIS-Text erreichen das Modell weiterhin als Daten und können es im
+  Raum steuern; die Wirkung an der Grenze stoppt Γ. Die Rahmung als untrusted
+  (Provenanz-Delimiter, Sitzungs-Prompt-Politik) ist Vermittler-Arbeit und steht als Entwurf im
+  Ticket #487.
 - Der Mock ignoriert das Zeitfenster (`from`/`until`) und liefert immer alle Sitzungen.
 
 ## Entwicklung

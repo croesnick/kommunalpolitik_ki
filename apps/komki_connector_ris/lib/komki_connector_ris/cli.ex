@@ -2,7 +2,7 @@ defmodule KomkiConnectorRis.CLI do
   @moduledoc """
   Escript entry `komki-connector-ris` (CONTRACT.md §4):
 
-      komki-connector-ris --socket <path> [--base-url <url>] [--proxy 127.0.0.1:<port>]
+      komki-connector-ris --socket <path> [--base-url <url>] [--web-url <url>] [--proxy 127.0.0.1:<port>]
 
   Reads the credentials line from stdin first (token, optionally
   `RIS_ZUGANG`), signs in to the RIS with `RIS_ZUGANG`, then binds the
@@ -30,7 +30,9 @@ defmodule KomkiConnectorRis.CLI do
   @doc "Argumente pruefen. Oeffentlich fuer Tests."
   @spec parse([String.t()]) :: {:ok, map()} | {:error, String.t()}
   def parse(argv) do
-    case OptionParser.parse(argv, strict: [socket: :string, base_url: :string, proxy: :string]) do
+    case OptionParser.parse(argv,
+           strict: [socket: :string, base_url: :string, web_url: :string, proxy: :string]
+         ) do
       {opts, [], []} -> build(opts)
       _ -> {:error, usage()}
     end
@@ -39,8 +41,9 @@ defmodule KomkiConnectorRis.CLI do
   defp build(opts) do
     with {:ok, socket} <- socket(opts[:socket]),
          {:ok, base_url} <- base_url(opts[:base_url]),
+         {:ok, web_base_url} <- web_base_url(opts[:web_url]),
          {:ok, proxy} <- proxy(opts[:proxy]) do
-      {:ok, %{socket: socket, base_url: base_url, proxy: proxy}}
+      {:ok, %{socket: socket, base_url: base_url, web_base_url: web_base_url, proxy: proxy}}
     end
   end
 
@@ -48,15 +51,20 @@ defmodule KomkiConnectorRis.CLI do
   defp socket(path), do: {:ok, path}
 
   defp base_url(nil), do: {:ok, KomkiConnectorRis.defaults().base_url}
+  defp base_url(url), do: check_url(url, "--base-url")
 
-  defp base_url(url) do
+  # Web base of the result links (#518); same URL shape as --base-url.
+  defp web_base_url(nil), do: {:ok, KomkiConnectorRis.defaults().web_base_url}
+  defp web_base_url(url), do: check_url(url, "--web-url")
+
+  defp check_url(url, flag) do
     case URI.parse(url) do
       %URI{scheme: scheme, host: host, query: nil, fragment: nil}
       when scheme in ["http", "https"] and is_binary(host) and host != "" ->
         {:ok, if(String.ends_with?(url, "/"), do: url, else: url <> "/")}
 
       _ ->
-        {:error, "--base-url muss eine http(s)-URL ohne Query sein"}
+        {:error, "#{flag} muss eine http(s)-URL ohne Query sein"}
     end
   end
 
@@ -74,7 +82,7 @@ defmodule KomkiConnectorRis.CLI do
 
   defp usage,
     do:
-      "Aufruf: komki-connector-ris --socket <pfad> [--base-url <url>] [--proxy 127.0.0.1:<port>]"
+      "Aufruf: komki-connector-ris --socket <pfad> [--base-url <url>] [--web-url <url>] [--proxy 127.0.0.1:<port>]"
 
   @spec fail(String.t()) :: no_return()
   defp fail(message) do

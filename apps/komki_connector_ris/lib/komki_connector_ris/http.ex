@@ -11,12 +11,28 @@ defmodule KomkiConnectorRis.Http do
     (`KomkiConnector.TLS.cacerts/0`, PEM-Datei statt Schluesselbund) und Hostname-Pruefung.
   - Keine Weiterleitungen: eine Umleitung auf einen anderen Host waere
     eine Tuer am Egress-Proxy vorbei.
+  - Bodies over `@max_body_bytes` and JSON nested deeper than `@max_depth`
+    are rejected before `:json.decode` materializes them (#497).
   """
 
   @profile :komki_connector_ris
 
+  # Bounds before materialization (#497): `:json.decode` builds the whole
+  # body as terms otherwise. Both limits sit far above anything the
+  # recordings show (responses in the kilobyte range, nesting depth of at
+  # most 7) and far below hostile sizes (hundreds of MB, 100k-deep arrays).
+  @max_body_bytes 1_048_576
+  @max_depth 16
+
   @type proxy :: {String.t(), :inet.port_number()} | nil
-  @type error :: :not_found | :timeout | {:status, pos_integer()} | :bad_json | :unreachable
+  @type error ::
+          :not_found
+          | :timeout
+          | {:status, pos_integer()}
+          | :bad_json
+          | :unreachable
+          | :too_large
+          | :too_deep
 
   @doc "Startet inets/ssl und setzt das httpc-Profil (samt Proxy) neu auf."
   @spec start(proxy()) :: :ok | {:error, term()}
@@ -109,11 +125,42 @@ defmodule KomkiConnectorRis.Http do
 
   defp charlist_header({k, v}), do: {String.to_charlist(k), String.to_charlist(v)}
 
+  # Byte budget and depth limit run before :json.decode (#497): a body
+  # over either bound is rejected as a structured error instead of being
+  # materialized as terms.
   defp decode(body) do
-    {:ok, :json.decode(body)}
+    cond do
+      byte_size(body) > @max_body_bytes -> {:error, :too_large}
+      too_deep?(body) -> {:error, :too_deep}
+      true -> {:ok, :json.decode(body)}
+    end
   rescue
     _ -> {:error, :bad_json}
   end
+
+  # String-aware depth scan, one linear pass over the bytes: brackets and
+  # quotes inside JSON strings (and escape sequences) do not count, so a
+  # text field full of brackets is not mistaken for nesting.
+  defp too_deep?(body), do: too_deep(body, 0, :top)
+
+  defp too_deep(<<>>, _depth, _mode), do: false
+
+  defp too_deep(<<?", rest::binary>>, depth, :top), do: too_deep(rest, depth, :string)
+
+  defp too_deep(<<?[, rest::binary>>, depth, :top),
+    do: depth + 1 > @max_depth or too_deep(rest, depth + 1, :top)
+
+  defp too_deep(<<?{, rest::binary>>, depth, :top),
+    do: depth + 1 > @max_depth or too_deep(rest, depth + 1, :top)
+
+  defp too_deep(<<?], rest::binary>>, depth, :top), do: too_deep(rest, depth - 1, :top)
+  defp too_deep(<<?}, rest::binary>>, depth, :top), do: too_deep(rest, depth - 1, :top)
+  defp too_deep(<<_c, rest::binary>>, depth, :top), do: too_deep(rest, depth, :top)
+
+  defp too_deep(<<?\\, rest::binary>>, depth, :string), do: too_deep(rest, depth, :escape)
+  defp too_deep(<<_c, rest::binary>>, depth, :escape), do: too_deep(rest, depth, :string)
+  defp too_deep(<<?", rest::binary>>, depth, :string), do: too_deep(rest, depth, :top)
+  defp too_deep(<<_c, rest::binary>>, depth, :string), do: too_deep(rest, depth, :string)
 
   # Zeitueberschreitung beim Verbinden oder Lesen ist :timeout, alles
   # andere (DNS, TLS, Verbindungsabbruch) :unreachable.
