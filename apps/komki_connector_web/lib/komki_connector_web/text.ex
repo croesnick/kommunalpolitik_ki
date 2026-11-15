@@ -2,7 +2,9 @@ defmodule KomkiConnectorWeb.Text do
   @moduledoc """
   Bereinigt Texte aus der Brave-Antwort: HTML-Tags entfernen (Brave
   markiert Treffer mit `<strong>`), Entities dekodieren, Leerraum
-  zusammenfassen und auf eine Hoechstlaenge kuerzen.
+  zusammenfassen und auf eine Hoechstlaenge kuerzen. Ferngesteuerte
+  Eingaben werden vorher hart auf 8 KiB gekappt (Ticket #483):
+  kein Pass arbeitet auf mehr Roheingabe, als ein Titel wert ist.
   """
 
   @named %{
@@ -32,10 +34,19 @@ defmodule KomkiConnectorWeb.Text do
     "euro" => "€"
   }
 
+  # Security guard (ticket #483): remote-controlled titles and descriptions
+  # are hard-cut to @raw_max bytes before any regex work runs, so a hostile
+  # search result can neither wedge nor delay a serving process — whatever
+  # the regex engine does with the input. 8 KiB raw is far more than the
+  # 300/1000 character results Brave titles are cleaned to (brave.ex), even
+  # for four-byte codepoints.
+  @raw_max 8 * 1024
+
   @doc "Tags entfernen, Entities dekodieren, Leerraum normalisieren, kuerzen."
   @spec clean(String.t(), pos_integer()) :: String.t()
   def clean(text, max) when is_binary(text) do
     text
+    |> cut_raw()
     |> strip_tags()
     |> decode_entities()
     |> String.replace(~r/\s+/u, " ")
@@ -43,9 +54,54 @@ defmodule KomkiConnectorWeb.Text do
     |> String.slice(0, max)
   end
 
-  # Erst Tags weg, dann dekodieren: ein kodiertes `&lt;b&gt;` bleibt so
-  # als Text sichtbar und wird nicht zum Tag.
-  defp strip_tags(text), do: String.replace(text, ~r/<[^>]*>/, "")
+  defp cut_raw(text) when byte_size(text) > @raw_max do
+    text
+    |> binary_part(0, @raw_max)
+    |> drop_broken_tail()
+  end
+
+  defp cut_raw(text), do: text
+
+  # The byte cut can split the last UTF-8 codepoint, and the String
+  # functions after it require valid UTF-8; a codepoint is at most four
+  # bytes, so at most three trailing bytes are dropped until the cut is
+  # valid again.
+  defp drop_broken_tail(cut), do: drop_broken_tail(cut, 3)
+
+  defp drop_broken_tail(cut, 0), do: cut
+
+  defp drop_broken_tail(cut, left) do
+    if String.valid?(cut) do
+      cut
+    else
+      drop_broken_tail(binary_part(cut, 0, byte_size(cut) - 1), left - 1)
+    end
+  end
+
+  # Linear replacement for the tag-strip regex (ticket #483): split at ">",
+  # keep everything before the last "<" of each segment, and drop the ">" of
+  # segments that open a tag (it closed that tag). A ">" whose segment opens
+  # no tag is literal text and survives. No backtracking engine is involved,
+  # so hostile "<"-runs cannot wedge the process.
+  defp strip_tags(text) do
+    segments = String.split(text, ">")
+    count = length(segments)
+
+    segments
+    |> Enum.with_index()
+    |> Enum.map_join(fn {segment, i} -> strip_segment(segment, i, count) end)
+  end
+
+  defp strip_segment(segment, i, count) do
+    case :binary.matches(segment, "<") do
+      [] ->
+        if i == count - 1, do: segment, else: segment <> ">"
+
+      matches ->
+        {pos, _len} = List.last(matches)
+        binary_part(segment, 0, pos)
+    end
+  end
 
   defp decode_entities(text) do
     Regex.replace(~r/&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z]+);/, text, fn whole, ref ->
