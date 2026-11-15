@@ -40,6 +40,12 @@ defmodule KomkiConnectorDocuments.Pdf.Helper do
   the render (`upstream-error`); without it, it never became runnable
   (`internal`) — for example in an escript context, where the code path is
   the zipped archive and no plain `erl` can load the module (#288).
+
+  The child boots the release's `start_clean` boot file under a Burrito
+  release (no `<root>/bin/start.boot` is unpacked there, and the full
+  release boot would start `KomkiCli.Application`, which claims argv and
+  halts — Burrito dual-mode). Roots without a `releases` directory, like
+  dev and escript, keep their working default boot (see `boot_args/1`).
   """
 
   alias KomkiConnectorDocuments.Pdf
@@ -137,7 +143,48 @@ defmodule KomkiConnectorDocuments.Pdf.Helper do
     wrapper = "ulimit -v #{@address_limit_kib} 2> /dev/null || :; exec \"$0\" \"$@\""
 
     ["-c", wrapper, erl_path(), "-noshell", "-env", "ERL_CRASH_DUMP", "/dev/null"] ++
+      boot_args(to_string(:code.root_dir())) ++
       code_paths() ++ ["-s", "elixir", "start_cli", "-extra", "-e", @eval, "--", to_string(path)]
+  end
+
+  @doc """
+  The `-boot`/`-boot_var` flags for the child (pure, for tests): a plain
+  `erl` boots `$ROOTDIR/bin/start.boot` by default, which a Burrito release
+  does not unpack — its boot files live under `releases/<vsn>`. The child
+  takes `start_clean`, the boot file without release applications: the
+  release boot would start `KomkiCli.Application`, which claims argv and
+  halts the VM (Burrito dual-mode, its moduledoc). A root without a
+  `releases` directory — dev, escript, a plain OTP install — needs no
+  flag, its default boot file exists.
+  """
+  @spec boot_args(String.t()) :: [String.t()]
+  def boot_args(root) do
+    releases = Path.join(root, "releases")
+
+    versions =
+      case File.ls(releases) do
+        {:ok, versions} -> versions
+        _ -> []
+      end
+
+    case versions
+         |> Enum.sort()
+         |> Enum.reverse()
+         |> Enum.find(&File.exists?(Path.join([releases, &1, "start_clean.boot"]))) do
+      nil ->
+        []
+
+      version ->
+        # The release's boot files expand $RELEASE_LIB; without the var the
+        # child dies during boot ('cannot expand $RELEASE_LIB in bootfile').
+        [
+          "-boot",
+          Path.join([releases, version, "start_clean"]),
+          "-boot_var",
+          "RELEASE_LIB",
+          Path.join(root, "lib")
+        ]
+    end
   end
 
   # The erl of the running runtime: the init argument `bindir` names the

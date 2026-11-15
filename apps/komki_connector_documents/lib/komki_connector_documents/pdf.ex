@@ -11,7 +11,7 @@ defmodule KomkiConnectorDocuments.Pdf do
 
   ## License and origin of the NIF
 
-  Built on `ex_pdfium` 0.6.0 (MIT), a NIF over the Rust crate
+  Built on `ex_pdfium` 0.7.0 (MIT), a NIF over the Rust crate
   `pdfium-render` that binds Chromium's pdfium (BSD-3-Clause, Google).
   `rustler_precompiled` fetches the precompiled NIF from the GitHub
   releases of the ex_pdfium project (one artifact per platform, NIF ABI

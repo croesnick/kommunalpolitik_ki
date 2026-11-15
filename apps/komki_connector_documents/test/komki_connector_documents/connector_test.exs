@@ -120,9 +120,42 @@ defmodule KomkiConnectorDocuments.ConnectorTest do
     eval_index = Enum.find_index(rest, &(&1 == "-e"))
     assert Enum.at(rest, eval_index + 1) == "KomkiConnectorDocuments.Pdf.Helper.run()"
 
-    pas = rest |> Enum.chunk_every(2) |> Enum.filter(&match?(["-pa", _], &1))
-    assert pas != []
-    Enum.each(pas, fn ["-pa", dir] -> assert File.dir?(dir) end)
+    # Walk the flat flag list instead of pairing by position: the flags
+    # before -pa have mixed arities (-env takes one value, -boot_var two).
+    pa_dirs =
+      rest
+      |> Enum.zip(Enum.drop(rest, 1))
+      |> Enum.filter(fn {flag, _value} -> flag == "-pa" end)
+      |> Enum.map(fn {_flag, value} -> value end)
+      |> Enum.uniq()
+
+    assert pa_dirs != []
+    Enum.each(pa_dirs, fn dir -> assert File.dir?(dir) end)
+
+    # Boot flags of the child (wegwerf-Lauf, ticket #488): a Burrito
+    # release unpacks no <root>/bin/start.boot, so the child explicitly
+    # boots the release's start_clean — command/1 carries exactly the
+    # boot_args/1 of the running root, right after the crash-dump env.
+    assert Enum.take(rest, 4) == ["-noshell", "-env", "ERL_CRASH_DUMP", "/dev/null"]
+    boot = Helper.boot_args(to_string(:code.root_dir()))
+    assert Enum.take(Enum.drop(rest, 4), length(boot)) == boot
+  end
+
+  # #488: under a Burrito release no <root>/bin/start.boot exists; the
+  # child boots the release's start_clean (no release applications — those
+  # would claim argv and halt, KomkiCli.Application) and needs RELEASE_LIB.
+  test "Helper-Boot: start_clean aus dem Release, RELEASE_LIB mitgegeben" do
+    root = Path.join(System.tmp_dir!(), "kcd-boot-" <> random_suffix())
+    boot_dir = Path.join([root, "releases", "0.1.0"])
+    File.mkdir_p!(boot_dir)
+    File.write!(Path.join(boot_dir, "start_clean.boot"), "fake")
+
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    assert ["-boot", boot, "-boot_var", "RELEASE_LIB", lib] = Helper.boot_args(root)
+    assert boot == Path.join([root, "releases", "0.1.0", "start_clean"])
+    assert lib == Path.join(root, "lib")
+    assert Helper.boot_args(Path.join(root, "gibt-es-nicht")) == []
   end
 
   # #488: classification keeps the closed set of error codes — a death
