@@ -7,7 +7,9 @@ defmodule KomkiCli.TresorNativeTest do
   echte Touch-ID-Dialog braucht die Secure Enclave und einen Menschen an der
   Maschine und laeuft hier nie (docs/echte-hardware.md).
 
-  Ohne gebautes Programm (Linux-CI ohne swiftc) ueberspringt der Test.
+  Ohne gebautes Programm (Linux-CI ohne swiftc) schliesst der Standardlauf
+  die Tests ueber den Tag :tresor_native aus (test_helper.exs); ein skip-Tag
+  aus setup oder setup_all wuerde ExUnit nicht am Laufen hindern.
   """
 
   use ExUnit.Case, async: true
@@ -19,7 +21,7 @@ defmodule KomkiCli.TresorNativeTest do
   # Programm aus dem priv-Verzeichnis, nicht den Fake aus test_helper.exs.
   setup_all do
     case Core.binary(:komki_cli) do
-      nil -> [skip: "komki-tresor nicht gebaut (macOS mit swiftc: mix compile)"]
+      nil -> :ok
       command -> %{command: command}
     end
   end
@@ -71,6 +73,7 @@ defmodule KomkiCli.TresorNativeTest do
     end
   end
 
+  @tag :tresor_native
   test "agree ohne Anfrage-Kennung ist kein gueltiger Aufruf mehr", %{command: command} do
     # Der Angriff aus dem Ticket: `echo "<ref> <eph>" | komki-tresor agree
     # --reason "..."` — diese Signatur faellt auf die Aufrufpruefung (exit 2)
@@ -84,6 +87,7 @@ defmodule KomkiCli.TresorNativeTest do
     assert out =~ "Aufruf:"
   end
 
+  @tag :tresor_native
   test "agree mit unzulaessiger Kennung ist kein gueltiger Aufruf", %{command: command} do
     # Die Kennung ist Dialog-Text: kurz und schlicht, sonst verwischt sie
     # die Zusammensetzung (#475).
@@ -97,6 +101,7 @@ defmodule KomkiCli.TresorNativeTest do
     end
   end
 
+  @tag :tresor_native
   test "agree mit gueltigen Argumenten gibt kein Geheimnis her", %{command: command} do
     {out, code} = run(command, ["agree", "--reason", "x", "--nonce", "AB23CD45"], "kein-base64")
 
@@ -107,6 +112,7 @@ defmodule KomkiCli.TresorNativeTest do
     assert out == ""
   end
 
+  @tag :tresor_native
   test "prompt setzt den Freigabe-Text zusammen, unabhaengig vom Aufrufertext", %{
     command: command
   } do
@@ -129,6 +135,7 @@ defmodule KomkiCli.TresorNativeTest do
                " - unvertrauter Aufrufertext: komki startet den Connector web: Anzeige"
   end
 
+  @tag :tresor_native
   test "prompt zu einem echten Siegel zeigt den Fingerabdruck, den komki vorrechnet",
        %{command: command} do
     {ref, eph} = envelope!()
@@ -144,6 +151,7 @@ defmodule KomkiCli.TresorNativeTest do
     assert text =~ "unvertrauter Aufrufertext: Text des Aufrufers"
   end
 
+  @tag :tresor_native
   test "prompt mit unbrauchbarer Eingabe: Schluessel ungueltig, kein Text", %{command: command} do
     {out, code} = run(command, ["prompt", "--reason", "x", "--nonce", "AB23CD45"], "kein-base64")
 
