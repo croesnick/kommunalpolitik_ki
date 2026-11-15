@@ -19,7 +19,7 @@ defmodule KomkiCli.TresorNativeTest do
   # Programm aus dem priv-Verzeichnis, nicht den Fake aus test_helper.exs.
   setup_all do
     case Core.binary(:komki_cli) do
-      nil -> {:skip, "komki-tresor nicht gebaut (macOS mit swiftc: mix compile)"}
+      nil -> [skip: "komki-tresor nicht gebaut (macOS mit swiftc: mix compile)"]
       command -> %{command: command}
     end
   end
