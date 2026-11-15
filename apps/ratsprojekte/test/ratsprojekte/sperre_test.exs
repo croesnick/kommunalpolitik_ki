@@ -154,6 +154,26 @@ defmodule Ratsprojekte.SperreTest do
     assert {:ok, _} = Task.await(neue, 10_000)
   end
 
+  # Review-Nacharbeit zu #490: `sperren` ist über den Verwaltungs-Socket für
+  # jeden Prozess im Benutzerkonto erreichbar. Räumte es den Platz der
+  # laufenden Anfrage, stellte ein Programm im Wechsel mit `sperren` wieder
+  # beliebig viele Dialoge auf. Der Platz bleibt belegt, solange der Dialog steht.
+  test "sperren räumt den Platz einer laufenden Anfrage nicht" do
+    home = home!()
+    eingerichtet!(home)
+    sperre = sperre!(home, provider: aufzeichner(home, warten: true))
+
+    erste = Task.async(fn -> Sperre.oeffnen(sperre, "111222") end)
+    assert_receive {:agree, _}
+
+    :ok = Sperre.sperren(sperre)
+    assert {:error, :anfrage_laeuft} = Sperre.oeffnen(sperre, "222333")
+
+    # Die laufende Anfrage bleibt zugeordnet: Freigabe entsperrt wie versprochen.
+    send(erste.pid, :freigabe)
+    assert {:ok, _} = Task.await(erste, 10_000)
+  end
+
   test "vor jeder Schemaänderung eine Kopie neben der Datenbank, nur die letzte bleibt" do
     home = home!()
     eingerichtet!(home)

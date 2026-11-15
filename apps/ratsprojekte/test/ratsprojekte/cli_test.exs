@@ -187,6 +187,48 @@ defmodule Ratsprojekte.CLITest do
       send(erste.pid, :freigabe)
       assert {:ok, _} = Task.await(erste, 10_000)
     end
+
+    # Review-Nacharbeit zu #490: `sperren` ist wie `oeffnen` für jedes Programm
+    # im Benutzerkonto über den Socket erreichbar. Räumte es den Platz der
+    # laufenden Anfrage, bekäme der nächste `oeffnen` statt der Abweisung
+    # wieder einen eigenen Dialog samt Link.
+    test "sperren über den Socket räumt den Platz einer laufenden Anfrage nicht", %{
+      home: home,
+      sperre: sperre
+    } do
+      erste = Task.async(fn -> Sperre.oeffnen(sperre, "111222") end)
+      assert_receive {:agree, _}
+
+      {:ok, sperren_sock} =
+        :gen_tcp.connect({:local, Ort.verwaltung(home)}, 0, [
+          :binary,
+          packet: :line,
+          active: false
+        ])
+
+      :ok = :gen_tcp.send(sperren_sock, "sperren\n")
+      assert {:ok, "ok\n"} = :gen_tcp.recv(sperren_sock, 0, 2_000)
+      :ok = :gen_tcp.close(sperren_sock)
+
+      {:ok, sock} =
+        :gen_tcp.connect({:local, Ort.verwaltung(home)}, 0, [
+          :binary,
+          packet: :line,
+          active: false
+        ])
+
+      :ok = :gen_tcp.send(sock, "oeffnen 222333\n")
+
+      # Nach dem Fix kommt die Abweisung sofort. Vor dem Fix hänge die zweite
+      # Anfrage an der Dialog-Bremse (fünf Sekunden) und käme dann als voller
+      # Link zurück — die sechs Sekunden lassen genau das sichtbar werden.
+      assert {:ok, "fehler eine Entsperr-Anfrage läuft schon\n"} =
+               :gen_tcp.recv(sock, 0, 6_000)
+
+      :ok = :gen_tcp.close(sock)
+      send(erste.pid, :freigabe)
+      assert {:ok, _} = Task.await(erste, 10_000)
+    end
   end
 
   test "ohne laufenden Hub sagt open, was zu tun ist" do

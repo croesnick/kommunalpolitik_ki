@@ -14,4 +14,7 @@ Sperrseite im Browser neben der Schaltfläche, und der Touch-ID-Dialog nennt ihn
 im Grund. Freigeben gehört nur bei übereinstimmendem Code — ein Dialog mit
 fremdem Code gehört zu einem anderen Programm. Ohne Prüfcode fragt der Socket
 gar nicht mehr nach, und es läuft höchstens eine Entsperr-Anfrage gleichzeitig;
-weitere weist der Hub klar ab.
+weitere weist der Hub klar ab. Das Sperren räumt den Platz einer laufenden
+Anfrage nicht: Der Socket nimmt `sperren` von jedem Programm im Benutzerkonto
+an, und nur die Anfrage selbst gibt den Platz frei — über die Freigabe, den
+Abbruch des Dialogs oder das Ende des Programms.

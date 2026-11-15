@@ -12,7 +12,11 @@ defmodule Ratsprojekte.Sperre do
   in the terminal, the lock page in the browser — so the person approves
   only a dialog naming their own code. Only one request runs at a time;
   a second one is rejected with `:anfrage_laeuft`, so no stream of prompts
-  can blend into the user's own unlock.
+  can blend into the user's own unlock. Locking does not free the slot
+  (#490 rework): it frees only through the request itself — approval,
+  dismissal or the end of the asking process — so `sperren`, reachable for
+  every process in the user account, cannot queue a new prompt while one
+  is up.
 
   After `:sperre_nach` milliseconds without an action in the interface
   (`handlung/1`) the hub locks again: the repo stops, the session marker is
@@ -229,11 +233,14 @@ defmodule Ratsprojekte.Sperre do
 
   # -- internals --------------------------------------------------------------
 
+  # The slot of a running request survives a lock (#490 rework): `sperren`
+  # is reachable for every process in the user account, so freeing the slot
+  # here would let a background process queue a stream of prompts again.
+  # Regular releases run through `:entsperren`, `:anfrage_vorbei` and the
+  # monitor; `init` reaches this with `anfrage: nil`.
   defp gesperrt(state),
     do:
-      state
-      |> anfrage_frei()
-      |> Map.merge(%{
+      Map.merge(state, %{
         status: :gesperrt,
         key_hash: nil,
         marker: nil,
