@@ -7,6 +7,8 @@ defmodule KomkiConnectorRis.RisCassettesTest do
 
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureIO, only: [capture_io: 1]
+
   alias KomkiConnectorRis.RisCassettes
 
   @canary "GEHEIM-MARKER-42"
@@ -97,6 +99,33 @@ defmodule KomkiConnectorRis.RisCassettesTest do
     if File.exists?(path),
       do: path |> File.read!() |> String.split("\n") |> Enum.count(&(&1 == subcommand)),
       else: 0
+  end
+
+  # Wrapper around the fake program: records argv and stdin of every call.
+  defp recording_tresor!(dir) do
+    fake = tresor!(dir)
+
+    script!(dir, "tresor-rec", """
+    echo "$@" >> #{dir}/argv
+    if [ "$1" = agree ]; then
+      read -r line; echo "$line" >> #{dir}/stdin
+      printf '%s\\n' "$line" | #{fake} "$@"
+    else
+      exec #{fake} "$@"
+    fi
+    """)
+  end
+
+  # Erste 8 Hexzeichen von SHA-256 ueber ref und eph (#475): der Test pinnt
+  # das Format unabhaengig von der Implementierung.
+  defp fingerprint_of(sealed) do
+    assert "ktv2." <> rest = sealed
+    assert {:ok, json} = Base.decode64(rest)
+    assert {:ok, %{"key" => key, "eph" => eph}} = JSON.decode(json)
+    assert {:ok, ref} = Base.decode64(key)
+    assert {:ok, eph} = Base.decode64(eph)
+
+    :sha256 |> :crypto.hash(ref <> eph) |> Base.encode16(case: :lower) |> binary_part(0, 8)
   end
 
   defp texts(messages), do: Enum.map(messages, fn {_channel, text} -> text end)
@@ -828,32 +857,50 @@ defmodule KomkiConnectorRis.RisCassettesTest do
       assert {:error, :timeout} = RisCassettes.tresor_check(cmd, check_timeout: 300)
     end
 
-    test "Klartext und Siegel erreichen das Programm nicht, der Grund geht ueber argv" do
+    test "Klartext und Siegel erreichen das Programm nicht, Grund und Kennung gehen ueber argv" do
       dir = tmp_area!("argv")
-      fake = tresor!(dir)
-
-      cmd =
-        script!(dir, "tresor-rec", """
-        echo "$@" >> #{dir}/argv
-        if [ "$1" = agree ]; then
-          read -r line; echo "$line" >> #{dir}/stdin
-          printf '%s\\n' "$line" | #{fake} "$@"
-        else
-          exec #{fake} "$@"
-        fi
-        """)
+      cmd = recording_tresor!(dir)
 
       assert {:ok, sealed} = RisCassettes.tresor_seal("kanarienwert", tresor: cmd)
       assert {:ok, "kanarienwert"} = RisCassettes.tresor_open(sealed, "Der Grund", tresor: cmd)
 
       argv = File.read!(Path.join(dir, "argv"))
       stdin = File.read!(Path.join(dir, "stdin"))
-      assert argv == "recipient\nagree --reason Der Grund\n"
+
+      assert ["recipient", agree] = String.split(argv, "\n", trim: true)
+      assert agree =~ ~r/\Aagree --reason Der Grund --nonce [A-Z2-7]{8}\z/
 
       for seen <- [argv, stdin] do
         refute seen =~ "kanarienwert"
         refute seen =~ sealed
       end
+    end
+
+    test "Terminal und Dialog zeigen denselben Fingerabdruck und dieselbe Anfrage-Kennung" do
+      dir = tmp_area!("abgleich")
+      cmd = recording_tresor!(dir)
+
+      assert {:ok, sealed} = RisCassettes.tresor_seal("kanarienwert", tresor: cmd)
+
+      # Der Aufrufer kontrolliert nur seinen Text: Fingerabdruck und
+      # Anfrage-Kennung kommen aus dem Siegel bzw. aus dem Tresor (#475).
+      output =
+        capture_io(fn ->
+          assert {:ok, "kanarienwert"} =
+                   RisCassettes.tresor_open(sealed, "Der Grund", tresor: cmd)
+        end)
+
+      assert ["recipient", agree] =
+               String.split(File.read!(Path.join(dir, "argv")), "\n", trim: true)
+
+      [nonce] = Regex.run(~r/--nonce ([A-Z2-7]{8})\z/, agree, capture: :all_but_first)
+
+      assert output ==
+               "Freigabe erbeten: Siegel " <>
+                 fingerprint_of(sealed) <>
+                 ", Anfrage " <>
+                 nonce <>
+                 " (im Touch-ID-Dialog abgleichen)\n"
     end
 
     test "Timeout beendet das Programm ohne Freigabe" do

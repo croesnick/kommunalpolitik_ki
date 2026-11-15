@@ -61,6 +61,9 @@ defmodule KomkiConnectorRis.RisCassettes do
   @outdated_prefix "ktv1."
   @tresor_program "komki-tresor"
   @shared_secret_bytes 32
+  # Fresh request tag for one tresor agreement (#475); distinct from the
+  # rkt1 file nonce below, which never leaves this script.
+  @request_nonce_bytes 5
   @seal_timeout_ms 10_000
   # Opening waits for Touch ID or the password.
   @open_timeout_ms 120_000
@@ -246,7 +249,14 @@ defmodule KomkiConnectorRis.RisCassettes do
 
   @impl SealedEnvelope.KeyAgreement
   def agree(key_ref, peer_public, opts) do
-    args = ["agree", "--reason", Keyword.fetch!(opts, :reason)]
+    # One fresh request nonce per agreement (#475): the dialog shows it next
+    # to the seal fingerprint, and the terminal line below shows the same
+    # pair for the person to compare. The caller's reason is display text,
+    # not the consent basis.
+    nonce = request_nonce()
+    show_crosscheck(key_ref, peer_public, nonce)
+
+    args = ["agree", "--reason", Keyword.fetch!(opts, :reason), "--nonce", nonce]
     input = Base.encode64(key_ref) <> " " <> Base.encode64(peer_public)
     timeout = Keyword.get(opts, :open_timeout, @open_timeout_ms)
 
@@ -256,6 +266,33 @@ defmodule KomkiConnectorRis.RisCassettes do
         _ -> {:error, :invalid}
       end
     end
+  end
+
+  # Fresh request tag for one agreement (#475): 8 readable characters, 40
+  # unpredictable bits. Not secret — its job is that the person can tell
+  # this request's dialog apart from every other.
+  defp request_nonce,
+    do: @request_nonce_bytes |> :crypto.strong_rand_bytes() |> Base.encode32(padding: false)
+
+  # The terminal line for the person (#475): the dialog shows the same
+  # fingerprint and nonce; the caller's reason alone never identifies the
+  # requester. Fingerprint: first 8 hex characters of SHA-256 over ref and
+  # eph, as the program composes them for the dialog.
+  defp show_crosscheck(key_ref, peer_public, nonce) do
+    IO.puts(
+      "Freigabe erbeten: Siegel " <>
+        fingerprint(key_ref, peer_public) <>
+        ", Anfrage " <>
+        nonce <>
+        " (im Touch-ID-Dialog abgleichen)"
+    )
+  end
+
+  defp fingerprint(key_ref, peer_public) do
+    :sha256
+    |> :crypto.hash(key_ref <> peer_public)
+    |> Base.encode16(case: :lower)
+    |> binary_part(0, 8)
   end
 
   # Key material travels only over stdin/stdout, never argv (komki-tresor

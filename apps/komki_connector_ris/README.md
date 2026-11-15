@@ -284,8 +284,11 @@ Dazu `unseal` des Echt-Verzeichnisses vorher und `seal` nachher — derselbe Bog
 auch kein Agent — die Kassetten ohne die Person am Mac lesen kann. Der Schlüssel liegt nur als
 ktv2-Siegel (`apps/sealed_envelope`, Schlüsselvereinbarung über `komki-tresor`) im macOS-Schlüsselbund (Eintrag `ris-kassetten`), gebunden an die Secure
 Enclave dieses Macs; jede Ver- und Entschlüsselung löst genau eine Freigabe per Touch ID (oder
-Passwort des Macs) aus. Der Eintrag heißt anders als das Skript, weil er gespeicherter Zustand ist:
-Ein neuer Name fände den Schlüssel der schon verschlüsselten Kassetten nicht mehr.
+Passwort des Macs) aus. Vor jeder Freigabe schreibt das Skript „Freigabe erbeten: Siegel …,
+Anfrage …“ ins Terminal, und der Dialog zeigt dieselbe Kombination vor dem als unvertraut
+gekennzeichneten Grund — passt sie nicht zusammen, ablehnen (#475). Der Eintrag heißt anders
+als das Skript, weil er gespeicherter Zustand ist: Ein neuer Name fände den Schlüssel der
+schon verschlüsselten Kassetten nicht mehr.
 
 ```bash
 elixir apps/komki_connector_ris/priv/ris_cassettes.exs init                 # einmalig
