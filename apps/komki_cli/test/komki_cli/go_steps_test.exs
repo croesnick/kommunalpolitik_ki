@@ -33,9 +33,14 @@ defmodule KomkiCli.GoStepsTest do
     %{base: base, dir: dir, request: request}
   end
 
-  defp ui(answer) do
+  defp ui(answer, selection \\ "") do
     test = self()
-    %{say: &send(test, {:said, &1}), confirm: fn _question, false -> answer end}
+
+    %{
+      say: &send(test, {:said, &1}),
+      confirm: fn _question, false -> answer end,
+      select: fn _question -> selection end
+    }
   end
 
   defp answer_file(dir, request), do: Path.join(dir, request["call_hash"] <> ".answer.json")
@@ -123,5 +128,81 @@ defmodule KomkiCli.GoStepsTest do
     assert GoSteps.describe(store) =~ "Aktion:    speichern — jedes Schreiben braucht dein GO"
     refute GoSteps.describe(request) =~ "Aktion:"
     assert Go.release_for(store, 1)["operation"] == "store"
+  end
+
+  # Offenlegungsfreigabe (#423, Szene 13): Erst die Teileauswahl, dann das
+  # GO — die Auswahl allein ist noch keine Freigabe. Ticket #476 (Audit
+  # #467, Fund F4): Eine Ablehnung (n, EOF, kein Terminal) darf die
+  # Auswahl nie als Freigabe schreiben; headless gibt es kein GO („Ein Ja
+  # darf nur eine Person geben, nie ein Skript").
+  describe "Offenlegungsfreigabe (#423, #476)" do
+    setup ctx do
+      File.rm!(Path.join(ctx.dir, ctx.request["call_hash"] <> ".request.json"))
+
+      offenlegung =
+        Map.merge(ctx.request, %{
+          "kind" => "offenlegungsfreigabe",
+          "tool" => "rp_fakt_vorschlagen",
+          "params" => %{
+            "fakt" => "Versammlungsraum-Anmietung",
+            "teile" => [
+              "Versammlungsraum: Saal im Bürgerzentrum, Miete 340 Euro",
+              "Bemerkung: Budget-Lage der Fraktion"
+            ]
+          },
+          "ausgabeart" => "stand",
+          "ziellabel" => ["vorstand"],
+          "empfaenger" => ["vorstand", "nextcloud-betreiber", "sicherung"],
+          "teile" => [%{"id" => "teil-1", "nummer" => 1}, %{"id" => "teil-2", "nummer" => 2}],
+          "call_hash" => String.duplicate("c", 64)
+        })
+
+      Go.write_atomic(
+        Path.join(ctx.dir, offenlegung["call_hash"] <> ".request.json"),
+        offenlegung
+      )
+
+      %{offenlegung: offenlegung}
+    end
+
+    test "Ja mit Teilauswahl: Freigabe mit genau den gewählten Teilen", %{
+      base: base,
+      dir: dir,
+      offenlegung: offenlegung
+    } do
+      assert {"1 von 1 Anfragen freigegeben\n", 0} = GoSteps.run(base, ui(true, "1"))
+
+      {:ok, answer} = KomkiPolicy.JSON.parse(File.read!(answer_file(dir, offenlegung)))
+      assert answer["schema"] == "komki-go-answer/1"
+      assert answer["go"] == true
+      assert answer["teile"] == ["teil-1"]
+    end
+
+    # #476: Der Mensch wählt Teil 1 und verweigert dann das GO — die
+    # Auswahl ist kein GO, nichts verlässt den Raum.
+    test "Ablehnung nach Teilauswahl: nie eine Freigabe", %{
+      base: base,
+      dir: dir,
+      offenlegung: offenlegung
+    } do
+      assert {"0 von 1 Anfragen freigegeben\n", 0} = GoSteps.run(base, ui(false, "1"))
+
+      assert {:ok, %{"go" => false}} =
+               KomkiPolicy.JSON.parse(File.read!(answer_file(dir, offenlegung)))
+    end
+
+    # #476, headless: Ohne Terminal liefert die Auswahl die Vorgabe (Enter
+    # = alle) und das GO ist immer nein — die Offenlegung darf nie
+    # automatisch alle Teile freigeben.
+    test "Headless: ohne Terminal nie eine Freigabe, auch nicht alle Teile", %{
+      base: base,
+      dir: dir,
+      offenlegung: offenlegung
+    } do
+      assert {"0 von 1 Anfragen freigegeben\n", 0} = GoSteps.run(base, ui(false, ""))
+
+      assert {:ok, %{"go" => false}} =
+               KomkiPolicy.JSON.parse(File.read!(answer_file(dir, offenlegung)))
+    end
   end
 end

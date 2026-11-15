@@ -109,7 +109,12 @@ defmodule KomkiCli.GoSteps do
         )
       end
 
-    case Go.answer_selection(dir, request, ids || []) do
+    # #476: Die Auswahl ist erst mit dem GO eine Freigabe. Eine Ablehnung
+    # (n, EOF, kein Terminal) schreibt [] — die leere Auswahl ist das Nein
+    # (Go.answer_selection/3), nie die gewaehlten Teile.
+    antwort_teile = if go?, do: ids || [], else: []
+
+    case Go.answer_selection(dir, request, antwort_teile) do
       :ok when go? ->
         ui.say.("Offenlegung erteilt — sie gilt nur für diesen Aufruf, einmal.")
         :go
