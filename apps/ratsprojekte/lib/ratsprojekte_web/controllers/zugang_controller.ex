@@ -6,7 +6,9 @@ defmodule RatsprojekteWeb.ZugangController do
     browser, valid once and for two minutes.
   - `entsperren/2`: the „Entsperren“ button on the lock page. A POST with
     the CSRF token of that page, so no other website can trigger it; the
-    hub then asks for Touch ID exactly as for `ratsprojekte open`.
+    hub then asks for Touch ID exactly as for `ratsprojekte open`. The page
+    shows the check code of the request, the person approves only a dialog
+    naming the same code (#490).
 
   Both renew the session, so a cookie from before cannot ride along.
   """
@@ -27,14 +29,26 @@ defmodule RatsprojekteWeb.ZugangController do
     end
   end
 
-  def entsperren(conn, _params) do
+  def entsperren(conn, params) do
     if Zugang.aktiv?() do
-      with {:ok, token} <- Sperre.oeffnen(),
+      with {:ok, token} <- Sperre.oeffnen(params["pruefcode"]),
            {:ok, marker} <- Sperre.einloesen(token) do
         zulassen(conn, marker)
       else
         {:error, :datenbank} ->
           Zugang.gesperrt(conn, "Nicht entsperrt: Die Datenbank ließ sich nicht öffnen.")
+
+        {:error, :anfrage_laeuft} ->
+          Zugang.gesperrt(
+            conn,
+            "Nicht entsperrt: Es läuft schon eine Entsperr-Anfrage, bitte gleich noch einmal."
+          )
+
+        {:error, :falscher_pruefcode} ->
+          Zugang.gesperrt(
+            conn,
+            "Nicht entsperrt: Prüfcode fehlt oder hat die falsche Form; bitte die Seite neu laden."
+          )
 
         {:error, reason} ->
           Zugang.gesperrt(conn, "Nicht entsperrt: " <> Schluessel.beschreiben(reason) <> ".")

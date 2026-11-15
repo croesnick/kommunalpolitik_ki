@@ -23,7 +23,7 @@ defmodule Ratsprojekte.SperreTest do
     eingerichtet!(home)
     sperre = sperre!(home)
 
-    assert {:ok, token} = Sperre.oeffnen(sperre)
+    assert {:ok, token} = Sperre.oeffnen(sperre, "111222")
     assert Sperre.status(sperre) == :offen
     assert {:ok, marker} = Sperre.einloesen(sperre, token)
     assert :error = Sperre.einloesen(sperre, token)
@@ -42,26 +42,26 @@ defmodule Ratsprojekte.SperreTest do
     eingerichtet!(home)
     sperre = sperre!(home)
 
-    {:ok, t1} = Sperre.oeffnen(sperre)
+    {:ok, t1} = Sperre.oeffnen(sperre, "111222")
     {:ok, m1} = Sperre.einloesen(sperre, t1)
-    {:ok, t2} = Sperre.oeffnen(sperre)
+    {:ok, t2} = Sperre.oeffnen(sperre, "111222")
     assert t1 != t2
     assert {:ok, ^m1} = Sperre.einloesen(sperre, t2)
 
     # Without the seal (Touch ID refused, key gone) no further link.
     File.rm!(Ort.schluessel(home))
-    assert {:error, :nicht_eingerichtet} = Sperre.oeffnen(sperre)
+    assert {:error, :nicht_eingerichtet} = Sperre.oeffnen(sperre, "111222")
   end
 
   test "falscher Schlüssel zur vorhandenen Datenbank: bleibt gesperrt" do
     home = home!()
     eingerichtet!(home)
     sperre = sperre!(home)
-    {:ok, _} = Sperre.oeffnen(sperre)
+    {:ok, _} = Sperre.oeffnen(sperre, "111222")
     Sperre.sperren(sperre)
 
     :ok = Schluessel.versiegeln(Schluessel.neu(), home, provider(home))
-    assert {:error, :falscher_schluessel} = Sperre.oeffnen(sperre)
+    assert {:error, :falscher_schluessel} = Sperre.oeffnen(sperre, "111222")
     assert Sperre.status(sperre) == :gesperrt
   end
 
@@ -71,8 +71,8 @@ defmodule Ratsprojekte.SperreTest do
     sperre = sperre!(home)
     Phoenix.PubSub.subscribe(Ratsprojekte.PubSub, Sperre.topic())
 
-    {:ok, t1} = Sperre.oeffnen(sperre)
-    {:ok, t2} = Sperre.oeffnen(sperre)
+    {:ok, t1} = Sperre.oeffnen(sperre, "111222")
+    {:ok, t2} = Sperre.oeffnen(sperre, "111222")
     {:ok, marker} = Sperre.einloesen(sperre, t1)
     :ok = Sperre.sperren(sperre)
 
@@ -89,7 +89,7 @@ defmodule Ratsprojekte.SperreTest do
     sperre = sperre!(home, sperre_nach: 150)
     Phoenix.PubSub.subscribe(Ratsprojekte.PubSub, Sperre.topic())
 
-    {:ok, _} = Sperre.oeffnen(sperre)
+    {:ok, _} = Sperre.oeffnen(sperre, "111222")
     assert_receive :gesperrt, 1_000
     assert Sperre.status(sperre) == :gesperrt
   end
@@ -99,7 +99,7 @@ defmodule Ratsprojekte.SperreTest do
     eingerichtet!(home)
     sperre = sperre!(home, sperre_nach: 300)
     Phoenix.PubSub.subscribe(Ratsprojekte.PubSub, Sperre.topic())
-    {:ok, _} = Sperre.oeffnen(sperre)
+    {:ok, _} = Sperre.oeffnen(sperre, "111222")
 
     for _ <- 1..6 do
       Sperre.handlung(sperre)
@@ -110,6 +110,70 @@ defmodule Ratsprojekte.SperreTest do
     assert_receive :gesperrt, 1_000
   end
 
+  # F21 (#490): Ohne Drossel stellt ein Programm im Benutzerkonto eine zweite
+  # Anfrage, während die erste am Dialog hängt — der zweite Prompt ist vom
+  # eigenen nicht zu unterscheiden.
+  test "nur eine Entsperr-Anfrage zur Zeit, die zweite wird klar abgewiesen" do
+    home = home!()
+    eingerichtet!(home)
+    sperre = sperre!(home, provider: aufzeichner(home, warten: true))
+
+    erste = Task.async(fn -> Sperre.oeffnen(sperre, "111222") end)
+    assert_receive {:agree, _}
+    assert {:error, :anfrage_laeuft} = Sperre.oeffnen(sperre, "111222")
+
+    # Nach dem Ende der ersten Anfrage ist der Platz wieder frei.
+    send(erste.pid, :freigabe)
+    assert {:ok, _} = Task.await(erste, 10_000)
+
+    zweite = Task.async(fn -> Sperre.oeffnen(sperre, "111222") end)
+    assert_receive {:agree, _}
+    send(zweite.pid, :freigabe)
+    assert {:ok, _} = Task.await(zweite, 10_000)
+  end
+
+  # Sonst bliebe der Platz für immer belegt: Nach einem Absturz der
+  # anfragenden Stelle ginge keine Entsperr-Anfrage mehr durch.
+  test "stirbt die anfragende Stelle am Dialog, wird der Platz wieder frei" do
+    home = home!()
+    eingerichtet!(home)
+    sperre = sperre!(home, provider: aufzeichner(home, warten: true))
+
+    pid = spawn(fn -> Sperre.oeffnen(sperre, "111222") end)
+    assert_receive {:agree, _}
+
+    # Der eigene Monitor belegt erst den Tod des Prozesses, wenn die Sperre
+    # ihre :DOWN-Nachricht sicher vor jeder neuen Anfrage sieht.
+    monitor = Process.monitor(pid)
+    Process.exit(pid, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^pid, _}
+
+    neue = Task.async(fn -> Sperre.oeffnen(sperre, "111222") end)
+    assert_receive {:agree, _}
+    send(neue.pid, :freigabe)
+    assert {:ok, _} = Task.await(neue, 10_000)
+  end
+
+  # Review-Nacharbeit zu #490: `sperren` ist über den Verwaltungs-Socket für
+  # jeden Prozess im Benutzerkonto erreichbar. Räumte es den Platz der
+  # laufenden Anfrage, stellte ein Programm im Wechsel mit `sperren` wieder
+  # beliebig viele Dialoge auf. Der Platz bleibt belegt, solange der Dialog steht.
+  test "sperren räumt den Platz einer laufenden Anfrage nicht" do
+    home = home!()
+    eingerichtet!(home)
+    sperre = sperre!(home, provider: aufzeichner(home, warten: true))
+
+    erste = Task.async(fn -> Sperre.oeffnen(sperre, "111222") end)
+    assert_receive {:agree, _}
+
+    :ok = Sperre.sperren(sperre)
+    assert {:error, :anfrage_laeuft} = Sperre.oeffnen(sperre, "222333")
+
+    # Die laufende Anfrage bleibt zugeordnet: Freigabe entsperrt wie versprochen.
+    send(erste.pid, :freigabe)
+    assert {:ok, _} = Task.await(erste, 10_000)
+  end
+
   test "vor jeder Schemaänderung eine Kopie neben der Datenbank, nur die letzte bleibt" do
     home = home!()
     eingerichtet!(home)
@@ -117,24 +181,24 @@ defmodule Ratsprojekte.SperreTest do
     sperre = sperre!(home, migrationen: dir)
 
     # A new database is no schema change of existing data: no copy.
-    {:ok, _} = Sperre.oeffnen(sperre)
+    {:ok, _} = Sperre.oeffnen(sperre, "111222")
     Ratsprojekte.BetriebRepo.query!("INSERT INTO probe_1 (text) VALUES ('Stand vor 2')")
     Sperre.sperren(sperre)
     refute File.exists?(Ort.kopie(home))
 
     # No pending migration: no copy either.
-    {:ok, _} = Sperre.oeffnen(sperre)
+    {:ok, _} = Sperre.oeffnen(sperre, "111222")
     Sperre.sperren(sperre)
     refute File.exists?(Ort.kopie(home))
 
     migrationen!(home, 2)
-    {:ok, _} = Sperre.oeffnen(sperre)
+    {:ok, _} = Sperre.oeffnen(sperre, "111222")
     Sperre.sperren(sperre)
     erste = File.read!(Ort.kopie(home))
     assert binary_part(erste, 0, 15) != @plaintext_header
 
     migrationen!(home, 3)
-    {:ok, _} = Sperre.oeffnen(sperre)
+    {:ok, _} = Sperre.oeffnen(sperre, "111222")
     Sperre.sperren(sperre)
 
     assert File.read!(Ort.kopie(home)) != erste

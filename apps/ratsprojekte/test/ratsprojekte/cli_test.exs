@@ -100,6 +100,135 @@ defmodule Ratsprojekte.CLITest do
       assert text =~ "nicht eingerichtet"
       refute_received {:browser, _}
     end
+
+    # F21 (#490): Wer am Touch-ID-Dialog nicht unterscheiden kann, ob die
+    # eigene Stelle fragt oder ein anderes Programm, gibt statt seiner Freigabe
+    # womöglich dessen. Der Prüfcode macht die Anfrage zurechenbar.
+    test "oeffnen ohne Prüfcode bekommt keinen Link", %{home: home} do
+      {:ok, sock} =
+        :gen_tcp.connect({:local, Ort.verwaltung(home)}, 0, [
+          :binary,
+          packet: :line,
+          active: false
+        ])
+
+      :ok = :gen_tcp.send(sock, "oeffnen\n")
+      assert {:ok, "fehler oeffnen braucht einen Prüfcode" <> _} = :gen_tcp.recv(sock, 0, 2_000)
+      :ok = :gen_tcp.close(sock)
+    end
+
+    test "oeffnen mit Prüfcode entsperrt wie open", %{home: home, sperre: sperre} do
+      {:ok, sock} =
+        :gen_tcp.connect({:local, Ort.verwaltung(home)}, 0, [
+          :binary,
+          packet: :line,
+          active: false
+        ])
+
+      :ok = :gen_tcp.send(sock, "oeffnen 111222\n")
+      assert {:ok, "ok http://localhost:4100/zugang/" <> line} = :gen_tcp.recv(sock, 0, 2_000)
+      token = String.trim(line)
+      assert {:ok, _} = Sperre.einloesen(sperre, token)
+      assert Sperre.status(sperre) == :offen
+      :ok = :gen_tcp.close(sock)
+    end
+
+    test "open zeigt den Prüfcode im Terminal, bevor der Dialog fragt", %{home: home} do
+      browser = fn link -> send(self(), {:browser, link}) end
+
+      io = [
+        browser: browser,
+        pruefcode: fn text -> send(self(), {:pruefcode, text}) end
+      ]
+
+      assert {_, 0} = CLI.run(["open"], home, provider(home), io)
+      assert_received {:pruefcode, text}
+      assert text =~ ~r/\d{6}/
+      assert_received {:browser, _}
+    end
+  end
+
+  describe "Entsperr-Anfragen gedrosselt (#490)" do
+    setup do
+      home = home!()
+      eingerichtet!(home)
+      sperre = sperre!(home, provider: aufzeichner(home, warten: true))
+
+      start_supervised!(
+        {Ratsprojekte.Verwaltung,
+         pfad: Ort.verwaltung(home), sperre: sperre, basis_url: fn -> "http://localhost:4100" end}
+      )
+
+      %{home: home, sperre: sperre}
+    end
+
+    # Der Socket serialisiert seine Verbindungen; ein Programm kann aber
+    # zeitgleich mit der Sperrseite fragen. Dann weist der Hub klar ab.
+    test "während einer laufenden Anfrage weist der Socket weitere klar ab", %{
+      home: home,
+      sperre: sperre
+    } do
+      erste = Task.async(fn -> Sperre.oeffnen(sperre, "111222") end)
+      assert_receive {:agree, _}
+
+      {:ok, sock} =
+        :gen_tcp.connect({:local, Ort.verwaltung(home)}, 0, [
+          :binary,
+          packet: :line,
+          active: false
+        ])
+
+      :ok = :gen_tcp.send(sock, "oeffnen 222333\n")
+
+      assert {:ok, "fehler eine Entsperr-Anfrage läuft schon\n"} =
+               :gen_tcp.recv(sock, 0, 2_000)
+
+      :ok = :gen_tcp.close(sock)
+      send(erste.pid, :freigabe)
+      assert {:ok, _} = Task.await(erste, 10_000)
+    end
+
+    # Review-Nacharbeit zu #490: `sperren` ist wie `oeffnen` für jedes Programm
+    # im Benutzerkonto über den Socket erreichbar. Räumte es den Platz der
+    # laufenden Anfrage, bekäme der nächste `oeffnen` statt der Abweisung
+    # wieder einen eigenen Dialog samt Link.
+    test "sperren über den Socket räumt den Platz einer laufenden Anfrage nicht", %{
+      home: home,
+      sperre: sperre
+    } do
+      erste = Task.async(fn -> Sperre.oeffnen(sperre, "111222") end)
+      assert_receive {:agree, _}
+
+      {:ok, sperren_sock} =
+        :gen_tcp.connect({:local, Ort.verwaltung(home)}, 0, [
+          :binary,
+          packet: :line,
+          active: false
+        ])
+
+      :ok = :gen_tcp.send(sperren_sock, "sperren\n")
+      assert {:ok, "ok\n"} = :gen_tcp.recv(sperren_sock, 0, 2_000)
+      :ok = :gen_tcp.close(sperren_sock)
+
+      {:ok, sock} =
+        :gen_tcp.connect({:local, Ort.verwaltung(home)}, 0, [
+          :binary,
+          packet: :line,
+          active: false
+        ])
+
+      :ok = :gen_tcp.send(sock, "oeffnen 222333\n")
+
+      # Nach dem Fix kommt die Abweisung sofort. Vor dem Fix hänge die zweite
+      # Anfrage an der Dialog-Bremse (fünf Sekunden) und käme dann als voller
+      # Link zurück — die sechs Sekunden lassen genau das sichtbar werden.
+      assert {:ok, "fehler eine Entsperr-Anfrage läuft schon\n"} =
+               :gen_tcp.recv(sock, 0, 6_000)
+
+      :ok = :gen_tcp.close(sock)
+      send(erste.pid, :freigabe)
+      assert {:ok, _} = Task.await(erste, 10_000)
+    end
   end
 
   test "ohne laufenden Hub sagt open, was zu tun ist" do
@@ -113,7 +242,7 @@ defmodule Ratsprojekte.CLITest do
     {text, 0} = CLI.run(["einrichten"], home, provider(home), ohne_launchd())
     [code] = Regex.run(~r/([A-Z2-7]{4}-){12}[A-Z2-7]{4}/, text, capture: :first)
     sperre = sperre!(home)
-    {:ok, _} = Sperre.oeffnen(sperre)
+    {:ok, _} = Sperre.oeffnen(sperre, "111222")
     :ok = Sperre.sperren(sperre)
 
     # Seal and enclave key gone, as after a restore onto another Mac.
@@ -123,7 +252,7 @@ defmodule Ratsprojekte.CLITest do
     gets = fn _prompt -> "  " <> String.downcase(code) <> "\n" end
     assert {text, 0} = CLI.run(["recover"], home, provider(home), gets: gets)
     assert text =~ "komki secret erzeugen ratsprojekte-hub"
-    assert {:ok, _} = Sperre.oeffnen(sperre)
+    assert {:ok, _} = Sperre.oeffnen(sperre, "111222")
 
     falsch = fn _prompt -> Schluessel.code(Schluessel.neu()) end
     assert {text, 1} = CLI.run(["recover"], home, provider(home), gets: falsch)

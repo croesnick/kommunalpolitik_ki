@@ -3,15 +3,18 @@ defmodule Ratsprojekte.Verwaltung do
   The socket of the `ratsprojekte` command (`Ort.verwaltung/1`, mode 0600):
   one line in, one line out, one connection at a time.
 
-      oeffnen   ->  ok <link>     Touch ID, then a one-time link
-      sperren   ->  ok
-      status    ->  ok offen | ok gesperrt
-      otherwise ->  fehler <text without values>
+      oeffnen <pruefcode> ->  ok <link>  Touch ID with that code in the reason, then a one-time link
+      oeffnen             ->  fehler     without a code there is no prompt at all (#490)
+      sperren             ->  ok
+      status              ->  ok offen | ok gesperrt
+      otherwise           ->  fehler <text without values>
 
-  The hub asks for Touch ID itself (`Sperre.oeffnen/1`); the key never
-  leaves the hub process. The release runs without Erlang distribution, so
-  this socket is the only way in besides the browser port and the connector
-  socket.
+  The hub asks for Touch ID itself (`Sperre.oeffnen/2`); the key never
+  leaves the hub process. The code names the requesting channel, so the
+  person approves only a dialog naming the code their channel shows, and
+  while one dialog is up further `oeffnen` lines get a clear error. The
+  release runs without Erlang distribution, so this socket is the only way
+  in besides the browser port and the connector socket.
   """
 
   use Task, restart: :permanent
@@ -70,13 +73,20 @@ defmodule Ratsprojekte.Verwaltung do
   end
 
   @doc false
-  def antwort("oeffnen", sperre, basis_url) do
-    case Sperre.oeffnen(sperre) do
+  def antwort("oeffnen " <> pruefcode, sperre, basis_url) do
+    case Sperre.oeffnen(sperre, pruefcode) do
       {:ok, token} -> "ok " <> basis_url.() <> "/zugang/" <> token
       {:error, :datenbank} -> "fehler Datenbank nicht zu öffnen, Log prüfen"
+      {:error, :anfrage_laeuft} -> "fehler eine Entsperr-Anfrage läuft schon"
+      {:error, :falscher_pruefcode} -> "fehler Prüfcode hat die falsche Form"
       {:error, reason} -> "fehler " <> Schluessel.beschreiben(reason)
     end
   end
+
+  # Without a code the dialog would belong to no channel the person can see,
+  # so it must not even ask (#490). Old CLIs get a hint instead of a prompt.
+  def antwort("oeffnen", _sperre, _basis_url),
+    do: "fehler oeffnen braucht einen Prüfcode (ratsprojekte-Version zu alt?)"
 
   def antwort("sperren", sperre, _basis_url) do
     :ok = Sperre.sperren(sperre)

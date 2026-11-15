@@ -29,6 +29,18 @@ defmodule Ratsprojekte.Betrieb do
 
   def provider(home), do: {FileTestDouble, path: Path.join(home, "enclave.key")}
 
+  @doc """
+  Provider like `provider/1`, but every agreement reports its opts to `ziel`
+  (the Touch ID reason); `reason:` sets one like in operation, `warten:` holds
+  the request at the „prompt“ until that process receives `:freigabe`
+  (or after five seconds). Tests for #490.
+  """
+  def aufzeichner(home, opts \\ []) do
+    {Ratsprojekte.Betrieb.Aufzeichner,
+     [path: Path.join(home, "enclave.key"), ziel: Keyword.get(opts, :ziel, self())] ++
+       Keyword.take(opts, [:reason, :warten])}
+  end
+
   @doc "Seal a fresh key under `home`, as `ratsprojekte einrichten` does."
   def eingerichtet!(home) do
     key = Schluessel.neu()
@@ -61,12 +73,44 @@ defmodule Ratsprojekte.Betrieb do
       {Sperre,
        name: Keyword.get(opts, :name),
        home: home,
-       provider: provider(home),
+       provider: Keyword.get(opts, :provider, provider(home)),
        sperre_nach: Keyword.get(opts, :sperre_nach, 60_000),
        repo: Ratsprojekte.BetriebRepo,
        repo_supervisor: sup,
        migrationen: Keyword.get_lazy(opts, :migrationen, fn -> migrationen!(home, 1) end)},
       id: make_ref()
     )
+  end
+end
+
+defmodule Ratsprojekte.Betrieb.Aufzeichner do
+  @moduledoc """
+  TEST DOUBLE — wie `SealedEnvelope.KeyAgreement.FileTestDouble`, aber
+  `agree/3` meldet seine opts an `:ziel` (darin steht der Grund des
+  Touch-ID-Dialogs); mit `warten: true` hält es die Anfrage am „Dialog“
+  fest, bis der aufrufende Prozess `:freigabe` erhält (nach fünf Sekunden
+  spätestens). Für die Tests zu #490.
+  """
+
+  @behaviour SealedEnvelope.KeyAgreement
+
+  alias SealedEnvelope.KeyAgreement.FileTestDouble
+
+  @impl true
+  def recipient(opts), do: FileTestDouble.recipient(opts)
+
+  @impl true
+  def agree(key_ref, peer_public, opts) do
+    send(Keyword.fetch!(opts, :ziel), {:agree, opts})
+
+    if opts[:warten] do
+      receive do
+        :freigabe -> :ok
+      after
+        5_000 -> :ok
+      end
+    end
+
+    FileTestDouble.agree(key_ref, peer_public, opts)
   end
 end

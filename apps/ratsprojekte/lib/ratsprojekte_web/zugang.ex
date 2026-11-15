@@ -44,13 +44,17 @@ defmodule RatsprojekteWeb.Zugang do
     end
   end
 
-  @doc "The lock page for everyone without access; `fehler` says why an unlock failed."
+  @doc """
+  The lock page for everyone without access; `fehler` says why an unlock
+  failed. Each render shows a fresh check code: the person approves only a
+  Touch ID dialog naming the same code (#490), and the form carries it back.
+  """
   @spec gesperrt(Plug.Conn.t(), String.t() | nil) :: Plug.Conn.t()
   def gesperrt(conn, fehler \\ nil) do
     conn
     |> put_status(401)
     |> put_view(RatsprojekteWeb.ZugangHTML)
-    |> render(:gesperrt, fehler: fehler)
+    |> render(:gesperrt, fehler: fehler, pruefcode: Sperre.pruefcode())
   end
 
   @spec on_mount(atom(), map(), map(), Phoenix.LiveView.Socket.t()) ::
