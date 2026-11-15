@@ -70,6 +70,36 @@ defmodule KomkiCli.Pins do
     Enum.map(artifacts(cfg), fn {name, path} -> check(name, path, Map.get(cfg.pins, name)) end)
   end
 
+  @doc """
+  Tresor-Gate (Ticket #489): `komki-tresor` vor dem Ausfuehren auf den
+  festgehaltenen Pin pruefen — dasselbe Urteil wie der Doctor-Pin (`checks/1`),
+  gesprochen vor jedem Start des Programms statt nur beim `up`. Fehlt der Pin
+  oder weichen Pfad oder SHA ab, verweigert das Gate mit der Begruendung des
+  Doctor-Checks; ein gepflanztes Programm versiegelt keine Geheimnisse. Die
+  Application-Env `:komki_cli, :tresor_pin` (Pin-Map wie in config.json)
+  ersetzt den Config-Lookup (Tests).
+  """
+  @spec tresor_gate(String.t()) :: :ok | {:error, String.t()}
+  def tresor_gate(command) do
+    with {:ok, pin} <- expected_pin() do
+      case check("komki-tresor", command, pin) do
+        %{ok: true} -> :ok
+        %{ok: false, reason: reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp expected_pin do
+    if pin = Application.get_env(:komki_cli, :tresor_pin) do
+      {:ok, pin}
+    else
+      case Config.load(Config.config_path(Config.default_base())) do
+        {:ok, cfg} -> {:ok, Map.get(cfg.pins, "komki-tresor")}
+        {:error, reason} -> {:error, "config: " <> reason}
+      end
+    end
+  end
+
   defp check(name, path, pin) do
     check = "pin " <> name
 
