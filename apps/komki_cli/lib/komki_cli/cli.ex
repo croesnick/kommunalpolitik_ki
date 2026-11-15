@@ -608,7 +608,7 @@ defmodule KomkiCli.CLI do
   defp run_session(opts) do
     case KomkiCli.Steps.session_plan(opts, &show_start/1) do
       {:session_plan, header, intake} ->
-        if header != [], do: IO.write(Enum.join(header, "\n") <> "\n")
+        if header != [], do: IO.write(render_session_header(header))
         render(KomkiCli.Steps.session_start(intake, opts))
 
       {:session_refused, header, _entries} ->
@@ -619,6 +619,22 @@ defmodule KomkiCli.CLI do
     end
   end
 
+  # Ticket #494 (F31): Intake-Header sind zeilenorientiert — eine
+  # Statuszeile je Datei, ein Vertragswert je Zeile. sanitize/1 entfernt
+  # die OSC/CSI/C1-Steuersequenzen aus Dateisystem- und Log-Daten;
+  # eingebettete Zeilenumbrueche escaped es sichtbar, damit ein
+  # Dateiname keine gefaelschte 'datei: … permit'-Zeile vortaeuschen
+  # kann (Terminal.sanitize haelt \n bewusst fuer pi-Prosa).
+  @doc false
+  @spec render_session_header([String.t()]) :: String.t()
+  def render_session_header([]), do: ""
+
+  def render_session_header(header),
+    do: Enum.map_join(header, "\n", &sanitize_header_line/1) <> "\n"
+
+  defp sanitize_header_line(line),
+    do: line |> KomkiCli.Terminal.sanitize() |> String.replace("\n", "\\n")
+
   @doc false
   @spec render_session_refused([String.t()]) :: outcome()
   def render_session_refused(header) do
@@ -627,7 +643,7 @@ defmodule KomkiCli.CLI do
         "session verweigert: Aufnahme nicht für alle Dateien permit (keine Datei abgelegt)" <>
         reset()
 
-    {Enum.join(header ++ [note], "\n") <> "\n", 3}
+    {Enum.join(Enum.map(header, &sanitize_header_line/1) ++ [note], "\n") <> "\n", 3}
   end
 
   defp trailing_help(argv) do
@@ -1190,8 +1206,12 @@ defmodule KomkiCli.CLI do
   defp render({:label_export, path, _json}),
     do: {"Γ-Export geschrieben: " <> path <> "\n", 0}
 
+  # Ticket #494 (F31): Fehlergründe betten rohe Pfade ein (etwa
+  # --gguf-from); sanitize/1 entzieht darin Steuersequenzen die Wirkung,
+  # der Fehlertext bleibt lesbar.
   defp render({:error, reason, code}),
-    do: {red() <> String.trim_trailing(reason) <> reset() <> "\n", code}
+    do:
+      {red() <> String.trim_trailing(KomkiCli.Terminal.sanitize(reason)) <> reset() <> "\n", code}
 
   defp render_decision(decision) do
     "  #" <>

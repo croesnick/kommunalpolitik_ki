@@ -577,6 +577,33 @@ defmodule KomkiCli.SessionIntakeTest do
     assert out =~ "session verweigert"
   end
 
+  # Ticket #494 (Audit #467, F31): Ein Dateiname ist Dateisystem-Datum und
+  # kann OSC 52 und eingebettete Zeilenumbrueche tragen (gueltige APFS-
+  # Namen). Die rohen Bytes duerfen bis zur CLI-Naht fliessen (Daten-
+  # schicht), aber die Terminal-Form neutralisiert sie: keine Steuer-
+  # sequenzen, eine Statuszeile je Datei, Umbruch sichtbar escaped.
+  test "Ticket #494: Angriffsbytes im Dateinamen — CLI-Naht neutralisiert die Terminal-Form",
+       %{base: base, db: db} do
+    name = "brief\e]52;c;c2VjcmV0\a\n  datei: vertraulich.md -> permit.txt"
+    file = write_source!(base, name, "Ratsunterlage")
+    register_classified!(db, "brief", file, ["ratsarbeit@1"])
+    write_contract_room!(base, ["ratsarbeit@1"], ["brief@v1"])
+
+    assert {:session_plan, header, _intake} =
+             KomkiCli.Steps.session_plan(session_plan_opts(base, [file]))
+
+    # Die Naht erhaelt die rohen Angriffsbytes (Daten bleiben roh) …
+    assert Enum.join(header, "\n") =~ "\e]52;c;c2VjcmV0"
+
+    # … die Terminal-Form ist neutralisiert: keine ESC-Bytes, keine
+    # gefälschte zweite 'datei:'-Zeile, Umbruch sichtbar im Dateinamen.
+    rendered = KomkiCli.CLI.render_session_header(header)
+
+    refute rendered =~ "\e"
+    assert rendered |> String.split("\n") |> Enum.count(&String.starts_with?(&1, "  datei:")) == 1
+    assert rendered =~ "\\n  datei: vertraulich.md -> permit.txt"
+  end
+
   test "Steps.session_plan: --continue mit Dateien -> Exit 2", %{base: base, db: db} do
     file = write_source!(base, "brief.txt", "x")
     register_classified!(db, "brief", file, ["ratsarbeit@1"])

@@ -479,6 +479,55 @@ defmodule KomkiCli.DenialsTest do
 
       assert footer =~ "… weitere 2"
     end
+
+    # Ticket #494 (Audit #467, F26): Denial-Targets kommen aus dem
+    # Unified Log und sind Angreifer-bytes (crafted Paths unter den
+    # verbatim-Praefixen, mach-lookup-Namen mit OSC 52/OSC 8). Der Footer
+    # sanitiert; die Pfade bleiben lesbar, nur Steuerbytes verschwinden.
+    test "Ticket #494: OSC/CSI in Denial-Zielen verlieren ihre Steuerwirkung" do
+      denials = [
+        %{
+          operation: "file-read-data",
+          target: "/opt/angriff\e]52;c;c2VjcmV0\a",
+          occurrences: 2
+        },
+        %{
+          operation: "mach-lookup",
+          target: "com.vendor.service\e]8;;https://evil.example/?q=geheim\e\\",
+          occurrences: 1
+        }
+      ]
+
+      summary = %{status: "ok", denials: denials, report_path: "denials/x.json", error: nil}
+
+      footer = Denials.footer(summary)
+
+      # Rot waere: rohe ESC-Bytes landen ungefiltert im Terminal-Strom
+      # (OSC 52 schreibt die Zwischenablage, CSI ueberschreibt Zeilen).
+      refute footer =~ "\e"
+      refute footer =~ "c2VjcmV0"
+      refute footer =~ "evil.example"
+
+      # Entscheidung (Ticket #494): verbatim-Systempfade und Nicht-Pfad-
+      # Targets bleiben nach dem Sanitize lesbar.
+      assert footer =~ "/opt/angriff ×2"
+      assert footer =~ "com.vendor.service"
+    end
+
+    test "Ticket #494: Fehler-Footer sanitiert Log-Reste im Fehlergrund" do
+      summary = %{
+        status: "error",
+        denials: [],
+        report_path: nil,
+        error: "log show exit 64: Ausgabe\e]52;c;c2VjcmV0\a"
+      }
+
+      footer = Denials.footer(summary)
+
+      refute footer =~ "\e"
+      refute footer =~ "c2VjcmV0"
+      assert footer =~ "log show exit 64:"
+    end
   end
 
   defp window do
