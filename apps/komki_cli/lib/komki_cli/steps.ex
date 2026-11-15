@@ -89,7 +89,9 @@ defmodule KomkiCli.Steps do
              %{
                llama: pos_integer(),
                connectors: [{String.t(), Connectors.up_state()}],
-               mediator: mediator_state()
+               mediator: mediator_state(),
+               # Store-Migration (#513): Pfad der Sicherung, nil ohne Ersetzung.
+               store: String.t() | nil
              }}
           | {:down,
              %{
@@ -1041,15 +1043,20 @@ defmodule KomkiCli.Steps do
       {:checks, _checks, :ok} ->
         cfg = override_ctx(load_cfg!(), opts)
 
-        # Reihenfolge (Ticket #146): llama -> egress -> Connectoren -> Vermittler
-        with {:ok, pid} <- Llama.up(cfg),
+        # Label-Store vor jedem Start pruefen (Ticket #513): ein Store,
+        # der nur eine fruehere Vorlage enthaelt, wird ersetzt (mit
+        # Sicherung); eigene Inhalte bleiben unberuehrt. Vor llama, damit
+        # ein Abbruch nichts gestartet hinterlaesst.
+        with {:ok, store} <- store_migration(cfg),
+             # Reihenfolge (Ticket #146): llama -> egress -> Connectoren -> Vermittler
+             {:ok, pid} <- Llama.up(cfg),
              :ok <- write_models(cfg),
              {:ok, connectors} <- Connectors.up(cfg),
              {:ok, mediator} <- mediator_up(cfg) do
           %{"tools" => tools} = health_of(mediator)
           Channel.write_relay!(cfg)
           Mediator.write_mcp_config(cfg, tools)
-          {:up, %{llama: pid, connectors: connectors, mediator: mediator}}
+          {:up, %{llama: pid, connectors: connectors, mediator: mediator, store: store}}
         else
           {:error, reason} -> {:error, reason, 4}
         end
@@ -1135,6 +1142,18 @@ defmodule KomkiCli.Steps do
 
   # Praesenz-Pflicht sitzt HIER (up), nicht in init: der Vermittler-Binary
   # ist optional bei init, aber Pflicht zum Start (Ticket #102).
+
+  # Store-Migration (#513): nil, wenn nichts ersetzt wurde; der Sicherungspfad
+  # sonst (eine Zeile in der up-Ausgabe). Fehler gehen wie jede andere
+  # Startverweigerung durch (Exit 4).
+  defp store_migration(cfg) do
+    case Gamma.migrate_outdated_store(cfg) do
+      :ok -> {:ok, nil}
+      {:replaced, backup} -> {:ok, backup}
+      {:error, _reason} = error -> error
+    end
+  end
+
   defp mediator_up(cfg) do
     cond do
       not is_binary(cfg.mediator_bin) ->

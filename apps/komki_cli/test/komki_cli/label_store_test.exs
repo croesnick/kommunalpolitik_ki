@@ -600,4 +600,82 @@ defmodule KomkiCli.LabelStoreTest do
   # Objektreferenz OBJ@VER als Struct (KomkiCli.LabelStore.ObjectRef).
   defp ref(object_id, version),
     do: %LabelStore.ObjectRef{object_id: object_id, version: version}
+
+  # ----------------------------------------------------------------------
+  # Rechte des Store (Ticket #500, Fund F33/F34): registry.db entsteht wie
+  # Token und Denials mit 0600. Das Verzeichnis bleibt unangetastet —
+  # --db ist eine freie Pfadnaht; die Instanzbasis härtet Gamma.sync.
+  # ----------------------------------------------------------------------
+
+  describe "Rechte: registry.db 0600, Verzeichnis unangetastet (#500)" do
+    test "frischer Store entsteht mit 0600; das Verzeichnis bleibt unangetastet", %{
+      db: db,
+      seed: seed
+    } do
+      File.mkdir_p!(Path.dirname(db))
+      File.chmod!(Path.dirname(db), 0o755)
+
+      assert {:ok, _} = LabelStore.import_registry(db, seed)
+
+      assert mode(db) == 0o600
+      assert mode(Path.dirname(db)) == 0o755
+    end
+
+    test "zu offene Rechte vorhandener Dateien werden korrigiert; das Verzeichnis bleibt unangetastet",
+         %{db: db, seed: seed} do
+      dir = Path.dirname(db)
+      File.mkdir_p!(dir)
+      File.chmod!(dir, 0o755)
+      File.write!(db, "")
+      File.chmod!(db, 0o644)
+
+      assert {:ok, _} = LabelStore.import_registry(db, seed)
+
+      assert mode(db) == 0o600
+      assert mode(dir) == 0o755
+    end
+
+    test "Begleitdateien (-wal, -shm, -journal) werden auf 0600 gehärtet", %{db: db, seed: seed} do
+      for suffix <- ["-wal", "-shm", "-journal"] do
+        File.write!(db <> suffix, "")
+        File.chmod!(db <> suffix, 0o644)
+      end
+
+      assert {:ok, _} = LabelStore.import_registry(db, seed)
+
+      # -wal/-shm bleiben liegen und tragen 0600; das leere -journal räumt
+      # SQLite beim Öffnen selbst weg (gemessen: kein Rest, kein Leak).
+      for suffix <- ["-wal", "-shm"] do
+        assert mode(db <> suffix) == 0o600
+      end
+
+      if File.exists?(db <> "-journal") do
+        assert mode(db <> "-journal") == 0o600
+      end
+    end
+
+    # Reproduktion des Review-Funds: ein Store in einem root-eigenen
+    # Verzeichnis (macOS/Linux: /tmp mit Sticky-Bit) crashte beim chmod
+    # des Elternverzeichnisses mit „not owner". with_conn fasst
+    # Verzeichnisse nicht mehr an — der Store öffnet, die Datei trägt
+    # 0600, /tmp bleibt beim Sticky-Bit-Modus.
+    test "Store im Not-Owner-Verzeichnis (/tmp) öffnet ohne Crash", %{seed: seed} do
+      db = Path.join("/tmp", "komki-label-store-fremd-#{System.unique_integer([:positive])}.db")
+
+      on_exit(fn ->
+        for suffix <- ["", "-wal", "-shm", "-journal"] do
+          File.rm(db <> suffix)
+        end
+      end)
+
+      assert {:ok, _} = LabelStore.import_registry(db, seed)
+      assert mode(db) == 0o600
+      assert mode("/tmp") == 0o777
+    end
+  end
+
+  defp mode(path) do
+    {:ok, stat} = File.stat(path)
+    Bitwise.band(stat.mode, 0o777)
+  end
 end

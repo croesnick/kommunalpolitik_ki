@@ -246,6 +246,33 @@ defmodule KomkiCli.LabelStore do
     end)
   end
 
+  @doc """
+  Traegt der Store nur Vorlagen-Inhalt (#513)? Das ist der Fall, wenn er
+  keine Objekte und keine Entscheidungen haelt, keine Bindung ausserhalb
+  der Vorlage registriert ist und die registry_id zur Vorlage passt —
+  dann ist sein gesamter Inhalt durch einen Import der Vorlage entstanden
+  und kann ohne Verlust durch die aktuelle Vorlage ersetzt werden. Ob der
+  Inhalt von der AKTUELLEN Vorlage abweicht (und der Import an R.2.1
+  scheitern wuerde), prueft der Aufrufer separat; hier geht es nur um
+  eigene Inhalte.
+  """
+  @spec template_only?(String.t(), map()) :: {:ok, boolean()} | {:error, String.t()}
+  def template_only?(db_path, seed) when is_binary(db_path) and is_map(seed) do
+    with_conn(db_path, fn conn ->
+      with {:ok, [objects]} <- fetch_row(conn, "SELECT COUNT(*) FROM objects", []),
+           {:ok, [decisions]} <- fetch_row(conn, "SELECT COUNT(*) FROM decisions", []),
+           {:ok, binding_rows} <- select(conn, "SELECT id FROM bindings"),
+           {:ok, registry_id} <- meta_value(conn, "registry_id") do
+        template_ids = Map.keys(seed["bindings"])
+        own_bindings = List.flatten(binding_rows) -- template_ids
+
+        {:ok,
+         objects == 0 and decisions == 0 and own_bindings == [] and
+           registry_id == seed["registry_id"]}
+      end
+    end)
+  end
+
   # ========================================================================
   # Import-Validierung (Engine als Schemainstanz + lokale Zusatzpruefung)
   # ========================================================================
@@ -1233,12 +1260,24 @@ WHERE object_id = ? AND version = ? ORDER BY id",
   # SQLite-Unterbau (Exqlite.Sqlite3 direkt, ohne Ecto)
   # ========================================================================
 
+  # Begleitdateien, die SQLite neben die Store-Datei legt; nach
+  # abgebrochenen Laeufen koennen sie mit umask-Default liegenbleiben.
+  @companions ~w(-wal -shm -journal)
+
   # Verbindungskontext: Verzeichnis anlegen (mkdir_p am Elternpfad),
   # Schema sicherstellen, fun ausfuehren, Verbindung schliessen. Jede
   # Oeffnung gilt Tabelle + Foreign-Key-PRAGMA neu (per-Connection).
   defp with_conn(db_path, fun) when is_function(fun, 1) do
-    File.mkdir_p!(Path.dirname(db_path))
+    case prepare_store(db_path) do
+      :ok ->
+        open_conn(db_path, fun)
 
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp open_conn(db_path, fun) do
     case Sqlite3.open(db_path) do
       {:ok, conn} ->
         result =
@@ -1257,6 +1296,67 @@ WHERE object_id = ? AND version = ? ORDER BY id",
 
       {:error, reason} ->
         {:error, "SQLite open " <> db_path <> ": " <> db_error(reason)}
+    end
+  end
+
+  # Store-Datei und Begleitdateien haerten wie ihre Schwestern (Token,
+  # Denials, Schluessel; Ticket #500, Fund F33/F34): exklusiv anlegen und
+  # chmod VOR Sqlite3.open — SQLite erzeugt fehlende Dateien sonst mit
+  # umask-Default, und der Store traegt das komplette Sicherheitsmodell
+  # samt Entscheidungs-Historie. Vorhandene zu offene Rechte werden
+  # korrigiert, wie es ensure_run_dirs! fuer die Verzeichnisse tut (#498).
+  #
+  # Das Elternverzeichnis bleibt unangetastet (Review zu #500): --db ist
+  # eine freie Pfadnaht (cli.ex db_opt) — ein beliebiges Verzeichnis nur
+  # deshalb auf 0700 zu ziehen, weil ein Store darin liegt, greift neben
+  # die Instanz hinaus (Not-Owner-Crash, stille Rechteaenderung fremder
+  # Verzeichnisse). Die Instanzbasis haertet stattdessen Gamma.sync.
+  # Schlaegt ein chmod fehl (z. B. fremde Datei), wird der Store nicht
+  # geoeffnet, sondern der Fehler gemeldet — kein Crash.
+  defp prepare_store(db_path) do
+    File.mkdir_p!(Path.dirname(db_path))
+
+    with :ok <- ensure_file(db_path) do
+      harden_companions(db_path)
+    end
+  end
+
+  # Exklusiv anlegen oder vorhandene Datei korrigierend haerten; kann
+  # Sqlite3 die Datei nicht einmal anfassen, meldet Sqlite3.open den
+  # fachlichen Grund (z. B. eisdir).
+  defp ensure_file(db_path) do
+    case File.open(db_path, [:write, :exclusive]) do
+      {:ok, fd} ->
+        :ok = File.close(fd)
+        harden(db_path)
+
+      {:error, :eexist} ->
+        harden(db_path)
+
+      {:error, _reason} ->
+        :ok
+    end
+  end
+
+  defp harden_companions(db_path) do
+    Enum.reduce_while(@companions, :ok, fn suffix, :ok ->
+      companion = db_path <> suffix
+
+      case harden_if_exists(companion) do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp harden_if_exists(path) do
+    if File.exists?(path), do: harden(path), else: :ok
+  end
+
+  defp harden(path) do
+    case File.chmod(path, 0o600) do
+      :ok -> :ok
+      {:error, reason} -> {:error, "chmod " <> path <> ": " <> db_error(reason)}
     end
   end
 

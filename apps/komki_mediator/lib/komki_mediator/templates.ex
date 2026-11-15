@@ -495,8 +495,10 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
 
   # Dokumente nur anlegen, wenn sie fehlen: vorhandene bleiben unberuehrt.
   # Store und Elternverzeichnis haerten auf 0700 wie run/ und connectors/ im
-  # CLI, Vorlagedokumente auf 0600 (Ticket #498): Raumdokumente sind
-  # vertraulich, die umask darf die lokale Lesbarkeitsgrenze nicht aufloesen.
+  # CLI, Vorlagedateien und -dokumente auf 0600 (Ticket #498/#485):
+  # Raumdokumente sind vertraulich, und registry.json/room.json tragen
+  # Bindungen und Beobachterkreis des Sicherheitsmodells — die umask darf
+  # die lokale Lesbarkeitsgrenze nicht aufloesen.
   defp write_templates(mediator_dir, files) do
     documents_dir = Path.join(mediator_dir, room()["documents_dir"])
 
@@ -507,7 +509,9 @@ Ohne Freigabe trennt das Gate den Inhalt zurueck.
 
     for file <- files do
       term = if file == "registry.json", do: registry(), else: room()
-      File.write!(Path.join(mediator_dir, file), JSON.canonical(term))
+      path = Path.join(mediator_dir, file)
+      File.write!(path, JSON.canonical(term))
+      File.chmod!(path, 0o600)
     end
 
     write_documents(documents_dir)

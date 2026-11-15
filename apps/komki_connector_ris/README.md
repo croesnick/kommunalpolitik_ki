@@ -139,6 +139,11 @@ mix komki_mock.serve --adapter KomkiMock.Adapters.Replay --seed <verzeichnis> --
 
 Der Seed ist hier das Kassettenverzeichnis, am besten als absoluter Pfad: `reset` liest es neu.
 
+Der Mock übernimmt die Rechteordnung des Recorders (Ticket #481): Das Zustandsverzeichnis entsteht
+mit 0700, `state.json`, `requests.jsonl` und `ports.json` mit 0600. Ein `--dir` innerhalb eines
+Git-Repos verweigert er bei Replay-Kassetten; ein bereits weltlesbares Zustandsverzeichnis härtet
+er auf 0700 und warnt auf stderr.
+
 Replay sucht den exakten Treffer für `(Methode, Pfad, Query)`. Nur bei `guestmeetings`, wo die Query
 lediglich das Zeitfenster wählt, greift es bei abweichender Query auf die erste Aufnahme desselben
 Pfads zurück. Überall sonst, etwa bei `fulltextsearch` mit anderem Suchbegriff, gibt es 404 statt

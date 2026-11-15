@@ -39,7 +39,10 @@ defmodule KomkiMediator.GoStand do
 
   @impl GenServer
   def init(%{dir: dir, scope: scope}) do
+    # GO-Verzeichnis wie run/ haerten (Ticket #485): der Stand der
+    # verbrauchten Noncen bleibt der Eigentuemerin vorbehalten.
     File.mkdir_p!(dir)
+    File.chmod!(dir, 0o700)
     {:ok, %{dir: dir, stand: load(path(dir), scope)}}
   end
 
@@ -85,7 +88,10 @@ defmodule KomkiMediator.GoStand do
   defp persist(dir, record) do
     tmp = path(dir) <> ".tmp"
 
-    with :ok <- File.write(tmp, JSON.canonical(record)) do
+    with :ok <- File.write(tmp, JSON.canonical(record)),
+         # stand.json mit 0600 (Ticket #485): der Modus steht vor dem
+         # Inhalt, das rename haelt ihn fest.
+         :ok <- File.chmod(tmp, 0o600) do
       File.rename(tmp, path(dir))
     end
   end

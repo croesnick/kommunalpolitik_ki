@@ -168,7 +168,12 @@ defmodule KomkiMediator.Journal do
 
   @impl GenServer
   def init({path, opts}) do
+    # Journal-Verzeichnis und Datei wie run/ haerten (Ticket #485, Fund
+    # F13): die Auditkette ist vertraulich und bleibt der Eigentuemerin
+    # vorbehalten. Der Modus steht vor dem uappnd-Flag, das nur Inhalt
+    # schuetzt, nicht Rechte.
     File.mkdir_p!(Path.dirname(path))
+    File.chmod!(Path.dirname(path), 0o700)
 
     with {:ok, head} <- read_head(path),
          {:ok, fd} <- open(path),
@@ -198,8 +203,15 @@ defmodule KomkiMediator.Journal do
 
   defp open(path) do
     case File.open(path, [:append, :binary]) do
-      {:ok, fd} -> {:ok, fd}
-      {:error, reason} -> {:error, {:journal_open, reason}}
+      {:ok, fd} ->
+        # pdr.jsonl entsteht bzw. bleibt mit 0600 (Ticket #485): File.open
+        # legt eine fehlende Datei mit umask-Default an, und auch einer
+        # bestehenden Datei wird der Modus nicht still ueberlassen.
+        File.chmod!(path, 0o600)
+        {:ok, fd}
+
+      {:error, reason} ->
+        {:error, {:journal_open, reason}}
     end
   end
 

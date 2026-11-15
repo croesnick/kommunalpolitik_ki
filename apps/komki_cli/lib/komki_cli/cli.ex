@@ -1010,17 +1010,27 @@ defmodule KomkiCli.CLI do
           | {:setup, :ok}
           | {:journal, map()}
         ) :: outcome()
+  # Ticket #513: eine Zeile zur Store-Migration; leer, wenn nichts ersetzt wurde.
+  defp store_line(%{store: backup}) when is_binary(backup),
+    do: "Label-Store: frühere Vorlage ersetzt; Sicherung: " <> backup <> "\n"
+
+  defp store_line(_up), do: ""
+
   defp render({:inited, cfg, gguf_lines}), do: render_init(cfg, gguf_lines)
   defp render({:checks, checks, summary}), do: render_doctor(checks, summary)
 
   # Ticket #102: up startet llama-server UND den Vermittler (zwei
   # Zustandszeilen); der Vermittler kann auch :already sein (healthz gruen,
-  # kein Neustart — Idempotenz).
+  # kein Neustart — Idempotenz). Der Label-Store kann vor dem Start eine
+  # fruehere Vorlage ersetzt haben (#513) — genau eine Zeile dazu, vor den
+  # Komponenten, weil die Migration vor ihnen laeuft.
   defp render(
-         {:up, %{llama: pid, connectors: connectors, mediator: {:started, mediator_pid, health}}}
+         {:up,
+          %{llama: pid, connectors: connectors, mediator: {:started, mediator_pid, health}} = up}
        ),
        do:
-         {green() <>
+         {store_line(up) <>
+            green() <>
             "llama up: pid " <>
             to_string(pid) <>
             reset() <>
@@ -1033,9 +1043,10 @@ defmodule KomkiCli.CLI do
             " (tools: " <>
             mediator_tools_line(health) <> ")\n", 0}
 
-  defp render({:up, %{llama: pid, connectors: connectors, mediator: {:already, health}}}),
+  defp render({:up, %{llama: pid, connectors: connectors, mediator: {:already, health}} = up}),
     do:
-      {green() <>
+      {store_line(up) <>
+         green() <>
          "llama up: pid " <>
          to_string(pid) <>
          reset() <>
