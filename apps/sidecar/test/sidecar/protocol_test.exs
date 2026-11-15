@@ -49,6 +49,29 @@ defmodule Sidecar.ProtocolTest do
     def handle_op("show", _params, _context, _state), do: {:error, "not-found", "DETAIL-CANARY"}
   end
 
+  # A sidecar that probed its upstream at start (#515): the probe result
+  # rides along on ping — a closed value ("ok" or an error code), keyed
+  # by the sidecar, mapped to fixed texts by the host.
+  defmodule Probed do
+    @behaviour Sidecar.Server
+
+    @impl true
+    def manifest, do: %{version: "probed/1", ops: %{"noop" => %{kind: :read, params: %{}}}}
+
+    @impl true
+    def init(state), do: {:ok, state}
+
+    @impl true
+    def handle_op("noop", _params, _context, state), do: {:ok, %{"state" => state}}
+
+    @impl true
+    def ping_extra(%{probe: "ok"}), do: %{"upstream" => "ok"}
+
+    def ping_extra(%{probe: code}) when is_binary(code), do: %{"upstream" => code}
+
+    def ping_extra(%{probe: :garbage}), do: "keine Karte"
+  end
+
   # A host with its own user-facing language, injected via the texts: option.
   defmodule HostTexts do
     @behaviour Sidecar.Texts
@@ -135,8 +158,41 @@ defmodule Sidecar.ProtocolTest do
   end
 
   test "ping is answered by the server from the manifest", %{path: path} do
-    assert {:ok, %{"version" => "sidecar-test/1", "ops" => ["search", "show"]}} =
+    assert {:ok, %{"version" => "sidecar-test/1", "ops" => ["search", "show"]} = answer} =
              Client.call(path, "pdr-2", "ping", %{})
+
+    # Without the optional ping_extra (#515) the answer carries exactly the
+    # contract keys — no sidecar state leaks into ping by default.
+    assert Enum.sort(Map.keys(answer)) == ["ops", "version"]
+  end
+
+  # #515: a sidecar with the optional ping_extra reports its start probe on
+  # ping; a malformed extra is dropped instead of breaking the doctor channel.
+  test "ping_extra rides along on ping, malformed extras are dropped" do
+    for {state, expected} <- [
+          {%{probe: "ok"}, %{"upstream" => "ok"}},
+          {%{probe: "upstream-error"}, %{"upstream" => "upstream-error"}},
+          {%{probe: :garbage}, %{}}
+        ] do
+      dir = Path.join(System.tmp_dir!(), "sc-probe-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      path = Path.join(dir, "sidecar.sock")
+      token = Token.provision!(path)
+
+      {:ok, listener} = Server.listen(path)
+      pid = spawn(fn -> Server.accept_loop(listener, Probed, state, token, peer: false) end)
+      _ = :socket.setopt(listener, {:otp, :controlling_process}, pid)
+
+      on_exit(fn ->
+        Process.exit(pid, :kill)
+        File.rm_rf!(dir)
+      end)
+
+      assert {:ok, answer} = Client.call(path, "probe", "ping", %{})
+      assert answer["version"] == "probed/1"
+
+      assert Map.drop(answer, ["version", "ops"]) == expected
+    end
   end
 
   test "unknown fields, operations and format violations are rejected", %{path: path} do

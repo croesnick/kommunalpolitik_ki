@@ -88,6 +88,10 @@ macOS begrenzt Unix-Socket-Pfade auf 103 Byte. `komki doctor` prüft die Länge.
 - Reservierte Operation `ping` (ohne Parameter) liefert `{"version": "<fassung-id>", "ops": [...]}`. Sie
   dient `komki doctor` und ist **kein** MCP-Tool. Der Schlüssel heißt `version`, weil die Library englisch
   spricht; der Wert ist die Fassung des Manifests (`KomkiConnector.Manifest.sidecar!/1` übersetzt).
+  Optionale Schlüssel kommen hinzu, ohne `version`/`ops` zu ersetzen: Der RIS-Connector meldet seit #515
+  `"upstream"` — das Ergebnis seiner Start-Sonde gegen die Gegenstelle (`"ok"` oder ein geschlossener
+  Fehler-Code aus der Liste oben). komki_cli übersetzt den Code in seinen festen Text und zeigt eine
+  unbekannte Gegenstelle im Doctor als FAIL; Connector-Freitext erreicht niemanden.
 - Timeout auf Vermittler-Seite: 15 s je Aufruf, danach `upstream-timeout`.
 - Implementierung: die Library-App `apps/sidecar` (`Sidecar.Frame`, `Sidecar.Client`, `Sidecar.Server`,
   `Sidecar.Token`, `Sidecar.Params`, `Sidecar.Peer`), extrahiert aus `komki_connector` (Ticket #225).
@@ -190,7 +194,9 @@ Fassung bricht den D.9-Pin absichtlich.
   an. Die Anmeldung geht nur über `https` oder `http` auf Loopback hinaus (`KomkiConnector.Transport.secret_ok?/1`).
   Verweigert die nutzende Person die Touch-ID-Freigabe, gibt `komki up` kein `RIS_ZUGANG` mit und meldet das; der
   Connector liest dann als Gast. Läuft das Token ab, antwortet er ebenso mit `credential-missing`, statt sich
-  neu anzumelden: Jede Anmeldung braucht eine eigene Freigabe per Touch ID.
+  neu anzumelden: Jede Anmeldung braucht eine eigene Freigabe per Touch ID. Beim Start sondiert der Connector
+  seine Gegenstelle (#515): eine Anfrage an die Gast-Sitzungsliste des heutigen Tages, ohne Credential, kurze
+  eigene Frist. Das Ergebnis blockiert den Start nicht, sondern reist als `"upstream"` auf `ping` mit (§3).
 - `web.search`: `{"results": [{"title", "url", "snippet"}], "abrufdatum"}`
 - `vault.search`: `{"results": [{"note_id", "title", "labels"}]}`. Notizen ohne gültiges `komki_labels` erscheinen
   nicht.

@@ -29,6 +29,16 @@ defmodule KomkiConnectorRis do
   credential at all, says so, and the connector starts as a guest (the
   ticket's "starts without credentials").
 
+  ## Counterpart probe at start (#515)
+
+  `init/1` sends one probe request to the counterpart (the guest meeting
+  list of today, no credential) before it binds the socket. An unknown
+  counterpart — wrong tenant, a moved API, a dead host — shows up right at
+  the start instead of at the first call. The result does not block the
+  start; it rides along on the reserved `ping` operation as `"upstream"`:
+  `"ok"` or a closed error code. `komki doctor` maps the code to its own
+  fixed text.
+
   Signed in, the connector has a council member's view. It still delivers
   only public items: the filter (`KomkiConnectorRis.Top.public_items/1` and
   the detail check below) is the same as without signing in. Non-public
@@ -85,20 +95,57 @@ defmodule KomkiConnectorRis do
     cfg = Map.merge(@defaults, Map.take(opts, Map.keys(@defaults)))
 
     with :ok <- start_http(cfg) do
+      # Ticket #515: Eine Probe-Anfrage gegen die Gegenstelle beim Start —
+      # die Sitzungsliste des heutigen Tages, Gast-Endpoint, kein Credential.
+      # Eine unbekannte Gegenstelle (falscher Mandant, umgezogen, tot)
+      # faellt so schon beim Start auf, nicht erst beim ersten Aufruf; der
+      # Doctor liest das Ergebnis ueber `ping` (ping_extra). Der Connector
+      # startet trotzdem: Der Doctor meldet rot, `komki up` reisst den Rest
+      # des Workspace nicht mit.
+      probe = probe_upstream(cfg)
+
       case sign_in(with_deadline(cfg), Map.get(opts, :credentials, %{})) do
         {:ok, nil} ->
-          {:ok, Map.put(cfg, :token, nil)}
+          {:ok, Map.merge(cfg, %{token: nil, probe: probe})}
 
         {:ok, token} ->
           log_validity(token)
-          {:ok, Map.put(cfg, :token, token)}
+          {:ok, Map.merge(cfg, %{token: token, probe: probe})}
 
         {:error, message} ->
           Logger.warning(message)
-          {:ok, Map.merge(cfg, %{token: nil, sign_in_error: message})}
+          {:ok, Map.merge(cfg, %{token: nil, sign_in_error: message, probe: probe})}
       end
     end
   end
+
+  # Die Probe hat kurze eigene Frist (3 s) und bleibt unter der des ersten
+  # echten Aufrufs. Fehler-Codes sind geschlossen; der Detailtext bleibt
+  # wie immer im Log, ping meldet nur den Code.
+  defp probe_upstream(cfg) do
+    today = Date.utc_today()
+    probe_cfg = cfg |> Map.merge(%{timeout_ms: 3_000, budget_ms: 3_000}) |> with_deadline()
+
+    case Api.meetings(probe_cfg, today, today) do
+      {:ok, _items} ->
+        :ok
+
+      {:error, code, detail} ->
+        Logger.warning("RIS-Probe beim Start fehlgeschlagen: " <> detail)
+        {:error, code}
+    end
+  end
+
+  # Optionaler Sidecar-Callback (#515): das Ergebnis der Start-Probe reist auf
+  # der reservierten Operation `ping` mit. Geschlossene Werte: "ok" oder ein
+  # Fehler-Code aus CONTRACT.md §3 — komki_cli uebersetzt ihn in seinen
+  # festen Text,Connector-Freitext erreicht niemanden.
+  @impl true
+  def ping_extra(%{probe: :ok}), do: %{"upstream" => "ok"}
+
+  def ping_extra(%{probe: {:error, code}}) when is_binary(code), do: %{"upstream" => code}
+
+  def ping_extra(_state), do: %{}
 
   defp start_http(cfg) do
     case Http.start(cfg.proxy) do

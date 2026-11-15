@@ -62,9 +62,7 @@ defmodule KomkiCli.Mediator do
     with gamma when gamma in [:unchanged, :written] <- Gamma.sync(cfg) do
       case fetch_health(cfg) do
         {:ok, "200", health} when gamma == :unchanged ->
-          # Laufender Vermittler mit dem aktuellen Token: kein Neustart, das
-          # Token bleibt (ein neues wuerde ihn aussperren).
-          {:ok, {:already, health}}
+          keep_or_restart_on_fassung(cfg, health)
 
         {:ok, "200", _health} ->
           restart_same_token(cfg)
@@ -73,6 +71,67 @@ defmodule KomkiCli.Mediator do
           fresh_start(cfg)
       end
     end
+  end
+
+  # Ticket #553: Der laufende Vermittler meldet eine andere Fassung als das
+  # Programm — nach einem Update entscheidet sonst weiter, was das alte
+  # komki gestartet hat. Neustart mit gleichem Token, laufende pi-Sessions
+  # bleiben verbunden. Ohne Drift: kein Neustart, das Token bleibt (ein
+  # neues wuerde ihn aussperren).
+  defp keep_or_restart_on_fassung(cfg, health) do
+    if fassung_stale?(program_fassung(cfg), health) do
+      restart_same_token(cfg)
+    else
+      {:ok, {:already, health}}
+    end
+  end
+
+  @doc """
+  Erwartete Vermittler-Fassung aus dem Programm selbst (Ticket #553):
+  `komki-mediator --version` druckt sie (wie `verify-journal` ohne Sandbox-
+  Huelle, derselbe Aufrufweg wie journal verify). `nil`, wenn das Programm
+  sie nicht hergibt — dann bleibt ein laufender Vermittler unberuehrt.
+  """
+  @spec program_fassung(Config.t()) :: String.t() | nil
+  def program_fassung(%Config{} = cfg) do
+    args = KomkiCli.Roles.prefix(cfg, cfg.mediator_bin, "komki-mediator") ++ ["--version"]
+
+    cond do
+      not is_binary(cfg.mediator_bin) ->
+        nil
+
+      cfg.launcher == "burrito" and cfg.mediator_bin == cfg.komki_bin ->
+        fassung_output(System.cmd(cfg.komki_bin, args, stderr_to_stdout: true))
+
+      not is_binary(cfg.escript_bin) ->
+        nil
+
+      true ->
+        fassung_output(
+          System.cmd(cfg.escript_bin, [cfg.mediator_bin | args], stderr_to_stdout: true)
+        )
+    end
+  end
+
+  defp fassung_output({out, 0}) do
+    case out |> String.split("\n", trim: true) |> List.first("") |> String.trim() do
+      "" -> nil
+      fassung -> fassung
+    end
+  end
+
+  defp fassung_output({_out, _code}), do: nil
+
+  @doc """
+  Läuft der laufende Vermittler in einer anderen Fassung als `expected`?
+  (Ticket #553) Ohne erwartbare Fassung (`nil`) niemals — dann gilt das
+  bisherige Verhalten (laufen lassen).
+  """
+  @spec fassung_stale?(String.t() | nil, health()) :: boolean()
+  def fassung_stale?(nil, _health), do: false
+
+  def fassung_stale?(expected, health) do
+    is_binary(health["fassung_id"]) and health["fassung_id"] != expected
   end
 
   @doc """
