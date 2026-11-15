@@ -34,14 +34,14 @@ defmodule RatsprojekteWeb.ConnectorTest do
   end
 
   test "offen: nur die Connector-Route, sonst nichts", %{home: home, sperre: sperre, token: token} do
-    {:ok, _} = Sperre.oeffnen(sperre)
+    {:ok, _} = Sperre.oeffnen(sperre, "111222")
     assert {501, _} = post(home, token)
     assert {404, _} = post(home, token, "/")
   end
 
   test "Connector-Aufrufe halten den Hub nicht offen", %{home: home, sperre: sperre, token: token} do
     Phoenix.PubSub.subscribe(Ratsprojekte.PubSub, Sperre.topic())
-    {:ok, _} = Sperre.oeffnen(sperre)
+    {:ok, _} = Sperre.oeffnen(sperre, "111222")
 
     # 500 ms of connector calls against a lock after 400 ms.
     for _ <- 1..10 do

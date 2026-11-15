@@ -7,17 +7,19 @@ defmodule Ratsprojekte.CLI do
       ratsprojekte einrichten        key, seal, recovery code (once), LaunchAgent
       ratsprojekte launchagent an    (re)load the LaunchAgent: start at login, locked
       ratsprojekte launchagent aus
-      ratsprojekte open              Touch ID, then the browser with a one-time link
-                                     (the lock page in the browser offers the same)
+      ratsprojekte open              shows a check code, then Touch ID and the browser
+                                     with a one-time link; approve only a dialog naming
+                                     the same code (the lock page offers the same)
       ratsprojekte sperren | status
       ratsprojekte connector-token   SHA-256 of komki's token from stdin
       ratsprojekte recover           seal the key again from the recovery code
 
   `run/4` returns `{text, exit code}`; `main/1` prints and halts. `io`
-  replaces the outside world in tests (`:browser`, `:gets`, `:launchagent`).
+  replaces the outside world in tests (`:browser`, `:gets`, `:launchagent`,
+  `:pruefcode`).
   """
 
-  alias Ratsprojekte.{LaunchAgent, Ort, Schluessel}
+  alias Ratsprojekte.{LaunchAgent, Ort, Schluessel, Sperre}
 
   @adresse "http://localhost:4100"
 
@@ -56,7 +58,10 @@ defmodule Ratsprojekte.CLI do
   end
 
   def run(["open"], home, _provider, io) do
-    case verwaltung(home, "oeffnen") do
+    pruefcode = Sperre.pruefcode()
+    Keyword.get(io, :pruefcode, &IO.write/1).(pruefcode_hinweis(pruefcode))
+
+    case verwaltung(home, "oeffnen " <> pruefcode) do
       {:ok, link} ->
         oeffnen = Keyword.get(io, :browser, &System.cmd("/usr/bin/open", [&1]))
         oeffnen.(link)
@@ -212,7 +217,11 @@ defmodule Ratsprojekte.CLI do
   end
 
   defp oeffnen_hinweis do
-    "Öffnen: #{@adresse} im Browser (als Lesezeichen), „Entsperren“, Touch ID.\n"
+    "Öffnen: #{@adresse} im Browser (als Lesezeichen), „Entsperren“, Touch ID (Prüfcode abgleichen).\n"
+  end
+
+  defp pruefcode_hinweis(pruefcode) do
+    "Touch ID nur freigeben, wenn der Dialog denselben Prüfcode zeigt: #{pruefcode}\n"
   end
 
   defp einfach(:ok, text), do: {text <> "\n", 0}

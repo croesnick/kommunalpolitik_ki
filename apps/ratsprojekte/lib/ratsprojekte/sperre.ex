@@ -1,11 +1,18 @@
 defmodule Ratsprojekte.Sperre do
   @moduledoc """
   The lock of the hub (ADR 0004 „Lokal, ohne Konten“). The release starts
-  locked: no key, no open database. `oeffnen/1` opens the sealed key (Touch
+  locked: no key, no open database. `oeffnen/2` opens the sealed key (Touch
   ID through `komki-tresor`), starts the repo with it and hands out a
   one-time link, which the web layer trades for a session cookie
-  (`einloesen/2`). Every further `oeffnen/1` asks for Touch ID again, so a
+  (`einloesen/2`). Every further `oeffnen/2` asks for Touch ID again, so a
   process in the user account gets no link without the person at the Mac.
+
+  The request carries a six-digit `pruefcode` (#490): it goes into the
+  Touch ID reason and the requesting channel shows it — `ratsprojekte open`
+  in the terminal, the lock page in the browser — so the person approves
+  only a dialog naming their own code. Only one request runs at a time;
+  a second one is rejected with `:anfrage_laeuft`, so no stream of prompts
+  can blend into the user's own unlock.
 
   After `:sperre_nach` milliseconds without an action in the interface
   (`handlung/1`) the hub locks again: the repo stops, the session marker is
@@ -29,6 +36,8 @@ defmodule Ratsprojekte.Sperre do
 
   @link_gueltig_ms 120_000
   @topic "sperre"
+  @pruefcode_stellen 6
+  @pruefcode_format ~r/\A\d{6}\z/
 
   # -- client -----------------------------------------------------------------
 
@@ -45,15 +54,43 @@ defmodule Ratsprojekte.Sperre do
   Open the sealed key (Touch ID) in the calling process, unlock with it and
   return a one-time link token. The key itself never enters this server's
   state; only its hash, to compare later unlocks.
-  """
-  @spec oeffnen(GenServer.server()) ::
-          {:ok, String.t()} | {:error, Schluessel.error() | :datenbank}
-  def oeffnen(server \\ __MODULE__) do
-    %{home: home, provider: provider} = GenServer.call(server, :einstellungen)
 
-    with {:ok, key} <- Schluessel.oeffnen(home, provider) do
-      GenServer.call(server, {:entsperren, key}, 60_000)
+  `pruefcode` names the requesting channel (#490): it goes into the Touch
+  ID reason, the requesting channel shows it, and the person refuses
+  dialogs with a foreign code. Only one request runs at a time; a second
+  one is rejected with `{:error, :anfrage_laeuft}`.
+  """
+  @spec oeffnen(GenServer.server(), String.t()) ::
+          {:ok, String.t()}
+          | {:error, Schluessel.error() | :datenbank | :anfrage_laeuft | :falscher_pruefcode}
+  def oeffnen(server \\ __MODULE__, pruefcode) do
+    with :ok <- pruefcode_pruefen(pruefcode),
+         {:ok, %{home: home, provider: provider}} <- anfrage(server) do
+      provider = mit_pruefcode(provider, pruefcode)
+
+      case Schluessel.oeffnen(home, provider) do
+        {:ok, key} ->
+          GenServer.call(server, {:entsperren, key}, 60_000)
+
+        {:error, reason} ->
+          GenServer.cast(server, :anfrage_vorbei)
+          {:error, reason}
+      end
     end
+  end
+
+  @doc """
+  A fresh code for one unlock request (#490): six digits, no secret — the
+  person compares it between their channel and the Touch ID dialog.
+  """
+  @spec pruefcode() :: String.t()
+  def pruefcode do
+    zahl = :binary.decode_unsigned(:crypto.strong_rand_bytes(4))
+
+    zahl
+    |> rem(1_000_000)
+    |> Integer.to_string()
+    |> String.pad_leading(@pruefcode_stellen, "0")
   end
 
   @doc "Lock now."
@@ -93,7 +130,8 @@ defmodule Ratsprojekte.Sperre do
       repo_supervisor: Keyword.get(opts, :repo_supervisor, Ratsprojekte.RepoSupervisor),
       migrationen:
         Keyword.get_lazy(opts, :migrationen, fn -> Ecto.Migrator.migrations_path(repo) end),
-      pubsub: Keyword.get(opts, :pubsub, Ratsprojekte.PubSub)
+      pubsub: Keyword.get(opts, :pubsub, Ratsprojekte.PubSub),
+      anfrage: nil
     }
 
     # Fail closed after a restart of this server: a repo left running from
@@ -102,17 +140,28 @@ defmodule Ratsprojekte.Sperre do
     {:ok, gesperrt(state)}
   end
 
+  # One request at a time (#490): the slot is marked with a monitor on the
+  # asking process, so a crash or kill frees it too.
   @impl true
-  def handle_call(:einstellungen, _from, state),
-    do: {:reply, Map.take(state, [:home, :provider]), state}
+  def handle_call(:anfrage, {pid, _ref}, state) do
+    if state.anfrage do
+      {:reply, {:error, :anfrage_laeuft}, state}
+    else
+      ref = Process.monitor(pid)
+      {:reply, {:ok, Map.take(state, [:home, :provider])}, %{state | anfrage: {pid, ref}}}
+    end
+  end
 
   def handle_call({:entsperren, key}, _from, %{status: :offen} = state) do
+    state = anfrage_frei(state)
+
     if Plug.Crypto.secure_compare(hash(key), state.key_hash),
       do: link(state),
       else: {:reply, {:error, :falscher_schluessel}, state}
   end
 
   def handle_call({:entsperren, key}, _from, state) do
+    state = anfrage_frei(state)
     db = Ort.datenbank(state.home)
     neu? = not File.exists?(db)
 
@@ -163,7 +212,13 @@ defmodule Ratsprojekte.Sperre do
 
   def handle_cast(:handlung, state), do: {:noreply, state}
 
+  # The asking process ended without a key (dialog refused, crashed, killed).
+  def handle_cast(:anfrage_vorbei, state), do: {:noreply, anfrage_frei(state)}
+
   @impl true
+  def handle_info({:DOWN, _ref, :process, _pid, _grund}, state),
+    do: {:noreply, anfrage_frei(state)}
+
   def handle_info({:pruefen, ref}, %{timer: ref} = state) do
     rest = state.sperre_nach - (jetzt() - state.letzte)
     {:noreply, if(rest <= 0, do: sperren_jetzt(state), else: planen(state, rest))}
@@ -176,7 +231,9 @@ defmodule Ratsprojekte.Sperre do
 
   defp gesperrt(state),
     do:
-      Map.merge(state, %{
+      state
+      |> anfrage_frei()
+      |> Map.merge(%{
         status: :gesperrt,
         key_hash: nil,
         marker: nil,
@@ -270,4 +327,34 @@ defmodule Ratsprojekte.Sperre do
   defp hash(value), do: :crypto.hash(:sha256, value)
   defp zufall, do: 32 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)
   defp jetzt, do: System.monotonic_time(:millisecond)
+
+  # The asking process reserves the slot; the reply releases it in every
+  # path, a crash through the monitor.
+  defp anfrage(server), do: GenServer.call(server, :anfrage)
+
+  defp anfrage_frei(%{anfrage: {_pid, ref}} = state) do
+    Process.demonitor(ref, [:flush])
+    %{state | anfrage: nil}
+  end
+
+  defp anfrage_frei(%{anfrage: nil} = state), do: state
+
+  defp pruefcode_pruefen(pruefcode) do
+    if is_binary(pruefcode) and pruefcode =~ @pruefcode_format,
+      do: :ok,
+      else: {:error, :falscher_pruefcode}
+  end
+
+  # The code travels in the prompt reason, the one argument komki-tresor
+  # shows to the person (#490). Providers without a reason (test doubles)
+  # stay as they are.
+  defp mit_pruefcode({module, opts}, pruefcode) do
+    case Keyword.get(opts, :reason) do
+      nil ->
+        {module, opts}
+
+      reason ->
+        {module, Keyword.put(opts, :reason, reason <> " (Prüfcode " <> pruefcode <> ")")}
+    end
+  end
 end

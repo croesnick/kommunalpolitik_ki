@@ -6,12 +6,13 @@ defmodule RatsprojekteWeb.ZugangTest do
 
   alias Ratsprojekte.{Ort, Sperre}
 
-  setup do
+  setup context do
     Application.put_env(:ratsprojekte, :sperre, true)
     on_exit(fn -> Application.delete_env(:ratsprojekte, :sperre) end)
     home = home!()
     eingerichtet!(home)
-    %{home: home, sperre: sperre!(home, name: Sperre)}
+    provider = aufzeichner(home, reason: "ratsprojekte entsperren", warten: context[:bremsen])
+    %{home: home, sperre: sperre!(home, name: Sperre, provider: provider)}
   end
 
   defp gesperrt?(conn) do
@@ -25,7 +26,7 @@ defmodule RatsprojekteWeb.ZugangTest do
 
   describe "einmaliger Link (ratsprojekte open)" do
     test "setzt das Cookie, danach ist die Oberfläche offen", %{conn: conn} do
-      {:ok, token} = Sperre.oeffnen()
+      {:ok, token} = Sperre.oeffnen("111222")
 
       conn = get(conn, ~p"/zugang/#{token}")
       assert redirected_to(conn) == ~p"/"
@@ -38,7 +39,7 @@ defmodule RatsprojekteWeb.ZugangTest do
     end
 
     test "nach dem Sperren hilft das alte Cookie nicht mehr", %{conn: conn} do
-      {:ok, token} = Sperre.oeffnen()
+      {:ok, token} = Sperre.oeffnen("111222")
       conn = get(conn, ~p"/zugang/#{token}")
       :ok = Sperre.sperren()
 
@@ -54,7 +55,7 @@ defmodule RatsprojekteWeb.ZugangTest do
 
   describe "Schaltfläche „Entsperren“" do
     test "entsperrt mit Touch ID und öffnet denselben Tab", %{conn: conn} do
-      conn = post(conn, ~p"/entsperren")
+      conn = post(conn, ~p"/entsperren", %{"pruefcode" => "111222"})
       assert redirected_to(conn) == ~p"/"
       assert Sperre.status() == :offen
 
@@ -68,7 +69,7 @@ defmodule RatsprojekteWeb.ZugangTest do
     } do
       File.rm!(Ort.schluessel(home))
 
-      conn = post(conn, ~p"/entsperren")
+      conn = post(conn, ~p"/entsperren", %{"pruefcode" => "111222"})
       assert gesperrt?(conn)
       assert html_response(conn, 401) =~ ~s(id="entsperren-fehler")
       assert Sperre.status() == :gesperrt
@@ -80,24 +81,52 @@ defmodule RatsprojekteWeb.ZugangTest do
     test "mit echter CSRF-Prüfung, auch nach Neuladen der Sperrseite", %{conn: conn} do
       conn = get(conn, ~p"/")
       conn = conn |> recycle() |> get(~p"/")
-      [_, token] = Regex.run(~r/name="_csrf_token"[^>]*value="([^"]+)"/, html_response(conn, 401))
+      html = html_response(conn, 401)
+      [_, token] = Regex.run(~r/name="_csrf_token"[^>]*value="([^"]+)"/, html)
+      [code] = Regex.run(~r/id="pruefcode"[^>]*>(\d{6})</, html, capture: :all_but_first)
 
       conn =
         conn
         |> recycle()
         |> Plug.Conn.put_private(:plug_skip_csrf_protection, false)
-        |> post(~p"/entsperren", %{"_csrf_token" => token})
+        |> post(~p"/entsperren", %{"_csrf_token" => token, "pruefcode" => code})
 
       assert redirected_to(conn) == ~p"/"
       assert Sperre.status() == :offen
     end
 
     test "zweiter Browser bei offenem Hub: neue Abfrage, gleiche Sitzung", %{conn: conn} do
-      {:ok, token} = Sperre.oeffnen()
+      {:ok, token} = Sperre.oeffnen("111222")
       {:ok, marker} = Sperre.einloesen(token)
 
-      conn = post(conn, ~p"/entsperren")
+      conn = post(conn, ~p"/entsperren", %{"pruefcode" => "111222"})
       assert get_session(conn, :zugang) == marker
+    end
+
+    # F21 (#490): Der Touch-ID-Dialog ist zurechenbar, wenn sein Grund den
+    # Prüfcode der anfragenden Seite nennt; die Sperrseite zeigt denselben.
+    test "Sperrseite zeigt den Prüfcode, der Dialog-Grund trägt ihn", %{conn: conn} do
+      html = conn |> get(~p"/") |> html_response(401)
+      assert html =~ ~s(id="pruefcode")
+      [code] = Regex.run(~r/id="pruefcode"[^>]*>(\d{6})</, html, capture: :all_but_first)
+
+      assert conn |> post(~p"/entsperren", %{"pruefcode" => code}) |> redirected_to() == ~p"/"
+      assert_received {:agree, opts}
+      assert opts[:reason] =~ code
+      assert Sperre.status() == :offen
+    end
+
+    @tag :bremsen
+    test "läuft schon eine Entsperr-Anfrage: klare Ansage statt zweitem Dialog", %{conn: conn} do
+      erste = Task.async(fn -> Sperre.oeffnen("111222") end)
+      assert_receive {:agree, _}
+
+      conn = post(conn, ~p"/entsperren", %{"pruefcode" => "222333"})
+      assert gesperrt?(conn)
+      assert html_response(conn, 401) =~ "läuft schon eine Entsperr-Anfrage"
+
+      send(erste.pid, :freigabe)
+      assert {:ok, _} = Task.await(erste, 10_000)
     end
   end
 end
