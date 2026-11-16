@@ -403,7 +403,7 @@ Das unabhängige Review dieser Analyse hat außerdem eine Abweichung der Engine 
 
 ### GO-Vorlage
 
-Das GO kam am 16.11.2026 für alle Punkte. Nach dem GO hat das unabhängige Review drei Formulierungen geschärft, die die nutzende Person noch bestätigt:
+Das GO kam am 16.11.2026 für alle Punkte. Nach dem GO hat das unabhängige Review drei Formulierungen geschärft; die nutzende Person hat sie am 16.11.2026 bestätigt:
 
 - Wiedervorlage von Option C: „Schreibwege ohne GO“ statt „Wirkungen ohne GO“. Übergaben laufen schon heute ohne GO (Abschnitt 3.6); mit der alten Fassung wäre die Bedingung bereits erfüllt.
 - F6: „Fester Γ je Raum“ statt „je Vermittlerlauf“, mit der Folge, dass ein Raum mit veraltetem Start-`gamma_hash` nicht weiter entscheidet.
