@@ -160,7 +160,7 @@ Je Eigenschaft folgen das komki-Vertragszitat, das APPA-Vertragszitat und der Be
 
 **Trust lässt sich in komki als Bindung schreiben.** Eine Bindung wie `quelle-ungeprueft@1` erhält einen offenen Empfängerkreis und keine `store`-Regel. Ein Raum, der Web-Treffer aufnimmt, muss sie in `B_W` tragen (λ(x) ⊆ B_W), also trägt jede seiner Ausgaben sie (λ(y) ⊇ B_W). Jedes Speichern endet dann in `missing_operation_rule` und braucht eine Aktionsfreigabe für den exakten Call. Das entspricht APPAs `requires = { trust = "trusted" }` mit einer Authority für `trust_below`, nur steht es von Beginn an im Raumvertrag statt erst nach dem Lesen.
 
-Entfernen ließe sich die Bindung nach R.5.7 nur über eine Lockerung mit Befugnis. Die Engine weicht davon heute ab: Bei der Offenlegungsfreigabe verlangt sie eine Befugnis nur für Bindungen, deren Empfängerkreis das Ziel nicht abdeckt (CONTRACT § 4.9, Schritt 6; `calculus.ex`, Z. 68–75). Eine offene Bindung wie diese fiele also ohne Befugnis weg, ebenso eine Lizenzbindung mit Auflage (R.2.4). Das klärt #603; erst danach trägt der Vorschlag.
+Entfernen ließe sich die Bindung nach R.5.7 nur über eine Lockerung mit Befugnis. Die Engine weicht davon heute ab: Bei der Offenlegungsfreigabe verlangt sie eine Befugnis nur für Bindungen, deren Empfängerkreis das Ziel nicht abdeckt (CONTRACT § 4.9, Schritt 6; `calculus.ex`, Z. 68–75). Eine offene Bindung wie diese fiele also ohne Befugnis weg, ebenso eine Lizenzbindung mit offenem Empfängerkreis und Auflage (R.2.4). Das klärt #603; erst danach trägt der Vorschlag.
 
 Für Schreibwege bringt das heute wenig, weil jeder ein GO verlangt. Übergaben laufen dagegen ohne GO: Bindungen mit `transfer: true` im Seed-Γ erlauben Anfragen an RIS und Websuche, und eine eingeschleuste Anweisung aus einem Web-Treffer kann solche Anfragen steuern. Die Frage nach der Integrität (#602) stellt sich also schon jetzt.
 
@@ -208,7 +208,7 @@ sequenceDiagram
 |---|---|---|
 | Hook-Endpunkt: `appa` als eigener Prozess, `POST /hook` | Der Vermittler übersetzt seine Gate-Schritte in Hook-Ereignisse. | Machbar. Aber "`/hook` does not authenticate incoming callers": Der Endpunkt muss für pi unerreichbar sein, also im Seatbelt-Profil gesperrt. Die Ereignisse passen nicht 1:1: komki entscheidet je Connector-Aufruf dreimal (emit, transfer oder store, admit), APPA kennt `tool_call` und `tool_result`. Ein Prozess in einer anderen Sprache ist eine Abweichung nach AGENTS.md §1. |
 | NIF (Rustler) um `appa-engine` | Der reine Kern läuft in der BEAM-VM. | Nach §1 zulässig, weil nativer Code mit Elixir-Schnittstelle keine Abweichung ist. Der Kern allein reicht aber nicht: Policy-Parser (`appa-policy`) und Log (`appa-eventlog`, SQLite) gehören dazu, Konsultationen und Adapter stecken im Runtime-Crate. Der native Anteil im Vermittler wüchse von null auf rund 58 000 Zeilen (engine, policy, runtime-api), mit dem Log-Crate auf rund 72 000. Ein Absturz im nativen Code beendet die ganze VM und damit den Vermittler. |
-| pi-Erweiterung `pi-openappa` | Erweiterung im pi-Prozess, Runtime von der Sitzung gestartet: beides auf der Seite des Agenten | Verworfen. Die Erweiterung übersetzt nur: "The runtime owns every decision: the extension only translates Pi events into hook events and applies the answer." Die Runtime startet aber die Sitzung selbst ("A protected session starts the APPA runtime on its own"), und der Schutz ist abschaltbar ("Protection is opt-in", `/appa off`). Entschieden würde an einer zweiten Stelle vor dem Vermittler. Das Paket ist ein Community-Paket (MIT, 2 Sterne, letzter Push am 01.11.2026) und wird über npm installiert (`pi install npm:pi-openappa`). |
+| pi-Erweiterung `pi-openappa` | Erweiterung im pi-Prozess, Runtime von der Sitzung gestartet: beides auf der Seite des Agenten | Verworfen. Die Erweiterung übersetzt nur: "The runtime owns every decision: the extension only translates Pi events into hook events and applies the answer." Die Sitzung startet die Runtime aber selbst ("A protected session starts the APPA runtime on its own"), und der Schutz ist abschaltbar ("Protection is opt-in", `/appa off`). Entschieden würde an einer zweiten Stelle vor dem Vermittler. Das Paket ist ein Community-Paket (MIT, 2 Sterne, letzter Push am 01.11.2026) und wird über npm installiert (`pi install npm:pi-openappa`). |
 | Elixir-Port der Algebra | in komki_policy | Das ist Option A beziehungsweise D. |
 
 ### Was das für den Vermittler als einzige Tür bedeutet
@@ -285,7 +285,10 @@ Das unabhängige Review dieser Analyse hat außerdem eine Abweichung der Engine 
 
 ### GO-Vorlage
 
-Das GO kam am 16.11.2026 für alle Punkte.
+Das GO kam am 16.11.2026 für alle Punkte. Nach dem GO hat das unabhängige Review zwei Formulierungen geschärft, die die nutzende Person noch bestätigt:
+
+- Wiedervorlage von Option C: „Schreibwege ohne GO“ statt „Wirkungen ohne GO“. Übergaben laufen schon heute ohne GO (Abschnitt 3.6); mit der alten Fassung wäre die Bedingung bereits erfüllt.
+- F6: „Fester Γ je Raum“ statt „je Vermittlerlauf“, mit der Folge, dass ein Raum mit veraltetem Start-`gamma_hash` nicht weiter entscheidet.
 
 ```text
 GO #596
