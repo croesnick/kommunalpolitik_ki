@@ -26,6 +26,37 @@ defmodule KomkiCli.GammaTest do
     assert :unchanged = Gamma.sync(cfg)
   end
 
+  # Ticket #354, ADR 0007: Ein Store aus der Vorlage vor der Befugnis fuer
+  # suchanfrage startet weiter. komki up ersetzt genau die vier
+  # mitgelieferten Bindungen und haelt jeden Uebergang fest; die
+  # Fingerabdruecke in Templates.superseded_bindings/0 treffen die alte
+  # Fassung.
+  test "Vorlagen-Upgrade: Store von vor #354 bekommt die Befugnis fuer suchanfrage", %{
+    cfg: cfg
+  } do
+    seed = Templates.label_store_seed()
+
+    old =
+      Enum.reduce(Map.keys(Templates.superseded_bindings()), seed, fn id, acc ->
+        update_in(acc, ["bindings", id, "relaxation_authorities"], fn entries ->
+          Enum.reject(entries, &(&1["output"] == "suchanfrage"))
+        end)
+      end)
+
+    assert old != seed
+    assert {:ok, _} = LabelStore.import_registry(Gamma.db_path(cfg), old)
+
+    assert :written = Gamma.sync(cfg)
+    assert File.read!(Gamma.registry_path(cfg)) == JSON.canonical(Templates.registry())
+
+    {:ok, upgrades} = LabelStore.binding_upgrades(Gamma.db_path(cfg))
+
+    assert upgrades |> Enum.map(& &1["binding"]) |> Enum.sort() ==
+             Enum.sort(Map.keys(Templates.superseded_bindings()))
+
+    assert :unchanged = Gamma.sync(cfg)
+  end
+
   test "eigene Bindungen aus dem Store kommen in den Export", %{cfg: cfg} do
     seed = Templates.label_store_seed()
     own = put_in(seed, ["bindings", "vorlage-ausschuss@1"], seed["bindings"]["doc-oeffentlich@1"])

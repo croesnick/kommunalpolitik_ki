@@ -142,6 +142,13 @@ defmodule KomkiCli.LabelStore do
     decided_at TEXT NOT NULL,
     FOREIGN KEY (object_id, version) REFERENCES objects(object_id, version)
   );
+  CREATE TABLE IF NOT EXISTS binding_upgrades (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    binding TEXT NOT NULL,
+    from_sha256 TEXT NOT NULL,
+    to_sha256 TEXT NOT NULL,
+    upgraded_at TEXT NOT NULL
+  );
   """
 
   # ========================================================================
@@ -158,12 +165,54 @@ defmodule KomkiCli.LabelStore do
   werden). Einmal registrierter Inhalt ist unveraenderlich:
   kanonisch-identischer Re-Import ist ein No-op, abweichender Inhalt ein
   Fehler. Liefert die Zahl je Tabelle neu eingefuegter Zeilen.
+
+  Einzige Ausnahme ist das Vorlagen-Upgrade (`upgrades:`, Ticket #354,
+  ADR 0007), ein ausdruecklicher Verwaltungsschritt (RFC A.1): Nur der
+  Import der mitgelieferten Vorlage in `komki up` uebergibt je Bindung die
+  Fingerabdruecke frueherer mitgelieferter Fassungen
+  (`binding_fingerprint/1`). Steht genau eine davon im Store, ersetzt der
+  Import sie durch die aktuelle Fassung und haelt den Uebergang in
+  `binding_upgrades` fest. Eine selbst angelegte oder veraenderte Bindung
+  bleibt unveraenderlich; `komki label import` uebergibt nie Upgrades.
   """
-  @spec import_registry(String.t(), term()) :: {:ok, counts()} | {:error, String.t()}
-  def import_registry(db_path, term) when is_binary(db_path) do
+  @spec import_registry(String.t(), term(), keyword()) :: {:ok, counts()} | {:error, String.t()}
+  def import_registry(db_path, term, opts \\ []) when is_binary(db_path) do
+    upgrades = Keyword.get(opts, :upgrades, %{})
+
     with :ok <- validate_import(term) do
-      with_conn(db_path, fn conn -> merge(conn, term) end)
+      with_conn(db_path, fn conn -> merge(conn, term, upgrades) end)
     end
+  end
+
+  @doc """
+  Fingerabdruck einer Bindung in Store-Form `komki-label-store/2`
+  (Vorlagen-Upgrade, Ticket #354): SHA-256 (Hex) ueber die kanonisch
+  gespeicherte Zeile ohne Kennung und Zeitstempel. Zwei Fassungen haben
+  genau dann denselben Abdruck, wenn ein Re-Import ein No-op waere.
+  """
+  @spec binding_fingerprint(map()) :: String.t()
+  def binding_fingerprint(spec) when is_map(spec) do
+    spec
+    |> binding_values_of()
+    |> Tuple.to_list()
+    |> row_fingerprint()
+  end
+
+  @doc "Festgehaltene Vorlagen-Upgrades, aelteste zuerst (Ticket #354)."
+  @spec binding_upgrades(String.t()) :: {:ok, [map()]} | {:error, String.t()}
+  def binding_upgrades(db_path) do
+    with_conn(db_path, fn conn ->
+      with {:ok, rows} <-
+             select(
+               conn,
+               "SELECT binding, from_sha256, to_sha256, upgraded_at FROM binding_upgrades ORDER BY id"
+             ) do
+        {:ok,
+         Enum.map(rows, fn [binding, from, to, at] ->
+           %{"binding" => binding, "from_sha256" => from, "to_sha256" => to, "upgraded_at" => at}
+         end)}
+      end
+    end)
   end
 
   @doc "registry_id aus registry_meta lesen (nil bei uninitialisiertem Store)."
@@ -605,14 +654,14 @@ defmodule KomkiCli.LabelStore do
   # Import-Merge (R.2.1: registrieren zwischen Entscheidungen; Transaktion)
   # ========================================================================
 
-  defp merge(conn, term) do
+  defp merge(conn, term, upgrades) do
     :ok = Sqlite3.execute(conn, "BEGIN")
 
     with {:ok, obs_n} <- merge_observers(conn, term["observers"]),
          :ok <- merge_observer_types(conn, Map.to_list(term["observer_types"])),
          {:ok, ff_n} <- merge_fact_fields(conn, term["fact_fields"]),
          {:ok, env_n} <- merge_environments(conn, term["environments"]),
-         {:ok, bind_n} <- merge_bindings(conn, term["bindings"]),
+         {:ok, bind_n} <- merge_bindings(conn, term["bindings"], upgrades),
          :ok <-
            put_meta(conn, "registry_id", term["registry_id"]) do
       :ok = Sqlite3.execute(conn, "COMMIT")
@@ -754,11 +803,12 @@ defmodule KomkiCli.LabelStore do
     end
   end
 
-  defp merge_bindings(conn, bindings) do
+  defp merge_bindings(conn, bindings, upgrades) do
     Enum.reduce_while(Map.to_list(bindings), {:ok, 0}, fn {id, spec}, {:ok, n} ->
-      case merge_binding(conn, id, spec) do
+      case merge_binding(conn, id, spec, Map.get(upgrades, id, [])) do
         {:ok, :inserted} -> {:cont, {:ok, n + 1}}
         {:ok, :noop} -> {:cont, {:ok, n}}
+        {:ok, :upgraded} -> {:cont, {:ok, n}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
@@ -770,23 +820,30 @@ defmodule KomkiCli.LabelStore do
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   """
 
-  defp merge_binding(conn, id, spec) do
-    new_values =
-      binding_values(
-        spec["bezeichnung"],
-        spec["geltungsbereich"],
-        spec["verantwortliche_stelle"],
-        spec["readers"],
-        spec["operations"],
-        spec["auflagen"],
-        spec["relaxation_authorities"]
-      )
+  defp merge_binding(conn, id, spec, superseded) do
+    new_values = binding_values_of(spec)
 
     case fetch_row(conn, "SELECT id FROM bindings WHERE id = ?", [id]) do
       {:ok, nil} -> insert_new_binding(conn, id, new_values)
-      {:ok, _row} -> compare_binding(conn, id, Tuple.to_list(new_values))
+      {:ok, _row} -> compare_binding(conn, id, Tuple.to_list(new_values), superseded)
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  defp binding_values_of(spec) do
+    binding_values(
+      spec["bezeichnung"],
+      spec["geltungsbereich"],
+      spec["verantwortliche_stelle"],
+      spec["readers"],
+      spec["operations"],
+      spec["auflagen"],
+      spec["relaxation_authorities"]
+    )
+  end
+
+  defp row_fingerprint(values) do
+    Base.encode16(:crypto.hash(:sha256, canonical_json(values)), case: :lower)
   end
 
   defp insert_new_binding(conn, id, new_values) do
@@ -808,8 +865,10 @@ defmodule KomkiCli.LabelStore do
 
   # Identischer Re-Import = "byte-identical canonical JSON" je Spalte:
   # verglichen wird der 7er-Inhalt (registered_at bleibt beim ersten
-  # Import); geschriebene Werte sind kanonisch codiert.
-  defp compare_binding(conn, id, new_row) do
+  # Import); geschriebene Werte sind kanonisch codiert. Weicht er ab, ist
+  # nur ein Vorlagen-Upgrade zulaessig: die gespeicherte Zeile ist eine
+  # fruehere mitgelieferte Fassung (`superseded`, Ticket #354).
+  defp compare_binding(conn, id, new_row, superseded) do
     case fetch_row(
            conn,
            "SELECT bezeichnung, geltungsbereich, verantwortliche_stelle, readers,
@@ -817,14 +876,41 @@ operations, auflagen, relaxation_authorities FROM bindings WHERE id = ?",
            [id]
          ) do
       {:ok, saved_row} ->
-        if new_row == Enum.to_list(saved_row) do
-          {:ok, :noop}
-        else
-          {:error, "Import ungültig: Bindung unveränderlich: " <> id <> " (Inhalt weicht ab)"}
+        saved = Enum.to_list(saved_row)
+
+        cond do
+          new_row == saved ->
+            {:ok, :noop}
+
+          row_fingerprint(saved) in superseded ->
+            upgrade_binding(conn, id, saved, new_row)
+
+          true ->
+            {:error, "Import ungültig: Bindung unveränderlich: " <> id <> " (Inhalt weicht ab)"}
         end
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  # Vorlagen-Upgrade (Ticket #354, RFC A.1): die fruehere mitgelieferte
+  # Fassung wird durch die aktuelle ersetzt, registered_at bleibt; der
+  # Uebergang steht mit beiden Fingerabdruecken in binding_upgrades.
+  defp upgrade_binding(conn, id, saved, new_row) do
+    sql = """
+    UPDATE bindings SET bezeichnung = ?, geltungsbereich = ?, verantwortliche_stelle = ?,
+    readers = ?, operations = ?, auflagen = ?, relaxation_authorities = ? WHERE id = ?
+    """
+
+    with :ok <- insert(conn, sql, new_row ++ [id]),
+         :ok <-
+           insert(
+             conn,
+             "INSERT INTO binding_upgrades (binding, from_sha256, to_sha256, upgraded_at) VALUES (?, ?, ?, ?)",
+             [id, row_fingerprint(saved), row_fingerprint(new_row), utc_now()]
+           ) do
+      {:ok, :upgraded}
     end
   end
 

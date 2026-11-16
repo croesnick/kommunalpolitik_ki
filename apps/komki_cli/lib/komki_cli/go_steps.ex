@@ -18,11 +18,13 @@ defmodule KomkiCli.GoSteps do
 
   Eine Offenlegungsfreigabe (#423, Szene 13) ist kein gewoehnliches GO:
   Der Text verlaesst einen vertraulichen Raum und wird dem Vorstand
-  offengelegt. Die Vorschau sagt das in einem eigenen Satz, nennt alle
-  Empfaenger des Ziels und zeigt die Teile einzeln — abgewaehlte Teile
-  verlassen den Raum nicht. Die Auswahl geschieht VOR dem GO (ein
-  abgewaehltes Teil ist ein neues Ereignis mit neuem Hash, R.6.2); das
-  Haeckchen im Hub kaeme zu spaet.
+  offengelegt. Die Vorschau sagt das in einem eigenen Satz, nennt die
+  Bindungen, die sie aufhebt, alle Empfaenger des Ziels und zeigt die
+  Teile einzeln — abgewaehlte Teile verlassen den Raum nicht. Die Auswahl
+  geschieht VOR dem GO (ein abgewaehltes Teil ist ein neues Ereignis mit
+  neuem Hash, R.6.2); das Haeckchen im Hub kaeme zu spaet. Ein Suchtext
+  nach draussen (#354, Szene 4) ist ebenfalls eine Offenlegung, hat aber
+  keine Teile: Das GO gilt dem ganzen Aufruf.
   """
 
   alias KomkiConnector.Manifest
@@ -69,15 +71,30 @@ defmodule KomkiCli.GoSteps do
   defp answer(dir, request, ui, environments) do
     ui.say.(describe(request, recipients(request["tool"], environments)))
 
-    if offenlegung?(request) do
-      answer_offenlegung(dir, request, ui)
-    else
-      answer_simple(dir, request, ui)
+    cond do
+      offenlegung?(request) and Map.get(request, "teile", []) == [] ->
+        answer_simple(dir, request, ui, offenlegung_frage(request))
+
+      offenlegung?(request) ->
+        answer_offenlegung(dir, request, ui)
+
+      true ->
+        answer_simple(dir, request, ui, "GO für genau diesen Aufruf?")
     end
   end
 
-  defp answer_simple(dir, request, ui) do
-    go? = ui.confirm.("GO für genau diesen Aufruf?", false)
+  # Ein Suchtext ohne Teile (#354): ein GO fuer den ganzen Aufruf, mit dem
+  # Satz der Offenlegung. Go.answer/3 schreibt dafuer die Auswahl-Antwort.
+  defp offenlegung_frage(request) do
+    "GO: Ich gebe genau diesen Suchtext bewusst an #{namen(extern(request))} weiter."
+  end
+
+  # Die Empfaenger des Ziels ausserhalb des Rechners, aus der Anfrage
+  # selbst (der Vermittler nennt alle Empfaenger laut Γ).
+  defp extern(request), do: Map.get(request, "empfaenger", []) -- @intern
+
+  defp answer_simple(dir, request, ui, frage) do
+    go? = ui.confirm.(frage, false)
 
     case Go.answer(dir, request, go?) do
       :ok when go? ->
@@ -188,13 +205,17 @@ defmodule KomkiCli.GoSteps do
   end
 
   defp kopf(%{"kind" => "offenlegungsfreigabe"} = request, params, _recipients) do
-    """
+    basis = """
     Gesperrter Aufruf (Beleg #{request["decision_id"]})
       Werkzeug:  #{request["tool"]}
     #{action(request)}#{offenlegung(request)}  Parameter:
     #{params}
     #{teile(request)}  Gesperrt:  #{Enum.join(request["blockers"], ", ")}
     """
+
+    # Ein Suchtext geht an Empfaenger ausserhalb des Rechners: Auch hier
+    # gilt die Warnung zum Existenz-Leck (#217).
+    if Map.get(request, "teile", []) == [], do: basis <> leak(extern(request)), else: basis
   end
 
   defp kopf(request, params, recipients) do
@@ -216,24 +237,45 @@ defmodule KomkiCli.GoSteps do
 
   defp action(_request), do: ""
 
-  # Der Hinweis auf die Offenlegung (Szene 13): Ziel, alle Empfaenger und
-  # was dieses GO bedeutet — mit den Namen aus @names.
+  # Der Hinweis auf die Offenlegung (Szene 4, Szene 13): Ausgabeart, die
+  # Bindungen, die sie aufhebt (#603), alle Empfaenger und was dieses GO
+  # bedeutet — mit den Namen aus @names.
   defp offenlegung(request) do
-    empfaenger =
-      request
-      |> Map.get("empfaenger", [])
-      |> Enum.map_join(", ", &Map.get(@names, &1, &1))
+    empfaenger = request |> Map.get("empfaenger", []) |> namen()
 
     """
-      Ausgabe:   #{request["ausgabeart"]} (Lockerung auf #{Enum.join(request["ziellabel"], ", ")})
-      Offenlegung: Ich lege den ausgewählten Text bewusst gegenüber dem Vorstand offen.
+      Ausgabe:   #{request["ausgabeart"]} (#{lockerung(request)})
+      Offenlegung: #{offenlegung_satz(request)}
       Alle Empfänger: #{empfaenger}
     """
   end
 
+  # Was die Lockerung aufhebt; eine Anfrage ohne diese Angabe (vor #603)
+  # nennt das Ziellabel.
+  defp lockerung(%{"aufgehoben" => aufgehoben}) when is_list(aufgehoben),
+    do: "hebt auf: " <> Enum.join(aufgehoben, ", ")
+
+  defp lockerung(request), do: "Lockerung auf " <> Enum.join(request["ziellabel"], ", ")
+
+  defp offenlegung_satz(%{"ausgabeart" => "suchanfrage"} = request),
+    do: "Ich gebe genau diesen Suchtext bewusst an #{namen(extern(request))} weiter."
+
+  defp offenlegung_satz(_essenz),
+    do: "Ich lege den ausgewählten Text bewusst gegenüber dem Vorstand offen."
+
+  defp namen(ids), do: Enum.map_join(ids, ", ", &Map.get(@names, &1, &1))
+
   # Der genaue Text, Teil fuer Teil: die Vorschau zeigt jedes Teil mit
   # Nummer und vollstaendigem Inhalt — nichts wird gekuerzt (Szene 13).
+  # Ein Suchtext hat keine Teile, sein Text steht unter Parameter.
   defp teile(request) do
+    case Map.get(request, "teile", []) do
+      [] -> ""
+      _teile -> teile_block(request)
+    end
+  end
+
+  defp teile_block(request) do
     teile =
       request["params"]
       |> Map.get("teile", [])
@@ -252,7 +294,7 @@ defmodule KomkiCli.GoSteps do
   defp leak([]), do: ""
 
   defp leak(recipients) do
-    names = Enum.map_join(recipients, ", ", &Map.get(@names, &1, &1))
+    names = namen(recipients)
 
     """
       Sichtbar für: #{names}

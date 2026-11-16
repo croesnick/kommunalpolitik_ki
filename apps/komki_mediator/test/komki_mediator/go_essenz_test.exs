@@ -7,6 +7,16 @@ defmodule KomkiMediator.GoEssenzTest do
 
   alias KomkiMediator.{ConnectorGate, FakeConnector, Go, GoStand, Hinweis, Templates, TestHelpers}
 
+  # Ziellabel der Essenz aus dem Fraktionsraum (§ 4.9, #603): ratsprojekte@1
+  # plus die oeffentlichen Bindungen des Raums.
+  @ziellabel [
+    "doc-oeffentlich@2",
+    "ratsprojekte@1",
+    "ris-oeffentlich@1",
+    "vault-oeffentlich@1",
+    "web-oeffentlich@1"
+  ]
+
   @teile [
     %{
       "aussage" => "Die Fraktion favourisiert die Fuehrung entlang der Bahntrasse.",
@@ -130,7 +140,11 @@ defmodule KomkiMediator.GoEssenzTest do
     assert request["tool"] == "rp_fakt_vorschlagen"
     assert request["params"] == @params
     assert request["ausgabeart"] == "ratsprojekte-essenz"
-    assert request["ziellabel"] == ["ratsprojekte@1"]
+    # #603: Die oeffentlichen Bindungen des Raums darf der Hub ohnehin
+    # lesen; sie bleiben im Ziellabel. Aufgehoben werden nur die beiden
+    # Fraktionsbindungen.
+    assert request["ziellabel"] == @ziellabel
+    assert request["aufgehoben"] == ["fraktion-intern@1", "fraktionsprojekt-radweg@1"]
 
     assert request["empfaenger"] == [
              "fraktion",
@@ -158,7 +172,7 @@ defmodule KomkiMediator.GoEssenzTest do
 
     assert released["offenlegung"] == %{
              "ausgabeart" => "ratsprojekte-essenz",
-             "ziellabel" => ["ratsprojekte@1"],
+             "ziellabel" => @ziellabel,
              "empfaenger" => [
                "fraktion",
                "nextcloud-betreiber",
@@ -259,7 +273,7 @@ defmodule KomkiMediator.GoEssenzTest do
       |> Enum.find(&(&1["type"] == "offenlegungsfreigabe"))
 
     assert transition["ausgabeart"] == "ratsprojekte-essenz"
-    assert transition["ziellabel"] == ["ratsprojekte@1"]
+    assert transition["ziellabel"] == @ziellabel
     # Der Weg von Hand bleibt die Grenz-Aussage, nicht die Offenlegung:
     assert response["hinweis"] == Hinweis.text(:deny)
   end

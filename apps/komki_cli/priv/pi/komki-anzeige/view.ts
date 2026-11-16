@@ -205,10 +205,12 @@ function goRow(r: Json, p: Paint): Row | undefined {
 	return undefined;
 }
 
+// A call GO is an Aktionsfreigabe or, since #354, an Offenlegungsfreigabe
+// (a search text from a confidential room).
 function callGoOffered(r: Json): boolean {
 	return (Array.isArray(r.remedies) ? r.remedies : []).some((remedy: Json) =>
 		(Array.isArray(remedy?.transitions) ? remedy.transitions : []).some(
-			(t: Json) => t?.type === "aktionsfreigabe" && t.scope === "call",
+			(t: Json) => (t?.type === "aktionsfreigabe" || t?.type === "offenlegungsfreigabe") && t.scope === "call",
 		),
 	);
 }
@@ -250,6 +252,8 @@ function transition(t: Json): string {
 			return t.scope === "object"
 				? `nach Einstufung von ${clean(String(t.object))} (GO)`
 				: "mit deinem GO für genau diesen Aufruf, im komki-Fenster";
+		case "offenlegungsfreigabe":
+			return "wenn du genau diesen Aufruf bewusst offenlegst, im komki-Fenster";
 		case "fakt_nachreichen":
 			return `nach Nachreichen von ${(t.facts ?? []).map((f: unknown) => clean(String(f))).join(", ")}`;
 		case "registrierte_transformation":

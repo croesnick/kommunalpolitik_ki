@@ -354,11 +354,13 @@ defmodule KomkiMediator.ConnectorGate do
 
   # -------------------------------------------------------------------------
   # GO: Offenlegungsfreigabe fuer den Store in den Hub (§ 4.9, Szene 13,
-  # #423). Die Anfrage zeigt den genauen Text (Parameter), alle Empfaenger
-  # des Ziels und den Hinweis auf die Offenlegung; die Teile waehlt die
-  # nutzende Person hier ab, nicht erst im Hub. Eine Abwahl ergibt ein
-  # neues Ereignis mit neuem Hash (R.6.2): Der Vermittler leitet den
-  # reduzierten Call neu ab und baut die Freigabe darueber.
+  # #423) und fuer eine Suchanfrage nach draussen (Szene 4, #354). Die
+  # Anfrage zeigt den genauen Text (Parameter), alle Empfaenger des Ziels,
+  # die aufgehobenen Bindungen und den Hinweis auf die Offenlegung; die
+  # Teile waehlt die nutzende Person hier ab, nicht erst im Hub. Eine Abwahl
+  # ergibt ein neues Ereignis mit neuem Hash (R.6.2): Der Vermittler leitet
+  # den reduzierten Call neu ab und baut die Freigabe darueber. Ein Suchtext
+  # hat keine Teile; das GO gilt dem ganzen Aufruf.
   # -------------------------------------------------------------------------
 
   defp ask_go_offenlegung(env, go, call, {snapshot, intent, then}, response, offer) do
@@ -379,6 +381,7 @@ defmodule KomkiMediator.ConnectorGate do
         "authority" => Go.authority(),
         "ausgabeart" => offer.ausgabeart,
         "ziellabel" => offer.ziellabel,
+        "aufgehoben" => aufgehoben(snapshot, offer),
         "empfaenger" => ziel_empfaenger(env, call),
         "teile" => teile_choices(call)
       }
@@ -394,6 +397,12 @@ defmodule KomkiMediator.ConnectorGate do
         go_not_given(env, call, {snapshot, intent}, response, "go_timeout")
     end
   end
+
+  # Die Bindungen, die die Lockerung entfernt (R.5.7, #603): λ(y) ohne das
+  # Ziellabel. Das Fenster nennt sie, damit die Person sieht, welche
+  # Einschraenkung sie aufhebt.
+  defp aufgehoben(snapshot, offer),
+    do: Enum.sort(snapshot["object"]["labels"] -- offer.ziellabel)
 
   # Alle Empfaenger des Ziels (Szene 13: das Fenster zeigt alle Empfaenger):
   # die Beobachter der Zielumgebung des Manifests, sortiert.
@@ -1028,10 +1037,11 @@ defmodule KomkiMediator.ConnectorGate do
     response
   end
 
-  # A store whose target lies outside the recipient circle has no GO way
-  # (#417): the model gets only the note and who lies outside, which the
-  # pi display needs for its sentence; no catalog and no relaxation
-  # authorities (Gegenprobe 13.5). Every other denial keeps its form.
+  # A store or transfer whose target lies outside the recipient circle and
+  # has no GO way (#417, #354, Szene 4): the model gets only the note and
+  # who lies outside, which the pi display needs for its sentence; no
+  # catalog and no relaxation authorities (Gegenprobe 13.5). Every other
+  # denial keeps its form.
   defp denial(env, rule, kind, remedies) do
     if Hinweis.not_transmitted?(rule, remedies) do
       %{

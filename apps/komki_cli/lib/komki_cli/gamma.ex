@@ -9,8 +9,11 @@ defmodule KomkiCli.Gamma do
   in den Store und schreibt den Export, wenn er sich geaendert hat. Der
   Import ist ein Merge: eigene Bindungen aus `komki label import` bleiben,
   ein identischer Re-Import aendert nichts, eine abweichend registrierte
-  Bindung bricht ab (Bindungen sind unveraenderlich, R.2.1). Validiert wird
-  ueber `KomkiPolicy.Registry.compile/1` im Export.
+  Bindung bricht ab (Bindungen sind unveraenderlich, R.2.1). Ausnahme ist
+  das Vorlagen-Upgrade (ADR 0007, #354): Eine fruehere mitgelieferte
+  Fassung (`Templates.superseded_bindings/0`) ersetzt der Import durch die
+  aktuelle und haelt den Uebergang im Store fest. Validiert wird ueber
+  `KomkiPolicy.Registry.compile/1` im Export.
   """
 
   alias KomkiCli.{Config, LabelStore}
@@ -33,7 +36,9 @@ defmodule KomkiCli.Gamma do
     path = registry_path(cfg)
 
     with {:ok, _counts} <-
-           LabelStore.import_registry(db, KomkiMediator.Templates.label_store_seed()),
+           LabelStore.import_registry(db, KomkiMediator.Templates.label_store_seed(),
+             upgrades: KomkiMediator.Templates.superseded_bindings()
+           ),
          {:ok, export} <- LabelStore.export(db),
          {:ok, term} <- parse(export) do
       # Kanonische Form wie die Vorlagen des Vermittlers: so erkennt dessen

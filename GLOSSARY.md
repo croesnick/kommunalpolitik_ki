@@ -965,9 +965,10 @@ Lockerung zulässig.
 
 **Abgrenzung:** Original und laufender Arbeitsraum behalten ihr Label. Ein
 GO ersetzt keine fehlende Lockerungsbefugnis. Befugnisse sind strukturierte
-Einträge `{authority, restriction, output}` im Γ (CONTRACT.md § 2.1); eine
-Bindung, deren Empfängerkreis das Ziel ohnehin abdeckt, lockert nichts
-und braucht keine Befugnis.
+Einträge `{authority, restriction, output}` im Γ (CONTRACT.md § 2.1). Eine
+Bindung, deren Empfängerkreis das Ziel ohnehin abdeckt, bleibt im
+Ziellabel und braucht deshalb keine Befugnis; entfernt eine Freigabe sie
+trotzdem, braucht auch sie eine (R.5.7, #603).
 
 **Siehe:** RFC 0003 R.2.2, R.5.7; [Aktionsfreigabe und Offenlegungsfreigabe](#aktionsfreigabe-und-offenlegungsfreigabe), [Ausgabeart](#ausgabeart).
 
@@ -976,16 +977,20 @@ und braucht keine Befugnis.
 ### Ausgabeart
 
 **Definition:** Das `output` einer Lockerungsbefugnis und einer
-Offenlegungsfreigabe: wofür eine Bindung gelockert werden darf — im
-ersten gebauten Fall `ratsprojekte-essenz` (Arbeitstitel) für gegengelesene
-Essenz aus dem Fraktionsraum in den ratsprojekte-Hub (Szene 13, #423).
+Offenlegungsfreigabe: wofür eine Bindung gelockert werden darf — etwa
+`ratsprojekte-essenz` (Arbeitstitel) für gegengelesene Essenz aus dem
+Fraktionsraum in den ratsprojekte-Hub (Szene 13, #423) oder
+`suchanfrage` für genau einen Suchtext an Websuche oder RIS (Szene 4,
+#354).
 Das Vokabular ist geschlossen (CONTRACT.md § 2.1), die Engine ordnet die
 Ausgabeart der Zielumgebung zu und rechnet sie gegen die Freigabe nach;
 der Agent benennt keine Ausgabeart.
 
 **Abgrenzung:** Die Ausgabeart benennt den Zweck der Lockerung, nicht das
-Ziellabel: `ratsprojekte-essenz` lockert auf `ratsprojekte@1`, aber das
-Ziellabel steht in der Freigabe und wird separat geprüft (R.6.2).
+Ziellabel. Das Ziellabel ist das Grundlabel der Ausgabeart (bei
+`ratsprojekte-essenz` `ratsprojekte@1`) plus die Bindungen, die das Ziel
+ohnehin lesen darf; es steht in der Freigabe und wird separat geprüft
+(R.6.2).
 
 _Vermeiden:_ Ausgabeform, Exportart.
 
@@ -1076,11 +1081,13 @@ Wirkung (R.6.1) — eine Transaktion, nicht nur einen Text; sie wird an
 den exakten call hash gebunden, mit Frische-Fenster und einmalig
 verbrauchter Nonce (R.6.3). Eine Offenlegungsfreigabe erlaubt zusätzlich das
 Lockern von Bindungen (Herabstufungsbefugnis): Sie nennt Ausgabeart und
-Ziellabel der Lockerung und wirkt nur, wenn jede lockerungsbedürftige
-Bindung die Befugnis trägt (R.5.7). Seit #423 entscheidet die Engine
+Ziellabel der Lockerung und wirkt nur, wenn jede Bindung, die sie
+entfernt, die Befugnis trägt (R.5.7). Seit #423 entscheidet die Engine
 sie für `store` (`komki-release/2`, CONTRACT.md § 4.9), zuerst für
-gegegengelesene Essenz aus dem Fraktionsraum in den ratsprojekte-Hub
-(Szene 13).
+gegengelesene Essenz aus dem Fraktionsraum in den ratsprojekte-Hub
+(Szene 13), seit #354 auch für `transfer`: Einen Empfänger außerhalb des
+Empfängerkreises lässt bei `store` und `transfer` nur eine
+Offenlegungsfreigabe zu, nie eine Aktionsfreigabe.
 
 **Siehe:** RFC 0003 R.6.1–R.6.3; [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.6, § 4.6, § 4.9.
 

@@ -1007,7 +1007,7 @@ Die Bauliste ergibt sich aus den Szenen. Ein Ticket steht dabei, wenn es schon e
 | Nr. | Baustein | Szenen | Ticket |
 |---|---|---|---|
 | B1 | Lockerungsbefugnisse in Export und Entscheidung, mit Bedingung (K1) | 5, 6, 7 | #109, #85 |
-| B2 | Offenlegungsfreigabe als eigene Art neben der Aktionsfreigabe; das heutige GO für Anfragen aus dem Raum `vertraulich` ist der Sache nach eine Offenlegung | 4, 5, 6, 7 | #109, neu |
+| B2 | Offenlegungsfreigabe als eigene Art neben der Aktionsfreigabe; das GO für Anfragen aus dem Raum `vertraulich` ist seit #354 eine Offenlegung (Ausgabeart `suchanfrage`) | 4, 5, 6, 7 | #109, #423, #354 |
 | B4 | Faktenfreigabe: Faktenkatalog als Objekt, Projektion E, Prüffakt „öffentliche Quelle“ | 7 | neu |
 | B5 | Offenlegungsstand je Geltungsbereich im Vermittler, sichtbar im Freigabefenster | 5, 7 | neu (Engine kann `advance`) |
 | B10 | Bindungsvorlagen und parametrisierte Bindungen (`buergerfall-<n>`, `auftrag-sitzung-<datum>`, `abo-<quelle>`) | 0, 2, 3 | #38, neu |

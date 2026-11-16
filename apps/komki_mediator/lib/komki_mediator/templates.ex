@@ -31,7 +31,7 @@ defmodule KomkiMediator.Templates do
   # (#106 und #107 fuer die Registry, beide mit demselben Raum; #134 nur
   # fuer den Raum; 8dc75f9 vor #213 fuer beide).
   @current %{
-    "registry.json" => "7524cca748ac4f580d5385c4ff68cb182bd6b4a92915382244bfbe597c37c140",
+    "registry.json" => "6b3bfbaece144f54285da92052634faa3d55aba9823d5699690ff82dd3082a2c",
     "room.json" => "8bb7a156134d43ebd4cc0027fc66ec27c26e00ae696d0d65f83b8ad8c9d57469"
   }
   @outdated %{
@@ -45,7 +45,9 @@ defmodule KomkiMediator.Templates do
       # before #298: bindings without a transfer rule
       "038a1756f2be26e6a13b844e802d15afbb6b9d65fc5b05a19ffb168066ffcc62",
       # vor #423: ohne Fraktionsraum-Welt, Lockerungsbefugnisse exportiert als []
-      "9d06e591083615071f4386298ddb1e62e9d6f2fc20388a21741fc9bab07d55e0"
+      "9d06e591083615071f4386298ddb1e62e9d6f2fc20388a21741fc9bab07d55e0",
+      # vor #354: ohne Befugnis fuer suchanfrage
+      "7524cca748ac4f580d5385c4ff68cb182bd6b4a92915382244bfbe597c37c140"
     ],
     "room.json" => [
       "127831a737e7f5565d8def234c260ca270056b8954b346725f03ef638ef0b51f",
@@ -107,6 +109,33 @@ defmodule KomkiMediator.Templates do
       "output" => "ratsprojekte-essenz"
     }
   ]
+
+  # Befugnis fuer genau einen Suchtext an Websuche oder RIS (Szene 4, #354,
+  # Γ-GO vom 2026-11-16): In den Raeumen vertraulich, projektraum und
+  # fraktion darf Miriam diese Bindungen fuer eine Suchanfrage lockern —
+  # als Offenlegungsfreigabe statt als schlichtes GO. ratsarbeit@1 bekommt
+  # sie nie: Aus dem Mandatsraum gibt es kein Fenster.
+  @suchanfrage_befugnis [
+    %{
+      "authority" => "nutzende-person",
+      "restriction" => "readers",
+      "output" => "suchanfrage"
+    }
+  ]
+
+  # Fruehere mitgelieferte Fassungen von Bindungen, die eine neue Fassung
+  # unter derselben Kennung ersetzen darf (Vorlagen-Upgrade, ADR 0007,
+  # #354): Fingerabdruck der Store-Zeile
+  # (`KomkiCli.LabelStore.binding_fingerprint/1`). Hier: die vier
+  # Bindungen vor der Befugnis fuer `suchanfrage`.
+  @superseded_bindings %{
+    "fraktion-intern@1" => ["7fa5a105c08f1667d2efd3db8918bd8bd0e0b85e40fc4c11a35b23307f9fad37"],
+    "fraktionsprojekt-radweg@1" => [
+      "695ab4d4982764d337ed1f9f67060d4ec7317801f993e62b1e192c0f783216dc"
+    ],
+    "ratsprojekte@1" => ["37432cf7b0b58a3f65fa11178d0b6df44cb7bdf3f4e7ef4bcca2aed6565a2a46"],
+    "vault-vertraulich@1" => ["279d616381c246c7b4ddee25878d67ac77b433fe307c69ff8535c6090d1ed90c"]
+  }
 
   @doc """
   Vorlage des Arbeitsraums in Store-Form `komki-label-store/2` (Ticket
@@ -175,22 +204,22 @@ defmodule KomkiMediator.Templates do
           # Fraktionsarbeit. Miriam, pi-agent, Fraktion und der
           # nextcloud-betreiber (Fraktionsordner) lesen mit — der Vorstand
           # fehlt bewusst (ADR 0004, verworfene Option fraktion-intern@2).
-          # Die Befugnis erlaubt Miriam die gegengelesene Essenz an
-          # ratsprojekte (Szene 13, #423); fuer konkrete Rechercheauftraege
-          # entscheidet #354.
+          # Die Befugnisse erlauben Miriam die gegengelesene Essenz an
+          # ratsprojekte (Szene 13, #423) und einen Suchtext an Websuche
+          # oder RIS (#354), je als Offenlegungsfreigabe.
           "fraktion-intern@1" =>
             binding(
               "Interne Fraktionsarbeit",
               ["fraktion", "nextcloud-betreiber", "nutzende-person", "pi-agent"],
               %{"admit" => true, "emit" => true, "transfer" => true},
-              %{"relaxation_authorities" => @essenz_befugnis}
+              %{"relaxation_authorities" => @essenz_befugnis ++ @suchanfrage_befugnis}
             ),
           "fraktionsprojekt-radweg@1" =>
             binding(
               "Die Projektidee selbst",
               ["fraktion", "nextcloud-betreiber", "nutzende-person", "pi-agent"],
               %{"admit" => true, "emit" => true, "transfer" => true},
-              %{"relaxation_authorities" => @essenz_befugnis}
+              %{"relaxation_authorities" => @essenz_befugnis ++ @suchanfrage_befugnis}
             ),
           # Nichtoeffentliche Ratsunterlagen (Szenario, Bindungstabelle):
           # Aufheben kann nur der Stadtrat — Miriam bekommt die
@@ -228,15 +257,26 @@ defmodule KomkiMediator.Templates do
           # Bestand des ratsprojekte-Hubs (ADR 0004, Szene 11): gemeinsam
           # gebunden, admit+emit nach dem Γ-GO vom 2026-11-10, keine
           # transfer-Regel — jede Übergabe und jede Speicherung bleibt
-          # GO-pflichtig.
+          # GO-pflichtig. Eine Suchanfrage nach draussen ist eine
+          # Offenlegungsfreigabe (#354).
           "ratsprojekte@1" =>
-            binding("Bestand des ratsprojekte-Hubs", @hub_observers, %{
-              "admit" => true,
-              "emit" => true
-            })
+            binding(
+              "Bestand des ratsprojekte-Hubs",
+              @hub_observers,
+              %{"admit" => true, "emit" => true},
+              %{"relaxation_authorities" => @suchanfrage_befugnis}
+            )
         })
     }
   end
+
+  @doc """
+  Fruehere mitgelieferte Fassungen von Bindungen fuer das Vorlagen-Upgrade
+  in `komki up` (ADR 0007, #354): Kennung → Fingerabdruecke der
+  Store-Zeile. Nur diese Fassungen ersetzt der Import der Vorlage.
+  """
+  @spec superseded_bindings() :: %{String.t() => [String.t()]}
+  def superseded_bindings, do: @superseded_bindings
 
   @doc """
   Registry-Term des Default-Arbeitsraums (`komki-registry/2`): die
@@ -279,7 +319,9 @@ defmodule KomkiMediator.Templates do
   # without conditions. The recipient set does the separation:
   # vault-vertraulich is read only by nutzende-person and pi-agent, so in a
   # room with this binding every request to RIS or web search fails
-  # recipient_inclusion at the handover (transfer, #298). The @1 versions
+  # recipient_inclusion at the handover (transfer, #298). Its Befugnis for
+  # `suchanfrage` makes the one way out an Offenlegungsfreigabe for exactly
+  # that search text (#354, Szene 4). The @1 versions
   # carry transfer only since #298; an older label store rejects them
   # (R.2.1) and has to be set aside.
   #
@@ -297,7 +339,9 @@ defmodule KomkiMediator.Templates do
       "web-oeffentlich@1" => binding("Öffentliche Web-Treffer", @observers, open),
       "vault-oeffentlich@1" => binding("Öffentliche Vault-Notiz", @observers, open),
       "vault-vertraulich@1" =>
-        binding("Vertrauliche Vault-Notiz", ["nutzende-person", "pi-agent"], open)
+        binding("Vertrauliche Vault-Notiz", ["nutzende-person", "pi-agent"], open, %{
+          "relaxation_authorities" => @suchanfrage_befugnis
+        })
     }
   end
 

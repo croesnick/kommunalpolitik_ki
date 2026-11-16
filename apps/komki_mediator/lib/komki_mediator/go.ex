@@ -171,17 +171,22 @@ defmodule KomkiMediator.Go do
 
   # Die Auswahl nennt nur Kennungen aus der Anfrage; Unbekanntes,
   # Duplikate und eine leere Auswahl sind ein Nein — nichts verlässt
-  # den Raum, wenn kein Teil gewählt bleibt.
+  # den Raum, wenn kein Teil gewählt bleibt. Eine Anfrage ohne Teile (ein
+  # Suchtext, #354) nimmt genau die leere Auswahl an: Das GO gilt dem
+  # ganzen Aufruf.
   defp valid_selection(answer, request) do
     ids = Map.get(answer, "teile", [])
     valid = request |> Map.get("teile", []) |> Enum.map(& &1["id"])
 
-    if is_list(ids) and ids != [] and Enum.all?(ids, &(&1 in valid)) and
-         ids == Enum.uniq(ids) do
-      ids
-    else
-      nil
+    cond do
+      valid == [] and ids == [] -> []
+      valid_ids?(ids, valid) -> ids
+      true -> nil
     end
+  end
+
+  defp valid_ids?(ids, valid) do
+    is_list(ids) and ids != [] and Enum.all?(ids, &(&1 in valid)) and ids == Enum.uniq(ids)
   end
 
   # Eine unlesbare Antwort ist ein Nein, nie ein GO.
@@ -228,10 +233,22 @@ defmodule KomkiMediator.Go do
   @doc """
   Beantwortet eine Anfrage: `true` schreibt eine Aktionsfreigabe fuer genau
   diesen Call (frische Nonce, Frische-Fenster ab jetzt), `false` ein Nein.
-  Ist die Anfrage inzwischen abgelaufen (der Vermittler hat sie entfernt),
-  bleibt sie unbeantwortet: `:expired`.
+  Bei einer Offenlegungs-Anfrage (#423, #354) gilt `true` dem ganzen
+  Aufruf mit allen Teilen; die Freigabe baut der Vermittler. Ist die
+  Anfrage inzwischen abgelaufen (der Vermittler hat sie entfernt), bleibt
+  sie unbeantwortet: `:expired`.
   """
   @spec answer(Path.t(), map(), boolean()) :: :ok | :expired
+  def answer(dir, %{"kind" => "offenlegungsfreigabe", "call_hash" => hash} = request, go?) do
+    if File.exists?(Path.join(dir, hash <> ".request.json")) do
+      alle = request |> Map.get("teile", []) |> Enum.map(& &1["id"])
+      term = if go?, do: go_answer(alle), else: %{"go" => false}
+      write_atomic(Path.join(dir, hash <> ".answer.json"), term)
+    else
+      :expired
+    end
+  end
+
   def answer(dir, %{"call_hash" => hash} = request, go?) do
     if File.exists?(Path.join(dir, hash <> ".request.json")) do
       term = if go?, do: release_for(request, System.os_time(:second)), else: %{"go" => false}
@@ -240,6 +257,8 @@ defmodule KomkiMediator.Go do
       :expired
     end
   end
+
+  defp go_answer(teile), do: %{"schema" => "komki-go-answer/1", "go" => true, "teile" => teile}
 
   @doc """
   Beantwortet eine Offenlegungs-Anfrage mit einer Teileauswahl (#423):
@@ -255,7 +274,7 @@ defmodule KomkiMediator.Go do
     if File.exists?(Path.join(dir, hash <> ".request.json")) do
       answer =
         if selection != [] and Enum.all?(selection, &(&1 in valid_ids)) do
-          %{"schema" => "komki-go-answer/1", "go" => true, "teile" => Enum.uniq(selection)}
+          go_answer(Enum.uniq(selection))
         else
           %{"go" => false}
         end

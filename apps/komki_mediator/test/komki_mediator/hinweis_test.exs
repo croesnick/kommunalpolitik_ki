@@ -1,6 +1,6 @@
 defmodule KomkiMediator.HinweisTest do
-  # Ticket #417: which denial is "nothing transmitted". Only store without a
-  # GO way qualifies; emit and transfer keep their form from before (#354).
+  # Tickets #417 and #354: which denial is "nothing transmitted". Store and
+  # transfer without a GO way qualify; emit keeps its form.
   use ExUnit.Case, async: true
 
   alias KomkiMediator.Hinweis
@@ -10,13 +10,23 @@ defmodule KomkiMediator.HinweisTest do
   @room %{"type" => "neuer_raum", "required_bindings" => [], "required_recipients" => ["x"]}
   @call_go %{"type" => "aktionsfreigabe", "scope" => "call", "call_hash" => "abc"}
 
-  test "store, Empfänger außerhalb, kein GO im Katalog: nicht übertragen" do
-    remedies = [
-      remedy("recipient_not_allowed", [@room]),
-      remedy("missing_operation_rule", [@room])
-    ]
+  @offenlegung %{"type" => "offenlegungsfreigabe", "scope" => "call", "call_hash" => "abc"}
 
-    assert Hinweis.not_transmitted?("store", remedies)
+  for rule <- ["store", "transfer"] do
+    test "#{rule}, Empfänger außerhalb, kein GO im Katalog: nicht übertragen" do
+      remedies = [
+        remedy("recipient_not_allowed", [@room]),
+        remedy("missing_operation_rule", [@room])
+      ]
+
+      assert Hinweis.not_transmitted?(unquote(rule), remedies)
+    end
+
+    test "#{rule}, Empfänger außerhalb, Offenlegung im Katalog: bisherige Form" do
+      remedies = [remedy("recipient_not_allowed", [@room, @offenlegung])]
+
+      refute Hinweis.not_transmitted?(unquote(rule), remedies)
+    end
   end
 
   test "store ohne Empfängerbefund: bisherige Form" do
@@ -26,15 +36,13 @@ defmodule KomkiMediator.HinweisTest do
   # Neither path reaches workspace_invalid through ConnectorGate (the
   # mediator's snapshot is always valid), so the engine-shaped remedies are
   # given here: no call GO, recipient_not_allowed among the findings.
-  for rule <- ["emit", "transfer"] do
-    test "#{rule} mit recipient_not_allowed und workspace_invalid: bisherige Form" do
-      remedies = [
-        remedy("workspace_invalid", [@room]),
-        remedy("recipient_not_allowed", [@room])
-      ]
+  test "emit mit recipient_not_allowed und workspace_invalid: bisherige Form" do
+    remedies = [
+      remedy("workspace_invalid", [@room]),
+      remedy("recipient_not_allowed", [@room])
+    ]
 
-      refute Hinweis.not_transmitted?(unquote(rule), remedies)
-    end
+    refute Hinweis.not_transmitted?("emit", remedies)
   end
 
   test "admit (Gate 2): bisherige Form" do

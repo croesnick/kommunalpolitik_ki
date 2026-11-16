@@ -455,6 +455,8 @@ Eine Bindung ist eine benannte, versionierte Umgangsregel. Es gibt keine Rangfol
 
 Mehrere Bindungen gelten gemeinsam. Ihre Empfängerkreise werden geschnitten; ihre Operationsbedingungen werden gemeinsam geprüft. Eine Erlaubnis hebt kein anderes Verbot auf.
 
+**Abweichung in komki:** Eine mitgelieferte Bindung darf unter derselben Kennung eine neue Fassung bekommen, etwa eine zusätzliche Lockerungsbefugnis ([ADR 0007](../adr/0007-vorlagen-upgrade-mitgelieferter-bindungen.md), #354). Das geschieht nur als ausdrücklicher Verwaltungsschritt beim Import der Vorlage (A.1), nur für eine frühere mitgelieferte Fassung, und der Übergang wird festgehalten. Selbst angelegte Bindungen bleiben unveränderlich.
+
 Eine Leseberechtigung am Original ersetzt keine weiterwirkende Bindung. Soll eine Einschränkung auch für Ableitungen gelten, MUSS sie im Label repräsentiert sein. Unterschiedliche vertrauliche Leserkreise benötigen entsprechend unterscheidbare Bindungen.
 
 ### R.2.3 Empfängerkreis und Operationsbedingungen
