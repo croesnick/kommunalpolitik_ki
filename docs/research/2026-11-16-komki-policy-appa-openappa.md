@@ -2,7 +2,7 @@
 
 Stand: 16.11.2026. Analyse zu Ticket [#596](https://github.com/croesnick/kommunalpolitik_ki/issues/596) (`ai:s-tier`). Das Dokument baut nichts. Es hat eine Entscheidung der nutzenden Person vorbereitet (GO-Vorlage in Abschnitt 7). Das GO kam am 16.11.2026 für alle Punkte; die Entscheidung steht in [ADR 0006](../adr/0006-eigene-inferenz-engine-appa-als-referenzmodell.md). Für APPA schreibt es die Recherche vom 13.10.2026 fort ([Agent policy models](2026-10-13-agent-policy-models-openappa-pace.md)); PACE ist hier kein Thema.
 
-Alle Quellen wurden am 16.11.2026 abgerufen: das Paper in Version 2 (arXiv 2607.24625v2), die OpenAPPA-Dokumentation (openappa.com, vollständig als `llms.txt`), der OpenAPPA-Quellcode auf v0.43.0 (Commit `8151ed1`, 15.11.2026), die Workshop-Seite auf neurips.cc. Auf komki-Seite sind es [CONTRACT.md](../../apps/komki_policy/CONTRACT.md), [RFC 0003](../rfcs/0003-vertrauliche-ki-arbeitsraeume.md) und der Code auf `origin/main` (`b22b759`). Zitate aus englischen Quellen bleiben englisch. **APPA** meint das Modell aus dem Paper, **OpenAPPA** die Implementierung. Wo beide auseinanderlaufen, ist das vermerkt.
+Alle Quellen wurden am 16.11.2026 abgerufen: das Paper in Version 2 (arXiv 2607.24625v2), die OpenAPPA-Dokumentation (openappa.com, vollständig als `llms.txt`), der OpenAPPA-Quellcode auf `main` bei `8151ed1` (15.11.2026, ein CI-Commit nach v0.43.0), die Workshop-Seite auf neurips.cc. Auf komki-Seite sind es [CONTRACT.md](../../apps/komki_policy/CONTRACT.md), [RFC 0003](../rfcs/0003-vertrauliche-ki-arbeitsraeume.md) und der Code auf `origin/main` (`b22b759`). Zitate aus englischen Quellen bleiben englisch. **APPA** meint das Modell aus dem Paper, **OpenAPPA** die Implementierung. Wo beide auseinanderlaufen, ist das vermerkt.
 
 ## Kurzfassung
 
@@ -10,12 +10,12 @@ APPA und komki_policy entscheiden dieselbe Frage: Darf diese Information zu dies
 
 Bei dieser Abbildung geht verloren, was komki von APPA unterscheidet. Von den vier Eigenschaften aus dem Ticket kann APPA drei in seiner Algebra nicht ausdrücken und die vierte nur zum Teil:
 
-- **Fester Raumvertrag `B_W`.** APPA führt stattdessen ein Label pro Trajektorie, das beim Lesen sinkt; eine Verengung bestätigt der Agent selbst.
+- **Fester Raumvertrag `B_W`.** APPA führt stattdessen ein Label pro Trajektorie, das beim Lesen sinkt; eine Verengung bestätigt der Agent selbst. Den Empfänger- und Trust-Anteil eines festen Raums kann ein Host nachbilden, Bindungen und ihre Bedingungen nicht.
 - **Zweckbedingung `P_b`.** Dafür gibt es im Vertrag keinen Ort, denn `requires` kennt nur `audience`, `trust`, `effects` und `attention`.
 - **Beobachter des Verarbeitungswegs `ρ(c)`.** Für ausgehende Aufrufe lassen sie sich als feste Empfänger nachbilden, für den Inferenzweg nicht. Ein unvollständiger Beobachternachweis ist in APPA kein Zustand.
 - **Quarantäne.** Es gibt sie nicht. Unbekannte Aufrufe werden abgelehnt oder von einem Annotator eingeordnet, ab Werk von einem Modell.
 
-**Empfehlung: Option D.** komki_policy bleibt die Engine, APPA dient als Referenzmodell. Dazu kommt eine gezielte Angleichung (Option A) an benannten Stellen (Abschnitt 7). Ein Ersatz (B) gäbe Zusagen des RFC auf und widerspräche AGENTS.md §1. Ein Parallelbetrieb (C) brächte einen zweiten Vertrauenskern (TCB, trusted computing base) mit rund 205 000 Zeilen Rust, ein zweites Log und einen zweiten Ausnahmeweg. Übrig bliebe als Gewinn vor allem die Trust-Dimension, und die kann komki als Bindung selbst modellieren.
+**Empfehlung: Option D.** komki_policy bleibt die Engine, APPA dient als Referenzmodell. Dazu kommt eine gezielte Angleichung (Option A) an benannten Stellen (Abschnitt 7). Ein Ersatz (B) gäbe Zusagen des RFC auf und widerspräche AGENTS.md §1. Ein Parallelbetrieb (C) brächte einen zweiten Vertrauenskern (TCB, trusted computing base) mit rund 205 000 Zeilen Rust in den `appa-*`-Crates, ein zweites Log und einen zweiten Ausnahmeweg. Übrig bliebe als Gewinn vor allem die Trust-Dimension, und die kann komki als Bindung selbst modellieren, sobald #603 geklärt ist.
 
 **Nebenbefund (Abschnitt 6):** CONTRACT §2.6 sagt, das Modell sei kein Beobachter und könne deshalb keine Aktionsfreigabe ausstellen. Im Seed-Γ ist `pi-agent` aber Element von 𝒪, und die Engine prüft nur die Zugehörigkeit zu 𝒪. Die Grenze hält derzeit allein, weil pi das GO-Verzeichnis nicht schreiben kann.
 
@@ -34,8 +34,8 @@ Der Vermittler hat zwei Gates nach APPA-Vorbild. Gate 1 entscheidet vor dem Voll
 ### APPA und OpenAPPA
 
 - **Das Paper** steht seit dem 26.08.2026 unverändert in Version 2. Dass es angenommen wurde, ist jetzt belegt: Die offizielle Workshop-Seite auf neurips.cc führt es unter den angenommenen Beiträgen von „Agents in the Wild“ (11.12.2026, Sydney). Es ist also ein Workshop-Paper und kein Beitrag zur Hauptkonferenz. Die Website schreibt „NeurIPS-accepted paper“, das README genauer „Accepted to the NeurIPS 2026 Workshop on Agents in the Wild“.
-- **OpenAPPA** ist von v0.1.0 (18.08.2026) bei v0.43.0 (15.11.2026) angekommen, mit 66 Tags in 89 Tagen. Hinzugekommen sind unter anderem `forwards`, Attention-Marken, Annotatoren (auch modellgestützte), Context Provider, Recorder, der File-Tracker mit SafeBash, Policy-Revisionen mit Replay und eine Community-Erweiterung für pi (`pi-openappa`).
-- **Paper und Code laufen auseinander.** Das Paper beschreibt in §3 partielle Labels `(L_est, U_src)` für nicht annotierte Werkzeuge, die erst ein registrierter Cast auflöst. Der Engine-Code sagt das Gegenteil: "there is no partial or pending label state anywhere in the algebra" (`appa-engine/src/lib.rs`). Nicht annotierte Aufrufe gehen heute an einen Wildcard-Annotator oder werden abgelehnt. Auch die Empfängerdimension ist im Code symbolisch, als Schnitt von Vereinigungsklauseln über Gruppen, die Mitgliedschaftsdienste auflösen. Im Paper ist sie eine endliche Menge `P(U)`.
+- **OpenAPPA** ist von v0.1.0 (18.08.2026) bei v0.43.0 (15.11.2026) angekommen, mit 58 Versions-Tags in 89 Tagen. Hinzugekommen sind unter anderem `forwards`, Attention-Marken, Annotatoren (auch modellgestützte), Context Provider, Recorder, der File-Tracker mit SafeBash, Policy-Revisionen mit Replay und eine Community-Erweiterung für pi (`pi-openappa`).
+- **Paper und Code laufen auseinander.** Das Paper beschreibt in §3 partielle Labels `(L_est, U_src)` für nicht annotierte Werkzeuge, die erst ein registrierter Cast auflöst. Der Engine-Code sagt das Gegenteil: "there is no partial or pending label state anywhere in the algebra" (`appa-engine/src/lib.rs`). Nicht annotierte Aufrufe gehen heute an einen Wildcard-Annotator oder werden abgelehnt. Der Bruch kam mit v0.7.0 (02.09.2026): "replace dynamic resolvers, casts, and Unknown with the Annotator boundary" (CHANGELOG). Auch die Empfängerdimension ist im Code symbolisch, als Schnitt von Vereinigungsklauseln über Gruppen, die Mitgliedschaftsdienste auflösen. Im Paper ist sie eine endliche Menge `P(U)`.
 - **Die Grenzen** aus der Recherche vom 13.10. stehen weiter in der Doku, nur an anderen Stellen: Abschalten über `APPA_GATE` oder `disableAllHooks`, ungeschützte Hintergrundsitzungen, ein `/hook`-Endpunkt ohne Authentifizierung. Unter `/coding-agents#limits` stehen jetzt die Grenzen von File-Tracker und SafeBash, darunter: "Model-provider requests and assistant messages are not mediated."
 
 ## 2. Zwei Modelle mit gemeinsamer Mitte
@@ -92,9 +92,9 @@ Je Eigenschaft folgen das komki-Vertragszitat, das APPA-Vertragszitat und der Be
 
 **Befund: nicht ausdrückbar.**
 
-1. Wo komki ablehnt (`label_not_included`, λ(x) ⊄ B_W), verengt APPA das Label und bietet dem Agenten an, die Verengung zu bestätigen. Genau dieses Wachsen der Bindungsmenge verbietet R.4.1. Laut Paper ist das Accept der einzige Weg, der keine registrierte Komponente braucht. Der Code bestätigt das mit dem Test `an_acceptance_alone_is_the_one_guaranteed_route` (`appa-engine/src/route.rs`).
+1. Wo komki ablehnt (`label_not_included`, λ(x) ⊄ B_W), verengt APPA das Label und bietet dem Agenten an, die Verengung zu bestätigen. Genau dieses Wachsen der Bindungsmenge verbietet R.4.1. Laut Paper ist das Accept der einzige Weg, der keine registrierte Komponente braucht. Im Code ist es ein Routenschritt ohne Vorbehalt (`RecoveryRoute::certainty`, `appa-engine/src/route.rs`, Z. 85–105). Unterbinden kann es nur der Host: Führt er `appa/execute_remedy_plan` nie aus, bleibt jede Verengung eine Ablehnung. Einen eigenen Schalter dafür dokumentiert OpenAPPA nicht.
 2. Den Regressionsfall D.1 kann APPA nicht abbilden: Eine öffentliche Datei (λ(x) = ∅) scheitert, weil die Bedingung der Fallbindung falsch ist. In APPA verengt öffentliches Lesen nichts, und eine Bedingung, die an einer Bindung des Raums hängt, gibt es nicht.
-3. **Nachbildbar ist ein Teil.** `[policy.deployment] starting_label` (im Code, `appa-policy/src/raw.rs`, in der öffentlichen Doku nicht beschrieben) setzt alle Trajektorien eines Deployments auf ein Startlabel. Das ergibt den konservativen Start aus R.4.2, wenn jeder Raum ein eigenes Deployment bekommt. Den Empfängeranteil der Aufnahmeregel kann man je Lesewerkzeug nachstellen, indem man das Objektlabel als `forwards` angibt und die Empfänger von `R_Γ(B_W)` in `requires.audience.contains` einträgt. Das zweckentfremdet `forwards` (gemeint ist "content the tool sends beyond its arguments") und erfasst weder Bindungsidentität noch `P_b`.
+3. **Nachbildbar ist ein Teil.** `[policy.deployment] starting_label` (im Code, `appa-policy/src/raw.rs`, in der öffentlichen Doku nicht beschrieben) setzt alle Trajektorien eines Deployments auf ein Startlabel. Das ergibt den konservativen Start aus R.4.2, wenn jeder Raum ein eigenes Deployment bekommt. Den Empfängeranteil der Aufnahmeregel kann man je Lesewerkzeug nachstellen, indem man das Objektlabel als `forwards` angibt und die Empfänger von `R_Γ(B_W)` in `requires.audience.contains` einträgt. Das zweckentfremdet `forwards` (gemeint ist "content the tool sends beyond its arguments"). Die entstehende Lücke ist eine Anforderungslücke, und die räumt ein Accept nicht ab (Anhang B: "acceptance clears a narrowing block rather than a requirement gap"). Zusammen mit einem Host, der kein Accept ausführt (Punkt 1), lassen sich R.4.1 und R.4.2 so für `audience × trust` nachbilden. Es fehlen weiter Bindungsidentität, `P_b` und D.1.
 4. Am nächsten kommt einer festen Obergrenze der Rückgabevertrag eines Unteragenten: "The declared return limits constrain what the child may read" (Doku, Subagent Returns). Er gilt aber nur für Unteragenten, und der Agent setzt ihn selbst: "Return declarations are executed autonomously by the agent without requiring human approval."
 
 ### 3.2 Zweckbedingung `P_b`
@@ -133,17 +133,17 @@ Je Eigenschaft folgen das komki-Vertragszitat, das APPA-Vertragszitat und der Be
 **Befund: als Zustand nicht ausdrückbar.**
 
 1. Nachbildbar ist das Abweisen: Ohne Wildcard-Regel wird jeder Aufruf ohne Vertrag abgelehnt. Das ist Quarantäne als `deny`, ohne abgesonderten Eingang und ohne eine Fortsetzung, die zur Erstklassifikation führt.
-2. Ein eigener Annotator über `command` oder `url` könnte einen Menschen fragen. Er ordnet dann aber einen Aufruf ein, keine Objektversion, und es gibt weder Ledger noch Widerruf.
+2. Ein eigener Annotator über `command` oder `url` könnte einen Menschen fragen. Er ordnet dann aber einen Aufruf ein. Labels je Datei über Sitzungen hinweg hält der File-Tracker, und zurücksetzen kann sie nur die Person (Doku, „Files that keep their labels“). Dort stammt das Label aber aus dem Schreibweg, nicht aus einer Erstklassifikation. Einen Zustand „unklassifiziert“ und ein Ledger der Einordnungen gibt es nicht.
 3. Die eingebauten Annotatoren sind Modelle. Ist das Modell nicht zugelassen, verbietet R.2.5 genau diesen Weg für die Erstklassifikation, denn der Aufruf samt Argumenten geht an den Anbieter, die Schwärzung von Zugangsdaten ist "best effort".
 
 ### 3.5 Übersicht
 
 | komki-Eigenschaft | in der APPA-Algebra | Nachbildung in OpenAPPA | Was dabei verloren geht |
 |---|---|---|---|
-| Aufnahme gegen `B_W` | nein | `starting_label` je Deployment; Empfängeranteil über `forwards` und `requires` | Ablehnung statt Verengung (R.4.1), D.1, Bindungsidentität |
+| Aufnahme gegen `B_W` | nein | `starting_label` je Deployment; Empfängeranteil über `forwards` und `requires`; ein Host, der kein Accept ausführt | Bindungsidentität, `P_b`, D.1 |
 | Zweckbedingung `P_b` | nein | Zweck als Pseudo-Empfänger; Annotator mit Context Provider | Trennung nach R.2.3, Faktenprädikate, `indeterminate`, Beweisbaum |
 | Beobachter `ρ(c)` | teilweise | feste Empfänger je Senke | Inferenzweg, Vollständigkeitsnachweis, versionierte Umgebung |
-| Quarantäne | nein | Ablehnung ohne Vertrag; Annotator fragt einen Menschen | Zustand ≠ leeres Label, Objektbezug, Ledger, Widerruf |
+| Quarantäne | nein | Ablehnung ohne Vertrag; Annotator fragt einen Menschen; Labels je Datei im File-Tracker | Zustand „unklassifiziert“, menschliche Erstklassifikation, Ledger der Einordnungen |
 
 ### 3.6 Die Gegenrichtung: was APPA hat und komki nicht
 
@@ -158,7 +158,11 @@ Je Eigenschaft folgen das komki-Vertragszitat, das APPA-Vertragszitat und der Be
 | Evaluation mit 6 600 Episoden, Angriffs- und Nutzwertquote | Fixtures, Eigenschaftstests, TCR@k im Test (§ 8.3) | hoch; siehe Abschnitt 7 |
 | `appa replay`: erwartete Entscheidungen als Daten, gegen die Policy im Einsatz | Engine-Fixtures; einzelne Entscheidungen auf der Γ-Vorlage in Tests (`templates_test.exs`, `connector_gate_test.exs`); nichts davon läuft gegen den exportierten Γ mit eigenen Bindungen | mittel |
 
-**Trust lässt sich in komki als Bindung schreiben.** Eine Bindung wie `quelle-ungeprueft@1` erhält einen offenen Empfängerkreis und keine `store`-Regel. Ein Raum, der Web-Treffer aufnimmt, muss sie in `B_W` tragen (λ(x) ⊆ B_W), also trägt jede seiner Ausgaben sie (λ(y) ⊇ B_W). Jedes Speichern endet dann in `missing_operation_rule` und braucht eine Aktionsfreigabe für den exakten Call. Entfernen lässt sich die Bindung nur über eine Lockerung mit Befugnis. Das entspricht APPAs `requires = { trust = "trusted" }` mit einer Authority für `trust_below`, nur steht es von Beginn an im Raumvertrag statt erst nach dem Lesen. Für komkis heutige Wirkungen bringt das wenig, weil jeder Schreibweg ohnehin ein GO verlangt. Wichtig wird es, sobald komki Wirkungen ohne GO bekommt.
+**Trust lässt sich in komki als Bindung schreiben.** Eine Bindung wie `quelle-ungeprueft@1` erhält einen offenen Empfängerkreis und keine `store`-Regel. Ein Raum, der Web-Treffer aufnimmt, muss sie in `B_W` tragen (λ(x) ⊆ B_W), also trägt jede seiner Ausgaben sie (λ(y) ⊇ B_W). Jedes Speichern endet dann in `missing_operation_rule` und braucht eine Aktionsfreigabe für den exakten Call. Das entspricht APPAs `requires = { trust = "trusted" }` mit einer Authority für `trust_below`, nur steht es von Beginn an im Raumvertrag statt erst nach dem Lesen.
+
+Entfernen ließe sich die Bindung nach R.5.7 nur über eine Lockerung mit Befugnis. Die Engine weicht davon heute ab: Bei der Offenlegungsfreigabe verlangt sie eine Befugnis nur für Bindungen, deren Empfängerkreis das Ziel nicht abdeckt (CONTRACT § 4.9, Schritt 6; `calculus.ex`, Z. 68–75). Eine offene Bindung wie diese fiele also ohne Befugnis weg, ebenso eine Lizenzbindung mit Auflage (R.2.4). Das klärt #603; erst danach trägt der Vorschlag.
+
+Für Schreibwege bringt das heute wenig, weil jeder ein GO verlangt. Übergaben laufen dagegen ohne GO: Bindungen mit `transfer: true` im Seed-Γ erlauben Anfragen an RIS und Websuche, und eine eingeschleuste Anweisung aus einem Web-Treffer kann solche Anfragen steuern. Die Frage nach der Integrität (#602) stellt sich also schon jetzt.
 
 ## 4. Integrationsskizze: OpenAPPA als Sidecar
 
@@ -190,7 +194,7 @@ sequenceDiagram
 
 - **komki_policy bleibt Pflicht.** Die vier Eigenschaften aus Abschnitt 3 gibt es nur dort.
 - **OpenAPPA entscheidet zusätzlich** über `audience × trust` und Effekte. Die Verknüpfung ist eine Konjunktion: permit nur bei Zustimmung beider, `indeterminate` aus komki geht vor.
-- **Remedies kommen nur aus komki.** APPAs Pläne laufen über das eigene Werkzeug `appa/execute_remedy_plan` und den Endpunkt `/mcp`, der die Authorities konsultiert. Das wäre ein zweiter Ausnahmeweg neben dem GO. R.4.4 sagt über den Freigabedienst: „Er liegt außerhalb der Agentenhoheit.“ Ein Ausnahmeweg, den der Agent über ein eigenes Werkzeug anstößt, passt dazu nicht. Authorities, Sanitizer und Accept in OpenAPPA blieben abgeschaltet.
+- **Remedies kommen nur aus komki.** APPAs Pläne laufen über das eigene Werkzeug `appa/execute_remedy_plan` und den Endpunkt `/mcp`, der die Authorities konsultiert. Das wäre ein zweiter Ausnahmeweg neben dem GO. R.4.4 sagt über den Freigabedienst: „Er liegt außerhalb der Agentenhoheit.“ Ein Ausnahmeweg, den der Agent über ein eigenes Werkzeug anstößt, passt dazu nicht. Authorities und Sanitizer blieben abgeschaltet, und der Vermittler führte keine Remedy-Pläne von OpenAPPA aus. Nur so bleibt auch das Accept aus; einen eigenen Schalter dafür gibt es nicht.
 
 ### Wer protokolliert
 
@@ -204,7 +208,7 @@ sequenceDiagram
 |---|---|---|
 | Hook-Endpunkt: `appa` als eigener Prozess, `POST /hook` | Der Vermittler übersetzt seine Gate-Schritte in Hook-Ereignisse. | Machbar. Aber "`/hook` does not authenticate incoming callers": Der Endpunkt muss für pi unerreichbar sein, also im Seatbelt-Profil gesperrt. Die Ereignisse passen nicht 1:1: komki entscheidet je Connector-Aufruf dreimal (emit, transfer oder store, admit), APPA kennt `tool_call` und `tool_result`. Ein Prozess in einer anderen Sprache ist eine Abweichung nach AGENTS.md §1. |
 | NIF (Rustler) um `appa-engine` | Der reine Kern läuft in der BEAM-VM. | Nach §1 zulässig, weil nativer Code mit Elixir-Schnittstelle keine Abweichung ist. Der Kern allein reicht aber nicht: Policy-Parser (`appa-policy`) und Log (`appa-eventlog`, SQLite) gehören dazu, Konsultationen und Adapter stecken im Runtime-Crate. Der native Anteil im Vermittler wüchse von null auf rund 58 000 Zeilen (engine, policy, runtime-api), mit dem Log-Crate auf rund 72 000. Ein Absturz im nativen Code beendet die ganze VM und damit den Vermittler. |
-| pi-Erweiterung `pi-openappa` | im pi-Prozess, also im Seatbelt | Verworfen. Die Prüfung läuft auf der Seite des Agenten ("Protection runs on the client"), als zweite Entscheidungsstelle vor dem Vermittler. Das Paket ist ein Community-Paket (MIT, 2 Sterne, letzter Push am 01.11.2026) und wird über npm installiert (`pi install npm:pi-openappa`). |
+| pi-Erweiterung `pi-openappa` | Erweiterung im pi-Prozess, Runtime von der Sitzung gestartet: beides auf der Seite des Agenten | Verworfen. Die Erweiterung übersetzt nur: "The runtime owns every decision: the extension only translates Pi events into hook events and applies the answer." Die Runtime startet aber die Sitzung selbst ("A protected session starts the APPA runtime on its own"), und der Schutz ist abschaltbar ("Protection is opt-in", `/appa off`). Entschieden würde an einer zweiten Stelle vor dem Vermittler. Das Paket ist ein Community-Paket (MIT, 2 Sterne, letzter Push am 01.11.2026) und wird über npm installiert (`pi install npm:pi-openappa`). |
 | Elixir-Port der Algebra | in komki_policy | Das ist Option A beziehungsweise D. |
 
 ### Was das für den Vermittler als einzige Tür bedeutet
@@ -219,18 +223,18 @@ Der Vermittler bleibt nur dann die einzige Tür, wenn OpenAPPA ein reines Orakel
 4. Recorder und Telemetrie sind abgeschaltet.
 5. Das Urteil geht als Beleg in den PDR, das Journal bleibt der einzige Auditweg.
 
-Unter diesen Bedingungen schrumpft OpenAPPA auf die Faltung von `audience × trust` und die Effekt-Historie. Die Empfängerdimension hat komki schon, und Trust kann es als Bindung schreiben (Abschnitt 3.6). Der Sidecar brächte also viel TCB für wenig zusätzliche Entscheidung.
+Unter diesen Bedingungen schrumpft OpenAPPA auf die Faltung von `audience × trust` und die Effekt-Historie. Die Empfängerdimension hat komki schon, und Trust kann es als Bindung schreiben (Abschnitt 3.6, nach #603). Der Sidecar brächte also viel TCB für wenig zusätzliche Entscheidung.
 
 ## 5. Risiken
 
 | Risiko | Beleg | Gewicht |
 |---|---|---|
 | Preview-Status | README: "OpenAPPA is a **preview and an RFC**. … config and wire surfaces may break without shims." | hoch |
-| Änderungstempo | 66 Tags in 89 Tagen; 10 Abschnitte "BREAKING CHANGES" im CHANGELOG, darunter Änderungen der Semantik: v0.33.0 (14.10.2026) "check requirements against what a call forwards", v0.37.0 (20.10.2026) "remove policy snapshots and pinned trajectory families" | hoch |
+| Änderungstempo | 58 Versions-Tags in 89 Tagen; 10 Abschnitte "BREAKING CHANGES" im CHANGELOG, darunter Änderungen der Semantik: v0.7.0 (02.09.2026) "replace dynamic resolvers, casts, and Unknown with the Annotator boundary", v0.33.0 (14.10.2026) "check requirements against what a call forwards", v0.37.0 (20.10.2026) "remove policy snapshots and pinned trajectory families" | hoch |
 | Paper ≠ Implementierung | partielle Labels im Paper (§3), keine im Code (`appa-engine/src/lib.rs`); symbolische statt endlicher Empfängermengen | mittel: Unklar ist, welches APPA ein Referenzmodell wäre. |
 | Laufende Räume folgen der neuesten Policy | "The next decision in every family, new or already running, is made under the deployment's current revision, its head." komki hält Γ für den Raum fest (R.4.1, Startvertrag: Regelstand). | mittel: ein semantischer Unterschied, den ein Parallelbetrieb überbrücken müsste |
 | Elixir-first | AGENTS.md §1: „Eine fertige Bibliothek in einer anderen Sprache … rechtfertigt keine Abweichung. Nativer Code ist keine Abweichung (NIF über Rustler …), hat aber eine Elixir-Schnittstelle.“ | hoch für den Sidecar-Prozess, mittel für den NIF |
-| Wartung | rund 205 000 Zeilen in `.rs`-Dateien (Tests eingeschlossen) gegen 5 437 Zeilen Elixir in `komki_policy/lib` ohne Laufzeitabhängigkeit; eine Rust-Toolchain käme in den Bau aus dem Checkout dazu ([release.md](../release.md)) | hoch |
+| Wartung | rund 205 000 Zeilen in den `.rs`-Dateien der `appa-*`-Crates, Tests eingeschlossen (alle `.rs`-Dateien des Repos: rund 214 000), gegen 5 437 Zeilen Elixir in `komki_policy/lib` ohne Laufzeitabhängigkeit; eine Rust-Toolchain käme in den Bau aus dem Checkout dazu ([release.md](../release.md)) | hoch |
 | Ein Anbieter | Spezifikation, Referenzimplementierung und kommerzielle Plattform (Archestra) stammen aus einem Haus; 397 von 1 015 Commits auf `main` von einem Autor. Das Paper rät selbst: "use APPA as one defense-in-depth layer" (§8). | mittel |
 | Angriffsfläche | `/hook` ohne Authentifizierung; Recorder erhalten volle Argumente; LLM-Annotatoren senden Aufrufe an Anbieter; `builtin = "approve"` genehmigt automatisch; native Module über `--modules-dir` | hoch, ließe sich aber per Konfiguration abschalten (Abschnitt 4) |
 | Evidenz | Die Evaluation stammt vom Hersteller selbst. §8: "finite zero-ASR observations do not prove attacks impossible". Status: Workshop-Paper. | mittel |
@@ -246,7 +250,7 @@ Der Code sieht anders aus:
 - Die Engine prüft nur `release.authority in registry.observers` ([derive.ex](../../apps/komki_policy/lib/komki_policy/derive.ex), Z. 470–475). Eine Aktionsfreigabe mit `authority: "pi-agent"` bestünde diese Prüfung.
 - Der Label-Store kennt Beobachtertypen und führt `pi-agent` als `processing_domain` (templates.ex, Z. 70–81: „nur eine Person darf klassifizieren; Agent und Empfaenger sind Verarbeitungsdomaenen“). Der Export nach `komki-registry/2` trägt diese Typen nicht mit.
 
-Ausnutzbar ist das heute nicht: Der Vermittler setzt `authority` selbst auf `nutzende-person` (go.ex, Z. 29), und pi kann `<base>/mediator/go/` weder lesen noch schreiben (go.ex, Z. 10). Tragend ist damit die Dateisystemgrenze, nicht die 𝒪-Prüfung, die der Vertrag als Grenze nennt. Das RFC sieht genau diese Lücke vor: Zu A.4 („Kein Autoritätsgewinn“) heißt es, „Die tatsächliche Trennung von Verwaltungs- und Agentenrechten bleibt nachzuweisen.“ Die Engine könnte einen Teil dieses Nachweises selbst führen. Für Offenlegungsfreigaben gilt das nicht, denn dort steht die Befugnis in der Bindung, und das Seed-Γ vergibt sie nur an `nutzende-person`.
+Ausnutzbar ist das heute nicht: Der Vermittler setzt `authority` selbst auf `nutzende-person` (go.ex, Z. 29), und pi kann `<base>/mediator/go/` weder lesen noch schreiben (go.ex, Z. 10). Tragend ist damit die Dateisystemgrenze, nicht die 𝒪-Prüfung, die der Vertrag als Grenze nennt. Das RFC sieht genau diese Lücke vor: Zu A.4 („Kein Autoritätsgewinn“) heißt es, „Die tatsächliche Trennung von Verwaltungs- und Agentenrechten bleibt nachzuweisen.“ Die Engine könnte einen Teil dieses Nachweises selbst führen. Bei Offenlegungsfreigaben steht die Befugnis in der Bindung, und das Seed-Γ vergibt sie nur an `nutzende-person`. Label-Store und Registry prüfen bei einer Lockerungsbefugnis aber ebenfalls nur die Zugehörigkeit zu 𝒪 ([label_store.ex](../../apps/komki_cli/lib/komki_cli/label_store.ex), Z. 567; [registry.ex](../../apps/komki_policy/lib/komki_policy/registry.ex), ab Z. 299). Ein eigener Γ könnte sie also an eine Verarbeitungsdomäne vergeben. #598 schließt beides.
 
 APPA löst die Frage sauberer: Authorities sind eigene registrierte Komponenten mit Mandat, und Korollar 7 stützt sich genau darauf ("model tokens cannot forge a ruling, expand a mandate, or alter a rendered call hash"). Für komki folgt daraus der Vorschlag F1 in Abschnitt 7: eine eigene Menge zuständiger Stellen in Γ, die die Engine prüft. Der Vorschlag ändert den Datenvertrag, also nur durch den Integrator.
 
@@ -258,7 +262,7 @@ APPA löst die Frage sauberer: Authorities sind eigene registrierte Komponenten 
 |---|---|---|
 | A | komki_policy semantisch an APPA angleichen | ja, an den Stellen F2–F7 unten; nicht bei der Grundsemantik (fester Raum statt floating label) |
 | B | durch OpenAPPA ersetzen, komki nur als Umgebungsschicht | nein. Es gingen `B_W`, `P_b`, der Inferenzweg in `ρ`, `indeterminate`, die Quarantäne und die Nichtinterferenz-Zusage des RFC verloren (A.5; APPA lehnt sie ausdrücklich ab: "not general noninterference", §5). Dazu kämen eine Abweichung von AGENTS.md §1 und der Preview-Status. |
-| C | beides parallel | jetzt nicht. Abschnitt 4: unter den nötigen Bedingungen bleibt wenig Entscheidung bei viel TCB. Wiedervorlage, wenn eins davon eintritt: OpenAPPA erreicht eine stabile Version mit versioniertem Wire-Vertrag; komki bekommt Wirkungen ohne GO; komki geht in Mehrnutzerbetrieb mit wechselnden Gruppen. |
+| C | beides parallel | jetzt nicht. Abschnitt 4: unter den nötigen Bedingungen bleibt wenig Entscheidung bei viel TCB. Wiedervorlage, wenn eins davon eintritt: OpenAPPA erreicht eine stabile Version mit versioniertem Wire-Vertrag; komki bekommt Schreibwege ohne GO; komki geht in Mehrnutzerbetrieb mit wechselnden Gruppen. |
 | D | Engine behalten, APPA nur als Referenzmodell | ja, als Grundentscheidung |
 
 ### Was komki_policy „best in class“ macht
@@ -269,11 +273,13 @@ APPA ist an drei Stellen weiter als komki: bei der Messung, bei der Trennung der
 |---|---|---|---|
 | F1 | Zuständige Stellen in Γ getrennt von 𝒪 führen (etwa `authorities` in `komki-registry/3` oder Beobachtertypen im Export); die Engine prüft `release.authority` dagegen. Danach stimmt der Text von § 2.6 wieder. | Abschnitt 6, APPA Korollar 7 | S, #598 |
 | F2 | Erwartete Entscheidungen als Daten, analog zu `appa replay`: ein Satz von Fällen (Raum, Objekt, Operation, Umgebung → Entscheidung), der im CI gegen die Vorlage läuft und bei `komki up` gegen den tatsächlich exportierten Γ. Eine Änderung im Label-Store, die eine Entscheidung kippt, fällt dann vor der ersten Sitzung auf. | OpenAPPA Validation | A, #599 |
-| F3 | Zusagen aus RFC Anhang A als Eigenschaftstests über erzeugte Eingaben: (a) Wird das Prüflabel um eine Bindung erweitert, bleibt jeder Befund `recipient_not_allowed` und `binding_condition_false` bestehen (A.2; die Aufnahme als Ganzes ist nicht monoton, weil ein größeres `B_W` mehr Objekte zulässt). (b) Jeder `permit`-Baum aus `derive` ist für `verify` gültig, nicht nur für die zwei Fixtures aus CONTRACT § 8. (c) Eine Freigabe, deren zuständige Stelle eine Verarbeitungsdomäne ist, führt nie zu `permit` (A.4, setzt F1 voraus). StreamData ist schon eingebunden, diese drei Eigenschaften fehlen bisher. Später ist eine maschinell geprüfte Spezifikation des kleinen Kerns denkbar, nach dem Vorbild von cedar-spec. | APPA Anhang A, RFC A.2–A.7 | S, #600 |
+| F3 | Zusagen aus RFC Anhang A als Eigenschaftstests über erzeugte Eingaben: (a) Wird das Prüflabel um eine Bindung erweitert, bleibt jeder Befund `recipient_not_allowed` und `binding_condition_false` bestehen (A.2; die Aufnahme als Ganzes ist nicht monoton, weil ein größeres `B_W` mehr Objekte zulässt). (b) Jeder `permit`-Baum aus `derive` ist für `verify` gültig, nicht nur für die vier Permit-Fixtures, eine je Zweig (CONTRACT § 8, § 8.4, § 8.5). (c) Eine Freigabe, deren zuständige Stelle eine Verarbeitungsdomäne ist, führt nie zu `permit` (A.4, setzt F1 voraus). StreamData ist schon eingebunden, diese drei Eigenschaften fehlen bisher. Später ist eine maschinell geprüfte Spezifikation des kleinen Kerns denkbar, nach dem Vorbild von cedar-spec. | APPA Anhang A, RFC A.2–A.7 | S, #600 |
 | F4 | Angriffskorpus D.4/D.9 als echte Läufe mit pi: Angriffs- und Nutzwertquote, Fehlschläge bleiben im Nenner, TCR@k wie CONTRACT § 8.3, aber live. | APPA §7 | A, #601 |
 | F5 | Integrität als RFC-Frage: ungeprüfte Quellen als Bindung (Abschnitt 3.6) oder als eigene Dimension. Zuerst das RFC, dann Code. | APPA Trust `t` | S, #602 |
-| F6 | Fester Γ je Vermittlerlauf als ausdrückliche Regel festhalten. Kommt je ein Neuladen im Betrieb, committet eine Entscheidung nur unter dem aktuellen `gamma_hash` (APPAs Compare-and-Swap bei der Veröffentlichung). | OpenAPPA Revisionen | B, Regel in ADR 0006 |
+| F6 | Fester Γ je Raum als ausdrückliche Regel. Kommt einmal ein Neuladen im Betrieb, entscheidet ein Raum, dessen Start-`gamma_hash` nicht mehr der aktuelle ist, nicht weiter; die Regelmigration ist ein expliziter administrativer Übergang (RFC A.1). Von OpenAPPA übernommen ist nur die Prüfung beim Commit ("A decision commits only while the revision that made it is still the head"), nicht die Folge, dass laufende Räume der neuen Revision folgen. | OpenAPPA Revisionen | B, Regel in ADR 0006 |
 | F7 | Wenn Agentendelegation (R.7) gebaut wird: Rückkanal mit begrenzter Form wie `attest-schema`, keine Freigabe über die Grenze zwischen Eltern und Kind (Theorem 8). | APPA §6 | später, Regel in ADR 0006 |
+
+Das unabhängige Review dieser Analyse hat außerdem eine Abweichung der Engine vom RFC gefunden: Die Offenlegungsfreigabe entfernt Bindungen mit offenem Empfängerkreis ohne Befugnis (Abschnitt 3.6). Dafür gibt es #603 (`ai:s-tier`).
 
 **Nicht übernehmen:** das Accept durch den Agenten, Authorities als LLM oder Auto-Approver, Modelle als Erstklassifikatoren und die Regel, dass laufende Räume der neuesten Policy folgen.
 
@@ -294,7 +300,7 @@ GO #596
 
 ## 8. Folienkorrektur
 
-Die Folien liegen in `docs/talks/komki-vortrag/slides.md`: „Kontrolle wandert aus dem Modell“ ab Zeile 1375, „Beitrag und Preis“ ab Zeile 1420. Der Ordner ist nicht versioniert und liegt nur im Hauptcheckout. Nach dem GO vom 16.11.2026 ist der Ersatztext dort eingesetzt; dieser PR enthält die Folien deshalb nicht.
+Die Folien liegen in `docs/talks/komki-vortrag/slides.md`: „Kontrolle wandert aus dem Modell“ ab Zeile 1375 (Überschrift Zeile 1379), „Beitrag und Preis“ ab Zeile 1424 (Überschrift Zeile 1431), Stand nach dem Einsetzen. Der Ordner ist nicht versioniert und liegt nur im Hauptcheckout. Nach dem GO vom 16.11.2026 ist der Ersatztext dort eingesetzt; dieser PR enthält die Folien deshalb nicht.
 
 **Folie „Kontrolle wandert aus dem Modell“.** Zwei Zeilen sind überholt. „Theoreme und Evaluation, die komki fehlt“ stimmt nur zur Hälfte: komki hat Beweise im RFC (Anhang A, darunter eine Nichtinterferenz-Zusage, die APPA ausdrücklich nicht gibt), aber keine Evaluation. „Offenlegungsstand hat komki nicht gebaut“ gilt seit Lieferung 5 nicht mehr.
 
@@ -334,10 +340,11 @@ Zweck, der feste Raum, der ganze Verarbeitungsweg, die Quarantäne.
 Die Sprechernotiz sagt: „APPA und PACE haben ein Gate. Aber sie beantworten nicht, wer eine Ausnahme freigibt. Manche setzen dafür ein LLM ein.“ Für APPA stimmt das nicht. Ersatz:
 
 ```text
-APPA beantwortet auch, wer eine Ausnahme freigibt: eine registrierte Prüfstelle mit festem
-Mandat. Nur hängt das Mandat am Werkzeug, und die Prüfstelle darf ein Mensch, eine Regel
-oder ein LLM sein. Bei komki steht die Lockerungsbefugnis in der Bindung der Daten, und sie
-liegt bei einer Person. Ein Modell kann keine politische Verantwortung tragen.
+Der erste Punkt ist der wichtigste. APPA beantwortet auch, wer eine Ausnahme freigibt: eine
+registrierte Prüfstelle mit festem Mandat. Nur hängt das Mandat am Werkzeug, und die
+Prüfstelle darf ein Mensch, eine Regel oder ein LLM sein. Ein LLM als Prüfstelle widerspricht
+dem GO-Prinzip: Ein Modell kann keine politische Verantwortung tragen. Bei komki steht die
+Lockerungsbefugnis in der Bindung der Daten, und sie liegt bei einer Person.
 ```
 
 und statt „Die Lücken stehen auf der Folie davor: keine Theoreme, keine Benchmarks, kein CaMeL-Schutz, kein implementiertes Offenlegungslog.“:
@@ -356,7 +363,7 @@ Alle abgerufen am 16.11.2026.
 - APPA-Paper: Kravchenko et al., *APPA: Recoverable Information-Flow Control for Real-World LLM Agents*, arXiv 2607.24625v2 (26.08.2026), https://arxiv.org/abs/2607.24625. Zitiert: §3 (Labels, Tool-Verträge, partielle Labels), §4 (Dispatch, Theorem 5), §5 (Authorities, Theorem 6, Korollar 7), §6 (Branches, Theorem 8), §8 (Grenzen), Anhang B.
 - Workshop: NeurIPS 2026 Workshop „Agents in the Wild“, https://neurips.cc/virtual/2026/loc/sydney/workshop/137500 (Liste der angenommenen Beiträge, APPA enthalten); https://agentwild-workshop.github.io/neurips2026/.
 - OpenAPPA-Dokumentation: https://openappa.com/llms.txt (vollständige Doku als Markdown), darin `/how-it-works`, `/contracts`, `/coding-agents` (Abschnitt Limits), `/claude-code`, `/pi`, `/add-to-agent`, `/observability`.
-- OpenAPPA-Quellcode: https://github.com/archestra-ai/OpenAPPA, Commit `8151ed1` (v0.43.0, 15.11.2026): `README.md`, `CHANGELOG.md`, `LICENSE.md`, `appa-engine/src/lib.rs`, `appa-engine/src/route.rs`, `appa-policy/src/raw.rs`. Zeilenzahlen per `wc -l` über `git ls-files` je Crate.
+- OpenAPPA-Quellcode: https://github.com/archestra-ai/OpenAPPA, Commit `8151ed1` (15.11.2026, `git describe`: `v0.43.0-1-g8151ed1e`): `README.md`, `CHANGELOG.md`, `LICENSE.md`, `appa-engine/src/lib.rs`, `appa-engine/src/route.rs`, `appa-policy/src/raw.rs`. Zeilenzahlen per `wc -l` über `git ls-files` je Crate.
 - pi-openappa: https://github.com/aemonge/pi-openappa (Metadaten über die GitHub-API).
 - komki: [CONTRACT.md](../../apps/komki_policy/CONTRACT.md), [RFC 0003](../rfcs/0003-vertrauliche-ki-arbeitsraeume.md), [AGENTS.md](../../AGENTS.md), Code auf `origin/main` `b22b759`.
 - Vorgänger: [Agent policy models: OpenAPPA (APPA) and PACE](2026-10-13-agent-policy-models-openappa-pace.md), 13.10.2026.
