@@ -1,6 +1,6 @@
 # komki_policy und APPA/OpenAPPA: angleichen, ersetzen oder als Referenzmodell nutzen
 
-Stand: 16.11.2026. Analyse zu Ticket [#596](https://github.com/croesnick/kommunalpolitik_ki/issues/596) (`ai:s-tier`). Das Dokument baut nichts und entscheidet nichts. Es bereitet eine Entscheidung der nutzenden Person vor, die GO-Vorlage steht in Abschnitt 7. Für APPA schreibt es die Recherche vom 13.10.2026 fort ([Agent policy models](2026-10-13-agent-policy-models-openappa-pace.md)); PACE ist hier kein Thema.
+Stand: 16.11.2026. Analyse zu Ticket [#596](https://github.com/croesnick/kommunalpolitik_ki/issues/596) (`ai:s-tier`). Das Dokument baut nichts. Es hat eine Entscheidung der nutzenden Person vorbereitet (GO-Vorlage in Abschnitt 7). Das GO kam am 16.11.2026 für alle Punkte; die Entscheidung steht in [ADR 0006](../adr/0006-eigene-inferenz-engine-appa-als-referenzmodell.md). Für APPA schreibt es die Recherche vom 13.10.2026 fort ([Agent policy models](2026-10-13-agent-policy-models-openappa-pace.md)); PACE ist hier kein Thema.
 
 Alle Quellen wurden am 16.11.2026 abgerufen: das Paper in Version 2 (arXiv 2607.24625v2), die OpenAPPA-Dokumentation (openappa.com, vollständig als `llms.txt`), der OpenAPPA-Quellcode auf v0.43.0 (Commit `8151ed1`, 15.11.2026), die Workshop-Seite auf neurips.cc. Auf komki-Seite sind es [CONTRACT.md](../../apps/komki_policy/CONTRACT.md), [RFC 0003](../rfcs/0003-vertrauliche-ki-arbeitsraeume.md) und der Code auf `origin/main` (`b22b759`). Zitate aus englischen Quellen bleiben englisch. **APPA** meint das Modell aus dem Paper, **OpenAPPA** die Implementierung. Wo beide auseinanderlaufen, ist das vermerkt.
 
@@ -265,34 +265,36 @@ APPA löst die Frage sauberer: Authorities sind eigene registrierte Komponenten 
 
 APPA ist an drei Stellen weiter als komki: bei der Messung, bei der Trennung der Autoritäten und beim Umgang mit Policy-Revisionen. komki liegt vorn bei der Ausdruckskraft (Abschnitt 3) und beim kleinen Vertrauenskern. Die folgenden Schritte schließen die Lücken, ohne den Vorsprung aufzugeben. Sie sind nach Nutzen je Aufwand geordnet.
 
-| Nr. | Schritt | Anker | Stufe |
+| Nr. | Schritt | Anker | Stufe, Ticket |
 |---|---|---|---|
-| F1 | Zuständige Stellen in Γ getrennt von 𝒪 führen (etwa `authorities` in `komki-registry/3` oder Beobachtertypen im Export); die Engine prüft `release.authority` dagegen. Danach stimmt der Text von § 2.6 wieder. | Abschnitt 6, APPA Korollar 7 | S |
-| F2 | Erwartete Entscheidungen als Daten, analog zu `appa replay`: ein Satz von Fällen (Raum, Objekt, Operation, Umgebung → Entscheidung), der im CI gegen die Vorlage läuft und bei `komki up` gegen den tatsächlich exportierten Γ. Eine Änderung im Label-Store, die eine Entscheidung kippt, fällt dann vor der ersten Sitzung auf. | OpenAPPA Validation | A |
-| F3 | Zusagen aus RFC Anhang A als Eigenschaftstests über erzeugte Eingaben: (a) Wird das Prüflabel um eine Bindung erweitert, bleibt jeder Befund `recipient_not_allowed` und `binding_condition_false` bestehen (A.2; die Aufnahme als Ganzes ist nicht monoton, weil ein größeres `B_W` mehr Objekte zulässt). (b) Jeder `permit`-Baum aus `derive` ist für `verify` gültig, nicht nur für die zwei Fixtures aus CONTRACT § 8. (c) Eine Freigabe, deren zuständige Stelle eine Verarbeitungsdomäne ist, führt nie zu `permit` (A.4, setzt F1 voraus). StreamData ist schon eingebunden, diese drei Eigenschaften fehlen bisher. Später ist eine maschinell geprüfte Spezifikation des kleinen Kerns denkbar, nach dem Vorbild von cedar-spec. | APPA Anhang A, RFC A.2–A.7 | S/A |
-| F4 | Angriffskorpus D.4/D.9 als echte Läufe mit pi: Angriffs- und Nutzwertquote, Fehlschläge bleiben im Nenner, TCR@k wie CONTRACT § 8.3, aber live. | APPA §7 | A |
-| F5 | Integrität als RFC-Frage: ungeprüfte Quellen als Bindung (Abschnitt 3.6) oder als eigene Dimension. Zuerst das RFC, dann Code. | APPA Trust `t` | S |
-| F6 | Fester Γ je Vermittlerlauf als ausdrückliche Regel festhalten. Kommt je ein Neuladen im Betrieb, committet eine Entscheidung nur unter dem aktuellen `gamma_hash` (APPAs Compare-and-Swap bei der Veröffentlichung). | OpenAPPA Revisionen | B |
-| F7 | Wenn Agentendelegation (R.7) gebaut wird: Rückkanal mit begrenzter Form wie `attest-schema`, keine Freigabe über die Grenze zwischen Eltern und Kind (Theorem 8). | APPA §6 | später |
+| F1 | Zuständige Stellen in Γ getrennt von 𝒪 führen (etwa `authorities` in `komki-registry/3` oder Beobachtertypen im Export); die Engine prüft `release.authority` dagegen. Danach stimmt der Text von § 2.6 wieder. | Abschnitt 6, APPA Korollar 7 | S, #598 |
+| F2 | Erwartete Entscheidungen als Daten, analog zu `appa replay`: ein Satz von Fällen (Raum, Objekt, Operation, Umgebung → Entscheidung), der im CI gegen die Vorlage läuft und bei `komki up` gegen den tatsächlich exportierten Γ. Eine Änderung im Label-Store, die eine Entscheidung kippt, fällt dann vor der ersten Sitzung auf. | OpenAPPA Validation | A, #599 |
+| F3 | Zusagen aus RFC Anhang A als Eigenschaftstests über erzeugte Eingaben: (a) Wird das Prüflabel um eine Bindung erweitert, bleibt jeder Befund `recipient_not_allowed` und `binding_condition_false` bestehen (A.2; die Aufnahme als Ganzes ist nicht monoton, weil ein größeres `B_W` mehr Objekte zulässt). (b) Jeder `permit`-Baum aus `derive` ist für `verify` gültig, nicht nur für die zwei Fixtures aus CONTRACT § 8. (c) Eine Freigabe, deren zuständige Stelle eine Verarbeitungsdomäne ist, führt nie zu `permit` (A.4, setzt F1 voraus). StreamData ist schon eingebunden, diese drei Eigenschaften fehlen bisher. Später ist eine maschinell geprüfte Spezifikation des kleinen Kerns denkbar, nach dem Vorbild von cedar-spec. | APPA Anhang A, RFC A.2–A.7 | S, #600 |
+| F4 | Angriffskorpus D.4/D.9 als echte Läufe mit pi: Angriffs- und Nutzwertquote, Fehlschläge bleiben im Nenner, TCR@k wie CONTRACT § 8.3, aber live. | APPA §7 | A, #601 |
+| F5 | Integrität als RFC-Frage: ungeprüfte Quellen als Bindung (Abschnitt 3.6) oder als eigene Dimension. Zuerst das RFC, dann Code. | APPA Trust `t` | S, #602 |
+| F6 | Fester Γ je Vermittlerlauf als ausdrückliche Regel festhalten. Kommt je ein Neuladen im Betrieb, committet eine Entscheidung nur unter dem aktuellen `gamma_hash` (APPAs Compare-and-Swap bei der Veröffentlichung). | OpenAPPA Revisionen | B, Regel in ADR 0006 |
+| F7 | Wenn Agentendelegation (R.7) gebaut wird: Rückkanal mit begrenzter Form wie `attest-schema`, keine Freigabe über die Grenze zwischen Eltern und Kind (Theorem 8). | APPA §6 | später, Regel in ADR 0006 |
 
 **Nicht übernehmen:** das Accept durch den Agenten, Authorities als LLM oder Auto-Approver, Modelle als Erstklassifikatoren und die Regel, dass laufende Räume der neuesten Policy folgen.
 
 ### GO-Vorlage
 
+Das GO kam am 16.11.2026 für alle Punkte.
+
 ```text
 GO #596
-[ ] Grundentscheidung: Option D – komki_policy bleibt die Engine,
+[x] Grundentscheidung: Option D – komki_policy bleibt die Engine,
     APPA ist Referenzmodell; Angleichung nur an F2–F7.
-    Festhalten als ADR unter docs/adr/.
-[ ] Folgeticket F1 (ai:s-tier): zuständige Stellen getrennt von 𝒪, CONTRACT § 2.6
-[ ] Folgetickets F2–F5 anlegen (F6, F7 nur als Notiz im ADR)
-[ ] Folienkorrektur aus Abschnitt 8 in docs/talks/komki-vortrag/slides.md einsetzen
-[ ] Wiedervorlage von Option C, wenn eine der drei Bedingungen eintritt
+    Festgehalten in ADR 0006.
+[x] Folgeticket F1 (ai:s-tier): zuständige Stellen getrennt von 𝒪, CONTRACT § 2.6 → #598
+[x] Folgetickets F2–F5 angelegt → #599, #600, #601, #602 (F6, F7 als Regel im ADR)
+[x] Folienkorrektur aus Abschnitt 8 in docs/talks/komki-vortrag/slides.md eingesetzt
+[x] Wiedervorlage von Option C unter den drei Bedingungen, festgehalten im ADR
 ```
 
 ## 8. Folienkorrektur
 
-Die Folien liegen in `docs/talks/komki-vortrag/slides.md`: „Kontrolle wandert aus dem Modell“ ab Zeile 1375, „Beitrag und Preis“ ab Zeile 1420. Der Ordner ist nicht versioniert und liegt nur im Hauptcheckout, zuletzt am 16.11.2026 um 00:30 geändert. Diese Analyse ändert ihn deshalb nicht, sondern liefert den Ersatztext.
+Die Folien liegen in `docs/talks/komki-vortrag/slides.md`: „Kontrolle wandert aus dem Modell“ ab Zeile 1375, „Beitrag und Preis“ ab Zeile 1420. Der Ordner ist nicht versioniert und liegt nur im Hauptcheckout. Nach dem GO vom 16.11.2026 ist der Ersatztext dort eingesetzt; dieser PR enthält die Folien deshalb nicht.
 
 **Folie „Kontrolle wandert aus dem Modell“.** Zwei Zeilen sind überholt. „Theoreme und Evaluation, die komki fehlt“ stimmt nur zur Hälfte: komki hat Beweise im RFC (Anhang A, darunter eine Nichtinterferenz-Zusage, die APPA ausdrücklich nicht gibt), aber keine Evaluation. „Offenlegungsstand hat komki nicht gebaut“ gilt seit Lieferung 5 nicht mehr.
 
