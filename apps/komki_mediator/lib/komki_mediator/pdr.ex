@@ -1,10 +1,18 @@
 defmodule KomkiMediator.PDR do
   @moduledoc """
-  PDR audit records (schema `"komki-pdr/5"`): one shared shape for
+  PDR audit records (schema `"komki-pdr/6"`): one shared shape for
   `KomkiMediator.Gate` (ping, admit_document) and
   `KomkiMediator.ConnectorGate` (connector tools).
 
   Every record carries the same keys; unused fields are `null`.
+
+  New in `komki-pdr/6` (ticket #495): `session_id` ist eine behauptete
+  Angabe des Aufrufers, keine authentisierte Sitzungsidentitaet - der
+  `X-Komki-Session`-Header authentisiert nichts (jede Token-haltende
+  Session kann einen beliebigen Wert setzen, Audit F27). Das neue Feld
+  `session_id_provenance` (`"caller-asserted"` mit Session-Angabe,
+  `null` ohne) fuehrt die Herkunft im Datensatz selbst; eine
+  Journal-Auswertung stuetzt Zuordnungen nur noch als behauptet.
 
   New in `komki-pdr/5` (ticket #423): a `store` record released by an
   Offenlegungsfreigabe carries `offenlegung` — `{ausgabeart, ziellabel,
@@ -36,8 +44,11 @@ defmodule KomkiMediator.PDR do
       before effect (connector contract §6); a pre-check rejection has
       none. If the call reaches execution, the record before effect (rule
       `emit`, `outcome: emitted`) has it as its `decision_id`.
-    * `session_id` — the pi session (from the environment, may be `null`;
-      the socket access fills it, connector contract §8).
+    * `session_id` — die vom Aufrufer ueber den `X-Komki-Session`-Header
+      *behauptete* Session (unbelegt, connector contract §8); seit
+      `komki-pdr/6` mit `session_id_provenance` als `caller-asserted`
+      markiert - keine authentisierte Identitaet, keine Basis fuer
+      ungepruefte Accountability-Aussagen.
     * `assigned_label` — for emit permits and the record before effect,
       the assigned output set λ(y) = B_W.
 
@@ -53,7 +64,7 @@ defmodule KomkiMediator.PDR do
   alias KomkiMediator.{Fassung, Hash, Journal}
   alias KomkiPolicy.JSON
 
-  @schema "komki-pdr/5"
+  @schema "komki-pdr/6"
 
   @doc "Schema-Kennung der Datensaetze."
   @spec schema() :: String.t()
@@ -73,12 +84,15 @@ defmodule KomkiMediator.PDR do
   """
   @spec record(map(), %{String.t() => term()}) :: map()
   def record(env, %{"decision_id" => _} = fields) do
+    session_id = Map.get(env, :session_id)
+
     defaults = %{
       "schema" => @schema,
       "tool" => nil,
       "rule" => nil,
       "call_id" => nil,
-      "session_id" => Map.get(env, :session_id),
+      "session_id" => session_id,
+      "session_id_provenance" => session_provenance(session_id),
       "decision" => nil,
       "outcome" => nil,
       "admitted" => nil,
@@ -102,4 +116,12 @@ defmodule KomkiMediator.PDR do
   @doc "Baut den Datensatz und haengt ihn synchron an das Journal an."
   @spec append(map(), %{String.t() => term()}) :: :ok
   def append(env, fields), do: Journal.append(env.journal, record(env, fields))
+
+  # X-Komki-Session ist eine unbelegte Angabe des Aufrufers (Ticket #495,
+  # Audit F27): Der Header authentisiert die Session nicht. Das Journal
+  # fuehrt die Zuordnung deshalb als behauptet (caller-asserted) - erst
+  # eine kuenftige Authentisierung je Sitzung (eigene Credential je
+  # pi-Start) darf hier einen anderen Wert eintragen.
+  defp session_provenance(nil), do: nil
+  defp session_provenance(_session_id), do: "caller-asserted"
 end

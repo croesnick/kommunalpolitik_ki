@@ -165,7 +165,9 @@ defmodule KomkiMediator.ConnectorGateTest do
     assert emit["call_id"] == emit["decision_id"]
     assert emit["checked_label"] == @recherche
     assert emit["session_id"] == "sess-test"
-    assert emit["schema"] == "komki-pdr/5"
+    # Ticket #495: Die Session-Angabe ist behauptet, nicht authentisiert.
+    assert emit["session_id_provenance"] == "caller-asserted"
+    assert emit["schema"] == "komki-pdr/6"
     # The record before effect decides nothing and names the two decisions
     # it relies on (R.11).
     assert emit["decision"] == nil

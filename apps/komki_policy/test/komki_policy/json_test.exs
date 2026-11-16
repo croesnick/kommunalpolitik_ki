@@ -270,6 +270,42 @@ defmodule KomkiPolicy.JSONTest do
     end
   end
 
+  describe "Tiefengrenze des Encoders (Ticket #473)" do
+    # F1 des Sicherheits-Audits (#467): Der Encoder rückt pro Ebene ein
+    # und trieb so Θ(Tiefe²) Zellen und Bytes. canonical/1 scheitert
+    # jenseits der Grenze strukturiert (code, path, detail wie bei den
+    # Parsefehlern), statt pro Eingabeebene zu rekursieren.
+    test "128 Ebenen verschachteln kanonisieren noch" do
+      chain = fn n -> Enum.reduce(1..n, 1, fn _, acc -> %{"a" => acc} end) end
+
+      assert String.ends_with?(JSON.canonical(chain.(128)), "}\n")
+    end
+
+    test "jede zusaetzliche Ebene schlaegt strukturiert fehl" do
+      chain = fn n -> Enum.reduce(1..n, 1, fn _, acc -> %{"a" => acc} end) end
+
+      error =
+        assert_raise KomkiPolicy.JSON.DepthLimitError, fn ->
+          JSON.canonical(%{"params" => chain.(129)})
+        end
+
+      assert error.code == :depth_limit_exceeded
+      assert error.path =~ "$.params.a.a"
+      assert is_binary(error.detail)
+    end
+
+    test "Arrays zaehlen zur Tiefe mit und benennen den Pfad mit Index" do
+      deep_list = Enum.reduce(1..129, [], fn _, acc -> [acc] end)
+
+      error =
+        assert_raise KomkiPolicy.JSON.DepthLimitError, fn ->
+          JSON.canonical(%{"xs" => deep_list})
+        end
+
+      assert error.path =~ "$.xs[0][0]"
+    end
+  end
+
   describe "Round-Trip" do
     test "canonical(parse(canonical(parse(x)))) == canonical(parse(x))" do
       Enum.each(valid_fixture_files(), fn file ->

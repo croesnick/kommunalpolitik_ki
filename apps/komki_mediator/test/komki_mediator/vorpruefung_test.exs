@@ -145,6 +145,72 @@ defmodule KomkiMediator.VorpruefungTest do
   end
 
   # -----------------------------------------------------------------------
+  # Grenzen der Argumente vor der Kanonisierung (Ticket #473)
+  # -----------------------------------------------------------------------
+
+  # F1 des Sicherheits-Audits (#467): refused/5 band den gestellten Call,
+  # indem es die rohen Argumente unbegrenzt kanonisierte - der Encoder
+  # rückt pro Ebene ein und treibt damit Θ(Tiefe²) Zellen und Bytes
+  # (Messung im Beweisverzeichnis). Die Vorpruefung begrenzt Tiefe und
+  # Gesamtgroesse der rohen Argumente VOR Params.check und VOR dem
+  # Refusal-PDR; die Ablehnung bleibt billig und bindet den Call bis
+  # zur Grenze.
+  test "zu tief verschachtelte Argumente: billige decision error mit PDR", %{env: env} do
+    deep = Enum.reduce(1..40, %{}, fn _, acc -> %{"a" => acc} end)
+
+    assert {:reply, reply, _frame} = call("web_search", deep)
+
+    assert %{"decision" => "error", "detail" => detail} = body(reply)
+    assert detail =~ "zu tief verschachtelt"
+
+    assert [%{"tool" => "web_search", "rule" => "emit"} = pdr] = pdrs(env)
+    assert pdr["decision"] == "error"
+    assert pdr["outcome"] == "error"
+    assert pdr["admitted"] == false
+    assert pdr["intent_hash"] =~ "sha256:"
+    assert pdr["decision_id"] == body(reply)["decision_id"]
+  end
+
+  test "Tiefe an der Grenze: normale Parameterpruefung, voll gebundener Call", %{env: env} do
+    deep = Enum.reduce(1..32, %{}, fn _, acc -> %{"a" => acc} end)
+
+    assert {:reply, reply, _frame} = call("web_search", deep)
+
+    # Innerhalb der Grenze bleibt der Ablauf unveraendert: Params.check
+    # lehnt das unbekannte Feld ab, der intent_hash bindet die vollstaendigen
+    # Argumente.
+    assert %{"decision" => "error", "detail" => detail} = body(reply)
+    assert detail =~ "unbekannte Felder: a"
+  end
+
+  test "zu grosse Argumente: billige decision error mit PDR", %{env: env} do
+    big = %{"query" => String.duplicate("x", 300_000)}
+
+    assert {:reply, reply, _frame} = call("web_search", big)
+
+    assert %{"decision" => "error", "detail" => detail} = body(reply)
+    assert detail =~ "zu gross"
+
+    assert [%{"tool" => "web_search", "rule" => "emit"} = pdr] = pdrs(env)
+    assert pdr["decision"] == "error"
+    assert pdr["admitted"] == false
+    assert pdr["intent_hash"] =~ "sha256:"
+  end
+
+  test "Ablehnung uebergrosser Aufrufe bindet deterministisch bis zur Grenze", %{env: env} do
+    deep = fn n -> Enum.reduce(1..n, %{}, fn _, acc -> %{"a" => acc} end) end
+
+    assert {:reply, first, _frame} = call("web_search", deep.(40))
+    assert {:reply, second, _frame} = call("web_search", deep.(40))
+
+    # Gleicher Aufruf, gleicher intent_hash: die begrenzte Sicht auf die
+    # Argumente ist byte-stabil (Zusammenspiel mit der Hash-Kette).
+    assert body(first)["decision_id"] != body(second)["decision_id"]
+    assert [%{"intent_hash" => first_hash}, %{"intent_hash" => second_hash}] = pdrs(env)
+    assert first_hash == second_hash
+  end
+
+  # -----------------------------------------------------------------------
   # Grenzen der Vorpruefung
   # -----------------------------------------------------------------------
 
