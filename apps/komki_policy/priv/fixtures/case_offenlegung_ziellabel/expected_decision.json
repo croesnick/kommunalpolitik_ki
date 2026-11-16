@@ -6,6 +6,11 @@
       "condition": null
     },
     {
+      "binding": "web-oeffentlich-fall@1",
+      "code": "lockerungsbefugnis_fehlt",
+      "condition": null
+    },
+    {
       "binding": null,
       "code": "recipient_not_allowed",
       "condition": null,
@@ -28,12 +33,32 @@
     "object_id": "obj-essenz-a",
     "version": "v1"
   },
+  "proof": null,
   "registry_ref": "reg-fall-4711-test",
   "release": null,
   "remedies": [
     {
       "binding": null,
       "code": "ziellabel_unpassend",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "fraktion",
+            "nextcloud-betreiber",
+            "nutzende-person",
+            "pi-agent",
+            "sicherung",
+            "vorstand"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    },
+    {
+      "binding": "web-oeffentlich-fall@1",
+      "code": "lockerungsbefugnis_fehlt",
       "condition": null,
       "transitions": [
         {

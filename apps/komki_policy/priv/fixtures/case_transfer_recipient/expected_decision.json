@@ -39,11 +39,6 @@
             "webdienst-x"
           ],
           "type": "neuer_raum"
-        },
-        {
-          "call_hash": "b0eb07dfc9f2025d16f7b87ce6ff065e4fdbb20227e88f43a735098530e3e153",
-          "scope": "call",
-          "type": "aktionsfreigabe"
         }
       ]
     }

@@ -1,5 +1,5 @@
 {
-  "intent_id": "intent-case-release-transfer-permit",
+  "intent_id": "intent-release-transfer-permit",
   "object": "obj-ausgabe-a@v1",
   "operation": "transfer",
   "schema": "komki-intent/1",

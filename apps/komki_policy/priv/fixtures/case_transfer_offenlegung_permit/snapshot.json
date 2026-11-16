@@ -1,0 +1,51 @@
+{
+  "facts": {
+    "audit_path_ready": {
+      "source": "journal-verwaltung",
+      "source_kind": "technical",
+      "value": true
+    },
+    "environment_observers_complete": {
+      "source": "umgebungs-verwaltung",
+      "source_kind": "assumption",
+      "value": true
+    },
+    "has_operation_right": {
+      "source": "rechte-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    "output_content_digest": {
+      "source": "ausgabe-diagnose",
+      "source_kind": "technical",
+      "value": "e27407c6f48a7a053d0349bfde3bccf021f27ab453370f50f07c663bd9d2fd65"
+    },
+    "purpose": {
+      "source": "auftrags-verwaltung",
+      "source_kind": "administered",
+      "value": "fraktionsarbeit"
+    }
+  },
+  "identity": "nutzende-person",
+  "object": {
+    "classification": "classified",
+    "labels": [
+      "fraktion-intern@1",
+      "web-oeffentlich-fall@1"
+    ],
+    "object_id": "obj-suche-a",
+    "version": "v1"
+  },
+  "registry_ref": "reg-fall-4711-test",
+  "schema": "komki-snapshot/1",
+  "snapshot_id": "snap-transfer-offenlegung-permit",
+  "workspace": {
+    "bindings": [
+      "fraktion-intern@1",
+      "web-oeffentlich-fall@1"
+    ],
+    "environment": "web-suche@1",
+    "valid": true,
+    "workspace_id": "ws-fraktionsraum"
+  }
+}

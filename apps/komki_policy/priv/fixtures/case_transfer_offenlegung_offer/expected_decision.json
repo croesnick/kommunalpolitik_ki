@@ -1,0 +1,60 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null,
+      "recipients_outside": [
+        "webdienst-x"
+      ]
+    }
+  ],
+  "checked_label": [
+    "fraktion-intern@1",
+    "web-oeffentlich-fall@1"
+  ],
+  "content_digest": "36f8f302aa77ddfd73696a5941eee5179d443d78941e8653a73f797c77ebce2e",
+  "decision": "deny",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-transfer-offenlegung-offer",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-suche-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null,
+      "recipients_outside": [
+        "webdienst-x"
+      ],
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "nutzende-person",
+            "pi-agent",
+            "webdienst-x"
+          ],
+          "type": "neuer_raum"
+        },
+        {
+          "ausgabeart": "suchanfrage",
+          "call_hash": "547c8871482c8c5af34e1f96f028b25a8269ed6de7c735cbe595de7499d54018",
+          "scope": "call",
+          "type": "offenlegungsfreigabe",
+          "ziellabel": [
+            "web-oeffentlich-fall@1"
+          ]
+        }
+      ]
+    }
+  ],
+  "rule": "transfer",
+  "snapshot_ref": "snap-transfer-offenlegung-offer",
+  "workspace": "ws-fraktionsraum"
+}

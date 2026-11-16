@@ -74,8 +74,32 @@
           "authority": "nutzende-person",
           "output": "ratsprojekte-essenz",
           "restriction": "readers"
+        },
+        {
+          "authority": "nutzende-person",
+          "output": "suchanfrage",
+          "restriction": "readers"
         }
       ]
+    },
+    "lizenz-cc-by@1": {
+      "operations": {
+        "admit": true,
+        "emit": true,
+        "transfer": true
+      },
+      "readers": [
+        "eigene-rz-analyse",
+        "fraktion",
+        "lokale-fallverarbeitung",
+        "nextcloud-betreiber",
+        "nutzende-person",
+        "pi-agent",
+        "sicherung",
+        "vorstand",
+        "webdienst-x"
+      ],
+      "relaxation_authorities": []
     },
     "lizenz-namensnennung@1": {
       "operations": {
@@ -176,6 +200,13 @@
     "recherche-webdienst@1": {
       "observers": [
         "nutzende-person",
+        "webdienst-x"
+      ]
+    },
+    "web-suche@1": {
+      "observers": [
+        "nutzende-person",
+        "pi-agent",
         "webdienst-x"
       ]
     }

@@ -1,0 +1,50 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null,
+      "recipients_outside": [
+        "webdienst-x"
+      ]
+    }
+  ],
+  "checked_label": [
+    "fraktion-intern@1"
+  ],
+  "content_digest": "b9c5b8f80828e22b36f37d3c0b693e73b5c31cbb2f2cace67dbe2b68d0220b17",
+  "decision": "deny",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-transfer-offenlegung-leer",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-suche-c",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null,
+      "recipients_outside": [
+        "webdienst-x"
+      ],
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "nutzende-person",
+            "pi-agent",
+            "webdienst-x"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
+  "rule": "transfer",
+  "snapshot_ref": "snap-transfer-offenlegung-leer",
+  "workspace": "ws-fraktionsraum"
+}

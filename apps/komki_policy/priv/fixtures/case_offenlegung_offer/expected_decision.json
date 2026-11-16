@@ -33,6 +33,7 @@
     "object_id": "obj-essenz-a",
     "version": "v1"
   },
+  "proof": null,
   "registry_ref": "reg-fall-4711-test",
   "remedies": [
     {
@@ -62,7 +63,8 @@
           "scope": "call",
           "type": "offenlegungsfreigabe",
           "ziellabel": [
-            "ratsprojekte@1"
+            "ratsprojekte@1",
+            "web-oeffentlich-fall@1"
           ]
         }
       ]
@@ -90,7 +92,8 @@
           "scope": "call",
           "type": "offenlegungsfreigabe",
           "ziellabel": [
-            "ratsprojekte@1"
+            "ratsprojekte@1",
+            "web-oeffentlich-fall@1"
           ]
         }
       ]
@@ -118,7 +121,8 @@
           "scope": "call",
           "type": "offenlegungsfreigabe",
           "ziellabel": [
-            "ratsprojekte@1"
+            "ratsprojekte@1",
+            "web-oeffentlich-fall@1"
           ]
         }
       ]

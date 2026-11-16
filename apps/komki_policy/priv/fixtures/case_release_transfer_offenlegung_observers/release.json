@@ -1,0 +1,19 @@
+{
+  "ausgabeart": "suchanfrage",
+  "authority": "nutzende-person",
+  "call_hash": "a6dae3237f3a897e7ad00bf1688e323bb839ba113b67b79e19a2bdb02d334d4f",
+  "content_digest": "5e2e0a43522fcb3b727dd9af6968342e6b0bd45ae652d0a60d0d76394f7c22d9",
+  "kind": "offenlegungsfreigabe",
+  "nonce": "n-release-transfer-offenlegung-observers",
+  "object": "obj-suche-d@v1",
+  "operation": "transfer",
+  "release_id": "go-release-transfer-offenlegung-observers",
+  "schema": "komki-release/2",
+  "scope": "go-ws-fraktionsraum",
+  "valid_from": 1000,
+  "valid_until": 1100,
+  "workspace": "ws-fraktionsraum",
+  "ziellabel": [
+    "web-oeffentlich-fall@1"
+  ]
+}

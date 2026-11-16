@@ -13,6 +13,7 @@
     "object_id": "obj-essenz-a",
     "version": "v1"
   },
+  "proof": null,
   "registry_ref": "reg-fall-4711-test",
   "release": {
     "ausgabeart": "ratsprojekte-essenz",
@@ -22,7 +23,8 @@
     "stand_ref": "stand-fall@7",
     "stand_version_after": 8,
     "ziellabel": [
-      "ratsprojekte@1"
+      "ratsprojekte@1",
+      "web-oeffentlich-fall@1"
     ]
   },
   "remedies": null,

@@ -1,0 +1,7 @@
+{
+  "intent_id": "intent-transfer-offenlegung-leer",
+  "object": "obj-suche-c@v1",
+  "operation": "transfer",
+  "schema": "komki-intent/1",
+  "workspace": "ws-fraktionsraum"
+}

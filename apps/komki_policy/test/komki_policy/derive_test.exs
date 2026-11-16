@@ -654,7 +654,7 @@ defmodule KomkiPolicy.DeriveTest do
     end
   end
 
-  describe "unbelegte Beobachterliste: emit/transfer unverändert (#354)" do
+  describe "unbelegte Beobachterliste: emit unverändert, transfer wie store (#354)" do
     test "emit: Katalog bietet das call-GO weiter an" do
       snapshot = fixture("case_emit_deny_purpose/snapshot.json")
       intent = fixture("case_emit_deny_purpose/intent.json")
@@ -667,20 +667,28 @@ defmodule KomkiPolicy.DeriveTest do
       assert "aktionsfreigabe" in Enum.map(remedy["transitions"], & &1["type"])
     end
 
-    test "transfer: Katalog bietet das call-GO weiter an" do
-      snapshot = fixture("case_transfer_recipient/snapshot.json")
-      intent = fixture("case_transfer_recipient/intent.json")
+    test "transfer: Katalog bietet kein call-GO mehr an" do
+      snapshot = fixture("case_release_transfer_permit/snapshot.json")
+      intent = fixture("case_release_transfer_permit/intent.json")
+
+      assert {:ok, %{"decision" => "deny", "remedies" => [proven]}} =
+               Derive.decide(registry(), snapshot, intent)
+
+      assert "aktionsfreigabe" in Enum.map(proven["transitions"], & &1["type"])
 
       unproven = put_in(snapshot, ["facts", "environment_observers_complete", "value"], false)
 
-      assert {:ok, %{"decision" => "deny", "remedies" => [remedy | _]}} =
+      assert {:ok, %{"decision" => "deny", "remedies" => remedies}} =
                Derive.decide(registry(), unproven, intent)
 
-      assert "aktionsfreigabe" in Enum.map(remedy["transitions"], & &1["type"])
+      types = for r <- remedies, t <- r["transitions"], do: t["type"]
+      refute "aktionsfreigabe" in types
     end
 
-    test "Freigabe-Zweig: emit und transfer erlauben ein gültiges GO weiter" do
-      for dir <- ["case_release_permit", "case_release_transfer_permit"] do
+    test "Freigabe-Zweig: emit erlaubt ein gültiges GO weiter, transfer nicht" do
+      expected = %{"case_release_permit" => "permit", "case_release_transfer_permit" => "deny"}
+
+      for {dir, decision} <- expected do
         snapshot = fixture(Path.join(dir, "snapshot.json"))
         intent = fixture(Path.join(dir, "intent.json"))
         release = fixture(Path.join(dir, "release.json"))
@@ -688,7 +696,7 @@ defmodule KomkiPolicy.DeriveTest do
 
         unproven = put_in(snapshot, ["facts", "environment_observers_complete", "value"], false)
 
-        assert {:ok, %{"decision" => "permit"}} =
+        assert {:ok, %{"decision" => ^decision}} =
                  Derive.decide_with_release(registry(), unproven, intent, release, stand)
       end
     end
@@ -802,21 +810,39 @@ defmodule KomkiPolicy.DeriveTest do
       refute "aktionsfreigabe" in types
     end
 
-    test "unzulässiger Empfänger: call-GO im Katalog mit dem transfer-Hash der Freigabe" do
-      dir = Path.join(@fixtures_dir, "case_transfer_recipient")
-      {:ok, snapshot} = JSON.parse(File.read!(Path.join(dir, "snapshot.json")))
-      {:ok, intent} = JSON.parse(File.read!(Path.join(dir, "intent.json")))
-
-      {:ok, release} =
-        JSON.parse(
-          File.read!(Path.join(@fixtures_dir, "case_release_transfer_permit/release.json"))
-        )
-
+    # #354: kein GO ersetzt bei transfer den Empfängertest. Ohne Befugnis
+    # bleibt nur neuer_raum; mit Befugnis bietet der Katalog die
+    # Offenlegungsfreigabe mit dem transfer-Hash an, die die Freigabe trägt.
+    test "unzulässiger Empfänger: kein call-GO, mit Befugnis die Offenlegungsfreigabe" do
       assert {:ok, %{"decision" => "deny", "remedies" => [%{"transitions" => transitions}]}} =
-               Derive.decide(registry(), snapshot, intent)
+               Derive.decide(
+                 registry(),
+                 fixture("case_transfer_recipient/snapshot.json"),
+                 fixture("case_transfer_recipient/intent.json")
+               )
 
-      assert [%{"type" => "neuer_raum"}, %{"type" => "aktionsfreigabe", "call_hash" => hash}] =
-               transitions
+      assert [%{"type" => "neuer_raum"}] = transitions
+
+      dir = "case_transfer_offenlegung_permit"
+
+      assert {:ok, %{"decision" => "deny", "remedies" => [%{"transitions" => offered}]}} =
+               Derive.decide(
+                 registry(),
+                 fixture(Path.join(dir, "snapshot.json")),
+                 fixture(Path.join(dir, "intent.json"))
+               )
+
+      release = fixture(Path.join(dir, "release.json"))
+
+      assert [
+               %{"type" => "neuer_raum"},
+               %{
+                 "type" => "offenlegungsfreigabe",
+                 "call_hash" => hash,
+                 "ausgabeart" => "suchanfrage",
+                 "ziellabel" => ["web-oeffentlich-fall@1"]
+               }
+             ] = offered
 
       assert hash == release["call_hash"]
     end

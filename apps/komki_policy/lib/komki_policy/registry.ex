@@ -32,12 +32,19 @@ defmodule KomkiPolicy.Registry do
   # welche Einschraenkung fuer welche Ausgabe lockern darf. Geschlossene
   # Vokabulare fuer Einschaenkung und Ausgabe — die Engine ist die
   # Schemainstanz, kein Konsumierender schreibt eigene Checks. Nur die
-  # Kombination `readers` x `ratsprojekte-essenz` ist entscheidbar
-  # (Offenlegungsfreigabe-Zweig, § 4.9); alles andere ist strukturiert
-  # verwaltet, aber undecidable (fail-closed).
+  # Kombinationen `readers` x `ratsprojekte-essenz` (#423) und `readers` x
+  # `suchanfrage` (#354) sind entscheidbar (Offenlegungsfreigabe-Zweig,
+  # § 4.9); alles andere ist strukturiert verwaltet, aber undecidable
+  # (fail-closed).
   @authority_fields ["authority", "restriction", "output"]
   @restriction_kinds ["readers", "operations", "auflagen"]
-  @output_kinds ["ratsprojekte-essenz", "freigabe-notiz", "sitzungsmappe", "kurzzitat-mit-quelle"]
+  @output_kinds [
+    "ratsprojekte-essenz",
+    "suchanfrage",
+    "freigabe-notiz",
+    "sitzungsmappe",
+    "kurzzitat-mit-quelle"
+  ]
 
   @kebab_re ~r/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/
   @ref_re ~r/\A[a-z0-9]+(?:-[a-z0-9]+)*@(0|[1-9][0-9]*)\z/
@@ -90,8 +97,8 @@ defmodule KomkiPolicy.Registry do
 
   @doc """
   Geschlossenes Vokabular der Ausgabearten (§ 2.1, § 2.6): die Ausgabe
-  einer Lockerungsbefugnis und einer Offenlegungsfreigabe. Decidierbar
-  ist in dieser Lieferung nur `ratsprojekte-essenz` (Offenlegungsfreigabe-
+  einer Lockerungsbefugnis und einer Offenlegungsfreigabe. Entscheidbar
+  sind `ratsprojekte-essenz` und `suchanfrage` (Offenlegungsfreigabe-
   Zweig, § 4.9); die uebrigen sind strukturiert verwaltet, aber
   undecidable (fail-closed).
   """

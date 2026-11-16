@@ -1,0 +1,72 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null,
+      "recipients_outside": [
+        "webdienst-x"
+      ]
+    },
+    {
+      "binding": "ratsarbeit@1",
+      "code": "missing_operation_rule",
+      "condition": null
+    }
+  ],
+  "checked_label": [
+    "ratsarbeit@1",
+    "web-oeffentlich-fall@1"
+  ],
+  "content_digest": "8764a7299f7d2e832a1694d00ceedd3ba35ee3ee7f1cd1bbb2dbef729a5cb9d3",
+  "decision": "deny",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-transfer-ohne-befugnis",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-suche-b",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "remedies": [
+    {
+      "binding": null,
+      "code": "recipient_not_allowed",
+      "condition": null,
+      "recipients_outside": [
+        "webdienst-x"
+      ],
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "nutzende-person",
+            "pi-agent",
+            "webdienst-x"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    },
+    {
+      "binding": "ratsarbeit@1",
+      "code": "missing_operation_rule",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "nutzende-person",
+            "pi-agent",
+            "webdienst-x"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
+  "rule": "transfer",
+  "snapshot_ref": "snap-transfer-ohne-befugnis",
+  "workspace": "ws-fraktionsraum"
+}

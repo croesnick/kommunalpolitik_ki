@@ -13,7 +13,7 @@
     "has_operation_right": {
       "source": "rechte-verwaltung",
       "source_kind": "administered",
-      "value": true
+      "value": false
     },
     "input_in_approved_case_scope": {
       "source": "fall-verwaltung",
@@ -35,17 +35,17 @@
   "object": {
     "classification": "classified",
     "labels": [
-      "buergerfall-4711@1"
+      "lizenz-namensnennung@1"
     ],
     "object_id": "obj-ausgabe-a",
     "version": "v1"
   },
   "registry_ref": "reg-fall-4711-test",
   "schema": "komki-snapshot/1",
-  "snapshot_id": "snap-transfer-4711-release",
+  "snapshot_id": "snap-release-transfer-permit",
   "workspace": {
     "bindings": [
-      "buergerfall-4711@1"
+      "lizenz-namensnennung@1"
     ],
     "environment": "recherche-webdienst@1",
     "valid": true,

@@ -1,0 +1,7 @@
+{
+  "intent_id": "intent-case-release-transfer-permit",
+  "object": "obj-ausgabe-a@v1",
+  "operation": "transfer",
+  "schema": "komki-intent/1",
+  "workspace": "ws-fall-4711"
+}

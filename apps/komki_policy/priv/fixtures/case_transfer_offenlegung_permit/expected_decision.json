@@ -1,0 +1,33 @@
+{
+  "blockers": null,
+  "checked_label": [
+    "fraktion-intern@1",
+    "web-oeffentlich-fall@1"
+  ],
+  "content_digest": "e27407c6f48a7a053d0349bfde3bccf021f27ab453370f50f07c663bd9d2fd65",
+  "decision": "permit",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-transfer-offenlegung-permit",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-suche-a",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "release": {
+    "ausgabeart": "suchanfrage",
+    "call_hash": "a1d3ef026daef6fb8378dad54ef4cab6f90ec3a429d23c09d62d0dcedc62486a",
+    "nonce": "n-transfer-offenlegung-permit",
+    "release_id": "go-transfer-offenlegung-permit",
+    "stand_ref": "stand-fall@7",
+    "stand_version_after": 8,
+    "ziellabel": [
+      "web-oeffentlich-fall@1"
+    ]
+  },
+  "remedies": null,
+  "rule": "transfer",
+  "snapshot_ref": "snap-transfer-offenlegung-permit",
+  "workspace": "ws-fraktionsraum"
+}

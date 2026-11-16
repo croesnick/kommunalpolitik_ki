@@ -76,12 +76,14 @@ defmodule KomkiPolicy.RegistryTest do
       assert Map.keys(compiled.environments) == [
                "lokale-fallverarbeitung@1",
                "ratsprojekte-bestand@1",
-               "recherche-webdienst@1"
+               "recherche-webdienst@1",
+               "web-suche@1"
              ]
 
       assert Map.keys(compiled.bindings) == [
                "buergerfall-4711@1",
                "fraktion-intern@1",
+               "lizenz-cc-by@1",
                "lizenz-namensnennung@1",
                "nur-start-test@1",
                "ratsarbeit@1",
@@ -90,7 +92,7 @@ defmodule KomkiPolicy.RegistryTest do
              ]
     end
 
-    test "strukturierte Lockerungsbefugnisse kompilieren mit (R.2.2, #423)" do
+    test "strukturierte Lockerungsbefugnisse kompilieren mit (R.2.2, #423, #354)" do
       compiled = compile_term!(fixture("registry.json"))
       binding = Map.fetch!(compiled.bindings, "fraktion-intern@1")
 
@@ -99,6 +101,11 @@ defmodule KomkiPolicy.RegistryTest do
                  authority: "nutzende-person",
                  restriction: "readers",
                  output: "ratsprojekte-essenz"
+               },
+               %{
+                 authority: "nutzende-person",
+                 restriction: "readers",
+                 output: "suchanfrage"
                }
              ]
 
