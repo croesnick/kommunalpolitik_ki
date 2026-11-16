@@ -80,4 +80,25 @@ defmodule KomkiCli.TestSupport do
     Integer.to_string(System.unique_integer([:positive])) <>
       "-" <> Integer.to_string(System.system_time(:millisecond))
   end
+
+  @doc """
+  OS pid of a stand-in for a running component: `/bin/sh` looping with
+  `marker` in its ps command line (a compound command, so sh does not exec
+  it away).
+
+  The loop ends by itself once the test VM is gone (`$PPID` is the VM's
+  port helper). Tests clean up with `Proc.kill_checked/2`, which needs `ps`;
+  inside the Claude sandbox it sends no signal, and an endless loop would
+  outlive the run and keep the caller's stderr pipe open (ticket #610).
+  """
+  @spec marker_loop!(String.t()) :: pos_integer()
+  def marker_loop!(marker) do
+    port =
+      Port.open({:spawn_executable, "/bin/sh"},
+        args: ["-c", "while kill -0 $PPID 2>/dev/null; do sleep 1; done # " <> marker]
+      )
+
+    {:os_pid, pid} = Port.info(port, :os_pid)
+    pid
+  end
 end

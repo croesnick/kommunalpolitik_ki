@@ -443,13 +443,7 @@ defmodule KomkiCli.ConnectorsTest do
                   id <- ["documents", "ris", "vault", "web"],
                   do: {Connectors.pidfile(cfg, id), Manifest.fetch!(id).binary}
                 ) do
-          # Compound-Kommando, damit der Marker in der ps-Zeile bleibt
-          port =
-            Port.open({:spawn_executable, "/bin/sh"},
-              args: ["-c", "while :; do sleep 1; done # " <> marker]
-            )
-
-          {:os_pid, pid} = Port.info(port, :os_pid)
+          pid = TestSupport.marker_loop!(marker)
           File.write!(pidfile, Integer.to_string(pid) <> "\n")
           {pid, marker}
         end
