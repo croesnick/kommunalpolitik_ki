@@ -1,0 +1,51 @@
+{
+  "facts": {
+    "audit_path_ready": {
+      "source": "journal-verwaltung",
+      "source_kind": "technical",
+      "value": true
+    },
+    "environment_observers_complete": {
+      "source": "umgebungs-verwaltung",
+      "source_kind": "assumption",
+      "value": true
+    },
+    "has_operation_right": {
+      "source": "rechte-verwaltung",
+      "source_kind": "administered",
+      "value": true
+    },
+    "output_content_digest": {
+      "source": "ausgabe-diagnose",
+      "source_kind": "technical",
+      "value": "6b51b136f7b80e207cecbe54744da5f84397c9305c679c2281f0a601b7a8f0a4"
+    },
+    "purpose": {
+      "source": "auftrags-verwaltung",
+      "source_kind": "administered",
+      "value": "fraktionsarbeit"
+    }
+  },
+  "identity": "nutzende-person",
+  "object": {
+    "classification": "classified",
+    "labels": [
+      "fraktion-intern@1",
+      "lizenz-cc-by@1"
+    ],
+    "object_id": "obj-essenz-lizenz",
+    "version": "v1"
+  },
+  "registry_ref": "reg-fall-4711-test",
+  "schema": "komki-snapshot/1",
+  "snapshot_id": "snap-offenlegung-lizenz",
+  "workspace": {
+    "bindings": [
+      "fraktion-intern@1",
+      "lizenz-cc-by@1"
+    ],
+    "environment": "ratsprojekte-bestand@1",
+    "valid": true,
+    "workspace_id": "ws-fraktionsraum"
+  }
+}

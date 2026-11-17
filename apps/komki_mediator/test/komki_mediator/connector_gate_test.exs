@@ -476,11 +476,12 @@ defmodule KomkiMediator.ConnectorGateTest do
     fake(env, "vault", ok(note(["vault-vertraulich@1"])))
 
     cases = [
-      # emit: doc-vertraulich@1 has no emit rule.
-      {"emit", put_in(env.room.workspace_bindings, ["doc-vertraulich@1", "web-oeffentlich@1"]),
-       "web_search", %{"query" => "Radweg"}, @denial_keys},
-      # transfer: brave-search is outside the circle of vault-vertraulich@1,
-      # a GO still bridges it (#354).
+      # emit: doc-vertraulich@1 has no emit rule; the handover to the vault
+      # keeps a GO way, so the emit denial keeps its form.
+      {"emit", put_in(env.room.workspace_bindings, ["doc-vertraulich@1", "vault-oeffentlich@1"]),
+       "vault_search", %{"text" => "Radweg"}, @denial_keys},
+      # transfer: brave-search is outside the circle of vault-vertraulich@1;
+      # an Offenlegungsfreigabe for the search text is the GO way (#354).
       {"transfer", TestHelpers.vertraulich(env), "web_search", %{"query" => "Radweg"},
        @denial_keys},
       # store with a GO way: missing_operation_rule only.

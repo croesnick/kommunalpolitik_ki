@@ -229,9 +229,9 @@ Freigabe-Zweigs; fuer dasselbe Gate folgt kein `permitted`-PDR. Ein Nein
 ergibt `go_refused`, keine Antwort `go_timeout`,
 jeweils mit PDR. Die Antwort bleibt das deny samt Katalog, ergaenzt um
 `"go"`. Eine ungueltige Freigabe (falscher Call, abgelaufen, Nonce
-verbraucht) ist ein neues deny des Freigabe-Zweigs. Bei `store` mit
-unbelegter Beobachterliste waere auch eine gueltige Freigabe ein deny
-(`recipients_unproven`, Ticket #432) — so weit kommt es ueber den
+verbraucht) ist ein neues deny des Freigabe-Zweigs. Bei `store` und
+`transfer` mit unbelegter Beobachterliste waere auch eine gueltige
+Freigabe ein deny (`recipients_unproven`, Tickets #432 und #354) — so weit kommt es ueber den
 Vermittler aber nie: Der Katalog haelt das GO unter derselben Bedingung
 zurueck, eine Anfrage entsteht nicht.
 
@@ -441,10 +441,13 @@ die Labels ihrer Dokumente in `workspace_bindings`, sonst sperrt
     Schreiben ein deny mit Aktionsfreigabe fuer den exakten Call; mit
     Zuhoerer fragt der Vermittler (GO-Anfrage mit `operation: store`
     bzw. `transfer`), sonst bleibt es beim deny. Faellt beim Speichern der
-    Empfaengertest, gibt es kein GO und kein Fenster (#417) — es sei denn,
-    der Katalog bietet eine Offenlegungsfreigabe an (#423, Szene 13):
-    Jede Bindung, deren Empfaengerkreis das Ziel nicht abdeckt, braucht
-    dann eine Befugnis fuer die Ausgabeart des Ziels. Die Anfrage zeigt
+    Empfaengertest, gibt es kein GO und kein Fenster (#417); seit #354
+    gilt das auch beim Uebergeben (`transfer`) — es sei denn, der Katalog
+    bietet eine Offenlegungsfreigabe an (#423, Szene 13; Suchanfragen
+    #354, Szene 4): Jede Bindung, deren Empfaengerkreis das Ziel nicht
+    abdeckt, braucht dann eine Befugnis fuer die Ausgabeart des Ziels.
+    Steht schon vor dem Erzeugen fest, dass die Uebergabe keinen GO-Weg
+    hat, fragt der Vermittler auch das emit-GO nicht an. Die Anfrage zeigt
     den genauen Text, alle Empfaenger und den Hinweis auf die Offenlegung
     und bietet die Teile zur Abwahl an — eine Abwahl leitet den Call neu
     ab und die Freigabe bindet den neuen Hash (R.6.2). Bei unbelegter

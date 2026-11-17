@@ -249,12 +249,12 @@ defmodule KomkiCli.GoStepsTest do
 
       assert_received {:said, preview}
       assert preview =~ "Ausgabe:   suchanfrage (hebt auf: vault-vertraulich@1)"
-      assert preview =~ "Ich gebe genau diesen Suchtext bewusst an Brave (Websuche) weiter."
+      assert preview =~ "Ich gebe genau diese Anfrage bewusst an Brave (Websuche) weiter."
       assert preview =~ "Sichtbar für: Brave (Websuche)"
       refute preview =~ "Teile:"
 
       assert_received {:asked,
-                       "GO: Ich gebe genau diesen Suchtext bewusst an Brave (Websuche) weiter."}
+                       "GO: Ich gebe genau diese Anfrage bewusst an Brave (Websuche) weiter."}
 
       {:ok, answer} = KomkiPolicy.JSON.parse(File.read!(answer_file(dir, suche)))
       assert answer == %{"schema" => "komki-go-answer/1", "go" => true, "teile" => []}

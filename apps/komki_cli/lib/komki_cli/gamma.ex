@@ -12,8 +12,8 @@ defmodule KomkiCli.Gamma do
   Bindung bricht ab (Bindungen sind unveraenderlich, R.2.1). Ausnahme ist
   das Vorlagen-Upgrade (ADR 0007, #354): Eine fruehere mitgelieferte
   Fassung (`Templates.superseded_bindings/0`) ersetzt der Import durch die
-  aktuelle und haelt den Uebergang im Store fest. Validiert wird ueber
-  `KomkiPolicy.Registry.compile/1` im Export.
+  aktuelle, haelt den Uebergang im Store fest und nennt ihn auf stderr.
+  Validiert wird ueber `KomkiPolicy.Registry.compile/1` im Export.
   """
 
   alias KomkiCli.{Config, LabelStore}
@@ -35,10 +35,13 @@ defmodule KomkiCli.Gamma do
     db = db_path(cfg)
     path = registry_path(cfg)
 
-    with {:ok, _counts} <-
+    with {:ok, before} <- LabelStore.binding_upgrades(db),
+         {:ok, _counts} <-
            LabelStore.import_registry(db, KomkiMediator.Templates.label_store_seed(),
              upgrades: KomkiMediator.Templates.superseded_bindings()
            ),
+         {:ok, upgrades} <- LabelStore.binding_upgrades(db),
+         :ok <- report_upgrades(Enum.drop(upgrades, length(before))),
          {:ok, export} <- LabelStore.export(db),
          {:ok, term} <- parse(export) do
       # Kanonische Form wie die Vorlagen des Vermittlers: so erkennt dessen
@@ -55,6 +58,18 @@ defmodule KomkiCli.Gamma do
     else
       {:error, reason} -> {:error, "Γ aus dem Label-Store: " <> reason}
     end
+  end
+
+  # Vorlagen-Upgrade (ADR 0007): jeder Uebergang in einer Zeile, damit der
+  # Verwaltungsschritt nicht still geschieht.
+  defp report_upgrades(upgrades) do
+    Enum.each(upgrades, fn upgrade ->
+      IO.puts(
+        :stderr,
+        "komki: mitgelieferte Bindung #{upgrade["binding"]} in neuer Fassung übernommen " <>
+          "(Vorlagen-Upgrade, ADR 0007)"
+      )
+    end)
   end
 
   defp parse(export) do
