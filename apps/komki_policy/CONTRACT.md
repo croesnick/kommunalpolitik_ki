@@ -630,7 +630,7 @@ Die Fixture-Registry trägt dafür bei `lizenz-namensnennung@1` die Regel `store
 | `case_offenlegung_entfernt_offen` | Kontext von `case_offenlegung_permit`, aber Ziellabel `[ratsprojekte@1]`: die Freigabe entfernt die offene Bindung `web-oeffentlich-fall@1`, die keine Befugnis trägt (#603, R.5.7) | **deny**, Blocker `ziellabel_unpassend` und `lockerungsbefugnis_fehlt` (`web-oeffentlich-fall@1`); Remedies nur `neuer_raum` |
 | `case_offenlegung_authority_agent` | Kontext von `case_offenlegung_permit`, `authority: pi-agent` (#598) | **deny**, Blocker `release_authority_not_person` und `lockerungsbefugnis_fehlt` (`fraktion-intern@1`: die Befugnis gilt nur für `nutzende-person`); Remedies nur `neuer_raum` |
 | `case_offenlegung_lizenz_entfernt` | Kontext von `case_offenlegung_lizenz`, aber Ziellabel `[ratsprojekte@1]`: die Freigabe entfernt die Lizenzbindung, die keine Befugnis trägt | **deny**, Blocker `ziellabel_unpassend` und `lockerungsbefugnis_fehlt` (`lizenz-cc-by@1`); Remedies nur `neuer_raum` |
-| `case_offenlegung_lizenz` | Fraktionsraum mit Lizenzbindung (λ(y) = `[fraktion-intern@1, lizenz-cc-by@1]`), Offenlegungsfreigabe mit Ziellabel `[lizenz-cc-by@1, ratsprojekte@1]` | **permit**; die Lizenzbindung bleibt im Ziellabel und wird erfüllt, nicht entfernt (R.2.4, #603) |
+| `case_offenlegung_lizenz` | Fraktionsraum mit Lizenzbindung (λ(y) = `[fraktion-intern@1, lizenz-cc-by@1]`), Offenlegungsfreigabe mit Ziellabel `[lizenz-cc-by@1, ratsprojekte@1]` | **permit**; die Lizenzbindung bleibt im Ziellabel, statt entfernt zu werden (R.2.4, #603); ihre Auflage prüft die Engine nicht (§ 9) |
 
 ### 8.5 `transfer`-Fälle (Übergabe, § 4.8)
 

@@ -230,7 +230,9 @@ dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bz
    gibt es keinen GO-Weg (komki_policy CONTRACT §4.7, §4.8, Tickets #417 und #354). Dann trägt die Antwort nur
    den `hinweis`, dass nichts übertragen wurde, und `recipients_outside` aus dem Blocker der Engine, ohne
    Remedies und Lockerungsbefugnisse; den vollen Katalog hält der PDR fest. Steht schon fest, dass die Übergabe
-   keinen GO-Weg hat, fragt der Vermittler auch das GO für Schritt 3 nicht mehr an (Szene 4, Gegenprobe 13.1).
+   keinen GO-Weg hat, fragt der Vermittler auch das GO für Schritt 3 nicht mehr an (Szene 4, Gegenprobe 13.1):
+   Er entscheidet die Übergabe mit λ(y) = B_W vorab, das Journal zeigt dann `emit` und `transfer` bzw. `store`,
+   beide abgelehnt, für ein Objekt, das nie erzeugt wurde.
    Bei `store` und `transfer` mit unbelegter Beobachterliste bietet die Engine ebenfalls kein GO an
    (komki_policy CONTRACT §4.7, §4.8, Tickets #432 und #354) —
    die Antwort behält dort die normale Form mit dem GO-losen Katalog, die GO-Runde entfällt. Die

@@ -253,6 +253,30 @@ defmodule KomkiMediator.GoTest do
     refute Map.has_key?(response, "remedies")
   end
 
+  # Auch eine unbelegte Beobachterliste laesst der Uebergabe keinen GO-Weg
+  # (#432, #354): Das emit-GO fuer doc-vertraulich@1 ohne emit-Regel waere
+  # sinnlos, also fragt der Vermittler gar nicht.
+  test "Uebergabe ohne GO-Weg wegen unbelegter Beobachterliste: kein emit-Fenster", %{
+    env: env,
+    go_dir: go_dir
+  } do
+    env =
+      env
+      |> aktion(["doc-vertraulich@1", "vault-oeffentlich@1"])
+      |> put_in(
+        [Access.key(:room), Access.key(:facts), "environment_observers_complete", "value"],
+        false
+      )
+
+    response = ConnectorGate.call(env, "vault_search", @vault_params)
+
+    assert response["decision"] == "deny"
+    assert response["rule"] == "transfer"
+    refute_received :vault_called
+    assert Go.pending(go_dir) == []
+    assert outcomes(env) == ["not_admitted", "not_admitted"]
+  end
+
   test "Frische-Fenster ueberschritten: deny release_expired", %{env: env, go_dir: go_dir} do
     env = aktion(env)
     person(go_dir, fn request -> Go.release_for(request, System.os_time(:second) - 3_600) end)
