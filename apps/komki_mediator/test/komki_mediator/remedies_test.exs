@@ -158,7 +158,7 @@ defmodule KomkiMediator.RemediesTest do
            ]
 
     # Die kompilierte Form traegt sie als Engine-Feld — sie ist Teil des
-    # Schemas komki-registry/2 (CONTRACT § 2.1), ohne Remedy-Semantik.
+    # Schemas komki-registry/3 (CONTRACT § 2.1), ohne Remedy-Semantik.
     assert gamma.compiled.bindings["doc-pending-freigabe@1"].relaxation_authorities == [
              %{authority: "nutzende-person", restriction: "operations", output: "freigabe-notiz"}
            ]

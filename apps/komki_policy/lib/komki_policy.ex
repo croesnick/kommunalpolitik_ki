@@ -3,7 +3,7 @@ defmodule KomkiPolicy do
   Deterministischer Policy-Kern `komki_policy` (Lieferung 2 und 3: Regelzweige
   `admit`, `emit`, `store` und `transfer`, Remedy-Katalog, Aktionsfreigabe).
 
-  Der Kern kann aus einer Registry (`komki-registry/2`), einem
+  Der Kern kann aus einer Registry (`komki-registry/3`), einem
   `ContextSnapshot` (`komki-snapshot/1`) und einem `Intent` (`komki-intent/1`)
   auf regelwerksbasierter Herleitung entscheiden (`derive`), mit vorgelegter
   Aktionsfreigabe und Offenlegungsstand den Freigabe-Zweig laufen lassen

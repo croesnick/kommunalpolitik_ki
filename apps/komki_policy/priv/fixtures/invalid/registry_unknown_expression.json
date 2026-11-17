@@ -32,10 +32,14 @@
     "input_in_approved_case_scope": "boolean",
     "purpose": "string"
   },
+  "observer_types": {
+    "lokale-fallverarbeitung": "processing_domain",
+    "nutzende-person": "person"
+  },
   "observers": [
     "nutzende-person",
     "lokale-fallverarbeitung"
   ],
   "registry_id": "reg-fall-4711-test",
-  "schema": "komki-registry/2"
+  "schema": "komki-registry/3"
 }

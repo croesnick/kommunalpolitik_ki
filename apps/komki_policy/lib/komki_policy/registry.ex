@@ -3,8 +3,9 @@ defmodule KomkiPolicy.Registry do
   Registry-Compiler und -Validierer (CONTRACT.md § 2.1, § 3).
 
   Nimmt einen geparsten Registry-Term und validiert ihn als geschlossenes,
-  versioniertes Schema `komki-registry/2`: geschlossene Feldmengen,
-  Kennungsformate, Beobachterräume, die typgeprüfte Kompilierung aller
+  versioniertes Schema `komki-registry/3`: geschlossene Feldmengen,
+  Kennungsformate, Beobachterräume mit Beobachtertypen (Ticket #598: nur
+  eine Person darf freigeben oder lockern), die typgeprüfte Kompilierung aller
   Operations-Ausdrücke (B.4-Sprachumfang) und optional registrierte
   Transformationen (§ 2.1: gepinnte Label-Transition `input_labels →
   output_labels`). Compile-Fehler sind Eingabefehler — die Sprachlücke
@@ -17,6 +18,7 @@ defmodule KomkiPolicy.Registry do
     "schema",
     "registry_id",
     "observers",
+    "observer_types",
     "fact_fields",
     "environments",
     "bindings",
@@ -26,6 +28,11 @@ defmodule KomkiPolicy.Registry do
   @environment_fields ["observers"]
   @transformation_fields ["input_labels", "output_labels"]
   @fact_types ["string", "boolean", "integer", "string_set"]
+
+  # Beobachtertypen (R.2.5, Ticket #598): Nur eine Person darf eine
+  # Freigabe erteilen oder eine Bindung lockern; eine Verarbeitungsdomaene
+  # (der Agent, ein Dienst, eine Sicherung) nie.
+  @observer_type_kinds ["person", "processing_domain"]
   @known_operations ["start", "admit", "emit", "transfer", "store"]
 
   # Strukturierte Lockerungsbefugnisse (R.2.2, Ticket #109/#423): wer
@@ -52,6 +59,7 @@ defmodule KomkiPolicy.Registry do
   @type compiled :: %{
           required(:registry_id) => String.t(),
           required(:observers) => [String.t()],
+          required(:observer_types) => %{String.t() => String.t()},
           required(:fact_fields) => %{String.t() => String.t()},
           required(:environments) => %{String.t() => %{observers: [String.t()]}},
           required(:bindings) => %{
@@ -105,24 +113,34 @@ defmodule KomkiPolicy.Registry do
   @spec output_kinds() :: [String.t()]
   def output_kinds, do: @output_kinds
 
+  @doc """
+  Darf `observer` eine Freigabe erteilen oder eine Bindung lockern? Nur
+  eine Person aus 𝒪 (Ticket #598, CONTRACT.md § 2.1, § 2.6).
+  """
+  @spec person?(compiled(), String.t()) :: boolean()
+  def person?(compiled, observer), do: Map.get(compiled.observer_types, observer) == "person"
+
   # ---------------------------------------------------------------------
   # Kernvalidierung
   # ---------------------------------------------------------------------
 
   defp validate(term) do
-    with :ok <- Validations.require_schema(term, "komki-registry/2", :invalid_schema),
+    with :ok <- Validations.require_schema(term, "komki-registry/3", :invalid_schema),
          :ok <- Validations.closed_fields(term, @registry_fields, "$"),
          :ok <- validate_registry_id(term),
          {:ok, observers} <- validate_observers(term),
+         {:ok, observer_types} <- validate_observer_types(term, observers),
          {:ok, fact_fields} <- validate_fact_fields(term),
          {:ok, environments} <- validate_environments(term, observers),
          {:ok, bindings} <- validate_bindings(term, fact_fields, observers),
+         :ok <- require_person_authorities(bindings, observer_types),
          {:ok, transformations} <-
            validate_transformations(term, Map.keys(bindings)) do
       {:ok,
        %{
          registry_id: term["registry_id"],
          observers: Enum.sort(observers),
+         observer_types: observer_types,
          fact_fields: fact_fields,
          environments: environments,
          bindings: bindings,
@@ -155,6 +173,57 @@ defmodule KomkiPolicy.Registry do
          :ok <- kebab_strings(observers, path) do
       {:ok, observers}
     end
+  end
+
+  # Beobachtertypen (Ticket #598): Pflichtfeld, Schluessel genau 𝒪, Werte
+  # aus dem geschlossenen Vokabular. Ein Beobachter ohne Typ waere ein
+  # stiller Default — darum Eingabefehler, kein "keine Person".
+  defp validate_observer_types(term, observers) do
+    types = term["observer_types"]
+    path = "$.observer_types"
+
+    cond do
+      not is_map(types) ->
+        fail(:invalid_observer_types, path, "expected an object")
+
+      Enum.sort(Map.keys(types)) != Enum.sort(observers) ->
+        fail(:invalid_observer_types, path, "keys must be exactly the registry observers")
+
+      Enum.any?(Map.values(types), &(&1 not in @observer_type_kinds)) ->
+        fail(:invalid_observer_types, path, "expected types in " <> inspect(@observer_type_kinds))
+
+      true ->
+        {:ok, types}
+    end
+  end
+
+  # Eine Lockerungsbefugnis vergibt nur eine Person (Ticket #598, R.2.2):
+  # Eine Verarbeitungsdomaene, die lockern duerfte, koennte ueber eine
+  # Offenlegungsfreigabe in ihrem Namen jede Bindung entfernen.
+  defp require_person_authorities(bindings, observer_types) do
+    bindings
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.flat_map(&authority_slots/1)
+    |> Enum.find(fn {_id, _index, authority} ->
+      Map.get(observer_types, authority) != "person"
+    end)
+    |> case do
+      nil ->
+        :ok
+
+      {id, index, authority} ->
+        fail(
+          :relaxation_authority_not_person,
+          "$.bindings.#{id}.relaxation_authorities.[#{index}].authority",
+          "only a person may relax a binding: " <> authority
+        )
+    end
+  end
+
+  defp authority_slots({id, binding}) do
+    binding.relaxation_authorities
+    |> Enum.with_index()
+    |> Enum.map(fn {entry, index} -> {id, index, entry.authority} end)
   end
 
   defp validate_fact_fields(term) do
@@ -416,6 +485,7 @@ defmodule KomkiPolicy.Registry do
     %{
       registry_id: parts.registry_id,
       observers: parts.observers,
+      observer_types: parts.observer_types,
       fact_fields: parts.fact_fields,
       environments: parts.environments,
       bindings: parts.bindings,

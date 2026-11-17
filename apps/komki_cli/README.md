@@ -523,7 +523,7 @@ Drei Eigenschaften tragen das Design:
 ./komki label list                              # Übersicht
 ./komki label show binding ratsarbeit@1        # volle Bindungsdefinition
 ./komki label show object brief-4711@v1        # Metadaten + Entscheidungshistorie
-./komki label export --out gamma.json           # Γ-Export: komki-registry/2
+./komki label export --out gamma.json           # Γ-Export: komki-registry/3
 ```
 
 Der Γ-Export ist der feste Regelstand für Entscheidungen. `komki-policy`

@@ -536,7 +536,7 @@ defmodule KomkiCli.CLI do
           ],
           export: [
             name: "export",
-            description: "Γ-Export: komki-registry/2 JSON (stdout oder --out)",
+            description: "Γ-Export: komki-registry/3 JSON (stdout oder --out)",
             options: [db: db_opt(), out: out_opt()]
           ]
         ]

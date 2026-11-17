@@ -7,8 +7,8 @@ Ableitungsprüfer (`verify`) sowie eine reine Escript-CLI (`komki-policy`) ohne
 Runtime-Abhängigkeiten.
 
 **Maßgeblich ist [`CONTRACT.md`](CONTRACT.md) im App-Verzeichnis** — der
-verbindliche Datenvertrag (Version v2: `komki-registry/2`,
-`komki-snapshot/1`, `komki-intent/1`, `komki-release/1`, `komki-stand/1`,
+verbindliche Datenvertrag (`komki-registry/3`,
+`komki-snapshot/1`, `komki-intent/1`, `komki-release/1` und `komki-release/2`, `komki-stand/1`,
 `komki-proof/1`) samt Sprachumfang, Befundcodes, Remedy-Ordnung und
 Exit-Code-Semantik.
 
@@ -148,7 +148,7 @@ keine Herabstufungsbefugnis: `assigned_label` bleibt B_W.
 |---|---|
 | `KomkiPolicy.JSON` | Strenger JSON-Parser (keine doppelten Schlüssel, kein `NaN`) + kanonischer Encoder (§ 6) |
 | `KomkiPolicy.Validations` | Geteilte Schema-Bausteine der Datensatz-Validierer (Objekt-Form, geschlossene Feldmengen, Kebab-/Hex-/Ganzzahl-Prüfungen) |
-| `KomkiPolicy.Registry` | Registry-Compiler (`komki-registry/2`): typgeprüfte B.4-Ausdrücke + registrierte Transformationen (§ 2.1) |
+| `KomkiPolicy.Registry` | Registry-Compiler (`komki-registry/3`): typgeprüfte B.4-Ausdrücke + registrierte Transformationen (§ 2.1) |
 | `KomkiPolicy.Context` | Snapshot-Validierung, Intent-Kohärenz |
 | `KomkiPolicy.Evaluator` | Dreiwertige Ausdrucksauswertung (kein Default für fehlende Fakten) |
 | `KomkiPolicy.Calculus` | Reine Mengenfunktionen (R_Γ, ρ_Γ, Label-Subsets) |

@@ -798,7 +798,7 @@ Gemeint ist weder die kommunale Verwaltung noch der Vault. Der Regelstand
 Γ bezeichnet einen bestimmten Stand dieses Registers.
 
 **Wo:** In der SQLite-Registry des `komki label`-CLI (apps/komki_cli);
-der Γ-Export als `komki-registry/2` übergibt den Regelstand an die
+der Γ-Export als `komki-registry/3` übergibt den Regelstand an die
 Engine (`komki-policy`).
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
@@ -811,6 +811,12 @@ Engine (`komki-policy`).
 ein Ereignis oder seine Auswirkungen zugreifen könnten. Der
 Empfängerkreis umfasst dagegen diejenigen, die die Information erhalten
 dürfen, und ist nicht mit einer technischen Zugriffsliste gleichzusetzen.
+
+**Abgrenzung:** Jeder Beobachter hat einen Typ: Person oder
+Verarbeitungsdomäne (der Agent, ein Dienst, eine Sicherung). Nur eine
+Person ordnet ein Objekt ein, erteilt eine Freigabe oder hält eine
+Lockerungsbefugnis (R.2.5, #598). Dass jemand Beobachter ist, macht ihn
+noch nicht zur zuständigen Stelle.
 
 **Siehe:** [RFC 0003](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md).
 

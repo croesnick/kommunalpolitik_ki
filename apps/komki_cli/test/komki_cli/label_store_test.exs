@@ -296,19 +296,24 @@ defmodule KomkiCli.LabelStoreTest do
       assert {:ok, _compiled} = Registry.compile(JSON.decode!(json))
     end
 
-    # Unabhaengiges Orakel: das erwartete komki-registry/2 steht als Literal
+    # Unabhaengiges Orakel: das erwartete komki-registry/3 steht als Literal
     # hier (aus der Seed-Fixture abgeleitet und eingefroren), NICHT durch
     # erneute Anwendung der Store-Projektionslogik — das Exportergebnis
     # belegt sich also nicht selbst.
-    test "Export entspricht dem erwarteten komki-registry/2 (unabhaengiges Orakel)", %{db: db} do
+    test "Export entspricht dem erwarteten komki-registry/3 (unabhaengiges Orakel)", %{db: db} do
       {:ok, _} = import_seed(db)
 
       assert {:ok, json} = LabelStore.export(db)
 
       expected = %{
-        "schema" => "komki-registry/2",
+        "schema" => "komki-registry/3",
         "registry_id" => "komki-synth-demo",
         "observers" => ["fraktionskollege", "lokale-verarbeitung", "nutzende-person"],
+        "observer_types" => %{
+          "fraktionskollege" => "person",
+          "lokale-verarbeitung" => "processing_domain",
+          "nutzende-person" => "person"
+        },
         "fact_fields" => %{"purpose" => "string", "workspace_scope_ok" => "boolean"},
         "environments" => %{
           "lokal@1" => %{"observers" => ["lokale-verarbeitung", "nutzende-person"]}
@@ -548,11 +553,23 @@ defmodule KomkiCli.LabelStoreTest do
     } do
       {:ok, _} = LabelStore.import_registry(db, seed)
 
-      seed2 = deep_put(seed, ["observer_types", "nutzende-person"], "processing_domain")
+      seed2 = deep_put(seed, ["observer_types", "fraktionskollege"], "processing_domain")
 
       assert {:error, reason} = LabelStore.import_registry(db, seed2)
       assert reason =~ "Beobachtertyp unveränderlich"
       assert reason =~ "person != processing_domain"
+    end
+
+    # #598: Wer eine Lockerungsbefugnis haelt, muss eine Person sein; schon
+    # die Engine-Projektion des Imports lehnt die Herabstufung ab.
+    test "Inhaberin einer Lockerungsbefugnis kann keine Verarbeitungsdomäne sein (#598)", %{
+      db: db,
+      seed: seed
+    } do
+      seed2 = deep_put(seed, ["observer_types", "nutzende-person"], "processing_domain")
+
+      assert {:error, reason} = LabelStore.import_registry(db, seed2)
+      assert reason =~ "relaxation_authority_not_person"
     end
   end
 

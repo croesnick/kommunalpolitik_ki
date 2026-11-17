@@ -67,13 +67,14 @@ defmodule KomkiCli.LabelStore do
       Policy-Sprache.
 
   Naht zur Engine (apps/komki_policy/CONTRACT.md, contract-frozen): der
-  Import ist `komki-label-store/2` (Obermenge von `komki-registry/2`) und
+  Import ist `komki-label-store/2` (Obermenge von `komki-registry/3`) und
   wird auf die Engine-Form § 2.1 herabprojiziert und mit
   `KomkiPolicy.Registry.compile/1` geprueft — die Engine ist die einzige
   Schemainstanz (Beobachterraum, B.4-Typen, Kennungsformate); die
   Store-Zusatzfelder (bezeichnung, geltungsbereich, verantwortliche_stelle,
-  auflagen, Lockerungsbefugnis-Eintraege, observer_types) prueft dieses
-  Modul lokal. Beim Export wird der gebaute Γ-Term (`komki-registry/2`)
+  auflagen, Lockerungsbefugnis-Eintraege) prueft dieses Modul lokal; die
+  observer_types prueft es lokal und seit #598 auch die Engine, die sie
+  fuer Freigaben und Lockerungsbefugnisse braucht. Beim Export wird der gebaute Γ-Term (`komki-registry/3`)
   vor der Ausgabe kompiliert (fail-closed; nur bei Store-Korruption
   erreichbar).
 
@@ -278,7 +279,7 @@ defmodule KomkiCli.LabelStore do
   end
 
   @doc """
-  Γ-Export: baut `komki-registry/2` aus dem Store (Mengen sortiert,
+  Γ-Export: baut `komki-registry/3` aus dem Store (Mengen sortiert,
   key-deterministisch) und kompiliert den gebauten Term vor der Ausgabe
   (fail-closed). Gleicher Store-Inhalt liefert byte-identische Ausgabe.
   """
@@ -391,9 +392,11 @@ defmodule KomkiCli.LabelStore do
   # die Engine-Schicht nur [] (fail-closed).
   defp engine_projection(term) do
     %{
-      "schema" => "komki-registry/2",
+      "schema" => "komki-registry/3",
       "registry_id" => term["registry_id"],
       "observers" => term["observers"],
+      # Seit #598 Engine-Schicht: nur eine Person darf freigeben oder lockern.
+      "observer_types" => term["observer_types"],
       "fact_fields" => term["fact_fields"],
       "environments" => term["environments"],
       "bindings" =>
@@ -1270,19 +1273,23 @@ WHERE object_id = ? AND version = ? ORDER BY id",
   end
 
   # ========================================================================
-  # Γ-Export (komki-registry/2, deterministisch, fail-closed)
+  # Γ-Export (komki-registry/3, deterministisch, fail-closed)
   # ========================================================================
 
   defp build_export(conn, registry_id) do
     with {:ok, observer_rows} <- select(conn, "SELECT id FROM observers"),
+         {:ok, type_rows} <- select(conn, "SELECT id, type FROM observer_types"),
          {:ok, fact_rows} <- select(conn, "SELECT name, type FROM fact_fields"),
          {:ok, env_rows} <- select(conn, "SELECT id, observers FROM environments"),
          {:ok, binding_rows} <-
            select(conn, "SELECT id, readers, operations, relaxation_authorities FROM bindings") do
       term = %{
-        "schema" => "komki-registry/2",
+        "schema" => "komki-registry/3",
         "registry_id" => registry_id,
         "observers" => Enum.sort(List.flatten(observer_rows)),
+        # Beobachtertypen gehen seit #598 in den Γ-Export: Die Engine
+        # laesst nur eine Person freigeben oder lockern.
+        "observer_types" => Map.new(type_rows, fn [id, type] -> {id, type} end),
         "fact_fields" => Map.new(fact_rows, fn [name, type] -> {name, type} end),
         "environments" =>
           Map.new(env_rows, fn [id, json] ->

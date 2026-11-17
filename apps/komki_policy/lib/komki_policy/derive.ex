@@ -493,11 +493,19 @@ defmodule KomkiPolicy.Derive do
     end
   end
 
+  # Zustaendige Stelle (§ 2.6, Ticket #598): Element von 𝒪 und eine Person.
+  # Der Agent und jeder Dienst sind Verarbeitungsdomaenen; sie erteilen
+  # keine Freigabe, auch wenn sie Beobachter sind.
   defp release_check_authority(state, registry, release) do
-    if release.authority in registry.observers do
-      state
-    else
-      add_blocker(state, binder("release_authority_unknown", nil, nil))
+    cond do
+      release.authority not in registry.observers ->
+        add_blocker(state, binder("release_authority_unknown", nil, nil))
+
+      not Registry.person?(registry, release.authority) ->
+        add_blocker(state, binder("release_authority_not_person", nil, nil))
+
+      true ->
+        state
     end
   end
 

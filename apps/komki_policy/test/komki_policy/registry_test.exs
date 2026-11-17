@@ -38,9 +38,10 @@ defmodule KomkiPolicy.RegistryTest do
 
   defp base_registry do
     %{
-      "schema" => "komki-registry/2",
+      "schema" => "komki-registry/3",
       "registry_id" => "reg-test",
       "observers" => ["nutzende-person"],
+      "observer_types" => %{"nutzende-person" => "person"},
       "fact_fields" => %{"purpose" => "string", "count" => "integer", "labels" => "string_set"},
       "environments" => %{"lokale@1" => %{"observers" => ["nutzende-person"]}},
       "bindings" => %{
@@ -112,8 +113,49 @@ defmodule KomkiPolicy.RegistryTest do
       assert Map.fetch!(compiled.bindings, "ratsarbeit@1").relaxation_authorities == []
     end
 
+    # Ticket #598: Γ sagt, wer freigeben darf. Typen sind Pflicht, decken
+    # genau 𝒪 ab, und eine Lockerungsbefugnis vergibt nur eine Person.
+    test "Beobachtertypen: Pflicht, genau 𝒪, geschlossenes Vokabular (#598)" do
+      base = base_registry()
+
+      assert %{code: :invalid_observer_types} =
+               compile_term_error(Map.delete(base, "observer_types"))
+
+      assert %{code: :invalid_observer_types} =
+               compile_term_error(Map.put(base, "observer_types", %{}))
+
+      assert %{code: :invalid_observer_types} =
+               compile_term_error(
+                 Map.put(base, "observer_types", %{"nutzende-person" => "agent"})
+               )
+
+      assert {:ok, compiled} = Registry.compile(base)
+      assert Registry.person?(compiled, "nutzende-person")
+      refute Registry.person?(compiled, "fremde-stelle")
+    end
+
+    test "Lockerungsbefugnis nur fuer eine Person (#598)" do
+      base =
+        base_registry()
+        |> Map.put("observers", ["nutzende-person", "pi-agent"])
+        |> Map.put("observer_types", %{
+          "nutzende-person" => "person",
+          "pi-agent" => "processing_domain"
+        })
+
+      agent =
+        put_in(base["bindings"]["test@1"]["relaxation_authorities"], [
+          %{"authority" => "pi-agent", "restriction" => "readers", "output" => "suchanfrage"}
+        ])
+
+      assert %{
+               code: :relaxation_authority_not_person,
+               path: "$.bindings.test@1.relaxation_authorities.[0].authority"
+             } = compile_term_error(agent)
+    end
+
     test "Befugnis-Eintraege sind geschlossen: Felder, Vokabular, Beobachter" do
-      base = Map.put(base_registry(), "schema", "komki-registry/2")
+      base = base_registry()
 
       binding = fn authorities ->
         put_in(
