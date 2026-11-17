@@ -1,7 +1,11 @@
 defmodule KomkiCli.Raum do
   @moduledoc """
   Raum anzeigen und wechseln (Ticket #268): `komki raum` und
-  `komki raum recherche|vertraulich|fraktion|projektraum`.
+  `komki raum recherche|vertraulich|fraktion|projektraum|mandat`.
+
+  Jeder Referenzraum ist eine Vorlage für eine Aufgabe (Ticket #607): Er
+  bringt sein B_W und seinen Zweck mit (R.4.1). Den Zweck setzt der
+  Wechsel als verwalteten Fakt `purpose` in `room.json`, nie der Agent.
 
   Ein Raum ist hier sein B_W, die `workspace_bindings` in
   `<base>/mediator/room.json`. Gewechselt wird nur zwischen den beiden
@@ -54,7 +58,20 @@ defmodule KomkiCli.Raum do
         "Essenz — mit Offenlegung gegenüber dem Vorstand, Teile wählst du vorher ab.",
     "projektraum" =>
       "Wie recherche, dazu der Stand aus ratsprojekte. Websuche, RIS und Vault nur mit deinem GO " <>
-        "für den einzelnen Aufruf."
+        "für den einzelnen Aufruf.",
+    "mandat" =>
+      "Nichtöffentliche Ratsunterlagen für dein Mandat. Websuche und RIS gibt es hier nicht, " <>
+        "auch nicht mit deinem GO; jeder andere Aufruf braucht dein GO."
+  }
+
+  # Zweck je Vorlage (Ticket #607, R.4.1): verwalteter Fakt, gesetzt beim
+  # Wechsel. `ratsarbeit@1` nimmt nur mit dem Zweck `mandat` auf.
+  @purposes %{
+    "recherche" => "offene-recherche",
+    "vertraulich" => "vertraulich",
+    "fraktion" => "fraktionsarbeit",
+    "projektraum" => "projektarbeit",
+    "mandat" => "mandat"
   }
 
   @typedoc "Abhängigkeiten, in Tests ersetzbar."
@@ -78,9 +95,14 @@ defmodule KomkiCli.Raum do
       "recherche" => Templates.recherche_bindings(),
       "vertraulich" => Templates.vertraulich_bindings(),
       "fraktion" => Templates.fraktion_bindings(),
-      "projektraum" => Templates.projektraum_bindings()
+      "projektraum" => Templates.projektraum_bindings(),
+      "mandat" => Templates.mandat_bindings()
     }
   end
+
+  @doc "Zweck der Raumvorlage `name` (Ticket #607)."
+  @spec purpose(String.t()) :: String.t()
+  def purpose(name), do: Map.fetch!(@purposes, name)
 
   @doc "Name des Referenzraums zu einem B_W, sonst `nil`."
   @spec name([String.t()] | nil) :: String.t() | nil
@@ -114,7 +136,7 @@ defmodule KomkiCli.Raum do
          :ok <- not_same(current, target),
          :ok <- loosening_allowed(cfg, current, bindings, deps),
          :ok <- bindings_in_gamma(cfg, bindings),
-         :ok <- write_room(cfg, room, bindings),
+         :ok <- write_room(cfg, room, bindings, purpose(target)),
          :ok <- mark_if_running(cfg, bindings, deps),
          {:ok, note} <- reload(cfg, deps) do
       {:raum,
@@ -355,12 +377,20 @@ defmodule KomkiCli.Raum do
     end
   end
 
-  defp write_room(cfg, room, bindings),
-    do:
-      write_json(
-        StartContract.default_path(cfg.base_dir),
-        Map.put(room, "workspace_bindings", bindings)
-      )
+  # B_W und Zweck der Vorlage; der Zweck ist ein verwalteter Fakt wie in
+  # der Raumvorlage des Vermittlers (Templates.room/0).
+  defp write_room(cfg, room, bindings, purpose) do
+    fact = %{
+      "value" => purpose,
+      "source" => "auftrags-verwaltung",
+      "source_kind" => "administered"
+    }
+
+    room
+    |> Map.put("workspace_bindings", bindings)
+    |> Map.update("facts", %{"purpose" => fact}, &Map.put(&1, "purpose", fact))
+    |> then(&write_json(StartContract.default_path(cfg.base_dir), &1))
+  end
 
   # Eine laufende Session arbeitet nach einem verschärfenden Wechsel im
   # strengeren Raum weiter; ihre Markierung zieht mit.

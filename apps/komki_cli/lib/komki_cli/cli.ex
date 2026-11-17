@@ -18,7 +18,7 @@ defmodule KomkiCli.CLI do
       komki up    [--ctx N]
       komki down
       komki status
-      komki raum [recherche|vertraulich|fraktion|projektraum]
+      komki raum [recherche|vertraulich|fraktion|projektraum|mandat]
       komki go
       komki run "PROMPT" [--mode text|json] [--scratch PATH] [--timeout SEKUNDEN] [--capture-denials]
       komki session [FILE ...] [--continue] [--detach] [--decided-by ID]
@@ -348,7 +348,8 @@ defmodule KomkiCli.CLI do
           name: [
             value_name: "NAME",
             required: false,
-            help: "recherche, vertraulich, fraktion oder projektraum; ohne Angabe nur anzeigen"
+            help:
+              "recherche, vertraulich, fraktion, projektraum oder mandat; ohne Angabe nur anzeigen"
           ]
         ]
       ],
