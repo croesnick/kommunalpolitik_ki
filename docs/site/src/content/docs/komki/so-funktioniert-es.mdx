@@ -76,13 +76,15 @@ Vermittler  neu gestartet, er entscheidet jetzt im neuen Raum.
 
 Aus dem Mandatsraum geht keine Suche nach draußen, auch nicht mit deinem GO: Die Ratsunterlagen darf nur der Stadtrat freigeben, also erscheint kein Fenster, und pi erfährt nur, dass nichts übertragen wurde. pi zeigt das schon beim Start („Draußen: gesperrt, auch nicht mit deinem GO“) und bei jedem Versuch:
 
-```text frame="terminal" title="Websuche im Mandatsraum, aus einer Session auf einer Wegwerf-Instanz"
+```text frame="terminal" title="Websuche im Mandatsraum, aus einer Session auf einer Wegwerf-Instanz (gekürzt)"
  Im Web suchen  »Kosten pro Kilometer Radweg Bau«
  ✗ abgelehnt  Die Anfrage hat komki nicht verlassen.
  Grund     Inhalte dieses Arbeitsraums dürfen nicht an brave-search gehen. Ein GO ändert daran nichts.
 ```
 
 Was du im Web nachsehen willst, fragst du im Raum `recherche`. Andere Aufrufe, etwa eine Notiz lesen oder ablegen, brauchen im Mandatsraum heute je zwei GOs, weil die Bindung der Ratsunterlagen noch keine Regel für Aufrufe hat. Eine Notiz, die du dort ablegst, trägt das Label der Ratsunterlagen und ist danach in jedem anderen Raum unsichtbar.
+
+Die Unterlagen selbst holst du wie jede andere Datei mit `komki session` in den Raum ([Eigene Dokumente in die Session holen](#eigene-dokumente-in-die-session-holen)), eingeordnet mit dem Label `ratsarbeit@1`. Den Startvertrag dafür trägst du heute von Hand in `room.json` ein; solange er dort steht, wechselt `komki raum` den Raum nicht ([#214](https://github.com/croesnick/kommunalpolitik_ki/issues/214)).
 
 ### Den Stand aus ratsprojekte lesen
 
