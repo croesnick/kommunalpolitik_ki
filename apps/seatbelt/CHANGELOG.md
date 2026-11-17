@@ -1,8 +1,8 @@
----
-seatbelt: patch
----
+## 0.1.1 (2026-11-17)
 
-# Mach-O load commands yield only validated read scopes
+### Fixes
+
+#### Mach-O load commands yield only validated read scopes
 
 A Mach-O binary names the dylibs it wants, and `Seatbelt.MachODeps.dylib_dirs/1`
 turned every one of those load commands into a `file-read*` scope for the
