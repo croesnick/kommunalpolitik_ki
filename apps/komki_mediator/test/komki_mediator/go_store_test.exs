@@ -207,6 +207,7 @@ defmodule KomkiMediator.GoStoreTest do
     term =
       env.gamma.term
       |> Map.update!("observers", &Enum.sort(["sync-dienst" | &1]))
+      |> put_in(["observer_types", "sync-dienst"], "processing_domain")
       |> put_in(["environments", "vault-lokal@1", "observers"], [
         "nutzende-person",
         "pi-agent",

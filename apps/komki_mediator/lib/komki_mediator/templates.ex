@@ -31,7 +31,7 @@ defmodule KomkiMediator.Templates do
   # (#106 und #107 fuer die Registry, beide mit demselben Raum; #134 nur
   # fuer den Raum; 8dc75f9 vor #213 fuer beide).
   @current %{
-    "registry.json" => "6b3bfbaece144f54285da92052634faa3d55aba9823d5699690ff82dd3082a2c",
+    "registry.json" => "ddba83e0d78be9662cc51b0191c11e6cfe7d6289521cf7a6ffc17e84ab10e61d",
     "room.json" => "8bb7a156134d43ebd4cc0027fc66ec27c26e00ae696d0d65f83b8ad8c9d57469"
   }
   @outdated %{
@@ -47,7 +47,9 @@ defmodule KomkiMediator.Templates do
       # vor #423: ohne Fraktionsraum-Welt, Lockerungsbefugnisse exportiert als []
       "9d06e591083615071f4386298ddb1e62e9d6f2fc20388a21741fc9bab07d55e0",
       # vor #354: ohne Befugnis fuer suchanfrage
-      "7524cca748ac4f580d5385c4ff68cb182bd6b4a92915382244bfbe597c37c140"
+      "7524cca748ac4f580d5385c4ff68cb182bd6b4a92915382244bfbe597c37c140",
+      # vor #598: komki-registry/2 ohne Beobachtertypen
+      "6b3bfbaece144f54285da92052634faa3d55aba9823d5699690ff82dd3082a2c"
     ],
     "room.json" => [
       "127831a737e7f5565d8def234c260ca270056b8954b346725f03ef638ef0b51f",
@@ -279,19 +281,19 @@ defmodule KomkiMediator.Templates do
   def superseded_bindings, do: @superseded_bindings
 
   @doc """
-  Registry-Term des Default-Arbeitsraums (`komki-registry/2`): die
+  Registry-Term des Default-Arbeitsraums (`komki-registry/3`): die
   Projektion von `label_store_seed/0` auf die Engine-Form, so wie der
   Label-Store exportiert. Lockerungsbefugnisse traegt der Export seit
-  #423 strukturiert (komki-registry/2, R.2.2): die Engine validiert die
-  Einträge gegen das geschlossene Vokabular und entscheidet die
-  Essenz-Befugnis im Offenlegungsfreigabe-Zweig (§ 4.9).
+  #423 strukturiert (R.2.2): die Engine validiert die Einträge gegen das
+  geschlossene Vokabular und entscheidet sie im
+  Offenlegungsfreigabe-Zweig (§ 4.9). Seit #598 traegt er auch die
+  Beobachtertypen: nur eine Person darf freigeben oder lockern.
   """
   def registry do
     seed = label_store_seed()
 
     seed
-    |> Map.drop(["observer_types"])
-    |> Map.put("schema", "komki-registry/2")
+    |> Map.put("schema", "komki-registry/3")
     |> Map.put(
       "bindings",
       Map.new(seed["bindings"], fn {id, b} ->

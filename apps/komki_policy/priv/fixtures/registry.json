@@ -216,6 +216,17 @@
     "output_content_digest": "string",
     "purpose": "string"
   },
+  "observer_types": {
+    "eigene-rz-analyse": "processing_domain",
+    "fraktion": "person",
+    "lokale-fallverarbeitung": "processing_domain",
+    "nextcloud-betreiber": "processing_domain",
+    "nutzende-person": "person",
+    "pi-agent": "processing_domain",
+    "sicherung": "processing_domain",
+    "vorstand": "person",
+    "webdienst-x": "processing_domain"
+  },
   "observers": [
     "eigene-rz-analyse",
     "fraktion",
@@ -228,7 +239,7 @@
     "webdienst-x"
   ],
   "registry_id": "reg-fall-4711-test",
-  "schema": "komki-registry/2",
+  "schema": "komki-registry/3",
   "transformations": {
     "presse-auszug@1": {
       "input_labels": [

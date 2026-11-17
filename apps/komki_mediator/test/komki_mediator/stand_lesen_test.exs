@@ -344,10 +344,15 @@ defmodule KomkiMediator.StandLesenTest do
   end
 
   # Γ for these tests only: one more environment, its new observers added.
+  # Their type does not matter for the recipient test; Γ requires one
+  # (#598), so a new observer counts as a processing domain.
   defp with_environment(env, id, observers) do
     term =
       env.gamma.term
       |> Map.update!("observers", &Enum.sort(Enum.uniq(&1 ++ observers)))
+      |> Map.update!("observer_types", fn types ->
+        Enum.reduce(observers, types, &Map.put_new(&2, &1, "processing_domain"))
+      end)
       |> put_in(["environments", id], %{"observers" => observers})
 
     {:ok, compiled} = KomkiPolicy.Registry.compile(term)

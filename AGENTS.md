@@ -97,7 +97,7 @@ Bei Änderungen zuerst das jeweilige Dokument pflegen, dann Code oder Skills:
 
 ## Γ-Datenorte (RFC 0003)
 
-- **Datenvertrag:** [apps/komki_policy/CONTRACT.md](apps/komki_policy/CONTRACT.md). Die Γ-Konsumformate (`komki-registry/2`, Snapshot, Intent, Decision, Proof) gehören zur Engine, weil `KomkiPolicy.Registry.compile/1` die Formate durchsetzt; Änderungen nur durch den Integrator.
+- **Datenvertrag:** [apps/komki_policy/CONTRACT.md](apps/komki_policy/CONTRACT.md). Die Γ-Konsumformate (`komki-registry/3`, Snapshot, Intent, Decision, Proof) gehören zur Engine, weil `KomkiPolicy.Registry.compile/1` die Formate durchsetzt; Änderungen nur durch den Integrator.
 - **Quelle eines Γ:** der Label-Store. Vorlage des Arbeitsraums ist `KomkiMediator.Templates.label_store_seed/0`; `komki up` importiert sie und schreibt `<base>/mediator/registry.json` als Export; `registry.json` nie von Hand pflegen. Importformat `komki-label-store/2`: Moduledoc in [apps/komki_cli/lib/komki_cli/label_store.ex](apps/komki_cli/lib/komki_cli/label_store.ex), Beispiel in [apps/komki_cli/priv/fixtures/registry-seed.json](apps/komki_cli/priv/fixtures/registry-seed.json).
 - **Normative Basis:** [docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md](docs/rfcs/0003-vertrauliche-ki-arbeitsraeume.md), ≈ 2 400 Zeilen; Abschnitte per Anker-Grep (`R.N.M`, `B.N`) und gerangelte Reads statt Volltext.
 - Import und Export validieren immer über `KomkiPolicy.Registry.compile/1`; die Engine ist die Schemainstanz: kein Tool schreibt eigene Schema-Checks für engine-seitige Datenformate.
