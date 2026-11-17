@@ -46,15 +46,19 @@ defmodule KomkiCli.GammaTest do
     assert old != seed
     assert {:ok, _} = LabelStore.import_registry(Gamma.db_path(cfg), old)
 
-    assert :written = Gamma.sync(cfg)
+    stderr = ExUnit.CaptureIO.capture_io(:stderr, fn -> assert :written = Gamma.sync(cfg) end)
     assert File.read!(Gamma.registry_path(cfg)) == JSON.canonical(Templates.registry())
+
+    assert stderr =~
+             "komki: mitgelieferte Bindung vault-vertraulich@1 in neuer Fassung übernommen"
 
     {:ok, upgrades} = LabelStore.binding_upgrades(Gamma.db_path(cfg))
 
     assert upgrades |> Enum.map(& &1["binding"]) |> Enum.sort() ==
              Enum.sort(Map.keys(Templates.superseded_bindings()))
 
-    assert :unchanged = Gamma.sync(cfg)
+    assert ExUnit.CaptureIO.capture_io(:stderr, fn -> assert :unchanged = Gamma.sync(cfg) end) ==
+             ""
   end
 
   test "eigene Bindungen aus dem Store kommen in den Export", %{cfg: cfg} do

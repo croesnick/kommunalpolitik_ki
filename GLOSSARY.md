@@ -967,8 +967,8 @@ Lockerung zulässig.
 GO ersetzt keine fehlende Lockerungsbefugnis. Befugnisse sind strukturierte
 Einträge `{authority, restriction, output}` im Γ (CONTRACT.md § 2.1). Eine
 Bindung, deren Empfängerkreis das Ziel ohnehin abdeckt, bleibt im
-Ziellabel und braucht deshalb keine Befugnis; entfernt eine Freigabe sie
-trotzdem, braucht auch sie eine (R.5.7, #603).
+Ziellabel und braucht deshalb keine Befugnis. Eine Freigabe, die sie
+trotzdem entfernen will, lehnt die Engine ab (R.5.7, #603).
 
 **Siehe:** RFC 0003 R.2.2, R.5.7; [Aktionsfreigabe und Offenlegungsfreigabe](#aktionsfreigabe-und-offenlegungsfreigabe), [Ausgabeart](#ausgabeart).
 
@@ -980,17 +980,17 @@ trotzdem, braucht auch sie eine (R.5.7, #603).
 Offenlegungsfreigabe: wofür eine Bindung gelockert werden darf — etwa
 `ratsprojekte-essenz` (Arbeitstitel) für gegengelesene Essenz aus dem
 Fraktionsraum in den ratsprojekte-Hub (Szene 13, #423) oder
-`suchanfrage` für genau einen Suchtext an Websuche oder RIS (Szene 4,
-#354).
-Das Vokabular ist geschlossen (CONTRACT.md § 2.1), die Engine ordnet die
-Ausgabeart der Zielumgebung zu und rechnet sie gegen die Freigabe nach;
-der Agent benennt keine Ausgabeart.
+`suchanfrage` für genau eine Anfrage an Websuche oder RIS (Szene 4,
+#354). Das Vokabular ist geschlossen (CONTRACT.md § 2.1), die Engine
+ordnet die Ausgabeart Operation und Zielumgebung zu und rechnet sie gegen
+die Freigabe nach; der Agent benennt keine Ausgabeart.
 
 **Abgrenzung:** Die Ausgabeart benennt den Zweck der Lockerung, nicht das
-Ziellabel. Das Ziellabel ist das Grundlabel der Ausgabeart (bei
-`ratsprojekte-essenz` `ratsprojekte@1`) plus die Bindungen, die das Ziel
-ohnehin lesen darf; es steht in der Freigabe und wird separat geprüft
-(R.6.2).
+Ziellabel. Das Ziellabel ist das Grundlabel der Ausgabeart plus die
+Bindungen, die das Ziel ohnehin lesen darf. Das Grundlabel ist das Label,
+das jede Ausgabe dieser Art im Ziel mindestens trägt: bei
+`ratsprojekte-essenz` `ratsprojekte@1`, bei `suchanfrage` keines. Das
+Ziellabel steht in der Freigabe und wird separat geprüft (R.6.2).
 
 _Vermeiden:_ Ausgabeform, Exportart.
 

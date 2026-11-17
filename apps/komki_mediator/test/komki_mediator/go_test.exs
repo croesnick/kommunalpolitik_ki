@@ -231,25 +231,20 @@ defmodule KomkiMediator.GoTest do
 
   # Szene 4, #354: Aus einem Raum mit nichtoeffentlichen Ratsunterlagen gibt
   # es fuer die Websuche kein Fenster, denn ratsarbeit@1 traegt keine
-  # Befugnis fuer suchanfrage. Das emit-GO davor gehoert zu ratsarbeit@1
-  # ohne emit-Regel.
+  # Befugnis fuer suchanfrage. ratsarbeit@1 hat auch keine emit-Regel; der
+  # Vermittler entscheidet die Uebergabe deshalb vor dem emit-GO und fragt
+  # gar nicht erst.
   test "Szene 4: Websuche aus dem Mandatsraum ohne Fenster", %{env: env, go_dir: go_dir} do
     env = put_in(env.room.workspace_bindings, ["ratsarbeit@1", "web-oeffentlich@1"])
-    test = self()
-
-    spawn_link(fn ->
-      request = wait_for_request(go_dir, 100, "emit")
-      send(test, {:request, request["operation"]})
-      Go.answer(go_dir, request, true)
-    end)
 
     response = ConnectorGate.call(env, "web_search", @params)
 
     assert response["decision"] == "deny"
+    assert response["rule"] == "transfer"
     refute Map.has_key?(response, "go")
-    assert_received {:request, "emit"}
     refute_received :web_called
     assert Go.pending(go_dir) == []
+    assert outcomes(env) == ["not_admitted", "not_admitted"]
 
     # pi hoert nur, dass nichts uebertragen wurde, und an wen es nicht darf;
     # kein Katalog, der eine umformulierte Suche nahelegt (Gegenprobe 13.5).

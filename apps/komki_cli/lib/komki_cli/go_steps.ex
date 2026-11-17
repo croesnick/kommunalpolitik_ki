@@ -86,7 +86,7 @@ defmodule KomkiCli.GoSteps do
   # Ein Suchtext ohne Teile (#354): ein GO fuer den ganzen Aufruf, mit dem
   # Satz der Offenlegung. Go.answer/3 schreibt dafuer die Auswahl-Antwort.
   defp offenlegung_frage(request) do
-    "GO: Ich gebe genau diesen Suchtext bewusst an #{namen(extern(request))} weiter."
+    "GO: Ich gebe genau diese Anfrage bewusst an #{namen(extern(request))} weiter."
   end
 
   # Die Empfaenger des Ziels ausserhalb des Rechners, aus der Anfrage
@@ -258,7 +258,7 @@ defmodule KomkiCli.GoSteps do
   defp lockerung(request), do: "Lockerung auf " <> Enum.join(request["ziellabel"], ", ")
 
   defp offenlegung_satz(%{"ausgabeart" => "suchanfrage"} = request),
-    do: "Ich gebe genau diesen Suchtext bewusst an #{namen(extern(request))} weiter."
+    do: "Ich gebe genau diese Anfrage bewusst an #{namen(extern(request))} weiter."
 
   defp offenlegung_satz(_essenz),
     do: "Ich lege den ausgewählten Text bewusst gegenüber dem Vorstand offen."

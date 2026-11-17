@@ -1,0 +1,73 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "ziellabel_unpassend",
+      "condition": null
+    },
+    {
+      "binding": "lizenz-cc-by@1",
+      "code": "lockerungsbefugnis_fehlt",
+      "condition": null
+    }
+  ],
+  "checked_label": [
+    "fraktion-intern@1",
+    "lizenz-cc-by@1"
+  ],
+  "content_digest": "6b51b136f7b80e207cecbe54744da5f84397c9305c679c2281f0a601b7a8f0a4",
+  "decision": "deny",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-offenlegung-lizenz-entfernt",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-essenz-lizenz",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "release": null,
+  "remedies": [
+    {
+      "binding": null,
+      "code": "ziellabel_unpassend",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "fraktion",
+            "nextcloud-betreiber",
+            "nutzende-person",
+            "pi-agent",
+            "sicherung",
+            "vorstand"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    },
+    {
+      "binding": "lizenz-cc-by@1",
+      "code": "lockerungsbefugnis_fehlt",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "fraktion",
+            "nextcloud-betreiber",
+            "nutzende-person",
+            "pi-agent",
+            "sicherung",
+            "vorstand"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
+  "rule": "store",
+  "snapshot_ref": "snap-offenlegung-lizenz",
+  "workspace": "ws-fraktionsraum"
+}

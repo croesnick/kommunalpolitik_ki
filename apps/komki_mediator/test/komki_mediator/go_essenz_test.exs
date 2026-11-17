@@ -284,10 +284,9 @@ defmodule KomkiMediator.GoEssenzTest do
          env: env,
          go_dir: go_dir
        } do
-    # ratsarbeit@1 hat keine emit-Regel: Das Erzeugen braucht ein GO
-    # (Szene 3, interne Uebernahme). Die Person gibt es — und der Store
-    # in den Hub bleibt fensterlos (Gegenprobe 13.1/13.5).
-    person(go_dir)
+    # ratsarbeit@1 hat keine emit-Regel, der Store in den Hub aber auch
+    # keinen GO-Weg: Der Vermittler entscheidet ihn vor dem emit-GO, also
+    # erscheint gar kein Fenster (Gegenprobe 13.1/13.5, #354).
     env = fraktion_mit(env, "ratsarbeit@1")
 
     response = ConnectorGate.call(env, "rp_fakt_vorschlagen", @params)
@@ -306,9 +305,10 @@ defmodule KomkiMediator.GoEssenzTest do
     assert Enum.sort(Map.keys(response)) ==
              ~w(decision decision_id hinweis recipients_outside registry_id rule)
 
-    # Niemand wurde nach der Offenlegung gefragt: Nach dem emit-GO ist
-    # keine weitere Anfrage offen, der Connector wurde nie gerufen.
+    # Niemand wurde gefragt, weder nach dem Erzeugen noch nach der
+    # Offenlegung, und der Connector wurde nie gerufen.
     assert Go.pending(go_dir) == []
+    assert journal(env) == [{"emit", "not_admitted"}, {"store", "not_admitted"}]
     refute_received {:connector_called, _, _, _, _, _}
   end
 
@@ -317,7 +317,6 @@ defmodule KomkiMediator.GoEssenzTest do
     env: env,
     go_dir: go_dir
   } do
-    person(go_dir)
     env = fraktion_mit(env, "abo-az@1")
 
     response = ConnectorGate.call(env, "rp_fakt_vorschlagen", @params)
@@ -333,6 +332,7 @@ defmodule KomkiMediator.GoEssenzTest do
            ]
 
     assert Go.pending(go_dir) == []
+    assert journal(env) == [{"emit", "not_admitted"}, {"store", "not_admitted"}]
     refute_received {:connector_called, _, _, _, _, _}
   end
 

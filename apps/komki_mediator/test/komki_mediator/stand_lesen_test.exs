@@ -225,10 +225,9 @@ defmodule KomkiMediator.StandLesenTest do
   test "12.9 Stand und Nichtöffentliches in einem Raum: nichts geht in den Hub, kein Fenster dafür",
        %{env: env, go_dir: go_dir} do
     hub(env)
-    # ratsarbeit@1 has no emit rule, so creating the request asks for an
-    # emit GO first (as in Gegenprobe 13.1); the store into the hub then
-    # gets no window and nothing is transmitted.
-    person(go_dir, true)
+    # ratsarbeit@1 has no emit rule, but the store into the hub has no GO
+    # way at all: the mediator decides it before the emit GO, so no window
+    # appears and nothing is transmitted (Gegenprobe 13.1, #354).
 
     env =
       put_in(
@@ -249,7 +248,7 @@ defmodule KomkiMediator.StandLesenTest do
     assert response["hinweis"] == Hinweis.text(:not_transmitted)
     assert "vorstand" in response["recipients_outside"]
 
-    assert_received {:request, %{"operation" => "emit"}}
+    assert response["rule"] == "store"
     assert Go.pending(go_dir) == []
     refute_received {:connector_called, _, _, _, _, _}
   end

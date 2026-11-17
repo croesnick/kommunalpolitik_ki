@@ -213,9 +213,34 @@ defmodule KomkiMediator.ConnectorGate do
 
       other ->
         response = not_permitted(env, call, "emit", nil, intent, snapshot, other)
-        maybe_go(env, call, snapshot, intent, response, to_handover)
+
+        case hopeless_handover(env, call, response) do
+          nil -> maybe_go(env, call, snapshot, intent, response, to_handover)
+          denial -> denial
+        end
     end
   end
+
+  # Szene 4, Gegenprobe 13.1 (#354): an emit GO is pointless when the
+  # handover after it has no GO way. λ(y) after emit is B_W either way (an
+  # Aktionsfreigabe assigns no label), so the mediator decides the
+  # handover before it asks: then no window appears, and the model hears
+  # only that nothing was transmitted. Both decisions are journaled.
+  defp hopeless_handover(env, call, emit_response) do
+    if Go.offered(emit_response["remedies"]), do: decide_hopeless(env, call)
+  end
+
+  defp decide_hopeless(env, call) do
+    {rule, snapshot, intent} = handover_case(env, call, env.room.workspace_bindings)
+    result = Derive.decide(env.gamma.compiled, snapshot, intent)
+
+    if hopeless?(rule, result), do: not_permitted(env, call, rule, nil, intent, snapshot, result)
+  end
+
+  defp hopeless?(rule, {:ok, %{"decision" => "deny", "remedies" => remedies}}),
+    do: Hinweis.not_transmitted?(rule, remedies)
+
+  defp hopeless?(_rule, _result), do: false
 
   defp digest_fact(call) do
     %{"value" => call.intent_hash, "source" => "komki-mediator", "source_kind" => "technical"}
@@ -227,24 +252,7 @@ defmodule KomkiMediator.ConnectorGate do
   # -------------------------------------------------------------------------
 
   defp handover(env, call, emit) do
-    rule = if call.kind == :write, do: "store", else: "transfer"
-    d12 = Hash.digest12(call.intent_hash)
-
-    object = %Object{
-      object_id: "out-" <> d12,
-      version: "v1",
-      labels: emit.decision["assigned_label"]
-    }
-
-    snapshot =
-      Room.connector_snapshot(env.room, env.gamma, %{
-        snapshot_id: "snap-" <> rule <> "-" <> d12,
-        environment: call.environment,
-        object: object,
-        facts: Map.put(env.room.facts, "output_content_digest", digest_fact(call))
-      })
-
-    intent = intent(env.room, rule, "intent-" <> rule <> "-" <> d12, object)
+    {rule, snapshot, intent} = handover_case(env, call, emit.decision["assigned_label"])
     # `decided` is the decision_id of the Gate 1b permit or GO record.
     to_execution = fn _decision, decided -> execute(env, call, emit, decided) end
 
@@ -257,6 +265,23 @@ defmodule KomkiMediator.ConnectorGate do
         response = not_permitted(env, call, rule, nil, intent, snapshot, other)
         maybe_go(env, call, snapshot, intent, response, to_execution)
     end
+  end
+
+  # Snapshot and intent of the handover of y with λ(y) = `labels`.
+  defp handover_case(env, call, labels) do
+    rule = if call.kind == :write, do: "store", else: "transfer"
+    d12 = Hash.digest12(call.intent_hash)
+    object = %Object{object_id: "out-" <> d12, version: "v1", labels: labels}
+
+    snapshot =
+      Room.connector_snapshot(env.room, env.gamma, %{
+        snapshot_id: "snap-" <> rule <> "-" <> d12,
+        environment: call.environment,
+        object: object,
+        facts: Map.put(env.room.facts, "output_content_digest", digest_fact(call))
+      })
+
+    {rule, snapshot, intent(env.room, rule, "intent-" <> rule <> "-" <> d12, object)}
   end
 
   # A permit, journaled when it is made: `permitted` from the normal branch

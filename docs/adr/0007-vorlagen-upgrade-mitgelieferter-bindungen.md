@@ -10,7 +10,7 @@ RFC 0003 R.2.2 zählt die Lockerungsbefugnis zur Bindung, und eine Bindung träg
 
 - **Neue Versionen gehen nicht überall.** `ratsprojekte@1` steht in der Stand-Schnittstelle zum Hub: „`label` … immer `ratsprojekte@1`“ ([stand.md](../schnittstellen/stand.md)). Eine Fassung `@2` bräuchte eine Änderung im Hub. `vault-vertraulich@2` hätte den Filter des Vault-Connectors berührt.
 - **Den Store beiseitezulegen kostet Daten.** So lief es bei #298 ([Wenn es hakt](../site/src/content/docs/komki/wenn-es-hakt.mdx)). Dabei gehen eigene Bindungen und Erstklassifikationen verloren oder müssen neu importiert werden.
-- **Der Übergang bleibt ausdrücklich.** RFC A.1: „Regelmigration, Widerruf und Änderung der Umgebung sind explizite administrative Übergänge.“ Das Upgrade läuft nur beim Import der Vorlage in `komki up`, nur für Fassungen, deren Fingerabdruck die Vorlage nennt (`Templates.superseded_bindings/0`), und hält jeden Übergang in der Tabelle `binding_upgrades` fest. Der Vermittler entscheidet weiter unter dem Γ, mit dem er gestartet ist (ADR 0006, F6), und hält dessen Hash im Journal fest.
+- **Der Übergang bleibt ausdrücklich.** RFC A.1: „Regelmigration, Widerruf und Änderung der Umgebung sind explizite administrative Übergänge.“ Das Upgrade läuft nur beim Import der Vorlage, den komki vor jedem Start des Vermittlers ausführt (`komki up`, Neustart, Raumwechsel mit `komki raum`). Es betrifft nur Fassungen, deren Fingerabdruck die Vorlage nennt (`Templates.superseded_bindings/0`), hält jeden Übergang in der Tabelle `binding_upgrades` fest und nennt ihn in einer Zeile auf stderr. Der Vermittler entscheidet weiter unter dem Γ, mit dem er gestartet ist (ADR 0006), und hält dessen Hash in jedem Journal-Eintrag fest.
 
 ## Erwogene Optionen
 

@@ -47,8 +47,8 @@ Ein **Raum** legt fest, welche Arten von Daten in einer Sitzung zusammenkommen d
 
 | Darf pi … | Raum `recherche` (Standard) | Raum `vertraulich` | Raum `fraktion` | Raum `projektraum` |
 |---|---|---|---|---|
-| im RIS suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO |
-| im Web suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO |
+| im RIS suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen |
+| im Web suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen |
 | öffentliche Notizen lesen | <span class="ja">ja</span> | <span class="ja">ja</span> | <span class="ja">ja</span> | <span class="ja">ja</span>, nach deinem GO |
 | vertrauliche Notizen lesen | <span class="nein">nein, sie sind unsichtbar</span> | <span class="ja">ja</span> | <span class="nein">nein, unsichtbar</span> | <span class="nein">nein, unsichtbar</span> |
 | interne Fraktionsarbeit lesen | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span> | <span class="nein">nein</span> |
@@ -129,10 +129,10 @@ Manchmal ist eine gesperrte Anfrage in Ordnung, etwa eine Websuche nach einem F�
 Aus dem Raum „vertraulich“ ist eine Websuche kein gewöhnliches GO: Der Suchtext verlässt einen Raum, in dem vertrauliche Notizen liegen, also legst du ihn offen. Das Fenster nennt die Bindung, die dein GO dafür aufhebt, und fragt mit einem eigenen Satz. So sah es in einem Lauf auf einer Wegwerf-Instanz aus, mit dem Vermittler und `komki go` aus diesem Stand und einem Test-Connector statt Brave:
 
 ```text frame="terminal" title="Das Freigabefenster für einen Suchtext"
-Gesperrter Aufruf (Beleg pdr-4fc0eaeaa20ba1be78e790533f630b8c)
+Gesperrter Aufruf (Beleg pdr-22da9ec43eef41541980afe3aed82b35)
   Werkzeug:  web_search
   Ausgabe:   suchanfrage (hebt auf: vault-vertraulich@1)
-  Offenlegung: Ich gebe genau diesen Suchtext bewusst an Brave (Websuche) weiter.
+  Offenlegung: Ich gebe genau diese Anfrage bewusst an Brave (Websuche) weiter.
   Alle Empfänger: Brave (Websuche), nutzende-person, pi-agent
   Parameter:
     count: 5
@@ -142,7 +142,7 @@ Gesperrter Aufruf (Beleg pdr-4fc0eaeaa20ba1be78e790533f630b8c)
   Schon der Aufruf selbst zeigt Brave (Websuche), dass und wann aus diesem
   Arbeitsraum gefragt wird, auch wenn die Parameter harmlos aussehen.
   Ein GO gilt nur für genau diesen Aufruf, einmal, fünf Minuten lang.
-GO: Ich gebe genau diesen Suchtext bewusst an Brave (Websuche) weiter. [j/N] j
+GO: Ich gebe genau diese Anfrage bewusst an Brave (Websuche) weiter. [j/N] j
 1 von 1 Anfragen freigegeben
 ```
 
@@ -164,7 +164,7 @@ In pi steht danach unter der Sperre, was aus der Freigabe wurde: abgelehnt, ohne
 
 Gibt pi aus dem Fraktionsraum etwas an ratsprojekte weiter, verlässt der Text den Raum und wird dem Vorstand offengelegt. Das ist kein gewöhnliches GO: Das Fenster sagt es mit eigenen Worten, nennt alle Empfänger und zeigt die Teile einzeln an. Vor dem GO wählst du aus, welche Teile den Raum verlassen dürfen — ein abgewähltes Teil fliegt nicht erst im Hub raus, es geht gar nicht erst hinaus, und die Freigabe bindet genau die Auswahl.
 
-Das Fenster stammt aus einem Lauf auf einer Wegwerf-Instanz (Raum `fraktion`, Aufruf `rp_fakt_vorschlagen`, ein Test-Connector statt des Hubs). Es nennt die beiden Fraktionsbindungen, die dein GO aufhebt; die öffentlichen Bindungen des Raums bleiben am Text:
+Das Fenster stammt aus einem Lauf auf einer Wegwerf-Instanz (Raum `fraktion`, Aufruf `rp_fakt_vorschlagen`, ein Test-Connector statt des Hubs). Es nennt die beiden Fraktionsbindungen, die dein GO aufhebt. Die öffentlichen Bindungen des Raums hebt es nicht auf, sie stehen weiter im Ziellabel der Freigabe, das das Journal festhält:
 
 ```text
 Gesperrter Aufruf (Beleg pdr-95cb247284bf597c0edf0b387d8b9e9e)
