@@ -520,11 +520,23 @@ Drei Eigenschaften tragen das Design:
 ./komki label classify brief-4711@v1 \
            --label ratsarbeit@1 \
            --decided-by ID --basis TEXT         # Erstklassifikation
+./komki label regel anlegen ris-protokolle \
+           --ordner PFAD --typ md --label ris-oeffentlich@1 \
+           --decided-by ID --basis TEXT --bis JJJJ-MM-TT  # Importregel (#606)
+./komki label regel widerrufen ris-protokolle   # neueste Fassung widerrufen
+./komki label regel liste                       # alle Regeln mit Fassung und Stand
 ./komki label list                              # Übersicht
 ./komki label show binding ratsarbeit@1        # volle Bindungsdefinition
 ./komki label show object brief-4711@v1        # Metadaten + Entscheidungshistorie
 ./komki label export --out gamma.json           # Γ-Export: komki-registry/3
 ```
+
+Eine Importregel (RFC R.2.5, Ticket #606) ordnet neue Dateien beim
+Aufnehmen über `komki session` ein, wenn sie unter `--ordner` liegen und
+eine der `--typ`-Endungen tragen (optional höchstens `--max-groesse`
+Bytes). Nur eine Person darf sie freigeben; jede Einordnung steht im
+Ledger mit Regel und Fassung. Passen mehrere Regeln, ordnet keine ein.
+Ob das Objekt in den Raum darf, entscheiden weiter Startvertrag und Engine.
 
 Der Γ-Export ist der feste Regelstand für Entscheidungen. `komki-policy`
 konsumiert die Datei direkt (`validate`/`decide` mit `--registry`); der

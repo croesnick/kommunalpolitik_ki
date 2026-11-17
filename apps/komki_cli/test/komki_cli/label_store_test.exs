@@ -141,6 +141,104 @@ defmodule KomkiCli.LabelStoreTest do
     end
   end
 
+  # Ticket #606, R.2.5: Eine freigegebene Importregel ordnet neue Dateien
+  # aus einer belegten Quelle ein, wenn komki ein Merkmal selbst prüft.
+  describe "Importregeln" do
+    @ordner "/tmp/komki-fixture/ratsinfo"
+
+    defp regel(overrides \\ %{}) do
+      Map.merge(
+        %{
+          "id" => "ris-protokolle",
+          "ordner" => @ordner,
+          "typen" => ["pdf", "md"],
+          "max_bytes" => 1_000,
+          "labels" => ["lizenz-namensnennung@1"],
+          "decided_by" => "nutzende-person",
+          "basis" => "Öffentliche Protokolle aus dem RIS-Download",
+          "gueltig_bis" => "2099-12-31"
+        },
+        overrides
+      )
+    end
+
+    @heute ~D[2026-11-17]
+
+    test "Herkunft allein reicht nicht: ohne Dateityp keine Regel", %{db: db} do
+      {:ok, _} = import_seed(db)
+      assert {:error, reason} = LabelStore.add_rule(db, regel(%{"typen" => []}))
+      assert reason =~ "Herkunft allein reicht nicht"
+    end
+
+    test "nur eine Person gibt eine Regel frei, nur bekannte Bindungen", %{db: db} do
+      {:ok, _} = import_seed(db)
+
+      assert {:error, reason} =
+               LabelStore.add_rule(db, regel(%{"decided_by" => "lokale-verarbeitung"}))
+
+      assert reason =~ "Verarbeitungsdomäne"
+      assert {:error, _} = LabelStore.add_rule(db, regel(%{"labels" => ["gibt-es-nicht@1"]}))
+      assert {:error, _} = LabelStore.add_rule(db, regel(%{"ordner" => "relativ/pfad"}))
+    end
+
+    test "passt nur bei Quelle, Endung, Größe und Frist", %{db: db} do
+      {:ok, _} = import_seed(db)
+      assert {:ok, %{version: 1}} = LabelStore.add_rule(db, regel())
+
+      assert {:ok, %{id: "ris-protokolle"}} =
+               LabelStore.rule_for(db, @ordner <> "/top-7.pdf", 500, @heute)
+
+      # Andere Endung, zu groß, anderer Ordner, Präfix ohne Trennzeichen, abgelaufen.
+      assert :none = LabelStore.rule_for(db, @ordner <> "/top-7.docx", 500, @heute)
+      assert :none = LabelStore.rule_for(db, @ordner <> "/top-7.pdf", 5_000, @heute)
+      assert :none = LabelStore.rule_for(db, "/tmp/komki-fixture/andere/top-7.pdf", 500, @heute)
+      assert :none = LabelStore.rule_for(db, @ordner <> "-alt/top-7.pdf", 500, @heute)
+      assert :none = LabelStore.rule_for(db, @ordner <> "/top-7.pdf", 500, ~D[2100-01-01])
+    end
+
+    test "neue Fassung ersetzt die alte, Widerruf beendet die Regel", %{db: db} do
+      {:ok, _} = import_seed(db)
+      {:ok, _} = LabelStore.add_rule(db, regel())
+      assert {:ok, %{version: 2}} = LabelStore.add_rule(db, regel(%{"typen" => ["md"]}))
+
+      # Fassung 2 kennt kein PDF mehr.
+      assert :none = LabelStore.rule_for(db, @ordner <> "/top-7.pdf", 500, @heute)
+      assert {:ok, %{version: 2}} = LabelStore.rule_for(db, @ordner <> "/top-7.md", 500, @heute)
+
+      assert {:ok, %{widerrufen_am: am}} = LabelStore.revoke_rule(db, "ris-protokolle")
+      assert is_binary(am)
+      assert :none = LabelStore.rule_for(db, @ordner <> "/top-7.md", 500, @heute)
+      assert {:error, _} = LabelStore.revoke_rule(db, "ris-protokolle")
+      assert {:ok, [_v1, _v2]} = LabelStore.rules(db)
+    end
+
+    test "zwei passende Regeln: keine ordnet ein (die Person entscheidet)", %{db: db} do
+      {:ok, _} = import_seed(db)
+      {:ok, _} = LabelStore.add_rule(db, regel())
+      {:ok, _} = LabelStore.add_rule(db, regel(%{"id" => "ris-zweite"}))
+      assert :none = LabelStore.rule_for(db, @ordner <> "/top-7.pdf", 500, @heute)
+    end
+
+    test "Einordnung durch die Regel steht im Ledger mit Regel und Fassung", %{db: db} do
+      {:ok, _} = import_seed(db)
+      {:ok, rule} = LabelStore.add_rule(db, regel())
+      {:ok, _} = quarantine(db, ref("protokoll-7", "v1"))
+
+      assert {:ok, %{classification: "classified", labels: ["lizenz-namensnennung@1"]}} =
+               LabelStore.classify_by_rule(db, ref("protokoll-7", "v1"), rule)
+
+      assert {:ok, %{decisions: decisions}} = LabelStore.show_object(db, ref("protokoll-7", "v1"))
+      last = List.last(decisions)
+      assert last.decided_by == "nutzende-person"
+      assert last.basis =~ "Importregel ris-protokolle@1"
+
+      {:ok, conn} = Sqlite3.open(db)
+      {:ok, stmt} = Sqlite3.prepare(conn, "SELECT rule_id, rule_version FROM rule_decisions")
+      assert {:row, ["ris-protokolle", 1]} = Sqlite3.step(conn, stmt)
+      Sqlite3.close(conn)
+    end
+  end
+
   describe "Objekte und Entscheidungen" do
     test "Quarantäne registriert: classification quarantine,Labels [], Historie 1 Eintrag", %{
       db: db

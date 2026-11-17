@@ -504,6 +504,65 @@ defmodule KomkiCli.CLI do
             description: "Übersicht: Bindungen und Objektstände",
             options: [db: db_opt()]
           ],
+          regel: [
+            name: "regel",
+            description:
+              "Importregeln: Erstklassifikation für neue Dateien aus einer Quelle (R.2.5, Ticket #606)",
+            subcommands: [
+              anlegen: [
+                name: "anlegen",
+                description:
+                  "Regel anlegen oder neu fassen: Ordner plus Dateityp, den komki selbst prüft",
+                args: [
+                  id: [value_name: "REGEL-ID", required: true, help: "Kennung (kebab-case)"]
+                ],
+                options: [
+                  db: db_opt(),
+                  ordner: [
+                    value_name: "PFAD",
+                    long: "ordner",
+                    required: true,
+                    help: "Quelle: Ordner, aus dem neue Dateien kommen"
+                  ],
+                  typ: [
+                    value_name: "ENDUNG",
+                    long: "typ",
+                    multiple: true,
+                    help:
+                      "Dateityp, den komki prüft (wiederholbar, mindestens einer; z. B. md, pdf)"
+                  ],
+                  max_groesse: [
+                    value_name: "BYTES",
+                    long: "max-groesse",
+                    parser: :integer,
+                    help: "Höchstgröße einer Datei in Bytes (optional)"
+                  ],
+                  label: label_opt(),
+                  decided_by: decided_by_opt(),
+                  basis: basis_opt(),
+                  bis: [
+                    value_name: "JJJJ-MM-TT",
+                    long: "bis",
+                    required: true,
+                    help: "Gültig bis einschließlich (die Regel ist befristet)"
+                  ]
+                ]
+              ],
+              widerrufen: [
+                name: "widerrufen",
+                description: "Die neueste Fassung einer Regel widerrufen",
+                args: [
+                  id: [value_name: "REGEL-ID", required: true, help: "Kennung der Regel"]
+                ],
+                options: [db: db_opt()]
+              ],
+              liste: [
+                name: "liste",
+                description: "Alle Importregeln mit Fassung, Quelle, Merkmalen und Stand",
+                options: [db: db_opt()]
+              ]
+            ]
+          ],
           show: [
             name: "show",
             description: "Einzelansichten (Binding R.2.2/Objekt-Historie)",
@@ -695,6 +754,10 @@ defmodule KomkiCli.CLI do
 
   defp dispatch_label_tail([:show, which], result) do
     render(KomkiCli.LabelSteps.label_show(which, label_opts(result)))
+  end
+
+  defp dispatch_label_tail([:regel, which], result) do
+    render(KomkiCli.LabelSteps.label_regel(which, label_opts(result)))
   end
 
   @doc false
@@ -1026,6 +1089,14 @@ defmodule KomkiCli.CLI do
           | {:setup, :ok}
           | {:journal, map()}
         ) :: outcome()
+  defp render({:label_regel, rule}),
+    do: {"Importregel " <> regel_zeile(rule) <> "\n", 0}
+
+  defp render({:label_regeln, []}), do: {"keine Importregeln\n", 0}
+
+  defp render({:label_regeln, rules}),
+    do: {Enum.map_join(rules, "", &(regel_zeile(&1) <> "\n")), 0}
+
   defp render({:inited, cfg, gguf_lines}), do: render_init(cfg, gguf_lines)
   defp render({:checks, checks, summary}), do: render_doctor(checks, summary)
 
@@ -1375,4 +1446,17 @@ defmodule KomkiCli.CLI do
 
   defp down_line(component, {:stale, reason}),
     do: green() <> component <> " down: " <> reason <> reset()
+
+  # Eine Zeile je Fassung: Kennung, Quelle, Merkmale, Labels und Stand.
+  defp regel_zeile(rule) do
+    groesse = if rule.max_bytes, do: ", höchstens #{rule.max_bytes} Bytes", else: ""
+
+    stand =
+      if rule.widerrufen_am,
+        do: "widerrufen am #{rule.widerrufen_am}",
+        else: "gültig bis #{rule.gueltig_bis}"
+
+    "#{rule.id}@#{rule.version}: #{rule.ordner} (#{Enum.join(rule.typen, ", ")}#{groesse}) " <>
+      "→ [#{Enum.join(rule.labels, ", ")}], entschieden von #{rule.decided_by}, #{stand}"
+  end
 end

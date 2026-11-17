@@ -143,6 +143,25 @@ defmodule KomkiCli.LabelStore do
     decided_at TEXT NOT NULL,
     FOREIGN KEY (object_id, version) REFERENCES objects(object_id, version)
   );
+  CREATE TABLE IF NOT EXISTS import_rules (
+    id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    ordner TEXT NOT NULL,
+    typen TEXT NOT NULL,
+    max_bytes INTEGER,
+    labels TEXT NOT NULL,
+    decided_by TEXT NOT NULL,
+    basis TEXT NOT NULL,
+    gueltig_bis TEXT NOT NULL,
+    widerrufen_am TEXT,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (id, version)
+  );
+  CREATE TABLE IF NOT EXISTS rule_decisions (
+    decision_id INTEGER NOT NULL,
+    rule_id TEXT NOT NULL,
+    rule_version INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS binding_upgrades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     binding TEXT NOT NULL,
@@ -259,6 +278,229 @@ defmodule KomkiCli.LabelStore do
       end)
     end
   end
+
+  # ========================================================================
+  # Importregeln (Ticket #606, RFC R.2.5)
+  # ========================================================================
+
+  @rule_select """
+  SELECT id, version, ordner, typen, max_bytes, labels, decided_by, basis, gueltig_bis,
+  widerrufen_am FROM import_rules
+  """
+
+  @typedoc "Eine Importregel in einer Fassung."
+  @type rule :: %{
+          id: String.t(),
+          version: pos_integer(),
+          ordner: String.t(),
+          typen: [String.t()],
+          max_bytes: pos_integer() | nil,
+          labels: [String.t()],
+          decided_by: String.t(),
+          basis: String.t(),
+          gueltig_bis: String.t(),
+          widerrufen_am: String.t() | nil
+        }
+
+  @doc """
+  Eine Importregel anlegen oder neu fassen (R.2.5, Ticket #606). Sie nennt
+  eine Quelle, die komki selbst belegt (`ordner`, ein absoluter Pfad), und
+  mindestens ein Merkmal, das komki selbst prueft (`typen`, die erlaubten
+  Dateiendungen; dazu optional `max_bytes`). Herkunft allein reicht nicht,
+  Angaben im Dokument zaehlen nie. Entscheiden darf nur eine Person
+  (`decided_by`, Beobachtertyp `person`); die Regel ist befristet
+  (`gueltig_bis`, ISO-Datum) und widerrufbar. Eine Regel mit vorhandener
+  Kennung wird eine neue Fassung; die alte bleibt im Store.
+  """
+  @spec add_rule(String.t(), map()) :: {:ok, rule()} | {:error, String.t()}
+  def add_rule(db_path, spec) when is_binary(db_path) and is_map(spec) do
+    with :ok <- validate_rule(spec) do
+      with_conn(db_path, fn conn -> insert_rule(conn, spec) end)
+    end
+  end
+
+  @doc "Die neueste Fassung einer Importregel widerrufen; ab dann ordnet sie nichts mehr ein."
+  @spec revoke_rule(String.t(), String.t()) :: {:ok, rule()} | {:error, String.t()}
+  def revoke_rule(db_path, id) when is_binary(db_path) do
+    with_conn(db_path, fn conn ->
+      with {:ok, rule} <- latest_rule(conn, id),
+           :ok <- not_revoked(rule),
+           now = utc_now(),
+           :ok <-
+             insert(
+               conn,
+               "UPDATE import_rules SET widerrufen_am = ? WHERE id = ? AND version = ?",
+               [now, rule.id, rule.version]
+             ) do
+        {:ok, %{rule | widerrufen_am: now}}
+      end
+    end)
+  end
+
+  @doc "Alle Fassungen aller Importregeln, nach Kennung und Fassung."
+  @spec rules(String.t()) :: {:ok, [rule()]} | {:error, String.t()}
+  def rules(db_path) when is_binary(db_path) do
+    with_conn(db_path, fn conn ->
+      with {:ok, rows} <- select(conn, @rule_select <> " ORDER BY id, version") do
+        {:ok, Enum.map(rows, &rule_from_row/1)}
+      end
+    end)
+  end
+
+  @doc """
+  Die Importregel, die eine Datei einordnet, oder `:none`: die neueste
+  Fassung je Kennung, nicht widerrufen, am Tag `today` gueltig, Datei unter
+  `ordner`, Endung in `typen`, Groesse hoechstens `max_bytes`. Passen
+  mehrere Regeln, ordnet keine ein (fail-closed): Die Person entscheidet.
+  """
+  @spec rule_for(String.t(), String.t(), non_neg_integer(), Date.t()) ::
+          {:ok, rule()} | :none | {:error, String.t()}
+  def rule_for(db_path, path, size, %Date{} = today) do
+    with {:ok, all} <- rules(db_path) do
+      all
+      |> Enum.group_by(& &1.id)
+      |> Enum.map(fn {_id, versions} -> Enum.max_by(versions, & &1.version) end)
+      |> Enum.filter(&rule_matches?(&1, Path.expand(path), size, today))
+      |> case do
+        [rule] -> {:ok, rule}
+        _none_or_many -> :none
+      end
+    end
+  end
+
+  @doc """
+  Erstklassifikation durch eine Importregel (R.2.5): ein `classified`-
+  Eintrag im Ledger mit der Person der Regel als Entscheiderin und der
+  Regel samt Fassung in der Basis und in `rule_decisions`.
+  """
+  @spec classify_by_rule(String.t(), ObjectRef.t(), rule()) ::
+          {:ok, object_state()} | {:error, String.t()}
+  def classify_by_rule(db_path, %ObjectRef{} = ref, rule) do
+    basis = "Importregel #{rule.id}@#{rule.version}: #{rule.basis}"
+
+    with_conn(db_path, fn conn ->
+      with {:ok, state} <- do_classify(conn, ref, rule.labels, rule.decided_by, basis),
+           {:ok, [[decision_id]]} <- select(conn, "SELECT last_insert_rowid()"),
+           :ok <-
+             insert(
+               conn,
+               "INSERT INTO rule_decisions (decision_id, rule_id, rule_version) VALUES (?, ?, ?)",
+               [decision_id, rule.id, rule.version]
+             ) do
+        {:ok, state}
+      end
+    end)
+  end
+
+  defp validate_rule(spec) do
+    Enum.find_value(rule_checks(spec), :ok, fn {ok?, message} ->
+      if not ok?, do: {:error, "Importregel ungültig: " <> message}
+    end)
+  end
+
+  defp rule_checks(spec) do
+    [
+      {kebab?(spec["id"]), "id muss kebab-case sein"},
+      {absolute_path?(spec["ordner"]), "ordner muss ein absoluter Pfad sein (die Quelle)"},
+      {typen?(spec["typen"]),
+       "mindestens ein Dateityp (typen), den komki selbst prüft; Herkunft allein reicht nicht (R.2.5)"},
+      {max_bytes?(spec["max_bytes"]), "max_bytes muss eine positive Zahl sein"},
+      {is_list(spec["labels"]), "labels muss eine Liste sein"},
+      {nonempty_string?(spec["basis"]), "basis fehlt"},
+      {iso_date?(spec["gueltig_bis"]), "gueltig_bis muss ein Datum JJJJ-MM-TT sein"}
+    ]
+  end
+
+  defp absolute_path?(value), do: is_binary(value) and Path.type(value) == :absolute
+  defp typen?(value), do: is_list(value) and value != [] and Enum.all?(value, &kebab?/1)
+  defp max_bytes?(value), do: is_nil(value) or (is_integer(value) and value > 0)
+  defp iso_date?(value), do: is_binary(value) and match?({:ok, _}, Date.from_iso8601(value))
+
+  defp kebab?(value),
+    do: is_binary(value) and Regex.match?(~r/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/, value)
+
+  defp insert_rule(conn, spec) do
+    with :ok <- require_decider(conn, spec["decided_by"]),
+         {:ok, labels} <- classify_labels(conn, spec["labels"]),
+         {:ok, [[current]]} <-
+           select(conn, "SELECT COALESCE(MAX(version), 0) FROM import_rules WHERE id = ?", [
+             spec["id"]
+           ]),
+         version = current + 1,
+         typen = spec["typen"] |> Enum.uniq() |> Enum.sort(),
+         :ok <-
+           insert(
+             conn,
+             "INSERT INTO import_rules (id, version, ordner, typen, max_bytes, labels, decided_by, " <>
+               "basis, gueltig_bis, widerrufen_am, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)",
+             [
+               spec["id"],
+               version,
+               Path.expand(spec["ordner"]),
+               canonical_json(typen),
+               spec["max_bytes"],
+               canonical_json(labels),
+               spec["decided_by"],
+               spec["basis"],
+               spec["gueltig_bis"],
+               utc_now()
+             ]
+           ) do
+      latest_rule(conn, spec["id"])
+    end
+  end
+
+  defp latest_rule(conn, id) do
+    case select(conn, @rule_select <> " WHERE id = ? ORDER BY version DESC LIMIT 1", [id]) do
+      {:ok, [row]} -> {:ok, rule_from_row(row)}
+      {:ok, []} -> {:error, "unbekannte Importregel: " <> Kernel.inspect(id)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp not_revoked(%{widerrufen_am: nil}), do: :ok
+
+  defp not_revoked(rule),
+    do: {:error, "Importregel #{rule.id}@#{rule.version} ist schon widerrufen"}
+
+  defp rule_from_row([
+         id,
+         version,
+         ordner,
+         typen,
+         max_bytes,
+         labels,
+         decided_by,
+         basis,
+         bis,
+         widerrufen
+       ]) do
+    %{
+      id: id,
+      version: version,
+      ordner: ordner,
+      typen: JSON.decode!(typen),
+      max_bytes: max_bytes,
+      labels: JSON.decode!(labels),
+      decided_by: decided_by,
+      basis: basis,
+      gueltig_bis: bis,
+      widerrufen_am: widerrufen
+    }
+  end
+
+  # Die Datei liegt unter dem Ordner der Regel: Vergleich mit Trennzeichen,
+  # damit `/a` nicht `/ab/x` einschliesst.
+  defp rule_matches?(rule, path, size, today) do
+    rule.widerrufen_am == nil and
+      Date.compare(today, Date.from_iso8601!(rule.gueltig_bis)) != :gt and
+      String.starts_with?(path, String.trim_trailing(rule.ordner, "/") <> "/") and
+      extension(path) in rule.typen and
+      (rule.max_bytes == nil or size <= rule.max_bytes)
+  end
+
+  defp extension(path),
+    do: path |> Path.extname() |> String.trim_leading(".") |> String.downcase()
 
   @doc "Übersicht: Bindungszusammenfassungen (id, bezeichnung) und Objektstände."
   @spec list(String.t()) :: {:ok, [map()], [map()]} | {:error, String.t()}

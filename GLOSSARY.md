@@ -1169,7 +1169,30 @@ nicht zugelassene externe KI erfolgen. In `komki_policy` als
 `aktionsfreigabe` scope `object` im Remedy-Katalog abgebildet:
 genau ein Objekt-Level-GO, danach laufende Aufnahmen ohne weiteres GO.
 
+**Abgrenzung:** Eine Person ordnet Objekt für Objekt ein oder gibt einmal
+eine [Importregel](#importregel) frei, die neue Dateien aus einer Quelle
+einordnet.
+
 **Siehe:** RFC 0003 R.2.5; [`CONTRACT.md`](apps/komki_policy/CONTRACT.md) § 2.8.
+
+---
+
+### Importregel
+
+**Definition:** Eine von einer Person freigegebene Regel für die
+Erstklassifikation: Neue Dateien aus einer Quelle (einem Ordner), die ein
+Merkmal erfüllen, das komki selbst prüft (Dateityp, Größe), bekommen die
+Labels der Regel. Die Regel ist versioniert, befristet und widerrufbar;
+jede Einordnung durch sie steht im Ledger mit Regel und Fassung.
+
+**Abgrenzung:** Herkunft allein reicht nicht, und Angaben im Dokument
+zählen nie. Passen mehrere Regeln, ordnet keine ein. Eine Importregel
+ordnet nur ein; ob ein Objekt in einen Raum darf, entscheiden weiter
+Startvertrag und Engine.
+
+**Wo:** Im Label-Store (`komki label regel`), Ticket #606.
+
+**Siehe:** RFC 0003 R.2.5; [Quarantäne](#quarantäne), [Erstklassifikation](#erstklassifikation).
 
 ---
 

@@ -485,6 +485,8 @@ Nur ein gesondert autorisiertes Einordnungsverfahren darf es regulär einordnen.
 
 Ein Agent darf eine Klassifikation vorschlagen. Eine berechtigte Person oder eine freigegebene Importregel entscheidet. Herkunft oder Selbstauszeichnung allein reichen nicht.
 
+Eine **Importregel** nennt eine Quelle, die das System selbst belegt, etwa einen Ordner, und mindestens ein Merkmal, das das System selbst prüft, etwa Dateityp oder Größe. Angaben im Dokument zählen nie. Eine berechtigte Person gibt die Regel frei; sie ist versioniert, befristet und widerrufbar. Jede Einordnung durch eine Regel steht im Ledger mit Verweis auf die Regel und ihre Fassung. Passen mehrere Regeln auf dasselbe Material, ordnet keine ein, und eine Person entscheidet.
+
 ## R.3 Betreibervertrauen und Laufzeitumgebung
 
 Die Zulassung betrifft eine **konkrete Betreiber- und Laufzeitumgebung**, nicht einen Modellnamen oder einen numerischen Vertrauenswert.

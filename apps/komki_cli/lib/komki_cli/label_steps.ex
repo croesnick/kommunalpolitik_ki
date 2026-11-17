@@ -49,6 +49,8 @@ defmodule KomkiCli.LabelSteps do
           | {:label_show_binding, map()}
           | {:label_show_object, map(), [map()]}
           | {:label_export, String.t() | nil, String.t()}
+          | {:label_regel, LabelStore.rule()}
+          | {:label_regeln, [LabelStore.rule()]}
           | {:error, String.t(), non_neg_integer()}
 
   # ========================================================================
@@ -76,6 +78,42 @@ defmodule KomkiCli.LabelSteps do
   defp step(:classify, opts), do: label_classify(opts)
   defp step(:list, opts), do: label_list(opts)
   defp step(:export, opts), do: label_export(opts)
+
+  @doc "Dispatch der `komki label regel …`-Subcommands (Ticket #606)."
+  @spec label_regel(atom(), %{String.t() => term()}) :: result()
+  def label_regel(which, opts) do
+    regel_step(which, opts)
+  rescue
+    e -> {:error, failed_message("label regel " <> Atom.to_string(which), e), 2}
+  end
+
+  defp regel_step(:anlegen, opts) do
+    spec = %{
+      "id" => Map.fetch!(opts, "id"),
+      "ordner" => Map.fetch!(opts, "ordner"),
+      "typen" => opts |> Map.get("typ", []) |> Enum.map(&String.downcase/1),
+      "max_bytes" => Map.get(opts, "max-groesse"),
+      "labels" => Map.get(opts, "label", []),
+      "decided_by" => Map.fetch!(opts, "decided-by"),
+      "basis" => Map.fetch!(opts, "basis"),
+      "gueltig_bis" => Map.fetch!(opts, "bis")
+    }
+
+    regel_result(LabelStore.add_rule(Map.fetch!(opts, "db"), spec))
+  end
+
+  defp regel_step(:widerrufen, opts),
+    do: regel_result(LabelStore.revoke_rule(Map.fetch!(opts, "db"), Map.fetch!(opts, "id")))
+
+  defp regel_step(:liste, opts) do
+    case LabelStore.rules(Map.fetch!(opts, "db")) do
+      {:ok, rules} -> {:label_regeln, rules}
+      {:error, reason} -> {:error, reason, 2}
+    end
+  end
+
+  defp regel_result({:ok, rule}), do: {:label_regel, rule}
+  defp regel_result({:error, reason}), do: {:error, reason, 2}
 
   defp show_step(:binding, opts), do: label_show_binding(opts)
   defp show_step(:object, opts), do: label_show_object(opts)

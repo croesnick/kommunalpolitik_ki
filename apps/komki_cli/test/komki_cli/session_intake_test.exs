@@ -90,6 +90,52 @@ defmodule KomkiCli.SessionIntakeTest do
     assert mode(Path.join(documents, "brief-modi.md")) == 0o600
   end
 
+  # Ticket #606, R.2.5: Eine freigegebene Importregel ordnet neue Dateien
+  # aus ihrem Ordner ein; eine Datei mit anderem Typ bleibt in Quarantäne.
+  test "Importregel: neue Dateien aus der Quelle eingeordnet, andere bleiben in Quarantäne", %{
+    base: base,
+    db: db
+  } do
+    protokoll = write_source!(base, "prot-1.txt", "Öffentliches Protokoll")
+    anhang = write_source!(base, "anhang.docx", "kein Word")
+
+    {:ok, _rule} =
+      LabelStore.add_rule(db, %{
+        "id" => "quellen",
+        "ordner" => Path.dirname(protokoll),
+        "typen" => ["txt"],
+        "max_bytes" => nil,
+        "labels" => ["lizenz-namensnennung@1"],
+        "decided_by" => "nutzende-person",
+        "basis" => "Testquelle",
+        "gueltig_bis" => "2099-12-31"
+      })
+
+    contract =
+      contract_json(["lizenz-namensnennung@1"], ["prot-1@v1", "anhang@v1"],
+        purpose: "sitzungsvorbereitung"
+      )
+
+    room = load_room!(base, contract)
+
+    # Eine Datei in Quarantäne hält den Start an; die Einträge zeigen beide.
+    assert {:refused, [prot, anh] = entries} = plan(db, base, room, [protokoll, anhang])
+
+    assert prot.status == "permit"
+    assert prot.labels == ["lizenz-namensnennung@1"]
+    assert prot.rule == "quellen@1"
+    refute prot.quarantine_created
+
+    assert anh.classification == "quarantine"
+    assert anh.rule == nil
+    assert anh.quarantine_created
+
+    assert Enum.any?(
+             SessionIntake.entry_lines(entries),
+             &(&1 =~ "eingeordnet durch Importregel quellen@1")
+           )
+  end
+
   test "kein UTF-8-Text -> Fehler, nichts abgelegt", %{base: base, db: db} do
     file = write_source!(base, "scan.txt", <<0xFF, 0xFE, 0x00, 0x41>>)
     register_classified!(db, "scan", file, ["ratsarbeit@1"])

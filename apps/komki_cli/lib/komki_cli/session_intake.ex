@@ -45,6 +45,7 @@ defmodule KomkiCli.SessionIntake do
           remedies: [map()] | nil,
           quarantine_created: boolean(),
           equivalent_cli: String.t() | nil,
+          rule: String.t() | nil,
           destination: String.t() | nil
         }
 
@@ -354,8 +355,13 @@ defmodule KomkiCli.SessionIntake do
         JSON.encode!(entry.blockers) <>
         "  missing_evidence: " <> JSON.encode!(entry.missing_evidence),
       "    remedies: " <> JSON.encode!(entry.remedies)
-    ] ++ destination_lines(entry)
+    ] ++ rule_lines(entry) ++ destination_lines(entry)
   end
+
+  defp rule_lines(%{rule: rule}) when is_binary(rule),
+    do: ["    eingeordnet durch Importregel " <> rule]
+
+  defp rule_lines(_entry), do: []
 
   defp destination_lines(%{status: "permit", destination: destination})
        when is_binary(destination),
@@ -454,20 +460,59 @@ defmodule KomkiCli.SessionIntake do
              origin: origin,
              decided_by: decided_by,
              basis: basis
-           }) do
-      {:ok,
-       %{
-         path: path,
-         object: to_string(ref),
-         content_ref: content_ref,
-         classification: "quarantine",
-         labels: [],
-         quarantine_created: true,
-         equivalent_cli:
-           equivalent_cli(object_id <> "@v1", content_ref, origin, decided_by, basis, db)
-       }}
+           }),
+         {:ok, rule} <- matching_rule(db, path) do
+      info = %{path: path, object: to_string(ref), content_ref: content_ref}
+
+      case rule do
+        nil ->
+          {:ok,
+           Map.merge(info, %{
+             classification: "quarantine",
+             labels: [],
+             quarantine_created: true,
+             equivalent_cli:
+               equivalent_cli(object_id <> "@v1", content_ref, origin, decided_by, basis, db),
+             rule: nil
+           })}
+
+        rule ->
+          classified_by_rule(db, ref, rule, info)
+      end
     else
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Importregel (Ticket #606, R.2.5): Eine Regel, die eine Person
+  # freigegeben hat, ordnet eine neue Datei aus ihrer Quelle ein, wenn
+  # komki die Merkmale selbst prueft (Endung, Groesse). Ohne passende Regel
+  # bleibt die Datei in Quarantaene.
+  defp matching_rule(db, path) do
+    with {:ok, %File.Stat{size: size}} <- File.stat(path),
+         {:ok, rule} <- LabelStore.rule_for(db, path, size, Date.utc_today()) do
+      {:ok, rule}
+    else
+      :none -> {:ok, nil}
+      {:error, reason} when is_binary(reason) -> {:error, reason}
+      {:error, posix} -> {:error, "Datei " <> path <> " nicht lesbar: " <> inspect(posix)}
+    end
+  end
+
+  defp classified_by_rule(db, ref, rule, info) do
+    case LabelStore.classify_by_rule(db, ref, rule) do
+      {:ok, state} ->
+        {:ok,
+         Map.merge(info, %{
+           classification: "classified",
+           labels: state.labels,
+           quarantine_created: false,
+           equivalent_cli: nil,
+           rule: "#{rule.id}@#{rule.version}"
+         })}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -483,7 +528,8 @@ defmodule KomkiCli.SessionIntake do
        classification: classification,
        labels: labels,
        quarantine_created: false,
-       equivalent_cli: nil
+       equivalent_cli: nil,
+       rule: nil
      }}
   end
 
@@ -591,6 +637,7 @@ defmodule KomkiCli.SessionIntake do
            remedies: decision["remedies"],
            quarantine_created: info.quarantine_created,
            equivalent_cli: info.equivalent_cli,
+           rule: info.rule,
            destination: destination(status, info, documents)
          }}
 

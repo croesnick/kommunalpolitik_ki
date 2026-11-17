@@ -120,6 +120,34 @@ Eine Vorlage, ein Protokoll, eine Notiz — oder eine Drucksache als PDF: `komki
 - Kennt komki die Datei nicht, kommt sie in Quarantäne, bis du sie einordnest. Die Session startet dann nicht.
 - Passt das Label nicht zum Raum, etwa eine öffentliche Datei in einem Raum mit enger Zweckbindung, lehnt komki ab und sagt, was stattdessen ginge.
 
+**Viele Dateien aus derselben Quelle.** Statt jede Datei einzeln einzuordnen, gibst du einmal eine Importregel frei: einen Ordner, mindestens einen Dateityp, den komki selbst prüft, die Labels und eine Frist. Was danach aus diesem Ordner kommt und passt, ordnet komki beim Aufnehmen ein; alles andere bleibt in Quarantäne. Herkunft allein reicht nicht, und was im Dokument steht, zählt nie.
+
+```text frame="terminal" title="Das siehst du"
+$ komki label regel anlegen ris-protokolle --ordner ~/Downloads/ris-protokolle --typ md --max-groesse 100000 --label ris-oeffentlich@1 --decided-by nutzende-person --basis "Öffentliche Protokolle aus dem RIS-Download" --bis 2027-06-30
+Importregel ris-protokolle@1: ~/Downloads/ris-protokolle (md, höchstens 100000 Bytes) → [ris-oeffentlich@1], entschieden von nutzende-person, gültig bis 2027-06-30
+```
+
+Beim Start der Session nennt komki je Datei, wer sie eingeordnet hat. Eine Word-Datei aus demselben Ordner passt nicht zur Regel und bleibt in Quarantäne:
+
+```text frame="terminal" title="Aus dem Kopf von komki session (Auszug)"
+  datei: ~/Downloads/ris-protokolle/top-7.md -> top-7@v1 permit
+    labels: ["ris-oeffentlich@1"]  checked_label: ["doc-oeffentlich@2","ris-oeffentlich@1","vault-oeffentlich@1","web-oeffentlich@1"]
+    blockers: null  missing_evidence: null
+    eingeordnet durch Importregel ris-protokolle@1
+  datei: ~/Downloads/ris-protokolle/anhang.docx -> anhang@v1 deny
+    labels: []  checked_label: ["doc-oeffentlich@2","ris-oeffentlich@1","vault-oeffentlich@1","web-oeffentlich@1"]
+    blockers: [{"binding":null,"code":"object_quarantine","condition":null}]  missing_evidence: null
+```
+
+Eine Regel nimmst du mit `komki label regel widerrufen` zurück; danach landen neue Dateien wieder in Quarantäne. Einordnungen, die die Regel schon getroffen hat, bleiben im Ledger, jede mit der Regel und ihrer Fassung:
+
+```text frame="terminal" title="Das siehst du"
+$ komki label regel widerrufen ris-protokolle
+Importregel ris-protokolle@1: ~/Downloads/ris-protokolle (md, höchstens 100000 Bytes) → [ris-oeffentlich@1], entschieden von nutzende-person, widerrufen am 2026-11-17T19:07:42Z
+```
+
+Die Ausgaben stammen aus einem Lauf auf einer Wegwerf-Instanz; die Pfade sind hier allgemein geschrieben, und der Start der Session lief ohne Modell, nur bis zur Aufnahme.
+
 Einzelheiten stehen in der [README von komki_cli](https://github.com/croesnick/kommunalpolitik_ki/tree/main/apps/komki_cli#dateien-beim-session-start-aufnehmen-ticket-92).
 
 ## Freigabe: dein GO für genau einen Aufruf
