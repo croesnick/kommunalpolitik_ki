@@ -63,6 +63,32 @@ Im Raum „vertraulich“ fehlt jeder Weg nach draußen, solange du nicht selbst
 
 Der Raum `fraktion` trägt interne Fraktionsarbeit und die Projektidee: Fraktion und der Betreiber der Nextcloud, in dem der Fraktionsordner liegt, lesen mit — der Vorstand nicht. In den ratsprojekte-Hub gelangt aus ihm nur, was du selbst gegengelesen und freigegeben hast: der Weg ist eine Offenlegung gegenüber dem Vorstand, und du wählst die Teile vorher ab (siehe unten). Bis du das brauchst, trägst du die Essenz von Hand ein: eine kurze Fassung schreiben lassen, gegenlesen, im Hub eintragen — komki hält diese Übergabe nicht im Journal fest.
 
+### Ergebnisse aus der Recherche in den Raum „vertraulich“ mitnehmen
+
+Ein laufender Raum nimmt keine neuen Arten von Daten auf. Was du im Raum `recherche` gefunden hast, holst du deshalb über den Vault in den Raum „vertraulich“. Im Raum `recherche` bittest du pi, das Ergebnis als Notiz abzulegen, und gibst das Speichern frei. Die Notiz trägt die Labels des Raums, in dem sie entstanden ist:
+
+```text frame="terminal" title="~/.local/share/komki/vault/komki-test/2026-11-17-radweg-kosten-je-kilometer.md (Anfang)"
+---
+komki_labels: [doc-oeffentlich@2, ris-oeffentlich@1, vault-oeffentlich@1, web-oeffentlich@1]
+title: "Radweg Kosten je Kilometer"
+created: 2026-11-17T09:34:38Z
+---
+```
+
+Danach wechselst du mit `komki raum vertraulich`. Der Raum „vertraulich“ verträgt alle Labels des Rechercheraums, also liest pi die Notiz dort ohne weiteres GO.
+
+Andersherum geht es nicht. Eine Notiz aus dem Raum „vertraulich“ trägt auch `vault-vertraulich@1`:
+
+```text frame="terminal" title="~/.local/share/komki/vault/komki-test/2026-11-17-grunderwerb-nord-intern.md (Anfang)"
+---
+komki_labels: [doc-oeffentlich@2, ris-oeffentlich@1, vault-oeffentlich@1, vault-vertraulich@1, web-oeffentlich@1]
+title: "Grunderwerb Nord intern"
+created: 2026-11-17T09:34:58Z
+---
+```
+
+Liest pi sie im Raum `recherche`, lehnt komki ab: Das Label ist dort nicht zugelassen. Beide Notizen stammen aus einem Lauf auf einer Wegwerf-Instanz, mit dem Vermittler und dem Vault-Connector von komki und mit `komki go` für die beiden Freigaben; die Aufrufe kamen aus einem Skript statt aus pi.
+
 ### Den Stand aus ratsprojekte lesen
 
 Willst du mit pi durchgehen, wo ein Projekt steht, wechselst du in den **Projektraum**. Nur dort darf der Stand hinein, den ratsprojekte als Datei ausgibt. pi liest ihn mit `rp_stand_lesen`, ohne dass du freigeben musst, und ratsprojekte erfährt davon nichts: komki liest nur die Datei. Dafür fragt im Projektraum jede Anfrage nach draußen nach deinem GO, auch die Websuche. So kennt ein Raum entweder den Stand oder hat einen freien Weg nach draußen, nie beides.
