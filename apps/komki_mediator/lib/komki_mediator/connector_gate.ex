@@ -222,10 +222,11 @@ defmodule KomkiMediator.ConnectorGate do
   end
 
   # Szene 4, Gegenprobe 13.1 (#354): an emit GO is pointless when the
-  # handover after it has no GO way. λ(y) after emit is B_W either way (an
-  # Aktionsfreigabe assigns no label), so the mediator decides the
-  # handover before it asks: then no window appears, and the model hears
-  # only that nothing was transmitted. Both decisions are journaled.
+  # handover after it has no GO way — a recipient outside the circle
+  # without Offenlegung, or an unproven observer list. λ(y) after emit is
+  # B_W either way (an Aktionsfreigabe assigns no label), so the mediator
+  # decides the handover before it asks: then no window appears, and the
+  # answer is the handover's denial. Both decisions are journaled.
   defp hopeless_handover(env, call, emit_response) do
     if Go.offered(emit_response["remedies"]), do: decide_hopeless(env, call)
   end
@@ -234,13 +235,14 @@ defmodule KomkiMediator.ConnectorGate do
     {rule, snapshot, intent} = handover_case(env, call, env.room.workspace_bindings)
     result = Derive.decide(env.gamma.compiled, snapshot, intent)
 
-    if hopeless?(rule, result), do: not_permitted(env, call, rule, nil, intent, snapshot, result)
+    if hopeless?(result), do: not_permitted(env, call, rule, nil, intent, snapshot, result)
   end
 
-  defp hopeless?(rule, {:ok, %{"decision" => "deny", "remedies" => remedies}}),
-    do: Hinweis.not_transmitted?(rule, remedies)
+  defp hopeless?({:ok, %{"decision" => decision, "remedies" => remedies}})
+       when decision in ["deny", "indeterminate"],
+       do: Go.offered(remedies) == nil and Go.offered_offenlegung(remedies) == nil
 
-  defp hopeless?(_rule, _result), do: false
+  defp hopeless?(_result), do: false
 
   defp digest_fact(call) do
     %{"value" => call.intent_hash, "source" => "komki-mediator", "source_kind" => "technical"}

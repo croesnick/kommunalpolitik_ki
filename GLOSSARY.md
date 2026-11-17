@@ -988,7 +988,7 @@ die Freigabe nach; der Agent benennt keine Ausgabeart.
 **Abgrenzung:** Die Ausgabeart benennt den Zweck der Lockerung, nicht das
 Ziellabel. Das Ziellabel ist das Grundlabel der Ausgabeart plus die
 Bindungen, die das Ziel ohnehin lesen darf. Das Grundlabel ist das Label,
-das jede Ausgabe dieser Art im Ziel mindestens trägt: bei
+das das Ziellabel jeder Ausgabe dieser Art mindestens enthält: bei
 `ratsprojekte-essenz` `ratsprojekte@1`, bei `suchanfrage` keines. Das
 Ziellabel steht in der Freigabe und wird separat geprüft (R.6.2).
 
