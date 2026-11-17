@@ -412,7 +412,7 @@ defmodule KomkiCli.LabelStore do
   end
 
   # ========================================================================
-  # Store-Zusatzfelder (nicht Teil der Engine-Schicht § 2.1)
+  # Store-Zusatzfelder (nicht Teil der Engine-Schicht § 2.1) und observer_types
   # ========================================================================
 
   @store_binding_fields [
