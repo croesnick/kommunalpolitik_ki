@@ -11,7 +11,7 @@ defmodule KomkiMediator.GoTest do
   # as `komki go`.
   use ExUnit.Case, async: false
 
-  alias KomkiMediator.{ConnectorGate, FakeConnector, Go, GoStand, TestHelpers}
+  alias KomkiMediator.{ConnectorGate, FakeConnector, Gate, Go, GoStand, Templates, TestHelpers}
 
   @params %{"query" => "Foerderung Radweg"}
   @vault_params %{"text" => "Foerderung Radweg"}
@@ -251,6 +251,59 @@ defmodule KomkiMediator.GoTest do
     assert response["hinweis"] == KomkiMediator.Hinweis.text(:not_transmitted)
     assert response["recipients_outside"] == ["brave-search"]
     refute Map.has_key?(response, "remedies")
+  end
+
+  # #607: the mandate room as `komki raum mandat` writes it (template B_W
+  # and the purpose mandat). Council papers are admitted only there, the
+  # purpose is load-bearing, and web search gets no window.
+  test "Mandatsraum aus der Vorlage: Ratsunterlagen nur dort, Websuche ohne Fenster", %{
+    env: env,
+    go_dir: go_dir
+  } do
+    mandat = raum(env, Templates.mandat_bindings(), "mandat")
+
+    assert admit_mappe(mandat)["decision"] == "permit"
+
+    assert %{"decision" => "deny", "remedies" => [%{"code" => "label_not_included"} | _]} =
+             admit_mappe(raum(env, Templates.recherche_bindings(), "offene-recherche"))
+
+    assert %{"decision" => "deny", "remedies" => remedies} =
+             admit_mappe(raum(env, Templates.mandat_bindings(), "offene-recherche"))
+
+    assert "binding_condition_false" in Enum.map(remedies, & &1["code"])
+
+    response = ConnectorGate.call(mandat, "web_search", @params)
+
+    assert response["decision"] == "deny"
+    assert response["rule"] == "transfer"
+    assert response["hinweis"] == KomkiMediator.Hinweis.text(:not_transmitted)
+    refute_received :web_called
+    assert Go.pending(go_dir) == []
+  end
+
+  defp raum(env, bindings, purpose) do
+    File.write!(Path.join(env.room.documents_dir, "mappe-top7.md"), "# TOP 7 (erfunden)\n")
+
+    room =
+      env.room
+      |> Map.put(:workspace_bindings, bindings)
+      |> put_in([Access.key(:facts), "purpose", "value"], purpose)
+      |> put_in([Access.key(:objects), "mappe-top7"], %{
+        "type" => "document",
+        "version" => "v1",
+        "labels" => ["ratsarbeit@1"]
+      })
+
+    %{env | room: room}
+  end
+
+  defp admit_mappe(env) do
+    Gate.call(
+      env,
+      "admit_document",
+      %{"document_id" => "mappe-top7"},
+      TestHelpers.admit_executor(env.room, "mappe-top7")
+    )
   end
 
   # Auch eine unbelegte Beobachterliste laesst der Uebergabe keinen GO-Weg

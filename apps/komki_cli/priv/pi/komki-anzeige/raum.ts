@@ -12,13 +12,16 @@ export interface Raum {
 	raum: string | null;
 	zweck: string | null;
 	labels: { id: string; bezeichnung: string | null; intern: boolean | null }[];
-	nach_draussen: { empfaenger: string; offen: boolean }[];
+	nach_draussen: { empfaenger: string; offen: boolean; mit_go: boolean }[];
 }
 
 const ZWECKE: Record<string, string> = {
 	"offene-recherche": "offene Recherche",
 	sitzungsvorbereitung: "Sitzungsvorbereitung",
 	vertraulich: "vertrauliche Arbeit",
+	fraktionsarbeit: "Fraktionsarbeit",
+	projektarbeit: "Projektarbeit",
+	mandat: "Mandatsarbeit",
 };
 
 const EMPFAENGER: Record<string, string> = {
@@ -52,6 +55,8 @@ export function parseRaum(text: string | undefined): Raum | undefined {
 			nach_draussen: (Array.isArray(r.nach_draussen) ? r.nach_draussen : []).map((e: any) => ({
 				empfaenger: clean(String(e?.empfaenger ?? "")),
 				offen: e?.offen === true,
+				// Ältere Raumbilder ohne das Feld: wie bisher „nur mit GO“.
+				mit_go: e?.mit_go !== false,
 			})),
 		};
 	} catch {
@@ -75,16 +80,27 @@ function aufzaehlung(namen: string[]): string {
 	return namen.length <= 1 ? namen.join("") : `${namen.slice(0, -1).join(", ")} und ${namen[namen.length - 1]}`;
 }
 
-/** Ein Satz zum Weg nach draußen; undefined, wenn das Raumbild keine Empfänger kennt. */
-export function draussen(r: Raum): { offen: boolean; satz: string } | undefined {
+/**
+ * Ein Satz zum Weg nach draußen; undefined, wenn das Raumbild keine Empfänger kennt.
+ * `nie` ist wahr, wenn kein Empfänger offen ist und auch kein GO einen Weg öffnet.
+ */
+export function draussen(r: Raum): { offen: boolean; nie: boolean; satz: string } | undefined {
 	const alle = r.nach_draussen;
 	if (alle.length === 0) return undefined;
-	const offen = alle.filter((e) => e.offen).map((e) => empfaenger(e.empfaenger));
-	const zu = alle.filter((e) => !e.offen).map((e) => empfaenger(e.empfaenger));
-	if (zu.length === 0) return { offen: true, satz: `offen für ${aufzaehlung(offen)}` };
+	const namen = (passt: (e: Raum["nach_draussen"][number]) => boolean) =>
+		alle.filter(passt).map((e) => empfaenger(e.empfaenger));
+	const offen = namen((e) => e.offen);
+	const mitGo = namen((e) => !e.offen && e.mit_go);
+	const nie = namen((e) => !e.offen && !e.mit_go);
+	if (mitGo.length === 0 && nie.length === 0) return { offen: true, nie: false, satz: `offen für ${aufzaehlung(offen)}` };
 	const go = "einzelne Aufrufe nur mit deinem GO im komki-Fenster";
-	if (offen.length === 0) return { offen: false, satz: `gesperrt, ${go}` };
-	return { offen: false, satz: `offen für ${aufzaehlung(offen)}; ${aufzaehlung(zu)} gesperrt, ${go}` };
+	const keinGo = "auch nicht mit deinem GO";
+	if (offen.length === 0 && nie.length === 0) return { offen: false, nie: false, satz: `gesperrt, ${go}` };
+	if (offen.length === 0 && mitGo.length === 0) return { offen: false, nie: true, satz: `gesperrt, ${keinGo}` };
+	const teile = offen.length > 0 ? [`offen für ${aufzaehlung(offen)}`] : [];
+	if (mitGo.length > 0) teile.push(`${aufzaehlung(mitGo)} gesperrt, ${go}`);
+	if (nie.length > 0) teile.push(`${aufzaehlung(nie)} gesperrt, ${keinGo}`);
+	return { offen: false, nie: false, satz: teile.join("; ") };
 }
 
 // Labels als Wörter, ohne Dopplungen: „öffentlich, vertraulich“.
@@ -118,7 +134,7 @@ export function headerRows(r: Raum | undefined, p: Paint): Row[] {
 export function statusText(r: Raum | undefined, docs: RoomDocument[] | undefined): string {
 	const parts = [raumName(r)];
 	const d = r && draussen(r);
-	if (d) parts.push(d.offen ? "nach draußen offen" : "nach draußen nur mit GO");
+	if (d) parts.push(d.offen ? "nach draußen offen" : d.nie ? "nach draußen gesperrt" : "nach draußen nur mit GO");
 	if (docs) parts.push(docs.length === 1 ? "1 Raumdokument" : `${docs.length} Raumdokumente`);
 	return parts.join(" · ");
 }

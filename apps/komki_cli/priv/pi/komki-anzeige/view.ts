@@ -40,6 +40,7 @@ const LABELS: Record<string, string> = {
 	"doc-oeffentlich@1": "öffentlich",
 	"doc-oeffentlich@2": "öffentlich",
 	"doc-vertraulich@1": "vertraulich",
+	"ratsarbeit@1": "nichtöffentlich",
 };
 
 const BLOCKERS: Record<string, string> = {

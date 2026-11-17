@@ -877,6 +877,21 @@ Rechercheraum plus `ratsprojekte@1`.
 
 ---
 
+### Mandatsraum
+
+**Definition:** Ein Arbeitsraum für die Arbeit mit nichtöffentlichen
+Ratsunterlagen. Er trägt `ratsarbeit@1` und den Zweck `mandat` und nimmt als
+einziger solche Unterlagen auf. Weil nur der Stadtrat sie freigeben darf,
+öffnet dort auch ein GO keinen Weg nach draußen.
+
+**In komki:** Referenzraum `mandat` (`komki raum mandat`), der
+Rechercheraum plus `ratsarbeit@1`.
+
+**Siehe:** [Projektraum](#projektraum),
+[Referenzszenario](docs/szenarien/radweg-bahnhofstrasse.md), Szene 4.
+
+---
+
 ### Raumdokument
 
 **Definition:** Ein Dokument, das zum Arbeitsraum gehört: als Datei unter
@@ -896,7 +911,8 @@ Raumdokumente kommen über die Dateiaufnahme beim Session-Start
 **Definition:** Die Beschreibung des Raums für die pi-Oberfläche: Name
 („recherche“, „vertraulich“ oder eigener Raum), Zweck, die Labels in B_W
 mit ihren Bezeichnungen und für jeden Empfänger außerhalb des Rechners, ob
-der Empfängerkreis aller Bindungen ihn einschließt („nach draußen offen“).
+der Empfängerkreis aller Bindungen ihn einschließt („nach draußen offen“)
+und, falls nicht, ob ein GO den Weg für einen einzelnen Aufruf öffnen kann.
 komki schreibt es vor jedem pi-Start als `raum.json` aus `room.json`, Γ und
 dem Label-Store (Ticket #242).
 

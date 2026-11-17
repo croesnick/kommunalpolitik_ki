@@ -67,6 +67,25 @@ defmodule KomkiCli.RaumTest do
     assert room(cfg)["facts"]["purpose"]["value"] == "offene-recherche"
   end
 
+  test "jede Vorlage setzt ihren Zweck als verwalteten Fakt", %{cfg: cfg} do
+    for {name, zweck} <- [
+          {"vertraulich", "vertraulich"},
+          {"fraktion", "fraktionsarbeit"},
+          {"projektraum", "projektarbeit"},
+          {"mandat", "mandat"},
+          {"recherche", "offene-recherche"}
+        ] do
+      assert {:raum, _text} = Raum.switch(cfg, name, deps([]))
+
+      assert %{
+               "value" => ^zweck,
+               "source" => "auftrags-verwaltung",
+               "source_kind" => "administered"
+             } =
+               room(cfg)["facts"]["purpose"]
+    end
+  end
+
   test "verschärfen geht auch mit laufender Session und startet den Vermittler neu", %{cfg: cfg} do
     assert {:ok, dir} = Raum.open_session(cfg, false)
     assert {:raum, text} = Raum.switch(cfg, "vertraulich", deps(session: true, mediator: true))

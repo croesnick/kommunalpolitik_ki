@@ -26,12 +26,12 @@ defmodule KomkiCli.RaumbildTest do
     # Hub-Empfaenger Fraktion, Vorstand, Nextcloud-Betreiber und
     # Sicherung.
     assert bild["nach_draussen"] == [
-             %{"empfaenger" => "brave-search", "offen" => true},
-             %{"empfaenger" => "fraktion", "offen" => true},
-             %{"empfaenger" => "nextcloud-betreiber", "offen" => true},
-             %{"empfaenger" => "ris-betreiber", "offen" => true},
-             %{"empfaenger" => "sicherung", "offen" => true},
-             %{"empfaenger" => "vorstand", "offen" => true}
+             %{"empfaenger" => "brave-search", "offen" => true, "mit_go" => true},
+             %{"empfaenger" => "fraktion", "offen" => true, "mit_go" => true},
+             %{"empfaenger" => "nextcloud-betreiber", "offen" => true, "mit_go" => true},
+             %{"empfaenger" => "ris-betreiber", "offen" => true, "mit_go" => true},
+             %{"empfaenger" => "sicherung", "offen" => true, "mit_go" => true},
+             %{"empfaenger" => "vorstand", "offen" => true, "mit_go" => true}
            ]
   end
 
@@ -41,6 +41,23 @@ defmodule KomkiCli.RaumbildTest do
     assert bild["raum"] == "vertraulich"
     assert %{"intern" => true} = Enum.find(bild["labels"], &(&1["id"] == "vault-vertraulich@1"))
     assert Enum.all?(bild["nach_draussen"], &(&1["offen"] == false))
+    # vault-vertraulich@1 trägt eine Befugnis für den Empfängerkreis.
+    assert Enum.all?(bild["nach_draussen"], &(&1["mit_go"] == true))
+  end
+
+  # #607: ratsarbeit@1 trägt keine Lockerungsbefugnis, also öffnet auch
+  # ein GO keinen Weg nach draußen.
+  test "Raum mandat: gesperrt, auch mit GO" do
+    room =
+      Templates.room()
+      |> Map.put("workspace_bindings", Templates.mandat_bindings())
+      |> put_in(["facts", "purpose", "value"], "mandat")
+
+    bild = Raumbild.build(room, registry(), &names/1)
+
+    assert bild["raum"] == "mandat"
+    assert bild["zweck"] == "mandat"
+    assert Enum.all?(bild["nach_draussen"], &(&1["offen"] == false and &1["mit_go"] == false))
   end
 
   test "eigener Raum ohne Namen; ohne B_W ist nichts offen" do
@@ -50,7 +67,7 @@ defmodule KomkiCli.RaumbildTest do
       Raumbild.build(Map.delete(Templates.room(), "workspace_bindings"), registry(), &names/1)
 
     assert leer["labels"] == []
-    assert Enum.all?(leer["nach_draussen"], &(&1["offen"] == false))
+    assert Enum.all?(leer["nach_draussen"], &(&1["offen"] == false and &1["mit_go"] == false))
   end
 
   test "fehlende Dateien: leeres Raumbild statt Absturz" do

@@ -10,7 +10,8 @@ defmodule KomkiCli.Raumbild do
   (Empfängerkreise der Bindungen, Beobachter) und der Label-Store
   (Bezeichnungen). Das Raumbild ist reine Anzeige. Was pi darf, entscheidet
   weiter der Vermittler mit der Engine; „nach draußen“ beschreibt nur, wen
-  der Empfängerkreis aller Bindungen in B_W einschließt.
+  der Empfängerkreis aller Bindungen in B_W einschließt und ob ein GO den
+  Weg für einen einzelnen Aufruf öffnen kann.
 
   Ins Modell gelangt nichts davon: Die Extension zeichnet es nur.
   """
@@ -75,19 +76,28 @@ defmodule KomkiCli.Raumbild do
   defp internal?(_binding), do: nil
 
   # Ein Empfänger außerhalb ist offen, wenn ihn der Empfängerkreis jeder
-  # Bindung in B_W einschließt (recipient_inclusion der Engine). Ohne B_W
-  # bietet der Raum keine Connector-Operationen an: nichts ist offen.
+  # Bindung in B_W einschließt (recipient_inclusion der Engine). Sonst
+  # öffnet ein GO den Weg für einen einzelnen Aufruf nur, wenn jede Bindung,
+  # die ihn ausschließt, eine Lockerungsbefugnis für den Empfängerkreis
+  # trägt (R.5.7); fehlt sie einer, bleibt der Weg auch mit GO zu. Ohne
+  # B_W bietet der Raum keine Connector-Operationen an: nichts ist offen.
   defp outward(bw, bindings, observers) do
     for observer <- Enum.sort(observers), observer not in @intern do
-      open? =
-        bw != [] and
-          Enum.all?(bw, fn id ->
-            observer in (bindings |> Map.get(id, %{}) |> Map.get("readers", []))
-          end)
+      excluding = Enum.reject(bw, &(observer in field(bindings, &1, "readers")))
 
-      %{"empfaenger" => observer, "offen" => open?}
+      %{
+        "empfaenger" => observer,
+        "offen" => bw != [] and excluding == [],
+        "mit_go" => bw != [] and Enum.all?(excluding, &relaxable?(bindings, &1))
+      }
     end
   end
+
+  defp relaxable?(bindings, id),
+    do:
+      Enum.any?(field(bindings, id, "relaxation_authorities"), &(&1["restriction"] == "readers"))
+
+  defp field(bindings, id, key), do: bindings |> Map.get(id, %{}) |> Map.get(key, [])
 
   defp bezeichnung(db, id) do
     if File.regular?(db) do

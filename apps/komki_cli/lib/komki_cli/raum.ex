@@ -61,7 +61,7 @@ defmodule KomkiCli.Raum do
         "für den einzelnen Aufruf.",
     "mandat" =>
       "Nichtöffentliche Ratsunterlagen für dein Mandat. Websuche und RIS gibt es hier nicht, " <>
-        "auch nicht mit deinem GO; jeder andere Aufruf braucht dein GO."
+        "auch nicht mit deinem GO; Notizen lesen und ablegen nur mit deinem GO."
   }
 
   # Zweck je Vorlage (Ticket #607, R.4.1): verwalteter Fakt, gesetzt beim
