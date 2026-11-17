@@ -1,0 +1,34 @@
+{
+  "blockers": null,
+  "checked_label": [
+    "fraktion-intern@1",
+    "lizenz-cc-by@1"
+  ],
+  "content_digest": "6b51b136f7b80e207cecbe54744da5f84397c9305c679c2281f0a601b7a8f0a4",
+  "decision": "permit",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-offenlegung-lizenz",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-essenz-lizenz",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "release": {
+    "ausgabeart": "ratsprojekte-essenz",
+    "call_hash": "6fc439a7e581f5efe8ab10da523abf73797b0e8a5c696b0b8d49dcd439538c30",
+    "nonce": "n-offenlegung-lizenz",
+    "release_id": "go-offenlegung-lizenz",
+    "stand_ref": "stand-fall@7",
+    "stand_version_after": 8,
+    "ziellabel": [
+      "lizenz-cc-by@1",
+      "ratsprojekte@1"
+    ]
+  },
+  "remedies": null,
+  "rule": "store",
+  "snapshot_ref": "snap-offenlegung-lizenz",
+  "workspace": "ws-fraktionsraum"
+}

@@ -1,0 +1,46 @@
+{
+  "blockers": [
+    {
+      "binding": null,
+      "code": "recipients_unproven",
+      "condition": null
+    }
+  ],
+  "checked_label": [
+    "fraktion-intern@1",
+    "web-oeffentlich-fall@1"
+  ],
+  "content_digest": "5e2e0a43522fcb3b727dd9af6968342e6b0bd45ae652d0a60d0d76394f7c22d9",
+  "decision": "deny",
+  "identity": "nutzende-person",
+  "intent_ref": "intent-release-transfer-offenlegung-observers",
+  "missing_evidence": null,
+  "object": {
+    "object_id": "obj-suche-d",
+    "version": "v1"
+  },
+  "proof": null,
+  "registry_ref": "reg-fall-4711-test",
+  "release": null,
+  "remedies": [
+    {
+      "binding": null,
+      "code": "recipients_unproven",
+      "condition": null,
+      "transitions": [
+        {
+          "required_bindings": [],
+          "required_recipients": [
+            "nutzende-person",
+            "pi-agent",
+            "webdienst-x"
+          ],
+          "type": "neuer_raum"
+        }
+      ]
+    }
+  ],
+  "rule": "transfer",
+  "snapshot_ref": "snap-release-transfer-offenlegung-observers",
+  "workspace": "ws-fraktionsraum"
+}

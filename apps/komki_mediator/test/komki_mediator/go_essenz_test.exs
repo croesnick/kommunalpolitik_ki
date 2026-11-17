@@ -7,6 +7,16 @@ defmodule KomkiMediator.GoEssenzTest do
 
   alias KomkiMediator.{ConnectorGate, FakeConnector, Go, GoStand, Hinweis, Templates, TestHelpers}
 
+  # Ziellabel der Essenz aus dem Fraktionsraum (§ 4.9, #603): ratsprojekte@1
+  # plus die oeffentlichen Bindungen des Raums.
+  @ziellabel [
+    "doc-oeffentlich@2",
+    "ratsprojekte@1",
+    "ris-oeffentlich@1",
+    "vault-oeffentlich@1",
+    "web-oeffentlich@1"
+  ]
+
   @teile [
     %{
       "aussage" => "Die Fraktion favourisiert die Fuehrung entlang der Bahntrasse.",
@@ -130,7 +140,11 @@ defmodule KomkiMediator.GoEssenzTest do
     assert request["tool"] == "rp_fakt_vorschlagen"
     assert request["params"] == @params
     assert request["ausgabeart"] == "ratsprojekte-essenz"
-    assert request["ziellabel"] == ["ratsprojekte@1"]
+    # #603: Die oeffentlichen Bindungen des Raums darf der Hub ohnehin
+    # lesen; sie bleiben im Ziellabel. Aufgehoben werden nur die beiden
+    # Fraktionsbindungen.
+    assert request["ziellabel"] == @ziellabel
+    assert request["aufgehoben"] == ["fraktion-intern@1", "fraktionsprojekt-radweg@1"]
 
     assert request["empfaenger"] == [
              "fraktion",
@@ -158,7 +172,7 @@ defmodule KomkiMediator.GoEssenzTest do
 
     assert released["offenlegung"] == %{
              "ausgabeart" => "ratsprojekte-essenz",
-             "ziellabel" => ["ratsprojekte@1"],
+             "ziellabel" => @ziellabel,
              "empfaenger" => [
                "fraktion",
                "nextcloud-betreiber",
@@ -259,7 +273,7 @@ defmodule KomkiMediator.GoEssenzTest do
       |> Enum.find(&(&1["type"] == "offenlegungsfreigabe"))
 
     assert transition["ausgabeart"] == "ratsprojekte-essenz"
-    assert transition["ziellabel"] == ["ratsprojekte@1"]
+    assert transition["ziellabel"] == @ziellabel
     # Der Weg von Hand bleibt die Grenz-Aussage, nicht die Offenlegung:
     assert response["hinweis"] == Hinweis.text(:deny)
   end
@@ -270,10 +284,9 @@ defmodule KomkiMediator.GoEssenzTest do
          env: env,
          go_dir: go_dir
        } do
-    # ratsarbeit@1 hat keine emit-Regel: Das Erzeugen braucht ein GO
-    # (Szene 3, interne Uebernahme). Die Person gibt es — und der Store
-    # in den Hub bleibt fensterlos (Gegenprobe 13.1/13.5).
-    person(go_dir)
+    # ratsarbeit@1 hat keine emit-Regel, der Store in den Hub aber auch
+    # keinen GO-Weg: Der Vermittler entscheidet ihn vor dem emit-GO, also
+    # erscheint gar kein Fenster (Gegenprobe 13.1/13.5, #354).
     env = fraktion_mit(env, "ratsarbeit@1")
 
     response = ConnectorGate.call(env, "rp_fakt_vorschlagen", @params)
@@ -292,9 +305,10 @@ defmodule KomkiMediator.GoEssenzTest do
     assert Enum.sort(Map.keys(response)) ==
              ~w(decision decision_id hinweis recipients_outside registry_id rule)
 
-    # Niemand wurde nach der Offenlegung gefragt: Nach dem emit-GO ist
-    # keine weitere Anfrage offen, der Connector wurde nie gerufen.
+    # Niemand wurde gefragt, weder nach dem Erzeugen noch nach der
+    # Offenlegung, und der Connector wurde nie gerufen.
     assert Go.pending(go_dir) == []
+    assert journal(env) == [{"emit", "not_admitted"}, {"store", "not_admitted"}]
     refute_received {:connector_called, _, _, _, _, _}
   end
 
@@ -303,7 +317,6 @@ defmodule KomkiMediator.GoEssenzTest do
     env: env,
     go_dir: go_dir
   } do
-    person(go_dir)
     env = fraktion_mit(env, "abo-az@1")
 
     response = ConnectorGate.call(env, "rp_fakt_vorschlagen", @params)
@@ -319,6 +332,7 @@ defmodule KomkiMediator.GoEssenzTest do
            ]
 
     assert Go.pending(go_dir) == []
+    assert journal(env) == [{"emit", "not_admitted"}, {"store", "not_admitted"}]
     refute_received {:connector_called, _, _, _, _, _}
   end
 

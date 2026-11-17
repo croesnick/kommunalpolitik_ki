@@ -205,6 +205,12 @@ defmodule KomkiMediator.TemplatesTest do
              "emit" => true
            }
 
+    suchanfrage = %{
+      "authority" => "nutzende-person",
+      "restriction" => "readers",
+      "output" => "suchanfrage"
+    }
+
     for binding <- ["fraktion-intern@1", "fraktionsprojekt-radweg@1"] do
       assert registry["bindings"][binding]["readers"] == [
                "fraktion",
@@ -213,18 +219,26 @@ defmodule KomkiMediator.TemplatesTest do
                "pi-agent"
              ]
 
-      # Der Vorstand fehlt bewusst (ADR 0004); die Befugnis erlaubt Miriam
-      # die Lockerung fuer genau die Ausgabeart ratsprojekte-essenz.
+      # Der Vorstand fehlt bewusst (ADR 0004); die Befugnisse erlauben Miriam
+      # die Lockerung fuer genau die Ausgabearten ratsprojekte-essenz (#423)
+      # und suchanfrage (#354).
       assert registry["bindings"][binding]["relaxation_authorities"] == [
                %{
                  "authority" => "nutzende-person",
                  "restriction" => "readers",
                  "output" => "ratsprojekte-essenz"
-               }
+               },
+               suchanfrage
              ]
     end
 
-    # ratsarbeit@1 bekommt die Befugnis nie (Szene 13, Gegenprobe 13.1).
+    # Szene 4, #354: ein Suchtext aus vertraulich und projektraum ist eine
+    # Offenlegung mit Befugnis.
+    for binding <- ["ratsprojekte@1", "vault-vertraulich@1"] do
+      assert registry["bindings"][binding]["relaxation_authorities"] == [suchanfrage]
+    end
+
+    # ratsarbeit@1 bekommt keine Befugnis (Szene 4, Szene 13, Gegenprobe 13.1).
     assert registry["bindings"]["ratsarbeit@1"]["relaxation_authorities"] == []
     assert {:ok, _} = KomkiPolicy.Registry.compile(registry)
   end

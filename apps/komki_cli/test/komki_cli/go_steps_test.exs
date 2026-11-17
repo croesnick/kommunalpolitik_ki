@@ -205,4 +205,66 @@ defmodule KomkiCli.GoStepsTest do
                KomkiPolicy.JSON.parse(File.read!(answer_file(dir, offenlegung)))
     end
   end
+
+  # #354, Szene 4: Ein Suchtext aus einem vertraulichen Raum ist eine
+  # Offenlegung ohne Teile. Das Fenster nennt die aufgehobene Bindung, den
+  # Empfänger draußen und warnt vor dem Existenz-Leck; ein Ja gilt dem
+  # ganzen Aufruf.
+  describe "Offenlegung eines Suchtexts (#354)" do
+    setup ctx do
+      File.rm!(Path.join(ctx.dir, ctx.request["call_hash"] <> ".request.json"))
+
+      suche =
+        Map.merge(ctx.request, %{
+          "kind" => "offenlegungsfreigabe",
+          "ausgabeart" => "suchanfrage",
+          "ziellabel" => ["web-oeffentlich@1"],
+          "aufgehoben" => ["vault-vertraulich@1"],
+          "empfaenger" => ["brave-search", "nutzende-person", "pi-agent"],
+          "teile" => [],
+          "call_hash" => String.duplicate("d", 64)
+        })
+
+      Go.write_atomic(Path.join(ctx.dir, suche["call_hash"] <> ".request.json"), suche)
+      %{suche: suche}
+    end
+
+    test "Ja: GO für genau diesen Suchtext, ohne Teileauswahl", %{
+      base: base,
+      dir: dir,
+      suche: suche
+    } do
+      test = self()
+
+      ui = %{
+        say: &send(test, {:said, &1}),
+        confirm: fn question, false ->
+          send(test, {:asked, question})
+          true
+        end,
+        select: fn _question -> flunk("keine Teileauswahl für einen Suchtext") end
+      }
+
+      assert {"1 von 1 Anfragen freigegeben\n", 0} = GoSteps.run(base, ui)
+
+      assert_received {:said, preview}
+      assert preview =~ "Ausgabe:   suchanfrage (hebt auf: vault-vertraulich@1)"
+      assert preview =~ "Ich gebe genau diese Anfrage bewusst an Brave (Websuche) weiter."
+      assert preview =~ "Sichtbar für: Brave (Websuche)"
+      refute preview =~ "Teile:"
+
+      assert_received {:asked,
+                       "GO: Ich gebe genau diese Anfrage bewusst an Brave (Websuche) weiter."}
+
+      {:ok, answer} = KomkiPolicy.JSON.parse(File.read!(answer_file(dir, suche)))
+      assert answer == %{"schema" => "komki-go-answer/1", "go" => true, "teile" => []}
+    end
+
+    test "Nein (Default): keine Offenlegung", %{base: base, dir: dir, suche: suche} do
+      assert {"0 von 1 Anfragen freigegeben\n", 0} = GoSteps.run(base, ui(false))
+
+      assert {:ok, %{"go" => false}} =
+               KomkiPolicy.JSON.parse(File.read!(answer_file(dir, suche)))
+    end
+  end
 end

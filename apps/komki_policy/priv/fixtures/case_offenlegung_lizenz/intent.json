@@ -1,0 +1,7 @@
+{
+  "intent_id": "intent-offenlegung-lizenz",
+  "object": "obj-essenz-lizenz@v1",
+  "operation": "store",
+  "schema": "komki-intent/1",
+  "workspace": "ws-fraktionsraum"
+}

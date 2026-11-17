@@ -7,7 +7,6 @@ import { Aside } from '@astrojs/starlight/components';
 import Architektur from '../../../assets/architektur.svg';
 import Anfrage from '../../../assets/anfrage.svg';
 import GoAbgelehnt from '../../../assets/go-abgelehnt.svg';
-import GoExistenzLeck from '../../../assets/go-existenz-leck.svg';
 import RaumRecherche from '../../../assets/raum-recherche.svg';
 import RaumVertraulich from '../../../assets/raum-vertraulich-hell.svg';
 
@@ -48,8 +47,8 @@ Ein **Raum** legt fest, welche Arten von Daten in einer Sitzung zusammenkommen d
 
 | Darf pi … | Raum `recherche` (Standard) | Raum `vertraulich` | Raum `fraktion` | Raum `projektraum` |
 |---|---|---|---|---|
-| im RIS suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO |
-| im Web suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO | <span class="ja">ja</span> | <span class="nein">nein</span>, außer mit deinem GO |
+| im RIS suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen |
+| im Web suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen |
 | öffentliche Notizen lesen | <span class="ja">ja</span> | <span class="ja">ja</span> | <span class="ja">ja</span> | <span class="ja">ja</span>, nach deinem GO |
 | vertrauliche Notizen lesen | <span class="nein">nein, sie sind unsichtbar</span> | <span class="ja">ja</span> | <span class="nein">nein, unsichtbar</span> | <span class="nein">nein, unsichtbar</span> |
 | interne Fraktionsarbeit lesen | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span> | <span class="nein">nein</span> |
@@ -125,13 +124,33 @@ Einzelheiten stehen in der [README von komki_cli](https://github.com/croesnick/k
 
 ## Freigabe: dein GO für genau einen Aufruf
 
-Manchmal ist eine gesperrte Anfrage in Ordnung, etwa eine Websuche nach einem Förderprogramm, während eine vertrauliche Notiz offen ist. Dann entscheidest du. Schreiben ist immer gesperrt, bis du es freigibst: Keine Regel erlaubt komki, von sich aus eine Notiz abzulegen. Das Fenster sagt dann „Aktion: speichern“. Läuft eine Session und hängt dein Terminal daran, öffnet komki bei einer gesperrten Anfrage ein Fenster. Das Bild stammt aus einer echten Session im Raum „vertraulich“:
+Manchmal ist eine gesperrte Anfrage in Ordnung, etwa eine Websuche nach einem Förderprogramm, während eine vertrauliche Notiz offen ist. Dann entscheidest du. Schreiben ist immer gesperrt, bis du es freigibst: Keine Regel erlaubt komki, von sich aus eine Notiz abzulegen. Das Fenster sagt dann „Aktion: speichern“. Läuft eine Session und hängt dein Terminal daran, öffnet komki bei einer gesperrten Anfrage ein Fenster.
 
-<div class="komki-figure"><GoExistenzLeck /></div>
+Aus dem Raum „vertraulich“ ist eine Websuche kein gewöhnliches GO: Der Suchtext verlässt einen Raum, in dem vertrauliche Notizen liegen, also legst du ihn offen. Das Fenster nennt die Bindung, die dein GO dafür aufhebt, und fragt mit einem eigenen Satz. So sah es in einem Lauf auf einer Wegwerf-Instanz aus, mit dem Vermittler und `komki go` aus diesem Stand und einem Test-Connector statt Brave:
+
+```text frame="terminal" title="Das Freigabefenster für einen Suchtext"
+Gesperrter Aufruf (Beleg pdr-22da9ec43eef41541980afe3aed82b35)
+  Werkzeug:  web_search
+  Ausgabe:   suchanfrage (hebt auf: vault-vertraulich@1)
+  Offenlegung: Ich gebe genau diese Anfrage bewusst an Brave (Websuche) weiter.
+  Alle Empfänger: Brave (Websuche), nutzende-person, pi-agent
+  Parameter:
+    count: 5
+    query: "Förderprogramm Radweg Bayern"
+  Gesperrt:  recipient_not_allowed
+  Sichtbar für: Brave (Websuche)
+  Schon der Aufruf selbst zeigt Brave (Websuche), dass und wann aus diesem
+  Arbeitsraum gefragt wird, auch wenn die Parameter harmlos aussehen.
+  Ein GO gilt nur für genau diesen Aufruf, einmal, fünf Minuten lang.
+GO: Ich gebe genau diese Anfrage bewusst an Brave (Websuche) weiter. [j/N] j
+1 von 1 Anfragen freigegeben
+```
 
 Geht die Anfrage nach draußen, nennt das Fenster, wer sie zu sehen bekommt, hier Brave für die Websuche. Bedenke: Schon der Aufruf selbst verrät, *dass* und *wann* aus diesem Arbeitsraum gefragt wird, auch wenn der Suchtext harmlos aussieht. Ein GO für eine Suche nach „x“ ist also nicht folgenlos.
 
 Mit `j` läuft genau diese Anfrage, einmal. Fragt pi danach etwas anderes oder dasselbe noch einmal, wird wieder gesperrt. Enter oder `n` heißt Nein. Antwortest du zwei Minuten lang nicht, bleibt es ebenfalls beim Nein. Jede Freigabe und jede Ablehnung steht im Journal.
+
+Liegt im Raum etwas, das du für eine Suche nicht lockern darfst, etwa nichtöffentliche Ratsunterlagen, öffnet komki für die Suche kein Fenster. pi erfährt dann nur, dass nichts übertragen wurde. Die Frage stellst du selbst im Raum `recherche`.
 
 Ohne angedocktes Terminal, also bei `komki run` oder einer Session im Hintergrund, fragt komki nicht und lehnt sofort ab. Offene Anfragen kannst du auch in einem zweiten Terminal mit `komki go` beantworten.
 
@@ -145,13 +164,13 @@ In pi steht danach unter der Sperre, was aus der Freigabe wurde: abgelehnt, ohne
 
 Gibt pi aus dem Fraktionsraum etwas an ratsprojekte weiter, verlässt der Text den Raum und wird dem Vorstand offengelegt. Das ist kein gewöhnliches GO: Das Fenster sagt es mit eigenen Worten, nennt alle Empfänger und zeigt die Teile einzeln an. Vor dem GO wählst du aus, welche Teile den Raum verlassen dürfen — ein abgewähltes Teil fliegt nicht erst im Hub raus, es geht gar nicht erst hinaus, und die Freigabe bindet genau die Auswahl.
 
-Das Fenster stammt aus einem echten Lauf auf einer Wegwerf-Instanz (Raum `fraktion`, Aufruf `rp_fakt_vorschlagen`):
+Das Fenster stammt aus einem Lauf auf einer Wegwerf-Instanz (Raum `fraktion`, Aufruf `rp_fakt_vorschlagen`, ein Test-Connector statt des Hubs). Es nennt die beiden Fraktionsbindungen, die dein GO aufhebt. Die öffentlichen Bindungen des Raums hebt es nicht auf, sie stehen weiter im Ziellabel der Freigabe, das das Journal festhält:
 
 ```text
-Gesperrter Aufruf (Beleg pdr-eb178e848619483e969c7d1e9306c69d)
+Gesperrter Aufruf (Beleg pdr-95cb247284bf597c0edf0b387d8b9e9e)
   Werkzeug:  rp_fakt_vorschlagen
   Aktion:    speichern — jedes Schreiben braucht dein GO
-  Ausgabe:   ratsprojekte-essenz (Lockerung auf ratsprojekte@1)
+  Ausgabe:   ratsprojekte-essenz (hebt auf: fraktion-intern@1, fraktionsprojekt-radweg@1)
   Offenlegung: Ich lege den ausgewählten Text bewusst gegenüber dem Vorstand offen.
   Alle Empfänger: Fraktion, Betreiber der Nextcloud (Ordner für den Stand), nutzende-person, pi-agent, Sicherung (Time Machine), Vorstand
   Parameter:

@@ -97,6 +97,50 @@ defmodule KomkiCli.LabelStoreTest do
   # Objekte und Entscheidungen (R.2.1/R.2.5)
   # ========================================================================
 
+  # Vorlagen-Upgrade (Ticket #354, ADR 0007): Nur eine fruehere
+  # mitgelieferte Fassung, die der Import ausdruecklich als ersetzbar nennt,
+  # weicht der aktuellen. Alles andere bleibt unveraenderlich (R.2.2).
+  describe "Vorlagen-Upgrade" do
+    setup %{seed: seed} do
+      [{id, binding} | _] = Enum.sort(seed["bindings"])
+      old = Map.put(binding, "bezeichnung", binding["bezeichnung"] <> " (alt)")
+      old_seed = put_in(seed, ["bindings", id], old)
+      %{id: id, old_seed: old_seed, old: old}
+    end
+
+    test "fruehere Fassung wird ersetzt und der Uebergang festgehalten", ctx do
+      assert {:ok, _} = LabelStore.import_registry(ctx.db, ctx.old_seed)
+
+      upgrades = %{ctx.id => [LabelStore.binding_fingerprint(ctx.old)]}
+      assert {:ok, _} = LabelStore.import_registry(ctx.db, ctx.seed, upgrades: upgrades)
+
+      # Danach ist die aktuelle Fassung im Store: ein Re-Import ist ein No-op.
+      assert {:ok, %{bindings: 0}} = LabelStore.import_registry(ctx.db, ctx.seed)
+
+      assert {:ok, [upgrade]} = LabelStore.binding_upgrades(ctx.db)
+      assert upgrade["binding"] == ctx.id
+      assert upgrade["from_sha256"] == LabelStore.binding_fingerprint(ctx.old)
+      assert upgrade["to_sha256"] == LabelStore.binding_fingerprint(ctx.seed["bindings"][ctx.id])
+    end
+
+    test "ohne Upgrade-Angabe bleibt die Bindung unveränderlich (komki label import)", ctx do
+      assert {:ok, _} = LabelStore.import_registry(ctx.db, ctx.old_seed)
+      assert {:error, reason} = LabelStore.import_registry(ctx.db, ctx.seed)
+      assert reason =~ "Bindung unveränderlich: " <> ctx.id
+      assert {:ok, []} = LabelStore.binding_upgrades(ctx.db)
+    end
+
+    test "eine selbst veränderte Fassung ersetzt das Upgrade nicht", ctx do
+      own = put_in(ctx.old_seed, ["bindings", ctx.id, "bezeichnung"], "eigene Fassung")
+      assert {:ok, _} = LabelStore.import_registry(ctx.db, own)
+
+      upgrades = %{ctx.id => [LabelStore.binding_fingerprint(ctx.old)]}
+      assert {:error, reason} = LabelStore.import_registry(ctx.db, ctx.seed, upgrades: upgrades)
+      assert reason =~ "Bindung unveränderlich: " <> ctx.id
+      assert {:ok, []} = LabelStore.binding_upgrades(ctx.db)
+    end
+  end
+
   describe "Objekte und Entscheidungen" do
     test "Quarantäne registriert: classification quarantine,Labels [], Historie 1 Eintrag", %{
       db: db

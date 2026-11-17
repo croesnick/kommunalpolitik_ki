@@ -420,8 +420,8 @@ erst. Stattdessen bietet komki an, eine Session im Raum `recherche` zu öffnen, 
 Aus dem Mappenraum wird dafür nichts übertragen, auch nicht der Vorschlag von pi. Die Antwort holt Miriam danach als
 öffentlichen Eingang in die Mappe.
 
-Im Raum `vertraulich` von heute, der nur `vault-vertraulich@1` trägt, wäre das anders: Diese Bindung darf Miriam
-lockern. Dort bleibt das Freigabefenster für genau diesen Suchtext richtig, dann aber als Offenlegungsfreigabe (B2).
+Im Raum `vertraulich` von heute, der neben den öffentlichen Bindungen nur `vault-vertraulich@1` trägt, wäre das
+anders: Diese Bindung darf Miriam lockern. Dort bleibt das Freigabefenster für genau diesen Suchtext richtig, dann aber als Offenlegungsfreigabe (B2).
 
 **Im Kalkül.** Ausgaben des Mappenraums tragen B_W. Eine Übergabe an Brave verlangt eine Offenlegungsfreigabe mit
 Zuständigkeit für jede entfernte Bindung (R.5.7, R.6.1). Für `ratsarbeit@1` hat Miriam keine, also gibt es aus
@@ -809,9 +809,10 @@ alle Empfänger und den Hinweis auf die Offenlegung; seine heutige Gestalt ist d
 Form entscheidet das Freigabefenster (#360).
 
 **Im Kalkül: über komki.** Aus dem Bestand gelesen trüge der Inhalt nur noch `ratsprojekte@1`. Das Ersetzen einer Bindung
-gilt als ihre Entfernung (R.5.7). Deshalb ist der Weg eine Lockerung von B_W auf {`ratsprojekte@1`} mit einer
-Offenlegungsfreigabe (R.6.1) und einer Befugnis für jede Bindung, deren Empfängerkreis das Ziel nicht ohnehin abdeckt,
-Ausgabeart `ratsprojekte-essenz` (Arbeitstitel). Eine eigene Freigabeart gibt es nicht. `ratsarbeit@1` bekommt diese
+gilt als ihre Entfernung (R.5.7). Deshalb ist der Weg eine Lockerung von B_W auf L′ mit einer Offenlegungsfreigabe
+(R.6.1), Ausgabeart `ratsprojekte-essenz` (Arbeitstitel). L′ ist `ratsprojekte@1` plus jede Bindung, deren
+Empfängerkreis den Bestand ohnehin abdeckt; nur die übrigen fallen weg, und jede von ihnen braucht eine Befugnis
+(#603). Heute steht L′ in der Freigabe und im Journal, der Stand trägt weiter nur `ratsprojekte@1`. Eine eigene Freigabeart gibt es nicht. `ratsarbeit@1` bekommt diese
 Befugnis nie. `fraktion-intern@1` bleibt unverändert: Eine
 Fassung mit Vorstand hieße, dass der Vorstand alles Fraktionsinterne lesen dürfte und nicht nur das, was Miriam auswählt.
 Auch Sicherung und die Nextcloud-Betreiber als Weg des Stands müssten dort hinein. Eine weitere Bindung für den engeren Kreis braucht es nicht, das ist
@@ -1007,7 +1008,7 @@ Die Bauliste ergibt sich aus den Szenen. Ein Ticket steht dabei, wenn es schon e
 | Nr. | Baustein | Szenen | Ticket |
 |---|---|---|---|
 | B1 | Lockerungsbefugnisse in Export und Entscheidung, mit Bedingung (K1) | 5, 6, 7 | #109, #85 |
-| B2 | Offenlegungsfreigabe als eigene Art neben der Aktionsfreigabe; das heutige GO für Anfragen aus dem Raum `vertraulich` ist der Sache nach eine Offenlegung | 4, 5, 6, 7 | #109, neu |
+| B2 | Offenlegungsfreigabe als eigene Art neben der Aktionsfreigabe; das GO für Anfragen aus dem Raum `vertraulich` ist seit #354 eine Offenlegung (Ausgabeart `suchanfrage`) | 4, 5, 6, 7 | #109, #423, #354 |
 | B4 | Faktenfreigabe: Faktenkatalog als Objekt, Projektion E, Prüffakt „öffentliche Quelle“ | 7 | neu |
 | B5 | Offenlegungsstand je Geltungsbereich im Vermittler, sichtbar im Freigabefenster | 5, 7 | neu (Engine kann `advance`) |
 | B10 | Bindungsvorlagen und parametrisierte Bindungen (`buergerfall-<n>`, `auftrag-sitzung-<datum>`, `abo-<quelle>`) | 0, 2, 3 | #38, neu |

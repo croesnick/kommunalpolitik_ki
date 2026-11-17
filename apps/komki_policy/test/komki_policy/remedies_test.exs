@@ -278,10 +278,14 @@ defmodule KomkiPolicy.RemediesTest do
     assert transition_type(without_flag) == ["neuer_raum"]
   end
 
-  test "emit und transfer behalten das call-GO bei unbelegter Beobachterliste (#354)" do
+  # Ticket #354: transfer folgt store — ein GO kann nicht belegen, wer beim
+  # Ziel mitliest. Nur emit (Raumumgebung) behält das call-GO.
+  test "emit behält das call-GO bei unbelegter Beobachterliste, transfer nicht (#354)" do
     reg = registry()
 
-    Enum.each([:emit, :transfer], fn rule ->
+    expected = %{emit: ["neuer_raum", "aktionsfreigabe"], transfer: ["neuer_raum"]}
+
+    Enum.each(expected, fn {rule, types} ->
       ctx =
         %{
           test_ctx(["buergerfall-4711@1"], [], "lokale-fallverarbeitung@1")
@@ -292,7 +296,7 @@ defmodule KomkiPolicy.RemediesTest do
 
       [remedy] = Remedies.catalog(reg, ctx, [finding("missing_operation_rule")])
 
-      assert transition_type(remedy) == ["neuer_raum", "aktionsfreigabe"]
+      assert transition_type(remedy) == types, "#{rule}"
     end)
   end
 

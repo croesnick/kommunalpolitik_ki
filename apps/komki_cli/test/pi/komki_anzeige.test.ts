@@ -86,7 +86,9 @@ test("Ablehnung: rot, mit Grund, Ausweg und Beleg; Gate benannt", () => {
 	const web = strip(render("web_search_deny"));
 	assert.match(web, /Die Anfrage hat komki nicht verlassen\./);
 	assert.match(web, /brave-search/);
-	assert.match(flat(render("web_search_deny")), /mit deinem GO für genau diesen Aufruf, im komki-Fenster/);
+	// #354: Aus dem Raum vertraulich ist der Suchtext eine Offenlegung.
+	assert.match(flat(render("web_search_deny")), /wenn du genau diesen Aufruf bewusst offenlegst, im komki-Fenster/);
+	assert.doesNotMatch(flat(render("web_search_deny")), /offenlegungsfreigabe/);
 });
 
 test("GO: was aus der Freigabe wurde, ohne dass pi selbst fragt", () => {

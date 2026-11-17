@@ -213,9 +213,36 @@ defmodule KomkiMediator.ConnectorGate do
 
       other ->
         response = not_permitted(env, call, "emit", nil, intent, snapshot, other)
-        maybe_go(env, call, snapshot, intent, response, to_handover)
+
+        case hopeless_handover(env, call, response) do
+          nil -> maybe_go(env, call, snapshot, intent, response, to_handover)
+          denial -> denial
+        end
     end
   end
+
+  # Szene 4, Gegenprobe 13.1 (#354): an emit GO is pointless when the
+  # handover after it has no GO way — a recipient outside the circle
+  # without Offenlegung, or an unproven observer list. λ(y) after emit is
+  # B_W either way (an Aktionsfreigabe assigns no label), so the mediator
+  # decides the handover before it asks: then no window appears, and the
+  # answer is the handover's denial. Both decisions are journaled.
+  defp hopeless_handover(env, call, emit_response) do
+    if Go.offered(emit_response["remedies"]), do: decide_hopeless(env, call)
+  end
+
+  defp decide_hopeless(env, call) do
+    {rule, snapshot, intent} = handover_case(env, call, env.room.workspace_bindings)
+    result = Derive.decide(env.gamma.compiled, snapshot, intent)
+
+    if hopeless?(result), do: not_permitted(env, call, rule, nil, intent, snapshot, result)
+  end
+
+  defp hopeless?({:ok, %{"decision" => decision, "remedies" => remedies}})
+       when decision in ["deny", "indeterminate"],
+       do: Go.offered(remedies) == nil and Go.offered_offenlegung(remedies) == nil
+
+  defp hopeless?(_result), do: false
 
   defp digest_fact(call) do
     %{"value" => call.intent_hash, "source" => "komki-mediator", "source_kind" => "technical"}
@@ -227,24 +254,7 @@ defmodule KomkiMediator.ConnectorGate do
   # -------------------------------------------------------------------------
 
   defp handover(env, call, emit) do
-    rule = if call.kind == :write, do: "store", else: "transfer"
-    d12 = Hash.digest12(call.intent_hash)
-
-    object = %Object{
-      object_id: "out-" <> d12,
-      version: "v1",
-      labels: emit.decision["assigned_label"]
-    }
-
-    snapshot =
-      Room.connector_snapshot(env.room, env.gamma, %{
-        snapshot_id: "snap-" <> rule <> "-" <> d12,
-        environment: call.environment,
-        object: object,
-        facts: Map.put(env.room.facts, "output_content_digest", digest_fact(call))
-      })
-
-    intent = intent(env.room, rule, "intent-" <> rule <> "-" <> d12, object)
+    {rule, snapshot, intent} = handover_case(env, call, emit.decision["assigned_label"])
     # `decided` is the decision_id of the Gate 1b permit or GO record.
     to_execution = fn _decision, decided -> execute(env, call, emit, decided) end
 
@@ -257,6 +267,23 @@ defmodule KomkiMediator.ConnectorGate do
         response = not_permitted(env, call, rule, nil, intent, snapshot, other)
         maybe_go(env, call, snapshot, intent, response, to_execution)
     end
+  end
+
+  # Snapshot and intent of the handover of y with λ(y) = `labels`.
+  defp handover_case(env, call, labels) do
+    rule = if call.kind == :write, do: "store", else: "transfer"
+    d12 = Hash.digest12(call.intent_hash)
+    object = %Object{object_id: "out-" <> d12, version: "v1", labels: labels}
+
+    snapshot =
+      Room.connector_snapshot(env.room, env.gamma, %{
+        snapshot_id: "snap-" <> rule <> "-" <> d12,
+        environment: call.environment,
+        object: object,
+        facts: Map.put(env.room.facts, "output_content_digest", digest_fact(call))
+      })
+
+    {rule, snapshot, intent(env.room, rule, "intent-" <> rule <> "-" <> d12, object)}
   end
 
   # A permit, journaled when it is made: `permitted` from the normal branch
@@ -354,11 +381,13 @@ defmodule KomkiMediator.ConnectorGate do
 
   # -------------------------------------------------------------------------
   # GO: Offenlegungsfreigabe fuer den Store in den Hub (§ 4.9, Szene 13,
-  # #423). Die Anfrage zeigt den genauen Text (Parameter), alle Empfaenger
-  # des Ziels und den Hinweis auf die Offenlegung; die Teile waehlt die
-  # nutzende Person hier ab, nicht erst im Hub. Eine Abwahl ergibt ein
-  # neues Ereignis mit neuem Hash (R.6.2): Der Vermittler leitet den
-  # reduzierten Call neu ab und baut die Freigabe darueber.
+  # #423) und fuer eine Suchanfrage nach draussen (Szene 4, #354). Die
+  # Anfrage zeigt den genauen Text (Parameter), alle Empfaenger des Ziels,
+  # die aufgehobenen Bindungen und den Hinweis auf die Offenlegung; die
+  # Teile waehlt die nutzende Person hier ab, nicht erst im Hub. Eine Abwahl
+  # ergibt ein neues Ereignis mit neuem Hash (R.6.2): Der Vermittler leitet
+  # den reduzierten Call neu ab und baut die Freigabe darueber. Ein Suchtext
+  # hat keine Teile; das GO gilt dem ganzen Aufruf.
   # -------------------------------------------------------------------------
 
   defp ask_go_offenlegung(env, go, call, {snapshot, intent, then}, response, offer) do
@@ -379,6 +408,7 @@ defmodule KomkiMediator.ConnectorGate do
         "authority" => Go.authority(),
         "ausgabeart" => offer.ausgabeart,
         "ziellabel" => offer.ziellabel,
+        "aufgehoben" => aufgehoben(snapshot, offer),
         "empfaenger" => ziel_empfaenger(env, call),
         "teile" => teile_choices(call)
       }
@@ -394,6 +424,12 @@ defmodule KomkiMediator.ConnectorGate do
         go_not_given(env, call, {snapshot, intent}, response, "go_timeout")
     end
   end
+
+  # Die Bindungen, die die Lockerung entfernt (R.5.7, #603): λ(y) ohne das
+  # Ziellabel. Das Fenster nennt sie, damit die Person sieht, welche
+  # Einschraenkung sie aufhebt.
+  defp aufgehoben(snapshot, offer),
+    do: Enum.sort(snapshot["object"]["labels"] -- offer.ziellabel)
 
   # Alle Empfaenger des Ziels (Szene 13: das Fenster zeigt alle Empfaenger):
   # die Beobachter der Zielumgebung des Manifests, sortiert.
@@ -1028,10 +1064,11 @@ defmodule KomkiMediator.ConnectorGate do
     response
   end
 
-  # A store whose target lies outside the recipient circle has no GO way
-  # (#417): the model gets only the note and who lies outside, which the
-  # pi display needs for its sentence; no catalog and no relaxation
-  # authorities (Gegenprobe 13.5). Every other denial keeps its form.
+  # A store or transfer whose target lies outside the recipient circle and
+  # has no GO way (#417, #354, Szene 4): the model gets only the note and
+  # who lies outside, which the pi display needs for its sentence; no
+  # catalog and no relaxation authorities (Gegenprobe 13.5). Every other
+  # denial keeps its form.
   defp denial(env, rule, kind, remedies) do
     if Hinweis.not_transmitted?(rule, remedies) do
       %{

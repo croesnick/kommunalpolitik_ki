@@ -226,10 +226,15 @@ dieselbe `call_id` (Schritt 7): Erzeugen (`emit`) und Übergeben (`transfer`) bz
    komki_policy CONTRACT §4.6). Der GO-Beleg ist die Entscheidung des Freigabe-Zweigs; für dasselbe Gate
    folgt kein `permitted`. So steht auch bei einem abgelehnten Aufruf jede Prüfung im Journal.
 6. Lehnt Schritt 3 **oder** Schritt 4 ab und kommt kein GO: Antwort mit Remedies, **kein Vollzug**. Ausnahme:
-   Fällt bei `store` der Empfängertest, gibt es keinen GO-Weg (komki_policy CONTRACT §4.7, Ticket #417). Dann
-   trägt die Antwort nur den `hinweis`, dass nichts übertragen wurde, und `recipients_outside` aus dem Blocker
-   der Engine, ohne Remedies und Lockerungsbefugnisse; den vollen Katalog hält der PDR fest. Bei `store` mit
-   unbelegter Beobachterliste bietet die Engine ebenfalls kein GO an (komki_policy CONTRACT §4.7, Ticket #432) —
+   Fällt bei `store` oder `transfer` der Empfängertest und bietet der Katalog keine Offenlegungsfreigabe an,
+   gibt es keinen GO-Weg (komki_policy CONTRACT §4.7, §4.8, Tickets #417 und #354). Dann trägt die Antwort nur
+   den `hinweis`, dass nichts übertragen wurde, und `recipients_outside` aus dem Blocker der Engine, ohne
+   Remedies und Lockerungsbefugnisse; den vollen Katalog hält der PDR fest. Steht schon fest, dass die Übergabe
+   keinen GO-Weg hat, fragt der Vermittler auch das GO für Schritt 3 nicht mehr an (Szene 4, Gegenprobe 13.1):
+   Er entscheidet die Übergabe mit λ(y) = B_W vorab, das Journal zeigt dann `emit` und `transfer` bzw. `store`,
+   beide abgelehnt, für ein Objekt, das nie erzeugt wurde.
+   Bei `store` und `transfer` mit unbelegter Beobachterliste bietet die Engine ebenfalls kein GO an
+   (komki_policy CONTRACT §4.7, §4.8, Tickets #432 und #354) —
    die Antwort behält dort die normale Form mit dem GO-losen Katalog, die GO-Runde entfällt. Die
    Antwort nennt keinen Vorbeleg (`emit_decision_id`), weil es keinen gibt. Nur wenn beide Schritte erlaubt
    sind (per Permit oder GO): der **Vorbeleg vor Wirkung** (`rule: emit`, `outcome: emitted`, `decision:
@@ -297,7 +302,8 @@ Journal eines erlaubten Aufrufs: `admit executing` → `admit admitted`. Abgeleh
 Einzige Operation dieser Art ist `ratsprojekte.stand_lesen`: Die Umgebung `lokaler-arbeitsraum@1` hat nur nutzende
 Person und Agent als Beobachter, das Label `ratsprojekte@1` steht im Manifest. Damit liest nur ein Raum mit
 `ratsprojekte@1` in B_W den Stand (Projektraum, Szene 12). Weil `ratsprojekte@1` keine `transfer`-Regel hat, brauchen
-alle Anfragen aus so einem Raum ein GO, und Websuche und RIS liegen zusätzlich außerhalb des Empfängerkreises. Eine
+alle Anfragen aus so einem Raum ein GO. Websuche und RIS liegen zusätzlich außerhalb des Empfängerkreises, dort ist
+das GO seit #354 eine Offenlegung mit der Befugnis für `suchanfrage`. Eine
 `transfer`-Regel auf `ratsprojekte@1` wäre der falsche Weg gewesen, sie gäbe dem Projektraum einen freien Anfragekanal
 (Entscheidung vom 2026-11-12 in #419).
 
