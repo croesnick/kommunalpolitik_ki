@@ -65,7 +65,7 @@ Der Raum `fraktion` trägt interne Fraktionsarbeit und die Projektidee: Fraktion
 
 ### Ergebnisse aus der Recherche in den Raum „vertraulich“ mitnehmen
 
-Wechselst du mitten in einer Session mit `komki raum vertraulich`, arbeitet die Session im strengeren Raum weiter und behält, was sie schon weiß. Für eine neue Session im Raum „vertraulich“ oder damit ein Ergebnis über die Session hinaus bleibt, legst du es als Notiz im Vault ab. Im Raum `recherche` bittest du pi darum und gibst das Speichern frei. Die Notiz trägt die Labels des Raums, in dem sie entstanden ist:
+Wechselst du mitten in einer Session mit `komki raum vertraulich`, arbeitet die Session im strengeren Raum weiter und behält, was sie schon weiß. Soll eine neue Session im Raum „vertraulich“ das Ergebnis kennen oder soll es über die Session hinaus bleiben, legst du es als Notiz im Vault ab. Im Raum `recherche` bittest du pi darum und gibst das Speichern frei. Die Notiz trägt die Labels des Raums, in dem sie entstanden ist:
 
 ```text frame="terminal" title="~/.local/share/komki/vault/komki-test/2026-11-17-radweg-kosten-je-kilometer.md (Anfang)"
 ---
@@ -75,7 +75,7 @@ created: 2026-11-17T14:12:05Z
 ---
 ```
 
-Im Raum „vertraulich“ sind alle Labels des Rechercheraums zugelassen, also liest pi die Notiz dort ohne weiteres GO.
+Nach `komki raum vertraulich` liest pi die Notiz dort ohne weiteres GO, denn im Raum „vertraulich“ sind alle Labels des Rechercheraums zugelassen.
 
 Andersherum geht es nicht. Eine Notiz aus dem Raum „vertraulich“ trägt auch `vault-vertraulich@1`:
 
