@@ -79,10 +79,18 @@ defmodule KomkiCli.BurritoLaunchTest do
 
     # Aeussere Shell (ohne Marker) mit einem Kind, dessen Kommandozeile den
     # Marker traegt; "; true" verhindert, dass die Shell sich per exec ersetzt.
+    # The child ends with the test VM ($1 is the outer shell's parent, the
+    # VM's port helper): without pkill (Claude sandbox) it would otherwise
+    # keep the caller's stderr pipe open (ticket #610). Bound to the outer
+    # shell instead, the two would wait for each other forever once the
+    # after block does not run.
     port =
       Port.open({:spawn_executable, "/bin/sh"}, [
         :binary,
-        args: ["-c", "/bin/sh -c 'sleep 30; true' #{marker}-kind; true"]
+        args: [
+          "-c",
+          "/bin/sh -c 'while kill -0 $1 2>/dev/null; do sleep 1; done' #{marker}-kind $PPID; true"
+        ]
       ])
 
     {:os_pid, parent} = Port.info(port, :os_pid)

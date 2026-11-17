@@ -246,13 +246,9 @@ defmodule KomkiCli.StepsTest do
       cfg = med_gate_cfg("komki-steps-med-alive")
 
       # Eigener Prozess fuer den ps-Identitaetscheck: die Marker-Form im
-      # sh-Argument taucht in der ps-Kommandozeile auf; Compound-Kommando
-      # (statt einzelner Befehl) verhindert das sh-exec, das die Argzeile
-      # durch den Kindprozess ersetzen wuerde.
+      # sh-Argument taucht in der ps-Kommandozeile auf.
       ps_marker = "komki-mediator"
-      cmd = "while :; do sleep 1; done # " <> ps_marker
-      port = Port.open({:spawn_executable, "/bin/sh"}, args: ["-c", cmd])
-      {:os_pid, os_pid} = Port.info(port, :os_pid)
+      os_pid = TestSupport.marker_loop!(ps_marker)
 
       pidfile = Path.join([cfg.base_dir, "tmp", "komki-mediator.pid"])
       File.mkdir_p!(Path.dirname(pidfile))
@@ -597,12 +593,7 @@ defmodule KomkiCli.StepsTest do
               {"connector-ris.pid", "komki-connector-ris"},
               {"connector-web.pid", "komki-connector-web"}
             ] do
-          port =
-            Port.open({:spawn_executable, "/bin/sh"},
-              args: ["-c", "while :; do sleep 1; done # " <> marker]
-            )
-
-          {:os_pid, pid} = Port.info(port, :os_pid)
+          pid = TestSupport.marker_loop!(marker)
           File.write!(Path.join(tmp, file), Integer.to_string(pid) <> "\n")
           pid
         end
