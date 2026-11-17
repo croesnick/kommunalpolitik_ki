@@ -36,7 +36,7 @@ defmodule KomkiCli.RaumTest do
   test "anzeigen: der Default-Raum ist recherche", %{cfg: cfg} do
     assert {:raum, text} = Raum.show(cfg)
     assert text =~ "Raum        recherche"
-    assert text =~ "komki raum fraktion | projektraum | recherche | vertraulich"
+    assert text =~ "komki raum fraktion | mandat | projektraum | recherche | vertraulich"
   end
 
   # #419, Szene 12: Der Projektraum ist recherche plus ratsprojekte@1. Der
@@ -50,6 +50,40 @@ defmodule KomkiCli.RaumTest do
 
     assert {:error, reason, 2} = Raum.switch(cfg, "recherche", deps(session: true))
     assert reason =~ "Session läuft noch"
+  end
+
+  # #607: Jede Vorlage bringt ihren Zweck mit. Der Mandatsraum ist recherche
+  # plus ratsarbeit@1 mit dem Zweck mandat; zurück nach recherche setzt den
+  # Zweck wieder auf offene-recherche.
+  test "Mandatsraum: B_W und Zweck der Vorlage, zurück mit dem Zweck von recherche", %{cfg: cfg} do
+    assert {:raum, text} = Raum.switch(cfg, "mandat", deps([]))
+    assert text =~ "recherche → mandat"
+    assert bindings(cfg) == Templates.mandat_bindings()
+    assert "ratsarbeit@1" in bindings(cfg)
+    assert room(cfg)["facts"]["purpose"]["value"] == "mandat"
+    assert room(cfg)["facts"]["purpose"]["source_kind"] == "administered"
+
+    assert {:raum, _text} = Raum.switch(cfg, "recherche", deps([]))
+    assert room(cfg)["facts"]["purpose"]["value"] == "offene-recherche"
+  end
+
+  test "jede Vorlage setzt ihren Zweck als verwalteten Fakt", %{cfg: cfg} do
+    for {name, zweck} <- [
+          {"vertraulich", "vertraulich"},
+          {"fraktion", "fraktionsarbeit"},
+          {"projektraum", "projektarbeit"},
+          {"mandat", "mandat"},
+          {"recherche", "offene-recherche"}
+        ] do
+      assert {:raum, _text} = Raum.switch(cfg, name, deps([]))
+
+      assert %{
+               "value" => ^zweck,
+               "source" => "auftrags-verwaltung",
+               "source_kind" => "administered"
+             } =
+               room(cfg)["facts"]["purpose"]
+    end
   end
 
   test "verschärfen geht auch mit laufender Session und startet den Vermittler neu", %{cfg: cfg} do
@@ -97,7 +131,7 @@ defmodule KomkiCli.RaumTest do
 
   test "unbekannter Raum und gleicher Raum", %{cfg: cfg} do
     assert {:error, reason, 2} = Raum.switch(cfg, "offen", deps([]))
-    assert reason =~ "Es gibt: fraktion, projektraum, recherche, vertraulich"
+    assert reason =~ "Es gibt: fraktion, mandat, projektraum, recherche, vertraulich"
     assert {:error, "Der Raum ist schon recherche.", 2} = Raum.switch(cfg, "recherche", deps([]))
   end
 

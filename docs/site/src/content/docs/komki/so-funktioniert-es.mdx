@@ -43,24 +43,48 @@ Gate 1 besteht technisch aus zwei Fragen: `emit` (der Raum erzeugt die Anfrage) 
 
 ## Räume: was zusammenkommen darf
 
-Ein **Raum** legt fest, welche Arten von Daten in einer Sitzung zusammenkommen dürfen. komki kennt vier:
+Ein **Raum** legt fest, welche Arten von Daten in einer Sitzung zusammenkommen dürfen und wofür du arbeitest. komki kennt fünf:
 
-| Darf pi … | Raum `recherche` (Standard) | Raum `vertraulich` | Raum `fraktion` | Raum `projektraum` |
-|---|---|---|---|---|
-| im RIS suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen |
-| im Web suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen |
-| öffentliche Notizen lesen | <span class="ja">ja</span> | <span class="ja">ja</span> | <span class="ja">ja</span> | <span class="ja">ja</span>, nach deinem GO |
-| vertrauliche Notizen lesen | <span class="nein">nein, sie sind unsichtbar</span> | <span class="ja">ja</span> | <span class="nein">nein, unsichtbar</span> | <span class="nein">nein, unsichtbar</span> |
-| interne Fraktionsarbeit lesen | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span> | <span class="nein">nein</span> |
-| den Stand aus ratsprojekte lesen | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span> |
-| Notizen in `komki-test/` schreiben | <span class="ja">ja</span>, nach deinem GO | <span class="ja">ja</span>, nach deinem GO, mit vertraulichem Label | <span class="ja">ja</span>, nach deinem GO | <span class="ja">ja</span>, nach deinem GO |
-| gegengelesene Essenz an ratsprojekte geben | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span>, mit Offenlegung gegenüber dem Vorstand | <span class="nein">nein</span>; Fakten nach deinem GO |
+| Darf pi … | Raum `recherche` (Standard) | Raum `vertraulich` | Raum `fraktion` | Raum `projektraum` | Raum `mandat` |
+|---|---|---|---|---|---|
+| im RIS suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, auch nicht mit deinem GO |
+| im Web suchen | <span class="ja">ja</span> | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, außer du legst die einzelne Anfrage offen | <span class="nein">nein</span>, auch nicht mit deinem GO |
+| öffentliche Notizen lesen | <span class="ja">ja</span> | <span class="ja">ja</span> | <span class="ja">ja</span> | <span class="ja">ja</span>, nach deinem GO | <span class="ja">ja</span>, nach zwei GOs |
+| vertrauliche Notizen lesen | <span class="nein">nein, sie sind unsichtbar</span> | <span class="ja">ja</span> | <span class="nein">nein, unsichtbar</span> | <span class="nein">nein, unsichtbar</span> | <span class="nein">nein, unsichtbar</span> |
+| interne Fraktionsarbeit lesen | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span> | <span class="nein">nein</span> | <span class="nein">nein</span> |
+| den Stand aus ratsprojekte lesen | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span> | <span class="nein">nein</span> |
+| Notizen in `komki-test/` schreiben | <span class="ja">ja</span>, nach deinem GO | <span class="ja">ja</span>, nach deinem GO, mit vertraulichem Label | <span class="ja">ja</span>, nach deinem GO | <span class="ja">ja</span>, nach deinem GO | <span class="ja">ja</span>, nach zwei GOs, mit dem Label der Ratsunterlagen |
+| nichtöffentliche Ratsunterlagen lesen | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span>, mit dem Zweck `mandat` |
+| gegengelesene Essenz an ratsprojekte geben | <span class="nein">nein</span> | <span class="nein">nein</span> | <span class="ja">ja</span>, mit Offenlegung gegenüber dem Vorstand | <span class="nein">nein</span>; Fakten nach deinem GO | <span class="nein">nein</span> |
 
 <Aside type="tip" title="Warum das wirkt">
-Im Raum „vertraulich“ fehlt jeder Weg nach draußen, solange du nicht selbst einen einzelnen Aufruf freigibst. Selbst ein Agent, der vollständig von einem Angreifer gesteuert würde, kann vertrauliche Inhalte dort nicht weitergeben. Im Raum „recherche“ ist der Weg nach draußen offen, dafür kommt der Agent gar nicht erst an Vertrauliches. Du wechselst mit `komki raum vertraulich`, `komki raum recherche`, `komki raum fraktion` und `komki raum projektraum`. Das kannst du [selbst ausprobieren](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
+Im Raum „vertraulich“ fehlt jeder Weg nach draußen, solange du nicht selbst einen einzelnen Aufruf freigibst. Selbst ein Agent, der vollständig von einem Angreifer gesteuert würde, kann vertrauliche Inhalte dort nicht weitergeben. Im Raum „recherche“ ist der Weg nach draußen offen, dafür kommt der Agent gar nicht erst an Vertrauliches. Du wechselst mit `komki raum vertraulich`, `komki raum recherche`, `komki raum fraktion`, `komki raum projektraum` und `komki raum mandat`. Das kannst du [selbst ausprobieren](/kommunalpolitik_ki/komki/sicherheitsgrenze/).
 </Aside>
 
 Der Raum `fraktion` trägt interne Fraktionsarbeit und die Projektidee: Fraktion und der Betreiber der Nextcloud, in dem der Fraktionsordner liegt, lesen mit — der Vorstand nicht. In den ratsprojekte-Hub gelangt aus ihm nur, was du selbst gegengelesen und freigegeben hast: der Weg ist eine Offenlegung gegenüber dem Vorstand, und du wählst die Teile vorher ab (siehe unten). Bis du das brauchst, trägst du die Essenz von Hand ein: eine kurze Fassung schreiben lassen, gegenlesen, im Hub eintragen — komki hält diese Übergabe nicht im Journal fest.
+
+### Ein Raum je Aufgabe: der Mandatsraum
+
+Jeder Raum ist eine Vorlage für eine Aufgabe und bringt seinen Zweck mit: `recherche` die offene Recherche, `vertraulich` die vertrauliche, `fraktion` die Fraktionsarbeit, `projektraum` die Projektarbeit und `mandat` die Arbeit mit nichtöffentlichen Ratsunterlagen. Den Zweck setzt `komki raum`, nie pi. Nichtöffentliche Unterlagen nimmt komki nur im Mandatsraum auf: Nur er trägt ihre Bindung `ratsarbeit@1`, und die verlangt zusätzlich den Zweck `mandat`:
+
+```text frame="terminal" title="Das siehst du"
+$ komki raum mandat
+Raum        recherche → mandat
+            Nichtöffentliche Ratsunterlagen für dein Mandat. Websuche und RIS gibt es hier nicht, auch nicht mit deinem GO; Notizen lesen und ablegen nur mit deinem GO.
+Vermittler  neu gestartet, er entscheidet jetzt im neuen Raum.
+```
+
+Aus dem Mandatsraum geht keine Suche nach draußen, auch nicht mit deinem GO: Die Ratsunterlagen darf nur der Stadtrat freigeben, also erscheint kein Fenster, und pi erfährt nur, dass nichts übertragen wurde. pi zeigt das schon beim Start („Draußen: gesperrt, auch nicht mit deinem GO“) und bei jedem Versuch:
+
+```text frame="terminal" title="Websuche im Mandatsraum, aus einer Session auf einer Wegwerf-Instanz (gekürzt)"
+ Im Web suchen  »Kosten pro Kilometer Radweg Bau«
+ ✗ abgelehnt  Die Anfrage hat komki nicht verlassen.
+ Grund     Inhalte dieses Arbeitsraums dürfen nicht an brave-search gehen. Ein GO ändert daran nichts.
+```
+
+Was du im Web nachsehen willst, fragst du im Raum `recherche`. Andere Aufrufe, etwa eine Notiz lesen oder ablegen, brauchen im Mandatsraum heute je zwei GOs, weil die Bindung der Ratsunterlagen noch keine Regel für Aufrufe hat. Eine Notiz, die du dort ablegst, trägt das Label der Ratsunterlagen und ist danach in jedem anderen Raum unsichtbar.
+
+Die Unterlagen selbst holst du wie jede andere Datei mit `komki session` in den Raum ([Eigene Dokumente in die Session holen](#eigene-dokumente-in-die-session-holen)), eingeordnet mit dem Label `ratsarbeit@1`. Den Startvertrag dafür trägst du heute von Hand in `room.json` ein; solange er dort steht, wechselt `komki raum` den Raum nicht ([#214](https://github.com/croesnick/kommunalpolitik_ki/issues/214)).
 
 ### Den Stand aus ratsprojekte lesen
 
@@ -93,7 +117,7 @@ Zurück nach `recherche` geht es nur ohne laufende Session, sonst käme der Stan
 
 ## Was pi dir zeigt: Raum, Labels, Dokumente
 
-Beim Start zeigt pi oben, in welchem Raum du arbeitest, wofür er da ist, welche Labels darin zusammenkommen und ob Anfragen nach draußen offen sind. Unten steht dasselbe kurz in der Fußzeile, dazu die Zahl der Raumdokumente, sobald pi sie aufgelistet hat. Welche Dokumente bereitliegen, erfährt pi über den Vermittler (`list_documents`): nur Kennung und Label, den Inhalt erst beim Lesen.
+Beim Start zeigt pi oben, in welchem Raum du arbeitest, wofür er da ist, welche Labels darin zusammenkommen und ob Anfragen nach draußen offen sind, nur mit deinem GO gehen oder auch mit GO gesperrt bleiben. Unten steht dasselbe kurz in der Fußzeile, dazu die Zahl der Raumdokumente, sobald pi sie aufgelistet hat. Welche Dokumente bereitliegen, erfährt pi über den Vermittler (`list_documents`): nur Kennung und Label, den Inhalt erst beim Lesen.
 
 <div class="komki-figure"><RaumRecherche /></div>
 

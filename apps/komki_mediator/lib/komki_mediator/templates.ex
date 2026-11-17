@@ -373,6 +373,15 @@ defmodule KomkiMediator.Templates do
     do: Enum.sort(["ratsprojekte@1" | recherche_bindings()])
 
   @doc """
+  B_W des Referenzraums mandat (Ticket #607, Szene 3): nichtoeffentliche
+  Ratsunterlagen und die oeffentlichen Bindungen jedes Raums. `ratsarbeit@1`
+  nimmt nur mit dem Zweck `mandat` auf; nach draussen gibt es keinen Weg,
+  denn `ratsarbeit@1` traegt keine Befugnis (Szene 4, #354).
+  """
+  @spec mandat_bindings() :: [String.t()]
+  def mandat_bindings, do: Enum.sort(["ratsarbeit@1" | recherche_bindings()])
+
+  @doc """
   B_W des Referenzraums fraktion (Szenario, Raumtabelle: antrag-radweg):
   interne Fraktionsarbeit und die Projektidee, dazu die oeffentlichen
   Bindungen jedes Raums. Ratsprojekte ist kein Weg dieses Raums — die

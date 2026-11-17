@@ -270,7 +270,7 @@ Hinweise zu den einzelnen Schritten:
 ./komki session --detach            # im Hintergrund; der Befehl zum Andocken steht in der Ausgabe
 ./komki down                        # alles stoppen (Vermittler, Connectoren, Egress, llama)
 ./komki status                      # Zustand (base, gguf, port, Socket, llama, Egress, Connectoren, Vermittler)
-./komki raum                        # Raum anzeigen; mit recherche|vertraulich wechseln
+./komki raum                        # Raum anzeigen; mit recherche|vertraulich|fraktion|projektraum|mandat wechseln
 ./komki label …                     # SQLite-Registry: Bindungen, Labels, Γ-Export (siehe unten)
 ```
 

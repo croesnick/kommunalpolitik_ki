@@ -48,8 +48,23 @@ const vertraulich = JSON.stringify({
 		{ id: "vault-vertraulich@1", bezeichnung: "Vertrauliche Vault-Notiz", intern: true },
 	],
 	nach_draussen: [
-		{ empfaenger: "brave-search", offen: false },
-		{ empfaenger: "ris-betreiber", offen: false },
+		{ empfaenger: "brave-search", offen: false, mit_go: true },
+		{ empfaenger: "ris-betreiber", offen: false, mit_go: true },
+	],
+});
+
+// #607: ratsarbeit@1 trägt keine Befugnis, kein GO öffnet einen Weg.
+const mandat = JSON.stringify({
+	schema: "komki-raum/1",
+	raum: "mandat",
+	zweck: "mandat",
+	labels: [
+		{ id: "ratsarbeit@1", bezeichnung: "Nichtöffentliche Ratsunterlagen", intern: true },
+		{ id: "web-oeffentlich@1", bezeichnung: "Öffentliche Web-Treffer", intern: false },
+	],
+	nach_draussen: [
+		{ empfaenger: "brave-search", offen: false, mit_go: false },
+		{ empfaenger: "ris-betreiber", offen: false, mit_go: false },
 	],
 });
 
@@ -61,14 +76,25 @@ test("Raumbild lesen: falsche Form oder kaputtes JSON ergibt undefined", () => {
 });
 
 test("Weg nach draußen in einem Satz", () => {
-	assert.deepEqual(draussen(parseRaum(recherche)!), { offen: true, satz: "offen für Websuche und RIS" });
+	assert.deepEqual(draussen(parseRaum(recherche)!), { offen: true, nie: false, satz: "offen für Websuche und RIS" });
 	assert.deepEqual(draussen(parseRaum(vertraulich)!), {
 		offen: false,
+		nie: false,
 		satz: "gesperrt, einzelne Aufrufe nur mit deinem GO im komki-Fenster",
 	});
+	assert.deepEqual(draussen(parseRaum(mandat)!), { offen: false, nie: true, satz: "gesperrt, auch nicht mit deinem GO" });
 	const teils = parseRaum(recherche)!;
 	teils.nach_draussen[0].offen = false;
 	assert.match(draussen(teils)!.satz, /^offen für RIS; Websuche gesperrt, einzelne Aufrufe nur mit deinem GO/);
+	teils.nach_draussen[1] = { empfaenger: "ris-betreiber", offen: false, mit_go: false };
+	assert.equal(
+		draussen(teils)!.satz,
+		"Websuche gesperrt, einzelne Aufrufe nur mit deinem GO im komki-Fenster; RIS gesperrt, auch nicht mit deinem GO",
+	);
+	// Ein Raumbild ohne mit_go (vor #607) zeigt den Weg wie bisher.
+	const alt = JSON.parse(vertraulich);
+	for (const e of alt.nach_draussen) delete e.mit_go;
+	assert.equal(draussen(parseRaum(JSON.stringify(alt))!)!.nie, false);
 });
 
 test("Kopfzeile: deutsch, Raum, Zweck, Labels in Worten, Befehle", () => {
@@ -85,6 +111,7 @@ test("Kopfzeile: deutsch, Raum, Zweck, Labels in Worten, Befehle", () => {
 test("Fußzeile: Raum, Weg nach draußen, Anzahl der Raumdokumente", () => {
 	assert.equal(statusText(parseRaum(recherche), undefined), "Raum recherche · nach draußen offen");
 	assert.equal(statusText(parseRaum(vertraulich), []), "Raum vertraulich · nach draußen nur mit GO · 0 Raumdokumente");
+	assert.equal(statusText(parseRaum(mandat), undefined), "Raum mandat · nach draußen gesperrt");
 	assert.equal(
 		statusText(parseRaum(recherche), [{ id: "doc-oeffentlich", labels: ["doc-oeffentlich@2"] }]),
 		"Raum recherche · nach draußen offen · 1 Raumdokument",
