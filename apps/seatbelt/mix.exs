@@ -4,7 +4,7 @@ defmodule Seatbelt.MixProject do
   def project do
     [
       app: :seatbelt,
-      version: "0.1.0",
+      version: "0.1.1",
       description:
         "A dependency-free Elixir library for running programs under macOS Seatbelt confinement with deny-default profiles",
       elixir: "~> 1.19",
