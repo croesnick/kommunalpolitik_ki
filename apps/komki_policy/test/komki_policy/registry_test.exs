@@ -126,6 +126,22 @@ defmodule KomkiPolicy.RegistryTest do
 
       assert %{code: :invalid_observer_types} =
                compile_term_error(
+                 Map.put(base, "observer_types", %{
+                   "nutzende-person" => "person",
+                   "fremde-stelle" => "person"
+                 })
+               )
+
+      # komki-registry/2 ohne Typen ist kein gültiges Schema mehr.
+      assert %{code: :invalid_schema} =
+               compile_term_error(
+                 base
+                 |> Map.put("schema", "komki-registry/2")
+                 |> Map.delete("observer_types")
+               )
+
+      assert %{code: :invalid_observer_types} =
+               compile_term_error(
                  Map.put(base, "observer_types", %{"nutzende-person" => "agent"})
                )
 
