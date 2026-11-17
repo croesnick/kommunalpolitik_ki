@@ -60,8 +60,8 @@ defmodule KomkiCli.LabelStore do
       Label und wird nicht als leere Bindungsmenge behandelt; die
       Erstklassifikation ist ein menschlicher Akt (decided_by, basis) —
       Entscheiderin ist nur eine Beobachterin vom Typ "person"
-      (Store-Zusatzfeld observer_types; eine Verarbeitungsdomaene darf nur
-      vorschlagen). Quarantäne-Objekte tragen immer `[]` als Labels — die
+      (Feld observer_types, seit #598 auch in der Engine-Form; eine
+      Verarbeitungsdomaene darf nur vorschlagen). Quarantäne-Objekte tragen immer `[]` als Labels — die
       Unterscheidung lebt allein im classification-Feld.
     * Anhang B.3/B.4 — geschlossene, versionierte Schemas; beschränkte
       Policy-Sprache.
@@ -690,8 +690,9 @@ defmodule KomkiCli.LabelStore do
        "Import ungültig: $.bindings." <>
          id <> " (expected an object, got " <> Kernel.inspect(other) <> ")"}
 
-  # Store-Zusatzfeld observer_types (R.2.5): Typ je Beobachter, nur
-  # store-seitig — die Engine-Schicht sieht das Feld nicht.
+  # observer_types (R.2.5): Typ je Beobachter. Seit #598 prueft auch die
+  # Engine das Feld; die Store-Pruefung steht vorn, damit die deutsche
+  # Meldung zuerst kommt (wie bei den Lockerungsbefugnissen).
   defp validate_observer_types(%{"observer_types" => types, "observers" => observers})
        when is_map(types) do
     expected = Enum.sort(observers)

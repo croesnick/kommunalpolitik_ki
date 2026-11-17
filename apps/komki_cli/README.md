@@ -487,8 +487,10 @@ R.2.2: Kennung mit Version, Empfängerkreis, Operationsbedingungen, Auflagen
 und Lockerungsbefugnis. Die Lockerungsbefugnis ist strukturiert — jeder
 Eintrag `authority`/`restriction`/`output` hält fest, wer welche Einschränkung
 für welche Ausgabe lockern darf. Ohne Eintrag ist keine Lockerung zulässig
-(R.2.2). Der Γ-Export gibt die Einträge derzeit nicht weiter und emittiert
-`[]` (Ticket #109). Dazu speichert die Registry Objekt-Metadaten: Herkunft,
+(R.2.2). Der Γ-Export (`komki-registry/3`) gibt die Einträge strukturiert
+weiter (seit #423) und trägt die Beobachtertypen: Eine Freigabe oder eine
+Lockerungsbefugnis gilt nur für einen Beobachter vom Typ `person` (#598).
+Dazu speichert die Registry Objekt-Metadaten: Herkunft,
 Inhaltsversion und Klassifikationsentscheidung, getrennt vom Inhalt. Als
 SQLite-Anbindung dient exqlite (MIT-Lizenz,
 [siehe Hex-Paket](https://hex.pm/packages/exqlite)), direkt ohne Ecto-Ebene.
