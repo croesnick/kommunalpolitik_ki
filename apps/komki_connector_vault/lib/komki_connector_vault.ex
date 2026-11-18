@@ -111,12 +111,17 @@ defmodule KomkiConnectorVault do
   defp join(rel, name), do: rel <> "/" <> name
 
   # Eine Notiz ist sichtbar, wenn sie sicher aufloesbar ist und gueltige
-  # Labels traegt. Dieselbe Pruefung wie `read`.
+  # Labels traegt. Dieselbe Pruefung wie `read`. Schlaegt das Laden einer
+  # Notiz fehl oder wirft es, ueberspringt die Suche nur diese Notiz —
+  # eine pathologische Notiz darf die Suche fuer alle anderen nicht
+  # mitreissen (#478).
   defp visible(root, id) do
     case load(root, id) do
       {:ok, note, labels} -> [{id, note, labels}]
       {:error, _code, _detail} -> []
     end
+  rescue
+    _ -> []
   end
 
   # --- read ------------------------------------------------------------------

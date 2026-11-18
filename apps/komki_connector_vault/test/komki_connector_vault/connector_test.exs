@@ -355,4 +355,41 @@ defmodule KomkiConnectorVault.ConnectorTest do
       assert read["content"] == body
     end
   end
+
+  # #478 (Audit #467, Fund F6): Gepflanzte Notiz wie im Zielbild — Titel aus
+  # Control-Zeichen (der Writer macht daraus ein Leerzeichen, das leer
+  # decodiert), Body-Zeile "# a" + 19995 Leerzeichen + "x". Frueher verbrannte
+  # jede Suche darueber CPU bis zum vollen Regex-Budget und scheiterte dann
+  # per SystemLimitError fuer alle Raeume.
+  describe "Resilienz gegen gepflanzte Notizen (#478)" do
+    test "Suche und read tolerieren die Angriffsnotiz", %{sock: sock, state: state, vault: vault} do
+      spaces = String.duplicate(" ", 19_995)
+      line = "# a" <> spaces <> "x"
+      title = "a" <> spaces <> "x"
+
+      assert {:ok, %{"note_id" => id}} =
+               call(sock, "write_test", %{"title" => <<1>>, "body" => line <> "\n"}, %{
+                 "assigned_label" => [@oeff]
+               })
+
+      # Der Writer hat das Control-Zeichen gereinigt; der Frontmatter-Titel
+      # decodiert leer, die Titel-Extraktion faellt auf die Angriffszeile.
+      assert File.read!(Path.join(vault, id)) =~ ~s(title: " ")
+
+      # Suche ohne Treffer erschöpft alle Notizen (Worst Case) und darf
+      # weder raisen noch Treffer erfinden.
+      assert {:ok, %{"results" => []}} =
+               KomkiConnectorVault.handle_op("search", %{"text" => "nichttreffer-9q"}, %{}, state)
+
+      # Andere Notizen bleiben auffindbar ...
+      assert search_ids(sock, "bauausschuss 17.09.2026") == [
+               "Sitzungen/2026-09-17 Bauausschuss.md"
+             ]
+
+      # ... und die gepflanzte Notiz selbst ist lesbar, mit der
+      # Angriffszeile (ohne "# "-Praefix) als Titel und ohne Rest-Burn.
+      assert {:ok, %{"title" => ^title, "labels" => [@oeff]}} =
+               KomkiConnectorVault.handle_op("read", %{"note_id" => id}, %{}, state)
+    end
+  end
 end

@@ -72,10 +72,22 @@ defmodule KomkiConnectorVault.Note do
     end
   end
 
+  # Titel-Zeile ohne Lazy-/Greedy-Ambiguitaet (#478): `(.+)$` frisst die
+  # Zeile in einem linearen Lauf; Leerzeichen und Tabs am Zeilenende trimmt
+  # nonempty/1 wie bisher. Das an die Groesse des Bodys gekoppelte
+  # match_limit haelt den Motor-Aufwand je Notiz linear begrenzt — jede
+  # superlineare Explosionsform ueberschreitet ein lineares Budget nach
+  # Millisekunden. :re.run meldet eine Ueberschreitung schlicht als
+  # keinen Treffer, statt wie Regex.run/3 erst das volle Standard-Budget
+  # von 10 Mio. Schritten zu verbrennen und dann SystemLimitError zu
+  # raisen — das liess eine gepflanzte Notiz jede Suche scheitern.
   defp heading(body) do
-    case Regex.run(~r/^# +(.+?)[ \t]*$/m, body) do
-      [_, title] -> nonempty(title)
-      nil -> nil
+    case :re.run(body, ~r/^# (.+)$/m.re_pattern, [
+           {:match_limit, 8 * byte_size(body) + 1_000},
+           {:capture, :all_but_first, :binary}
+         ]) do
+      {:match, [title]} -> nonempty(title)
+      _kein_treffer_oder_ueberzogenes_budget -> nil
     end
   end
 
