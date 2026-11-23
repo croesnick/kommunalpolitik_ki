@@ -174,10 +174,13 @@ theorem verify_sound {Γ : Registry} {S : Snapshot} {I : Intent} {P : Proof}
         simp only [Bool.and_eq_true, beq_iff_eq] at hc
         exact ⟨j, e, hj, he, hc.1.2⟩
 
-/-- The Verarbeitungssituation Aufnahme(x, W) of R.5.4, read from the snapshot. -/
+/-- The Verarbeitungssituation Aufnahme(x, W) of R.5.4, read from the snapshot.
+The base requires a known environment: unknown recipients are missing
+evidence, not ∅ (R.5.1). -/
 def admitSituation (Γ : Registry) (S : Snapshot) : Situation String String where
   base := S.classification = "classified" ∧ S.workspaceValid = true ∧
-    ∀ n ∈ admitBaseFacts, S.fact? n = some (.bool true)
+    (∀ n ∈ admitBaseFacts, S.fact? n = some (.bool true)) ∧
+    ∃ env, Γ.environment? S.environment = some env
   observers o := ∃ env, Γ.environment? S.environment = some env ∧ o ∈ env
   condition b := ∃ j e, Γ.ruleExpr? b "admit" = some j ∧ Expr.ofJVal j = some e ∧
     eval S.fact? e = .true
@@ -188,7 +191,7 @@ theorem admitDerivable_permitted {Γ : Registry} {S : Snapshot} (h : AdmitDeriva
     Sub (· ∈ S.objectLabels) (· ∈ S.workspaceBindings) ∧
     Permitted Γ.rules (admitSituation Γ S) (· ∈ S.workspaceBindings) := by
   obtain ⟨hc, hv, hbase, hlab, ⟨env, henv, hrec⟩, hcond⟩ := h
-  refine ⟨hlab, ⟨hc, hv, hbase⟩, fun o ⟨env', henv', ho⟩ => ?_, hcond⟩
+  refine ⟨hlab, ⟨hc, hv, hbase, env, henv⟩, fun o ⟨env', henv', ho⟩ => ?_, hcond⟩
   rw [henv] at henv'
   cases henv'
   exact hrec o ho

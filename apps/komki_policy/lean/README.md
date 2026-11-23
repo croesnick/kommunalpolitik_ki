@@ -15,11 +15,12 @@ in Repo und CI.
 | `verify_sound_rfc` | Daraus folgt die Aufnahmeregel: λ(x) ⊆ B_W ∧ Erlaubt_Γ(Aufnahme(x, W), B_W) | R.5.4 |
 | `eval_mono` | Mehr Fakten kippen kein bekanntes Urteil des dreiwertigen Auswerters | R.5.2, CONTRACT.md § 3 |
 | `recipients_antitone`, `permitted_antitone` | Mehr Bindungen, nie mehr Empfänger; Erlaubt vererbt sich auf Teilmengen | A.2 |
-| `no_forbidden_recipient` | Ohne Lockerung erreicht nichts, was von x abhängt, einen Beobachter außerhalb von R_Γ(λ(x)) | A.3 |
+| `no_forbidden_recipient` | Ohne Lockerung erreicht nichts, was von x abhängt, einen Beobachter außerhalb von R_Γ(λ(x)) | Kern von A.3: nur die Labels, ohne Schrittmodell |
 
 Kein `sorry`: `lake build` behandelt jede Warnung als Fehler.
-`lake env lean Axioms.lean` zeigt die Axiome je Satz; es sind nur Leans
-Standardaxiome (`propext`, `Quot.sound`, `Classical.choice`).
+`./check-axioms.sh` zeigt die Axiome je Hauptsatz und lässt nur Leans
+Standardaxiome durch (`propext`, `Quot.sound`, `Classical.choice`); ein
+eigenes `axiom` oder ein `sorry` macht es rot.
 
 Die drei geschmiedeten Beweise aus dem Audit (#477, #479, #480) waren
 Gegenbeispiele genau zu `verify_sound`, für den damaligen Elixir-Prüfer. Der
@@ -46,8 +47,8 @@ Einmalig elan installieren (siehe [docs/prerequisites.md](../../../docs/prerequi
 dann im Verzeichnis `apps/komki_policy/lean`:
 
 ```bash
-lake build                  # Beweise prüfen, komki-spec bauen
-lake env lean Axioms.lean   # Axiome der Hauptsätze
+lake build          # Beweise prüfen, komki-spec bauen
+./check-axioms.sh   # Axiome der Hauptsätze, nur Standardaxiome
 ```
 
 Den Differenztest startet man in `apps/komki_policy`:
@@ -86,7 +87,8 @@ shasum -a 256 lib/komki_policy/{calculus,context,evaluator,registry,verify}.ex >
 ```
 
 Die Tabellen aus `derive.ex` (Prämissen von `admit`, Regelzweige) prüft
-der Differenztest direkt gegen `komki-spec constants`.
+der Differenztest direkt gegen `komki-spec constants`, dazu das Prüflabel
+von `admit` (B_W) aus `Derive.checked_label/3`.
 
 ## Grenzen
 
@@ -97,10 +99,19 @@ der Differenztest direkt gegen `komki-spec constants`.
 - **Nur der geprüfte Wertebereich.** Das Modell setzt voraus, was
   `Registry.compile/1` und `Context` durchsetzen: sortierte, eindeutige
   Mengen, typgerechte Fakten, Leser ⊆ 𝒪 (`Registry.WellFormed`, Hypothese
-  von `verify_sound`).
+  von `verify_sound`). Die Eingabeprüfung selbst ist nicht modelliert; der
+  Differenztest lässt Fälle mit Eingabefehler weg.
+- **Kohärenz von Intent und Snapshot liegt außerhalb.** Dass Objekt,
+  Version und Raum des Intents zum Snapshot passen, prüft
+  `Context.ensure_coherence/2` vor `verify`; das Modell nimmt es an.
 - **Die Brücke ist unbewiesen.** `KomkiSpec/Bridge.lean` liest JSON ins
-  Modell ein. Gleitkommazahlen hält sie von Ganzzahlen getrennt, Elixirs `==`
-  setzt `1.0` und `1` gleich; gültige Eingaben enthalten keine.
+  Modell ein. Gleitkommazahlen hält sie von Ganzzahlen getrennt.
+- **Bekannte Abweichung: Gleitkomma-Literale im Baum.** Trägt eine
+  behauptete `expression` `3.0`, wo die Registry `3` hat, sagt Elixir
+  `valid`, Lean `invalid`. `verify.ex` vergleicht mit `!=`, CONTRACT.md § 5
+  verlangt strukturelle Gleichheit; Lean folgt dem Vertrag. Ohne
+  Sicherheitswirkung, weil der Registry-AST ausgewertet wird. Der Generator
+  erzeugt solche Fälle deshalb noch nicht; Behebung in #626.
 
 ## Lizenzen
 

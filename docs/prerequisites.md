@@ -629,11 +629,20 @@ Elixir-Prüfer hält. elan installiert die Lean-Version, die
 Apache-2.0, elan unter Apache-2.0 und MIT. Die Toolchain belegt rund 2,8 GB;
 Mathlib wird nicht gebraucht.
 
-**Install** (nach `~/.cache/elan`, ohne Änderung an Shell-Profilen):
+**Install** (macOS mit Apple Silicon; dieselbe elan-Version wie die CI, mit
+Prüfsumme, nach `~/.cache/elan`, ohne Änderung an Shell-Profilen):
 
 ```bash
-curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
-  | ELAN_HOME=~/.cache/elan sh -s -- -y --default-toolchain none --no-modify-path
+curl -fsSL -o /tmp/elan.tar.gz \
+  https://github.com/leanprover/elan/releases/download/v4.2.4/elan-aarch64-apple-darwin.tar.gz
+echo "7ad829861392c718dfebde3a83b5c8508df47be02af68894b094b0b3952616e5  /tmp/elan.tar.gz" | shasum -a 256 -c -
+tar -xzf /tmp/elan.tar.gz -C /tmp
+ELAN_HOME=~/.cache/elan /tmp/elan-init -y --default-toolchain none --no-modify-path
+```
+
+Jede neue Shell braucht vor `lake` die Umgebung:
+
+```bash
 export ELAN_HOME=~/.cache/elan PATH=~/.cache/elan/bin:$PATH
 ```
 

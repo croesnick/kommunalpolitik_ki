@@ -50,6 +50,12 @@ defmodule KomkiPolicy.LeanSpecTest do
 
     assert constants["admit_premises"] == Derive.required_premises("admit")
     assert constants["proof_rules"] == Derive.proof_rules()
+
+    # Verify.lean takes B_W as the checked label of admit, never λ(x).
+    assert Derive.checked_label("admit", %{"bindings" => ["b-eins@1"]}, %{
+             "labels" => ["b-zwei@1"]
+           }) ==
+             ["b-eins@1"]
   end
 
   test "Fixture-Korpus: Elixir und Lean urteilen gleich" do
@@ -64,7 +70,8 @@ defmodule KomkiPolicy.LeanSpecTest do
             do: proof
 
     cases =
-      for {snapshot, intent} <- worlds, proof <- proofs do
+      for {snapshot, intent, proof} <-
+            audit_attacks() ++ for({s, i} <- worlds, p <- proofs, do: {s, i, p}) do
         {raw, registry, snapshot, intent, proof}
       end
 
@@ -236,6 +243,38 @@ defmodule KomkiPolicy.LeanSpecTest do
           do: Path.join(dir, "proof_valid.json")
 
     Enum.map(proof_files ++ case_files, &fixture/1)
+  end
+
+  # The forged trees of the audit, built as in verify_test.exs. verify.ex
+  # before ed7c4574 accepts them; the Lean verifier never does.
+  defp audit_attacks do
+    permit = fixture("case_permit/snapshot.json")
+    permit_intent = fixture("case_permit/intent.json")
+    permit_proof = fixture("case_permit/proof_valid.json")
+    no_basis = fixture("case_deny_no_basis/snapshot.json")
+    no_basis_intent = fixture("case_deny_no_basis/intent.json")
+    false_fact = fixture("proofs/proof_false_fact_value.json")
+    admitless = fixture("proofs/proof_admitless_condition.json")
+
+    [
+      # #477: expression null hides the missing admit rule.
+      {fixture("case_deny_missing_rule/snapshot.json"),
+       fixture("case_deny_missing_rule/intent.json"),
+       put_in(admitless, ["premises", Access.at(8), "expression"], nil)},
+      # #479: the has_operation_right slot checks another, true fact.
+      {no_basis, no_basis_intent,
+       put_named(false_fact, "has_operation_right", "fact", "has_object_access_right")},
+      # #480: faithfully mirrored false values.
+      {no_basis, no_basis_intent, put_named(false_fact, "has_operation_right", "value", false)},
+      {put_in(permit, ["workspace", "valid"], false), permit_intent,
+       put_named(permit_proof, "workspace_contract_valid", "value", false)},
+      {permit, permit_intent, put_named(permit_proof, "not_quarantine", "value", false)}
+    ]
+  end
+
+  defp put_named(proof, name, key, value) do
+    index = Enum.find_index(proof["premises"], &(&1["name"] == name))
+    put_in(proof, ["premises", Access.at(index), key], value)
   end
 
   defp derived_proof(registry, snapshot, intent) do

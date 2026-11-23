@@ -10,12 +10,16 @@ on:
     branches: [main]
     paths:
       - 'apps/komki_policy/**'
+      # stream_data bestimmt, welche Fälle ein fester Seed erzeugt.
+      - 'apps/workspace.lock'
       - '.tool-versions'
       - '.github/workflows/lean.yml'
   pull_request:
     branches: ['**']
     paths:
       - 'apps/komki_policy/**'
+      # stream_data bestimmt, welche Fälle ein fester Seed erzeugt.
+      - 'apps/workspace.lock'
       - '.tool-versions'
       - '.github/workflows/lean.yml'
   workflow_dispatch:
@@ -64,14 +68,12 @@ jobs:
         working-directory: apps/komki_policy/lean
         run: lake build
 
-      - name: Axiome der Hauptsätze (kein sorryAx)
+      # Positivliste: nur Leans Standardaxiome. Ein sorry (sorryAx) oder ein
+      # eigenes `axiom` macht den Schritt rot, ebenso ein Satz, den
+      # Axioms.lean nicht mehr findet.
+      - name: Axiome der Hauptsätze (nur Standardaxiome)
         working-directory: apps/komki_policy/lean
-        run: |
-          lake env lean Axioms.lean | tee "$RUNNER_TEMP/axioms.txt"
-          if grep -q sorryAx "$RUNNER_TEMP/axioms.txt"; then
-            echo "::error::Ein Hauptsatz stützt sich auf sorry."
-            exit 1
-          fi
+        run: ./check-axioms.sh
 
       - name: Erlang/Elixir einrichten
         uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
