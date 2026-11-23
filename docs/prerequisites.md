@@ -619,6 +619,40 @@ will, bleibt auf einem Stand vor #435.
 
 ---
 
+## Lean 4 und elan
+
+**Zweck:** Lean prüft die Beweise der Spezifikation von `komki_policy`
+(`apps/komki_policy/lean/`, [#625](https://github.com/croesnick/kommunalpolitik_ki/issues/625))
+und baut den Prüfer `komki-spec`, gegen den der Differenztest den
+Elixir-Prüfer hält. elan installiert die Lean-Version, die
+`apps/komki_policy/lean/lean-toolchain` pinnt. Lean 4 steht unter
+Apache-2.0, elan unter Apache-2.0 und MIT. Die Toolchain belegt rund 2,8 GB;
+Mathlib wird nicht gebraucht.
+
+**Install** (nach `~/.cache/elan`, ohne Änderung an Shell-Profilen):
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+  | ELAN_HOME=~/.cache/elan sh -s -- -y --default-toolchain none --no-modify-path
+export ELAN_HOME=~/.cache/elan PATH=~/.cache/elan/bin:$PATH
+```
+
+Der erste `lake build` in `apps/komki_policy/lean` holt die gepinnte
+Lean-Version. Entfernen: `rm -rf ~/.cache/elan`.
+
+**Benötigt von:**
+
+| Skill / Workflow | Anmerkung |
+|---|---|
+| `mix test --only lean_spec` in `apps/komki_policy` | Differenztest, braucht `lean/.lake/build/bin/komki-spec` |
+| Workflow `Lean` (`.github/workflows/lean.yml`) | Installiert elan als gepinnte Release-Datei (Version und SHA-256 im Workflow) |
+
+**Fallback (wenn Lean nicht verfügbar):** Der normale `mix test` schließt
+den Differenztest aus und prüft nur den Pin `lean/SYNC.sha256`. Die
+Beweise und der Differenztest laufen dann im Workflow `Lean` auf GitHub.
+
+---
+
 ## Hinzufügen einer neuen Abhängigkeit
 
 1. Abhängigkeit in diesem Dokument eintragen (Zweck, Install, Konfiguration,
