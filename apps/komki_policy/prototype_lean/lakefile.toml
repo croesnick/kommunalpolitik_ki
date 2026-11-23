@@ -1,0 +1,7 @@
+# PROTOTYPE, throwaway: Lean model of the RFC 0003 calculus. Not part of komki.
+name = "komki_kalkuel"
+version = "0.1.0"
+defaultTargets = ["KomkiKalkuel"]
+
+[[lean_lib]]
+name = "KomkiKalkuel"
