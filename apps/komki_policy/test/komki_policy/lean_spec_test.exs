@@ -75,7 +75,7 @@ defmodule KomkiPolicy.LeanSpecTest do
         {raw, registry, snapshot, intent, proof}
       end
 
-    stats = compare!(cases)
+    stats = compare!(cases, "korpus")
 
     assert stats.valid >= 2
     assert stats.invalid >= 100
@@ -95,7 +95,7 @@ defmodule KomkiPolicy.LeanSpecTest do
       |> Enum.at(0)
       |> Enum.flat_map(&world_cases/1)
 
-    stats = compare!(cases)
+    stats = compare!(cases, "generator")
     IO.puts("\nlean_spec seed=#{seed} runs=#{runs}: #{inspect(stats)}")
 
     assert stats.valid >= 600
@@ -106,7 +106,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   # Comparison
   # ---------------------------------------------------------------------
 
-  defp compare!(cases) do
+  defp compare!(cases, label) do
     judged =
       cases
       |> Enum.map(fn {raw, registry, snapshot, intent, proof} ->
@@ -122,7 +122,7 @@ defmodule KomkiPolicy.LeanSpecTest do
           Map.get(lean, id) != verdict,
           do: {id, verdict, Map.get(lean, id), raw, snapshot, intent, proof}
 
-    report_mismatches!(mismatches)
+    report_mismatches!(mismatches, label)
 
     %{
       compared: length(judged),
@@ -171,10 +171,10 @@ defmodule KomkiPolicy.LeanSpecTest do
     }) <> "\n"
   end
 
-  defp report_mismatches!([]), do: :ok
+  defp report_mismatches!([], _label), do: :ok
 
-  defp report_mismatches!(mismatches) do
-    path = Path.join(System.tmp_dir!(), "komki-spec-mismatch.jsonl")
+  defp report_mismatches!(mismatches, label) do
+    path = Path.join(System.tmp_dir!(), "komki-spec-mismatch-#{label}.jsonl")
 
     File.write!(
       path,
