@@ -323,10 +323,18 @@ defmodule KomkiPolicy.Derive do
   end
 
   # Empfängertest unter dem Ziellabel (R.5.7: Zulässigkeit der Übergabe
-  # unter L'): ein GO ersetzt ihn auch hier nicht (§ 4.6, #417).
+  # unter L'): ein GO ersetzt ihn auch hier nicht (§ 4.6, #417). An
+  # unregistered Ziellabel has no recipient circle; ziellabel_unknown
+  # already denies it (#632).
   defp offenlegung_check_recipients(state, registry, release) do
-    allowed = Calculus.allowed_recipients(registry, release.ziellabel)
+    if Enum.all?(release.ziellabel, &Map.has_key?(registry.bindings, &1)) do
+      check_ziellabel_recipients(state, Calculus.allowed_recipients(registry, release.ziellabel))
+    else
+      state
+    end
+  end
 
+  defp check_ziellabel_recipients(state, allowed) do
     case state.rho -- allowed do
       [] ->
         state
