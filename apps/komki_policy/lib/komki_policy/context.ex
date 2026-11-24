@@ -176,6 +176,47 @@ defmodule KomkiPolicy.Context do
     )
   end
 
+  # =========================================================================
+  # Snapshot prerequisites of the output rules (§ 4.5, § 4.7, § 4.8)
+  # =========================================================================
+
+  @doc """
+  Snapshot prerequisites of `emit`, `store` and `transfer`: the technical
+  fact `output_content_digest` and classification `classified`. `derive`
+  and `verify` share them, so `verify` accepts no output call that `derive`
+  refuses (#628).
+  """
+  @spec ensure_output_input(ctx()) :: :ok | {:error, {atom(), String.t(), String.t()}}
+  def ensure_output_input(ctx) do
+    with :ok <- require_output_digest(ctx) do
+      require_output_classification(ctx)
+    end
+  end
+
+  defp require_output_digest(ctx) do
+    if Map.has_key?(ctx.facts, "output_content_digest") do
+      :ok
+    else
+      fail(
+        :emit_digest_missing,
+        "$.facts.output_content_digest",
+        "emit requires the technical fact output_content_digest (§ 4.5)"
+      )
+    end
+  end
+
+  defp require_output_classification(ctx) do
+    if ctx.object["classification"] == "classified" do
+      :ok
+    else
+      fail(
+        :emit_object_not_classified,
+        "$.object.classification",
+        "emit requires classification \"classified\"; quarantine is an input state, not an output state"
+      )
+    end
+  end
+
   defp fail(code, path, detail), do: {:error, {code, path, detail}}
 
   defp require_schema(%{"schema" => schema} = _term, schema), do: :ok

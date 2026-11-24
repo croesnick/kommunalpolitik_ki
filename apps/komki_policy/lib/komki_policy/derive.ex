@@ -93,6 +93,10 @@ defmodule KomkiPolicy.Derive do
   @spec handover_operations() :: [String.t()]
   def handover_operations, do: @handover_operations
 
+  @doc "Rule branches with an output object and the snapshot prerequisites of § 4.5."
+  @spec output_operations() :: [String.t()]
+  def output_operations, do: @output_operations
+
   @doc "Rule branches with a proof tree (`verify`, § 5)."
   @spec proof_rules() :: [String.t()]
   def proof_rules, do: ["admit" | @output_operations]
@@ -232,7 +236,7 @@ defmodule KomkiPolicy.Derive do
       # dann die Digest-Pflicht (emit, store, transfer) — ein nicht-unterstützter Zweig ist
       # unsupported (Exit 3), auch wenn der Snapshot bereits den Digest
       # vermissen lassen würde.
-      case require_emit_input(ctx) do
+      case Context.ensure_output_input(ctx) do
         :ok ->
           release_branch(release.kind, ctx, registry, auth, release, stand)
 
@@ -554,41 +558,6 @@ defmodule KomkiPolicy.Derive do
   end
 
   # =========================================================================
-  # Eingabepflichten für emit, store und transfer (§ 4.5, § 4.7, § 4.8): Digest-Pflicht,
-  # Klassifikationszustand
-  # =========================================================================
-
-  defp require_emit_input(ctx) do
-    with :ok <- require_emit_digest(ctx) do
-      require_emit_classification(ctx)
-    end
-  end
-
-  defp require_emit_digest(ctx) do
-    if Map.has_key?(ctx.facts, "output_content_digest") do
-      :ok
-    else
-      fail(
-        :emit_digest_missing,
-        "$.facts.output_content_digest",
-        "emit requires the technical fact output_content_digest (§ 4.5)"
-      )
-    end
-  end
-
-  defp require_emit_classification(ctx) do
-    if ctx.object["classification"] == "classified" do
-      :ok
-    else
-      fail(
-        :emit_object_not_classified,
-        "$.object.classification",
-        "emit requires classification \"classified\"; quarantine is an input state, not an output state"
-      )
-    end
-  end
-
-  # =========================================================================
   # admit-Kern (§ 4): Prämissen in fester Ordnung
   # =========================================================================
 
@@ -614,7 +583,7 @@ defmodule KomkiPolicy.Derive do
   # =========================================================================
 
   defp run_emit(ctx, registry, auth) do
-    with :ok <- require_emit_input(ctx) do
+    with :ok <- Context.ensure_output_input(ctx) do
       state =
         ctx
         |> shared_premises(registry, "emit")
@@ -635,7 +604,7 @@ defmodule KomkiPolicy.Derive do
   # =========================================================================
 
   defp run_handover(ctx, registry, auth, rule) do
-    with :ok <- require_emit_input(ctx) do
+    with :ok <- Context.ensure_output_input(ctx) do
       state =
         ctx
         |> shared_premises(registry, rule)

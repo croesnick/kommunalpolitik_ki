@@ -29,6 +29,10 @@ defmodule KomkiPolicy.Verify do
     a non-true claim or recomputed non-true value fires
     `premise_not_true` (§ 5 steps 3 and 9).
 
+  * For an `emit`, `store` or `transfer` intent the snapshot prerequisites
+    of § 4.5 hold as in `derive` (`Context.ensure_output_input/1`): a
+    missing digest or a quarantined object is an input error (#628).
+
   Checks run in the fixed order of § 5; findings come in check order.
   Structural findings from steps 1–3 end the check at once (exactly that
   finding, later steps do not run). Findings from the predicate steps 4–8
@@ -164,6 +168,7 @@ defmodule KomkiPolicy.Verify do
       with {:ok, auth} <- Context.validate_intent(intent),
            {:ok, ctx} <- Context.validate_snapshot(snapshot, registry),
            :ok <- Context.ensure_coherence(ctx, auth),
+           :ok <- ensure_output_input(ctx, auth.operation),
            {:ok, proof} <- validate_proof(proof) do
         {:ok, run_checks(ctx, registry, auth, proof)}
       else
@@ -171,6 +176,15 @@ defmodule KomkiPolicy.Verify do
       end
 
     outcome
+  end
+
+  # The snapshot prerequisites of the intent's output rule hold as in
+  # `derive`: no valid tree for a quarantined object or a call without
+  # digest (#628).
+  defp ensure_output_input(ctx, operation) do
+    if operation in Derive.output_operations(),
+      do: Context.ensure_output_input(ctx),
+      else: :ok
   end
 
   defp error_shape(%{} = map), do: map

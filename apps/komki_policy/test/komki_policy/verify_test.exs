@@ -578,4 +578,36 @@ defmodule KomkiPolicy.VerifyTest do
                Enum.map(reasons, &Map.fetch!(&1, "code"))
     end
   end
+
+  describe "Snapshot-Voraussetzungen der Ausgaberegeln (§ 4.5, § 4.7, § 4.8, #628)" do
+    for case_dir <- ~w(case_emit_permit case_store_permit case_transfer_permit) do
+      test "#{case_dir}: Quarantäne und fehlender Digest sind Eingabefehler wie in derive" do
+        reg = registry()
+        snapshot = fixture(unquote(case_dir) <> "/snapshot.json")
+        intent = fixture(unquote(case_dir) <> "/intent.json")
+        {:ok, %{"decision" => "permit", "proof" => proof}} = Derive.decide(reg, snapshot, intent)
+
+        quarantined = put_in(snapshot, ["object", "classification"], "quarantine")
+        digestless = update_in(snapshot, ["facts"], &Map.delete(&1, "output_content_digest"))
+
+        for {broken, code} <- [
+              {quarantined, :emit_object_not_classified},
+              {digestless, :emit_digest_missing}
+            ] do
+          assert {:error, %{code: ^code}} = Derive.decide(reg, broken, intent)
+          assert {:error, %{code: ^code}} = Verify.check(reg, broken, intent, proof)
+        end
+      end
+    end
+
+    test "admit kennt die Voraussetzungen nicht: ohne Digest bleibt der Baum valid" do
+      reg = registry()
+      snapshot = fixture("case_permit/snapshot.json")
+      intent = fixture("case_permit/intent.json")
+      proof = fixture("case_permit/proof_valid.json")
+
+      refute Map.has_key?(snapshot["facts"], "output_content_digest")
+      assert {:ok, %{"result" => "valid"}} = Verify.check(reg, snapshot, intent, proof)
+    end
+  end
 end

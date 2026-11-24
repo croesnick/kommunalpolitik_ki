@@ -75,7 +75,7 @@ stdout.
 |---|---|
 | `0` | Erfolg. Auch `deny`/`indeterminate` (decide), `valid` (verify) und der erfolgreiche `advance` sind legitime Ergebnisse — der Exit-Code sagt nur „Befehl ausgeführt“, nicht „erlaubt“. |
 | `1` | `verify` hat den Beweis verworfen (`result: invalid`) **oder** `advance` hat den Standübergang abgelehnt (`refused`). |
-| `2` | Eingabefehler: Parse-/Schema-/Kohärenzverstoß, fehlender `output_content_digest` bei `emit` (`emit_digest_missing`), emit-Snapshot mit `quarantine`-Objekt, fehlende Datei, fehlende/unerwartete/unbekannte Argumente, bekanntes Flag am falschen Befehl, `advance`-Vorschlag außerhalb der § 4.6-Form, unbekannter Befehl. Immer mit strukturiertem Fehlerdatensatz auf stdout. |
+| `2` | Eingabefehler: Parse-/Schema-/Kohärenzverstoß, fehlender `output_content_digest` bei `emit`, `store` oder `transfer` (`emit_digest_missing`), Ausgabe-Snapshot mit `quarantine`-Objekt (`emit_object_not_classified`; beides auch in `verify`, #628), fehlende Datei, fehlende/unerwartete/unbekannte Argumente, bekanntes Flag am falschen Befehl, `advance`-Vorschlag außerhalb der § 4.6-Form, unbekannter Befehl. Immer mit strukturiertem Fehlerdatensatz auf stdout. |
 | `3` | `unsupported`: nicht implementierter Regelzweig (inkl. `plan`), Freigabe-`kind: offenlegungsfreigabe` oder Freigabe für eine Operation außer `emit`/`store`/`transfer` — **niemals** ein `deny`. |
 | `4` | Unerwarteter interner Fehler. Der Crash-Handler erzeugt **niemals** eine Decision und fällt **nie** auf `permit` zurück (CONTRACT § 1). |
 
