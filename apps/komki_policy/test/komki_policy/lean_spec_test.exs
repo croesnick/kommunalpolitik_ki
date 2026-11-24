@@ -291,7 +291,8 @@ defmodule KomkiPolicy.LeanSpecTest do
   # Cases per world: the honest tree, the same tree against the second
   # snapshot (a proof from another world), trees from a repaired snapshot
   # (all base facts true, #480) and from a registry where every binding has
-  # an admit rule (#477), and each tree mutated.
+  # an admit rule (#477); each tree also with float literals (#626) and
+  # mutated.
   defp world_cases({raw, snapshot, other, mutations}) do
     with {:ok, registry} <- Registry.compile(raw),
          {:ok, ruled} <- Registry.compile(with_admit_rules(raw)) do
@@ -308,6 +309,7 @@ defmodule KomkiPolicy.LeanSpecTest do
           {target, proof} <- [
             {snapshot, tree},
             {other, tree},
+            {snapshot, mutate(:floatify, tree)},
             {snapshot, Enum.reduce(mutations, tree, &mutate/2)}
           ],
           do: {raw, registry, target, @intent, proof}
@@ -502,6 +504,8 @@ defmodule KomkiPolicy.LeanSpecTest do
 
     StreamData.one_of([
       StreamData.tuple({StreamData.constant(:flip_value), index}),
+      # Same number, other JSON type: CONTRACT § 5 step 8 demands structural equality (#626).
+      StreamData.constant(:floatify),
       StreamData.tuple({StreamData.constant(:drop), index}),
       StreamData.tuple({StreamData.constant(:duplicate), index}),
       StreamData.tuple(
@@ -547,6 +551,10 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp mutate({:flip_value, i}, proof),
     do: update_premise(proof, i, &Map.put(&1, "value", not Map.get(&1, "value", true)))
 
+  defp mutate(:floatify, proof) do
+    Map.update!(proof, "premises", fn premises -> Enum.map(premises, &floatify_expression/1) end)
+  end
+
   defp mutate({:drop, i}, proof), do: Map.update!(proof, "premises", &List.delete_at(&1, i))
 
   defp mutate({:duplicate, i}, proof) do
@@ -560,6 +568,16 @@ defmodule KomkiPolicy.LeanSpecTest do
     do: update_premise(proof, i, &Map.put(&1, key, value))
 
   defp mutate({:top, key, value}, proof), do: Map.put(proof, key, value)
+
+  defp floatify_expression(%{"expression" => expression} = premise),
+    do: Map.put(premise, "expression", floatify(expression))
+
+  defp floatify_expression(premise), do: premise
+
+  defp floatify(value) when is_integer(value), do: value * 1.0
+  defp floatify(value) when is_list(value), do: Enum.map(value, &floatify/1)
+  defp floatify(value) when is_map(value), do: Map.new(value, fn {k, v} -> {k, floatify(v)} end)
+  defp floatify(value), do: value
 
   defp update_premise(proof, i, fun) do
     if i < length(proof["premises"]),

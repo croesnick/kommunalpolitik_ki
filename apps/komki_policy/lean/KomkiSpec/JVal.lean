@@ -14,8 +14,8 @@ inductive JVal where
   | null
   | bool (b : Bool)
   | int (i : Int)
-  /-- Floats never occur in valid inputs (CONTRACT.md § 6). Kept apart from
-  `int`, so `1.0` never equals `1` here (Elixir's `==` would say it does). -/
+  /-- Kept apart from `int`, so `3.0` never equals `3`: CONTRACT.md § 5
+  compares claimed expressions structurally (`!==` in `verify.ex`, #626). -/
   | float (mantissa : Int) (exponent : Nat)
   | str (s : String)
   | arr (xs : List JVal)

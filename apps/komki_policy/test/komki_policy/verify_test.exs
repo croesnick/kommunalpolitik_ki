@@ -498,4 +498,84 @@ defmodule KomkiPolicy.VerifyTest do
                Enum.map(quarantine_reasons, &Map.fetch!(&1, "code"))
     end
   end
+
+  # ---------------------------------------------------------------------
+  # CONTRACT § 5 step 8: the claimed expression equals the registry AST
+  # structurally. 3.0 and 3 are the same number but not the same JSON
+  # (#626, found by the differential test against the Lean verifier).
+  # ---------------------------------------------------------------------
+
+  describe "Ausdrucksvergleich strukturell (§ 5 Schritt 8, #626)" do
+    test "ein Gleitkomma-Literal statt der Ganzzahl aus der Registry ist expression_mismatch" do
+      {:ok, reg} =
+        Registry.compile(%{
+          "schema" => "komki-registry/2",
+          "registry_id" => "reg-zahl",
+          "observers" => ["o-a"],
+          "fact_fields" => %{"count" => "integer"},
+          "environments" => %{"env-a@1" => %{"observers" => ["o-a"]}},
+          "bindings" => %{
+            "b-zahl@1" => %{
+              "readers" => ["o-a"],
+              "operations" => %{"admit" => %{"at_most" => ["count", 3]}},
+              "relaxation_authorities" => []
+            }
+          }
+        })
+
+      fact = fn value -> %{"value" => value, "source" => "test", "source_kind" => "test"} end
+
+      snapshot = %{
+        "schema" => "komki-snapshot/1",
+        "snapshot_id" => "snap-zahl",
+        "registry_ref" => "reg-zahl",
+        "identity" => "o-a",
+        "workspace" => %{
+          "workspace_id" => "ws-zahl",
+          "bindings" => ["b-zahl@1"],
+          "valid" => true,
+          "environment" => "env-a@1"
+        },
+        "object" => %{
+          "object_id" => "obj-zahl",
+          "version" => "v1",
+          "classification" => "classified",
+          "labels" => []
+        },
+        "facts" =>
+          Map.put(
+            Map.new(
+              ~w(has_operation_right has_object_access_right audit_path_ready environment_observers_complete),
+              &{&1, fact.(true)}
+            ),
+            "count",
+            fact.(2)
+          )
+      }
+
+      intent = %{
+        "schema" => "komki-intent/1",
+        "intent_id" => "intent-zahl",
+        "operation" => "admit",
+        "object" => "obj-zahl@v1",
+        "workspace" => "ws-zahl"
+      }
+
+      {:ok, %{"decision" => "permit", "proof" => proof}} = Derive.decide(reg, snapshot, intent)
+      index = Enum.find_index(proof["premises"], &(&1["name"] == "binding_condition"))
+
+      forged =
+        put_in(proof, ["premises", Access.at(index), "expression"], %{
+          "at_most" => ["count", 3.0]
+        })
+
+      assert {:ok, %{"result" => "valid"}} = Verify.check(reg, snapshot, intent, proof)
+
+      assert {:ok, %{"result" => "invalid", "reasons" => reasons}} =
+               Verify.check(reg, snapshot, intent, forged)
+
+      assert ["expression_mismatch", "conclusion_mismatch"] ==
+               Enum.map(reasons, &Map.fetch!(&1, "code"))
+    end
+  end
 end

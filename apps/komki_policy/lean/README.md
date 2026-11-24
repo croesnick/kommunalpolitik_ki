@@ -105,13 +105,8 @@ von `admit` (B_W) aus `Derive.checked_label/3`.
   Version und Raum des Intents zum Snapshot passen, prüft
   `Context.ensure_coherence/2` vor `verify`; das Modell nimmt es an.
 - **Die Brücke ist unbewiesen.** `KomkiSpec/Bridge.lean` liest JSON ins
-  Modell ein. Gleitkommazahlen hält sie von Ganzzahlen getrennt.
-- **Bekannte Abweichung: Gleitkomma-Literale im Baum.** Trägt eine
-  behauptete `expression` `3.0`, wo die Registry `3` hat, sagt Elixir
-  `valid`, Lean `invalid`. `verify.ex` vergleicht mit `!=`, CONTRACT.md § 5
-  verlangt strukturelle Gleichheit; Lean folgt dem Vertrag. Ohne
-  Sicherheitswirkung, weil der Registry-AST ausgewertet wird. Der Generator
-  erzeugt solche Fälle deshalb noch nicht; Behebung in #626.
+  Modell ein. Gleitkommazahlen hält sie von Ganzzahlen getrennt, so wie
+  `verify.ex` behauptete Ausdrücke strikt vergleicht (#626).
 
 ## Lizenzen
 
