@@ -208,17 +208,20 @@ def callGoCodes : List String :=
   ["basis_right_false", "binding_condition_false", "audit_path_not_ready",
    "recipient_not_allowed", "missing_operation_rule"]
 
+/-- The authorities with a Befugnis {readers, `art`} on binding `b`. -/
+def befugteFor (Γ : Registry) (art b : String) : List String :=
+  match Γ.binding? b with
+  | none => []
+  | some bd => bd.befugnisse.filterMap fun (a, r, o) =>
+      if r == "readers" && o == art then some a else none
+
 /-- `Calculus.lockerungsbefugte/4`: authorities with a Befugnis on every
 lockerungsbedürftige binding; none if no binding needs one. -/
 def lockerungsbefugte (Γ : Registry) (checked rho : List String) (art : String) : List String :=
   match lockerungsbeduerftig Γ checked rho with
   | [] => []
   | b :: bs =>
-    let of : String → List String := fun b => match Γ.binding? b with
-      | none => []
-      | some bd => bd.befugnisse.filterMap fun (a, r, o) =>
-          if r == "readers" && o == art then some a else none
-    sortDedup ((of b).filter fun a => bs.all fun b' => (of b').contains a)
+    sortDedup ((befugteFor Γ art b).filter fun a => bs.all fun b' => (befugteFor Γ art b').contains a)
 
 /-- The decision a catalog belongs to, as `remedies_context/2` hands it over. -/
 structure CatalogCtx where
@@ -233,6 +236,14 @@ structure CatalogCtx where
   ziellabel : List String
   /-- Only for `release`: the kind of the presented release. -/
   releaseKind : Option String := none
+
+/-- `remedies_context/2` of the normal branch. -/
+def normalCatalogCtx (Γ : Registry) (S : Snapshot) (rule callHash : String) : CatalogCtx :=
+  let art := zielAusgabeart S.environment
+  { rule, callHash := if outputOperations.contains rule then some callHash else none,
+    objectRef := S.objectRef, checked := checkedLabel rule S, rho := actualRecipients Γ S,
+    observersProven := factState S "environment_observers_complete" == .true,
+    ausgabeart := art, ziellabel := (art.bind ausgabeartZiellabel).getD [] }
 
 /-- `regular_transitions/4` and `release_transitions/2`, GO entries only. -/
 def regularGos (c : CatalogCtx) (code : String) : List Go :=
@@ -265,7 +276,7 @@ def observersUnproven (c : CatalogCtx) : Bool := c.rule == "store" && !c.observe
 def offenlegungOfferable (Γ : Registry) (c : CatalogCtx) : Bool :=
   match c.ausgabeart, c.callHash with
   | some art, some _ =>
-    c.ziellabel.all (fun b => (Γ.binding? b).isSome) &&
+    !c.ziellabel.isEmpty && c.ziellabel.all (fun b => (Γ.binding? b).isSome) &&
     (c.rho.filter fun o => !(allowedRecipients Γ c.ziellabel).contains o).isEmpty &&
     !(lockerungsbefugte Γ c.checked c.rho art).isEmpty
   | _, _ => false

@@ -167,14 +167,6 @@ def Go.toJson : Go → Json
 def gosJson (gos : List (List Go)) : Json :=
   .arr (gos.map fun g => Json.arr (g.map Go.toJson).toArray).toArray
 
-/-- `remedies_context/2` of the normal branch. -/
-def normalCatalogCtx (Γ : Registry) (S : Snapshot) (rule callHash : String) : CatalogCtx :=
-  let art := zielAusgabeart S.environment
-  { rule, callHash := if outputOperations.contains rule then some callHash else none,
-    objectRef := S.objectRef, checked := checkedLabel rule S, rho := actualRecipients Γ S,
-    observersProven := factState S "environment_observers_complete" == .true,
-    ausgabeart := art, ziellabel := (art.bind ausgabeartZiellabel).getD [] }
-
 /-- The fields of `Derive.decide/3` this model decides: everything but the
 echoes of the input and the remedies apart from their GO offers. -/
 def decisionJson (S : Snapshot) (rule : String) (d : Decision) : Json :=
