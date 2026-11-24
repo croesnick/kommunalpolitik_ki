@@ -21,7 +21,8 @@ def Snapshot.wellFormed (S : Snapshot) : Bool :=
     | _ => false) &&
   sortStrings S.workspaceBindings == S.workspaceBindings &&
   sortDedup S.workspaceBindings == S.workspaceBindings &&
-  sortStrings S.objectLabels == S.objectLabels
+  sortStrings S.objectLabels == S.objectLabels &&
+  sortDedup S.objectLabels == S.objectLabels
 
 theorem mem_of_lookup {β : Type} {l : List (String × β)} {a : String} {b : β}
     (h : l.lookup a = some b) : (a, b) ∈ l := by
@@ -51,8 +52,8 @@ theorem Registry.wellFormed_sound {Γ : Registry} (h : Γ.wellFormed = true) : �
 theorem Snapshot.wellFormed_sound {S : Snapshot} (h : S.wellFormed = true) : S.WellFormed := by
   simp only [Snapshot.wellFormed, Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq,
     List.all_eq_true] at h
-  obtain ⟨⟨⟨⟨hc, hf⟩, hbs⟩, hbu⟩, hls⟩ := h
-  refine ⟨hc, fun n hn v hv => ?_, hbs, hbu, hls⟩
+  obtain ⟨⟨⟨⟨⟨hc, hf⟩, hbs⟩, hbu⟩, hls⟩, hlu⟩ := h
+  refine ⟨hc, fun n hn v hv => ?_, hbs, hbu, hls, hlu⟩
   have := hf n hn
   rw [hv] at this
   cases v <;> simp_all

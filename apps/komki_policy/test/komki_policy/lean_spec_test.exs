@@ -1,16 +1,18 @@
 defmodule KomkiPolicy.LeanSpecTest do
   @moduledoc false
 
-  # Differential test of `Verify.check/4` against the proven Lean verifier
-  # (#625, lean/README.md). Needs the binary from `cd lean && lake build`;
-  # excluded by default, run with `mix test --only lean_spec`.
+  # Differential tests of `Verify.check/4` and `Derive.decide/3` against the
+  # proven Lean model (#625, #629, lean/README.md). Needs the binary from
+  # `cd lean && lake build`; excluded by default, run with
+  # `mix test --only lean_spec`.
   #
   # Only cases inside the validated domain are compared: Elixir has to
-  # return a verdict or one of the modelled input errors (the snapshot
-  # prerequisites of the output rules, #628); any other input error drops
-  # the case. Within that domain, every verdict has to match. KOMKI_SPEC_SEED and KOMKI_SPEC_RUNS widen
-  # the search; a mismatch writes its cases to a JSONL file for replay with
-  # `komki-spec verify-batch`.
+  # return a verdict, a decision or one of the modelled input errors (the
+  # snapshot prerequisites of the output rules, #628; for `derive` also
+  # `unknown_environment`); any other input error drops the case. Within
+  # that domain, everything compared has to match. KOMKI_SPEC_SEED and
+  # KOMKI_SPEC_RUNS widen the search; a mismatch writes its cases to a JSONL
+  # file for replay with `komki-spec verify-batch` or `derive-batch`.
 
   use ExUnit.Case, async: false
   use ExUnitProperties
@@ -39,6 +41,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   @claim_fields ~w(object_labels checked_label actual_recipients allowed_recipients fact_refs
                    assigned_label workspace_bindings)
   @modelled_input_errors [:emit_digest_missing, :emit_object_not_classified]
+  @derive_input_errors [:unknown_environment | @modelled_input_errors]
   @decision_fields ~w(decision rule checked_label blockers missing_evidence proof
                       assigned_label content_digest)
 
@@ -209,9 +212,8 @@ defmodule KomkiPolicy.LeanSpecTest do
 
     mismatches =
       for {{line, decision}, id} <- judged,
-          lean_decision = parse_decision(Map.get(lean, id)),
-          lean_decision != decision,
-          do: {id, decision, lean_decision, line}
+          parse_decision(Map.get(lean, id)) != decision,
+          do: {id, decision, parse_decision(Map.get(lean, id)), line}
 
     report_mismatches!(mismatches, label, "Derive.decide/3 und dem Lean-Modell")
 
@@ -230,7 +232,7 @@ defmodule KomkiPolicy.LeanSpecTest do
       {:unsupported, _} ->
         %{"unsupported" => true}
 
-      {:error, %{code: code}} when code in @modelled_input_errors ->
+      {:error, %{code: code}} when code in @derive_input_errors ->
         %{"input_error" => to_string(code)}
 
       {:error, _} ->
@@ -322,7 +324,12 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp digestless do
     [
       {fixture("invalid/emit_digest_missing_snapshot.json"),
-       fixture("invalid/emit_digest_missing_intent.json")}
+       fixture("invalid/emit_digest_missing_intent.json")},
+      {put_in(
+         fixture("case_permit/snapshot.json"),
+         ["workspace", "environment"],
+         "env-unbekannt@1"
+       ), fixture("case_permit/intent.json")}
     ]
   end
 

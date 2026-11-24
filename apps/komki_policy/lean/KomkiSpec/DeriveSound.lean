@@ -22,6 +22,7 @@ structure Snapshot.WellFormed (S : Snapshot) : Prop where
   bindingsSorted : sortStrings S.workspaceBindings = S.workspaceBindings
   bindingsUnique : sortDedup S.workspaceBindings = S.workspaceBindings
   labelsSorted : sortStrings S.objectLabels = S.objectLabels
+  labelsUnique : sortDedup S.objectLabels = S.objectLabels
 
 /-- Nothing blocks, nothing is missing. -/
 def Clean (f : Findings) : Prop := f.blockers = [] ∧ f.evidence = []

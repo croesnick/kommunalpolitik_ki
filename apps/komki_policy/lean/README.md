@@ -49,8 +49,8 @@ Brücke prüft beides an jedem Fall des Differenztests
 ```mermaid
 flowchart LR
   RFC["RFC 0003 und CONTRACT.md<br/>(Prosa)"] -->|"Review: sagt das Modell<br/>dasselbe?"| Modell["Lean-Modell<br/>KomkiSpec/"]
-  Modell -->|"Lean-Kernel prüft"| Beweis["verify_sound"]
-  Modell -->|"Differenztest<br/>lean_spec_test.exs"| Elixir["verify.ex"]
+  Modell -->|"Lean-Kernel prüft"| Beweis["verify_sound,<br/>derive_sound, …"]
+  Modell -->|"Differenztest<br/>lean_spec_test.exs"| Elixir["verify.ex,<br/>derive.ex"]
   Elixir -->|"Pin<br/>SYNC.sha256"| Modell
 ```
 
@@ -108,7 +108,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean` |
 | `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal` |
-| `context.ex` | `KomkiSpec/Model.lean` (Wertebereich nach der Eingabeprüfung) |
+| `context.ex` | `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean` (Wertebereich nach der Eingabeprüfung) |
 
 Dann das Lean-Modell gegen die Änderung prüfen und anpassen, `lake build`
 und den Differenztest laufen lassen und den Pin erneuern:
@@ -136,8 +136,9 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 - **Nur der geprüfte Wertebereich.** Das Modell setzt voraus, was
   `Registry.compile/1` und `Context` durchsetzen (siehe oben). Von der
   Eingabeprüfung sind nur die Snapshot-Voraussetzung der Ausgaberegeln
-  (#628) und `unknown_environment` modelliert; Fälle mit einem anderen
-  Eingabefehler lässt der Differenztest weg. Wo Elixir außerhalb des
+  (#628) und, für `derive`, `unknown_environment` modelliert und
+  abgeglichen; Fälle mit einem anderen Eingabefehler lässt der
+  Differenztest weg. Wo Elixir außerhalb des
   Bereichs abstürzen würde, etwa bei einem Ausdruck außerhalb von B.4,
   verweigert das Modell (`missing_operation_rule`).
 - **Kohärenz von Intent und Snapshot liegt außerhalb.** Dass Objekt,
