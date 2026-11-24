@@ -76,9 +76,6 @@ vertauscht oder ersetzt, und der stärkste Fälscher: ein Baum, der jede
 Behauptung aus der Zielwelt spiegelt, einen falschen Fakt als `false`.
 Verglichen wird, wo Elixir ein Urteil fällt oder die Snapshot-Voraussetzung
 einer Ausgaberegel verwirft; jeder andere Eingabefehler fällt heraus.
-
-Dass der Test etwas findet, ist geprüft: zwölf gezielt eingebaute Fehler in
-`verify.ex` (je eine Prüfung entfernt oder abgeschwächt) machen ihn alle rot.
 `KOMKI_SPEC_SEED` und `KOMKI_SPEC_RUNS` erweitern die Suche. Eine Abweichung
 schreibt ihre Fälle als JSONL-Datei; `komki-spec verify-batch <datei>`
 spielt sie nach.
