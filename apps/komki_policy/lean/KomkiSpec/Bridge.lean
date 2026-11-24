@@ -98,7 +98,7 @@ def decodeProof (j : JVal) : Decode Proof := do
 def Outcome.label : Outcome → String
   | .valid => "valid"
   | .invalid => "invalid"
-  | .outOfScope => "out_of_scope"
+  | .inputError => "input_error"
 
 /-- One case `{"registry", "snapshot", "intent", "proof"}` → verdict. -/
 def verifyCase (j : JVal) : Decode Outcome := do

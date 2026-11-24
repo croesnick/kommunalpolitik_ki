@@ -3,7 +3,7 @@ import KomkiSpec.Bridge
 /-!
 `komki-spec verify-batch <cases.jsonl>`: one case per line,
 `{"id": n, "registry": …, "snapshot": …, "intent": …, "proof": …}`; prints
-`<id> valid|invalid|out_of_scope` or `<id> error <reason>` per line.
+`<id> valid|invalid|input_error` or `<id> error <reason>` per line.
 
 `komki-spec constants`: the fixed tables of the model, for the comparison
 with `KomkiPolicy.Derive`.
@@ -24,7 +24,11 @@ def runLine (line : String) : String :=
     | .error e => s!"{id} error {e}"
 
 def constants : Json :=
-  Json.mkObj [("admit_premises", toJson admitPremises), ("proof_rules", toJson proofRules)]
+  Json.mkObj [
+    ("required_premises", Json.mkObj (proofRules.map fun r => (r, toJson (requiredPremises r)))),
+    ("proof_rules", toJson proofRules),
+    ("output_operations", toJson outputOperations),
+    ("handover_operations", toJson handoverOperations)]
 
 def main : List String → IO UInt32
   | ["verify-batch", path] => do
