@@ -36,6 +36,10 @@ structure Snapshot where
   objectLabels : List String
   /-- Fact name → `value`. -/
   facts : List (String × JVal)
+  /-- `object_id@version`; only the tree `derive` builds names it. -/
+  objectRef : String := ""
+  /-- Fact name → (`source`, `source_kind`); only the tree `derive` builds names them. -/
+  factSources : List (String × String × String) := []
 
 structure Intent where
   intentId : String
