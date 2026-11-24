@@ -11,6 +11,7 @@ open KomkiSpec
 #print axioms verify_sound_rfc
 #print axioms derivable_permitted
 #print axioms handover_within_admitted
+#print axioms verify_emit_assigns
 #print axioms derive_sound
 #print axioms derive_complete
 #print axioms derive_permit_stable

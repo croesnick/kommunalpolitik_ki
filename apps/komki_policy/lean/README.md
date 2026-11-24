@@ -12,7 +12,8 @@ in Repo und CI.
 | Satz | Aussage | Bezug |
 |---|---|---|
 | `verify_sound` | Akzeptiert `verify` einen Baum, ist seine Regel aus Registry und Snapshot ableitbar (`Derivable`), gleich was der Baum behauptet | RFC 0003 A.7, CONTRACT.md § 4.3, § 4.5, § 4.7, § 4.8, § 5 |
-| `verify_sound_rfc`, `derivable_permitted` | Daraus folgt die Regel des RFC: λ(x) ⊆ B_W ∧ Erlaubt_Γ(Aufnahme(x, W), B_W); Erlaubt_Γ(Erzeugen(y, W), B_W); B_W ⊆ λ(y) ∧ Erlaubt_Γ(Speicherung oder Übergabe, λ(y)) | R.5.4, R.5.5, R.5.6 |
+| `verify_sound_rfc`, `derivable_permitted` | Daraus folgt die Regel: λ(x) ⊆ B_W ∧ Erlaubt_Γ(Aufnahme(x, W), B_W); Erlaubt_Γ(Erzeugen(y, W), B_W); B_W ⊆ λ(y) ∧ Erlaubt_Γ(Speicherung oder Übergabe, λ(y)) | R.5.4, CONTRACT.md § 4.5, R.5.6 |
+| `verify_emit_assigns` | Ein gültiger `emit`-Baum ordnet λ(y) := B_W zu: `assigned_label` ist als Menge B_W | R.5.5 |
 | `handover_within_admitted` | Wird x in einen Raum aufgenommen, erreicht ein geprüftes `store` oder `transfer` aus demselben Raum nur Beobachter in R_Γ(λ(x)) | A.3 an der Engine |
 | `derive_sound`, `derive_complete` | `derive` erlaubt genau dann, wenn die Regel ableitbar ist (`Derivable`, dieselbe Aussage, in der `verify_sound` endet) | CONTRACT.md § 4.3–§ 4.5, § 4.7, § 4.8 |
 | `derive_verifies` | `verify` akzeptiert jeden Baum, den `derive` baut | CONTRACT.md § 2.5, § 5 |
@@ -125,7 +126,10 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 
 - **Ohne Freigaben.** Die Freigabe-Zweige (§ 4.6, § 4.9), der
   Remedy-Katalog (§ 2.8) und `advance` (§ 2.7) sind nicht modelliert; sie
-  folgen in #625.
+  folgen in #629.
+- **Ohne Zielarbeitsraum.** R.5.6 verlangt bei der Übergabe an einen
+  Zielarbeitsraum zusätzlich dessen Aufnahmeregel. CONTRACT.md § 4.8
+  klammert das aus (#270), das Modell auch.
 - **Bei `verify` nur das Urteil.** Befundcodes von `verify` und ihre
   Reihenfolge modelliert die Spezifikation nicht; bei `derive` dagegen
   Blocker und fehlende Belege samt Reihenfolge.
