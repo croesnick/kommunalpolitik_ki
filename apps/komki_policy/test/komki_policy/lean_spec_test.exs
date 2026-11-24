@@ -46,6 +46,19 @@ defmodule KomkiPolicy.LeanSpecTest do
   @decision_fields ~w(decision rule checked_label blockers missing_evidence proof
                       assigned_label content_digest)
   @release_fields ~w(decision rule checked_label blockers release content_digest assigned_label)
+  # Release variants: one wrong field each, or a window on its edge. Both
+  # ends belong to the window (§ 4.6 step 3: valid_from ≤ as_of ≤ valid_until).
+  @release_changes %{
+    base: %{},
+    wrong_hash: %{"call_hash" => String.duplicate("ab", 32)},
+    foreign_scope: %{"scope" => "scope-fremd"},
+    not_yet: %{"valid_from" => 51, "valid_until" => 60},
+    expired: %{"valid_from" => 10, "valid_until" => 49},
+    edge_from: %{"valid_from" => 50, "valid_until" => 60},
+    edge_until: %{"valid_from" => 40, "valid_until" => 50},
+    consumed: %{"nonce" => "n-alt"},
+    foreign_authority: %{"authority" => "o-fremd"}
+  }
   @stand %{
     "schema" => "komki-stand/1",
     "stand_id" => "stand-drt",
@@ -881,7 +894,8 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp release_variant_gen do
     StreamData.one_of([
       StreamData.member_of(
-        ~w(base base wrong_hash foreign_scope not_yet expired consumed foreign_authority)a
+        ~w(base base wrong_hash foreign_scope not_yet expired edge_from edge_until consumed
+           foreign_authority)a
       ),
       StreamData.tuple(
         {StreamData.constant(:offenlegung),
@@ -951,29 +965,11 @@ defmodule KomkiPolicy.LeanSpecTest do
     base = base_release(target, op, hd(raw["observers"]))
 
     case variant do
-      :base ->
-        base
-
-      :wrong_hash ->
-        Map.put(base, "call_hash", @hex)
-
-      :foreign_scope ->
-        Map.put(base, "scope", "scope-fremd")
-
-      :not_yet ->
-        Map.merge(base, %{"valid_from" => 51, "valid_until" => 60})
-
-      :expired ->
-        Map.merge(base, %{"valid_from" => 10, "valid_until" => 49})
-
-      :consumed ->
-        Map.put(base, "nonce", "n-alt")
-
-      :foreign_authority ->
-        Map.put(base, "authority", "o-fremd")
-
       {:offenlegung, art, ziellabel, index} ->
         offenlegung(base, raw, target, art, ziellabel, index)
+
+      simple ->
+        Map.merge(base, Map.fetch!(@release_changes, simple))
     end
   end
 
