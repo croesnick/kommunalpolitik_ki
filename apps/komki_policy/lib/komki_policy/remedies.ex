@@ -37,7 +37,8 @@ defmodule KomkiPolicy.Remedies do
   Offenlegungsfreigabe (§ 4.9, R.5.7, R.6.1, ticket #423): a `store`
   denial whose target lies outside the recipient circle gets exactly one
   working GO when every lockerungsbedürftige Bindung carries a matching
-  Befugnis — an `offenlegungsfreigabe` scope `call` with the call hash,
+  Befugnis and the Ziellabel is registered and covers every observer of
+  the store (#631) — an `offenlegungsfreigabe` scope `call` with the call hash,
   the Ausgabeart and the Ziellabel of the relaxation (R.6.2). It replaces
   the Aktionsfreigabe on the GO-fähigen findings of that decision: a
   plain Aktionsfreigabe could never bridge the recipient test (#417).
@@ -259,7 +260,7 @@ defmodule KomkiPolicy.Remedies do
   defp ziellabel_reaches_target?(registry, ctx) do
     ziellabel = Map.get(ctx, :ziellabel, [])
 
-    Enum.all?(ziellabel, &Map.has_key?(registry.bindings, &1)) and
+    ziellabel != [] and Enum.all?(ziellabel, &Map.has_key?(registry.bindings, &1)) and
       ctx.rho -- Calculus.allowed_recipients(registry, ziellabel) == []
   end
 
