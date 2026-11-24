@@ -37,7 +37,8 @@ defmodule KomkiPolicy.Remedies do
   Offenlegungsfreigabe (§ 4.9, R.5.7, R.6.1, ticket #423): a `store`
   denial whose target lies outside the recipient circle gets exactly one
   working GO when every lockerungsbedürftige Bindung carries a matching
-  Befugnis — an `offenlegungsfreigabe` scope `call` with the call hash,
+  Befugnis and the Ziellabel is registered and covers every observer of
+  the store (#631) — an `offenlegungsfreigabe` scope `call` with the call hash,
   the Ausgabeart and the Ziellabel of the relaxation (R.6.2). It replaces
   the Aktionsfreigabe on the GO-fähigen findings of that decision: a
   plain Aktionsfreigabe could never bridge the recipient test (#417).
@@ -242,14 +243,25 @@ defmodule KomkiPolicy.Remedies do
   defp fill_neuer_raum(transitions, _ctx), do: transitions
 
   # Kann die Offenlegungsfreigabe für diesen Aufruf überhaupt wirken?
-  # Nur bei store mit benannter Ausgabeart, Call-Hash und einer
-  # nicht-leeren Schnittmenge der Befugnisse (§ 4.9) — sonst bliebe das
+  # Nur bei store mit benannter Ausgabeart, Call-Hash, einer nicht-leeren
+  # Schnittmenge der Befugnisse und einem Ziellabel, das registriert ist
+  # und den Speicher lesen darf (§ 4.9 Schritt 7, #631) — sonst bliebe das
   # Fenster eine Frage, die niemand bejahen kann.
   defp offenlegung_offerable?(nil, _ctx), do: false
 
   defp offenlegung_offerable?(registry, ctx) do
     is_binary(ctx.ausgabeart) and ctx.call_hash != nil and
+      ziellabel_reaches_target?(registry, ctx) and
       Calculus.lockerungsbefugte(registry, ctx.checked, ctx.rho, ctx.ausgabeart) != []
+  end
+
+  # The release branch rejects an unregistered Ziellabel and tests the
+  # recipients under it; the catalog asks the same before it offers (#631).
+  defp ziellabel_reaches_target?(registry, ctx) do
+    ziellabel = Map.get(ctx, :ziellabel, [])
+
+    ziellabel != [] and Enum.all?(ziellabel, &Map.has_key?(registry.bindings, &1)) and
+      ctx.rho -- Calculus.allowed_recipients(registry, ziellabel) == []
   end
 
   # Store into an environment whose observer list is not proven: no GO can
