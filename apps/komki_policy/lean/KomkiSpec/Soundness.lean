@@ -177,13 +177,13 @@ theorem recipients_hold {Γ : Registry} {S : Snapshot} {rule : String} {ps : Lis
     have hin := List.all_eq_true.1 hrc.1.1.1 o (mem_sortStrings.2 ho)
     exact allowedRecipients_sound Γ wf _ o (List.contains_iff_mem.1 hin)
 
-/-! ## Main theorems -/
-
-/-- Main theorem: `verify` accepts only trees whose decision is derivable. -/
-theorem verify_sound {Γ : Registry} {S : Snapshot} {I : Intent} {P : Proof}
-    (wf : Γ.WellFormed) (h : verify Γ S I P = .valid) :
-    I.operation = P.rule ∧ P.conclusion = "permit" ∧ P.registryRef = Γ.registryId ∧
-    P.snapshotRef = S.snapshotId ∧ P.intentRef = I.intentId ∧ Derivable Γ S P.rule := by
+/-- What `valid` means, check by check. -/
+theorem verify_valid {Γ : Registry} {S : Snapshot} {I : Intent} {P : Proof}
+    (h : verify Γ S I P = .valid) :
+    (outputOperations.contains I.operation && !outputInputOk S) = false ∧
+    referencesOk Γ S I P = true ∧ sortStrings P.checkedLabel = checkedLabel P.rule S ∧
+    requiredSetOk P.rule (checkedLabel P.rule S) P.premises = true ∧
+    P.premises.all (premiseOk Γ S P.rule) = true ∧ P.conclusion = "permit" := by
   unfold verify at h
   cases hin : (outputOperations.contains I.operation && !outputInputOk S)
   case true => simp only [hin, ite_true] at h; cases h
@@ -200,7 +200,16 @@ theorem verify_sound {Γ : Registry} {S : Snapshot} {I : Intent} {P : Proof}
     split at h
     · next hc => simpa only [Bool.and_eq_true, beq_iff_eq] using hc
     · cases h
-  obtain ⟨hall, hconcl⟩ := hfinal
+  exact ⟨rfl, rfl, hlab, rfl, hfinal⟩
+
+/-! ## Main theorems -/
+
+/-- Main theorem: `verify` accepts only trees whose decision is derivable. -/
+theorem verify_sound {Γ : Registry} {S : Snapshot} {I : Intent} {P : Proof}
+    (wf : Γ.WellFormed) (h : verify Γ S I P = .valid) :
+    I.operation = P.rule ∧ P.conclusion = "permit" ∧ P.registryRef = Γ.registryId ∧
+    P.snapshotRef = S.snapshotId ∧ P.intentRef = I.intentId ∧ Derivable Γ S P.rule := by
+  obtain ⟨hin, hr, _, hreq, hall, hconcl⟩ := verify_valid h
   simp only [referencesOk, Bool.and_eq_true, beq_iff_eq] at hr
   obtain ⟨⟨⟨⟨hsnap, hreg⟩, hint⟩, hrule⟩, hop⟩ := hr
   have hmem := List.contains_iff_mem.1 hrule
@@ -257,6 +266,31 @@ theorem verify_sound {Γ : Registry} {S : Snapshot} {I : Intent} {P : Proof}
     labels := hlabels.2
     recipients := recipients_hold wf hrule hreq hall
     conditions := conditions_hold hreq hall }
+
+/-- R.5.5 for `emit`: a valid tree assigns λ(y) := B_W. Its
+`label_assignment` premise names B_W as the assigned label, as a set. -/
+theorem verify_emit_assigns {Γ : Registry} {S : Snapshot} {I : Intent} {P : Proof}
+    (h : verify Γ S I P = .valid) (he : P.rule = "emit") :
+    ∃ p ∈ P.premises, p.name = "label_assignment" ∧ ∃ xs ls,
+      p.get? "assigned_label" = some (.arr xs) ∧ strings? xs = some ls ∧
+      ∀ l, l ∈ ls ↔ l ∈ S.workspaceBindings := by
+  obtain ⟨_, _, _, hreq, hall, _⟩ := verify_valid h
+  obtain ⟨p, hp, hn, hk, _, hok⟩ := fixed_slot (n := "label_assignment") (k := "computed")
+    hreq hall (by rw [he]; decide) rfl
+  have hla : labelAssignmentOk S p = true := by simpa [premiseOk, hk, hn, he] using hok
+  unfold labelAssignmentOk at hla
+  simp only [Bool.and_eq_true] at hla
+  have hassign := hla.1.1
+  refine ⟨p, hp, hn, ?_⟩
+  split at hassign
+  · next xs hxs =>
+    split at hassign
+    · next ls hls =>
+      refine ⟨xs, ls, hxs, hls, fun l => ?_⟩
+      rw [beq_iff_eq] at hassign
+      rw [← hassign, sortDedup, List.mem_eraseDups, mem_sortStrings]
+    · cases hassign
+  · cases hassign
 
 /-- The Verarbeitungssituation of the rule (Aufnahme R.5.4, Erzeugen R.5.5,
 Speicherung and Übergabe R.5.6), read from the snapshot. The base requires a
