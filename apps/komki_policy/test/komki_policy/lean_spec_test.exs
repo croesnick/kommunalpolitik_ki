@@ -306,16 +306,20 @@ defmodule KomkiPolicy.LeanSpecTest do
         |> Enum.uniq()
 
       for tree <- trees,
-          {target, proof} <- [
-            {snapshot, tree},
-            {other, tree},
-            {snapshot, mutate(:floatify, tree)},
-            {snapshot, Enum.reduce(mutations, tree, &mutate/2)}
-          ],
+          {target, proof} <- tree_cases(tree, snapshot, other, mutations),
           do: {raw, registry, target, @intent, proof}
     else
       {:error, _} -> []
     end
+  end
+
+  # The float variant only where it differs (strictly: `3.0 != 3` is false
+  # in Elixir); a tree without integer literals would count twice as valid.
+  defp tree_cases(tree, snapshot, other, mutations) do
+    floated = mutate(:floatify, tree)
+
+    [{snapshot, tree}, {other, tree}, {snapshot, Enum.reduce(mutations, tree, &mutate/2)}] ++
+      if floated !== tree, do: [{snapshot, floated}], else: []
   end
 
   defp with_admit_rules(raw) do

@@ -57,9 +57,11 @@ Den Differenztest startet man in `apps/komki_policy`:
 mix test --only lean_spec
 ```
 
-Er vergleicht drei Quellen: die Fixtures unter `priv/fixtures`, 8 000
-zufällige Welten (Registry, zwei Snapshots, Bäume aus fremden, reparierten
-und um Regeln ergänzten Welten) und Mutationen dieser Bäume. Verglichen wird
+Er vergleicht drei Quellen: die Fixtures unter `priv/fixtures` samt den
+geschmiedeten Beweisen aus dem Audit (#477, #479, #480), 8 000 zufällige
+Welten (Registry, zwei Snapshots, Bäume aus fremden, reparierten und um
+Regeln ergänzten Welten) und Varianten dieser Bäume: mit Gleitkomma- statt
+Ganzzahl-Literalen (#626) und mit Mutationen. Verglichen wird
 nur, wo Elixir ein Urteil fällt; ein Eingabefehler fällt heraus.
 `KOMKI_SPEC_SEED` und `KOMKI_SPEC_RUNS` erweitern die Suche. Eine Abweichung
 schreibt ihre Fälle als JSONL-Datei; `komki-spec verify-batch <datei>`
