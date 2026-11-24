@@ -6,7 +6,9 @@ import KomkiSpec.Verify
 `verify_sound`: whatever tree is presented, `valid` implies that the tree's
 rule is derivable under CONTRACT.md § 4.3, § 4.5, § 4.7 or § 4.8 from the
 registry and the snapshot alone. `verify_sound_rfc` carries that over to the
-rules of R.5.4–R.5.6, `handover_within_admitted` to A.3 at the engine. The
+rules of R.5.4 and R.5.6 and to Erlaubt for `emit` (CONTRACT.md § 4.5),
+`verify_emit_assigns` to the assignment λ(y) := B_W of R.5.5, and
+`handover_within_admitted` to A.3 at the engine. The
 forged trees of the audit (#477, #479, #480) and the output trees on a
 quarantined object or without digest (#628) were counterexamples to exactly
 this statement for the Elixir `verify`.
