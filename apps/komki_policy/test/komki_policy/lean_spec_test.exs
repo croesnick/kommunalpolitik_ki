@@ -17,7 +17,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   use ExUnit.Case, async: false
   use ExUnitProperties
 
-  alias KomkiPolicy.{Calculus, Derive, Registry, Verify}
+  alias KomkiPolicy.{Calculus, Derive, Registry, Release, Stand, Verify}
 
   @moduletag :lean_spec
   @moduletag timeout: 600_000
@@ -26,8 +26,9 @@ defmodule KomkiPolicy.LeanSpecTest do
   @default_bin Path.expand("../../lean/.lake/build/bin/komki-spec", __DIR__)
 
   @observers ~w(o-a o-b o-c o-d o-e)
-  @bindings ~w(b-drei@1 b-eins@1 b-vier@1 b-zwei@1)
-  @environments ~w(env-drei@1 env-eins@1 env-zwei@1)
+  @bindings ~w(b-drei@1 b-eins@1 b-vier@1 b-zwei@1 ratsprojekte@1)
+  @environments ~w(env-drei@1 env-eins@1 env-zwei@1 ratsprojekte-bestand@1)
+  @hex String.duplicate("ab", 32)
   @base_facts ~w(has_operation_right has_object_access_right audit_path_ready environment_observers_complete)
   @fact_fields %{
     "count" => "integer",
@@ -44,6 +45,15 @@ defmodule KomkiPolicy.LeanSpecTest do
   @derive_input_errors [:unknown_environment | @modelled_input_errors]
   @decision_fields ~w(decision rule checked_label blockers missing_evidence proof
                       assigned_label content_digest)
+  @release_fields ~w(decision rule checked_label blockers release content_digest assigned_label)
+  @stand %{
+    "schema" => "komki-stand/1",
+    "stand_id" => "stand-drt",
+    "version" => 3,
+    "scope" => "scope-drt",
+    "as_of" => 50,
+    "consumed" => %{"n-alt" => "go-alt"}
+  }
 
   test "Lean-Tabellen entsprechen Derive" do
     {out, 0} = System.cmd(spec_bin(), ["constants"])
@@ -152,6 +162,119 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
+  test "Freigabe-Zweige: Derive und das Lean-Modell entscheiden gleich" do
+    worlds = seeded_list(release_world_gen())
+
+    cases = fixture_release_cases() ++ Enum.flat_map(worlds, &release_cases/1)
+    pairs = Enum.map(cases, &release_pair/1)
+
+    stats =
+      compare_json!(
+        pairs,
+        "release-batch",
+        "release",
+        "Derive.decide_with_release/5 und dem Lean-Modell"
+      )
+
+    IO.puts("\nlean_spec release: #{inspect(stats)}")
+
+    offenlegung_permits =
+      Enum.count(pairs, fn {line, result} ->
+        line["release"]["kind"] == "offenlegungsfreigabe" and is_map(result) and
+          result["decision"] == "permit"
+      end)
+
+    assert offenlegung_permits >= 20
+
+    for op <- Derive.output_operations(), decision <- ~w(permit deny) do
+      assert Map.get(stats, {op, decision}, 0) >= 100, "zu wenige #{op}/#{decision}"
+    end
+  end
+
+  test "advance: Stand und das Lean-Modell gehen gleich über" do
+    cases = seeded_list(advance_gen())
+
+    chained =
+      for {stand, proposal} <- cases,
+          {:ok, next} <- [Stand.advance(stand, proposal)],
+          do: replay_on(Stand.to_record(next), proposal)
+
+    stats =
+      (cases ++ chained)
+      |> Enum.map(fn {stand, proposal} ->
+        line = %{
+          "stand" => stand,
+          "proposal" => proposal,
+          "intent" => %{"operation" => "advance"}
+        }
+
+        {line, elixir_advance(stand, proposal)}
+      end)
+      |> compare_json!("advance-batch", "advance", "Stand.advance/2 und dem Lean-Modell")
+
+    IO.puts("\nlean_spec advance: #{inspect(stats)}")
+    assert Map.get(stats, {"advance", "ok"}, 0) >= 200
+    assert Map.get(stats, {"advance", "refused"}, 0) >= 200
+  end
+
+  # Not a comparison with Lean, but the property the Lean theorem states
+  # for the model (#631): a GO the catalog offers takes effect. Each offer
+  # becomes a release with a fresh nonce; the release branch has to permit.
+  # The object-scope GO (quarantine) is an Erstklassifikation (R.2.5), no
+  # call of the release branch.
+  test "Katalog: jedes angebotene GO wirkt" do
+    raw = fixture("registry.json")
+    {:ok, registry} = Registry.compile(raw)
+
+    normal =
+      for({snapshot, intent} <- fixture_worlds(), do: {raw, registry, snapshot, intent}) ++
+        Enum.flat_map(seeded_list(world_gen()), &decision_cases/1)
+
+    released =
+      for {r, compiled, snapshot, intent, release, stand} <-
+            fixture_release_cases() ++
+              Enum.flat_map(seeded_list(release_world_gen()), &release_cases/1),
+          do:
+            {r, compiled, snapshot, intent,
+             Derive.decide_with_release(compiled, snapshot, intent, release, stand)}
+
+    offers =
+      (for(
+         {_, compiled, snapshot, intent} <- normal,
+         do: {compiled, snapshot, intent, Derive.decide(compiled, snapshot, intent)}
+       ) ++
+         for(
+           {_, compiled, snapshot, intent, result} <- released,
+           do: {compiled, snapshot, intent, result}
+         ))
+      |> Enum.flat_map(fn
+        {compiled, snapshot, intent, {:ok, %{"decision" => "deny", "remedies" => remedies}}} ->
+          for entry <- remedies,
+              go <- entry["transitions"],
+              go["type"] in ~w(aktionsfreigabe offenlegungsfreigabe),
+              go["scope"] == "call",
+              do: {compiled, snapshot, intent, go}
+
+        _ ->
+          []
+      end)
+      |> Enum.uniq()
+
+    failing =
+      for {compiled, snapshot, intent, go} <- offers,
+          release = release_from_offer(compiled, snapshot, intent, go),
+          result = Derive.decide_with_release(compiled, snapshot, intent, release, @stand),
+          not match?({:ok, %{"decision" => "permit"}}, result),
+          do: {go, snapshot, intent, result}
+
+    counts = Enum.frequencies_by(offers, fn {_, _, _, go} -> go["type"] end)
+    IO.puts("\nlean_spec GO-Angebote: #{inspect(counts)}")
+
+    assert failing == [], "Angebot wirkt nicht: #{inspect(Enum.take(failing, 2), limit: 8)}"
+    assert Map.get(counts, "aktionsfreigabe", 0) >= 200
+    assert Map.get(counts, "offenlegungsfreigabe", 0) >= 5
+  end
+
   # ---------------------------------------------------------------------
   # Comparison
   # ---------------------------------------------------------------------
@@ -199,35 +322,105 @@ defmodule KomkiPolicy.LeanSpecTest do
   end
 
   defp compare_decisions!(cases, label) do
+    cases
+    |> Enum.map(fn {raw, registry, snapshot, intent} ->
+      line = %{
+        "registry" => raw,
+        "snapshot" => snapshot,
+        "intent" => intent,
+        "call_hash" => call_hash(snapshot, intent)
+      }
+
+      {line, elixir_decision(registry, snapshot, intent)}
+    end)
+    |> compare_json!("derive-batch", label, "Derive.decide/3 und dem Lean-Modell")
+  end
+
+  # Pairs {case line, Elixir result} against the Lean batch `command`;
+  # returns the results counted by operation and kind.
+  defp compare_json!(pairs, command, label, what) do
     judged =
-      cases
-      |> Enum.map(fn {raw, registry, snapshot, intent} ->
-        line = %{"registry" => raw, "snapshot" => snapshot, "intent" => intent}
-        {line, elixir_decision(registry, snapshot, intent)}
-      end)
-      |> Enum.reject(fn {_, decision} -> decision == :dropped end)
+      pairs
+      |> Enum.reject(fn {_, result} -> result == :dropped end)
       |> Enum.with_index()
 
-    lean = run_lean("derive-batch", judged)
+    lean = run_lean(command, judged)
 
     mismatches =
-      for {{line, decision}, id} <- judged,
-          parse_decision(Map.get(lean, id)) != decision,
-          do: {id, decision, parse_decision(Map.get(lean, id)), line}
+      for {{line, result}, id} <- judged,
+          parse_decision(Map.get(lean, id)) != result,
+          do: {id, result, parse_decision(Map.get(lean, id)), line}
 
-    report_mismatches!(mismatches, label, "Derive.decide/3 und dem Lean-Modell")
+    report_mismatches!(mismatches, label, what)
 
-    Enum.frequencies_by(judged, fn {{line, decision}, _} ->
-      {line["intent"]["operation"], decision["decision"] || Enum.at(Map.keys(decision), 0)}
+    Enum.frequencies_by(judged, fn {{line, result}, _} ->
+      {line["intent"]["operation"], result["decision"] || Enum.at(Map.keys(result), 0)}
     end)
   end
 
+  defp release_pair({raw, registry, snapshot, intent, release, stand}) do
+    line = %{
+      "registry" => raw,
+      "snapshot" => snapshot,
+      "intent" => intent,
+      "release" => release,
+      "stand" => stand,
+      "call_hash" => call_hash(snapshot, intent)
+    }
+
+    {line, elixir_release(registry, snapshot, intent, release, stand)}
+  end
+
+  defp elixir_release(registry, snapshot, intent, release, stand) do
+    case Derive.decide_with_release(registry, snapshot, intent, release, stand) do
+      {:ok, decision} ->
+        decision |> Map.take(@release_fields) |> Map.put("gos", gos(decision["remedies"]))
+
+      {:unsupported, _} ->
+        %{"unsupported" => true}
+
+      {:error, %{code: code}} when code in @derive_input_errors ->
+        %{"input_error" => to_string(code)}
+
+      {:error, _} ->
+        :dropped
+    end
+  end
+
+  defp elixir_advance(stand, proposal) do
+    case Stand.advance(stand, proposal) do
+      {:ok, next} -> %{"ok" => next |> Stand.to_record() |> Map.delete("schema")}
+      {:refused, %{code: code}} -> %{"refused" => to_string(code)}
+      {:error, _} -> :dropped
+    end
+  end
+
+  defp call_hash(snapshot, intent) do
+    case get_in(snapshot, ["facts", "output_content_digest", "value"]) do
+      nil ->
+        ""
+
+      digest ->
+        Release.call_hash(digest, intent["object"], intent["operation"], intent["workspace"])
+    end
+  end
+
+  # The GO offers of a catalog, per finding (§ 2.8); the other transitions
+  # are not modelled.
+  defp gos(nil), do: nil
+
+  defp gos(remedies) do
+    for entry <- remedies do
+      Enum.filter(entry["transitions"], &(&1["type"] in ~w(aktionsfreigabe offenlegungsfreigabe)))
+    end
+  end
+
   # The fields of a decision the Lean model decides: everything but the
-  # echoes of the input and the remedies (§ 2.8, not modelled).
+  # echoes of the input and, of the remedies, all but the GO offers.
   defp elixir_decision(registry, snapshot, intent) do
     case Derive.decide(registry, snapshot, intent) do
       {:ok, decision} ->
-        Map.take(decision, @decision_fields)
+        decision |> Map.take(@decision_fields) |> Map.put("gos", gos(decision["remedies"]))
 
       {:unsupported, _} ->
         %{"unsupported" => true}
@@ -663,6 +856,205 @@ defmodule KomkiPolicy.LeanSpecTest do
     |> Map.put("facts", facts)
   end
 
+  defp seeded_list(generator) do
+    generator
+    |> StreamData.resize(30)
+    |> StreamData.list_of(length: env_int("KOMKI_SPEC_RUNS", 8_000))
+    |> StreamData.seeded(env_int("KOMKI_SPEC_SEED", 20_261_123))
+    |> Enum.at(0)
+  end
+
+  # ---------------------------------------------------------------------
+  # Releases (§ 4.6, § 4.9) and the stand (§ 2.7)
+  # ---------------------------------------------------------------------
+
+  defp release_world_gen do
+    gen all(
+          world <- world_gen(),
+          variants <- StreamData.list_of(release_variant_gen(), length: 3)
+        ) do
+      {world, variants}
+    end
+  end
+
+  defp release_variant_gen do
+    StreamData.one_of([
+      StreamData.member_of(
+        ~w(base base wrong_hash foreign_scope not_yet expired consumed foreign_authority)a
+      ),
+      StreamData.tuple(
+        {StreamData.constant(:offenlegung),
+         StreamData.frequency([
+           {4, StreamData.constant(:matching)},
+           {1, StreamData.constant("freigabe-notiz")}
+         ]),
+         StreamData.frequency([
+           {4, StreamData.constant(["ratsprojekte@1"])},
+           {1, StreamData.constant(["b-eins@1"])},
+           {1, StreamData.constant(["b-unbekannt@1"])}
+         ]), StreamData.integer(0..4)}
+      )
+    ])
+  end
+
+  # Each variant against the snapshot and the repaired one; a release only
+  # exists for the output rules.
+  defp release_cases({{raw, op, snapshot, _other, _mutations}, variants}) do
+    with true <- op in Derive.output_operations(),
+         {:ok, registry} <- Registry.compile(raw) do
+      for target <- [snapshot, repaired(snapshot, op)],
+          variant <- variants,
+          do:
+            {raw, registry, target, intent(op), release_variant(raw, target, op, variant), @stand}
+    else
+      _ -> []
+    end
+  end
+
+  defp fixture_release_cases do
+    raw = fixture("registry.json")
+    {:ok, registry} = Registry.compile(raw)
+
+    for dir <- File.ls!(@fixtures_dir),
+        File.exists?(Path.join([@fixtures_dir, dir, "release.json"])),
+        do:
+          {raw, registry, fixture(dir <> "/snapshot.json"), fixture(dir <> "/intent.json"),
+           fixture(dir <> "/release.json"), fixture(dir <> "/stand.json")}
+  end
+
+  defp base_release(target, op, authority) do
+    hash =
+      case call_hash(target, intent(op)) do
+        "" -> @hex
+        hash -> hash
+      end
+
+    %{
+      "schema" => "komki-release/1",
+      "release_id" => "go-drt",
+      "kind" => "aktionsfreigabe",
+      "operation" => op,
+      "object" => "obj-drt@v1",
+      "workspace" => "ws-drt",
+      "content_digest" => @hex,
+      "call_hash" => hash,
+      "scope" => "scope-drt",
+      "authority" => authority,
+      "valid_from" => 40,
+      "valid_until" => 60,
+      "nonce" => "n-neu"
+    }
+  end
+
+  defp release_variant(raw, target, op, variant) do
+    base = base_release(target, op, hd(raw["observers"]))
+
+    case variant do
+      :base ->
+        base
+
+      :wrong_hash ->
+        Map.put(base, "call_hash", @hex)
+
+      :foreign_scope ->
+        Map.put(base, "scope", "scope-fremd")
+
+      :not_yet ->
+        Map.merge(base, %{"valid_from" => 51, "valid_until" => 60})
+
+      :expired ->
+        Map.merge(base, %{"valid_from" => 10, "valid_until" => 49})
+
+      :consumed ->
+        Map.put(base, "nonce", "n-alt")
+
+      :foreign_authority ->
+        Map.put(base, "authority", "o-fremd")
+
+      {:offenlegung, art, ziellabel, index} ->
+        offenlegung(base, raw, target, art, ziellabel, index)
+    end
+  end
+
+  defp offenlegung(base, raw, target, art, ziellabel, index) do
+    ausgabeart =
+      if art == :matching,
+        do: Derive.ziel_ausgabeart(target["workspace"]["environment"]) || "ratsprojekte-essenz",
+        else: art
+
+    observers = raw["observers"]
+
+    Map.merge(base, %{
+      "schema" => "komki-release/2",
+      "kind" => "offenlegungsfreigabe",
+      "ausgabeart" => ausgabeart,
+      "ziellabel" => ziellabel,
+      "authority" => Enum.at(observers, rem(index, length(observers)))
+    })
+  end
+
+  # A release exactly as the offer reads, fresh nonce and valid window; for
+  # the Offenlegungsfreigabe an authority holding every needed Befugnis.
+  defp release_from_offer(registry, snapshot, intent, go) do
+    op = intent["operation"]
+    base = base_release(snapshot, op, hd(registry.observers))
+    base = Map.merge(base, %{"call_hash" => go["call_hash"], "nonce" => "n-frisch"})
+
+    case go["type"] do
+      "aktionsfreigabe" ->
+        base
+
+      "offenlegungsfreigabe" ->
+        checked = Derive.checked_label(op, snapshot["workspace"], snapshot["object"])
+        rho = Calculus.actual_recipients(registry, snapshot["workspace"]["environment"])
+
+        [authority | _] =
+          Calculus.lockerungsbefugte(registry, checked, rho, go["ausgabeart"]) ++
+            [base["authority"]]
+
+        Map.merge(base, %{
+          "schema" => "komki-release/2",
+          "kind" => "offenlegungsfreigabe",
+          "ausgabeart" => go["ausgabeart"],
+          "ziellabel" => go["ziellabel"],
+          "authority" => authority
+        })
+    end
+  end
+
+  defp advance_gen do
+    gen all(
+          version <- StreamData.integer(0..4),
+          consumed <- subset_gen(~w(n-a n-b n-c), 0),
+          nonce <- StreamData.member_of(~w(n-a n-b n-c n-d)),
+          ref <- StreamData.member_of([0, 0, 0, -1, 1]),
+          after_delta <- StreamData.member_of([1, 1, 1, 0, 2])
+        ) do
+      stand = %{
+        @stand
+        | "version" => version,
+          "consumed" => Map.new(consumed, &{&1, "go-" <> &1})
+      }
+
+      {stand, proposal(nonce, max(version + ref, 0), version + after_delta)}
+    end
+  end
+
+  defp proposal(nonce, ref_version, version_after) do
+    %{
+      "release_id" => "go-neu",
+      "nonce" => nonce,
+      "stand_ref" => "stand-drt@#{ref_version}",
+      "stand_version_after" => version_after,
+      "call_hash" => @hex
+    }
+  end
+
+  # After a commit: the same nonce, addressed correctly to the next stand.
+  defp replay_on(next, used) do
+    {next, proposal(used["nonce"], next["version"], next["version"] + 1)}
+  end
+
   defp world_gen do
     gen all(
           raw <- registry_gen(),
@@ -709,9 +1101,29 @@ defmodule KomkiPolicy.LeanSpecTest do
               {2, StreamData.constant(observers)},
               {1, subset_gen(observers, 1)}
             ]),
-          operations <- rules_gen()
+          operations <- rules_gen(),
+          befugnisse <- StreamData.list_of(befugnis_gen(observers), max_length: 2)
         ) do
-      %{"readers" => readers, "operations" => operations, "relaxation_authorities" => []}
+      %{
+        "readers" => readers,
+        "operations" => operations,
+        "relaxation_authorities" => Enum.uniq(befugnisse)
+      }
+    end
+  end
+
+  # Mostly the one combination § 4.9 decides, sometimes another (R.2.2).
+  defp befugnis_gen(observers) do
+    gen all(
+          authority <- StreamData.member_of(observers),
+          {restriction, output} <-
+            StreamData.frequency([
+              {4, StreamData.constant({"readers", "ratsprojekte-essenz"})},
+              {1, StreamData.constant({"operations", "ratsprojekte-essenz"})},
+              {1, StreamData.constant({"readers", "freigabe-notiz"})}
+            ])
+        ) do
+      %{"authority" => authority, "restriction" => restriction, "output" => output}
     end
   end
 
