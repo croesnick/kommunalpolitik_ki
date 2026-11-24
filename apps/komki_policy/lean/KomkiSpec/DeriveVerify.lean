@@ -123,7 +123,6 @@ theorem premises_built_ok {Γ : Registry} {S : Snapshot} {rule : String}
       mkPremise, basisPremise, Premise.strField?, Premise.get?, List.lookup, hv, hf, henv, hrho,
       hck, handoverOperations, List.all_eq_true]
     exact ⟨hl, hallowed, fun b hb => by simpa [premiseOk] using hconds b hb⟩
-  all_goals sorry
 
 /-- `verify` accepts every tree `derive` builds: the tree proves its permit
 against the same registry, snapshot and intent. -/
