@@ -16,6 +16,8 @@ structure Binding where
   readers : List String
   /-- Rule name → expression, as compiled (unparsed JSON). -/
   operations : List (String × JVal)
+  /-- `relaxation_authorities`: (authority, restriction, output) (§ 2.1, R.2.2). -/
+  befugnisse : List (String × String × String) := []
 
 structure Registry where
   registryId : String

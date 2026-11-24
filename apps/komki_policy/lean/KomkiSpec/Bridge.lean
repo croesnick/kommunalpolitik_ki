@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import KomkiSpec.Domain
+import KomkiSpec.Release
 
 /-!
 # Bridge: the CLI's JSON into the model
@@ -59,7 +60,11 @@ def decodeRegistry (j : JVal) : Decode Registry := do
     pure (id, sortStrings (← asStrs (← field env "observers")))
   let bindings ← (← asObj (← field j "bindings")).mapM fun (id, b) => do
     let readers := sortStrings (← asStrs (← field b "readers"))
-    pure (id, { readers, operations := ← asObj (← field b "operations") : Binding })
+    let befugnisse ← match b.get? "relaxation_authorities" with
+      | some (.arr es) => es.mapM fun e => do
+          pure (← strAt e "authority", ← strAt e "restriction", ← strAt e "output")
+      | _ => pure []
+    pure (id, { readers, operations := ← asObj (← field b "operations"), befugnisse : Binding })
   pure {
     registryId := ← strAt j "registry_id"
     observers := sortStrings (← asStrs (← field j "observers"))
@@ -153,8 +158,25 @@ def Proof.toJson (P : Proof) : Json :=
     ("checked_label", Lean.toJson P.checkedLabel),
     ("premises", .arr (P.premises.map fun p => (JVal.obj p.fields).toJson).toArray)]
 
+def Go.toJson : Go → Json
+  | .aktion h => Json.mkObj [("type", "aktionsfreigabe"), ("scope", "call"), ("call_hash", h)]
+  | .object r => Json.mkObj [("type", "aktionsfreigabe"), ("scope", "object"), ("object", r)]
+  | .offenlegung h art zl => Json.mkObj [("type", "offenlegungsfreigabe"), ("scope", "call"),
+      ("call_hash", h), ("ausgabeart", art), ("ziellabel", Lean.toJson zl)]
+
+def gosJson (gos : List (List Go)) : Json :=
+  .arr (gos.map fun g => Json.arr (g.map Go.toJson).toArray).toArray
+
+/-- `remedies_context/2` of the normal branch. -/
+def normalCatalogCtx (Γ : Registry) (S : Snapshot) (rule callHash : String) : CatalogCtx :=
+  let art := zielAusgabeart S.environment
+  { rule, callHash := if outputOperations.contains rule then some callHash else none,
+    objectRef := S.objectRef, checked := checkedLabel rule S, rho := actualRecipients Γ S,
+    observersProven := factState S "environment_observers_complete" == .true,
+    ausgabeart := art, ziellabel := (art.bind ausgabeartZiellabel).getD [] }
+
 /-- The fields of `Derive.decide/3` this model decides: everything but the
-echoes of the input and the remedies. -/
+echoes of the input and the remedies apart from their GO offers. -/
 def decisionJson (S : Snapshot) (rule : String) (d : Decision) : Json :=
   let checked := Lean.toJson (checkedLabel rule S)
   let (name, blockers, evidence, proof, assigned) : String × Json × Json × Json × Json :=
@@ -171,15 +193,125 @@ def decisionJson (S : Snapshot) (rule : String) (d : Decision) : Json :=
     [("decision", .str name), ("rule", .str rule), ("checked_label", checked),
      ("blockers", blockers), ("missing_evidence", evidence), ("proof", proof)] ++ output
 
-def Derived.toJson (S : Snapshot) (rule : String) : Derived → Json
-  | .decision d => decisionJson S rule d
+/-- The GO offers per finding of a `deny` or `indeterminate`. -/
+def decisionGos (Γ : Registry) (S : Snapshot) (rule callHash : String) : Decision → Json
+  | .permit _ => .null
+  | .deny bs => gosJson (catalogGos Γ (normalCatalogCtx Γ S rule callHash) (bs.map (·.code)))
+  | .indeterminate es =>
+    gosJson (catalogGos Γ (normalCatalogCtx Γ S rule callHash) (es.map (·.code)))
+
+def withField (j : Json) (k : String) (v : Json) : Json :=
+  match j with
+  | .obj kvs => .obj (kvs.insert k v)
+  | other => other
+
+def Derived.toJson (Γ : Registry) (S : Snapshot) (rule callHash : String) : Derived → Json
+  | .decision d => withField (decisionJson S rule d) "gos" (decisionGos Γ S rule callHash d)
   | .inputError code => Json.mkObj [("input_error", .str code)]
   | .unsupported => Json.mkObj [("unsupported", .bool true)]
 
-/-- One case `{"registry", "snapshot", "intent"}` → decision. -/
+def optStrAt (j : JVal) (k : String) : Decode (Option String) :=
+  match j.get? k with
+  | some (.str s) => pure (some s)
+  | _ => pure none
+
+/-- One case `{"registry", "snapshot", "intent", "call_hash"}` → decision. -/
 def deriveCase (j : JVal) : Decode Json := do
   let (Γ, S) ← decodeWorld j
   let I ← decodeIntent (← field j "intent")
-  pure ((derive Γ S I).toJson S I.operation)
+  let callHash := (← optStrAt j "call_hash").getD ""
+  pure ((derive Γ S I).toJson Γ S I.operation callHash)
+
+/-! ## Release branches and `advance` -/
+
+def asInt : JVal → Decode Int
+  | .int i => pure i
+  | _ => throw "expected an integer"
+
+def asNat (j : JVal) : Decode Nat := do
+  let i ← asInt j
+  if i < 0 then throw "expected a non-negative integer" else pure i.toNat
+
+def decodeRelease (j : JVal) : Decode Release := do
+  pure {
+    releaseId := ← strAt j "release_id", kind := ← strAt j "kind"
+    callHash := ← strAt j "call_hash", scope := ← strAt j "scope"
+    authority := ← strAt j "authority", validFrom := ← asInt (← field j "valid_from")
+    validUntil := ← asInt (← field j "valid_until"), nonce := ← strAt j "nonce"
+    ausgabeart := ← optStrAt j "ausgabeart"
+    ziellabel := ← match j.get? "ziellabel" with
+      | some v => asStrs v
+      | none => pure [] }
+
+def decodeStand (j : JVal) : Decode Stand := do
+  let consumed ← (← asObj (← field j "consumed")).mapM fun (n, r) => do pure (n, ← asStr r)
+  pure {
+    standId := ← strAt j "stand_id", version := ← asNat (← field j "version")
+    scope := ← strAt j "scope", asOf := ← asInt (← field j "as_of"), consumed }
+
+def decodeProposal (j : JVal) : Decode Proposal := do
+  pure {
+    releaseId := ← strAt j "release_id", nonce := ← strAt j "nonce"
+    standRef := ← strAt j "stand_ref"
+    standVersionAfter := ← asNat (← field j "stand_version_after")
+    callHash := ← strAt j "call_hash", ausgabeart := ← optStrAt j "ausgabeart"
+    ziellabel := ← match j.get? "ziellabel" with
+      | some v => asStrs v
+      | none => pure [] }
+
+def Proposal.toJson (P : Proposal) : Json :=
+  Json.mkObj <|
+    [("release_id", .str P.releaseId), ("nonce", .str P.nonce), ("stand_ref", .str P.standRef),
+     ("stand_version_after", Lean.toJson P.standVersionAfter), ("call_hash", .str P.callHash)] ++
+    match P.ausgabeart with
+    | some art => [("ausgabeart", .str art), ("ziellabel", Lean.toJson P.ziellabel)]
+    | none => []
+
+def Stand.toJson (St : Stand) : Json :=
+  Json.mkObj [("stand_id", .str St.standId), ("version", Lean.toJson St.version),
+    ("scope", .str St.scope), ("as_of", Lean.toJson St.asOf),
+    ("consumed", Json.mkObj (St.consumed.map fun (n, r) => (n, .str r)))]
+
+/-- `release_remedies_context/4`. -/
+def releaseCatalogCtx (Γ : Registry) (S : Snapshot) (rule : String) (R : Release)
+    (callHash : String) : CatalogCtx :=
+  { rule := "release", releaseKind := some R.kind, callHash := some callHash,
+    objectRef := S.objectRef, checked := checkedLabel rule S, rho := actualRecipients Γ S,
+    observersProven := factState S "environment_observers_complete" == .true,
+    ausgabeart := R.ausgabeart, ziellabel := R.ziellabel }
+
+def releaseDecisionJson (Γ : Registry) (S : Snapshot) (rule : String) (R : Release)
+    (callHash : String) (d : ReleaseDecision) : Json :=
+  let checked := Lean.toJson (checkedLabel rule S)
+  let (name, blockers, proposal, assigned, gos) : String × Json × Json × Json × Json :=
+    match d with
+    | .permit P => ("permit", .null, P.toJson, checked, .null)
+    | .deny bs => ("deny", .arr (bs.map Blocker.toJson).toArray, .null, .null,
+        gosJson (catalogGos Γ (releaseCatalogCtx Γ S rule R callHash) (bs.map (·.code))))
+  let digest := ((S.facts.lookup "output_content_digest").map JVal.toJson).getD .null
+  Json.mkObj <|
+    [("decision", .str name), ("rule", .str rule), ("checked_label", checked),
+     ("blockers", blockers), ("release", proposal), ("content_digest", digest), ("gos", gos)] ++
+    if rule == "emit" then [("assigned_label", assigned)] else []
+
+/-- One case `{"registry", "snapshot", "intent", "release", "stand", "call_hash"}`. -/
+def releaseCase (j : JVal) : Decode Json := do
+  let (Γ, S) ← decodeWorld j
+  let I ← decodeIntent (← field j "intent")
+  let R ← decodeRelease (← field j "release")
+  let St ← decodeStand (← field j "stand")
+  let c ← strAt j "call_hash"
+  pure <| match deriveWithRelease Γ S I R St c with
+    | .decision d => releaseDecisionJson Γ S I.operation R c d
+    | .inputError code => Json.mkObj [("input_error", .str code)]
+    | .unsupported => Json.mkObj [("unsupported", .bool true)]
+
+/-- One case `{"stand", "proposal"}`. -/
+def advanceCase (j : JVal) : Decode Json := do
+  let St ← decodeStand (← field j "stand")
+  let P ← decodeProposal (← field j "proposal")
+  pure <| match advance St P with
+    | .ok St' => Json.mkObj [("ok", St'.toJson)]
+    | .refused code => Json.mkObj [("refused", .str code)]
 
 end KomkiSpec
