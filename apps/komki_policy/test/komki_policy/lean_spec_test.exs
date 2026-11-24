@@ -121,7 +121,8 @@ defmodule KomkiPolicy.LeanSpecTest do
     {:ok, registry} = Registry.compile(raw)
 
     cases =
-      for {snapshot, intent} <- fixture_worlds() ++ unsupported_fixture_worlds() ++ digestless(),
+      for {snapshot, intent} <-
+            fixture_worlds() ++ unsupported_fixture_worlds() ++ input_error_worlds(),
           do: {raw, registry, snapshot, intent}
 
     stats = compare_decisions!(cases, "derive-korpus")
@@ -321,7 +322,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
-  defp digestless do
+  defp input_error_worlds do
     [
       {fixture("invalid/emit_digest_missing_snapshot.json"),
        fixture("invalid/emit_digest_missing_intent.json")},
