@@ -112,14 +112,18 @@ passender oder falscher Ausgabeart und Ziellabel). Für `advance` vergleicht
 er den nächsten Stand oder den Ablehnungsgrund, auch für die Wiederholung
 nach einem Commit.
 
+Den Auswerter vergleicht er auch direkt: die Grenzfälle aus
+`priv/fixtures/expressions/evaluate_expectations.json` und 8 000
+generierte Ausdrücke über generierten Fakten, Urteil gegen Urteil.
+
 Ein weiterer Test prüft in Elixir, was `catalog_*_effective` für das Modell
 beweist: Jedes angebotene GO für den exakten Call wird zu einer Freigabe
 mit frischer Nonce, und der Freigabe-Zweig muss erlauben.
 
 `KOMKI_SPEC_SEED` und `KOMKI_SPEC_RUNS` erweitern die Suche. Eine Abweichung
 schreibt ihre Fälle als JSONL-Datei; `komki-spec verify-batch`,
-`derive-batch`, `release-batch` beziehungsweise `advance-batch` spielt sie
-nach.
+`derive-batch`, `release-batch`, `advance-batch` beziehungsweise
+`eval-batch` spielt sie nach.
 
 ## Synchron halten
 

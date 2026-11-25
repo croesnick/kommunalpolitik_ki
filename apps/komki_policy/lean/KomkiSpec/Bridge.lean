@@ -339,4 +339,17 @@ def advanceCase (j : JVal) : Decode Json := do
     | .ok St' => Json.mkObj [("ok", St'.toJson)]
     | .refused code => Json.mkObj [("refused", .str code)]
 
+/-- One case `{"expression", "facts"}` → the verdict of `eval` (§ 3). -/
+def evalCase (j : JVal) : Decode Json := do
+  let e ← match Expr.ofJVal (← field j "expression") with
+    | some e => pure e
+    | none => throw "expression outside B.4"
+  let facts ← (← asObj (← field j "facts")).mapM fun (name, entry) => do
+    pure (name, ← field entry "value")
+  let verdict := match eval (fun n => facts.lookup n) e with
+    | .true => "true"
+    | .false => "false"
+    | .unknown => "unknown"
+  pure (Json.mkObj [("verdict", .str verdict)])
+
 end KomkiSpec

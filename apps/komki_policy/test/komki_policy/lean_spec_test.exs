@@ -17,7 +17,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   use ExUnit.Case, async: false
   use ExUnitProperties
 
-  alias KomkiPolicy.{Calculus, Derive, Registry, Release, Stand, Verify}
+  alias KomkiPolicy.{Calculus, Derive, Evaluator, Registry, Release, Stand, Verify}
 
   @moduletag :lean_spec
   @moduletag timeout: 600_000
@@ -230,6 +230,31 @@ defmodule KomkiPolicy.LeanSpecTest do
     IO.puts("\nlean_spec advance: #{inspect(stats)}")
     assert Map.get(stats, {"advance", "ok"}, 0) >= 200
     assert Map.get(stats, {"advance", "refused"}, 0) >= 200
+  end
+
+  test "Auswerter: Evaluator und das Lean-Modell werten gleich aus" do
+    corpus =
+      for c <- fixture("expressions/evaluate_expectations.json")["cases"],
+          do: {c["expression"], c["facts"]}
+
+    generated = seeded_list(StreamData.tuple({expr_gen(), facts_gen()}))
+
+    pairs =
+      for {expression, facts} <- corpus ++ generated do
+        line = %{
+          "expression" => expression,
+          "facts" => facts,
+          "intent" => %{"operation" => "eval"}
+        }
+
+        {line, %{"verdict" => to_string(Evaluator.evaluate(expression, facts))}}
+      end
+
+    compare_json!(pairs, "eval-batch", "eval", "Evaluator.evaluate/2 und dem Lean-Auswerter")
+    verdicts = Enum.frequencies_by(pairs, fn {_, result} -> result["verdict"] end)
+    IO.puts("\nlean_spec eval: #{inspect(verdicts)}")
+
+    for verdict <- ~w(true false unknown), do: assert(Map.get(verdicts, verdict, 0) >= 500)
   end
 
   # Not a comparison with Lean, but the property the Lean theorem states
