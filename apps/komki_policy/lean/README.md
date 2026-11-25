@@ -1,8 +1,8 @@
 # Lean-Spezifikation von komki_policy
 
 Formales Modell der Policy-Engine in Lean 4: `derive` mit normalem Zweig
-und Freigabe-Zweigen, `verify`, die GO-Angebote des Remedy-Katalogs und
-der Standübergang `advance`, mit Beweisen ihrer Korrektheit für die
+und Freigabe-Zweigen, `verify`, der Remedy-Katalog, der Auswerter und der
+Standübergang `advance`, mit Beweisen ihrer Korrektheit für die
 Regelzweige `admit`, `emit`, `store` und `transfer` (Tickets #625, #629).
 Der Elixir-Code wird per Differenztest gegen das bewiesene Lean-Modell
 gehalten, ein Pin meldet jede Änderung an den gespiegelten Modulen. Die
@@ -158,7 +158,10 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 
 - **Vom Remedy-Katalog sind Wirksamkeit, Ordnung und Vollständigkeit
   bewiesen,** nicht die Payloads der übrigen Fortsetzungen; die hält der
-  Differenztest am Elixir-Code.
+  Differenztest am Elixir-Code. Die Wirksamkeitssätze sprechen über
+  `catalogGos` (`Release.lean`), Ordnung und Vollständigkeit über `catalog`
+  (`Remedies.lean`). Dass beide auf den GO-Einträgen übereinstimmen, zeigt
+  nur der Differenztest, der beide mit Elixir vergleicht; ein Satz fehlt.
 - **Katalogsätze nur für den normalen Zweig.** `catalog_*_effective` gilt
   für die GO-Angebote einer Ablehnung im normalen Zweig. Dass ein erneutes
   Angebot nach einer Ablehnung im Freigabe-Zweig wirkt, prüft nur der

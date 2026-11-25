@@ -188,7 +188,8 @@ def gosJson (gos : List (List Go)) : Json :=
   .arr (gos.map fun g => Json.arr (g.map Go.toJson).toArray).toArray
 
 /-- The fields of `Derive.decide/3` this model decides: everything but the
-echoes of the input and the remedies apart from their GO offers. -/
+echoes of the input; the remedies come from `decisionRemedies`, the GO
+offers the theorems are about from `decisionGos`. -/
 def decisionJson (S : Snapshot) (rule : String) (d : Decision) : Json :=
   let checked := Lean.toJson (checkedLabel rule S)
   let (name, blockers, evidence, proof, assigned) : String × Json × Json × Json × Json :=

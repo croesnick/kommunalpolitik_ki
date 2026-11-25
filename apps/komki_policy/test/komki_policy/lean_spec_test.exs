@@ -445,8 +445,8 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
-  # The GO offers of a catalog, per finding (§ 2.8); the other transitions
-  # are not modelled.
+  # The GO offers of a catalog, per finding (§ 2.8): `catalogGos`, which the
+  # Lean theorems are about. The whole catalog is compared as `remedies`.
   defp gos(nil), do: nil
 
   defp gos(remedies) do
@@ -456,7 +456,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   end
 
   # The fields of a decision the Lean model decides: everything but the
-  # echoes of the input and, of the remedies, all but the GO offers.
+  # echoes of the input.
   defp elixir_decision(registry, snapshot, intent) do
     case Derive.decide(registry, snapshot, intent) do
       {:ok, decision} ->

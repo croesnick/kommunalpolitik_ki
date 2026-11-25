@@ -97,6 +97,8 @@ def catalog (Γ : Registry) (c : CatalogCtx) (fs : List Finding) : List (List Tr
     c.rule != "release" && offenlegungOfferable Γ c && !stripOff
   let built := fs.map fun f =>
     (f, ordered (if c.rule == "release" then releaseTransitions c f else regularTransitions Γ c f))
+  -- `:keep` fills nothing up. Observably the same as filling: every code
+  -- `derive` reports already has a continuation (`derive_deny_remedied`).
   if !(stripAktion0 || stripOff || instead) then built.map (·.2)
   else built.map fun (f, ts) =>
     let kept := ts.filter fun
