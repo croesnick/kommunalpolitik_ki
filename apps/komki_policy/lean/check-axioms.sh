@@ -14,6 +14,8 @@ for theorem in verify_sound verify_sound_rfc derivable_permitted handover_within
   verify_emit_assigns derive_sound derive_complete derive_permit_stable derive_deny_stable \
   derive_verifies aktion_permit offenlegung_permit release_single_use advance_cas \
   catalog_aktion_effective catalog_offenlegung_effective catalog_gos \
+  release_catalog_aktion_effective release_catalog_offenlegung_effective \
+  release_remedies_aktion_effective release_remedies_offenlegung_effective \
   remedies_aktion_effective remedies_offenlegung_effective catalog_ascending \
   derive_blockers_named derive_evidence_named derive_fakt_deny derive_fakt_indeterminate \
   derive_transformations_listed remedies_transformation catalog_neuerRaum neuer_raum_necessary \
