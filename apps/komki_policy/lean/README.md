@@ -28,9 +28,11 @@ CI.
 | `catalog_gos` | Die GO-Angebote des ganzen Katalogs (`catalog`) sind Eintrag für Eintrag die, über die die Wirksamkeitssätze sprechen (`catalogGos`), für jeden Befund, den `derive` meldet | CONTRACT.md § 2.8 |
 | `remedies_aktion_effective`, `remedies_offenlegung_effective` | Daraus: Jedes GO, das ein Eintrag des ganzen Katalogs einer Ablehnung des normalen Zweigs anbietet, wirkt | CONTRACT.md § 2.8 |
 | `catalog_ascending` | In jedem Eintrag des Katalogs stehen die Fortsetzungen in der normativen Ordnung: kein GO vor einer Fortsetzung, die nichts verletzt | CONTRACT.md § 2.8 |
-| `derive_missing_named`, `derive_condition_named` | Jeder `missing_fact` von `derive` nennt einen Fakt, der im Snapshot fehlt; jede falsche Bindungsbedingung, wenn überhaupt, ein Feld ihres Ausdrucks; `fakt_nachreichen` fragt genau danach | CONTRACT.md § 2.8, § 4.4 |
+| `derive_fakt_deny`, `derive_fakt_indeterminate` | `fakt_nachreichen` fragt nach genau dem Feld, das sein Befund nennt, nie nach keinem | CONTRACT.md § 2.8 |
+| `derive_blockers_named`, `derive_evidence_named` | Was ein Befund nennt, ist das, was § 2.8 meint: bei `missing_fact` einen Fakt, der im Snapshot fehlt; bei `recipients_unproven` die Beobachterliste, die nicht `true` ist; bei `basis_right_false` und `audit_path_not_ready` den Basisfakt, der `false` ist; bei `binding_condition_false` ein Feld der falschen Bedingung, und keines nur, wenn die Bedingung unabhängig von den Fakten `false` ist | CONTRACT.md § 2.8, § 4.3, § 4.4 |
+| `derive_transformations_listed` | `registrierte_transformation` listet bei `label_not_included` genau die registrierten Transformationen mit `input_labels ⊆ λ(x)` und `output_labels ⊆ B_W`, in der Reihenfolge der Registry | CONTRACT.md § 2.1, § 2.8 |
 | `remedies_transformation` | `registrierte_transformation` bietet nur registrierte Transformationen mit `input_labels ⊆ λ(x)` und `output_labels` im Prüflabel an; ein Objekt mit diesen Labels besteht die Label-Inklusion | CONTRACT.md § 2.1, § 2.8 |
-| `catalog_neuerRaum`, `neuer_raum_necessary`, `neuer_raum_recipients_necessary` | `neuer_raum` trägt außerhalb des Freigabe-Zweigs `required_bindings` = λ(x) bei `admit` und `required_recipients` = ρ_Γ(c). Beides ist notwendig: Jeder Raum, in dem `derive` x aufnimmt, hat alle `required_bindings`; jeder Raum in derselben Umgebung, in dem `derive` erlaubt, lässt alle `required_recipients` unter seinem Prüflabel zu | CONTRACT.md § 2.8, B.7 |
+| `catalog_neuerRaum`, `neuer_raum_necessary`, `neuer_raum_recipients_necessary` | `neuer_raum` trägt `required_bindings` = λ(x) bei `admit`, sonst `[]`, und `required_recipients` = ρ_Γ(c). Beides ist notwendig: Jeder Raum, in dem `derive` x aufnimmt, hat alle `required_bindings`; jeder Raum in derselben Umgebung, in dem `derive` erlaubt, lässt alle `required_recipients` unter seinem Prüflabel zu | CONTRACT.md § 2.8, B.7 |
 | `derive_deny_remedied`, `derive_indeterminate_remedied`, `release_remedied` | Jeder Blocker und jeder fehlende Beleg von `derive`, auch im Freigabe-Zweig, bekommt mindestens eine Fortsetzung, kein nacktes `deny` | CONTRACT.md § 2.8, APPA Theorem 5 |
 | `eval_mono` | Mehr Fakten kippen kein bekanntes Urteil des dreiwertigen Auswerters | R.5.2, CONTRACT.md § 3 |
 | `recipients_antitone`, `permitted_antitone` | Mehr Bindungen, nie mehr Empfänger; Erlaubt vererbt sich auf Teilmengen | A.2 |
@@ -126,12 +128,14 @@ generierte Ausdrücke über generierten Fakten, Urteil gegen Urteil.
 
 Die Eingabeprüfung vergleicht er mit verdorbenen Eingaben: Je Welt wird
 die Registry an einer Stelle beschädigt (fremder Leser, fremde Autorität,
-fremder Umgebungsbeobachter, leere oder doppelte Leser, unbekanntes Label
-einer Transformation, ein Ausdruck mit unbekanntem Feld, falschem
+fremder Umgebungsbeobachter, leere oder doppelte Leser, unbekanntes Ein-
+oder Ausgabelabel einer Transformation, leere Eingabelabels, ein in
+`fact_fields` umdeklarierter Basisfakt, ein Ausdruck mit unbekanntem Feld, falschem
 Literaltyp, Gleitkommazahl, negativer Schranke, falschem Operator für den
 Feldtyp oder falscher Form) und der Snapshot ebenso (unsortierte oder
 doppelte Bindungen und Labels, unbekannte Bindung oder Umgebung, Fakt mit
-falschem Typ, undeklarierter Fakt, fremde Klassifikation), jeweils oder
+falschem Typ, auch ein Basisfakt als String, `string_set` mit einem
+Nicht-String, undeklarierter Fakt, fremde Klassifikation), jeweils oder
 beides unverdorben. Was `Registry.compile/1` und
 `Context.validate_snapshot/2` annehmen, muss `Registry.compiledOk`
 beziehungsweise `Snapshot.validated` erfüllen: die Voraussetzungen der
@@ -191,9 +195,11 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 ## Grenzen
 
 - **Vom Remedy-Katalog sind Wirksamkeit, Ordnung, Vollständigkeit und
-  die Payload-Zusagen aus § 2.8 bewiesen** (benannter fehlender Fakt oder
-  Bedingungsfeld, passende Transformation, notwendige Bindungen und
-  Empfänger). Die Wirksamkeitssätze sprechen über
+  die Payload-Zusagen aus § 2.8 bewiesen**: das Feld von
+  `fakt_nachreichen`, die Liste der Transformationen, notwendige Bindungen
+  und Empfänger von `neuer_raum`. Dass die Registry ihre Transformationen
+  nach Kennung sortiert hält, besorgt die unbewiesene Brücke wie
+  `Registry.compile/1`. Die Wirksamkeitssätze sprechen über
   `catalogGos` (`Release.lean`), Ordnung und Vollständigkeit über `catalog`
   (`Remedies.lean`); `catalog_gos` zeigt, dass beide dieselben GOs
   anbieten.
@@ -225,10 +231,13 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   Blocker und fehlende Belege samt Reihenfolge.
 - **Nur der geprüfte Wertebereich.** Das Modell setzt voraus, was
   `Registry.compile/1` und `Context` durchsetzen (siehe oben). Dass sie es
-  durchsetzen, zeigt der Differenztest mit verdorbenen Eingaben, nur in
+  durchsetzen, prüft der Differenztest für die Verderbungen seines
+  Katalogs, je eine für jede Prüfung, auf der die Sätze ruhen, und nur in
   dieser Richtung: Lehnt Elixir mehr ab, als das Modell verlangt (Schema,
-  Kennungsformat, geschlossene Felder, Quellenangabe der Fakten), bleibt
-  das ungeprüft, ebenso die Fehlercodes. Von den Eingabefehlern sind nur
+  Kennungsformat, geschlossene Felder, Quellenangabe der Fakten, Sortierung
+  von Lesern und Transformationslabels, Vokabular der Befugnisse,
+  Operationsnamen, `identity`, `registry_ref`), bleibt das ungeprüft,
+  ebenso die Fehlercodes. Von den Eingabefehlern sind nur
   die Snapshot-Voraussetzung der Ausgaberegeln (#628) und, für `derive`,
   `unknown_environment` als Urteil modelliert; Fälle mit einem anderen
   Eingabefehler lassen die übrigen Vergleiche weg. Wo Elixir außerhalb des

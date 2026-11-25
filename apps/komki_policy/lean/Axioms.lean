@@ -27,8 +27,11 @@ open KomkiSpec
 #print axioms remedies_aktion_effective
 #print axioms remedies_offenlegung_effective
 #print axioms catalog_ascending
-#print axioms derive_missing_named
-#print axioms derive_condition_named
+#print axioms derive_blockers_named
+#print axioms derive_evidence_named
+#print axioms derive_fakt_deny
+#print axioms derive_fakt_indeterminate
+#print axioms derive_transformations_listed
 #print axioms remedies_transformation
 #print axioms catalog_neuerRaum
 #print axioms neuer_raum_necessary

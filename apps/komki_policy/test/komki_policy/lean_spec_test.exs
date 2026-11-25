@@ -78,6 +78,9 @@ defmodule KomkiPolicy.LeanSpecTest do
     :empty_readers,
     :duplicate_reader,
     :unknown_transformation_label,
+    :unknown_transformation_output,
+    :empty_transformation_input,
+    :base_fact_redeclared,
     {:expression, %{"eq" => ["unbekannt", 1]}},
     {:expression, %{"eq" => ["count", "drei"]}},
     {:expression, %{"eq" => ["count", 1.5]}},
@@ -102,6 +105,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     :unknown_binding,
     :unknown_environment,
     :string_base_fact,
+    :non_string_element,
     :wrong_fact_type,
     :undeclared_fact,
     :unknown_classification,
@@ -1046,11 +1050,21 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp corruption_gen(corruptions),
     do: StreamData.one_of([StreamData.constant(:none), StreamData.member_of(corruptions)])
 
+  # A redeclared base fact gets a string value in half the snapshots, so
+  # Context has to hold the base fact to boolean against fact_fields (§ 4.2).
   defp domain_gen do
     gen all(
           {raw, _op, snapshot, _other, _} <- world_gen(),
           registry_corruption <- corruption_gen(@registry_corruptions),
-          snapshot_corruption <- corruption_gen(@snapshot_corruptions)
+          snapshot_corruption <-
+            if(registry_corruption == :base_fact_redeclared,
+              do:
+                StreamData.one_of([
+                  StreamData.constant(:string_base_fact),
+                  corruption_gen(@snapshot_corruptions)
+                ]),
+              else: corruption_gen(@snapshot_corruptions)
+            )
         ) do
       {corrupt_registry(raw, registry_corruption),
        corrupt_snapshot(snapshot, snapshot_corruption)}
@@ -1110,6 +1124,23 @@ defmodule KomkiPolicy.LeanSpecTest do
         "t-x@1" => %{"input_labels" => ["b-fremd@1"], "output_labels" => []}
       })
 
+  defp corrupt_registry(raw, :unknown_transformation_output) do
+    [first | _] = raw["bindings"] |> Map.keys() |> Enum.sort()
+
+    Map.put(raw, "transformations", %{
+      "t-x@1" => %{"input_labels" => [first], "output_labels" => ["b-fremd@1"]}
+    })
+  end
+
+  defp corrupt_registry(raw, :empty_transformation_input),
+    do:
+      Map.put(raw, "transformations", %{
+        "t-x@1" => %{"input_labels" => [], "output_labels" => []}
+      })
+
+  defp corrupt_registry(raw, :base_fact_redeclared),
+    do: put_in(raw, ["fact_fields", "has_operation_right"], "string")
+
   defp corrupt_registry(raw, {:expression, expr}),
     do: update_first_binding(raw, &put_in(&1, ["operations", "admit"], expr))
 
@@ -1136,6 +1167,9 @@ defmodule KomkiPolicy.LeanSpecTest do
 
   defp corrupt_snapshot(snapshot, :string_base_fact),
     do: put_in(snapshot, ["facts", "has_operation_right"], entry("ja"))
+
+  defp corrupt_snapshot(snapshot, :non_string_element),
+    do: put_in(snapshot, ["facts", "tags"], entry(["x", 1]))
 
   defp corrupt_snapshot(snapshot, :wrong_fact_type),
     do: put_in(snapshot, ["facts", "count"], entry("viele"))
