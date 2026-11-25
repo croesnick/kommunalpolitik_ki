@@ -25,6 +25,8 @@ CI.
 | `release_single_use` | Ist der Verbrauch committet, erlaubt dieselbe Freigabe nie wieder, an keinem späteren Stand | CONTRACT.md § 2.7, B.8 |
 | `advance_cas` | Von zwei Vorschlägen für denselben Stand committet höchstens einer | CONTRACT.md § 2.7 |
 | `catalog_aktion_effective`, `catalog_offenlegung_effective` | Bietet der Katalog einer Ablehnung des normalen Zweigs ein GO für den exakten Call an, erlaubt der Freigabe-Zweig eine Freigabe genau nach diesem Angebot | CONTRACT.md § 2.8, #631 |
+| `catalog_gos` | Die GO-Angebote des ganzen Katalogs (`catalog`) sind Eintrag für Eintrag die, über die die Wirksamkeitssätze sprechen (`catalogGos`), für jeden Befund, den `derive` meldet | CONTRACT.md § 2.8 |
+| `remedies_aktion_effective`, `remedies_offenlegung_effective` | Daraus: Jedes GO, das ein Eintrag des ganzen Katalogs einer Ablehnung des normalen Zweigs anbietet, wirkt | CONTRACT.md § 2.8 |
 | `catalog_ascending` | In jedem Eintrag des Katalogs stehen die Fortsetzungen in der normativen Ordnung: kein GO vor einer Fortsetzung, die nichts verletzt | CONTRACT.md § 2.8 |
 | `derive_deny_remedied`, `derive_indeterminate_remedied`, `release_remedied` | Jeder Blocker und jeder fehlende Beleg von `derive`, auch im Freigabe-Zweig, bekommt mindestens eine Fortsetzung, kein nacktes `deny` | CONTRACT.md § 2.8, APPA Theorem 5 |
 | `eval_mono` | Mehr Fakten kippen kein bekanntes Urteil des dreiwertigen Auswerters | R.5.2, CONTRACT.md § 3 |
@@ -177,8 +179,8 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   bewiesen,** nicht die Payloads der übrigen Fortsetzungen; die hält der
   Differenztest am Elixir-Code. Die Wirksamkeitssätze sprechen über
   `catalogGos` (`Release.lean`), Ordnung und Vollständigkeit über `catalog`
-  (`Remedies.lean`). Dass beide auf den GO-Einträgen übereinstimmen, zeigt
-  nur der Differenztest, der beide mit Elixir vergleicht; ein Satz fehlt.
+  (`Remedies.lean`); `catalog_gos` zeigt, dass beide dieselben GOs
+  anbieten.
 - **Katalogsätze nur für den normalen Zweig.** `catalog_*_effective` gilt
   für die GO-Angebote einer Ablehnung im normalen Zweig. Dass ein erneutes
   Angebot nach einer Ablehnung im Freigabe-Zweig wirkt, prüft nur der

@@ -14,3 +14,4 @@ import KomkiSpec.CatalogSound
 import KomkiSpec.Remedies
 import KomkiSpec.RemediesSound
 import KomkiSpec.Input
+import KomkiSpec.CatalogAgree
