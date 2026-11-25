@@ -130,7 +130,7 @@ theorem factState_unknown {S : Snapshot} {n : String} (h : factState S n = .unkn
 /-- The premises `premiseFindings` lists, by kind. -/
 theorem premise_cases {Γ : Registry} {S : Snapshot} {rule : String} {g : Findings}
     (hg : g ∈ premiseFindings Γ S rule) :
-    g = quarantineFindings S ∨ g = workspaceFindings S ∨ (∃ n, g = basisFindings S n) ∨
+    g = quarantineFindings S ∨ g = workspaceFindings S ∨ (∃ n ∈ baseFacts rule, g = basisFindings S n) ∨
       g = envFindings S ∨ (∃ l, g = labelInclusionFindings S l) ∨
       (∃ l, g = labelPreservationFindings S l) ∨ (∃ rho l, g = recipientFindings Γ rho l) ∨
       ∃ b, g = conditionFindings Γ S rule b := by
@@ -142,7 +142,7 @@ theorem premise_cases {Γ : Registry} {S : Snapshot} {rule : String} {g : Findin
     all_goals first
       | exact Or.inl rfl
       | exact Or.inr (Or.inl rfl)
-      | exact Or.inr (Or.inr (Or.inl ⟨_, rfl⟩))
+      | exact Or.inr (Or.inr (Or.inl ⟨_, by simp_all [baseFacts, admitBaseFacts], rfl⟩))
       | exact Or.inr (Or.inr (Or.inr (Or.inl rfl)))
       | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨_, rfl⟩))))
       | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨_, rfl⟩)))))
@@ -154,7 +154,7 @@ theorem premise_cases {Γ : Registry} {S : Snapshot} {rule : String} {g : Findin
       all_goals first
         | exact Or.inl rfl
         | exact Or.inr (Or.inl rfl)
-        | exact Or.inr (Or.inr (Or.inl ⟨_, rfl⟩))
+        | exact Or.inr (Or.inr (Or.inl ⟨_, by simp_all [baseFacts, outputBaseFacts], rfl⟩))
         | exact Or.inr (Or.inr (Or.inr (Or.inl rfl)))
         | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨_, rfl⟩))))
         | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨_, rfl⟩)))))
@@ -165,7 +165,7 @@ theorem premise_cases {Γ : Registry} {S : Snapshot} {rule : String} {g : Findin
       all_goals first
         | exact Or.inl rfl
         | exact Or.inr (Or.inl rfl)
-        | exact Or.inr (Or.inr (Or.inl ⟨_, rfl⟩))
+        | exact Or.inr (Or.inr (Or.inl ⟨_, by simp_all [baseFacts, outputBaseFacts], rfl⟩))
         | exact Or.inr (Or.inr (Or.inr (Or.inl rfl)))
         | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨_, rfl⟩))))
         | exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨_, rfl⟩)))))
@@ -188,7 +188,7 @@ theorem evidence_named (Γ : Registry) (S : Snapshot) (rule : String) :
     intro g hg he
     rw [hg] at he
     cases he
-  rcases premise_cases hg with rfl | rfl | ⟨n, rfl⟩ | rfl | ⟨l, rfl⟩ | ⟨l, rfl⟩ | ⟨rho, l, rfl⟩ |
+  rcases premise_cases hg with rfl | rfl | ⟨n, _, rfl⟩ | rfl | ⟨l, rfl⟩ | ⟨l, rfl⟩ | ⟨rho, l, rfl⟩ |
     ⟨b, rfl⟩
   · exact none _ (by unfold quarantineFindings; split <;> rfl) he
   · exact none _ (by unfold workspaceFindings; split <;> rfl) he
@@ -335,13 +335,15 @@ theorem locate_none_false {facts : Facts} : ∀ (e : Expr),
       rw [hcg c hc] at hv; cases hv
     · rfl
 
-/-- What a blocker names: `basis_right_false` and `audit_path_not_ready` the
-base fact that is `false`; `binding_condition_false` a field of the
+/-- What a blocker names: `basis_right_false` a base fact of the rule that is
+`false`, `audit_path_not_ready` exactly `audit_path_ready`; `binding_condition_false` a field of the
 binding's condition, or nothing when that condition is `false` whatever the
 facts. `fakt_nachreichen` asks for exactly this (§ 2.8). -/
 def BlockerNamed (Γ : Registry) (S : Snapshot) (rule : String) (b : Blocker) : Prop :=
-  ((b.code = "basis_right_false" ∨ b.code = "audit_path_not_ready") →
-    ∃ n, b.condition = some n ∧ factState S n = .false) ∧
+  (b.code = "basis_right_false" → ∃ n, b.condition = some n ∧ n ∈ baseFacts rule ∧
+    n ≠ "audit_path_ready" ∧ factState S n = .false) ∧
+  (b.code = "audit_path_not_ready" → b.condition = some "audit_path_ready" ∧
+    factState S "audit_path_ready" = .false) ∧
   (b.code = "binding_condition_false" → ∃ bd j e, b.binding = some bd ∧
     Γ.ruleExpr? bd rule = some j ∧ Expr.ofJVal j = some e ∧ eval S.fact? e = .false ∧
     match b.condition with
@@ -358,19 +360,26 @@ theorem blocker_named (Γ : Registry) (S : Snapshot) (rule : String) :
       b ∈ g.blockers → BlockerNamed Γ S rule b := by
     intro g hg hb
     obtain ⟨h1, h2, h3⟩ := hg b hb
-    exact ⟨fun h => (h.elim h1 h2).elim, fun h => (h3 h).elim⟩
-  rcases premise_cases hg with rfl | rfl | ⟨n, rfl⟩ | rfl | ⟨l, rfl⟩ | ⟨l, rfl⟩ | ⟨rho, l, rfl⟩ |
-    ⟨bd, rfl⟩
+    exact ⟨fun h => (h1 h).elim, fun h => (h2 h).elim, fun h => (h3 h).elim⟩
+  rcases premise_cases hg with rfl | rfl | ⟨n, hn, rfl⟩ | rfl | ⟨l, rfl⟩ | ⟨l, rfl⟩ |
+    ⟨rho, l, rfl⟩ | ⟨bd, rfl⟩
   · exact other _ (by unfold quarantineFindings; split <;> simp [blocking, holds]) hb
   · exact other _ (by unfold workspaceFindings; split <;> simp [blocking, holds]) hb
   · cases hfs : factState S n
     · simp [basisFindings, hfs, holds] at hb
     · simp only [basisFindings, hfs] at hb
       split at hb
-      all_goals
+      · next ha =>
         simp only [blocking, List.mem_singleton] at hb
         subst hb
-        exact ⟨fun _ => ⟨n, rfl, hfs⟩, fun h => by simp at h⟩
+        have : n = "audit_path_ready" := by simpa using ha
+        subst this
+        exact ⟨fun h => by simp at h, fun _ => ⟨rfl, hfs⟩, fun h => by simp at h⟩
+      · next ha =>
+        simp only [blocking, List.mem_singleton] at hb
+        subst hb
+        exact ⟨fun _ => ⟨n, rfl, hn, by simpa using ha, hfs⟩, fun h => by simp at h,
+          fun h => by simp at h⟩
     · simp [basisFindings, hfs, lacking] at hb
   · exact other _ (by unfold envFindings; split <;> simp [lacking, holds]) hb
   · exact other _ (by unfold labelInclusionFindings; split <;> simp [blocking, holds]) hb
@@ -380,12 +389,12 @@ theorem blocker_named (Γ : Registry) (S : Snapshot) (rule : String) :
     split at hb
     · simp only [blocking, List.mem_singleton] at hb
       subst hb
-      exact ⟨fun h => by simp at h, fun h => by simp at h⟩
+      exact ⟨fun h => by simp at h, fun h => by simp at h, fun h => by simp at h⟩
     · next ex hex =>
       obtain ⟨j, hj, hjx⟩ := Option.bind_eq_some_iff.1 hex
       cases hv : eval S.fact? ex <;> rw [hv] at hb <;> simp [holds, blocking, lacking] at hb
       subst hb
-      refine ⟨fun h => by simp at h, fun _ => ⟨bd, j, ex, rfl, hj, hjx, hv, ?_⟩⟩
+      refine ⟨fun h => by simp at h, fun h => by simp at h, fun _ => ⟨bd, j, ex, rfl, hj, hjx, hv, ?_⟩⟩
       dsimp only
       cases hl : locate S.fact? .false ex with
       | some f => exact locate_field ex hl
