@@ -121,7 +121,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   @cli_runs 300
 
   # Pieces of a JSON string: raw characters and every kind of escape.
-  @string_parts ~w(a b z A Z 0 9 / é € 😀 ﻿ \\" \\\\ \\/ \\b \\f \\n \\r \\t \\u0041 \\u00e9 \\u20AC \\ud83d\\ude00 \\u0000 \\u001f \\uFFFF \\u007F) ++
+  @string_parts ~w(a b z A Z 0 9 / é € 😀 ﻿ ࠀ က 퀀   𐀀 񀀀 󿿿 \\" \\\\ \\/ \\b \\f \\n \\r \\t \\u0041 \\u00e9 \\u20AC \\ud83d\\ude00 \\u0000 \\u001f \\uFFFF \\u007F) ++
                   [<<0x7F>>, " "]
 
   # JSON documents on the edges of the grammar and of UTF-8 (CONTRACT.md § 6).
@@ -180,8 +180,37 @@ defmodule KomkiPolicy.LeanSpecTest do
     <<0xEF, 0xBB, 0xBF, ?{, ?}>>,
     "[1] x",
     "{} {}",
-    "[\"a\", 1, true, null, {}, []]"
+    "[\"a\", 1, true, null, {}, []]",
+    "\f1",
+    "1\v",
+    <<0xC2, 0xA0, ?1>>,
+    <<?", 0xC2, 0x80, ?">>,
+    <<?", 0xDF, 0xBF, ?">>,
+    <<?", 0xC2, 0xC0, ?">>,
+    <<?", 0xE0, 0xA0, 0x80, ?">>,
+    <<?", 0xE1, 0x80, 0x80, ?">>,
+    <<?", 0xE1, 0xC0, 0x80, ?">>,
+    <<?", 0xE3, 0x80, 0x80, ?">>,
+    <<?", 0xEC, 0xBF, 0xBF, ?">>,
+    <<?", 0xEC, 0x7F, 0x80, ?">>,
+    <<?", 0xEE, 0x80, 0x80, ?">>,
+    <<?", 0xEE, 0x80, 0xC0, ?">>,
+    <<?", 0xF0, 0x90, 0x80, 0x80, ?">>,
+    <<?", 0xF0, 0x8F, 0xBF, 0xBF, ?">>,
+    <<?", 0xF1, 0x80, 0x80, 0x80, ?">>,
+    <<?", 0xF3, 0xBF, 0xBF, 0xBF, ?">>,
+    <<?", 0xF3, 0x80, 0x80, 0x7F, ?">>,
+    <<?", 0xF5, 0x80, 0x80, 0x80, ?">>
   ]
+
+  # The overflow bound of binary_to_float/1 and one below, as a fraction, with
+  # an exponent and in scientific form: the bound fails, one below does not.
+  @overflow_cases (for t <- [2 ** 1024 - 2 ** 970, 2 ** 1024 - 2 ** 970 - 1] do
+                     digits = Integer.to_string(t)
+                     {first, rest} = String.split_at(digits, 1)
+                     [digits <> ".0", digits <> "e0", first <> "." <> rest <> "e308"]
+                   end)
+                  |> List.flatten()
 
   test "Lean-Tabellen entsprechen Derive" do
     {out, 0} = System.cmd(spec_bin(), ["constants"])
@@ -405,7 +434,10 @@ defmodule KomkiPolicy.LeanSpecTest do
       |> Path.wildcard()
       |> Enum.map(&File.read!/1)
 
-    documents = fixtures ++ @json_edge_cases ++ nested_documents() ++ seeded_list(json_doc_gen())
+    documents =
+      fixtures ++
+        @json_edge_cases ++ @overflow_cases ++ nested_documents() ++ seeded_list(json_doc_gen())
+
     pairs = Enum.map(documents, &json_pair/1)
     compare_json!(pairs, "json-batch", "json", "KomkiPolicy.JSON und dem Lean-Modell")
 
@@ -1259,8 +1291,8 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp mask_floats(%{} = value), do: Map.new(value, fn {k, v} -> {k, mask_floats(v)} end)
   defp mask_floats(value), do: value
 
-  # A document as bytes: spelled with varying whitespace and escapes, half
-  # of them with one byte inserted, replaced or dropped, or cut short.
+  # A document as bytes: spelled with varying whitespace and escapes, four in
+  # five with one byte inserted, replaced or dropped, or cut short.
   defp json_doc_gen do
     gen all(
           doc <- spelled_gen(),
@@ -1268,7 +1300,23 @@ defmodule KomkiPolicy.LeanSpecTest do
           at <- StreamData.integer(0..1_000),
           byte <-
             StreamData.member_of(
-              ~c',]}:"\\-+.e01 \nunt' ++ [0x00, 0x1F, 0x7F, 0x80, 0xC0, 0xED, 0xF4, 0xFF]
+              ~c',]}:"\\-+.e01 \nunt' ++
+                [
+                  0x00,
+                  0x0B,
+                  0x0C,
+                  0x1F,
+                  0x7F,
+                  0x80,
+                  0xA0,
+                  0xC0,
+                  0xC2,
+                  0xE1,
+                  0xED,
+                  0xF1,
+                  0xF4,
+                  0xFF
+                ]
             )
         ) do
       bytes = IO.iodata_to_binary(doc)

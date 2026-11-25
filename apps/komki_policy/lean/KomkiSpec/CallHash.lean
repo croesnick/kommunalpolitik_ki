@@ -19,6 +19,8 @@ def callHashOf (S : Snapshot) (I : Intent) : String :=
   let payload := JVal.obj [("content_digest", (S.fact? "output_content_digest").getD .null),
     ("object", .str S.objectRef), ("operation", .str I.operation),
     ("workspace", .str S.workspaceId)]
+  -- Fact values are strings, booleans, integers or string sets
+  -- (`Snapshot.validated`), so encoding never fails here.
   match Json.canonical payload with
   | .ok text => Sha256.hex text.toUTF8
   | .error _ => ""

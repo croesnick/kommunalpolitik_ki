@@ -1,9 +1,11 @@
 # Lean-Spezifikation von komki_policy
 
 Formales Modell der Policy-Engine in Lean 4: `derive` mit normalem Zweig
-und Freigabe-Zweigen, `verify`, der Remedy-Katalog, der Auswerter, der
-Standübergang `advance` und die JSON-Schicht samt Call-Hash, mit Beweisen ihrer Korrektheit für die
+und Freigabe-Zweigen, `verify`, der Remedy-Katalog, der Auswerter und der
+Standübergang `advance`, mit Beweisen ihrer Korrektheit für die
 Regelzweige `admit`, `emit`, `store` und `transfer` (Tickets #625, #629).
+Dazu, ausführbar und nur per Differenztest gehalten, die JSON-Schicht
+samt Call-Hash.
 Der Elixir-Code wird per Differenztest gegen das bewiesene Lean-Modell
 gehalten, ein Pin meldet jede Änderung an den gespiegelten Modulen. Die
 Spezifikation läuft nicht in komki mit, sie ist ein Prüforakel in Repo und
@@ -70,7 +72,7 @@ eigener Differenztest mit verdorbenen Eingaben (siehe unten).
 flowchart LR
   RFC["RFC 0003 und CONTRACT.md<br/>(Prosa)"] -->|"Review: sagt das Modell<br/>dasselbe?"| Modell["Lean-Modell<br/>KomkiSpec/"]
   Modell -->|"Lean-Kernel prüft"| Beweis["verify_sound,<br/>derive_sound, …"]
-  Modell -->|"Differenztest<br/>lean_spec_test.exs"| Elixir["verify.ex,<br/>derive.ex"]
+  Modell -->|"Differenztest<br/>lean_spec_test.exs"| Elixir["verify.ex, derive.ex,<br/>json.ex, release.ex, …"]
   Elixir -->|"Pin<br/>SYNC.sha256"| Modell
 ```
 
@@ -145,7 +147,9 @@ Zweige des Auswerters für falsch typisierte Werte unerreichbar sind.
 Die JSON-Schicht vergleicht er Byte für Byte: die Fixtures, Randfälle der
 Grammatik und von UTF-8, Verschachtelung um die Tiefengrenze des Encoders
 (#473), 8 000 generierte Dokumente mit wechselndem Leerraum und wechselnden
-Escapes, je zur Hälfte um ein Byte verändert. Verglichen werden der
+Escapes, vier von fünf um ein Byte verändert oder abgeschnitten, dazu
+die Überlaufgrenze der Gleitkommazahlen und je Klasse von UTF-8-Leitbytes
+eine gültige und eine kaputte Folge. Verglichen werden der
 Fehlercode von `JSON.parse/1` oder die kanonische Form samt SHA-256.
 Gleitkommazahlen werden geparst, aber als Marker verglichen, weil
 `Float.to_string/1` nicht modelliert ist. Den Call-Hash rechnet die Brücke
@@ -178,7 +182,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 
 | Elixir | Lean |
 |---|---|
-| `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige) |
+| `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige), `callHashOf` in `KomkiSpec/CallHash.lean` (`output_call_hash/2`) |
 | `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` |
