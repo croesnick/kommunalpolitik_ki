@@ -30,6 +30,7 @@ CI.
 | `eval_mono` | Mehr Fakten kippen kein bekanntes Urteil des dreiwertigen Auswerters | R.5.2, CONTRACT.md § 3 |
 | `recipients_antitone`, `permitted_antitone` | Mehr Bindungen, nie mehr Empfänger; Erlaubt vererbt sich auf Teilmengen | A.2 |
 | `no_forbidden_recipient` | Ohne Lockerung erreicht nichts, was von x abhängt, einen Beobachter außerhalb von R_Γ(λ(x)) | Kern von A.3: nur die Labels, ohne Schrittmodell |
+| `Registry.compiledOk_sound`, `Snapshot.validated_sound` | Was die Eingabeprüfung im Modell zusichert (`Registry.compiledOk`, `Snapshot.validated`), erfüllt die Voraussetzungen der übrigen Sätze | CONTRACT.md § 2.1, § 2.2, § 3 |
 
 Kein `sorry`: `lake build` behandelt jede Warnung als Fehler.
 `./check-axioms.sh` zeigt die Axiome je Hauptsatz und lässt nur Leans
@@ -52,7 +53,9 @@ Die Sätze setzen voraus, was `Registry.compile/1` und `Context` durchsetzen
 Leser und Befugnis-Autoritäten ⊆ 𝒪, sortierte und eindeutige Labels,
 geschlossene Klassifikation, boolesche Basisfakten). Die Brücke prüft alles
 an jedem Fall des Differenztests (`Registry.wellFormed_sound`,
-`Registry.wellFormed_authorities`, `Snapshot.wellFormed_sound`).
+`Registry.wellFormed_authorities`, `Snapshot.wellFormed_sound`). Dass
+`Registry.compile/1` und `Context` das wirklich durchsetzen, prüft ein
+eigener Differenztest mit verdorbenen Eingaben (siehe unten).
 
 ## Vertrauenskette
 
@@ -116,14 +119,28 @@ Den Auswerter vergleicht er auch direkt: die Grenzfälle aus
 `priv/fixtures/expressions/evaluate_expectations.json` und 8 000
 generierte Ausdrücke über generierten Fakten, Urteil gegen Urteil.
 
+Die Eingabeprüfung vergleicht er mit verdorbenen Eingaben: Je Welt wird
+die Registry an einer Stelle beschädigt (fremder Leser, fremde Autorität,
+fremder Umgebungsbeobachter, leere oder doppelte Leser, unbekanntes Label
+einer Transformation, ein Ausdruck mit unbekanntem Feld, falschem
+Literaltyp, Gleitkommazahl, negativer Schranke, falschem Operator für den
+Feldtyp oder falscher Form) und der Snapshot ebenso (unsortierte oder
+doppelte Bindungen und Labels, unbekannte Bindung oder Umgebung, Fakt mit
+falschem Typ, undeklarierter Fakt, fremde Klassifikation), jeweils oder
+beides unverdorben. Was `Registry.compile/1` und
+`Context.validate_snapshot/2` annehmen, muss `Registry.compiledOk`
+beziehungsweise `Snapshot.validated` erfüllen: die Voraussetzungen der
+Sätze und typrichtige Ausdrücke und Fakten nach § 3, mit denen die
+Zweige des Auswerters für falsch typisierte Werte unerreichbar sind.
+
 Ein weiterer Test prüft in Elixir, was `catalog_*_effective` für das Modell
 beweist: Jedes angebotene GO für den exakten Call wird zu einer Freigabe
 mit frischer Nonce, und der Freigabe-Zweig muss erlauben.
 
 `KOMKI_SPEC_SEED` und `KOMKI_SPEC_RUNS` erweitern die Suche. Eine Abweichung
 schreibt ihre Fälle als JSONL-Datei; `komki-spec verify-batch`,
-`derive-batch`, `release-batch`, `advance-batch` beziehungsweise
-`eval-batch` spielt sie nach.
+`derive-batch`, `release-batch`, `advance-batch`, `eval-batch`
+beziehungsweise `domain-batch` spielt sie nach.
 
 ## Synchron halten
 
@@ -139,8 +156,8 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `verify.ex` | `KomkiSpec/Verify.lean` |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
-| `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal` |
-| `context.ex` | `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean` (Wertebereich nach der Eingabeprüfung) |
+| `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
+| `context.ex` | `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean`, `Snapshot.validated` in `Input.lean` (Wertebereich nach der Eingabeprüfung) |
 
 Dann das Lean-Modell gegen die Änderung prüfen und anpassen, `lake build`
 und den Differenztest laufen lassen und den Pin erneuern:
@@ -183,11 +200,14 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   Reihenfolge modelliert die Spezifikation nicht; bei `derive` dagegen
   Blocker und fehlende Belege samt Reihenfolge.
 - **Nur der geprüfte Wertebereich.** Das Modell setzt voraus, was
-  `Registry.compile/1` und `Context` durchsetzen (siehe oben). Von der
-  Eingabeprüfung sind nur die Snapshot-Voraussetzung der Ausgaberegeln
-  (#628) und, für `derive`, `unknown_environment` modelliert und
-  abgeglichen; Fälle mit einem anderen Eingabefehler lässt der
-  Differenztest weg. Wo Elixir außerhalb des
+  `Registry.compile/1` und `Context` durchsetzen (siehe oben). Dass sie es
+  durchsetzen, zeigt der Differenztest mit verdorbenen Eingaben, nur in
+  dieser Richtung: Lehnt Elixir mehr ab, als das Modell verlangt (Schema,
+  Kennungsformat, geschlossene Felder, Quellenangabe der Fakten), bleibt
+  das ungeprüft, ebenso die Fehlercodes. Von den Eingabefehlern sind nur
+  die Snapshot-Voraussetzung der Ausgaberegeln (#628) und, für `derive`,
+  `unknown_environment` als Urteil modelliert; Fälle mit einem anderen
+  Eingabefehler lassen die übrigen Vergleiche weg. Wo Elixir außerhalb des
   Bereichs abstürzen würde, etwa bei einem Ausdruck außerhalb von B.4,
   verweigert das Modell (`missing_operation_rule`).
 - **Kohärenz von Intent und Snapshot liegt außerhalb.** Dass Objekt,

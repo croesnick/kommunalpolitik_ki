@@ -69,6 +69,46 @@ defmodule KomkiPolicy.LeanSpecTest do
     "consumed" => %{"n-alt" => "go-alt"}
   }
 
+  # Corruptions for the input-check test: each breaks one check of
+  # Registry.compile/1 or Context.validate_snapshot/2 (CONTRACT § 2.1, § 2.2, § 3).
+  @registry_corruptions [
+    {:reader, "o-fremd"},
+    {:authority, "o-fremd"},
+    {:environment, "o-fremd"},
+    :empty_readers,
+    :duplicate_reader,
+    :unknown_transformation_label,
+    {:expression, %{"eq" => ["unbekannt", 1]}},
+    {:expression, %{"eq" => ["count", "drei"]}},
+    {:expression, %{"eq" => ["count", 1.5]}},
+    {:expression, %{"eq" => ["tags", "x"]}},
+    {:expression, %{"at_most" => ["count", -1]}},
+    {:expression, %{"at_most" => ["purpose", 1]}},
+    {:expression, %{"subset" => ["purpose", ["a"]]}},
+    {:expression, %{"subset" => ["tags", [1]]}},
+    {:expression, %{"member" => ["scope", [1]]}},
+    {:expression, %{"member" => ["tags", ["x"]]}},
+    {:expression, %{"member" => ["tags", []]}},
+    {:expression, %{"not" => true}},
+    {:expression, %{"eq" => ["count", 1], "any" => []}},
+    {:expression, %{"all" => true}},
+    {:expression, %{"eq" => [1, 1]}},
+    {:expression, %{"any" => [%{"eq" => ["count", "x"]}]}}
+  ]
+
+  @snapshot_corruptions [
+    :unsorted_bindings,
+    :duplicate_binding,
+    :unknown_binding,
+    :unknown_environment,
+    :string_base_fact,
+    :wrong_fact_type,
+    :undeclared_fact,
+    :unknown_classification,
+    :unsorted_labels,
+    :duplicate_label
+  ]
+
   test "Lean-Tabellen entsprechen Derive" do
     {out, 0} = System.cmd(spec_bin(), ["constants"])
     {:ok, constants} = KomkiPolicy.JSON.parse(String.trim(out))
@@ -255,6 +295,31 @@ defmodule KomkiPolicy.LeanSpecTest do
     IO.puts("\nlean_spec eval: #{inspect(verdicts)}")
 
     for verdict <- ~w(true false unknown), do: assert(Map.get(verdicts, verdict, 0) >= 500)
+  end
+
+  # The theorems assume what Registry.compile/1 and Context guarantee
+  # (`Registry.compiledOk`, `Snapshot.validated`). Corrupted inputs go to
+  # Elixir; whatever it accepts has to pass the Lean checks.
+  test "Eingabeprüfung: was Registry.compile und Context annehmen, liegt im Wertebereich" do
+    cases = domain_gen() |> seeded_list() |> Enum.map(&domain_case/1)
+
+    pairs = for {line, expected} <- cases, expected != :dropped, do: {line, expected}
+
+    compare_json!(
+      pairs,
+      "domain-batch",
+      "domain",
+      "Registry.compile/Context und dem Wertebereich"
+    )
+
+    snapshots = Enum.count(pairs, fn {_, e} -> e["snapshot"] end)
+
+    IO.puts(
+      "\nlean_spec domain: registries #{length(pairs)}, snapshots #{snapshots}, rejected #{length(cases) - length(pairs)}"
+    )
+
+    assert length(pairs) >= 3_000
+    assert snapshots >= 1_000
   end
 
   # Not a comparison with Lean, but the property the Lean theorem states
@@ -895,6 +960,116 @@ defmodule KomkiPolicy.LeanSpecTest do
     |> put_in(["object", "labels"], fitting)
     |> Map.put("facts", facts)
   end
+
+  # Half the cases stay uncorrupted, so enough inputs get through.
+  defp corruption_gen(corruptions),
+    do: StreamData.one_of([StreamData.constant(:none), StreamData.member_of(corruptions)])
+
+  defp domain_gen do
+    gen all(
+          {raw, _op, snapshot, _other, _} <- world_gen(),
+          registry_corruption <- corruption_gen(@registry_corruptions),
+          snapshot_corruption <- corruption_gen(@snapshot_corruptions)
+        ) do
+      {corrupt_registry(raw, registry_corruption),
+       corrupt_snapshot(snapshot, snapshot_corruption)}
+    end
+  end
+
+  defp domain_case({raw, snapshot}) do
+    case Registry.compile(raw) do
+      {:ok, compiled} ->
+        case KomkiPolicy.Context.validate_snapshot(snapshot, compiled) do
+          {:ok, _} ->
+            {%{"registry" => raw, "snapshot" => snapshot, "intent" => %{"operation" => "domain"}},
+             %{"registry" => true, "snapshot" => true}}
+
+          {:error, _} ->
+            {%{"registry" => raw, "intent" => %{"operation" => "domain"}},
+             %{"registry" => true, "snapshot" => nil}}
+        end
+
+      {:error, _} ->
+        {nil, :dropped}
+    end
+  end
+
+  defp corrupt_registry(raw, :none), do: raw
+
+  defp corrupt_registry(raw, {:reader, o}),
+    do: update_first_binding(raw, &Map.update!(&1, "readers", fn rs -> Enum.sort([o | rs]) end))
+
+  defp corrupt_registry(raw, {:authority, o}),
+    do:
+      update_first_binding(raw, fn b ->
+        Map.update!(b, "relaxation_authorities", fn rs ->
+          [
+            %{"authority" => o, "restriction" => "readers", "output" => "ratsprojekte-essenz"}
+            | rs
+          ]
+        end)
+      end)
+
+  defp corrupt_registry(raw, {:environment, o}) do
+    Map.update!(raw, "environments", fn envs ->
+      [{id, env} | rest] = Enum.sort(envs)
+      Map.new([{id, Map.update!(env, "observers", &Enum.sort([o | &1]))} | rest])
+    end)
+  end
+
+  defp corrupt_registry(raw, :empty_readers),
+    do: update_first_binding(raw, &Map.put(&1, "readers", []))
+
+  defp corrupt_registry(raw, :duplicate_reader),
+    do: update_first_binding(raw, &Map.update!(&1, "readers", fn [r | _] = rs -> rs ++ [r] end))
+
+  defp corrupt_registry(raw, :unknown_transformation_label),
+    do:
+      Map.put(raw, "transformations", %{
+        "t-x@1" => %{"input_labels" => ["b-fremd@1"], "output_labels" => []}
+      })
+
+  defp corrupt_registry(raw, {:expression, expr}),
+    do: update_first_binding(raw, &put_in(&1, ["operations", "admit"], expr))
+
+  defp update_first_binding(raw, fun) do
+    Map.update!(raw, "bindings", fn bindings ->
+      [{id, b} | rest] = Enum.sort(bindings)
+      Map.new([{id, fun.(b)} | rest])
+    end)
+  end
+
+  defp corrupt_snapshot(snapshot, :none), do: snapshot
+
+  defp corrupt_snapshot(snapshot, :unsorted_bindings),
+    do: update_in(snapshot, ["workspace", "bindings"], &Enum.reverse/1)
+
+  defp corrupt_snapshot(snapshot, :duplicate_binding),
+    do: update_in(snapshot, ["workspace", "bindings"], fn bs -> bs ++ Enum.take(bs, 1) end)
+
+  defp corrupt_snapshot(snapshot, :unknown_binding),
+    do: update_in(snapshot, ["workspace", "bindings"], &Enum.sort(["b-fremd@1" | &1]))
+
+  defp corrupt_snapshot(snapshot, :unknown_environment),
+    do: put_in(snapshot, ["workspace", "environment"], "env-fremd@1")
+
+  defp corrupt_snapshot(snapshot, :string_base_fact),
+    do: put_in(snapshot, ["facts", "has_operation_right"], entry("ja"))
+
+  defp corrupt_snapshot(snapshot, :wrong_fact_type),
+    do: put_in(snapshot, ["facts", "count"], entry("viele"))
+
+  defp corrupt_snapshot(snapshot, :undeclared_fact),
+    do: put_in(snapshot, ["facts", "fremd"], entry(true))
+
+  defp corrupt_snapshot(snapshot, :unknown_classification),
+    do: put_in(snapshot, ["object", "classification"], "geheim")
+
+  defp corrupt_snapshot(snapshot, :unsorted_labels),
+    do: update_in(snapshot, ["object", "labels"], &Enum.reverse/1)
+
+  defp corrupt_snapshot(snapshot, :duplicate_label),
+    do: update_in(snapshot, ["object", "labels"], fn ls -> ls ++ Enum.take(ls, 1) end)
 
   defp seeded_list(generator) do
     generator

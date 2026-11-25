@@ -666,8 +666,10 @@ defmodule KomkiPolicy.Registry do
     end
   end
 
+  # An empty literal list must not let `member` onto a string_set field (§ 3).
   defp op_type_check("member", field, literals, fact_fields, path) do
-    if is_list(literals) and Enum.all?(literals, &type_compatible?(fact_fields[field], &1)) do
+    if fact_fields[field] in ["string", "boolean", "integer"] and is_list(literals) and
+         Enum.all?(literals, &type_compatible?(fact_fields[field], &1)) do
       :ok
     else
       fail(:expression_type_mismatch, path, "member literals must match field type " <> field)

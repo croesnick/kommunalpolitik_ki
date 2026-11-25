@@ -1,6 +1,6 @@
 import Lean.Data.Json
 import KomkiSpec.Domain
-import KomkiSpec.Remedies
+import KomkiSpec.Input
 
 /-!
 # Bridge: the CLI's JSON into the model
@@ -73,6 +73,9 @@ def decodeRegistry (j : JVal) : Decode Registry := do
     registryId := ← strAt j "registry_id"
     observers := sortStrings (← asStrs (← field j "observers"))
     environments, bindings
+    factFields := ← match j.get? "fact_fields" with
+      | some (.obj fs) => fs.mapM fun (n, t) => do pure (n, ← asStr t)
+      | _ => pure []
     transformations := transformations.mergeSort fun a b => !decide (b.1 < a.1) }
 
 def decodeSnapshot (j : JVal) : Decode Snapshot := do
@@ -352,5 +355,15 @@ def evalCase (j : JVal) : Decode Json := do
     | .false => "false"
     | .unknown => "unknown"
   pure (Json.mkObj [("verdict", .str verdict)])
+
+/-- One case `{"registry", "snapshot"?}` → whether each lies in the domain
+the input checks guarantee (`Registry.compiledOk`, `Snapshot.validated`). -/
+def domainCase (j : JVal) : Decode Json := do
+  let Γ ← decodeRegistry (← field j "registry")
+  let snapshot ← match j.get? "snapshot" with
+    | some s => do pure (some (Snapshot.validated Γ (← decodeSnapshot s)))
+    | none => pure none
+  pure (Json.mkObj [("registry", .bool Γ.compiledOk),
+    ("snapshot", match snapshot with | some b => .bool b | none => .null)])
 
 end KomkiSpec

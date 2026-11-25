@@ -31,3 +31,5 @@ open KomkiSpec
 #print axioms recipients_antitone
 #print axioms permitted_antitone
 #print axioms no_forbidden_recipient
+#print axioms Registry.compiledOk_sound
+#print axioms Snapshot.validated_sound

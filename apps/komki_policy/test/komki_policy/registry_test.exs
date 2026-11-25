@@ -309,6 +309,15 @@ defmodule KomkiPolicy.RegistryTest do
       assert %{code: :expression_type_mismatch} = compile_term_error(term2)
     end
 
+    test "member nur auf skalarem Feld, auch mit leerer Literalmenge" do
+      term =
+        put_in(base_registry(), ["bindings", "test@1", "operations", "admit"], %{
+          "member" => ["labels", []]
+        })
+
+      assert %{code: :expression_type_mismatch} = compile_term_error(term)
+    end
+
     test "subset nur auf string_set, Literalmenge strings" do
       term =
         put_in(base_registry(), ["bindings", "test@1", "operations", "admit"], %{

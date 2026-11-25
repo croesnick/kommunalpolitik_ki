@@ -15,7 +15,8 @@ for theorem in verify_sound verify_sound_rfc derivable_permitted handover_within
   derive_verifies aktion_permit offenlegung_permit release_single_use advance_cas \
   catalog_aktion_effective catalog_offenlegung_effective catalog_ascending \
   derive_deny_remedied derive_indeterminate_remedied release_remedied \
-  eval_mono recipients_antitone permitted_antitone no_forbidden_recipient; do
+  eval_mono recipients_antitone permitted_antitone no_forbidden_recipient \
+  Registry.compiledOk_sound Snapshot.validated_sound; do
   if ! printf '%s\n' "$out" | grep -q "^'KomkiSpec\.$theorem' "; then
     echo "Axioms.lean gibt den Hauptsatz $theorem nicht aus." >&2
     exit 1
