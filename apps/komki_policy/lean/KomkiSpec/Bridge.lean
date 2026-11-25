@@ -1,6 +1,7 @@
 import Lean.Data.Json
 import KomkiSpec.Domain
 import KomkiSpec.Input
+import KomkiSpec.CallHash
 
 /-!
 # Bridge: the CLI's JSON into the model
@@ -95,6 +96,7 @@ def decodeSnapshot (j : JVal) : Decode Snapshot := do
     objectLabels := ← asStrs (← field obj "labels")
     facts
     objectRef := (← strAt obj "object_id") ++ "@" ++ (← strAt obj "version")
+    workspaceId := ← strAt ws "workspace_id"
     factSources }
 
 def decodeWorld (j : JVal) : Decode (Registry × Snapshot) := do
@@ -240,12 +242,12 @@ def optStrAt (j : JVal) (k : String) : Decode (Option String) :=
   | some (.str s) => pure (some s)
   | _ => pure none
 
-/-- One case `{"registry", "snapshot", "intent", "call_hash"}` → decision. -/
+/-- One case `{"registry", "snapshot", "intent"}` → decision; the call hash
+is computed here (`callHashOf`). -/
 def deriveCase (j : JVal) : Decode Json := do
   let (Γ, S) ← decodeWorld j
   let I ← decodeIntent (← field j "intent")
-  let callHash := (← optStrAt j "call_hash").getD ""
-  pure ((derive Γ S I).toJson Γ S I.operation callHash)
+  pure ((derive Γ S I).toJson Γ S I.operation (callHashOf S I))
 
 /-! ## Release branches and `advance` -/
 
@@ -323,13 +325,13 @@ def releaseDecisionJson (Γ : Registry) (S : Snapshot) (rule : String) (R : Rele
      ("remedies", remedies)] ++
     if rule == "emit" then [("assigned_label", assigned)] else []
 
-/-- One case `{"registry", "snapshot", "intent", "release", "stand", "call_hash"}`. -/
+/-- One case `{"registry", "snapshot", "intent", "release", "stand"}`. -/
 def releaseCase (j : JVal) : Decode Json := do
   let (Γ, S) ← decodeWorld j
   let I ← decodeIntent (← field j "intent")
   let R ← decodeRelease (← field j "release")
   let St ← decodeStand (← field j "stand")
-  let c ← strAt j "call_hash"
+  let c := callHashOf S I
   pure <| match deriveWithRelease Γ S I R St c with
     | .decision d => releaseDecisionJson Γ S I.operation R c d
     | .inputError code => Json.mkObj [("input_error", .str code)]
@@ -365,5 +367,35 @@ def domainCase (j : JVal) : Decode Json := do
     | none => pure none
   pure (Json.mkObj [("registry", .bool Γ.compiledOk),
     ("snapshot", match snapshot with | some b => .bool b | none => .null)])
+
+/-! ## The JSON layer -/
+
+/-- Floats as a marker: `Float.to_string/1` is not modelled. -/
+partial def maskFloats : JVal → JVal
+  | .float _ _ => .str "<float>"
+  | .arr xs => .arr (xs.map maskFloats)
+  | .obj kvs => .obj (kvs.map fun (k, v) => (k, maskFloats v))
+  | v => v
+
+def hexBytes (s : String) : Decode ByteArray := do
+  let digit := fun (c : Char) =>
+    if '0' ≤ c && c ≤ '9' then pure (c.toNat - '0'.toNat)
+    else if 'a' ≤ c && c ≤ 'f' then pure (c.toNat - 'a'.toNat + 10)
+    else throw s!"not a hex digit: {c}"
+  let rec go : List Char → Decode (List UInt8)
+    | a :: b :: rest => do pure (((← digit a) * 16 + (← digit b)).toUInt8 :: (← go rest))
+    | [] => pure []
+    | _ => throw "odd number of hex digits"
+  pure (ByteArray.mk (← go s.toList).toArray)
+
+/-- One case `{"hex"}`: the bytes through `JSON.parse/1` and `JSON.canonical/1`
+→ `{"ok": canonical, "sha256": hex}` or `{"error": code}`. -/
+def jsonCase (j : JVal) : Decode Json := do
+  let bytes ← hexBytes (← strAt j "hex")
+  pure <| match Json.parse bytes with
+    | .error code => Json.mkObj [("error", .str code)]
+    | .ok v => match Json.canonical (maskFloats v) with
+      | .error code => Json.mkObj [("error", .str code)]
+      | .ok text => Json.mkObj [("ok", .str text), ("sha256", .str (Sha256.hex text.toUTF8))]
 
 end KomkiSpec

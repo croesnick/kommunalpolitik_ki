@@ -16,3 +16,4 @@ import KomkiSpec.RemediesSound
 import KomkiSpec.Input
 import KomkiSpec.CatalogAgree
 import KomkiSpec.RemediesPayload
+import KomkiSpec.CallHash

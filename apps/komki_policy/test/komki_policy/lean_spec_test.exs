@@ -109,6 +109,69 @@ defmodule KomkiPolicy.LeanSpecTest do
     :duplicate_label
   ]
 
+  # Pieces of a JSON string: raw characters and every kind of escape.
+  @string_parts ~w(a b z A Z 0 9 / é € 😀 ﻿ \\" \\\\ \\/ \\b \\f \\n \\r \\t \\u0041 \\u00e9 \\u20AC \\ud83d\\ude00 \\u0000 \\u001f \\uFFFF \\u007F) ++
+                  [<<0x7F>>, " "]
+
+  # JSON documents on the edges of the grammar and of UTF-8 (CONTRACT.md § 6).
+  @json_edge_cases [
+    "",
+    "   ",
+    "-0",
+    "1E5",
+    "1e400",
+    "-1e400",
+    "1e-400",
+    "0e99999999",
+    "1.7976931348623157e308",
+    "1.7976931348623159e308",
+    "179769313486231580793728971405303415079934132710037826936173778980444968292764750946649017977587207096330286416692887910946555547851940402630657488671505820681908902000708383676273854845817711531764475730270069855571366959622842914819860834936475292719074168444365510704342711559699508093042880177904174497792e-5",
+    "123456789012345678901234567890",
+    "+1",
+    "NaN",
+    "Infinity",
+    "01",
+    "1.",
+    ".5",
+    "1e",
+    "1e+",
+    "--1",
+    "tru",
+    "truex",
+    "true_",
+    "nul",
+    "[1,]",
+    "[,1]",
+    "{\"a\":1,}",
+    "{,}",
+    "{\"a\" 1}",
+    "{\"a\":1,\"a\":2}",
+    "{\"a\":1,\"\\u0061\":2}",
+    "\"\\ud800\"",
+    "\"\\ud800\\u0041\"",
+    "\"\\ud800\\udc00\"",
+    "\"\\udc00\"",
+    "\"\\u12\"",
+    "\"\\u12g4\"",
+    "\"\\x\"",
+    "\"a\nb\"",
+    "\"\\",
+    "\"abc",
+    <<?", 0xC0, 0x80, ?">>,
+    <<?", 0xED, 0xA0, 0x80, ?">>,
+    <<?", 0xED, 0x9F, 0xBF, ?">>,
+    <<?", 0xE0, 0x80, 0x80, ?">>,
+    <<?", 0xF4, 0x90, 0x80, 0x80, ?">>,
+    <<?", 0xF4, 0x8F, 0xBF, 0xBF, ?">>,
+    <<?", 0xEF, 0xBF, 0xBF, ?">>,
+    <<?", 0xFF, ?">>,
+    <<?", 0xE2, 0x82, ?">>,
+    <<0xEF, 0xBB, 0xBF, ?{, ?}>>,
+    "[1] x",
+    "{} {}",
+    "[\"a\", 1, true, null, {}, []]"
+  ]
+
   test "Lean-Tabellen entsprechen Derive" do
     {out, 0} = System.cmd(spec_bin(), ["constants"])
     {:ok, constants} = KomkiPolicy.JSON.parse(String.trim(out))
@@ -322,6 +385,26 @@ defmodule KomkiPolicy.LeanSpecTest do
     assert snapshots >= 1_000
   end
 
+  # The JSON layer (CONTRACT.md § 6) byte for byte: the fixtures, generated
+  # documents in many spellings, tokens on the grammar's edges, nesting
+  # around the encoder's limit and single-byte mutants of all of them.
+  test "JSON: Parser und kanonischer Encoder gleichen dem Lean-Modell" do
+    fixtures =
+      (@fixtures_dir <> "/**/*.json")
+      |> Path.wildcard()
+      |> Enum.map(&File.read!/1)
+
+    documents = fixtures ++ @json_edge_cases ++ nested_documents() ++ seeded_list(json_doc_gen())
+    pairs = Enum.map(documents, &json_pair/1)
+    compare_json!(pairs, "json-batch", "json", "KomkiPolicy.JSON und dem Lean-Modell")
+
+    stats = Enum.frequencies_by(pairs, fn {_, result} -> result["error"] || "ok" end)
+    IO.puts("\nlean_spec json: #{inspect(stats)}")
+
+    assert stats["ok"] >= 2_000
+    assert map_size(stats) >= 11, "zu wenige Fehlerarten: #{inspect(Map.keys(stats))}"
+  end
+
   # Not a comparison with Lean, but the property the Lean theorem states
   # for the model (#631): a GO the catalog offers takes effect. Each offer
   # becomes a release with a fresh nonce; the release branch has to permit.
@@ -432,8 +515,7 @@ defmodule KomkiPolicy.LeanSpecTest do
       line = %{
         "registry" => raw,
         "snapshot" => snapshot,
-        "intent" => intent,
-        "call_hash" => call_hash(snapshot, intent)
+        "intent" => intent
       }
 
       {line, elixir_decision(registry, snapshot, intent)}
@@ -469,8 +551,7 @@ defmodule KomkiPolicy.LeanSpecTest do
       "snapshot" => snapshot,
       "intent" => intent,
       "release" => release,
-      "stand" => stand,
-      "call_hash" => call_hash(snapshot, intent)
+      "stand" => stand
     }
 
     {line, elixir_release(registry, snapshot, intent, release, stand)}
@@ -1070,6 +1151,129 @@ defmodule KomkiPolicy.LeanSpecTest do
 
   defp corrupt_snapshot(snapshot, :duplicate_label),
     do: update_in(snapshot, ["object", "labels"], fn ls -> ls ++ Enum.take(ls, 1) end)
+
+  # ---------------------------------------------------------------------
+  # The JSON layer (CONTRACT.md § 6)
+  # ---------------------------------------------------------------------
+
+  # Arrays and objects nested around the encoder's depth limit (#473).
+  defp nested_documents do
+    for depth <- [127, 128, 129, 130], open <- ["[", "{\"k\":"] do
+      close = if open == "[", do: "]", else: "}"
+      String.duplicate(open, depth) <> "0" <> String.duplicate(close, depth)
+    end
+  end
+
+  defp json_pair(bytes),
+    do: {%{"hex" => Base.encode16(bytes, case: :lower)}, elixir_json(bytes)}
+
+  defp elixir_json(bytes) do
+    case KomkiPolicy.JSON.parse(bytes) do
+      {:ok, value} ->
+        text = KomkiPolicy.JSON.canonical(mask_floats(value))
+        %{"ok" => text, "sha256" => Base.encode16(:crypto.hash(:sha256, text), case: :lower)}
+
+      {:error, %{code: code}} ->
+        %{"error" => to_string(code)}
+    end
+  rescue
+    error in KomkiPolicy.JSON.DepthLimitError -> %{"error" => to_string(error.code)}
+  end
+
+  defp mask_floats(value) when is_float(value), do: "<float>"
+  defp mask_floats(value) when is_list(value), do: Enum.map(value, &mask_floats/1)
+  defp mask_floats(%{} = value), do: Map.new(value, fn {k, v} -> {k, mask_floats(v)} end)
+  defp mask_floats(value), do: value
+
+  # A document as bytes: spelled with varying whitespace and escapes, half
+  # of them with one byte inserted, replaced or dropped, or cut short.
+  defp json_doc_gen do
+    gen all(
+          doc <- spelled_gen(),
+          mutation <- StreamData.member_of([:none, :insert, :replace, :delete, :truncate]),
+          at <- StreamData.integer(0..1_000),
+          byte <-
+            StreamData.member_of(
+              ~c',]}:"\\-+.e01 \nunt' ++ [0x00, 0x1F, 0x7F, 0x80, 0xC0, 0xED, 0xF4, 0xFF]
+            )
+        ) do
+      bytes = IO.iodata_to_binary(doc)
+      mutate(bytes, mutation, div(at * byte_size(bytes), 1_000), byte)
+    end
+  end
+
+  defp mutate(bytes, :none, _at, _byte), do: bytes
+
+  defp mutate(bytes, :insert, at, byte),
+    do: binary_part(bytes, 0, at) <> <<byte>> <> binary_part(bytes, at, byte_size(bytes) - at)
+
+  defp mutate(bytes, kind, at, byte) when at < byte_size(bytes) do
+    rest = binary_part(bytes, at + 1, byte_size(bytes) - at - 1)
+
+    case kind do
+      :replace -> binary_part(bytes, 0, at) <> <<byte>> <> rest
+      :delete -> binary_part(bytes, 0, at) <> rest
+      :truncate -> binary_part(bytes, 0, at)
+    end
+  end
+
+  defp mutate(bytes, _kind, _at, _byte), do: bytes
+
+  defp spelled_gen do
+    ws = StreamData.member_of(["", " ", "\n", "\t", "\r\n  "])
+
+    StreamData.tree(spelled_leaf_gen(), fn child ->
+      StreamData.one_of([
+        StreamData.bind(ws, fn w ->
+          StreamData.map(StreamData.list_of(child, max_length: 4), fn items ->
+            ["[", w, Enum.intersperse(items, [w, ",", w]), w, "]"]
+          end)
+        end),
+        StreamData.bind(ws, fn w ->
+          StreamData.map(
+            StreamData.list_of({spelled_key_gen(), child}, max_length: 4),
+            fn entries ->
+              pairs = Enum.map(entries, fn {k, v} -> [k, w, ":", w, v] end)
+              ["{", w, Enum.intersperse(pairs, [w, ",", w]), w, "}"]
+            end
+          )
+        end)
+      ])
+    end)
+  end
+
+  defp spelled_leaf_gen do
+    StreamData.one_of([
+      StreamData.member_of(["null", "true", "false"]),
+      StreamData.map(StreamData.integer(), &Integer.to_string/1),
+      StreamData.member_of(["-0", "18446744073709551616", "-99999999999999999999999"]),
+      StreamData.member_of(["1.5", "-0.0", "1e5", "1E-5", "2.5e+3", "0.1", "123.456e-7"]),
+      spelled_string_gen()
+    ])
+  end
+
+  defp spelled_key_gen do
+    StreamData.one_of([
+      StreamData.member_of([
+        "\"a\"",
+        "\"b\"",
+        "\"\\u0061\"",
+        "\"A\"",
+        "\"é\"",
+        "\"\\u00e9\"",
+        "\"\"",
+        "\"a\\u0000\""
+      ]),
+      spelled_string_gen()
+    ])
+  end
+
+  defp spelled_string_gen do
+    @string_parts
+    |> StreamData.member_of()
+    |> StreamData.list_of(max_length: 6)
+    |> StreamData.map(fn parts -> ["\"", parts, "\""] end)
+  end
 
   defp seeded_list(generator) do
     generator

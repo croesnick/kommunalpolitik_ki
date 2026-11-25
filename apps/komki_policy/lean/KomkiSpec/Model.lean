@@ -44,6 +44,8 @@ structure Snapshot where
   facts : List (String × JVal)
   /-- `object_id@version`; only the tree `derive` builds names it. -/
   objectRef : String := ""
+  /-- `workspace_id`; only the call hash names it. -/
+  workspaceId : String := ""
   /-- Fact name → (`source`, `source_kind`); only the tree `derive` builds names them. -/
   factSources : List (String × String × String) := []
 
