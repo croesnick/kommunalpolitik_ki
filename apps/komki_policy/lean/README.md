@@ -29,7 +29,7 @@ CI.
 | `remedies_aktion_effective`, `remedies_offenlegung_effective` | Daraus: Jedes GO, das ein Eintrag des ganzen Katalogs einer Ablehnung des normalen Zweigs anbietet, wirkt | CONTRACT.md § 2.8 |
 | `catalog_ascending` | In jedem Eintrag des Katalogs stehen die Fortsetzungen in der normativen Ordnung: kein GO vor einer Fortsetzung, die nichts verletzt | CONTRACT.md § 2.8 |
 | `derive_fakt_deny`, `derive_fakt_indeterminate` | `fakt_nachreichen` fragt nach genau dem Feld, das sein Befund nennt, nie nach keinem | CONTRACT.md § 2.8 |
-| `derive_blockers_named`, `derive_evidence_named` | Was ein Befund nennt, ist das, was § 2.8 meint: bei `missing_fact` einen Fakt, der im Snapshot fehlt; bei `recipients_unproven` die Beobachterliste, die nicht `true` ist; bei `basis_right_false` und `audit_path_not_ready` den Basisfakt, der `false` ist; bei `binding_condition_false` ein Feld der falschen Bedingung, und keines nur, wenn die Bedingung unabhängig von den Fakten `false` ist | CONTRACT.md § 2.8, § 4.3, § 4.4 |
+| `derive_blockers_named`, `derive_evidence_named` | Was ein Befund nennt, ist das, was § 2.8 meint: bei `missing_fact` einen Fakt, der im Snapshot fehlt; bei `recipients_unproven` die Beobachterliste, die nicht `true` ist; bei `basis_right_false` einen Basisfakt der Regel, der `false` ist, bei `audit_path_not_ready` genau `audit_path_ready`; bei `binding_condition_false` ein Feld der falschen Bedingung, und keines nur, wenn die Bedingung unabhängig von den Fakten `false` ist | CONTRACT.md § 2.8, § 4.3, § 4.4 |
 | `derive_transformations_listed` | `registrierte_transformation` listet bei `label_not_included` genau die registrierten Transformationen mit `input_labels ⊆ λ(x)` und `output_labels ⊆ B_W`, in der Reihenfolge der Registry | CONTRACT.md § 2.1, § 2.8 |
 | `remedies_transformation` | `registrierte_transformation` bietet nur registrierte Transformationen mit `input_labels ⊆ λ(x)` und `output_labels` im Prüflabel an; ein Objekt mit diesen Labels besteht die Label-Inklusion | CONTRACT.md § 2.1, § 2.8 |
 | `catalog_neuerRaum`, `neuer_raum_necessary`, `neuer_raum_recipients_necessary` | `neuer_raum` trägt `required_bindings` = λ(x) bei `admit`, sonst `[]`, und `required_recipients` = ρ_Γ(c). Beides ist notwendig: Jeder Raum, in dem `derive` x aufnimmt, hat alle `required_bindings`; jeder Raum in derselben Umgebung, in dem `derive` erlaubt, lässt alle `required_recipients` unter seinem Prüflabel zu | CONTRACT.md § 2.8, B.7 |
@@ -187,7 +187,7 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   `fakt_nachreichen`, die Liste der Transformationen, notwendige Bindungen
   und Empfänger von `neuer_raum`. Dass die Registry ihre Transformationen
   nach Kennung sortiert hält, besorgt die unbewiesene Brücke wie
-  `Registry.compile/1`. Die Wirksamkeitssätze sprechen über
+  `Remedies.matching_transformations/2`. Die Wirksamkeitssätze sprechen über
   `catalogGos` (`Release.lean`), Ordnung und Vollständigkeit über `catalog`
   (`Remedies.lean`); `catalog_gos` zeigt, dass beide dieselben GOs
   anbieten.
