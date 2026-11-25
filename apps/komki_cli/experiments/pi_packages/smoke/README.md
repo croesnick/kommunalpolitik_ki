@@ -42,15 +42,15 @@ pnpm add --ignore-scripts \
 ## Ausführen
 
 ```bash
-# Aufgaben 1–4 und 6 (headless): TOP zusammenfassen, Quellen extrahieren,
-# Text redigieren, Todo-Workflow, Compaction-Experiment
+# Aufgaben 1–4, 6 und 7 (headless): TOP zusammenfassen, Quellen extrahieren,
+# Text redigieren, Todo-Workflow, Compaction-Experiment, Bürgerinformation
 node apps/komki_cli/experiments/pi_packages/smoke/run-smoke.mjs
 
 # Aufgabe 5 (interaktives TUI unter tmux): ask_user_question
 node apps/komki_cli/experiments/pi_packages/smoke/run-tui.mjs --root <run-root>
 ```
 
-Optionen von `run-smoke.mjs`: `--only 1,2,3,4,6` (Teilmenge) und
+Optionen von `run-smoke.mjs`: `--only 1,2,3,4,6,7` (Teilmenge) und
 `--root <dir>` (eigenes Laufverzeichnis). Der Standard-Lauf schreibt unter
 `$KOMKI_PI_EXPERIMENTS_DIR/runs/<timestamp>/`. Die Gesamtübersicht
 (`results.json`, `SMOKE.md`) wird aus allen `results/*.json` des Roots
@@ -128,6 +128,20 @@ liest der Harness die draft acceptance des MTP-Drafters aus dem llama-Log
 denen eine Messgröße fehlt, als Hinweis auf ein geändertes Log-Format.
 Der Arm `VB` ist das Homebrew-Bottle 0.9.0 samt ggml-Bottle, hergerichtet
 neben der Live-Instanz. Herkunft und Skript stehen im Labbook zu #372.
+
+Das Modell-A/B zu Inkling 2 Mini (#642) vergleicht den Produktivstart `G`
+mit `IL` und `IH` (Inkling, reasoning effort low und high), alle auf dem
+Release-Bundle b12720. Es bringt Aufgabe 7 mit (Bürgerinformation, freies
+Schreiben auf Deutsch) und eine blinde Deutsch-Checkliste (D1–D5, Fehler je
+100 Wörter) für die Aufgaben 1, 3 und 7. `grade-ab.mjs` verblindet Aufgabe 7
+und bewertet Deutsch nur, wenn die Läufe Aufgabe 7 enthalten; ältere Studien
+werten unverändert aus.
+
+```bash
+node smoke/run-ab.mjs --root <ab-root> --arms G,IL,IH --runs 3 \
+  --only 1,2,3,4,6,7 --timeout-factor 6 --seed-base 642000
+node smoke/grade-ab.mjs report --root <ab-root> --reference G
+```
 
 Context-Checkpoints und den FA-Modus je Kontext zeigt das llama-Log nur mit
 `-lv 4`. Dafür gibt es die Debug-Arme `V7D`/`V9D` (V7/V9 plus `-lv 4`) und
