@@ -17,7 +17,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   use ExUnit.Case, async: false
   use ExUnitProperties
 
-  alias KomkiPolicy.{Calculus, Derive, Evaluator, Registry, Release, Stand, Verify}
+  alias KomkiPolicy.{Calculus, CLI, Derive, Evaluator, Registry, Release, Stand, Verify}
 
   @moduletag :lean_spec
   @moduletag timeout: 600_000
@@ -112,6 +112,13 @@ defmodule KomkiPolicy.LeanSpecTest do
     :unsorted_labels,
     :duplicate_label
   ]
+
+  # The error codes of JSON.parse/1, which the Lean parser models.
+  @json_error_codes ~w(empty_input trailing_data incomplete_document unexpected_byte invalid_number
+                       unterminated_literal duplicate_json_key trailing_comma invalid_string
+                       invalid_utf8)
+  # komki-policy calls per command kind: each one compiles and parses files.
+  @cli_runs 300
 
   # Pieces of a JSON string: raw characters and every kind of escape.
   @string_parts ~w(a b z A Z 0 9 / é € 😀 ﻿ \\" \\\\ \\/ \\b \\f \\n \\r \\t \\u0041 \\u00e9 \\u20AC \\ud83d\\ude00 \\u0000 \\u001f \\uFFFF \\u007F) ++
@@ -407,6 +414,39 @@ defmodule KomkiPolicy.LeanSpecTest do
 
     assert stats["ok"] >= 2_000
     assert map_size(stats) >= 11, "zu wenige Fehlerarten: #{inspect(Map.keys(stats))}"
+  end
+
+  # komki-policy itself (CONTRACT.md § 7): the worlds of the other tests as
+  # files, every fourth with one byte changed, through CLI.run/1, against
+  # the strict parser and the model on the same bytes.
+  test "CLI: komki-policy antwortet wie das Lean-Modell, samt Exit-Code" do
+    dir = Path.join(System.tmp_dir!(), "komki-spec-cli-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+
+    try do
+      pairs =
+        cli_commands()
+        |> Enum.with_index()
+        |> Enum.map(fn {{command, values}, i} -> cli_pair(dir, command, cli_files(values, i)) end)
+
+      compare_json!(pairs, "cli-batch", "cli", "komki-policy und dem Lean-Modell")
+
+      stats =
+        Enum.frequencies_by(pairs, fn
+          {line, %{"exit" => exit}} -> {line["command"], exit}
+          {line, :dropped} -> {line["command"], :dropped}
+        end)
+
+      IO.puts("\nlean_spec cli: #{inspect(stats)}")
+
+      for key <-
+            [{"decide", 0}, {"decide", 2}, {"decide", 3}, {"verify", 0}, {"verify", 1}] ++
+              [{"verify", 2}, {"advance", 0}, {"advance", 1}, {"advance", 2}] do
+        assert Map.get(stats, key, 0) >= 20, "zu wenige Fälle #{inspect(key)}"
+      end
+    after
+      File.rm_rf!(dir)
+    end
   end
 
   # Not a comparison with Lean, but the property the Lean theorem states
@@ -1307,6 +1347,125 @@ defmodule KomkiPolicy.LeanSpecTest do
     |> StreamData.member_of()
     |> StreamData.list_of(max_length: 6)
     |> StreamData.map(fn parts -> ["\"", parts, "\""] end)
+  end
+
+  # ---------------------------------------------------------------------
+  # The CLI (CONTRACT.md § 7)
+  # ---------------------------------------------------------------------
+
+  defp cli_commands do
+    worlds = world_gen() |> seeded_list() |> Enum.take(@cli_runs)
+
+    decide =
+      for {raw, _, snapshot, intent} <-
+            worlds |> Enum.flat_map(&decision_cases/1) |> Enum.take(@cli_runs),
+          do: {"decide", [{"registry", raw}, {"snapshot", snapshot}, {"intent", intent}]}
+
+    verify =
+      for {raw, _, snapshot, intent, proof} <-
+            worlds |> Enum.flat_map(&world_cases/1) |> Enum.take(@cli_runs),
+          do:
+            {"verify",
+             [{"registry", raw}, {"snapshot", snapshot}, {"intent", intent}, {"proof", proof}]}
+
+    release =
+      for {raw, _, snapshot, intent, release, stand} <-
+            release_world_gen()
+            |> seeded_list()
+            |> Enum.take(@cli_runs)
+            |> Enum.flat_map(&release_cases/1)
+            |> Enum.take(@cli_runs),
+          do:
+            {"decide",
+             [
+               {"registry", raw},
+               {"snapshot", snapshot},
+               {"intent", intent},
+               {"release", release},
+               {"stand", stand}
+             ]}
+
+    advance =
+      for {stand, proposal} <- advance_gen() |> seeded_list() |> Enum.take(@cli_runs),
+          do: {"advance", [{"stand", stand}, {"proposal", proposal}]}
+
+    decide ++ verify ++ release ++ advance
+  end
+
+  # The canonical bytes of each file. In every fourth case one file gets a
+  # byte inserted, replaced or dropped, or is cut short; in every sixteenth
+  # each file gets its own change, so the order the CLI reads them in shows.
+  defp cli_files(values, i) do
+    files = for {name, value} <- values, do: {name, KomkiPolicy.JSON.canonical(value)}
+    target = rem(div(i, 4), length(files))
+
+    files
+    |> Enum.with_index()
+    |> Enum.map(fn {{name, bytes}, k} ->
+      if (rem(i, 4) == 0 and k == target) or rem(i, 16) == 2,
+        do: {name, cli_mutate(bytes, i + k)},
+        else: {name, bytes}
+    end)
+  end
+
+  defp cli_mutate(bytes, i) do
+    kind = Enum.at([:insert, :replace, :delete, :truncate], rem(div(i, 4), 4))
+    byte = Enum.at(~c',]}:"\\-0 ', rem(i, 8))
+    mutate(bytes, kind, rem(i * 7919, byte_size(bytes)), byte)
+  end
+
+  defp cli_pair(dir, command, files) do
+    argv =
+      Enum.flat_map(files, fn {name, bytes} ->
+        path = Path.join(dir, name <> ".json")
+        File.write!(path, bytes)
+        ["--" <> name, path]
+      end)
+
+    {out, exit} = CLI.run([command | argv])
+
+    line = %{
+      "command" => command,
+      "files" =>
+        Map.new(files, fn {name, bytes} -> {name, Base.encode16(bytes, case: :lower)} end)
+    }
+
+    {line, cli_expected(command, List.keymember?(files, "release", 0), out, exit)}
+  end
+
+  defp cli_expected(command, release?, out, exit) do
+    {:ok, parsed} = KomkiPolicy.JSON.parse(out)
+
+    case {command, exit, parsed} do
+      {_, 2, %{"result" => "error", "code" => code}} -> cli_input_error(command, code)
+      {"decide", 0, _} -> %{"exit" => 0, "result" => decided(parsed, release?)}
+      {"decide", 3, _} -> %{"exit" => 3, "result" => %{"unsupported" => true}}
+      {"verify", _, _} when exit in [0, 1] -> %{"exit" => exit, "result" => parsed["result"]}
+      {"advance", 0, _} -> %{"exit" => 0, "result" => %{"ok" => Map.delete(parsed, "schema")}}
+      {"advance", 1, _} -> %{"exit" => 1, "result" => %{"refused" => parsed["code"]}}
+      _ -> %{"exit" => exit, "result" => parsed}
+    end
+  end
+
+  defp decided(decision, release?) do
+    fields = if release?, do: @release_fields, else: @decision_fields
+    decision |> Map.take(fields) |> Map.put("gos", gos(decision["remedies"]))
+  end
+
+  defp cli_input_error(command, code) do
+    cond do
+      code in @json_error_codes ->
+        %{"exit" => 2, "result" => %{"error" => code}}
+
+      command == "decide" and code in Enum.map(@derive_input_errors, &to_string/1) ->
+        %{"exit" => 2, "result" => %{"input_error" => code}}
+
+      command == "verify" and code in Enum.map(@modelled_input_errors, &to_string/1) ->
+        %{"exit" => 2, "result" => "input_error"}
+
+      true ->
+        :dropped
+    end
   end
 
   defp seeded_list(generator) do

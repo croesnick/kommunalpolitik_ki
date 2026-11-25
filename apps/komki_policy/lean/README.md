@@ -152,6 +152,15 @@ Gleitkommazahlen werden geparst, aber als Marker verglichen, weil
 selbst (`callHashOf`); jede Entscheidung und jeder Katalog, die ihn
 nennen, vergleicht ihn so mit `Release.call_hash/4`.
 
+Die CLI vergleicht er als Ganzes: `komki-policy decide` (auch mit
+`--release`/`--stand`), `verify` und `advance` laufen über `CLI.run/1` auf
+Dateien aus den Welten der übrigen Tests, jede vierte mit einem
+veränderten Byte in einer Datei, jede sechzehnte in allen. Das Modell liest
+dieselben Bytes mit dem strengen Parser in der Reihenfolge der CLI und
+entscheidet; verglichen werden Exit-Code (§ 7), Fehlercode des Parsers und
+Entscheidung. `validate`, `plan`, Bedienfehler und Exit 4 deckt nur
+`cli_test.exs` ab.
+
 Ein weiterer Test prüft in Elixir, was `catalog_*_effective` für das Modell
 beweist: Jedes angebotene GO für den exakten Call wird zu einer Freigabe
 mit frischer Nonce, und der Freigabe-Zweig muss erlauben.
@@ -159,7 +168,7 @@ mit frischer Nonce, und der Freigabe-Zweig muss erlauben.
 `KOMKI_SPEC_SEED` und `KOMKI_SPEC_RUNS` erweitern die Suche. Eine Abweichung
 schreibt ihre Fälle als JSONL-Datei; `komki-spec verify-batch`,
 `derive-batch`, `release-batch`, `advance-batch`, `eval-batch`,
-`domain-batch` beziehungsweise `json-batch` spielt sie nach.
+`domain-batch`, `json-batch` beziehungsweise `cli-batch` spielt sie nach.
 
 ## Synchron halten
 

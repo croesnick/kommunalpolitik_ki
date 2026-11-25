@@ -392,10 +392,58 @@ def hexBytes (s : String) : Decode ByteArray := do
 → `{"ok": canonical, "sha256": hex}` or `{"error": code}`. -/
 def jsonCase (j : JVal) : Decode Json := do
   let bytes ← hexBytes (← strAt j "hex")
-  pure <| match Json.parse bytes with
+  pure <| match KomkiSpec.Json.parse bytes with
     | .error code => Json.mkObj [("error", .str code)]
     | .ok v => match Json.canonical (maskFloats v) with
       | .error code => Json.mkObj [("error", .str code)]
       | .ok text => Json.mkObj [("ok", .str text), ("sha256", .str (Sha256.hex text.toUTF8))]
+
+/-! ## The CLI (CONTRACT.md § 7) -/
+
+/-- The files each command reads, in the order `KomkiPolicy.CLI` reads them. -/
+def cliFiles : String → List String
+  | "verify" => ["registry", "snapshot", "intent", "proof"]
+  | "advance" => ["stand", "proposal"]
+  | _ => ["registry", "snapshot", "intent", "release", "stand"]
+
+def cliResult (exit : Nat) (result : Json) : Json :=
+  Json.mkObj [("exit", Lean.toJson exit), ("result", result)]
+
+/-- One case `{"command", "files": {name: hex}}`: `komki-policy <command>` on
+those bytes. Each file goes through the strict parser in the CLI's order,
+then the model decides; the exit code follows § 7 (0 decision or `valid` or
+a new stand, 1 `invalid` or `refused`, 2 input error, 3 `unsupported`). -/
+def cliCase (j : JVal) : Decode Json := do
+  let command ← strAt j "command"
+  let files ← asObj (← field j "files")
+  let mut parsed : List (String × JVal) := []
+  for name in cliFiles command do
+    match files.lookup name with
+    | none => pure ()
+    | some (.str hex) =>
+      match KomkiSpec.Json.parse (← hexBytes hex) with
+      | .error code => return cliResult 2 (Json.mkObj [("error", .str code)])
+      | .ok v => parsed := parsed ++ [(name, v)]
+    | some _ => throw s!"file {name} is not hex"
+  let input := JVal.obj parsed
+  match command with
+  | "verify" =>
+    let o ← verifyCase input
+    pure (cliResult (match o with | .valid => 0 | .invalid => 1 | .inputError => 2) (.str o.label))
+  | "advance" =>
+    let r ← advanceCase input
+    pure (cliResult (if (r.getObjVal? "ok").toOption.isSome then 0 else 1) r)
+  | _ =>
+    -- Without a release, `decide` rejects an unsupported operation before it
+    -- validates the snapshot (`decide_validated?/4`); with one, the other
+    -- way round (`release_validated?/5`). #644 asks which order holds.
+    if (input.get? "release").isNone then
+      let I ← decodeIntent (← field input "intent")
+      if !proofRules.contains I.operation then
+        return cliResult 3 (Json.mkObj [("unsupported", .bool true)])
+    let r ← if (input.get? "release").isSome then releaseCase input else deriveCase input
+    let exit := if (r.getObjVal? "input_error").toOption.isSome then 2
+      else if (r.getObjVal? "unsupported").toOption.isSome then 3 else 0
+    pure (cliResult exit r)
 
 end KomkiSpec
