@@ -15,6 +15,8 @@ for theorem in verify_sound verify_sound_rfc derivable_permitted handover_within
   derive_verifies aktion_permit offenlegung_permit release_single_use advance_cas \
   catalog_aktion_effective catalog_offenlegung_effective catalog_gos \
   remedies_aktion_effective remedies_offenlegung_effective catalog_ascending \
+  derive_missing_named derive_condition_named remedies_transformation catalog_neuerRaum neuer_raum_necessary \
+  neuer_raum_recipients_necessary \
   derive_deny_remedied derive_indeterminate_remedied release_remedied \
   eval_mono recipients_antitone permitted_antitone no_forbidden_recipient \
   Registry.compiledOk_sound Snapshot.validated_sound; do

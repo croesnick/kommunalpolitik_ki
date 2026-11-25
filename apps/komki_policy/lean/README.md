@@ -28,6 +28,9 @@ CI.
 | `catalog_gos` | Die GO-Angebote des ganzen Katalogs (`catalog`) sind Eintrag für Eintrag die, über die die Wirksamkeitssätze sprechen (`catalogGos`), für jeden Befund, den `derive` meldet | CONTRACT.md § 2.8 |
 | `remedies_aktion_effective`, `remedies_offenlegung_effective` | Daraus: Jedes GO, das ein Eintrag des ganzen Katalogs einer Ablehnung des normalen Zweigs anbietet, wirkt | CONTRACT.md § 2.8 |
 | `catalog_ascending` | In jedem Eintrag des Katalogs stehen die Fortsetzungen in der normativen Ordnung: kein GO vor einer Fortsetzung, die nichts verletzt | CONTRACT.md § 2.8 |
+| `derive_missing_named`, `derive_condition_named` | Jeder `missing_fact` von `derive` nennt einen Fakt, der im Snapshot fehlt; jede falsche Bindungsbedingung, wenn überhaupt, ein Feld ihres Ausdrucks; `fakt_nachreichen` fragt genau danach | CONTRACT.md § 2.8, § 4.4 |
+| `remedies_transformation` | `registrierte_transformation` bietet nur registrierte Transformationen mit `input_labels ⊆ λ(x)` und `output_labels` im Prüflabel an; ein Objekt mit diesen Labels besteht die Label-Inklusion | CONTRACT.md § 2.1, § 2.8 |
+| `catalog_neuerRaum`, `neuer_raum_necessary`, `neuer_raum_recipients_necessary` | `neuer_raum` trägt außerhalb des Freigabe-Zweigs `required_bindings` = λ(x) bei `admit` und `required_recipients` = ρ_Γ(c). Beides ist notwendig: Jeder Raum, in dem `derive` x aufnimmt, hat alle `required_bindings`; jeder Raum in derselben Umgebung, in dem `derive` erlaubt, lässt alle `required_recipients` unter seinem Prüflabel zu | CONTRACT.md § 2.8, B.7 |
 | `derive_deny_remedied`, `derive_indeterminate_remedied`, `release_remedied` | Jeder Blocker und jeder fehlende Beleg von `derive`, auch im Freigabe-Zweig, bekommt mindestens eine Fortsetzung, kein nacktes `deny` | CONTRACT.md § 2.8, APPA Theorem 5 |
 | `eval_mono` | Mehr Fakten kippen kein bekanntes Urteil des dreiwertigen Auswerters | R.5.2, CONTRACT.md § 3 |
 | `recipients_antitone`, `permitted_antitone` | Mehr Bindungen, nie mehr Empfänger; Erlaubt vererbt sich auf Teilmengen | A.2 |
@@ -175,9 +178,10 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 
 ## Grenzen
 
-- **Vom Remedy-Katalog sind Wirksamkeit, Ordnung und Vollständigkeit
-  bewiesen,** nicht die Payloads der übrigen Fortsetzungen; die hält der
-  Differenztest am Elixir-Code. Die Wirksamkeitssätze sprechen über
+- **Vom Remedy-Katalog sind Wirksamkeit, Ordnung, Vollständigkeit und
+  die Payload-Zusagen aus § 2.8 bewiesen** (benannter fehlender Fakt oder
+  Bedingungsfeld, passende Transformation, notwendige Bindungen und
+  Empfänger). Die Wirksamkeitssätze sprechen über
   `catalogGos` (`Release.lean`), Ordnung und Vollständigkeit über `catalog`
   (`Remedies.lean`); `catalog_gos` zeigt, dass beide dieselben GOs
   anbieten.

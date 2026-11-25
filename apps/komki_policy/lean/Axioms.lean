@@ -27,6 +27,12 @@ open KomkiSpec
 #print axioms remedies_aktion_effective
 #print axioms remedies_offenlegung_effective
 #print axioms catalog_ascending
+#print axioms derive_missing_named
+#print axioms derive_condition_named
+#print axioms remedies_transformation
+#print axioms catalog_neuerRaum
+#print axioms neuer_raum_necessary
+#print axioms neuer_raum_recipients_necessary
 #print axioms derive_deny_remedied
 #print axioms derive_indeterminate_remedied
 #print axioms release_remedied
