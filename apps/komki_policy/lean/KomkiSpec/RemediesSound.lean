@@ -6,9 +6,11 @@ import KomkiSpec.CatalogSound
 
 `catalog_ascending`: within every entry the transitions follow the
 normative order, so no GO comes before a continuation that violates
-nothing (no compensatory leakage). `derive_remedies_nonempty`: every
-blocker and every missing piece of evidence `derive` reports gets at least
-one continuation, no bare `deny` (APPA theorem 5).
+nothing (no compensatory leakage). `derive_deny_remedied` and
+`derive_indeterminate_remedied`: every blocker and every missing piece of
+evidence `derive` reports gets at least one continuation, no bare `deny`
+(APPA theorem 5); `release_remedied`: the same for a denial of a release
+branch.
 -/
 
 namespace KomkiSpec
@@ -261,5 +263,32 @@ theorem derive_indeterminate_remedied {Γ : Registry} {S : Snapshot} {I : Intent
   simp only [evidenceOf, List.mem_flatten, List.mem_map] at he
   obtain ⟨_, ⟨g, hg, rfl⟩, he⟩ := he
   exact Or.inr ⟨rfl, (premise_codes g hg).2 e he⟩
+
+/-- No bare `deny` after a release either (§ 2.8): every blocker of a release
+branch gets a continuation, a fresh GO or `neuer_raum`. -/
+theorem release_remedied {Γ : Registry} {c : CatalogCtx} (hrel : c.rule = "release")
+    (fs : List Finding) : ∀ e ∈ catalog Γ c fs, e ≠ [] := by
+  intro e he
+  have hr : (c.rule == "release") = true := by simpa using hrel
+  unfold catalog at he
+  dsimp only at he
+  split at he
+  · obtain ⟨p, hm, rfl⟩ := List.mem_map.1 he
+    obtain ⟨f, _, rfl⟩ := List.mem_map.1 hm
+    dsimp only
+    have : ∃ t ∈ releaseTransitions c f, t.rank ≠ 0 := by
+      unfold releaseTransitions
+      split
+      · split
+        · exact ⟨_, List.mem_singleton_self _, by simp [Transition.rank]⟩
+        · exact ⟨_, List.mem_singleton_self _, by simp [Transition.rank]⟩
+      · split
+        · exact ⟨_, List.mem_singleton_self _, by simp [Transition.rank]⟩
+        · exact ⟨_, List.mem_singleton_self _, by simp [Transition.rank]⟩
+    obtain ⟨t, ht, hrank⟩ := this
+    exact List.ne_nil_of_mem (mem_ordered ht hrank)
+  · obtain ⟨p, hm, rfl⟩ := List.mem_map.1 he
+    obtain ⟨f, _, rfl⟩ := List.mem_map.1 hm
+    exact fill_nonempty
 
 end KomkiSpec
