@@ -106,7 +106,7 @@ Die Kostengrenze K ist neu. Qwen3.8-27B fiel in #285 inhaltlich nicht durch, war
 
 | Schritt | Zeit (25.11.2026, MEZ) | Laufverzeichnis unter `$TMPDIR/komki-pi-experiments/ab-642/` |
 |---|---|---|
-| Vorab-Check (Denkstufe, Tool-Call) und Entwicklungslauf | 08:40–08:59 | `vorab/`, `dev-task7/` |
+| Vorab-Check (Denkstufe, Tool-Call, eine deutsche Probefrage je Arm), Entwicklungslauf und Probe der Auswertung mit Platzhalter-Bewertungen | 08:40–09:00 | `vorab/`, `dev-task7/`, `dev-grade/` |
 | Pre-Registration committet | 09:00 | Commit `1e327847`, Arbeitsbaum sauber |
 | Preflight-Check, Warm-up und 3 Runden × 3 Arme | 09:01–10:56 | `main/` (`schedule.json`, `provenance.json`, `REPORT.md`) |
 | Blindbewertung, Entblindung | danach | `main/blind/`, `main/blind-key.json` |
@@ -122,7 +122,7 @@ Die Rohdaten (Request-Mitschnitte, Sessions, Server-Logs, Blindkopien) liegen nu
 | llama-server | `1.0.0-dev (build 12720, commit 33aeb17f8)`, SHA-256 `685941b8df982e4e205fd20492f9aaa9418f2d1224ba3d311a686abd0edb0439`, für alle drei Arme |
 | Node, pi | 24.22.3, pi 1.5.2 (aus der Homebrew-Formel komki 0.1.0) |
 | Seeds | Warm-up 642 000, Runden 1–3: 642 001–642 003 |
-| Störgrößen | Die komki-Instanz lief nicht. Swap blieb im Hauptlauf bei rund 8 GB. |
+| Störgrößen | Die komki-Instanz lief nicht. Der Warm-up von G und der Beginn des Warm-ups von IL liefen auf Akku, danach am Netz. Im Warm-up von IL stieg die Systemlast auf 179 (5-Minuten-Mittel; vorher 3,1) und der Swap von 2,8 auf 8,1 GB, durch Prozesse außerhalb des Harness. Zu Beginn von Runde 1 lag das 15-Minuten-Mittel noch bei 55. Danach blieb der Swap bei rund 8 GB. Die Messläufe sind nicht erkennbar betroffen: Runde 1 war für IL und IH die schnellste (373 s und 932 s). |
 
 Vorab-Check bestanden: Der IL-Server rendert „Thinking effort level: 0.2“ in die Vorlage, IH „0.9“. Auf eine Frage mit Tool liefern beide Arme `finish_reason: tool_calls` mit gültigem `tool_calls`-Objekt, das Thinking getrennt in `reasoning_content`. Alle drei Arme laden im Preflight (G 3,3 s, IL 5,8 s, IH 3,0 s).
 
@@ -200,7 +200,7 @@ Englisch antwortet jeder Arm genau einmal, jeweils in Aufgabe 6 nach der Compact
 
 ### 3. Inkling trifft Inhalt und Beratungsstand besser
 
-Inkling nennt den Eigenanteil in allen sechs Zusammenfassungen, der Pin in keiner seiner drei, wie schon in #158 und #285. In der Bürgerinformation hält IL den Beratungsstand in allen drei Läufen korrekt, IH in keinem, der Pin in keinem. Der Pin erfindet dort in allen drei Läufen ein Ziel, in einem auch eine Begründung („Um den Verkehrsfluss und die Anwohner nicht zu stören“). In zwei Läufen macht er aus dem Ersatz der Parkbuchten „14 neue Parkplätze“, in allen dreien wertet er mit „lediglich“. Die Vorgabe „sachlich und ohne Wertung“ hält er nicht ein. Inkling erfindet in keinem Lauf etwas, verwendet aber Verwaltungsbegriffe wie „Zuwendungsbescheid“, die Laien nicht verstehen (B3 in fünf von sechs Läufen verfehlt).
+Inkling nennt den Eigenanteil in allen sechs Zusammenfassungen, der Pin in keiner seiner drei, wie schon in #158 und #285. In der Bürgerinformation gibt IL den Beratungsstand und die Empfehlung in allen drei Läufen richtig wieder. IH stellt einmal etwas als sicher dar (der Ergänzungsantrag „wird vorbereitet“) und verändert in allen drei Läufen den Inhalt der Empfehlung: zweimal „melden“ → „aufnehmen“ bzw. „übernehmen“, einmal einen anderen Akteur. B1 zählt beides nach der präzisierten Regel (Abweichung 1). Der Pin stellt den Umbau in allen drei Läufen als festen Plan der Stadt dar, ohne Ausschuss und Rat. Der Pin erfindet dort in allen drei Läufen ein Ziel, in einem auch eine Begründung („Um den Verkehrsfluss und die Anwohner nicht zu stören“). In zwei Läufen macht er aus dem Ersatz der Parkbuchten „14 neue Parkplätze“, in allen dreien wertet er mit „lediglich“. Die Vorgabe „sachlich und ohne Wertung“ hält er nicht ein. Inkling erfindet in keinem Lauf etwas, verwendet aber Verwaltungsbegriffe wie „Zuwendungsbescheid“, die Laien nicht verstehen (B3 in fünf von sechs Läufen verfehlt).
 
 ### 4. Rohe Anführungszeichen machen Inklings JSON ungültig
 
@@ -212,20 +212,22 @@ IL macht in einem Lauf aus der Bitte um Zustimmung „im Vorgriff auf“ die Hau
 
 ### 6. Der Warm-up von IL dauerte 20 Minuten
 
-Aufgabe 6 brauchte im ungemessenen Warm-up von IL 1 218 s, in den Messläufen 160–184 s. Zwei Requests liefen 447 und 573 s für 130 bzw. 573 Completion-Token. Danach trat das nicht wieder auf. Naheliegend ist ein einmaliger Aufwärmeffekt des neuen Architekturpfads auf Metal; untersucht wurde das nicht.
+Aufgabe 6 brauchte im ungemessenen Warm-up von IL 1 218 s, in den Messläufen 160–184 s. Zwei Requests liefen 447 und 573 s für 130 bzw. 573 Completion-Token. Danach trat das nicht wieder auf. Wahrscheinliche Ursache ist die Systemlast in diesem Zeitraum (siehe Störgrößen: Last bis 179, Swap von 2,8 auf 8,1 GB). Ein Aufwärmeffekt des neuen Architekturpfads auf Metal ist nicht ausgeschlossen; untersucht wurde das nicht.
 
 ## Abweichungen vom Protokoll
 
 1. **Bewertungsregel B1 präzisiert, vor dem Entblinden.** Auch ein veränderter Inhalt der Empfehlung zählt gegen B1: eine andere Handlung („melden“ → „aufnehmen“) oder ein anderer Akteur (der Rat statt der Verwaltung bereitet den Ergänzungsantrag vor). Auf alle neun Bürgerinformationen gleich angewandt.
 2. **Bewertungsregel B3 präzisiert, vor dem Entblinden.** Gegen B3 zählen nur Begriffe, die Laien aus dem Text nicht erschließen können: Förderrichtlinie, Zuwendungsbescheid, Auflagen ohne Erläuterung. „Kostenschätzung“, „Eigenanteil“ und „Haushaltsplanung“ zählen nicht, wenn der Satz ihre Bedeutung klar macht („80.000 Euro Eigenanteil der Stadt, der Rest aus Landesförderung“).
 3. **Zählregel für M1 festgelegt, vor dem Entblinden.** #285 hat sie nicht dokumentiert. Ein Stichpunkt zählt als ein Satz, mehrere Sätze in einem Stichpunkt zählen einzeln, die Überschrift zählt nicht.
+Die Präzisierungen 1 bis 3 widersprechen der eigenen Pre-Registration, nach der bei unklaren Regeln „die Wertung bleibt wie registriert“. Auf die Gates wirken sie nicht: Aufgabe 7 steht in keinem Gate, und mit M1 erfüllt läge IL in Aufgabe 1 bei 11 statt 10, also weiter über dem Pin. Wörtlich nach der registrierten Fassung gewertet, hält IH in B1 zwei von drei Läufen (nur der als sicher dargestellte Ergänzungsantrag zählt). Die Mediane der Aufgabe 7 lägen dann bei G 5, IL 6 und IH 6, wenn man B3 auch für erschließbare Begriffe streng zählt. Die Rangfolge bleibt.
+
 4. **Regel 4 nicht angewandt.** Gate D liegt knapp (14 gegen 15), und H1 hängt je an einem Lauf. Die Empfehlung hängt aber an keinem der beiden: K schließt beide Arme mit Faktor 4 bzw. 10 aus. Eine Nachmessung auf n = 5 hätte daran nichts geändert.
 5. **Fehlende Messwerte im generierten Bericht.** `REPORT.md` meldet für IL und IH fehlende Drafter-Zeilen und deshalb „unvollständige Log-Requests“. Die Arme laufen ohne Drafter; Prompt- und Eval-Zeiten sind für jeden Request vorhanden (nachgeprüft).
 
 ## Grenzen
 
 - n = 3 bei Temperatur 1,0. Einzelne Fehlerklassen (Befunde 4 und 5) liegen bei einem Fall je Arm.
-- Die Blindbewertung, auch die des Deutschen, lag bei der Session, die den Harness gebaut hat, einem Sprachmodell. Die Verblindung ist nicht perfekt: Die drei Texte des Pins je Aufgabe sind einander so ähnlich, dass sie als Gruppe erkennbar waren, und der Entwicklungslauf hatte den Pin in Aufgabe 7 gezeigt. Während der Läufe waren nur Rundenwechsel und Prüfergebnisse sichtbar, keine Texte.
+- Die Blindbewertung, auch die des Deutschen, lag bei der Session, die den Harness gebaut hat, einem Sprachmodell. Die Verblindung ist nicht perfekt: Die drei Texte des Pins je Aufgabe sind einander so ähnlich, dass sie als Gruppe erkennbar waren, und der Entwicklungslauf hatte den Pin in Aufgabe 7 gezeigt. Dazu kommt, was die Pre-Registration nicht nennt: Der Vorab-Check stellte jedem Arm eine deutsche Probefrage (was ein Eigenanteil ist), die Session kannte also vor der Bewertung je eine kurze deutsche Antwort von G, IL und IH. Während der Läufe waren nur Rundenwechsel und Prüfergebnisse sichtbar, keine Texte. Eine Zweitbewertung durch einen Menschen auf den Kopien unter `main/blind/` würde das absichern.
 - Gemessen ist nur ein M1 Max. Auf neuerer Hardware mit mehr Speicherbandbreite verschiebt sich das Verhältnis der Geschwindigkeiten möglicherweise. Der Hersteller zeigt Inkling auf einem „MacBook Pro (M5 Pro, 48GB)“ ([Blog](https://thinkingmachines.ai/news/inkling-2-mini/), abgerufen am 25.11.2026).
 - Der Pin lief auf b12720, nicht auf dem Binary der Instanz. Seine Gesamtdauer für die fünf Aufgaben aus #285 (rund 92 s ohne Aufgabe 7) liegt nahe am Wert aus F4 (86 s auf 0.7.0).
 - pis Default-System-Prompt, nicht der komki-Produktiv-Prompt; die Skills (`sitzungsvorbereitung`, `bericht_aus_dem_stadtrat`) waren nicht geladen.

@@ -134,8 +134,10 @@ mit `IL` und `IH` (Inkling, reasoning effort low und high), alle auf dem
 Release-Bundle b12720. Es bringt Aufgabe 7 mit (Bürgerinformation, freies
 Schreiben auf Deutsch) und eine blinde Deutsch-Checkliste (D1–D5, Fehler je
 100 Wörter) für die Aufgaben 1, 3 und 7. `grade-ab.mjs` verblindet Aufgabe 7
-und bewertet Deutsch nur, wenn die Läufe Aufgabe 7 enthalten; ältere Studien
-werten unverändert aus.
+und bewertet Deutsch nur, wenn die Läufe Aufgabe 7 enthalten. Ältere Studien
+behalten ihre Punkte und Gates; ihr Bericht zeigt zwei zusätzliche Spalten
+(Deutsch, Fehler je 100 Wörter), und Gate Q des Referenzarms steht für jede
+`--reference` auf „–“. Ohne `--only` misst `run-smoke.mjs` Aufgabe 7 mit.
 
 ```bash
 node smoke/run-ab.mjs --root <ab-root> --arms G,IL,IH --runs 3 \

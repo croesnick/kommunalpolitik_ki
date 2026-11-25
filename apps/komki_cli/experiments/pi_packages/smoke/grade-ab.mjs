@@ -481,7 +481,9 @@ async function report(root, { perfOnly = false, reference = "A" } = {}) {
   const key = perfOnly ? {} : await readJson("blind-key.json");
   const auto = perfOnly ? {} : await readJson(path.join("blind", "auto.json"));
   const grades = perfOnly ? {} : await readJson(path.join("blind", "grades.json"));
-  const open = Object.entries(grades).filter(([, g]) => Object.values(g).some((v) => v === null));
+  // checklist items must be booleans, `fehler` (#642) a count ≥ 0
+  const ungraded = ([k, v]) => (k === "notiz" ? false : k === "fehler" ? !(Number.isInteger(v) && v >= 0) : typeof v !== "boolean");
+  const open = Object.entries(grades).filter(([, g]) => Object.entries(g).some(ungraded));
   if (open.length > 0) throw new Error(`${open.length} Outputs noch nicht vollständig bewertet (grades.json)`);
 
   const runs = await measuredRuns(root);
@@ -587,7 +589,8 @@ async function report(root, { perfOnly = false, reference = "A" } = {}) {
     const pin = byArm[reference];
     const h1 = a.factViolationsTask3.length > 0 && a.factViolationsTask3.every((v) => v.length === 0);
     const h2 = pin && a.repairRate !== null && pin.repairRate !== null ? a.repairRate <= pin.repairRate : null;
-    const better = [1, 2, 3].filter((t) => pin && a.quality[t].median !== null && a.quality[t].median >= pin.quality[t].median);
+    // --perf-only studies have no quality entries
+    const better = [1, 2, 3].filter((t) => pin && (a.quality[t]?.median ?? null) !== null && a.quality[t].median >= pin.quality[t]?.median);
     const isPin = arm === reference;
     gates[arm] = {
       H1_faktentreue: h1,
