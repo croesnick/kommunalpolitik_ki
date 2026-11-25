@@ -1,6 +1,6 @@
 import Lean.Data.Json
 import KomkiSpec.Domain
-import KomkiSpec.Release
+import KomkiSpec.Remedies
 
 /-!
 # Bridge: the CLI's JSON into the model
@@ -65,10 +65,15 @@ def decodeRegistry (j : JVal) : Decode Registry := do
           pure (← strAt e "authority", ← strAt e "restriction", ← strAt e "output")
       | _ => pure []
     pure (id, { readers, operations := ← asObj (← field b "operations"), befugnisse : Binding })
+  let transformations ← match j.get? "transformations" with
+    | some (.obj ts) => ts.mapM fun (id, t) => do
+        pure (id, ← asStrs (← field t "input_labels"), ← asStrs (← field t "output_labels"))
+    | _ => pure []
   pure {
     registryId := ← strAt j "registry_id"
     observers := sortStrings (← asStrs (← field j "observers"))
-    environments, bindings }
+    environments, bindings
+    transformations := transformations.mergeSort fun a b => !decide (b.1 < a.1) }
 
 def decodeSnapshot (j : JVal) : Decode Snapshot := do
   let ws ← field j "workspace"
@@ -164,6 +169,21 @@ def Go.toJson : Go → Json
   | .offenlegung h art zl => Json.mkObj [("type", "offenlegungsfreigabe"), ("scope", "call"),
       ("call_hash", h), ("ausgabeart", art), ("ziellabel", Lean.toJson zl)]
 
+def Transition.toJson : Transition → Json
+  | .fakt facts => Json.mkObj [("type", "fakt_nachreichen"), ("facts", Lean.toJson facts)]
+  | .transformation id out => Json.mkObj [("type", "registrierte_transformation"),
+      ("transformation", .str id), ("output_labels", Lean.toJson out)]
+  | .neuerRaum rb rr => Json.mkObj [("type", "neuer_raum"), ("required_bindings", Lean.toJson rb),
+      ("required_recipients", Lean.toJson rr)]
+  | .go g => g.toJson
+
+/-- The `remedies` entries: each finding with its transitions. -/
+def remediesJson (findings : List Json) (catalogue : List (List Transition)) : Json :=
+  .arr ((findings.zip catalogue).map fun (f, ts) =>
+    match f with
+    | .obj kvs => Json.obj (kvs.insert "transitions" (.arr (ts.map Transition.toJson).toArray))
+    | other => other).toArray
+
 def gosJson (gos : List (List Go)) : Json :=
   .arr (gos.map fun g => Json.arr (g.map Go.toJson).toArray).toArray
 
@@ -192,13 +212,22 @@ def decisionGos (Γ : Registry) (S : Snapshot) (rule callHash : String) : Decisi
   | .indeterminate es =>
     gosJson (catalogGos Γ (normalCatalogCtx Γ S rule callHash) (es.map (·.code)))
 
+/-- The whole catalog of a `deny` or `indeterminate` (§ 2.8). -/
+def decisionRemedies (Γ : Registry) (S : Snapshot) (rule callHash : String) : Decision → Json
+  | .permit _ => .null
+  | .deny bs => remediesJson (bs.map Blocker.toJson)
+      (catalog Γ (normalCatalogCtx Γ S rule callHash) (bs.map Blocker.finding))
+  | .indeterminate es => remediesJson (es.map Evidence.toJson)
+      (catalog Γ (normalCatalogCtx Γ S rule callHash) (es.map Evidence.finding))
+
 def withField (j : Json) (k : String) (v : Json) : Json :=
   match j with
   | .obj kvs => .obj (kvs.insert k v)
   | other => other
 
 def Derived.toJson (Γ : Registry) (S : Snapshot) (rule callHash : String) : Derived → Json
-  | .decision d => withField (decisionJson S rule d) "gos" (decisionGos Γ S rule callHash d)
+  | .decision d => withField (withField (decisionJson S rule d) "gos" (decisionGos Γ S rule callHash d))
+      "remedies" (decisionRemedies Γ S rule callHash d)
   | .inputError code => Json.mkObj [("input_error", .str code)]
   | .unsupported => Json.mkObj [("unsupported", .bool true)]
 
@@ -275,15 +304,19 @@ def releaseCatalogCtx (Γ : Registry) (S : Snapshot) (rule : String) (R : Releas
 def releaseDecisionJson (Γ : Registry) (S : Snapshot) (rule : String) (R : Release)
     (callHash : String) (d : ReleaseDecision) : Json :=
   let checked := Lean.toJson (checkedLabel rule S)
-  let (name, blockers, proposal, assigned, gos) : String × Json × Json × Json × Json :=
+  let (name, blockers, proposal, assigned, gos, remedies) :
+      String × Json × Json × Json × Json × Json :=
     match d with
-    | .permit P => ("permit", .null, P.toJson, checked, .null)
+    | .permit P => ("permit", .null, P.toJson, checked, .null, .null)
     | .deny bs => ("deny", .arr (bs.map Blocker.toJson).toArray, .null, .null,
-        gosJson (catalogGos Γ (releaseCatalogCtx Γ S rule R callHash) (bs.map (·.code))))
+        gosJson (catalogGos Γ (releaseCatalogCtx Γ S rule R callHash) (bs.map (·.code))),
+        remediesJson (bs.map Blocker.toJson)
+          (catalog Γ (releaseCatalogCtx Γ S rule R callHash) (bs.map Blocker.finding)))
   let digest := ((S.facts.lookup "output_content_digest").map JVal.toJson).getD .null
   Json.mkObj <|
     [("decision", .str name), ("rule", .str rule), ("checked_label", checked),
-     ("blockers", blockers), ("release", proposal), ("content_digest", digest), ("gos", gos)] ++
+     ("blockers", blockers), ("release", proposal), ("content_digest", digest), ("gos", gos),
+     ("remedies", remedies)] ++
     if rule == "emit" then [("assigned_label", assigned)] else []
 
 /-- One case `{"registry", "snapshot", "intent", "release", "stand", "call_hash"}`. -/

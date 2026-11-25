@@ -44,8 +44,9 @@ defmodule KomkiPolicy.LeanSpecTest do
   @modelled_input_errors [:emit_digest_missing, :emit_object_not_classified]
   @derive_input_errors [:unknown_environment | @modelled_input_errors]
   @decision_fields ~w(decision rule checked_label blockers missing_evidence proof
-                      assigned_label content_digest)
-  @release_fields ~w(decision rule checked_label blockers release content_digest assigned_label)
+                      assigned_label content_digest remedies)
+  @release_fields ~w(decision rule checked_label blockers release content_digest assigned_label
+                     remedies)
   # Release variants: one wrong field each, or a window on its edge. Both
   # ends belong to the window (§ 4.6 step 3: valid_from ≤ as_of ≤ valid_until).
   @release_changes %{
@@ -1068,7 +1069,8 @@ defmodule KomkiPolicy.LeanSpecTest do
     gen all(
           observers <- subset_gen(@observers, 1),
           environments <- keyed_gen(@environments, fn -> subset_gen(observers, 1) end),
-          bindings <- keyed_gen(@bindings, fn -> binding_gen(observers) end)
+          bindings <- keyed_gen(@bindings, fn -> binding_gen(observers) end),
+          transformations <- transformations_gen(Enum.map(bindings, &elem(&1, 0)))
         ) do
       %{
         "schema" => "komki-registry/2",
@@ -1076,9 +1078,25 @@ defmodule KomkiPolicy.LeanSpecTest do
         "observers" => observers,
         "fact_fields" => @fact_fields,
         "environments" => Map.new(environments, fn {id, obs} -> {id, %{"observers" => obs}} end),
-        "bindings" => Map.new(bindings)
+        "bindings" => Map.new(bindings),
+        "transformations" => Map.new(transformations)
       }
     end
+  end
+
+  # Registered label transitions (§ 2.1): inputs non-empty, outputs may be empty.
+  defp transformations_gen(binding_ids) do
+    ids = Enum.sort(binding_ids)
+
+    transformation =
+      StreamData.tuple(
+        {StreamData.member_of(~w(t-a@1 t-b@1 t-c@1)), subset_gen(ids, 1), subset_gen(ids, 0)}
+      )
+
+    StreamData.map(StreamData.list_of(transformation, max_length: 2), fn ts ->
+      for {id, input, output} <- Enum.uniq_by(ts, &elem(&1, 0)),
+          do: {id, %{"input_labels" => input, "output_labels" => output}}
+    end)
   end
 
   # A non-empty subset of `ids`, each paired with its own generated value.

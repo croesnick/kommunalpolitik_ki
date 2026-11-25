@@ -96,8 +96,10 @@ Für `derive` vergleicht er die Entscheidung über denselben Welten und den
 Fixtures: Urteil, Prüflabel, Blocker samt `condition` und
 `recipients_outside`, fehlende Belege, den ganzen Beweisbaum,
 `assigned_label`, `content_digest`, dazu `unsupported` und die Eingabefehler
-aus #628, und von den Remedies die GO-Angebote je Befund. Nicht verglichen
-werden die Echos der Eingabe und die übrigen Fortsetzungen.
+aus #628, und den ganzen Remedy-Katalog: je Befund alle Fortsetzungen in
+ihrer Ordnung samt Payload (Fakt, Transformation, `required_bindings`,
+`required_recipients`, Call-Hash). Nicht verglichen werden nur die Echos
+der Eingabe.
 
 Für die Freigabe-Zweige vergleicht er dasselbe samt geplantem Verbrauch
 (`release`), über den Fixtures mit Freigabe und je Welt drei Varianten
@@ -125,7 +127,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | Elixir | Lean |
 |---|---|
 | `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige) |
-| `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (nur die GO-Angebote) |
+| `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
@@ -147,9 +149,9 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 
 ## Grenzen
 
-- **Vom Remedy-Katalog nur die GO-Angebote.** Welche Fortsetzung ein
-  Befund ohne GO bekommt (`fakt_nachreichen`, `registrierte_transformation`,
-  `neuer_raum`), modelliert die Spezifikation nicht.
+- **Vom Remedy-Katalog sind nur die GO-Angebote bewiesen.** Den ganzen
+  Katalog (`catalog` in `KomkiSpec/Remedies.lean`) hält der Differenztest
+  am Elixir-Code; über die übrigen Fortsetzungen gibt es keinen Satz.
 - **Call-Hash als Eingabe.** SHA-256 über den Call (§ 2.6) rechnet Lean
   nicht; das Modell nimmt den Hash des entschiedenen Calls als Parameter,
   die Sätze gelten für jeden Wert, der Differenztest reicht den von Elixir
