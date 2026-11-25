@@ -891,12 +891,13 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
+  # One or two wrong fields at once, so the fixed order of the release
+  # checks shows (§ 4.6 step 3); an Offenlegungsfreigabe with or without one.
   defp release_variant_gen do
+    simple = StreamData.member_of(Map.keys(@release_changes))
+
     StreamData.one_of([
-      StreamData.member_of(
-        ~w(base base wrong_hash foreign_scope not_yet expired edge_from edge_until consumed
-           foreign_authority)a
-      ),
+      StreamData.map(StreamData.list_of(simple, min_length: 1, max_length: 2), &{:simple, &1}),
       StreamData.tuple(
         {StreamData.constant(:offenlegung),
          StreamData.frequency([
@@ -907,7 +908,7 @@ defmodule KomkiPolicy.LeanSpecTest do
            {4, StreamData.constant(["ratsprojekte@1"])},
            {1, StreamData.constant(["b-eins@1"])},
            {1, StreamData.constant(["b-unbekannt@1"])}
-         ]), StreamData.integer(0..4)}
+         ]), StreamData.integer(0..4), StreamData.list_of(simple, max_length: 1)}
       )
     ])
   end
@@ -965,13 +966,16 @@ defmodule KomkiPolicy.LeanSpecTest do
     base = base_release(target, op, hd(raw["observers"]))
 
     case variant do
-      {:offenlegung, art, ziellabel, index} ->
-        offenlegung(base, raw, target, art, ziellabel, index)
+      {:offenlegung, art, ziellabel, index, changes} ->
+        base |> offenlegung(raw, target, art, ziellabel, index) |> apply_changes(changes)
 
-      simple ->
-        Map.merge(base, Map.fetch!(@release_changes, simple))
+      {:simple, changes} ->
+        apply_changes(base, changes)
     end
   end
+
+  defp apply_changes(release, changes),
+    do: Enum.reduce(changes, release, &Map.merge(&2, Map.fetch!(@release_changes, &1)))
 
   defp offenlegung(base, raw, target, art, ziellabel, index) do
     ausgabeart =

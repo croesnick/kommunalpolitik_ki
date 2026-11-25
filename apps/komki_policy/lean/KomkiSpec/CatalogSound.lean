@@ -112,8 +112,8 @@ def aktionRelease (callHash authority nonce : String) (St : Stand) : Release :=
     validFrom := St.asOf, validUntil := St.asOf, nonce }
 
 /-- No empty promise (§ 2.8): an Aktionsfreigabe the catalog offers on a
-denial is permitted by the release branch, at any stand, with a fresh
-nonce and any observer as the granting authority. -/
+denial of the normal branch is permitted by the release branch, at any
+stand, with a fresh nonce and any observer as the granting authority. -/
 theorem catalog_aktion_effective {Γ : Registry} {S : Snapshot} {I : Intent} {bs : List Blocker}
     {c h : String} {St : Stand} {nonce auth : String}
     (hd : derive Γ S I = .decision (.deny bs))
@@ -209,6 +209,31 @@ theorem befugteFor_mem {Γ : Registry} {art b a : String} (h : a ∈ befugteFor 
       have : ¬((r == "readers" && o == art) = true) := by simpa using hro
       simp [this] at hc
 
+theorem befugteFor_known {Γ : Registry} (hak : Γ.AuthoritiesKnown) {art b a : String}
+    (h : a ∈ befugteFor Γ art b) : a ∈ Γ.observers := by
+  unfold befugteFor at h
+  split at h
+  · simp at h
+  · next bd hbd =>
+    simp only [List.mem_filterMap, Prod.exists] at h
+    obtain ⟨a', r, o, hm, hc⟩ := h
+    have ha' : a' = a := by
+      by_cases hro : (r == "readers" && o == art) = true
+      · simpa [hro] using hc
+      · simp [hro] at hc
+    subst ha'
+    exact hak b bd hbd (a', r, o) hm
+
+/-- An authority among the lockerungsbefugte is an observer. -/
+theorem lockerungsbefugte_known {Γ : Registry} (hak : Γ.AuthoritiesKnown)
+    {checked rho : List String} {art a : String} (h : a ∈ lockerungsbefugte Γ checked rho art) :
+    a ∈ Γ.observers := by
+  unfold lockerungsbefugte at h
+  split at h
+  · simp at h
+  · simp only [sortDedup, List.mem_eraseDups, mem_sortStrings, List.mem_filter] at h
+    exact befugteFor_known hak h.1
+
 /-- An authority among the lockerungsbefugte holds the Befugnis on every
 lockerungsbedürftige binding. -/
 theorem mem_lockerungsbefugte {Γ : Registry} {checked rho : List String} {art a : String}
@@ -267,14 +292,14 @@ def offenlegungRelease (callHash art : String) (ziellabel : List String)
     validFrom := St.asOf, validUntil := St.asOf, nonce, ausgabeart := some art, ziellabel }
 
 /-- No empty promise for the Offenlegungsfreigabe (§ 2.8, § 4.9, #631): an
-offer on a store denial is permitted, with a fresh nonce and an authority
-holding every needed Befugnis. -/
+offer on a store denial of the normal branch is permitted, with a fresh
+nonce and an authority holding every needed Befugnis. -/
 theorem catalog_offenlegung_effective {Γ : Registry} {S : Snapshot} {I : Intent}
     {bs : List Blocker} {c h art : String} {zl : List String} {St : Stand} {nonce auth : String}
     (hd : derive Γ S I = .decision (.deny bs))
     (hm : Go.offenlegung h art zl ∈
       (catalogGos Γ (normalCatalogCtx Γ S I.operation c) (codesOf bs)).flatten)
-    (hn : St.consumed.lookup nonce = none) (ha : auth ∈ Γ.observers)
+    (hn : St.consumed.lookup nonce = none) (hak : Γ.AuthoritiesKnown)
     (hb : auth ∈ lockerungsbefugte Γ (checkedLabel I.operation S) (actualRecipients Γ S) art) :
     deriveWithRelease Γ S I (offenlegungRelease h art zl auth nonce St) St c =
       .decision (.permit (proposalOf (offenlegungRelease h art zl auth nonce St) St c)) := by
@@ -288,6 +313,7 @@ theorem catalog_offenlegung_effective {Γ : Registry} {S : Snapshot} {I : Intent
   obtain ⟨hstore, hoff, hcodes, hobs, hh, hart, hzl⟩ := catalog_offenlegung_mem hrel hm
   simp only [normalCatalogCtx] at hstore hoff hobs hh hart hzl hb
   obtain ⟨hdig, hcls⟩ := hout (by rw [hstore]; decide)
+  have ha : auth ∈ Γ.observers := lockerungsbefugte_known hak hb
   have hop : outputOperations.contains I.operation = true := by rw [hstore]; decide
   rw [hop] at hh
   simp only [ite_true, Option.getD_some] at hh

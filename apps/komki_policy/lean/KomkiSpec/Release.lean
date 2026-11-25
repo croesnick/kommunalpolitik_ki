@@ -208,6 +208,11 @@ def callGoCodes : List String :=
   ["basis_right_false", "binding_condition_false", "audit_path_not_ready",
    "recipient_not_allowed", "missing_operation_rule"]
 
+/-- What `Registry.compile/1` enforces for relaxation authorities: each one
+is an observer of 𝒪 (§ 2.1). -/
+def Registry.AuthoritiesKnown (Γ : Registry) : Prop :=
+  ∀ b bd, Γ.binding? b = some bd → ∀ x ∈ bd.befugnisse, x.1 ∈ Γ.observers
+
 /-- The authorities with a Befugnis {readers, `art`} on binding `b`. -/
 def befugteFor (Γ : Registry) (art b : String) : List String :=
   match Γ.binding? b with

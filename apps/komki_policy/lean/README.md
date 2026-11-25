@@ -24,7 +24,7 @@ CI.
 | `offenlegung_permit` | Eine Offenlegungsfreigabe erlaubt nur `store`, mit gültigem Vertrag, erhaltener Bindung, belegter Beobachterliste, der geschlossenen Ausgabeart und dem Ziellabel, der Befugnis für jede gelockerte Bindung (BerechtigtZurLockerung) und einem Ziellabel, dessen Leser den Speicher abdecken | CONTRACT.md § 4.9, R.5.7 |
 | `release_single_use` | Ist der Verbrauch committet, erlaubt dieselbe Freigabe nie wieder, an keinem späteren Stand | CONTRACT.md § 2.7, B.8 |
 | `advance_cas` | Von zwei Vorschlägen für denselben Stand committet höchstens einer | CONTRACT.md § 2.7 |
-| `catalog_aktion_effective`, `catalog_offenlegung_effective` | Bietet der Katalog einer Ablehnung ein GO für den exakten Call an, erlaubt der Freigabe-Zweig eine Freigabe genau nach diesem Angebot | CONTRACT.md § 2.8, #631 |
+| `catalog_aktion_effective`, `catalog_offenlegung_effective` | Bietet der Katalog einer Ablehnung des normalen Zweigs ein GO für den exakten Call an, erlaubt der Freigabe-Zweig eine Freigabe genau nach diesem Angebot | CONTRACT.md § 2.8, #631 |
 | `eval_mono` | Mehr Fakten kippen kein bekanntes Urteil des dreiwertigen Auswerters | R.5.2, CONTRACT.md § 3 |
 | `recipients_antitone`, `permitted_antitone` | Mehr Bindungen, nie mehr Empfänger; Erlaubt vererbt sich auf Teilmengen | A.2 |
 | `no_forbidden_recipient` | Ohne Lockerung erreicht nichts, was von x abhängt, einen Beobachter außerhalb von R_Γ(λ(x)) | Kern von A.3: nur die Labels, ohne Schrittmodell |
@@ -46,10 +46,11 @@ nennen. B_W ist unveränderlich (RFC 4.1); das durchzusetzen ist Sache des
 Vermittlers, nicht der Engine.
 
 Die Sätze setzen voraus, was `Registry.compile/1` und `Context` durchsetzen
-(`Registry.WellFormed`, `Snapshot.WellFormed`: Leser ⊆ 𝒪, sortierte und
-eindeutige Labels, geschlossene Klassifikation, boolesche Basisfakten). Die
-Brücke prüft beides an jedem Fall des Differenztests
-(`Registry.wellFormed_sound`, `Snapshot.wellFormed_sound`).
+(`Registry.WellFormed`, `Registry.AuthoritiesKnown`, `Snapshot.WellFormed`:
+Leser und Befugnis-Autoritäten ⊆ 𝒪, sortierte und eindeutige Labels,
+geschlossene Klassifikation, boolesche Basisfakten). Die Brücke prüft alles
+an jedem Fall des Differenztests (`Registry.wellFormed_sound`,
+`Registry.wellFormed_authorities`, `Snapshot.wellFormed_sound`).
 
 ## Vertrauenskette
 
@@ -129,7 +130,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
-| `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean` |
+| `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
 | `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal` |
 | `context.ex` | `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean` (Wertebereich nach der Eingabeprüfung) |
 
@@ -150,6 +151,15 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 - **Vom Remedy-Katalog nur die GO-Angebote.** Welche Fortsetzung ein
   Befund ohne GO bekommt (`fakt_nachreichen`, `registrierte_transformation`,
   `neuer_raum`), modelliert die Spezifikation nicht.
+- **Katalogsätze nur für den normalen Zweig.** `catalog_*_effective` gilt
+  für die GO-Angebote einer Ablehnung im normalen Zweig. Dass ein erneutes
+  Angebot nach einer Ablehnung im Freigabe-Zweig wirkt, prüft nur der
+  Elixir-Test „Katalog: jedes angebotene GO wirkt“.
+- **Lockerung nach dem Vertrag.** `BerechtigtZurLockerung` folgt CONTRACT.md
+  § 4.9 Schritt 6: Befugnis nur für Bindungen, deren Leser den Speicher
+  nicht abdecken. RFC 0003 R.5.7 verlangt sie für jede entfernte Bindung
+  (∀ b ∈ L∖L′). Die Abweichung liegt im Vertrag, nicht im Code; zu
+  entscheiden in #638.
 - **Call-Hash als Eingabe.** SHA-256 über den Call (§ 2.6) rechnet Lean
   nicht; das Modell nimmt den Hash des entschiedenen Calls als Parameter,
   die Sätze gelten für jeden Wert, der Differenztest reicht den von Elixir
