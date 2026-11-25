@@ -442,6 +442,70 @@ async function task3Redigieren(llama, provider) {
   };
 }
 
+// ---------------------------------------------------------------- Aufgabe 7
+
+/**
+ * Free German writing (Ticket #642): a short citizen notice from TOP 3.
+ * The fixture carries two traps for German quality — the English term
+ * "Protected Bike Lane" and the case error "den Entwurf zuzustimmen" —
+ * and one for content: the committee only recommends, nothing is decided.
+ */
+async function task7Buergerinfo(llama, provider) {
+  const runDir = path.join(ROOT, "task-7-buergerinfo");
+  const workDir = path.join(runDir, "work");
+  await rm(path.join(workDir, "buergerinfo.md"), { force: true });
+  await writeTextFile(path.join(workDir, "top-3-anhoerung.md"), TOP_3_ANHOERUNG);
+
+  const executed = await executeRun(llama, provider, {
+    id: "task-7",
+    runRoot: ROOT,
+    runDir,
+    provider,
+    contextWindow: 131072,
+    timeoutMs: timeout(300_000),
+    tools: "read,write",
+    prompt:
+      "Lies die Datei top-3-anhoerung.md im aktuellen Verzeichnis. Schreibe daraus eine kurze Bürgerinformation für die Website der Stadt in die Datei buergerinfo.md: höchstens 150 Wörter, verständlich für Menschen ohne Verwaltungswissen, sachlich und ohne Wertung. Antworte am Ende nur mit einem Satz.",
+  });
+  const m = measurementsOf(executed);
+
+  let text = null;
+  let readError = null;
+  try {
+    text = await readFile(path.join(workDir, "buergerinfo.md"), "utf8");
+  } catch (error) {
+    readError = String(error?.message ?? error);
+  }
+  const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+  const writeCalls = m.toolCalls.filter((call) => call.name === "write" && call.valid);
+
+  const requirements = [
+    requirement(
+      "run-complete",
+      "Lauf endet fehlerfrei (Exit 0, kein Timeout)",
+      m.exitCode === 0 && !m.timedOut ? "pass" : "fail",
+      { exitCode: m.exitCode, timedOut: m.timedOut, stderrTail: m.stderrTail },
+    ),
+    requirement(
+      "buergerinfo",
+      "buergerinfo.md wurde über write erzeugt",
+      text !== null && writeCalls.length > 0 ? "pass" : "fail",
+      { readError, writeCalls: writeCalls.length },
+    ),
+    requirement("laenge", "Höchstens 150 Wörter", text !== null && words <= 150 ? "pass" : "partial", { words }),
+  ];
+
+  return {
+    id: "task-7-buergerinfo",
+    title: "Bürgerinformation auf Deutsch schreiben (read, write)",
+    hypothesis:
+      "Das Modell schreibt aus dem TOP eine bürgernahe, fehlerfreie deutsche Kurzinformation, ohne den Beratungsstand zu verfälschen.",
+    measurements: m,
+    requirements,
+    verdict: smokeVerdict(requirements),
+  };
+}
+
 // ---------------------------------------------------------------- Aufgabe 4
 
 async function task4Todo(llama, provider) {
@@ -741,6 +805,7 @@ async function runTasks(llama) {
     ["3", () => task3Redigieren(llama, provider)],
     ["4", () => task4Todo(llama, provider)],
     ["6", () => task6Compaction(llama, provider)],
+    ["7", () => task7Buergerinfo(llama, provider)],
   ];
 
   const results = [];

@@ -54,7 +54,36 @@ export const MANUAL = {
     { id: "S4", text: "Modalität der Förderung erhalten (Rest „kann“ gedeckt werden, nicht als sicher dargestellt)." },
     { id: "S5", text: "Textsorte erhalten: deutsche Beschlussvorlage an den Rat mit Beschlussbitte." },
   ],
+  // Ticket #642: citizen notice from TOP 3
+  7: [
+    { id: "B1", text: "Beratungsstand korrekt: Der Ausschuss empfiehlt dem Rat; nichts ist als beschlossen, genehmigt oder sicher dargestellt." },
+    { id: "B2", text: "Nichts hinzuerfunden (keine neue Tatsachenbehauptung, Zahl, Frist, Wirkung oder Wertung)." },
+    { id: "B3", text: "Verständlich ohne Verwaltungswissen: Fachbegriffe (Kostenschätzung, Eigenanteil, Förderrichtlinie, Auflagen, Haushaltsplanung) vermieden oder erklärt." },
+  ],
 };
+
+/**
+ * German text quality (Ticket #642), graded blind on the texts of tasks 1,
+ * 3 and 7 as a scale of its own next to the content checklists. `fehler`
+ * counts spelling, punctuation and grammar errors (reported per 100 words).
+ */
+export const DEUTSCH = [
+  { id: "D1", text: "Rechtschreibung und Zeichensetzung: höchstens ein Fehler (Kommas, Groß- und Kleinschreibung, Getrennt- und Zusammenschreibung, ß/ss)." },
+  { id: "D2", text: "Grammatik: kein Fehler (Kasus, Kongruenz, Wortstellung, Rektion). „den Entwurf zuzustimmen“ unverändert übernommen zählt als Fehler." },
+  { id: "D3", text: "Idiomatik: kein Übersetzungsdeutsch, keine schiefe Kollokation, kein erfundenes Wort. Englische Begriffe der Vorlage dürfen in den Aufgaben 1 und 3 stehen bleiben, in Aufgabe 7 müssen sie übersetzt oder erklärt sein." },
+  { id: "D4", text: "Register passt zur Textsorte und bleibt einheitlich: Aufgabe 1 sachlich-knapp für die Sitzungsmappe, Aufgabe 3 Beschlussvorlage, Aufgabe 7 bürgernah ohne Amtsdeutsch; keine wechselnde Anrede." },
+  { id: "D5", text: "Sprachtreue: durchgehend Deutsch, kein englischer Satz oder Halbsatz, keine Denk-, Tool- oder Formatierungsartefakte." },
+];
+export const DEUTSCH_TASKS = [1, 3, 7];
+
+/** Rough language of a final answer: English if English function words outnumber German ones. */
+export function answerLanguage(text) {
+  const german = (text.match(/\b(der|die|das|und|ist|nicht|für|mit|wird|wurde|den|dem|des|zu|auf|im|ich|wir|Sie)\b/g) ?? []).length;
+  // "in", "was", "will" are German words as well and do not count.
+  const english = (text.match(/\b(the|and|is|are|not|for|with|this|that|have|has|were|of|to|on|you|we|it)\b/g) ?? []).length;
+  if (german === 0 && english === 0) return "unbekannt";
+  return english > german ? "en" : "de";
+}
 
 const DATE_FORMS = [
   /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/,
@@ -162,6 +191,28 @@ function autoTask3(edited) {
   };
 }
 
+function autoTask7(text) {
+  if (text === null) return { items: { W1: false, K1: false, K2: false, K3: false, K4: false }, details: { fehlt: true } };
+  const words = text.split(/\s+/).filter(Boolean).length;
+  return {
+    items: {
+      W1: words <= 150,
+      K1: /Bahnhofstra(ß|ss)e/.test(text),
+      K2: /240[.\s ]?000|240 Tausend/.test(text),
+      K3: /80[.\s ]?000|80 Tausend/.test(text),
+      K4: /12\.\s?11\.\s?2026|12\. November/.test(text),
+    },
+    // Shown to the blind grader, not scored on their own (D2, D3 cover them).
+    details: {
+      words,
+      kasusfehlerUebernommen: /den Entwurf zuzustimmen/.test(text),
+      protectedBikeLane: /Protected Bike Lane/i.test(text),
+    },
+  };
+}
+
+const AUTO = { 1: autoTask1, 2: autoTask2, 3: autoTask3, 7: autoTask7 };
+
 // ---------------------------------------------------------------- blind
 
 async function readMaybe(file) {
@@ -184,7 +235,14 @@ async function artifactOf(root, entry, task) {
     return result?.measurements?.answerText ?? null;
   }
   if (task === 2) return readMaybe(path.join(dir, "task-2-quellen", "work", "quellen.json"));
+  if (task === 7) return readMaybe(path.join(dir, "task-7-buergerinfo", "work", "buergerinfo.md"));
   return readMaybe(path.join(dir, "task-3-redigieren", "work", "neue-fassung.md"));
+}
+
+/** Graded tasks of a study: 1–3, plus 7 where the runs include it (#642). */
+function gradedTasks(root, runs) {
+  const withTask7 = runs.some((entry) => existsSync(path.join(root, entry.dir, "results", "task-7-buergerinfo.json")));
+  return withTask7 ? [1, 2, 3, 7] : [1, 2, 3];
 }
 
 function shuffle(list) {
@@ -205,17 +263,19 @@ async function blind(root) {
   const key = {};
   const auto = {};
   const grades = {};
-  for (const task of [1, 2, 3]) {
+  const tasks = gradedTasks(root, runs);
+  for (const task of tasks) {
     await mkdir(path.join(blindDir, `task-${task}`), { recursive: true });
     for (const entry of shuffle(runs)) {
       const id = `t${task}-${randomBytes(3).toString("hex")}`;
       const artifact = await artifactOf(root, entry, task);
       key[id] = { task, arm: entry.arm, round: entry.round, dir: entry.dir };
       await writeFile(path.join(blindDir, `task-${task}`, `${id}.txt`), artifact ?? "(kein Output: Datei fehlt)\n");
-      auto[id] =
-        task === 1 ? autoTask1(artifact) : task === 2 ? autoTask2(artifact) : autoTask3(artifact);
-      if (MANUAL[task]) {
-        grades[id] = Object.fromEntries(MANUAL[task].map((item) => [item.id, null]));
+      auto[id] = AUTO[task](artifact);
+      const items = [...(MANUAL[task] ?? []), ...(tasks.includes(7) && DEUTSCH_TASKS.includes(task) ? DEUTSCH : [])];
+      if (items.length > 0) {
+        grades[id] = Object.fromEntries(items.map((item) => [item.id, null]));
+        if (items.includes(DEUTSCH[0])) grades[id].fehler = null;
         grades[id].notiz = "";
       }
     }
@@ -223,7 +283,7 @@ async function blind(root) {
   await writeFile(path.join(root, "blind-key.json"), JSON.stringify(key, null, 2), { mode: 0o600 });
   await writeFile(path.join(blindDir, "auto.json"), JSON.stringify(auto, null, 2));
   await writeFile(path.join(blindDir, "grades.json"), JSON.stringify(grades, null, 2));
-  await writeFile(path.join(blindDir, "checklisten.json"), JSON.stringify(MANUAL, null, 2));
+  await writeFile(path.join(blindDir, "checklisten.json"), JSON.stringify({ ...MANUAL, deutsch: DEUTSCH }, null, 2));
   console.log(`${Object.keys(key).length} Outputs verblindet: ${blindDir}`);
 }
 
@@ -354,8 +414,12 @@ async function runMetrics(results, summary, dir) {
   const promptMs = server.reduce((s, r) => s + (r.promptMs ?? 0), 0);
   const task6 = results.find((r) => r.id === "task-6-compaction");
   const req = (r, id) => r?.requirements?.find((x) => x.id === id)?.status ?? null;
+  // #642: language of every non-empty final answer, all tasks
+  const answers = all.map((m) => m.answerText).filter((text) => text?.trim());
   return {
     tasks,
+    answers: answers.length,
+    answersEnglish: answers.filter((text) => answerLanguage(text) === "en").length,
     loadMs: summary.llama?.staging?.loadMs ?? null,
     draft: draftTotals(server),
     wallMsTotal: Object.values(tasks).reduce((s, t) => s + t.wallMs, 0),
@@ -391,10 +455,19 @@ async function runMetrics(results, summary, dir) {
 
 function scoreOf(task, autoEntry, manualEntry) {
   const autoItems = Object.values(autoEntry?.items ?? {});
-  const manualItems = Object.values(manualEntry ?? {}).filter((v) => typeof v === "boolean");
-  const points = [...autoItems, ...manualItems].filter(Boolean).length;
-  const max = autoItems.length + (MANUAL[task]?.length ?? 0);
+  const manualItems = (MANUAL[task] ?? []).map((item) => manualEntry?.[item.id]);
+  const points = [...autoItems, ...manualItems].filter((v) => v === true).length;
+  const max = autoItems.length + manualItems.length;
   return { points, max };
+}
+
+/** German quality of one graded text (#642): D points and errors per 100 words, null if not graded. */
+function deutschOf(manualEntry, artifactWords) {
+  if (!manualEntry || !("D1" in manualEntry)) return null;
+  return {
+    points: DEUTSCH.filter((item) => manualEntry[item.id] === true).length,
+    fehlerPro100: artifactWords > 0 ? (manualEntry.fehler / artifactWords) * 100 : null,
+  };
 }
 
 const fmt = (value, digits = 0) =>
@@ -408,7 +481,7 @@ async function report(root, { perfOnly = false, reference = "A" } = {}) {
   const key = perfOnly ? {} : await readJson("blind-key.json");
   const auto = perfOnly ? {} : await readJson(path.join("blind", "auto.json"));
   const grades = perfOnly ? {} : await readJson(path.join("blind", "grades.json"));
-  const open = Object.entries(grades).filter(([, g]) => Object.entries(g).some(([k, v]) => k !== "notiz" && typeof v !== "boolean"));
+  const open = Object.entries(grades).filter(([, g]) => Object.values(g).some((v) => v === null));
   if (open.length > 0) throw new Error(`${open.length} Outputs noch nicht vollständig bewertet (grades.json)`);
 
   const runs = await measuredRuns(root);
@@ -429,8 +502,12 @@ async function report(root, { perfOnly = false, reference = "A" } = {}) {
     const score = scoreOf(info.task, auto[id], grades[id]);
     const factViolations =
       info.task === 3 ? MANUAL[3].filter((item) => item.fact && grades[id][item.id] === false).map((item) => item.id) : [];
-    quality[id] = { ...info, ...score, factViolations, notiz: grades[id]?.notiz ?? "" };
+    const blindText = await readMaybe(path.join(root, "blind", `task-${info.task}`, `${id}.txt`));
+    const deutsch = deutschOf(grades[id], (blindText ?? "").split(/\s+/).filter(Boolean).length);
+    quality[id] = { ...info, ...score, factViolations, deutsch, notiz: grades[id]?.notiz ?? "" };
   }
+  const tasks = [...new Set(Object.values(key).map((info) => info.task))].sort((x, y) => x - y);
+  const deutschTasks = tasks.filter((task) => Object.values(quality).some((q) => q.task === task && q.deutsch));
 
   const byArm = {};
   for (const arm of arms) {
@@ -480,14 +557,27 @@ async function report(root, { perfOnly = false, reference = "A" } = {}) {
       }, {}),
       compaction: armRuns.map((r) => r.metrics.compaction),
       quality: Object.fromEntries(
-        [1, 2, 3].map((task) => {
+        tasks.map((task) => {
           const items = q.filter((x) => x.task === task);
           return [task, { ...spread(items.map((x) => x.points)), maxPoints: items[0]?.max ?? null }];
         }),
       ),
       factViolationsTask3: q.filter((x) => x.task === 3).map((x) => x.factViolations),
+      // #642: German quality per task, errors pooled over all graded texts,
+      // language of the final answers over all tasks
+      deutsch: Object.fromEntries(
+        deutschTasks.map((task) => [task, spread(q.filter((x) => x.task === task).map((x) => x.deutsch.points))]),
+      ),
+      fehlerPro100: spread(q.filter((x) => x.deutsch).map((x) => x.deutsch.fehlerPro100)),
+      answers: armRuns.reduce((s, r) => s + r.metrics.answers, 0),
+      answersEnglish: armRuns.reduce((s, r) => s + r.metrics.answersEnglish, 0),
+      failsOrTimeouts: armRuns.reduce(
+        (s, r) => s + Object.values(r.metrics.tasks).filter((t) => t.verdict === "fail" || t.verdict === "harness-error" || t.timedOut).length,
+        0,
+      ),
     };
   }
+  const deutschSum = (a) => deutschTasks.reduce((s, task) => s + (a.deutsch[task]?.median ?? 0), 0);
 
   // gates (pre-registered): the reference arm (the pin) is --reference,
   // default A as in #285; the #320 build A/B passes --reference V7.
@@ -498,12 +588,22 @@ async function report(root, { perfOnly = false, reference = "A" } = {}) {
     const h1 = a.factViolationsTask3.length > 0 && a.factViolationsTask3.every((v) => v.length === 0);
     const h2 = pin && a.repairRate !== null && pin.repairRate !== null ? a.repairRate <= pin.repairRate : null;
     const better = [1, 2, 3].filter((t) => pin && a.quality[t].median !== null && a.quality[t].median >= pin.quality[t].median);
+    const isPin = arm === reference;
     gates[arm] = {
       H1_faktentreue: h1,
       H2_reparaturrate: h2,
-      Q_qualitaet: arm === "A" ? null : better.length >= 2,
+      Q_qualitaet: isPin ? null : better.length >= 2,
       qualitaetGePin: better,
     };
+    // #642 gates: German quality, cost, failures — only where the study graded German
+    if (deutschTasks.length > 0 && pin) {
+      const share = (x) => (x.answers ? x.answersEnglish / x.answers : 0);
+      gates[arm].deutschSumme = deutschSum(a);
+      gates[arm].D_deutsch = isPin ? null : deutschSum(a) >= deutschSum(pin) && share(a) <= share(pin);
+      gates[arm].K_kosten = isPin ? null : a.wallMsTotal.median <= 2 * pin.wallMsTotal.median;
+      gates[arm].R1_ausfaelle = isPin ? null : a.failsOrTimeouts <= pin.failsOrTimeouts;
+      gates[arm].L_schleifen = isPin ? null : a.runsWithLoop <= pin.runsWithLoop;
+    }
   }
 
   const out = { root, at: new Date().toISOString(), perfOnly, arms, byArm, gates, perRun, quality };
@@ -568,27 +668,40 @@ function renderMarkdown({ perfOnly, arms, byArm, gates, perRun, quality }) {
   if (perfOnly) return renderRuns(lines, perRun);
   lines.push(`| Qualität (Punkte, Median, Spanne) | ${arms.join(" | ")} |`);
   lines.push(`|---|${arms.map(() => "---").join("|")}|`);
-  for (const task of [1, 2, 3]) row(`Aufgabe ${task}`, (a) => `${fmtSpread(a.quality[task])} / ${a.quality[task].maxPoints}`);
+  const tasks = Object.keys(byArm[arms[0]].quality);
+  for (const task of tasks) row(`Aufgabe ${task}`, (a) => `${fmtSpread(a.quality[task])} / ${a.quality[task].maxPoints}`);
   row("Faktenänderungen Aufgabe 3 je Lauf", (a) => a.factViolationsTask3.map((v) => v.length).join(" / "));
+  const deutschTasks = Object.keys(byArm[arms[0]].deutsch);
+  if (deutschTasks.length > 0) {
+    for (const task of deutschTasks) row(`Deutsch Aufgabe ${task}`, (a) => `${fmtSpread(a.deutsch[task])} / ${DEUTSCH.length}`);
+    row("Deutsch: Fehler je 100 Wörter", (a) => fmtSpread(a.fehlerPro100, 1));
+    row("Antworten auf Englisch", (a) => `${a.answersEnglish} von ${a.answers}`);
+    row("Aufgaben mit fail oder Timeout", (a) => String(a.failsOrTimeouts));
+  }
   lines.push("");
   lines.push(`| Gate | ${arms.join(" | ")} |`);
   lines.push(`|---|${arms.map(() => "---").join("|")}|`);
-  const yn = (v) => (v === null ? "–" : v ? "bestanden" : "**nicht bestanden**");
-  row("H1 0 Faktenänderungen (A3, jeder Lauf)", (a) => yn(gates[Object.keys(byArm).find((k) => byArm[k] === a)].H1_faktentreue));
-  row("H2 Reparaturrate ≤ Pin", (a) => yn(gates[Object.keys(byArm).find((k) => byArm[k] === a)].H2_reparaturrate));
-  row("Q Qualität ≥ Pin in ≥ 2 von 3", (a) => {
-    const g = gates[Object.keys(byArm).find((k) => byArm[k] === a)];
-    return `${yn(g.Q_qualitaet)} (${g.qualitaetGePin.join(", ") || "keine"})`;
-  });
+  const yn = (v) => (v === null || v === undefined ? "–" : v ? "bestanden" : "**nicht bestanden**");
+  const gateOf = (a) => gates[Object.keys(byArm).find((k) => byArm[k] === a)];
+  row("H1 0 Faktenänderungen (A3, jeder Lauf)", (a) => yn(gateOf(a).H1_faktentreue));
+  row("H2 Reparaturrate ≤ Pin", (a) => yn(gateOf(a).H2_reparaturrate));
+  row("Q Qualität ≥ Pin in ≥ 2 von 3", (a) => `${yn(gateOf(a).Q_qualitaet)} (${gateOf(a).qualitaetGePin.join(", ") || "keine"})`);
+  if (deutschTasks.length > 0) {
+    row("D Deutsch-Summe ≥ Pin, Englisch-Anteil ≤ Pin", (a) => `${yn(gateOf(a).D_deutsch)} (Summe ${fmt(gateOf(a).deutschSumme, 1)})`);
+    row("K Gesamtdauer ≤ 2 × Pin", (a) => yn(gateOf(a).K_kosten));
+    row("R1 fail/Timeout ≤ Pin", (a) => yn(gateOf(a).R1_ausfaelle));
+    row("L Läufe mit repetition loop ≤ Pin", (a) => yn(gateOf(a).L_schleifen));
+  }
   lines.push("");
   renderRuns(lines, perRun);
   lines.push("");
   lines.push("## Blindbewertung (entblindet)");
   lines.push("");
-  lines.push("| ID | Aufgabe | Arm | Runde | Punkte | Faktenänderungen | Notiz |");
-  lines.push("|---|---|---|---|---|---|---|");
+  lines.push("| ID | Aufgabe | Arm | Runde | Punkte | Deutsch | Fehler/100 | Faktenänderungen | Notiz |");
+  lines.push("|---|---|---|---|---|---|---|---|---|");
   for (const [id, q] of Object.entries(quality).sort((x, y) => x[1].task - y[1].task || x[1].arm.localeCompare(y[1].arm) || x[1].round - y[1].round)) {
-    lines.push(`| ${id} | ${q.task} | ${q.arm} | ${q.round} | ${q.points}/${q.max} | ${q.factViolations.join(", ") || "–"} | ${q.notiz.replace(/\|/g, "/")} |`);
+    const de = q.deutsch ? [`${q.deutsch.points}/${DEUTSCH.length}`, fmt(q.deutsch.fehlerPro100, 1)] : ["–", "–"];
+    lines.push(`| ${id} | ${q.task} | ${q.arm} | ${q.round} | ${q.points}/${q.max} | ${de.join(" | ")} | ${q.factViolations.join(", ") || "–"} | ${q.notiz.replace(/\|/g, "/")} |`);
   }
   return lines.join("\n") + "\n";
 }
