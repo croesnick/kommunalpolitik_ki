@@ -254,6 +254,14 @@ def normalCatalogCtx (Γ : Registry) (S : Snapshot) (rule callHash : String) : C
     ausgabeart := art, ziellabel := (art.bind ausgabeartZiellabel).getD [],
     objectLabels := if rule == "admit" then S.objectLabels else [] }
 
+/-- `release_remedies_context/4`. -/
+def releaseCatalogCtx (Γ : Registry) (S : Snapshot) (rule : String) (R : Release)
+    (callHash : String) : CatalogCtx :=
+  { rule := "release", releaseKind := some R.kind, callHash := some callHash,
+    objectRef := S.objectRef, checked := checkedLabel rule S, rho := actualRecipients Γ S,
+    observersProven := factState S "environment_observers_complete" == .true,
+    ausgabeart := R.ausgabeart, ziellabel := R.ziellabel }
+
 /-- `regular_transitions/4` and `release_transitions/2`, GO entries only. -/
 def regularGos (c : CatalogCtx) (code : String) : List Go :=
   if c.rule == "release" then

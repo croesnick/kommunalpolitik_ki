@@ -299,14 +299,6 @@ def Stand.toJson (St : Stand) : Json :=
     ("scope", .str St.scope), ("as_of", Lean.toJson St.asOf),
     ("consumed", Json.mkObj (St.consumed.map fun (n, r) => (n, .str r)))]
 
-/-- `release_remedies_context/4`. -/
-def releaseCatalogCtx (Γ : Registry) (S : Snapshot) (rule : String) (R : Release)
-    (callHash : String) : CatalogCtx :=
-  { rule := "release", releaseKind := some R.kind, callHash := some callHash,
-    objectRef := S.objectRef, checked := checkedLabel rule S, rho := actualRecipients Γ S,
-    observersProven := factState S "environment_observers_complete" == .true,
-    ausgabeart := R.ausgabeart, ziellabel := R.ziellabel }
-
 def releaseDecisionJson (Γ : Registry) (S : Snapshot) (rule : String) (R : Release)
     (callHash : String) (d : ReleaseDecision) : Json :=
   let checked := Lean.toJson (checkedLabel rule S)
