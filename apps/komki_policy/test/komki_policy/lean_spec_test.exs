@@ -52,7 +52,11 @@ defmodule KomkiPolicy.LeanSpecTest do
   # Input errors of verify: intent, snapshot and coherence (§ 2.2, § 2.3),
   # the output prerequisites and the proof's validation (§ 4.5, § 5).
   @proof_input_errors ~w(invalid_record invalid_reference_id unknown_environment
-                         unknown_fact_field intent_snapshot_mismatch emit_digest_missing
+                         unknown_fact_field intent_snapshot_mismatch invalid_flag
+                         invalid_classification invalid_fact_value invalid_operation
+                         invalid_reference_list invalid_source invalid_source_kind
+                         registry_ref_mismatch unknown_binding_reference unknown_observer
+                         unsorted_references emit_digest_missing
                          emit_object_not_classified missing_field invalid_schema unknown_field
                          invalid_entry invalid_premise invalid_premise_kind
                          unknown_premise_field)
@@ -190,6 +194,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     {"intent_snapshot_mismatch", "$.workspace"},
     {"invalid_classification", "$.object.classification"},
     {"invalid_fact_value", "$.facts.audit_path_ready.value"},
+    {"invalid_fact_value", "$.facts.count.value"},
     {"invalid_flag", "$.workspace.valid"},
     {"invalid_operation", "$.operation"},
     {"invalid_record", "$"},
@@ -1261,9 +1266,9 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
-  # The first tree on a broken snapshot or intent; for an output rule also
-  # a coherence error on a snapshot outside the rule's domain, which
-  # check/4 reports first.
+  # The first tree on a broken snapshot or intent, once a malformed proof
+  # on a broken snapshot; for an output rule also a coherence error on a
+  # snapshot outside the rule's domain. check/4 reports the context first.
   defp broken_verify_cases(_raw, _registry, _snapshot, _op, []), do: []
 
   defp broken_verify_cases(raw, registry, snapshot, op, [{_, tree} | _]) do
@@ -1272,7 +1277,10 @@ defmodule KomkiPolicy.LeanSpecTest do
         do: [{hd(off_domain(snapshot)), Map.put(intent(op), "workspace", "ws-fremd")}],
         else: []
 
-    for {s, i} <- broken_contexts(snapshot, op) ++ off, do: {raw, registry, s, i, tree}
+    [{broken, _} | _] = contexts = broken_contexts(snapshot, op)
+
+    [{raw, registry, broken, intent(op), 7}] ++
+      for {s, i} <- contexts ++ off, do: {raw, registry, s, i, tree}
   end
 
   # Decisions per world: the snapshot, the second snapshot and the repaired
@@ -1296,9 +1304,8 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
-  # One defect of snapshot or intent per world, picked by hash, so decide
-  # meets the context errors in its own order; `start` with a broken
-  # snapshot is unsupported without a release (#644).
+  # One defect of snapshot or intent per world, picked by hash, so a check
+  # meets the context errors in its own order; also with `start`.
   defp broken_contexts(snapshot, op) do
     pick = fn corruptions ->
       breaks = for {:break, _, _} = c <- corruptions, do: c
