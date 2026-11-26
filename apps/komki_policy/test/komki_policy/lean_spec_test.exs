@@ -1,16 +1,18 @@
 defmodule KomkiPolicy.LeanSpecTest do
   @moduledoc false
 
-  # Differential test of `Verify.check/4` against the proven Lean verifier
-  # (#625, lean/README.md). Needs the binary from `cd lean && lake build`;
-  # excluded by default, run with `mix test --only lean_spec`.
+  # Differential tests of `Verify.check/4` and `Derive.decide/3` against the
+  # proven Lean model (#625, #629, lean/README.md). Needs the binary from
+  # `cd lean && lake build`; excluded by default, run with
+  # `mix test --only lean_spec`.
   #
   # Only cases inside the validated domain are compared: Elixir has to
-  # return a verdict or one of the modelled input errors (the snapshot
-  # prerequisites of the output rules, #628); any other input error drops
-  # the case. Within that domain, every verdict has to match. KOMKI_SPEC_SEED and KOMKI_SPEC_RUNS widen
-  # the search; a mismatch writes its cases to a JSONL file for replay with
-  # `komki-spec verify-batch`.
+  # return a verdict, a decision or one of the modelled input errors (the
+  # snapshot prerequisites of the output rules, #628; for `derive` also
+  # `unknown_environment`); any other input error drops the case. Within
+  # that domain, everything compared has to match. KOMKI_SPEC_SEED and
+  # KOMKI_SPEC_RUNS widen the search; a mismatch writes its cases to a JSONL
+  # file for replay with `komki-spec verify-batch` or `derive-batch`.
 
   use ExUnit.Case, async: false
   use ExUnitProperties
@@ -39,6 +41,9 @@ defmodule KomkiPolicy.LeanSpecTest do
   @claim_fields ~w(object_labels checked_label actual_recipients allowed_recipients fact_refs
                    assigned_label workspace_bindings)
   @modelled_input_errors [:emit_digest_missing, :emit_object_not_classified]
+  @derive_input_errors [:unknown_environment | @modelled_input_errors]
+  @decision_fields ~w(decision rule checked_label blockers missing_evidence proof
+                      assigned_label content_digest)
 
   test "Lean-Tabellen entsprechen Derive" do
     {out, 0} = System.cmd(spec_bin(), ["constants"])
@@ -111,6 +116,43 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
+  test "Fixture-Korpus: Derive und das Lean-Modell entscheiden gleich" do
+    raw = fixture("registry.json")
+    {:ok, registry} = Registry.compile(raw)
+
+    cases =
+      for {snapshot, intent} <-
+            fixture_worlds() ++ unsupported_fixture_worlds() ++ input_error_worlds(),
+          do: {raw, registry, snapshot, intent}
+
+    stats = compare_decisions!(cases, "derive-korpus")
+
+    for decision <- ~w(permit deny indeterminate unsupported input_error) do
+      assert Enum.any?(stats, fn {{_, d}, n} -> d == decision and n > 0 end),
+             "kein Fixture-Fall mit #{decision}"
+    end
+  end
+
+  test "Generierte Welten: Derive und das Lean-Modell entscheiden gleich" do
+    seed = env_int("KOMKI_SPEC_SEED", 20_261_123)
+    runs = env_int("KOMKI_SPEC_RUNS", 8_000)
+
+    cases =
+      world_gen()
+      |> StreamData.resize(30)
+      |> StreamData.list_of(length: runs)
+      |> StreamData.seeded(seed)
+      |> Enum.at(0)
+      |> Enum.flat_map(&decision_cases/1)
+
+    stats = compare_decisions!(cases, "derive-generator")
+    IO.puts("\nlean_spec derive seed=#{seed} runs=#{runs}: #{inspect(stats)}")
+
+    for rule <- Derive.proof_rules(), decision <- ~w(permit deny indeterminate) do
+      assert Map.get(stats, {rule, decision}, 0) >= 150, "zu wenige #{rule}/#{decision}"
+    end
+  end
+
   # ---------------------------------------------------------------------
   # Comparison
   # ---------------------------------------------------------------------
@@ -119,21 +161,22 @@ defmodule KomkiPolicy.LeanSpecTest do
     judged =
       cases
       |> Enum.map(fn {raw, registry, snapshot, intent, proof} ->
-        {raw, snapshot, intent, proof, elixir_verdict(registry, snapshot, intent, proof)}
+        line = %{"registry" => raw, "snapshot" => snapshot, "intent" => intent, "proof" => proof}
+        {line, elixir_verdict(registry, snapshot, intent, proof)}
       end)
-      |> Enum.reject(fn {_, _, _, _, verdict} -> verdict == :dropped end)
+      |> Enum.reject(fn {_, verdict} -> verdict == :dropped end)
       |> Enum.with_index()
 
-    lean = lean_verdicts(judged)
+    lean = run_lean("verify-batch", judged)
 
     mismatches =
-      for {{raw, snapshot, intent, proof, verdict}, id} <- judged,
+      for {{line, verdict}, id} <- judged,
           Map.get(lean, id) != verdict,
-          do: {id, verdict, Map.get(lean, id), raw, snapshot, intent, proof}
+          do: {id, verdict, Map.get(lean, id), line}
 
-    report_mismatches!(mismatches, label)
+    report_mismatches!(mismatches, label, "Verify.check/4 und dem Lean-Prüfer")
 
-    count = fn verdict -> Enum.count(judged, fn {{_, _, _, _, v}, _} -> v == verdict end) end
+    count = fn verdict -> Enum.count(judged, fn {{_, v}, _} -> v == verdict end) end
 
     %{
       compared: length(judged),
@@ -143,8 +186,8 @@ defmodule KomkiPolicy.LeanSpecTest do
       input_error: count.("input_error"),
       valid_by_rule:
         judged
-        |> Enum.filter(fn {{_, _, _, _, v}, _} -> v == "valid" end)
-        |> Enum.frequencies_by(fn {{_, _, _, proof, _}, _} -> proof["rule"] end)
+        |> Enum.filter(fn {{_, v}, _} -> v == "valid" end)
+        |> Enum.frequencies_by(fn {{line, _}, _} -> line["proof"]["rule"] end)
     }
   end
 
@@ -156,18 +199,63 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
-  defp lean_verdicts(judged) do
+  defp compare_decisions!(cases, label) do
+    judged =
+      cases
+      |> Enum.map(fn {raw, registry, snapshot, intent} ->
+        line = %{"registry" => raw, "snapshot" => snapshot, "intent" => intent}
+        {line, elixir_decision(registry, snapshot, intent)}
+      end)
+      |> Enum.reject(fn {_, decision} -> decision == :dropped end)
+      |> Enum.with_index()
+
+    lean = run_lean("derive-batch", judged)
+
+    mismatches =
+      for {{line, decision}, id} <- judged,
+          parse_decision(Map.get(lean, id)) != decision,
+          do: {id, decision, parse_decision(Map.get(lean, id)), line}
+
+    report_mismatches!(mismatches, label, "Derive.decide/3 und dem Lean-Modell")
+
+    Enum.frequencies_by(judged, fn {{line, decision}, _} ->
+      {line["intent"]["operation"], decision["decision"] || Enum.at(Map.keys(decision), 0)}
+    end)
+  end
+
+  # The fields of a decision the Lean model decides: everything but the
+  # echoes of the input and the remedies (§ 2.8, not modelled).
+  defp elixir_decision(registry, snapshot, intent) do
+    case Derive.decide(registry, snapshot, intent) do
+      {:ok, decision} ->
+        Map.take(decision, @decision_fields)
+
+      {:unsupported, _} ->
+        %{"unsupported" => true}
+
+      {:error, %{code: code}} when code in @derive_input_errors ->
+        %{"input_error" => to_string(code)}
+
+      {:error, _} ->
+        :dropped
+    end
+  end
+
+  defp parse_decision(nil), do: nil
+
+  defp parse_decision(out) do
+    case KomkiPolicy.JSON.parse(out) do
+      {:ok, decision} -> decision
+      {:error, _} -> out
+    end
+  end
+
+  defp run_lean(command, judged) do
     path = Path.join(System.tmp_dir!(), "komki-spec-#{System.unique_integer([:positive])}.jsonl")
-
-    lines =
-      for {{raw, snapshot, intent, proof, _}, id} <- judged do
-        case_line(id, raw, snapshot, intent, proof)
-      end
-
-    File.write!(path, lines)
+    File.write!(path, for({{line, _}, id} <- judged, do: case_line(id, line)))
 
     try do
-      {out, 0} = System.cmd(spec_bin(), ["verify-batch", path])
+      {out, 0} = System.cmd(spec_bin(), [command, path])
 
       for line <- String.split(out, "\n", trim: true), into: %{} do
         [id, result] = String.split(line, " ", parts: 2)
@@ -178,37 +266,23 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
-  defp case_line(id, raw, snapshot, intent, proof) do
-    JSON.encode!(%{
-      "id" => id,
-      "registry" => raw,
-      "snapshot" => snapshot,
-      "intent" => intent,
-      "proof" => proof
-    }) <> "\n"
-  end
+  defp case_line(id, line), do: JSON.encode!(Map.put(line, "id", id)) <> "\n"
 
-  defp report_mismatches!([], _label), do: :ok
+  defp report_mismatches!([], _label, _what), do: :ok
 
-  defp report_mismatches!(mismatches, label) do
+  defp report_mismatches!(mismatches, label, what) do
     path = Path.join(System.tmp_dir!(), "komki-spec-mismatch-#{label}.jsonl")
-
-    File.write!(
-      path,
-      for {id, _, _, raw, snapshot, intent, proof} <- mismatches do
-        case_line(id, raw, snapshot, intent, proof)
-      end
-    )
+    File.write!(path, for({id, _, _, line} <- mismatches, do: case_line(id, line)))
 
     shown =
       mismatches
       |> Enum.take(5)
-      |> Enum.map_join("\n", fn {id, elixir, lean, _, _, _, _} ->
-        "  Fall #{id}: Elixir #{elixir}, Lean #{inspect(lean)}"
+      |> Enum.map_join("\n", fn {id, elixir, lean, _} ->
+        "  Fall #{id}: Elixir #{inspect(elixir)}, Lean #{inspect(lean)}"
       end)
 
     flunk("""
-    #{length(mismatches)} Abweichungen zwischen Verify.check/4 und dem Lean-Prüfer:
+    #{length(mismatches)} Abweichungen zwischen #{what}:
     #{shown}
     Fälle: #{path}
     """)
@@ -246,6 +320,23 @@ defmodule KomkiPolicy.LeanSpecTest do
         intent["operation"] in Derive.proof_rules() do
       {fixture(Path.join(dir, "snapshot.json")), intent}
     end
+  end
+
+  defp input_error_worlds do
+    [
+      {fixture("invalid/emit_digest_missing_snapshot.json"),
+       fixture("invalid/emit_digest_missing_intent.json")},
+      {put_in(
+         fixture("case_permit/snapshot.json"),
+         ["workspace", "environment"],
+         "env-unbekannt@1"
+       ), fixture("case_permit/intent.json")}
+    ]
+  end
+
+  defp unsupported_fixture_worlds do
+    for {snapshot, intent} <- fixture_worlds(),
+        do: {snapshot, Map.put(intent, "operation", "start")}
   end
 
   defp fixture_proofs do
@@ -358,6 +449,25 @@ defmodule KomkiPolicy.LeanSpecTest do
             do: {raw, registry, target, intent(op), mirrored_tree(registry, target, op)}
 
       cases ++ mirrored
+    else
+      {:error, _} -> []
+    end
+  end
+
+  # Decisions per world: the snapshot, the second snapshot and the repaired
+  # one, each under the registry and under the one with every rule, plus
+  # `start`, which no snapshot decides.
+  defp decision_cases({raw, op, snapshot, other, _mutations}) do
+    ruled_raw = with_all_rules(raw)
+
+    with {:ok, registry} <- Registry.compile(raw),
+         {:ok, ruled} <- Registry.compile(ruled_raw) do
+      worlds =
+        for {r, compiled} <- [{raw, registry}, {ruled_raw, ruled}],
+            s <- [snapshot, other, repaired(snapshot, op)],
+            do: {r, compiled, s, intent(op)}
+
+      worlds ++ [{raw, registry, snapshot, intent("start")}]
     else
       {:error, _} -> []
     end

@@ -4,3 +4,7 @@ import KomkiSpec.Calculus
 import KomkiSpec.Model
 import KomkiSpec.Verify
 import KomkiSpec.Soundness
+import KomkiSpec.Derive
+import KomkiSpec.DeriveSound
+import KomkiSpec.DeriveVerify
+import KomkiSpec.Domain

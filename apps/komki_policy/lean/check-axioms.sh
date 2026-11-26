@@ -11,7 +11,8 @@ if ! out=$(lake env lean Axioms.lean 2>&1); then
 fi
 printf '%s\n' "$out"
 for theorem in verify_sound verify_sound_rfc derivable_permitted handover_within_admitted \
-  verify_emit_assigns \
+  verify_emit_assigns derive_sound derive_complete derive_permit_stable derive_deny_stable \
+  derive_verifies \
   eval_mono recipients_antitone permitted_antitone no_forbidden_recipient; do
   if ! printf '%s\n' "$out" | grep -q "^'KomkiSpec\.$theorem' "; then
     echo "Axioms.lean gibt den Hauptsatz $theorem nicht aus." >&2

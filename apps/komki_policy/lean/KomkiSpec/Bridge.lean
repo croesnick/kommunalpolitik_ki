@@ -1,12 +1,16 @@
 import Lean.Data.Json
-import KomkiSpec.Verify
+import KomkiSpec.Domain
 
 /-!
 # Bridge: the CLI's JSON into the model
 
 Unverified and deliberately thin. It reads the records `komki-policy verify`
-reads and assumes they passed Elixir's input validation; anything else is a
-decoding error, never a verdict. Sorting mirrors `Registry.compile/1`.
+and `decide` read and assumes they passed Elixir's input validation;
+anything else is a decoding error, never a verdict. Sorting mirrors
+`Registry.compile/1`. A registry or snapshot outside the domain the
+theorems assume (`Registry.wellFormed`, `Snapshot.wellFormed`) is a decoding
+error too. On the way out it writes `derive`'s decision in the
+shape of `Derive.decide/3`, without the remedies.
 -/
 
 namespace KomkiSpec
@@ -64,8 +68,11 @@ def decodeRegistry (j : JVal) : Decode Registry := do
 def decodeSnapshot (j : JVal) : Decode Snapshot := do
   let ws ← field j "workspace"
   let obj ← field j "object"
-  let facts ← (← asObj (← field j "facts")).mapM fun (name, entry) => do
+  let entries ← asObj (← field j "facts")
+  let facts ← entries.mapM fun (name, entry) => do
     pure (name, ← field entry "value")
+  let factSources ← entries.mapM fun (name, entry) => do
+    pure (name, ← strAt entry "source", ← strAt entry "source_kind")
   pure {
     snapshotId := ← strAt j "snapshot_id"
     workspaceBindings := ← asStrs (← field ws "bindings")
@@ -73,7 +80,16 @@ def decodeSnapshot (j : JVal) : Decode Snapshot := do
     environment := ← strAt ws "environment"
     classification := ← strAt obj "classification"
     objectLabels := ← asStrs (← field obj "labels")
-    facts }
+    facts
+    objectRef := (← strAt obj "object_id") ++ "@" ++ (← strAt obj "version")
+    factSources }
+
+def decodeWorld (j : JVal) : Decode (Registry × Snapshot) := do
+  let Γ ← decodeRegistry (← field j "registry")
+  let S ← decodeSnapshot (← field j "snapshot")
+  unless Γ.wellFormed do throw "registry outside the validated domain"
+  unless S.wellFormed do throw "snapshot outside the validated domain"
+  pure (Γ, S)
 
 def decodeIntent (j : JVal) : Decode Intent := do
   pure { intentId := ← strAt j "intent_id", operation := ← strAt j "operation" }
@@ -102,7 +118,68 @@ def Outcome.label : Outcome → String
 
 /-- One case `{"registry", "snapshot", "intent", "proof"}` → verdict. -/
 def verifyCase (j : JVal) : Decode Outcome := do
-  pure (verify (← decodeRegistry (← field j "registry")) (← decodeSnapshot (← field j "snapshot"))
-    (← decodeIntent (← field j "intent")) (← decodeProof (← field j "proof")))
+  let (Γ, S) ← decodeWorld j
+  pure (verify Γ S (← decodeIntent (← field j "intent")) (← decodeProof (← field j "proof")))
+
+/-! ## `derive`'s decision as JSON -/
+
+partial def JVal.toJson : JVal → Json
+  | .null => .null
+  | .bool b => .bool b
+  | .int i => .num (Lean.JsonNumber.fromInt i)
+  | .float m e => .num ⟨m, e⟩
+  | .str s => .str s
+  | .arr xs => .arr (xs.map JVal.toJson).toArray
+  | .obj kvs => Json.mkObj (kvs.map fun (k, v) => (k, JVal.toJson v))
+
+def optStr : Option String → Json
+  | some s => .str s
+  | none => .null
+
+def Blocker.toJson (b : Blocker) : Json :=
+  Json.mkObj <|
+    [("code", .str b.code), ("binding", optStr b.binding), ("condition", optStr b.condition)] ++
+    match b.outside with
+    | some os => [("recipients_outside", Lean.toJson os)]
+    | none => []
+
+def Evidence.toJson (e : Evidence) : Json :=
+  Json.mkObj [("code", .str e.code), ("fact", optStr e.fact), ("binding", optStr e.binding)]
+
+def Proof.toJson (P : Proof) : Json :=
+  Json.mkObj [("schema", .str "komki-proof/1"), ("rule", .str P.rule),
+    ("conclusion", .str P.conclusion), ("registry_ref", .str P.registryRef),
+    ("snapshot_ref", .str P.snapshotRef), ("intent_ref", .str P.intentRef),
+    ("checked_label", Lean.toJson P.checkedLabel),
+    ("premises", .arr (P.premises.map fun p => (JVal.obj p.fields).toJson).toArray)]
+
+/-- The fields of `Derive.decide/3` this model decides: everything but the
+echoes of the input and the remedies. -/
+def decisionJson (S : Snapshot) (rule : String) (d : Decision) : Json :=
+  let checked := Lean.toJson (checkedLabel rule S)
+  let (name, blockers, evidence, proof, assigned) : String × Json × Json × Json × Json :=
+    match d with
+    | .permit P => ("permit", .null, .null, P.toJson, checked)
+    | .deny bs => ("deny", .arr (bs.map Blocker.toJson).toArray, .null, .null, .null)
+    | .indeterminate es => ("indeterminate", .null, .arr (es.map Evidence.toJson).toArray, .null, .null)
+  let digest := ((S.facts.lookup "output_content_digest").map JVal.toJson).getD .null
+  let output :=
+    if rule == "admit" then []
+    else if rule == "emit" then [("assigned_label", assigned), ("content_digest", digest)]
+    else [("content_digest", digest)]
+  Json.mkObj <|
+    [("decision", .str name), ("rule", .str rule), ("checked_label", checked),
+     ("blockers", blockers), ("missing_evidence", evidence), ("proof", proof)] ++ output
+
+def Derived.toJson (S : Snapshot) (rule : String) : Derived → Json
+  | .decision d => decisionJson S rule d
+  | .inputError code => Json.mkObj [("input_error", .str code)]
+  | .unsupported => Json.mkObj [("unsupported", .bool true)]
+
+/-- One case `{"registry", "snapshot", "intent"}` → decision. -/
+def deriveCase (j : JVal) : Decode Json := do
+  let (Γ, S) ← decodeWorld j
+  let I ← decodeIntent (← field j "intent")
+  pure ((derive Γ S I).toJson S I.operation)
 
 end KomkiSpec

@@ -12,6 +12,11 @@ open KomkiSpec
 #print axioms derivable_permitted
 #print axioms handover_within_admitted
 #print axioms verify_emit_assigns
+#print axioms derive_sound
+#print axioms derive_complete
+#print axioms derive_permit_stable
+#print axioms derive_deny_stable
+#print axioms derive_verifies
 #print axioms eval_mono
 #print axioms recipients_antitone
 #print axioms permitted_antitone
