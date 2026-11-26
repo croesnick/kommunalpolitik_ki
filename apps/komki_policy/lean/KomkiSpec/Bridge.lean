@@ -2,6 +2,7 @@ import Lean.Data.Json
 import KomkiSpec.Domain
 import KomkiSpec.Input
 import KomkiSpec.CallHash
+import KomkiSpec.ProofInput
 
 /-!
 # Bridge: the CLI's JSON into the model
@@ -126,15 +127,27 @@ def decodeProof (j : JVal) : Decode Proof := do
     checkedLabel := ← asStrs (← field j "checked_label")
     premises := ← (← asArr (← field j "premises")).mapM decodePremise }
 
-def Outcome.label : Outcome → String
-  | .valid => "valid"
-  | .invalid => "invalid"
-  | .inputError => "input_error"
+def Reason.toJson (r : Reason) : Json :=
+  let opt : Option String → Json := fun o => (o.map Json.str).getD .null
+  Json.mkObj [("binding", opt r.binding), ("code", .str r.code), ("fact", opt r.fact)]
 
-/-- One case `{"registry", "snapshot", "intent", "proof"}` → verdict. -/
-def verifyCase (j : JVal) : Decode Outcome := do
+/-- `check/4`'s outcome `{"reasons", "result"}`, or `{"input_error": code, "path"}`. -/
+def Report.toJson : Report → Json
+  | .error e => Json.mkObj [("input_error", .str e.code), ("path", .str e.path)]
+  | .ok rs =>
+    Json.mkObj [("reasons", .arr (rs.map Reason.toJson).toArray),
+      ("result", .str (if rs.isEmpty then "valid" else "invalid"))]
+
+/-- One case `{"registry", "snapshot", "intent", "proof"}` → report. As in
+`check/4`, the output prerequisites come before the proof's validation, and
+only a validated proof is decoded. -/
+def verifyCase (j : JVal) : Decode Report := do
   let (Γ, S) ← decodeWorld j
-  pure (verify Γ S (← decodeIntent (← field j "intent")) (← decodeProof (← field j "proof")))
+  let I ← decodeIntent (← field j "intent")
+  let raw ← field j "proof"
+  match outputInputError? S I.operation, proofError raw with
+  | some e, _ | none, some e => pure (.error e)
+  | none, none => pure (verifyReport Γ S I (← decodeProof raw))
 
 /-! ## `derive`'s decision as JSON -/
 
@@ -421,8 +434,9 @@ def cliCase (j : JVal) : Decode Json := do
   let input := JVal.obj parsed
   match command with
   | "verify" =>
-    let o ← verifyCase input
-    pure (cliResult (match o with | .valid => 0 | .invalid => 1 | .inputError => 2) (.str o.label))
+    let r ← verifyCase input
+    pure (cliResult (match r.verdict with | .valid => 0 | .invalid => 1 | .inputError => 2)
+      r.toJson)
   | "advance" =>
     let r ← advanceCase input
     pure (cliResult (if (r.getObjVal? "ok").toOption.isSome then 0 else 1) r)

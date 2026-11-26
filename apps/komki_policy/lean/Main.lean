@@ -3,7 +3,8 @@ import KomkiSpec.Bridge
 /-!
 `komki-spec verify-batch <cases.jsonl>`: one case per line,
 `{"id": n, "registry": …, "snapshot": …, "intent": …, "proof": …}`; prints
-`<id> valid|invalid|input_error` or `<id> error <reason>` per line.
+`<id> <json>` with `check/4`'s reasons and result, or `{"input_error": code}`,
+or `<id> error <reason>` per line.
 
 `komki-spec derive-batch <cases.jsonl>`: one case per line,
 `{"id": n, "registry": …, "snapshot": …, "intent": …}`; prints `<id> <json>`
@@ -51,7 +52,7 @@ def constants : Json :=
     ("handover_operations", toJson handoverOperations)]
 
 def main : List String → IO UInt32
-  | ["verify-batch", path] => runBatch (fun j => (verifyCase j).map (·.label)) path
+  | ["verify-batch", path] => runBatch (fun j => (verifyCase j).map (·.toJson.compress)) path
   | ["derive-batch", path] => runBatch (fun j => (deriveCase j).map (·.compress)) path
   | ["release-batch", path] => runBatch (fun j => (releaseCase j).map (·.compress)) path
   | ["advance-batch", path] => runBatch (fun j => (advanceCase j).map (·.compress)) path

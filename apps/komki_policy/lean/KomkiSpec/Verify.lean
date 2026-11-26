@@ -3,10 +3,10 @@ import KomkiSpec.Model
 /-!
 # `verify` for `admit`, `emit`, `store` and `transfer` (CONTRACT.md § 5)
 
-Mirrors `KomkiPolicy.Verify.check/4` step by step. Only the verdict is
-modelled: `verify.ex` reports reason codes and stops early after the
-structural steps 1–3, but any finding means `invalid`, so the verdict is the
-conjunction of all checks. Of the input errors, only the snapshot
+Mirrors `KomkiPolicy.Verify.check/4` step by step. This file models the
+verdict, the conjunction of all checks; the reasons `verify.ex` reports, with
+its early stop after the structural steps 1–3, are in VerifyReasons.lean,
+which proves they agree with this verdict. Of the input errors, only the snapshot
 prerequisites of the output rules are modelled (#628); the others mark the
 edge of the validated domain.
 -/
