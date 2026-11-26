@@ -3,6 +3,7 @@ import KomkiSpec.Domain
 import KomkiSpec.Input
 import KomkiSpec.CallHash
 import KomkiSpec.ContextInput
+import KomkiSpec.ReleaseInput
 
 /-!
 # Bridge: the CLI's JSON into the model
@@ -19,14 +20,6 @@ shape of `Derive.decide/3`, without the remedies.
 namespace KomkiSpec
 
 open Lean (Json)
-
-partial def JVal.ofJson : Json → JVal
-  | .null => .null
-  | .bool b => .bool b
-  | .num n => if n.exponent == 0 then .int n.mantissa else .float n.mantissa n.exponent
-  | .str s => .str s
-  | .arr xs => .arr (xs.toList.map JVal.ofJson)
-  | .obj kvs => .obj (kvs.toList.map fun (k, v) => (k, JVal.ofJson v))
 
 abbrev Decode := Except String
 
@@ -250,6 +243,16 @@ def decisionRemedies (Γ : Registry) (S : Snapshot) (rule callHash : String) : D
   | .indeterminate es => remediesJson (es.map Evidence.toJson)
       (catalog Γ (normalCatalogCtx Γ S rule callHash) (es.map Evidence.finding))
 
+/-- An input error of a decision: `{"input_error", "path"}`. -/
+def inputErrorJson (e : InputError) : Json :=
+  Json.mkObj [("input_error", .str e.code), ("path", .str e.path)]
+
+/-- The path of an input error the decision model raises itself. -/
+def modelErrorPath : String → String
+  | "unknown_environment" => "$.workspace.environment"
+  | "emit_digest_missing" => "$.facts.output_content_digest"
+  | _ => "$.object.classification"
+
 def withField (j : Json) (k : String) (v : Json) : Json :=
   match j with
   | .obj kvs => .obj (kvs.insert k v)
@@ -258,7 +261,7 @@ def withField (j : Json) (k : String) (v : Json) : Json :=
 def Derived.toJson (Γ : Registry) (S : Snapshot) (rule callHash : String) : Derived → Json
   | .decision d => withField (withField (decisionJson S rule d) "gos" (decisionGos Γ S rule callHash d))
       "remedies" (decisionRemedies Γ S rule callHash d)
-  | .inputError code => Json.mkObj [("input_error", .str code)]
+  | .inputError code => inputErrorJson ⟨code, modelErrorPath code⟩
   | .unsupported => Json.mkObj [("unsupported", .bool true)]
 
 def optStrAt (j : JVal) (k : String) : Decode (Option String) :=
@@ -269,8 +272,18 @@ def optStrAt (j : JVal) (k : String) : Decode (Option String) :=
 /-- One case `{"registry", "snapshot", "intent"}` → decision; the call hash
 is computed here (`callHashOf`). -/
 def deriveCase (j : JVal) : Decode Json := do
+  -- As `decide_validated?/4`: the intent, an unsupported operation, then
+  -- snapshot and coherence. With a release the order differs (#644).
+  let Γ₀ ← decodeRegistry (← field j "registry")
+  let intent ← field j "intent"
+  let snapshot ← field j "snapshot"
+  if let some e := intentError intent then return inputErrorJson e
+  if !proofRules.contains (← decodeIntent intent).operation then
+    return Json.mkObj [("unsupported", .bool true)]
+  if let some e := (snapshotError Γ₀ snapshot).or (coherenceError intent snapshot) then
+    return inputErrorJson e
   let (Γ, S) ← decodeWorld j
-  let I ← decodeIntent (← field j "intent")
+  let I ← decodeIntent intent
   pure ((derive Γ S I).toJson Γ S I.operation (callHashOf S I))
 
 /-! ## Release branches and `advance` -/
@@ -341,8 +354,14 @@ def releaseDecisionJson (Γ : Registry) (S : Snapshot) (rule : String) (R : Rele
      ("remedies", remedies)] ++
     if rule == "emit" then [("assigned_label", assigned)] else []
 
-/-- One case `{"registry", "snapshot", "intent", "release", "stand"}`. -/
+/-- One case `{"registry", "snapshot", "intent", "release", "stand"}`. As
+`release_validated?/5`: intent, snapshot and coherence, then the schemas of
+release and stand. -/
 def releaseCase (j : JVal) : Decode Json := do
+  let Γ₀ ← decodeRegistry (← field j "registry")
+  let err := (contextError Γ₀ (← field j "intent") (← field j "snapshot")).or <|
+    (releaseError (← field j "release")).or (standError (← field j "stand"))
+  if let some e := err then return inputErrorJson e
   let (Γ, S) ← decodeWorld j
   let I ← decodeIntent (← field j "intent")
   let R ← decodeRelease (← field j "release")
@@ -350,13 +369,16 @@ def releaseCase (j : JVal) : Decode Json := do
   let c := callHashOf S I
   pure <| match deriveWithRelease Γ S I R St c with
     | .decision d => releaseDecisionJson Γ S I.operation R c d
-    | .inputError code => Json.mkObj [("input_error", .str code)]
+    | .inputError code => inputErrorJson ⟨code, modelErrorPath code⟩
     | .unsupported => Json.mkObj [("unsupported", .bool true)]
 
 /-- One case `{"stand", "proposal"}`. -/
 def advanceCase (j : JVal) : Decode Json := do
-  let St ← decodeStand (← field j "stand")
-  let P ← decodeProposal (← field j "proposal")
+  let stand ← field j "stand"
+  let proposal ← field j "proposal"
+  if let some e := (standError stand).or (proposalError proposal) then return inputErrorJson e
+  let St ← decodeStand stand
+  let P ← decodeProposal proposal
   pure <| match advance St P with
     | .ok St' => Json.mkObj [("ok", St'.toJson)]
     | .refused code => Json.mkObj [("refused", .str code)]
@@ -460,15 +482,10 @@ def cliCase (j : JVal) : Decode Json := do
       r.toJson)
   | "advance" =>
     let r ← advanceCase input
-    pure (cliResult (if (r.getObjVal? "ok").toOption.isSome then 0 else 1) r)
+    let exit := if (r.getObjVal? "ok").toOption.isSome then 0
+      else if (r.getObjVal? "input_error").toOption.isSome then 2 else 1
+    pure (cliResult exit r)
   | "decide" =>
-    -- Without a release, `decide` rejects an unsupported operation before it
-    -- validates the snapshot (`decide_validated?/4`); with one, the other
-    -- way round (`release_validated?/5`). #644 asks which order holds.
-    if (input.get? "release").isNone then
-      let I ← decodeIntent (← field input "intent")
-      if !proofRules.contains I.operation then
-        return cliResult 3 (Json.mkObj [("unsupported", .bool true)])
     let r ← if (input.get? "release").isSome then releaseCase input else deriveCase input
     let exit := if (r.getObjVal? "input_error").toOption.isSome then 2
       else if (r.getObjVal? "unsupported").toOption.isSome then 3 else 0

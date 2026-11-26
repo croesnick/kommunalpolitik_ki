@@ -121,8 +121,10 @@ jeder Code dieser Eingabefehler muss dabei vorkommen.
 Für `derive` vergleicht er die Entscheidung über denselben Welten und den
 Fixtures: Urteil, Prüflabel, Blocker samt `condition` und
 `recipients_outside`, fehlende Belege, den ganzen Beweisbaum,
-`assigned_label`, `content_digest`, dazu `unsupported` und die Eingabefehler
-aus #628, und den ganzen Remedy-Katalog: je Befund alle Fortsetzungen in
+`assigned_label`, `content_digest`, dazu `unsupported` und jeden
+Eingabefehler mit Code und Pfad, je Welt auch mit einem verdorbenen Feld
+in Snapshot oder Intent und `start` mit verdorbenem Snapshot (#644), und
+den ganzen Remedy-Katalog: je Befund alle Fortsetzungen in
 ihrer Ordnung samt Payload (Fakt, Transformation, `required_bindings`,
 `required_recipients`, Call-Hash). Nicht verglichen werden nur die Echos
 der Eingabe.
@@ -133,7 +135,11 @@ Für die Freigabe-Zweige vergleicht er dasselbe samt geplantem Verbrauch
 danach, verbrauchte Nonce, unbekannte Autorität, Offenlegungsfreigaben mit
 passender oder falscher Ausgabeart und Ziellabel). Für `advance` vergleicht
 er den nächsten Stand oder den Ablehnungsgrund, auch für die Wiederholung
-nach einem Commit.
+nach einem Commit. Die Schemaprüfungen von Freigabe, Stand und Vorschlag
+(`KomkiSpec/ReleaseInput.lean`) vergleicht er an je einem Fixture mit
+Aktions- und Offenlegungsfreigabe: jede Verderbung aus seinem Katalog
+allein, jedes geordnete Paar, Freigabe mit Stand, Intent mit Freigabe und
+Stand mit Vorschlag, jeweils Code und Pfad des ersten Fehlers.
 
 Den Auswerter vergleicht er auch direkt: die Grenzfälle aus
 `priv/fixtures/expressions/evaluate_expectations.json` und 8 000
@@ -181,7 +187,7 @@ veränderten Byte in einer Datei, jede achte ab einer wechselnden Datei mit
 einem eigenen Parserfehler je Datei, dazu `decide` mit unbekannter Umgebung, mit und ohne
 Freigabe, für die eigene Operation und für `start`, und ohne Freigabe `start`
 mit einem Snapshot ohne `object`, den nur die vorgezogene
-`unsupported`-Prüfung beantwortet (#644). Das Modell liest
+`unsupported`-Prüfung von `decide_validated?/4` beantwortet (#644). Das Modell liest
 dieselben Bytes mit dem strengen Parser in der Reihenfolge der CLI und
 entscheidet; verglichen werden Exit-Code (§ 7), Fehlercode des Parsers und
 die Felder der Ausgabe, die das Modell kennt: die Entscheidung ohne die
@@ -211,15 +217,15 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 |---|---|
 | `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige), `callHashOf` in `KomkiSpec/CallHash.lean` (`output_call_hash/2`) |
 | `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
-| `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
+| `stand.ex` | `advance` in `KomkiSpec/Release.lean`, `standError` und `proposalError` in `KomkiSpec/ReleaseInput.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` (Urteil), `KomkiSpec/VerifyReasons.lean` (Befunde), `KomkiSpec/ProofInput.lean` (Eingabeprüfung des Beweisbaums) |
-| `validations.ex` | `firstUnknown` in `KomkiSpec/ProofInput.lean` (`closed_fields/3`: erstes unbekanntes Feld in Sortierreihenfolge), `kebabJ`, `objectRefJ` und `strIn knownOperations` in `KomkiSpec/ContextInput.lean` (`require_kebab/2`, `require_object_ref/2`, `require_operation/2`) |
+| `validations.ex` | `firstUnknown` in `KomkiSpec/ProofInput.lean` (`closed_fields/3`: erstes unbekanntes Feld in Sortierreihenfolge), `kebabJ`, `objectRefJ` und `strIn knownOperations` in `KomkiSpec/ContextInput.lean` (`require_kebab/2`, `require_object_ref/2`, `require_operation/2`), `schemaError`, `closedError`, `hex64`, `natJ` und `intJ` in `KomkiSpec/ReleaseInput.lean` (`require_schema/3`, `closed_fields/3`, `require_hex64/3`, `require_nonneg_integer/3`, `require_integer/3`) |
 | `cli.ex` | `cliFiles` und `cliCase` in `KomkiSpec/Bridge.lean` (Lesereihenfolge der Dateien, Exit-Codes) |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
-| `registry.ex` | `kebab` in `KomkiSpec/ContextInput.lean` (`kebab_id?/1`), Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
+| `registry.ex` | `kebab` in `KomkiSpec/ContextInput.lean` (`kebab_id?/1`), `refId` und `outputKinds` in `KomkiSpec/ReleaseInput.lean` (`reference_id?/1`, `output_kinds/0`), Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
 | `json.ex` | `KomkiSpec/Json.lean` (Parser, kanonischer Encoder) |
-| `release.ex` | `callHashOf` in `KomkiSpec/CallHash.lean`, SHA-256 in `KomkiSpec/Sha256.lean` |
+| `release.ex` | `callHashOf` in `KomkiSpec/CallHash.lean`, SHA-256 in `KomkiSpec/Sha256.lean`, `releaseError` in `KomkiSpec/ReleaseInput.lean` |
 | `context.ex` | `KomkiSpec/ContextInput.lean` (Eingabeprüfung von Intent und Snapshot, Kohärenz), `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean`, `Snapshot.validated` in `Input.lean` (Wertebereich nach der Eingabeprüfung) |
 
 Dann das Lean-Modell gegen die Änderung prüfen und anpassen, `lake build`
@@ -255,8 +261,9 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   auch für `callHashOf`, den die Brücke rechnet (SHA-256 über die
   kanonische Form, § 2.6). Dass verschiedene Calls verschiedene Hashes
   haben, setzt die Kollisionsresistenz von SHA-256 voraus; beweisen lässt
-  sie sich nicht. Die Schemaprüfung von Freigabe und Stand ist nicht
-  modelliert.
+  sie sich nicht. Die vier beschreibenden Felder einer Freigabe
+  (`operation`, `object`, `workspace`, `content_digest`) prüft auch
+  Elixir nur auf ihre Form; an den Call bindet allein `call_hash` (#655).
 - **JSON-Schicht ausführbar, nicht bewiesen.** `Json.lean` und
   `Sha256.lean` sind ausführbare Spezifikationen, die der Differenztest am
   Elixir-Code hält; Sätze über sie gibt es nicht. Gleitkommazahlen druckt
@@ -278,16 +285,18 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   der Vergleich mit `contextError`, für `Registry.compile/1` niemand,
   ebenso dessen Fehlercodes. Für `verify` ist jeder Eingabefehler nach
   einer kompilierten Registry modelliert (Intent, Snapshot, Kohärenz,
-  Snapshot-Voraussetzung der Ausgaberegeln (#628), Beweisbaum), für
-  `derive` nur `unknown_environment` und #628; Fälle mit einem anderen
-  Eingabefehler lassen die übrigen Vergleiche weg. Wo Elixir außerhalb des
+  Snapshot-Voraussetzung der Ausgaberegeln (#628), Beweisbaum), ebenso
+  für `derive` (Intent, `unsupported`, Snapshot, Kohärenz, #628, im
+  Freigabe-Zweig dazu die Schemata von Freigabe und Stand) und für
+  `advance` (Stand und Vorschlag). Wo Elixir außerhalb des
   Bereichs abstürzen würde, etwa bei einem Ausdruck außerhalb von B.4,
   verweigert das Modell (`missing_operation_rule`).
 - **Die Brücke ist unbewiesen.** `KomkiSpec/Bridge.lean` liest die Fälle
-  mit Leans eigenem JSON-Parser ins Modell ein; nur `cli-batch` und
-  `json-batch` lesen die Dateibytes mit `Json.lean`. Gleitkommazahlen hält
-  sie von Ganzzahlen getrennt, so wie `verify.ex` behauptete Ausdrücke
-  strikt vergleicht (#626).
+  mit dem strengen Parser aus `Json.lean` ins Modell ein, `cli-batch` und
+  `json-batch` auch die Dateibytes. Gleitkommazahlen hält er von
+  Ganzzahlen getrennt, auch in e-Schreibweise wie `1.0e3`, so wie
+  `JSON.parse/1` und `verify.ex`, das behauptete Ausdrücke strikt
+  vergleicht (#626).
 
 ## Lizenzen
 
