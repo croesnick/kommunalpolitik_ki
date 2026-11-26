@@ -26,6 +26,8 @@ structure Registry where
   /-- Environment → observers, sorted. -/
   environments : List (String × List String)
   bindings : List (String × Binding)
+  /-- `transformations`: id → (input labels, output labels), sorted by id (§ 2.1). -/
+  transformations : List (String × List String × List String) := []
 
 structure Snapshot where
   snapshotId : String

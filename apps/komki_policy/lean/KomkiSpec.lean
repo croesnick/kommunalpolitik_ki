@@ -11,3 +11,5 @@ import KomkiSpec.Domain
 import KomkiSpec.Release
 import KomkiSpec.ReleaseSound
 import KomkiSpec.CatalogSound
+import KomkiSpec.Remedies
+import KomkiSpec.RemediesSound

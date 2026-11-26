@@ -23,6 +23,10 @@ open KomkiSpec
 #print axioms advance_cas
 #print axioms catalog_aktion_effective
 #print axioms catalog_offenlegung_effective
+#print axioms catalog_ascending
+#print axioms derive_deny_remedied
+#print axioms derive_indeterminate_remedied
+#print axioms release_remedied
 #print axioms eval_mono
 #print axioms recipients_antitone
 #print axioms permitted_antitone

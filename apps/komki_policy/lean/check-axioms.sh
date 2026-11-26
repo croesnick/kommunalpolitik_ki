@@ -13,7 +13,8 @@ printf '%s\n' "$out"
 for theorem in verify_sound verify_sound_rfc derivable_permitted handover_within_admitted \
   verify_emit_assigns derive_sound derive_complete derive_permit_stable derive_deny_stable \
   derive_verifies aktion_permit offenlegung_permit release_single_use advance_cas \
-  catalog_aktion_effective catalog_offenlegung_effective \
+  catalog_aktion_effective catalog_offenlegung_effective catalog_ascending \
+  derive_deny_remedied derive_indeterminate_remedied release_remedied \
   eval_mono recipients_antitone permitted_antitone no_forbidden_recipient; do
   if ! printf '%s\n' "$out" | grep -q "^'KomkiSpec\.$theorem' "; then
     echo "Axioms.lean gibt den Hauptsatz $theorem nicht aus." >&2

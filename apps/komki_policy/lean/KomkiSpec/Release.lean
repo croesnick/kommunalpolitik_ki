@@ -6,8 +6,8 @@ import KomkiSpec.Derive
 Mirrors `KomkiPolicy.Derive.decide_with_release/5` (Aktionsfreigabe § 4.6,
 Offenlegungsfreigabe § 4.9), `KomkiPolicy.Stand.advance/2` (§ 2.7) and the
 GO part of `KomkiPolicy.Remedies.catalog/3` (§ 2.8): which finding offers
-which GO. The other transitions of the catalog (`fakt_nachreichen`,
-`registrierte_transformation`, `neuer_raum`) are not modelled.
+which GO (`catalogGos`, which the catalog theorems are about). The whole
+catalog is `catalog` in `Remedies.lean`.
 
 The call hash is SHA-256 over the call (§ 2.6). The model takes the hash of
 the decided call as a parameter `callHash`; the theorems hold for every
@@ -241,6 +241,8 @@ structure CatalogCtx where
   ziellabel : List String
   /-- Only for `release`: the kind of the presented release. -/
   releaseKind : Option String := none
+  /-- λ(x) for `admit`, `[]` otherwise (`remedies_context/2`). -/
+  objectLabels : List String := []
 
 /-- `remedies_context/2` of the normal branch. -/
 def normalCatalogCtx (Γ : Registry) (S : Snapshot) (rule callHash : String) : CatalogCtx :=
@@ -248,7 +250,8 @@ def normalCatalogCtx (Γ : Registry) (S : Snapshot) (rule callHash : String) : C
   { rule, callHash := if outputOperations.contains rule then some callHash else none,
     objectRef := S.objectRef, checked := checkedLabel rule S, rho := actualRecipients Γ S,
     observersProven := factState S "environment_observers_complete" == .true,
-    ausgabeart := art, ziellabel := (art.bind ausgabeartZiellabel).getD [] }
+    ausgabeart := art, ziellabel := (art.bind ausgabeartZiellabel).getD [],
+    objectLabels := if rule == "admit" then S.objectLabels else [] }
 
 /-- `regular_transitions/4` and `release_transitions/2`, GO entries only. -/
 def regularGos (c : CatalogCtx) (code : String) : List Go :=

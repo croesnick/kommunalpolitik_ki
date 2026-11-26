@@ -1,8 +1,8 @@
 # Lean-Spezifikation von komki_policy
 
 Formales Modell der Policy-Engine in Lean 4: `derive` mit normalem Zweig
-und Freigabe-Zweigen, `verify`, die GO-Angebote des Remedy-Katalogs und
-der Standübergang `advance`, mit Beweisen ihrer Korrektheit für die
+und Freigabe-Zweigen, `verify`, der Remedy-Katalog, der Auswerter und der
+Standübergang `advance`, mit Beweisen ihrer Korrektheit für die
 Regelzweige `admit`, `emit`, `store` und `transfer` (Tickets #625, #629).
 Der Elixir-Code wird per Differenztest gegen das bewiesene Lean-Modell
 gehalten, ein Pin meldet jede Änderung an den gespiegelten Modulen. Die
@@ -25,6 +25,8 @@ CI.
 | `release_single_use` | Ist der Verbrauch committet, erlaubt dieselbe Freigabe nie wieder, an keinem späteren Stand | CONTRACT.md § 2.7, B.8 |
 | `advance_cas` | Von zwei Vorschlägen für denselben Stand committet höchstens einer | CONTRACT.md § 2.7 |
 | `catalog_aktion_effective`, `catalog_offenlegung_effective` | Bietet der Katalog einer Ablehnung des normalen Zweigs ein GO für den exakten Call an, erlaubt der Freigabe-Zweig eine Freigabe genau nach diesem Angebot | CONTRACT.md § 2.8, #631 |
+| `catalog_ascending` | In jedem Eintrag des Katalogs stehen die Fortsetzungen in der normativen Ordnung: kein GO vor einer Fortsetzung, die nichts verletzt | CONTRACT.md § 2.8 |
+| `derive_deny_remedied`, `derive_indeterminate_remedied`, `release_remedied` | Jeder Blocker und jeder fehlende Beleg von `derive`, auch im Freigabe-Zweig, bekommt mindestens eine Fortsetzung, kein nacktes `deny` | CONTRACT.md § 2.8, APPA Theorem 5 |
 | `eval_mono` | Mehr Fakten kippen kein bekanntes Urteil des dreiwertigen Auswerters | R.5.2, CONTRACT.md § 3 |
 | `recipients_antitone`, `permitted_antitone` | Mehr Bindungen, nie mehr Empfänger; Erlaubt vererbt sich auf Teilmengen | A.2 |
 | `no_forbidden_recipient` | Ohne Lockerung erreicht nichts, was von x abhängt, einen Beobachter außerhalb von R_Γ(λ(x)) | Kern von A.3: nur die Labels, ohne Schrittmodell |
@@ -97,8 +99,10 @@ Für `derive` vergleicht er die Entscheidung über denselben Welten und den
 Fixtures: Urteil, Prüflabel, Blocker samt `condition` und
 `recipients_outside`, fehlende Belege, den ganzen Beweisbaum,
 `assigned_label`, `content_digest`, dazu `unsupported` und die Eingabefehler
-aus #628, und von den Remedies die GO-Angebote je Befund. Nicht verglichen
-werden die Echos der Eingabe und die übrigen Fortsetzungen.
+aus #628, und den ganzen Remedy-Katalog: je Befund alle Fortsetzungen in
+ihrer Ordnung samt Payload (Fakt, Transformation, `required_bindings`,
+`required_recipients`, Call-Hash). Nicht verglichen werden nur die Echos
+der Eingabe.
 
 Für die Freigabe-Zweige vergleicht er dasselbe samt geplantem Verbrauch
 (`release`), über den Fixtures mit Freigabe und je Welt drei Varianten
@@ -108,14 +112,18 @@ passender oder falscher Ausgabeart und Ziellabel). Für `advance` vergleicht
 er den nächsten Stand oder den Ablehnungsgrund, auch für die Wiederholung
 nach einem Commit.
 
+Den Auswerter vergleicht er auch direkt: die Grenzfälle aus
+`priv/fixtures/expressions/evaluate_expectations.json` und 8 000
+generierte Ausdrücke über generierten Fakten, Urteil gegen Urteil.
+
 Ein weiterer Test prüft in Elixir, was `catalog_*_effective` für das Modell
 beweist: Jedes angebotene GO für den exakten Call wird zu einer Freigabe
 mit frischer Nonce, und der Freigabe-Zweig muss erlauben.
 
 `KOMKI_SPEC_SEED` und `KOMKI_SPEC_RUNS` erweitern die Suche. Eine Abweichung
 schreibt ihre Fälle als JSONL-Datei; `komki-spec verify-batch`,
-`derive-batch`, `release-batch` beziehungsweise `advance-batch` spielt sie
-nach.
+`derive-batch`, `release-batch`, `advance-batch` beziehungsweise
+`eval-batch` spielt sie nach.
 
 ## Synchron halten
 
@@ -126,7 +134,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | Elixir | Lean |
 |---|---|
 | `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige) |
-| `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (nur die GO-Angebote) |
+| `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
@@ -148,9 +156,12 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 
 ## Grenzen
 
-- **Vom Remedy-Katalog nur die GO-Angebote.** Welche Fortsetzung ein
-  Befund ohne GO bekommt (`fakt_nachreichen`, `registrierte_transformation`,
-  `neuer_raum`), modelliert die Spezifikation nicht.
+- **Vom Remedy-Katalog sind Wirksamkeit, Ordnung und Vollständigkeit
+  bewiesen,** nicht die Payloads der übrigen Fortsetzungen; die hält der
+  Differenztest am Elixir-Code. Die Wirksamkeitssätze sprechen über
+  `catalogGos` (`Release.lean`), Ordnung und Vollständigkeit über `catalog`
+  (`Remedies.lean`). Dass beide auf den GO-Einträgen übereinstimmen, zeigt
+  nur der Differenztest, der beide mit Elixir vergleicht; ein Satz fehlt.
 - **Katalogsätze nur für den normalen Zweig.** `catalog_*_effective` gilt
   für die GO-Angebote einer Ablehnung im normalen Zweig. Dass ein erneutes
   Angebot nach einer Ablehnung im Freigabe-Zweig wirkt, prüft nur der

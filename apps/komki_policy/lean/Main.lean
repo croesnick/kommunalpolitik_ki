@@ -11,7 +11,8 @@ with `derive`'s decision, or `<id> error <reason>`.
 
 `komki-spec release-batch` and `advance-batch`: the same for
 `decide_with_release/5` (`{…, "release", "stand", "call_hash"}`) and for
-`Stand.advance/2` (`{"id", "stand", "proposal"}`).
+`Stand.advance/2` (`{"id", "stand", "proposal"}`); `eval-batch` for
+`Evaluator.evaluate/2` (`{"id", "expression", "facts"}`).
 
 `komki-spec constants`: the fixed tables of the model, for the comparison
 with `KomkiPolicy.Derive`.
@@ -49,9 +50,10 @@ def main : List String → IO UInt32
   | ["derive-batch", path] => runBatch (fun j => (deriveCase j).map (·.compress)) path
   | ["release-batch", path] => runBatch (fun j => (releaseCase j).map (·.compress)) path
   | ["advance-batch", path] => runBatch (fun j => (advanceCase j).map (·.compress)) path
+  | ["eval-batch", path] => runBatch (fun j => (evalCase j).map (·.compress)) path
   | ["constants"] => do
     IO.println constants.compress
     return 0
   | _ => do
-    IO.eprintln "usage: komki-spec verify-batch|derive-batch|release-batch|advance-batch <cases.jsonl> | komki-spec constants"
+    IO.eprintln "usage: komki-spec verify-batch|derive-batch|release-batch|advance-batch|eval-batch <cases.jsonl> | komki-spec constants"
     return 2

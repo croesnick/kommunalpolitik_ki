@@ -17,7 +17,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   use ExUnit.Case, async: false
   use ExUnitProperties
 
-  alias KomkiPolicy.{Calculus, Derive, Registry, Release, Stand, Verify}
+  alias KomkiPolicy.{Calculus, Derive, Evaluator, Registry, Release, Stand, Verify}
 
   @moduletag :lean_spec
   @moduletag timeout: 600_000
@@ -44,8 +44,9 @@ defmodule KomkiPolicy.LeanSpecTest do
   @modelled_input_errors [:emit_digest_missing, :emit_object_not_classified]
   @derive_input_errors [:unknown_environment | @modelled_input_errors]
   @decision_fields ~w(decision rule checked_label blockers missing_evidence proof
-                      assigned_label content_digest)
-  @release_fields ~w(decision rule checked_label blockers release content_digest assigned_label)
+                      assigned_label content_digest remedies)
+  @release_fields ~w(decision rule checked_label blockers release content_digest assigned_label
+                     remedies)
   # Release variants: one wrong field each, or a window on its edge. Both
   # ends belong to the window (§ 4.6 step 3: valid_from ≤ as_of ≤ valid_until).
   @release_changes %{
@@ -229,6 +230,31 @@ defmodule KomkiPolicy.LeanSpecTest do
     IO.puts("\nlean_spec advance: #{inspect(stats)}")
     assert Map.get(stats, {"advance", "ok"}, 0) >= 200
     assert Map.get(stats, {"advance", "refused"}, 0) >= 200
+  end
+
+  test "Auswerter: Evaluator und das Lean-Modell werten gleich aus" do
+    corpus =
+      for c <- fixture("expressions/evaluate_expectations.json")["cases"],
+          do: {c["expression"], c["facts"]}
+
+    generated = seeded_list(StreamData.tuple({expr_gen(), facts_gen()}))
+
+    pairs =
+      for {expression, facts} <- corpus ++ generated do
+        line = %{
+          "expression" => expression,
+          "facts" => facts,
+          "intent" => %{"operation" => "eval"}
+        }
+
+        {line, %{"verdict" => to_string(Evaluator.evaluate(expression, facts))}}
+      end
+
+    compare_json!(pairs, "eval-batch", "eval", "Evaluator.evaluate/2 und dem Lean-Auswerter")
+    verdicts = Enum.frequencies_by(pairs, fn {_, result} -> result["verdict"] end)
+    IO.puts("\nlean_spec eval: #{inspect(verdicts)}")
+
+    for verdict <- ~w(true false unknown), do: assert(Map.get(verdicts, verdict, 0) >= 500)
   end
 
   # Not a comparison with Lean, but the property the Lean theorem states
@@ -419,8 +445,8 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
-  # The GO offers of a catalog, per finding (§ 2.8); the other transitions
-  # are not modelled.
+  # The GO offers of a catalog, per finding (§ 2.8): `catalogGos`, which the
+  # Lean theorems are about. The whole catalog is compared as `remedies`.
   defp gos(nil), do: nil
 
   defp gos(remedies) do
@@ -430,7 +456,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   end
 
   # The fields of a decision the Lean model decides: everything but the
-  # echoes of the input and, of the remedies, all but the GO offers.
+  # echoes of the input.
   defp elixir_decision(registry, snapshot, intent) do
     case Derive.decide(registry, snapshot, intent) do
       {:ok, decision} ->
@@ -1072,7 +1098,8 @@ defmodule KomkiPolicy.LeanSpecTest do
     gen all(
           observers <- subset_gen(@observers, 1),
           environments <- keyed_gen(@environments, fn -> subset_gen(observers, 1) end),
-          bindings <- keyed_gen(@bindings, fn -> binding_gen(observers) end)
+          bindings <- keyed_gen(@bindings, fn -> binding_gen(observers) end),
+          transformations <- transformations_gen(Enum.map(bindings, &elem(&1, 0)))
         ) do
       %{
         "schema" => "komki-registry/2",
@@ -1080,9 +1107,25 @@ defmodule KomkiPolicy.LeanSpecTest do
         "observers" => observers,
         "fact_fields" => @fact_fields,
         "environments" => Map.new(environments, fn {id, obs} -> {id, %{"observers" => obs}} end),
-        "bindings" => Map.new(bindings)
+        "bindings" => Map.new(bindings),
+        "transformations" => Map.new(transformations)
       }
     end
+  end
+
+  # Registered label transitions (§ 2.1): inputs non-empty, outputs may be empty.
+  defp transformations_gen(binding_ids) do
+    ids = Enum.sort(binding_ids)
+
+    transformation =
+      StreamData.tuple(
+        {StreamData.member_of(~w(t-a@1 t-b@1 t-c@1)), subset_gen(ids, 1), subset_gen(ids, 0)}
+      )
+
+    StreamData.map(StreamData.list_of(transformation, max_length: 2), fn ts ->
+      for {id, input, output} <- Enum.uniq_by(ts, &elem(&1, 0)),
+          do: {id, %{"input_labels" => input, "output_labels" => output}}
+    end)
   end
 
   # A non-empty subset of `ids`, each paired with its own generated value.
