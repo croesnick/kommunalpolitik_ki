@@ -26,6 +26,7 @@ open KomkiSpec
 #print axioms catalog_gos
 #print axioms release_catalog_aktion_effective
 #print axioms release_catalog_offenlegung_effective
+#print axioms release_catalog_offenlegung_grantable
 #print axioms release_remedies_aktion_effective
 #print axioms release_remedies_offenlegung_effective
 #print axioms remedies_aktion_effective

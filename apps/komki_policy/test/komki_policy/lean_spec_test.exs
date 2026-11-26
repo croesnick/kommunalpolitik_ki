@@ -505,19 +505,20 @@ defmodule KomkiPolicy.LeanSpecTest do
     offers =
       (for(
          {_, compiled, snapshot, intent} <- normal,
-         do: {compiled, snapshot, intent, Derive.decide(compiled, snapshot, intent)}
+         do: {:normal, compiled, snapshot, intent, Derive.decide(compiled, snapshot, intent)}
        ) ++
          for(
            {_, compiled, snapshot, intent, result} <- released,
-           do: {compiled, snapshot, intent, result}
+           do: {:release, compiled, snapshot, intent, result}
          ))
       |> Enum.flat_map(fn
-        {compiled, snapshot, intent, {:ok, %{"decision" => "deny", "remedies" => remedies}}} ->
+        {branch, compiled, snapshot, intent,
+         {:ok, %{"decision" => "deny", "remedies" => remedies}}} ->
           for entry <- remedies,
               go <- entry["transitions"],
               go["type"] in ~w(aktionsfreigabe offenlegungsfreigabe),
               go["scope"] == "call",
-              do: {compiled, snapshot, intent, go}
+              do: {branch, compiled, snapshot, intent, go}
 
         _ ->
           []
@@ -525,18 +526,23 @@ defmodule KomkiPolicy.LeanSpecTest do
       |> Enum.uniq()
 
     failing =
-      for {compiled, snapshot, intent, go} <- offers,
+      for {_, compiled, snapshot, intent, go} <- offers,
           release = release_from_offer(compiled, snapshot, intent, go),
           result = Derive.decide_with_release(compiled, snapshot, intent, release, @stand),
           not match?({:ok, %{"decision" => "permit"}}, result),
           do: {go, snapshot, intent, result}
 
-    counts = Enum.frequencies_by(offers, fn {_, _, _, go} -> go["type"] end)
+    counts = Enum.frequencies_by(offers, fn {branch, _, _, _, go} -> {branch, go["type"]} end)
     IO.puts("\nlean_spec GO-Angebote: #{inspect(counts)}")
 
     assert failing == [], "Angebot wirkt nicht: #{inspect(Enum.take(failing, 2), limit: 8)}"
-    assert Map.get(counts, "aktionsfreigabe", 0) >= 200
-    assert Map.get(counts, "offenlegungsfreigabe", 0) >= 5
+
+    # Each branch on its own: offers after a denied release must not hide
+    # behind the normal branch's.
+    for branch <- [:normal, :release],
+        {type, min} <- [{"aktionsfreigabe", 1_000}, {"offenlegungsfreigabe", 10}] do
+      assert Map.get(counts, {branch, type}, 0) >= min, "zu wenige #{type}-Angebote (#{branch})"
+    end
   end
 
   # ---------------------------------------------------------------------

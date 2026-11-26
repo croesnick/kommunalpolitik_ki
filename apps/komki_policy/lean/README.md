@@ -27,7 +27,8 @@ CI.
 | `release_single_use` | Ist der Verbrauch committet, erlaubt dieselbe Freigabe nie wieder, an keinem späteren Stand | CONTRACT.md § 2.7, B.8 |
 | `advance_cas` | Von zwei Vorschlägen für denselben Stand committet höchstens einer | CONTRACT.md § 2.7 |
 | `catalog_aktion_effective`, `catalog_offenlegung_effective` | Bietet der Katalog einer Ablehnung des normalen Zweigs ein GO für den exakten Call an, erlaubt der Freigabe-Zweig eine Freigabe genau nach diesem Angebot | CONTRACT.md § 2.8, #631 |
-| `release_catalog_*_effective`, `release_remedies_*_effective` | Ebenso nach einer Ablehnung im Freigabe-Zweig: Das erneute GO, das der Katalog anbietet, wirkt mit frischer Nonce, passendem Fenster und befugter Autorität | CONTRACT.md § 2.8, § 4.6, § 4.9 |
+| `release_catalog_*_effective`, `release_remedies_*_effective` | Ebenso nach einer Ablehnung im Freigabe-Zweig: Das erneute GO, das der Katalog anbietet, wirkt an jedem Stand mit dort frischer Nonce, passendem Fenster und einem Beobachter als Autorität, der jede nötige Befugnis hat | CONTRACT.md § 2.8, § 4.6, § 4.9 |
+| `release_catalog_offenlegung_grantable` | Und jemand kann es annehmen: Bietet der Katalog nach einer abgelehnten Offenlegungsfreigabe ein GO an, gibt es einen Beobachter, dessen Freigabe erlaubt wird | CONTRACT.md § 2.8 |
 | `catalog_gos` | Die GO-Angebote des ganzen Katalogs (`catalog`) sind Eintrag für Eintrag die, über die die Wirksamkeitssätze sprechen (`catalogGos`), für jeden Befund, den `derive` meldet | CONTRACT.md § 2.8 |
 | `remedies_aktion_effective`, `remedies_offenlegung_effective` | Daraus: Jedes GO, das ein Eintrag des ganzen Katalogs einer Ablehnung des normalen Zweigs anbietet, wirkt | CONTRACT.md § 2.8 |
 | `catalog_ascending` | In jedem Eintrag des Katalogs stehen die Fortsetzungen in der normativen Ordnung: kein GO vor einer Fortsetzung, die nichts verletzt | CONTRACT.md § 2.8 |
