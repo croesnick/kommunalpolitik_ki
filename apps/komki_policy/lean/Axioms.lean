@@ -9,7 +9,9 @@ open KomkiSpec
 
 #print axioms verify_sound
 #print axioms verify_sound_rfc
-#print axioms admitDerivable_permitted
+#print axioms derivable_permitted
+#print axioms handover_within_admitted
+#print axioms verify_emit_assigns
 #print axioms eval_mono
 #print axioms recipients_antitone
 #print axioms permitted_antitone

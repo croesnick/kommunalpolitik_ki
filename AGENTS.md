@@ -133,7 +133,7 @@ Pro Tool unter `tools/`: `uv sync`, `uv run ruff check`, `uv run ruff format --c
 
 ### Lean
 
-Die Lean-Spezifikation unter `apps/komki_policy/lean/` beweist `verify` für `admit` und gleicht den Elixir-Prüfer per Differenztest ab. Sie ist ein Prüforakel, kein Tool im Sinne von § 1 (GO in #625). Ändert ein PR ein Modul, das `apps/komki_policy/lean/SYNC.sha256` pinnt, zieht er das Lean-Modell nach: [README](apps/komki_policy/lean/README.md).
+Die Lean-Spezifikation unter `apps/komki_policy/lean/` beweist `verify` für `admit`, `emit`, `store` und `transfer` und gleicht den Elixir-Prüfer per Differenztest ab. Sie ist ein Prüforakel, kein Tool im Sinne von § 1 (GO in #625). Ändert ein PR ein Modul, das `apps/komki_policy/lean/SYNC.sha256` pinnt, zieht er das Lean-Modell nach: [README](apps/komki_policy/lean/README.md).
 
 ### Versionen
 

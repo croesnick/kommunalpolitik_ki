@@ -6,15 +6,16 @@ defmodule KomkiPolicy.LeanSpecTest do
   # excluded by default, run with `mix test --only lean_spec`.
   #
   # Only cases inside the validated domain are compared: Elixir has to
-  # return a verdict, an input error drops the case. Within that domain,
-  # every verdict has to match. KOMKI_SPEC_SEED and KOMKI_SPEC_RUNS widen
+  # return a verdict or one of the modelled input errors (the snapshot
+  # prerequisites of the output rules, #628); any other input error drops
+  # the case. Within that domain, every verdict has to match. KOMKI_SPEC_SEED and KOMKI_SPEC_RUNS widen
   # the search; a mismatch writes its cases to a JSONL file for replay with
   # `komki-spec verify-batch`.
 
   use ExUnit.Case, async: false
   use ExUnitProperties
 
-  alias KomkiPolicy.{Derive, Registry, Verify}
+  alias KomkiPolicy.{Calculus, Derive, Registry, Verify}
 
   @moduletag :lean_spec
   @moduletag timeout: 600_000
@@ -28,40 +29,44 @@ defmodule KomkiPolicy.LeanSpecTest do
   @base_facts ~w(has_operation_right has_object_access_right audit_path_ready environment_observers_complete)
   @fact_fields %{
     "count" => "integer",
+    "output_content_digest" => "string",
     "purpose" => "string",
     "scope" => "boolean",
     "tags" => "string_set"
   }
   @purposes ~w(antwort mandat recherche)
   @tags ~w(x y z)
-  @claim_fields ~w(object_labels checked_label actual_recipients allowed_recipients fact_refs)
-
-  @intent %{
-    "schema" => "komki-intent/1",
-    "intent_id" => "intent-drt",
-    "operation" => "admit",
-    "object" => "obj-drt@v1",
-    "workspace" => "ws-drt"
-  }
+  @claim_fields ~w(object_labels checked_label actual_recipients allowed_recipients fact_refs
+                   assigned_label workspace_bindings)
+  @modelled_input_errors [:emit_digest_missing, :emit_object_not_classified]
 
   test "Lean-Tabellen entsprechen Derive" do
     {out, 0} = System.cmd(spec_bin(), ["constants"])
     {:ok, constants} = KomkiPolicy.JSON.parse(String.trim(out))
 
-    assert constants["admit_premises"] == Derive.required_premises("admit")
     assert constants["proof_rules"] == Derive.proof_rules()
+    assert constants["output_operations"] == Derive.output_operations()
+    assert constants["handover_operations"] == Derive.handover_operations()
 
-    # Verify.lean takes B_W as the checked label of admit, never λ(x).
-    assert Derive.checked_label("admit", %{"bindings" => ["b-eins@1"]}, %{
-             "labels" => ["b-zwei@1"]
-           }) ==
-             ["b-eins@1"]
+    for rule <- Derive.proof_rules() do
+      assert constants["required_premises"][rule] == Derive.required_premises(rule)
+    end
+
+    # Verify.lean takes B_W as the checked label of admit and emit, λ(y) of
+    # store and transfer.
+    workspace = %{"bindings" => ["b-eins@1"]}
+    object = %{"labels" => ["b-eins@1", "b-zwei@1"]}
+
+    for rule <- Derive.proof_rules() do
+      expected = if rule in Derive.handover_operations(), do: object["labels"], else: ["b-eins@1"]
+      assert Derive.checked_label(rule, workspace, object) == expected
+    end
   end
 
   test "Fixture-Korpus: Elixir und Lean urteilen gleich" do
     raw = fixture("registry.json")
     {:ok, registry} = Registry.compile(raw)
-    worlds = admit_fixture_worlds()
+    worlds = fixture_worlds()
 
     proofs =
       fixture_proofs() ++
@@ -77,8 +82,9 @@ defmodule KomkiPolicy.LeanSpecTest do
 
     stats = compare!(cases, "korpus")
 
-    assert stats.valid >= 2
-    assert stats.invalid >= 100
+    assert stats.valid >= 6
+    assert stats.invalid >= 500
+    assert stats.input_error >= 6
   end
 
   test "Generierte Welten und geschmiedete Bäume: Elixir und Lean urteilen gleich" do
@@ -98,8 +104,11 @@ defmodule KomkiPolicy.LeanSpecTest do
     stats = compare!(cases, "generator")
     IO.puts("\nlean_spec seed=#{seed} runs=#{runs}: #{inspect(stats)}")
 
-    assert stats.valid >= 600
-    assert stats.invalid >= 7_000
+    assert stats.input_error >= 200
+
+    for rule <- Derive.proof_rules() do
+      assert stats.valid_by_rule[rule] >= 150, "zu wenige gültige #{rule}-Bäume"
+    end
   end
 
   # ---------------------------------------------------------------------
@@ -112,7 +121,7 @@ defmodule KomkiPolicy.LeanSpecTest do
       |> Enum.map(fn {raw, registry, snapshot, intent, proof} ->
         {raw, snapshot, intent, proof, elixir_verdict(registry, snapshot, intent, proof)}
       end)
-      |> Enum.reject(fn {_, _, _, _, verdict} -> verdict == :input_error end)
+      |> Enum.reject(fn {_, _, _, _, verdict} -> verdict == :dropped end)
       |> Enum.with_index()
 
     lean = lean_verdicts(judged)
@@ -124,18 +133,26 @@ defmodule KomkiPolicy.LeanSpecTest do
 
     report_mismatches!(mismatches, label)
 
+    count = fn verdict -> Enum.count(judged, fn {{_, _, _, _, v}, _} -> v == verdict end) end
+
     %{
       compared: length(judged),
       dropped: length(cases) - length(judged),
-      valid: Enum.count(judged, fn {{_, _, _, _, v}, _} -> v == "valid" end),
-      invalid: Enum.count(judged, fn {{_, _, _, _, v}, _} -> v == "invalid" end)
+      valid: count.("valid"),
+      invalid: count.("invalid"),
+      input_error: count.("input_error"),
+      valid_by_rule:
+        judged
+        |> Enum.filter(fn {{_, _, _, _, v}, _} -> v == "valid" end)
+        |> Enum.frequencies_by(fn {{_, _, _, proof, _}, _} -> proof["rule"] end)
     }
   end
 
   defp elixir_verdict(registry, snapshot, intent, proof) do
     case Verify.check(registry, snapshot, intent, proof) do
       {:ok, %{"result" => result}} -> result
-      {:error, _} -> :input_error
+      {:error, %{code: code}} when code in @modelled_input_errors -> "input_error"
+      {:error, _} -> :dropped
     end
   end
 
@@ -221,12 +238,12 @@ defmodule KomkiPolicy.LeanSpecTest do
     term
   end
 
-  defp admit_fixture_worlds do
+  defp fixture_worlds do
     for dir <- File.ls!(@fixtures_dir),
         File.exists?(Path.join([@fixtures_dir, dir, "snapshot.json"])),
         File.exists?(Path.join([@fixtures_dir, dir, "intent.json"])),
         intent = fixture(Path.join(dir, "intent.json")),
-        intent["operation"] == "admit" do
+        intent["operation"] in Derive.proof_rules() do
       {fixture(Path.join(dir, "snapshot.json")), intent}
     end
   end
@@ -246,8 +263,31 @@ defmodule KomkiPolicy.LeanSpecTest do
   end
 
   # The forged trees of the audit, built as in verify_test.exs. verify.ex
-  # before ed7c4574 accepts them; the Lean verifier never does.
+  # before ed7c4574 accepts them; the Lean verifier never does. Then the
+  # output trees on a snapshot outside the rule's domain (#628).
   defp audit_attacks do
+    forged_trees() ++ off_domain_trees()
+  end
+
+  defp off_domain_trees do
+    {:ok, registry} = Registry.compile(fixture("registry.json"))
+
+    for dir <- ~w(case_emit_permit case_store_permit case_transfer_permit),
+        snapshot = fixture(dir <> "/snapshot.json"),
+        intent = fixture(dir <> "/intent.json"),
+        broken <- off_domain(snapshot) do
+      {broken, intent, derived_proof(registry, snapshot, intent)}
+    end
+  end
+
+  defp off_domain(snapshot) do
+    [
+      put_in(snapshot, ["object", "classification"], "quarantine"),
+      update_in(snapshot, ["facts"], &Map.delete(&1, "output_content_digest"))
+    ]
+  end
+
+  defp forged_trees do
     permit = fixture("case_permit/snapshot.json")
     permit_intent = fixture("case_permit/intent.json")
     permit_proof = fixture("case_permit/proof_valid.json")
@@ -288,26 +328,36 @@ defmodule KomkiPolicy.LeanSpecTest do
   # Generated worlds: a registry, two snapshots over it, tree mutations
   # ---------------------------------------------------------------------
 
-  # Cases per world: the honest tree, the same tree against the second
-  # snapshot (a proof from another world), trees from a repaired snapshot
-  # (all base facts true, #480) and from a registry where every binding has
-  # an admit rule (#477); each tree also with float literals (#626) and
-  # mutated.
-  defp world_cases({raw, snapshot, other, mutations}) do
+  # Cases per world: every tree in the world it comes from, in a second
+  # snapshot (a proof from another world), mutated, with float literals
+  # (#626), off its rule's domain (#628) and, for store and transfer, under
+  # the other handover rule. Trees come from the snapshot, from a repaired
+  # snapshot (base facts true, labels fitting the rule, #480) and from a
+  # registry where every binding has every rule (#477).
+  defp world_cases({raw, op, snapshot, other, mutations}) do
     with {:ok, registry} <- Registry.compile(raw),
-         {:ok, ruled} <- Registry.compile(with_admit_rules(raw)) do
-      trees =
+         {:ok, ruled} <- Registry.compile(with_all_rules(raw)) do
+      fixed = repaired(snapshot, op)
+
+      sources =
         [
-          derived_proof(registry, snapshot, @intent),
-          derived_proof(registry, repaired(snapshot), @intent),
-          derived_proof(ruled, repaired(snapshot), @intent)
+          {snapshot, derived_proof(registry, snapshot, intent(op))},
+          {fixed, derived_proof(registry, fixed, intent(op))},
+          {fixed, derived_proof(ruled, fixed, intent(op))}
         ]
-        |> Enum.reject(&is_nil/1)
+        |> Enum.reject(fn {_, tree} -> is_nil(tree) end)
         |> Enum.uniq()
 
-      for tree <- trees,
-          {target, proof} <- tree_cases(tree, snapshot, other, mutations),
-          do: {raw, registry, target, @intent, proof}
+      cases =
+        for {source, tree} <- sources,
+            {target, target_intent, proof} <- tree_cases(tree, op, source, other, mutations),
+            do: {raw, registry, target, target_intent, proof}
+
+      mirrored =
+        for target <- [snapshot, other, fixed],
+            do: {raw, registry, target, intent(op), mirrored_tree(registry, target, op)}
+
+      cases ++ mirrored
     else
       {:error, _} -> []
     end
@@ -315,45 +365,204 @@ defmodule KomkiPolicy.LeanSpecTest do
 
   # The float variant only where it differs (strictly: `3.0 != 3` is false
   # in Elixir); a tree without integer literals would count twice as valid.
-  defp tree_cases(tree, snapshot, other, mutations) do
+  defp tree_cases(tree, op, source, other, mutations) do
     floated = mutate(:floatify, tree)
 
-    [{snapshot, tree}, {other, tree}, {snapshot, Enum.reduce(mutations, tree, &mutate/2)}] ++
-      if floated !== tree, do: [{snapshot, floated}], else: []
+    [
+      {source, intent(op), tree},
+      {other, intent(op), tree},
+      {source, intent(op), Enum.reduce(mutations, tree, &mutate/2)}
+    ] ++
+      if(floated !== tree, do: [{source, intent(op), floated}], else: []) ++
+      if(op in Derive.output_operations(),
+        do: for(broken <- off_domain(source), do: {broken, intent(op), tree}),
+        else: []
+      ) ++ handover_swap(tree, op, source) ++ claim_variants(tree, op, source)
   end
 
-  defp with_admit_rules(raw) do
+  # One claim field at a time, every premise that carries it: reversed with
+  # a duplicate (a set for assigned_label, exact everywhere else) and
+  # replaced by a foreign value. A random mutation rarely hits exactly one
+  # field of an otherwise valid tree.
+  defp claim_variants(tree, op, source) do
+    for key <- @claim_fields,
+        change <- [&scramble/1, &foreign/1],
+        variant = map_claims(tree, key, change),
+        variant != tree,
+        do: {source, intent(op), variant}
+  end
+
+  defp map_claims(tree, key, change) do
+    Map.update!(tree, "premises", fn premises ->
+      Enum.map(premises, &Map.replace_lazy(&1, key, change))
+    end)
+  end
+
+  defp foreign([]), do: ["b-eins@1"]
+  defp foreign(_list), do: []
+
+  # The strongest forger (#480): every premise of the rule present, every
+  # claimed value mirrored from the target world, a false fact as false.
+  # Valid exactly where the world itself is derivable.
+  defp mirrored_tree(registry, snapshot, op) do
+    workspace = snapshot["workspace"]
+    object = snapshot["object"]
+    checked = Derive.checked_label(op, workspace, object)
+
+    premises =
+      for name <- Derive.required_premises(op),
+          premise <- mirrored_premises(name, registry, snapshot, checked, op),
+          do: premise
+
+    %{
+      "schema" => "komki-proof/1",
+      "rule" => op,
+      "conclusion" => "permit",
+      "registry_ref" => registry.registry_id,
+      "snapshot_ref" => snapshot["snapshot_id"],
+      "intent_ref" => "intent-drt",
+      "checked_label" => checked,
+      "premises" => premises
+    }
+  end
+
+  defp mirrored_premises("binding_condition", registry, _snapshot, checked, op) do
+    for binding <- checked do
+      expr = Map.get(Map.fetch!(registry.bindings, binding).operations, op, true)
+
+      %{
+        "name" => "binding_condition",
+        "kind" => "condition",
+        "binding" => binding,
+        "expression" => expr,
+        "fact_refs" => Registry.expression_fact_refs(expr),
+        "value" => true
+      }
+    end
+  end
+
+  defp mirrored_premises(name, registry, snapshot, checked, _op) do
+    workspace = snapshot["workspace"]
+    computed = %{"name" => name, "kind" => "computed", "value" => true}
+
+    premise =
+      case name do
+        "not_quarantine" ->
+          %{
+            "name" => name,
+            "kind" => "object_check",
+            "value" => true,
+            "object" => "obj-drt@v1",
+            "classification" => "classified"
+          }
+
+        "workspace_contract_valid" ->
+          %{
+            "name" => name,
+            "kind" => "fact",
+            "fact" => name,
+            "value" => workspace["valid"],
+            "source" => "drt"
+          }
+
+        "label_inclusion" ->
+          Map.merge(computed, %{
+            "object_labels" => snapshot["object"]["labels"],
+            "checked_label" => checked
+          })
+
+        "label_assignment" ->
+          Map.merge(computed, %{"assigned_label" => checked, "checked_label" => checked})
+
+        "label_preservation" ->
+          Map.merge(computed, %{
+            "workspace_bindings" => workspace["bindings"],
+            "checked_label" => checked
+          })
+
+        "recipient_inclusion" ->
+          Map.merge(computed, %{
+            "actual_recipients" => Calculus.actual_recipients(registry, workspace["environment"]),
+            "allowed_recipients" => Calculus.allowed_recipients(registry, checked)
+          })
+
+        base_fact ->
+          %{
+            "name" => base_fact,
+            "kind" => "fact",
+            "fact" => base_fact,
+            "value" => get_in(snapshot, ["facts", base_fact, "value"]) != false,
+            "source" => "drt",
+            "source_kind" => "test"
+          }
+      end
+
+    [premise]
+  end
+
+  # store and transfer trees share one shape; a tree proves only its own rule.
+  defp handover_swap(tree, "store", source),
+    do: [{source, intent("transfer"), Map.put(tree, "rule", "transfer")}]
+
+  defp handover_swap(tree, "transfer", source),
+    do: [{source, intent("store"), Map.put(tree, "rule", "store")}]
+
+  defp handover_swap(_tree, _op, _source), do: []
+
+  defp intent(op) do
+    %{
+      "schema" => "komki-intent/1",
+      "intent_id" => "intent-drt",
+      "operation" => op,
+      "object" => "obj-drt@v1",
+      "workspace" => "ws-drt"
+    }
+  end
+
+  defp with_all_rules(raw) do
     Map.update!(raw, "bindings", fn bindings ->
       Map.new(bindings, fn {id, binding} ->
-        {id, update_in(binding, ["operations"], &Map.put_new(&1, "admit", true))}
+        {id,
+         update_in(binding, ["operations"], fn rules ->
+           Enum.reduce(Derive.proof_rules(), rules, &Map.put_new(&2, &1, true))
+         end)}
       end)
     end)
   end
 
-  defp repaired(snapshot) do
-    workspace = snapshot["workspace"]
-    labels = Enum.filter(snapshot["object"]["labels"], &(&1 in workspace["bindings"]))
+  # λ(x) ⊆ B_W for admit, B_W ⊆ λ(y) for store and transfer; emit reads no labels.
+  defp repaired(snapshot, op) do
+    bindings = snapshot["workspace"]["bindings"]
+    labels = snapshot["object"]["labels"]
+
+    fitting =
+      cond do
+        op == "admit" -> Enum.filter(labels, &(&1 in bindings))
+        op in Derive.handover_operations() -> Enum.sort(Enum.uniq(labels ++ bindings))
+        true -> labels
+      end
 
     facts =
-      Enum.reduce(@base_facts, snapshot["facts"], fn name, acc ->
-        Map.put(acc, name, entry(true))
-      end)
+      @base_facts
+      |> Enum.reduce(snapshot["facts"], fn name, acc -> Map.put(acc, name, entry(true)) end)
+      |> Map.put_new("output_content_digest", entry("digest-drt"))
 
     snapshot
     |> put_in(["workspace", "valid"], true)
     |> put_in(["object", "classification"], "classified")
-    |> put_in(["object", "labels"], labels)
+    |> put_in(["object", "labels"], fitting)
     |> Map.put("facts", facts)
   end
 
   defp world_gen do
     gen all(
           raw <- registry_gen(),
+          op <- StreamData.member_of(Derive.proof_rules()),
           snapshot <- snapshot_gen(raw),
           other <- snapshot_gen(raw),
           mutations <- StreamData.list_of(mutation_gen(raw), min_length: 1, max_length: 3)
         ) do
-      {raw, snapshot, other, mutations}
+      {raw, op, snapshot, other, mutations}
     end
   end
 
@@ -391,15 +600,20 @@ defmodule KomkiPolicy.LeanSpecTest do
               {2, StreamData.constant(observers)},
               {1, subset_gen(observers, 1)}
             ]),
-          operations <-
-            StreamData.frequency([
-              {6, StreamData.map(expr_gen(), &%{"admit" => &1})},
-              {1, StreamData.constant(%{})},
-              {1, StreamData.constant(%{"emit" => true})}
-            ])
+          operations <- rules_gen()
         ) do
       %{"readers" => readers, "operations" => operations, "relaxation_authorities" => []}
     end
+  end
+
+  # Each rule with its own expression, or absent (B.4: no rule, no permit).
+  defp rules_gen do
+    Derive.proof_rules()
+    |> Enum.map(&{&1, maybe(expr_gen())})
+    |> StreamData.fixed_map()
+    |> StreamData.map(fn rules ->
+      for {rule, expr} <- rules, expr != :absent, into: %{}, do: {rule, expr}
+    end)
   end
 
   defp snapshot_gen(raw) do
@@ -409,8 +623,10 @@ defmodule KomkiPolicy.LeanSpecTest do
           bindings <- subset_gen(binding_ids, 0),
           labels <-
             StreamData.frequency([
-              {4, subset_gen(bindings, 0)},
-              {1, subset_gen(binding_ids, 0)}
+              {3, subset_gen(bindings, 0)},
+              {1, subset_gen(binding_ids, 0)},
+              {2,
+               StreamData.map(subset_gen(binding_ids, 0), &Enum.sort(Enum.uniq(&1 ++ bindings)))}
             ]),
           environment <- StreamData.member_of(Map.keys(raw["environments"])),
           valid <-
@@ -455,7 +671,8 @@ defmodule KomkiPolicy.LeanSpecTest do
       {"purpose", maybe(StreamData.member_of(@purposes))},
       {"scope", maybe(StreamData.boolean())},
       {"count", maybe(StreamData.integer(0..5))},
-      {"tags", maybe(subset_gen(@tags, 0))}
+      {"tags", maybe(subset_gen(@tags, 0))},
+      {"output_content_digest", maybe(StreamData.member_of(~w(digest-a digest-b)))}
     ]
 
     StreamData.map(StreamData.fixed_map(base ++ domain), fn facts ->
@@ -505,9 +722,14 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp mutation_gen(raw) do
     index = StreamData.integer(0..12)
     binding_ids = Map.keys(raw["bindings"])
+    names = Derive.proof_rules() |> Enum.flat_map(&Derive.required_premises/1) |> Enum.uniq()
 
     StreamData.one_of([
       StreamData.tuple({StreamData.constant(:flip_value), index}),
+      # Unsorted, duplicated claims: assigned_label counts as a set, the rest exactly.
+      StreamData.tuple(
+        {StreamData.constant(:scramble), index, StreamData.member_of(@claim_fields)}
+      ),
       # Same number, other JSON type: CONTRACT § 5 step 8 demands structural equality (#626).
       StreamData.constant(:floatify),
       StreamData.tuple({StreamData.constant(:drop), index}),
@@ -518,7 +740,7 @@ defmodule KomkiPolicy.LeanSpecTest do
       ),
       StreamData.tuple(
         {StreamData.constant(:put), index, StreamData.constant("name"),
-         StreamData.member_of(Derive.required_premises("admit") ++ ["label_assignment"])}
+         StreamData.member_of(names)}
       ),
       StreamData.tuple(
         {StreamData.constant(:put), index, StreamData.constant("fact"),
@@ -543,7 +765,7 @@ defmodule KomkiPolicy.LeanSpecTest do
       ),
       StreamData.tuple(
         {StreamData.constant(:top), StreamData.constant("rule"),
-         StreamData.member_of(["admit", "emit", "store"])}
+         StreamData.member_of(Derive.proof_rules() ++ ["start"])}
       ),
       StreamData.tuple(
         {StreamData.constant(:top), StreamData.constant("checked_label"),
@@ -554,6 +776,9 @@ defmodule KomkiPolicy.LeanSpecTest do
 
   defp mutate({:flip_value, i}, proof),
     do: update_premise(proof, i, &Map.put(&1, "value", not Map.get(&1, "value", true)))
+
+  defp mutate({:scramble, i, key}, proof),
+    do: update_premise(proof, i, &Map.replace_lazy(&1, key, fn value -> scramble(value) end))
 
   defp mutate(:floatify, proof) do
     Map.update!(proof, "premises", fn premises -> Enum.map(premises, &floatify_expression/1) end)
@@ -577,6 +802,9 @@ defmodule KomkiPolicy.LeanSpecTest do
     do: Map.put(premise, "expression", floatify(expression))
 
   defp floatify_expression(premise), do: premise
+
+  defp scramble([first | _] = list), do: Enum.reverse(list) ++ [first]
+  defp scramble(value), do: value
 
   defp floatify(value) when is_integer(value), do: value * 1.0
   defp floatify(value) when is_list(value), do: Enum.map(value, &floatify/1)
