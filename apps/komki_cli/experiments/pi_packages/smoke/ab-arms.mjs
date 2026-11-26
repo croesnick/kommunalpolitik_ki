@@ -145,6 +145,45 @@ ARMS.VB = {
   bin: path.join(EXPERIMENTS_ROOT, "downloads", "brew-0.9.0", "x", "llama.cpp", "0.9.0", "bin", "llama-server"),
   port: 49623,
 };
+// Ticket #642: Inkling 2 Mini against the production config. All arms run
+// on the release build b12720 (commit 33aeb17f8), because inkling2_loop
+// needs mainline llama.cpp from b12611 on (Unsloth, Mainline_Support/README.md);
+// the Homebrew pin 1.0.0 (build 12359) predates it. Extracted from
+// llama-b12720-bin-macos-arm64.tar.gz (SHA-256 42d569fe…8668ca3a3).
+const B12720 = path.join(EXPERIMENTS_ROOT, "downloads", "b12720", "llama-b12720", "llama-server");
+
+ARMS.G = {
+  ...ARMS.V7,
+  label: "Production config (Gemma pin, thinking off, MTP) on b12720",
+  bin: B12720,
+  port: 49624,
+};
+
+// Inkling's thinking cannot be switched off: the chat template turns
+// --reasoning-effort into a "Thinking effort level" system line (template
+// default 0.9). Sampling as recommended by Unsloth: temperature 1.0 without
+// truncation (top-p 1.0, top-k off, min-p 0).
+const INKLING = {
+  repo: "unsloth/Inkling-2-Mini-GGUF",
+  revision: "8078d149286eec7193795413b9e0643da6d11fa1",
+  file: "Inkling-2-Mini-UD-Q4_K_XL.gguf",
+  sha256: "e64276656f072e9b2197a61723667cbdb71da66a716ffd966e572c21088f3cd3",
+  sampling: { temp: 1.0, "top-p": 1.0, "top-k": 0, "min-p": 0.0 },
+  bin: B12720,
+};
+ARMS.IL = {
+  ...INKLING,
+  label: "Inkling 2 Mini UD-Q4_K_XL, reasoning effort low (0.2)",
+  serverArgs: ["--reasoning-effort", "low"],
+  port: 49625,
+};
+ARMS.IH = {
+  ...INKLING,
+  label: "Inkling 2 Mini UD-Q4_K_XL, reasoning effort high (0.9, template default)",
+  serverArgs: ["--reasoning-effort", "high"],
+  port: 49626,
+};
+
 // Debug probe (#372, descriptive, no gate): V7 and V9 with debug logging,
 // which is the only way to see context-checkpoint restores and the FA mode
 // per context in the llama log. Evaluated by probe-lv4.mjs.
