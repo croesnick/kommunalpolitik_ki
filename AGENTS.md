@@ -131,6 +131,10 @@ cd apps/<app> && mix dialyzer                             # Root-Dispatch crasht
 
 Pro Tool unter `tools/`: `uv sync`, `uv run ruff check`, `uv run ruff format --check`, `uv run mypy src/`, `uv run pytest`. Lose Python-Skripte in `skills/*/scripts` (Config: `ruff.toml` am Root): `uvx ruff@0.15.21 check skills/*/scripts` und `uvx ruff@0.15.21 format --check skills/*/scripts`.
 
+### Lean
+
+Die Lean-Spezifikation unter `apps/komki_policy/lean/` beweist `verify` für `admit` und gleicht den Elixir-Prüfer per Differenztest ab. Sie ist ein Prüforakel, kein Tool im Sinne von § 1 (GO in #625). Ändert ein PR ein Modul, das `apps/komki_policy/lean/SYNC.sha256` pinnt, zieht er das Lean-Modell nach: [README](apps/komki_policy/lean/README.md).
+
 ### Versionen
 
 `.tool-versions` am Root pinnt Python, Erlang und Elixir; asdf und uv lesen die Datei direkt, die CI parst sie (`setup-python`, `setup-beam` mit `version-file`). Erlang/Elixir folgen Homebrews aktuellem `erlang`, weil die komki-Formel davon abhängt (`packaging/homebrew/`).

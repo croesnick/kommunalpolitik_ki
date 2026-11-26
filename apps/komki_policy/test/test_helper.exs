@@ -7,4 +7,6 @@
 # Pruefling wird vom selben Seed genauso erzeugt.
 Application.put_env(:stream_data, :max_runs, 200)
 
-ExUnit.start()
+# lean_spec: differential test against the Lean verifier, needs
+# lean/.lake/build/bin/komki-spec (lean/README.md): mix test --only lean_spec
+ExUnit.start(exclude: [:lean_spec])

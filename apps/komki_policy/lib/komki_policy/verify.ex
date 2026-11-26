@@ -776,7 +776,9 @@ defmodule KomkiPolicy.Verify do
     # auch fuer eine behauptete null-Expression, deren nil == nil-Vergleich
     # die fehlende Regel sonst kaschierte (#477). Die Eingabevalidierung
     # lehnt null zusaetzlich ab; das hier ist die Tiefenabwehr.
-    if is_nil(registry_expr) or premise["expression"] != registry_expr,
+    # Strikt (!==): "exakt (strukturelle Gleichheit)" heißt, 3.0 ist nicht 3
+    # (#626).
+    if is_nil(registry_expr) or premise["expression"] !== registry_expr,
       do: reason("expression_mismatch", binding, nil),
       else: nil
   end

@@ -1,0 +1,91 @@
+# Lean-Spezifikation von komki_policy (#625): Beweise prüfen, ohne sorry,
+# und Verify.check/4 differenziell gegen den bewiesenen Lean-Prüfer testen.
+# Details: apps/komki_policy/lean/README.md. Der Pin lean/SYNC.sha256 läuft
+# im normalen mix test der CI mit (ci.yml), nicht hier.
+
+name: Lean
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/komki_policy/**'
+      # stream_data bestimmt, welche Fälle ein fester Seed erzeugt.
+      - 'apps/workspace.lock'
+      - '.tool-versions'
+      - '.github/workflows/lean.yml'
+  pull_request:
+    branches: ['**']
+    paths:
+      - 'apps/komki_policy/**'
+      # stream_data bestimmt, welche Fälle ein fester Seed erzeugt.
+      - 'apps/workspace.lock'
+      - '.tool-versions'
+      - '.github/workflows/lean.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lean-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lean:
+    name: Lean-Spezifikation und Differenztest
+    runs-on: ubuntu-latest
+    env:
+      # Wie in ci.yml: verhindert Kernel-Tabellenkonflikte auf frischen Runnern.
+      ERL_AFLAGS: "-kernel prevent_overlapping_tables false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # elan als gepinnte Release-Datei mit Prüfsumme, wie shfmt in ci.yml.
+      # Die Lean-Version selbst pinnt apps/komki_policy/lean/lean-toolchain.
+      - name: elan installieren (v4.2.4)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/elan.tar.gz" \
+            https://github.com/leanprover/elan/releases/download/v4.2.4/elan-x86_64-unknown-linux-gnu.tar.gz
+          echo "42b94d4244e8353142c456ec0e4ca6528fd898a6c604d4059f494e706e431f63  $RUNNER_TEMP/elan.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/elan.tar.gz" -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/elan-init" -y --default-toolchain none --no-modify-path
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Lean-Cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0, Node 24
+        with:
+          path: |
+            ~/.elan/toolchains
+            apps/komki_policy/lean/.lake
+          key: lean-${{ runner.os }}-${{ hashFiles('apps/komki_policy/lean/lean-toolchain') }}-${{ hashFiles('apps/komki_policy/lean/**/*.lean', 'apps/komki_policy/lean/lakefile.toml') }}
+          restore-keys: |
+            lean-${{ runner.os }}-${{ hashFiles('apps/komki_policy/lean/lean-toolchain') }}-
+
+      # Jede Warnung ist ein Fehler (lakefile.toml), ein sorry also auch.
+      - name: Beweise prüfen und komki-spec bauen
+        working-directory: apps/komki_policy/lean
+        run: lake build
+
+      # Positivliste: nur Leans Standardaxiome. Ein sorry (sorryAx) oder ein
+      # eigenes `axiom` macht den Schritt rot, ebenso ein Satz, den
+      # Axioms.lean nicht mehr findet.
+      - name: Axiome der Hauptsätze (nur Standardaxiome)
+        working-directory: apps/komki_policy/lean
+        run: ./check-axioms.sh
+
+      - name: Erlang/Elixir einrichten
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      # komki_policy hat nur Test- und Dev-Abhängigkeiten (stream_data,
+      # credo, dialyxir); der Workspace-Bootstrap aus ci.yml ist hier nicht
+      # nötig.
+      - name: Differenztest Elixir gegen Lean
+        working-directory: apps/komki_policy
+        run: |
+          mix deps.get
+          mix test --only lean_spec
