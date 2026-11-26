@@ -237,6 +237,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     {[], 7},
     {["schema"], :delete},
     {["schema"], "komki-release/9"},
+    {["schema"], nil},
     {["zusatz"], true},
     {["ausgabeart"], "sitzungsmappe"},
     {["release_id"], "Go 1"},
@@ -247,11 +248,15 @@ defmodule KomkiPolicy.LeanSpecTest do
     {["workspace"], 7},
     {["content_digest"], "abc"},
     {["call_hash"], String.upcase(@hex)},
+    {["call_hash"], String.duplicate("g", 64)},
     {["scope"], "Scope"},
     {["authority"], nil},
     {["valid_from"], -1},
     {["valid_until"], "100"},
     {["valid_from"], 999_999},
+    {["valid_from"], 60.0},
+    {["valid_until"], 1000.0},
+    {:merge, %{"valid_from" => 50, "valid_until" => 50}},
     {["nonce"], "N"}
   ]
   @offenlegung_breaks [
@@ -262,6 +267,8 @@ defmodule KomkiPolicy.LeanSpecTest do
     {["ziellabel"], :delete},
     {["ziellabel"], []},
     {["ziellabel"], ["ratsprojekte@1", "b-eins@1"]},
+    {["ziellabel"], ["ratsprojekte@1", "ratsprojekte@1"]},
+    {["ziellabel"], nil},
     {["ziellabel"], ["kein-ref"]},
     {["ziellabel"], "ratsprojekte@1"},
     {["schema"], "komki-release/1"}
@@ -270,12 +277,15 @@ defmodule KomkiPolicy.LeanSpecTest do
     {[], "stand"},
     {["schema"], :delete},
     {["schema"], 1},
+    {["schema"], nil},
     {["zusatz"], true},
     {["stand_id"], "Stand"},
     {["version"], -1},
     {["version"], "3"},
     {["scope"], 7},
     {["as_of"], "50"},
+    {["as_of"], -5},
+    {["version"], 3.0},
     {["consumed"], :delete},
     {["consumed"], []},
     {["consumed"], %{"N" => "go-a"}},
@@ -288,12 +298,52 @@ defmodule KomkiPolicy.LeanSpecTest do
     {:merge, %{"ausgabeart" => "erfunden", "ziellabel" => ["ratsprojekte@1"]}},
     {:merge, %{"ausgabeart" => "ratsprojekte-essenz", "ziellabel" => []}},
     {:merge, %{"ausgabeart" => nil, "ziellabel" => nil}},
+    {:merge, %{"ausgabeart" => "ratsprojekte-essenz", "ziellabel" => ["a@1", "a@1"]}},
+    {["release_id"], nil},
     {["release_id"], :delete},
     {["release_id"], "Go"},
     {["nonce"], 7},
     {["stand_ref"], "stand-drt@03"},
+    {["stand_ref"], "stand-drt@"},
     {["call_hash"], "abc"},
+    {["call_hash"], String.duplicate("g", 64)},
     {["stand_version_after"], -1}
+  ]
+
+  # Every code and path the breaks above reach.
+  @schema_errors [
+    {"invalid_as_of", "$.as_of"},
+    {"invalid_digest", "$.call_hash"},
+    {"invalid_digest", "$.content_digest"},
+    {"invalid_kind", "$.kind"},
+    {"invalid_operation", "$.operation"},
+    {"invalid_output_kind", "$.ausgabeart"},
+    {"invalid_proposal", "$"},
+    {"invalid_proposal", "$.ausgabeart"},
+    {"invalid_proposal", "$.call_hash"},
+    {"invalid_proposal", "$.stand_version_after"},
+    {"invalid_proposal", "$.ziellabel"},
+    {"invalid_record", "$"},
+    {"invalid_record", "$.consumed"},
+    {"invalid_reference_id", "$.authority"},
+    {"invalid_reference_id", "$.consumed"},
+    {"invalid_reference_id", "$.nonce"},
+    {"invalid_reference_id", "$.object"},
+    {"invalid_reference_id", "$.release_id"},
+    {"invalid_reference_id", "$.scope"},
+    {"invalid_reference_id", "$.stand_id"},
+    {"invalid_reference_id", "$.stand_ref"},
+    {"invalid_reference_id", "$.workspace"},
+    {"invalid_schema", "$.schema"},
+    {"invalid_stand_version", "$.version"},
+    {"invalid_window", "$.valid_from"},
+    {"invalid_window", "$.valid_until"},
+    {"invalid_ziellabel", "$.ziellabel"},
+    {"missing_field", "$.ausgabeart"},
+    {"missing_field", "$.schema"},
+    {"missing_field", "$.ziellabel"},
+    {"unknown_field", "$.ausgabeart"},
+    {"unknown_field", "$.zusatz"}
   ]
 
   # The error codes of JSON.parse/1, which the Lean parser models.
@@ -591,8 +641,8 @@ defmodule KomkiPolicy.LeanSpecTest do
       "\nlean_spec schemas: #{length(decide_pairs) + length(advance_pairs)} Fälle, #{length(codes)} Fehler"
     )
 
-    # Each code and path of the three checks meets its break.
-    assert length(codes) >= 35
+    missing = @schema_errors -- codes
+    assert missing == [], "Schemafehler ohne Fall: #{inspect(missing)}"
   end
 
   test "advance: Stand und das Lean-Modell gehen gleich über" do

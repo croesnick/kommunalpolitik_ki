@@ -219,11 +219,11 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean`, `standError` und `proposalError` in `KomkiSpec/ReleaseInput.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` (Urteil), `KomkiSpec/VerifyReasons.lean` (Befunde), `KomkiSpec/ProofInput.lean` (Eingabeprüfung des Beweisbaums) |
-| `validations.ex` | `firstUnknown` in `KomkiSpec/ProofInput.lean` (`closed_fields/3`: erstes unbekanntes Feld in Sortierreihenfolge), `kebabJ`, `objectRefJ` und `strIn knownOperations` in `KomkiSpec/ContextInput.lean` (`require_kebab/2`, `require_object_ref/2`, `require_operation/2`) |
+| `validations.ex` | `firstUnknown` in `KomkiSpec/ProofInput.lean` (`closed_fields/3`: erstes unbekanntes Feld in Sortierreihenfolge), `kebabJ`, `objectRefJ` und `strIn knownOperations` in `KomkiSpec/ContextInput.lean` (`require_kebab/2`, `require_object_ref/2`, `require_operation/2`), `schemaError`, `closedError`, `hex64`, `natJ` und `intJ` in `KomkiSpec/ReleaseInput.lean` (`require_schema/3`, `closed_fields/3`, `require_hex64/3`, `require_nonneg_integer/3`, `require_integer/3`) |
 | `cli.ex` | `cliFiles` und `cliCase` in `KomkiSpec/Bridge.lean` (Lesereihenfolge der Dateien, Exit-Codes) |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
-| `registry.ex` | `kebab` in `KomkiSpec/ContextInput.lean` (`kebab_id?/1`), Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
+| `registry.ex` | `kebab` in `KomkiSpec/ContextInput.lean` (`kebab_id?/1`), `refId` und `outputKinds` in `KomkiSpec/ReleaseInput.lean` (`reference_id?/1`, `output_kinds/0`), Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
 | `json.ex` | `KomkiSpec/Json.lean` (Parser, kanonischer Encoder) |
 | `release.ex` | `callHashOf` in `KomkiSpec/CallHash.lean`, SHA-256 in `KomkiSpec/Sha256.lean`, `releaseError` in `KomkiSpec/ReleaseInput.lean` |
 | `context.ex` | `KomkiSpec/ContextInput.lean` (Eingabeprüfung von Intent und Snapshot, Kohärenz), `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean`, `Snapshot.validated` in `Input.lean` (Wertebereich nach der Eingabeprüfung) |
@@ -292,10 +292,11 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   Bereichs abstürzen würde, etwa bei einem Ausdruck außerhalb von B.4,
   verweigert das Modell (`missing_operation_rule`).
 - **Die Brücke ist unbewiesen.** `KomkiSpec/Bridge.lean` liest die Fälle
-  mit Leans eigenem JSON-Parser ins Modell ein; nur `cli-batch` und
-  `json-batch` lesen die Dateibytes mit `Json.lean`. Gleitkommazahlen hält
-  sie von Ganzzahlen getrennt, so wie `verify.ex` behauptete Ausdrücke
-  strikt vergleicht (#626).
+  mit dem strengen Parser aus `Json.lean` ins Modell ein, `cli-batch` und
+  `json-batch` auch die Dateibytes. Gleitkommazahlen hält er von
+  Ganzzahlen getrennt, auch in e-Schreibweise wie `1.0e3`, so wie
+  `JSON.parse/1` und `verify.ex`, das behauptete Ausdrücke strikt
+  vergleicht (#626).
 
 ## Lizenzen
 

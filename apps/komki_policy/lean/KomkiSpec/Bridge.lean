@@ -21,14 +21,6 @@ namespace KomkiSpec
 
 open Lean (Json)
 
-partial def JVal.ofJson : Json → JVal
-  | .null => .null
-  | .bool b => .bool b
-  | .num n => if n.exponent == 0 then .int n.mantissa else .float n.mantissa n.exponent
-  | .str s => .str s
-  | .arr xs => .arr (xs.toList.map JVal.ofJson)
-  | .obj kvs => .obj (kvs.toList.map fun (k, v) => (k, JVal.ofJson v))
-
 abbrev Decode := Except String
 
 def field (j : JVal) (k : String) : Decode JVal :=

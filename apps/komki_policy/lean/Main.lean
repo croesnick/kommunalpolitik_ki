@@ -26,11 +26,12 @@ with `KomkiPolicy.Derive`.
 
 open KomkiSpec Lean
 
+/-- Each line goes through the strict parser, which keeps `1.0e3` a float
+as `JSON.parse/1` does. -/
 def runLine (run : JVal → Except String String) (line : String) : String :=
-  match Json.parse line with
+  match KomkiSpec.Json.parse line.toUTF8 with
   | .error e => s!"? error {e}"
-  | .ok json =>
-    let j := JVal.ofJson json
+  | .ok j =>
     let id := match j.get? "id" with
       | some (.int i) => toString i
       | _ => "?"
