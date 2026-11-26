@@ -15,7 +15,9 @@ with `derive`'s decision, or `<id> error <reason>`.
 `Evaluator.evaluate/2` (`{"id", "expression", "facts"}`); `domain-batch`
 checks a registry (and snapshot) against the domain the input checks
 guarantee (`{"id", "registry", "snapshot"?}`); `json-batch` runs bytes
-through the strict parser and the canonical encoder (`{"id", "hex"}`).
+through the strict parser and the canonical encoder (`{"id", "hex"}`);
+`cli-batch` runs `komki-policy decide|verify|advance` on file bytes
+(`{"id", "command", "files": {name: hex}}`).
 
 `komki-spec constants`: the fixed tables of the model, for the comparison
 with `KomkiPolicy.Derive`.
@@ -56,9 +58,10 @@ def main : List String → IO UInt32
   | ["eval-batch", path] => runBatch (fun j => (evalCase j).map (·.compress)) path
   | ["domain-batch", path] => runBatch (fun j => (domainCase j).map (·.compress)) path
   | ["json-batch", path] => runBatch (fun j => (jsonCase j).map (·.compress)) path
+  | ["cli-batch", path] => runBatch (fun j => (cliCase j).map (·.compress)) path
   | ["constants"] => do
     IO.println constants.compress
     return 0
   | _ => do
-    IO.eprintln "usage: komki-spec verify-batch|derive-batch|release-batch|advance-batch|eval-batch|domain-batch|json-batch <cases.jsonl> | komki-spec constants"
+    IO.eprintln "usage: komki-spec verify-batch|derive-batch|release-batch|advance-batch|eval-batch|domain-batch|json-batch|cli-batch <cases.jsonl> | komki-spec constants"
     return 2

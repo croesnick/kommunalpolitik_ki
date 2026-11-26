@@ -17,7 +17,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   use ExUnit.Case, async: false
   use ExUnitProperties
 
-  alias KomkiPolicy.{Calculus, Derive, Evaluator, Registry, Release, Stand, Verify}
+  alias KomkiPolicy.{Calculus, CLI, Derive, Evaluator, Registry, Release, Stand, Verify}
 
   @moduletag :lean_spec
   @moduletag timeout: 600_000
@@ -112,6 +112,13 @@ defmodule KomkiPolicy.LeanSpecTest do
     :unsorted_labels,
     :duplicate_label
   ]
+
+  # The error codes of JSON.parse/1, which the Lean parser models.
+  @json_error_codes ~w(empty_input trailing_data incomplete_document unexpected_byte invalid_number
+                       unterminated_literal duplicate_json_key trailing_comma invalid_string
+                       invalid_utf8)
+  # komki-policy calls per command kind: each one compiles and parses files.
+  @cli_runs 300
 
   # Pieces of a JSON string: raw characters and every kind of escape.
   @string_parts ~w(a b z A Z 0 9 / é € 😀 ﻿ ࠀ က 퀀   𐀀 񀀀 󿿿 \\" \\\\ \\/ \\b \\f \\n \\r \\t \\u0041 \\u00e9 \\u20AC \\ud83d\\ude00 \\u0000 \\u001f \\uFFFF \\u007F) ++
@@ -441,6 +448,72 @@ defmodule KomkiPolicy.LeanSpecTest do
     assert map_size(stats) >= 11, "zu wenige Fehlerarten: #{inspect(Map.keys(stats))}"
   end
 
+  # komki-policy itself (CONTRACT.md § 7): the worlds of the other tests as
+  # files, every fourth with one byte changed, through CLI.run/1, against
+  # the strict parser and the model on the same bytes.
+  test "CLI: komki-policy antwortet wie das Lean-Modell, samt Exit-Code" do
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "komki-spec-cli-#{System.pid()}-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(dir)
+
+    try do
+      calls = cli_commands()
+
+      tagged =
+        Enum.map(Enum.with_index(calls), fn {{command, values}, i} ->
+          files = cli_files(values, i)
+          {cli_pair(dir, command, files), files == intact_files(values)}
+        end) ++
+          for {command, values} <- broken_snapshot_calls(calls),
+              do: {cli_pair(dir, command, intact_files(values)), true}
+
+      pairs = Enum.map(tagged, &elem(&1, 0))
+
+      compare_json!(pairs, "cli-batch", "cli", "komki-policy und dem Lean-Modell")
+
+      # Over the generated calls only: the fixed ones would meet the
+      # thresholds for decide on their own.
+      stats =
+        Enum.frequencies_by(Enum.take(pairs, length(calls)), fn
+          {line, %{"exit" => exit}} -> {line["command"], exit}
+          {line, :dropped} -> {line["command"], :dropped}
+        end)
+
+      IO.puts("\nlean_spec cli: #{inspect(stats)}")
+
+      for key <-
+            [{"decide", 0}, {"decide", 2}, {"decide", 3}, {"verify", 0}, {"verify", 1}] ++
+              [{"verify", 2}, {"advance", 0}, {"advance", 1}, {"advance", 2}] do
+        assert Map.get(stats, key, 0) >= 10, "zu wenige Fälle #{inspect(key)}"
+      end
+
+      # A renamed input error code would drop its cases silently.
+      codes =
+        Enum.frequencies(for {_, %{"result" => %{"input_error" => code}}} <- pairs, do: code)
+
+      for code <- @derive_input_errors do
+        assert Map.get(codes, to_string(code), 0) >= 5, "zu wenige Fälle #{code}"
+      end
+
+      # Intact files never meet an input error the model does not know: a
+      # decision turned into one would leave the comparison unseen. verify
+      # is exempt, its mutated trees fail the proof validation by design.
+      dropped =
+        for {{%{"command" => command}, :dropped}, true} <- tagged,
+            command != "verify",
+            do: command
+
+      assert dropped == [],
+             "unverändert und doch verworfen: #{inspect(Enum.frequencies(dropped))}"
+    after
+      File.rm_rf!(dir)
+    end
+  end
+
   # Not a comparison with Lean, but the property the Lean theorem states
   # for the model (#631): a GO the catalog offers takes effect. Each offer
   # becomes a release with a fresh nonce; the release branch has to permit.
@@ -665,7 +738,12 @@ defmodule KomkiPolicy.LeanSpecTest do
   end
 
   defp run_lean(command, judged) do
-    path = Path.join(System.tmp_dir!(), "komki-spec-#{System.unique_integer([:positive])}.jsonl")
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "komki-spec-#{System.pid()}-#{System.unique_integer([:positive])}.jsonl"
+      )
+
     File.write!(path, for({{line, _}, id} <- judged, do: case_line(id, line)))
 
     try do
@@ -685,7 +763,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp report_mismatches!([], _label, _what), do: :ok
 
   defp report_mismatches!(mismatches, label, what) do
-    path = Path.join(System.tmp_dir!(), "komki-spec-mismatch-#{label}.jsonl")
+    path = Path.join(System.tmp_dir!(), "komki-spec-mismatch-#{label}-#{System.pid()}.jsonl")
     File.write!(path, for({id, _, _, line} <- mismatches, do: case_line(id, line)))
 
     shown =
@@ -1355,6 +1433,199 @@ defmodule KomkiPolicy.LeanSpecTest do
     |> StreamData.member_of()
     |> StreamData.list_of(max_length: 6)
     |> StreamData.map(fn parts -> ["\"", parts, "\""] end)
+  end
+
+  # ---------------------------------------------------------------------
+  # The CLI (CONTRACT.md § 7)
+  # ---------------------------------------------------------------------
+
+  defp cli_commands do
+    worlds = world_gen() |> seeded_list() |> Enum.take(@cli_runs)
+
+    decide =
+      for {raw, _, snapshot, intent} <-
+            worlds |> Enum.flat_map(&decision_cases/1) |> Enum.take(@cli_runs),
+          do: {"decide", [{"registry", raw}, {"snapshot", snapshot}, {"intent", intent}]}
+
+    verify =
+      for {raw, _, snapshot, intent, proof} <-
+            worlds |> Enum.flat_map(&world_cases/1) |> Enum.take(@cli_runs),
+          do:
+            {"verify",
+             [{"registry", raw}, {"snapshot", snapshot}, {"intent", intent}, {"proof", proof}]}
+
+    release =
+      for {raw, _, snapshot, intent, release, stand} <-
+            release_world_gen()
+            |> seeded_list()
+            |> Enum.take(@cli_runs)
+            |> Enum.flat_map(&release_cases/1)
+            |> Enum.take(@cli_runs),
+          do:
+            {"decide",
+             [
+               {"registry", raw},
+               {"snapshot", snapshot},
+               {"intent", intent},
+               {"release", release},
+               {"stand", stand}
+             ]}
+
+    advance =
+      for {stand, proposal} <- advance_gen() |> seeded_list() |> Enum.take(@cli_runs),
+          do: {"advance", [{"stand", stand}, {"proposal", proposal}]}
+
+    decide ++ verify ++ release ++ advance
+  end
+
+  # A snapshot Context rejects, with the call's own operation and with
+  # `start`: without a release `decide` answers `unsupported` first, with one
+  # the input error (#644). An unknown environment is an input error the
+  # model knows; a snapshot without `object` fails its decoder, so only the
+  # early `unsupported` answers it. The files stay intact, so the snapshot
+  # is the only defect.
+  defp broken_snapshot_calls(calls) do
+    for {"decide", [registry, {"snapshot", snapshot}, {"intent", intent} | release] = values} <-
+          calls |> Enum.filter(&match?({"decide", _}, &1)) |> Enum.take_every(10),
+        decides?(values),
+        {broken, operation} <- broken_snapshots(snapshot, intent["operation"], release) do
+      {"decide",
+       [registry, {"snapshot", broken}, {"intent", %{intent | "operation" => operation}}] ++
+         release}
+    end
+  end
+
+  defp broken_snapshots(snapshot, operation, release) do
+    unknown = put_in(snapshot, ["workspace", "environment"], "umgebung-unbekannt@1")
+    without_object = if release == [], do: [{Map.delete(snapshot, "object"), "start"}], else: []
+    [{unknown, operation}, {unknown, "start"}] ++ without_object
+  end
+
+  # Only calls that decide as they are: the model checks the whole input up
+  # front, so a second defect would fail there first.
+  defp decides?(values) do
+    files = Map.new(values)
+
+    case Registry.compile(files["registry"]) do
+      {:ok, registry} -> match?({:ok, _}, decide_files(registry, files))
+      {:error, _} -> false
+    end
+  end
+
+  defp decide_files(registry, %{"release" => release, "stand" => stand} = files),
+    do: Derive.decide_with_release(registry, files["snapshot"], files["intent"], release, stand)
+
+  defp decide_files(registry, files),
+    do: Derive.decide(registry, files["snapshot"], files["intent"])
+
+  # The canonical bytes of each file. In every fourth case one file gets a
+  # byte inserted, replaced or dropped, or is cut short. In every eighth the
+  # files from a rotating position on break, each with a parser code of its
+  # own, so the order the CLI reads them in shows.
+  defp cli_files(values, i) do
+    files = intact_files(values)
+    target = rem(div(i, 4), length(files))
+    first = rem(div(i, 8), length(files))
+
+    files
+    |> Enum.with_index()
+    |> Enum.map(fn
+      {{name, bytes}, k} when rem(i, 8) == 2 and k >= first ->
+        {name, cli_break(bytes, k + div(i, 8))}
+
+      {{name, bytes}, ^target} when rem(i, 4) == 0 ->
+        {name, cli_mutate(bytes, i)}
+
+      {{name, bytes}, _} ->
+        {name, bytes}
+    end)
+  end
+
+  defp intact_files(values),
+    do: for({name, value} <- values, do: {name, KomkiPolicy.JSON.canonical(value)})
+
+  defp cli_mutate(bytes, i) do
+    kind = Enum.at([:insert, :replace, :delete, :truncate], :erlang.phash2({i, :kind}, 4))
+    byte = Enum.at(~c',]}:"\\-0 ', :erlang.phash2({i, :byte}, 9))
+    mutate(bytes, kind, rem(i * 7919, byte_size(bytes)), byte)
+  end
+
+  # Five breakages, five parser codes; a call reads at most five files.
+  defp cli_break(bytes, k) do
+    case rem(k, 5) do
+      0 -> "x" <> bytes
+      1 -> bytes <> "x"
+      2 -> ""
+      3 -> String.replace_suffix(String.trim_trailing(bytes), "}", ",}")
+      4 -> String.replace(bytes, "\"", "\"" <> <<0xFF>>, global: false)
+    end
+  end
+
+  defp cli_pair(dir, command, files) do
+    argv =
+      Enum.flat_map(files, fn {name, bytes} ->
+        path = Path.join(dir, name <> ".json")
+        File.write!(path, bytes)
+        ["--" <> name, path]
+      end)
+
+    {out, exit} = CLI.run([command | argv])
+
+    line = %{
+      "command" => command,
+      "files" =>
+        Map.new(files, fn {name, bytes} -> {name, Base.encode16(bytes, case: :lower)} end)
+    }
+
+    {line, cli_expected(command, List.keymember?(files, "release", 0), out, exit)}
+  end
+
+  defp cli_expected(command, release?, out, exit) do
+    {:ok, parsed} = KomkiPolicy.JSON.parse(out)
+
+    case {command, exit, parsed} do
+      {_, 2, %{"result" => "error", "code" => code}} ->
+        cli_input_error(command, code)
+
+      {"decide", 0, _} ->
+        %{"exit" => 0, "result" => decided(parsed, release?)}
+
+      {"decide", 3, %{"result" => "unsupported"}} ->
+        %{"exit" => 3, "result" => %{"unsupported" => true}}
+
+      {"verify", _, _} when exit in [0, 1] ->
+        %{"exit" => exit, "result" => parsed["result"]}
+
+      {"advance", 0, %{"schema" => "komki-stand/1"}} ->
+        %{"exit" => 0, "result" => %{"ok" => Map.delete(parsed, "schema")}}
+
+      {"advance", 1, %{"result" => "refused", "code" => code}} ->
+        %{"exit" => 1, "result" => %{"refused" => code}}
+
+      _ ->
+        %{"exit" => exit, "result" => parsed}
+    end
+  end
+
+  defp decided(decision, release?) do
+    fields = if release?, do: @release_fields, else: @decision_fields
+    decision |> Map.take(fields) |> Map.put("gos", gos(decision["remedies"]))
+  end
+
+  defp cli_input_error(command, code) do
+    cond do
+      code in @json_error_codes ->
+        %{"exit" => 2, "result" => %{"error" => code}}
+
+      command == "decide" and code in Enum.map(@derive_input_errors, &to_string/1) ->
+        %{"exit" => 2, "result" => %{"input_error" => code}}
+
+      command == "verify" and code in Enum.map(@modelled_input_errors, &to_string/1) ->
+        %{"exit" => 2, "result" => "input_error"}
+
+      true ->
+        :dropped
+    end
   end
 
   defp seeded_list(generator) do
