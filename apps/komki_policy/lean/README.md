@@ -121,8 +121,10 @@ jeder Code dieser Eingabefehler muss dabei vorkommen.
 Für `derive` vergleicht er die Entscheidung über denselben Welten und den
 Fixtures: Urteil, Prüflabel, Blocker samt `condition` und
 `recipients_outside`, fehlende Belege, den ganzen Beweisbaum,
-`assigned_label`, `content_digest`, dazu `unsupported` und die Eingabefehler
-aus #628, und den ganzen Remedy-Katalog: je Befund alle Fortsetzungen in
+`assigned_label`, `content_digest`, dazu `unsupported` und jeden
+Eingabefehler mit Code und Pfad, je Welt auch mit einem verdorbenen Feld
+in Snapshot oder Intent und `start` mit verdorbenem Snapshot (#644), und
+den ganzen Remedy-Katalog: je Befund alle Fortsetzungen in
 ihrer Ordnung samt Payload (Fakt, Transformation, `required_bindings`,
 `required_recipients`, Call-Hash). Nicht verglichen werden nur die Echos
 der Eingabe.
@@ -181,7 +183,7 @@ veränderten Byte in einer Datei, jede achte ab einer wechselnden Datei mit
 einem eigenen Parserfehler je Datei, dazu `decide` mit unbekannter Umgebung, mit und ohne
 Freigabe, für die eigene Operation und für `start`, und ohne Freigabe `start`
 mit einem Snapshot ohne `object`, den nur die vorgezogene
-`unsupported`-Prüfung beantwortet (#644). Das Modell liest
+`unsupported`-Prüfung von `decide_validated?/4` beantwortet (#644). Das Modell liest
 dieselben Bytes mit dem strengen Parser in der Reihenfolge der CLI und
 entscheidet; verglichen werden Exit-Code (§ 7), Fehlercode des Parsers und
 die Felder der Ausgabe, die das Modell kennt: die Entscheidung ohne die
@@ -278,9 +280,10 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   der Vergleich mit `contextError`, für `Registry.compile/1` niemand,
   ebenso dessen Fehlercodes. Für `verify` ist jeder Eingabefehler nach
   einer kompilierten Registry modelliert (Intent, Snapshot, Kohärenz,
-  Snapshot-Voraussetzung der Ausgaberegeln (#628), Beweisbaum), für
-  `derive` nur `unknown_environment` und #628; Fälle mit einem anderen
-  Eingabefehler lassen die übrigen Vergleiche weg. Wo Elixir außerhalb des
+  Snapshot-Voraussetzung der Ausgaberegeln (#628), Beweisbaum), ebenso
+  für `derive` (Intent, `unsupported`, Snapshot, Kohärenz, #628); im
+  Freigabe-Zweig fehlen die Schemaprüfungen von Freigabe und Stand, Fälle
+  mit einem solchen Eingabefehler lassen die übrigen Vergleiche weg. Wo Elixir außerhalb des
   Bereichs abstürzen würde, etwa bei einem Ausdruck außerhalb von B.4,
   verweigert das Modell (`missing_operation_rule`).
 - **Die Brücke ist unbewiesen.** `KomkiSpec/Bridge.lean` liest die Fälle

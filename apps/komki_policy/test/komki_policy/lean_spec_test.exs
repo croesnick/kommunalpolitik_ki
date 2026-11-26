@@ -7,9 +7,10 @@ defmodule KomkiPolicy.LeanSpecTest do
   # `mix test --only lean_spec`.
   #
   # Only cases inside the validated domain are compared: Elixir has to
-  # return a verdict, a decision or one of the modelled input errors (the
-  # snapshot prerequisites of the output rules, #628; for `derive` also
-  # `unknown_environment`); any other input error drops the case. Within
+  # return a verdict, a decision or a modelled input error. Against a
+  # compiled registry that is every input error of `verify` and of `derive`
+  # without a release; with one, the schema checks of release and stand
+  # are not modelled and drop the case. Within
   # that domain, everything compared has to match. KOMKI_SPEC_SEED and
   # KOMKI_SPEC_RUNS widen the search; a mismatch writes its cases to a JSONL
   # file for replay with `komki-spec verify-batch` or `derive-batch`.
@@ -759,11 +760,10 @@ defmodule KomkiPolicy.LeanSpecTest do
       {:unsupported, _} ->
         %{"unsupported" => true}
 
-      {:error, %{code: code}} when code in @derive_input_errors ->
-        %{"input_error" => to_string(code)}
-
-      {:error, _} ->
-        :dropped
+      {:error, %{code: code, path: path}} ->
+        if code in @derive_input_errors or context_error(registry, snapshot, intent),
+          do: %{"input_error" => to_string(code), "path" => path},
+          else: :dropped
     end
   end
 
@@ -796,7 +796,8 @@ defmodule KomkiPolicy.LeanSpecTest do
   end
 
   # The fields of a decision the Lean model decides: everything but the
-  # echoes of the input.
+  # echoes of the input. Against a compiled registry the model knows every
+  # input error of the normal branch.
   defp elixir_decision(registry, snapshot, intent) do
     case Derive.decide(registry, snapshot, intent) do
       {:ok, decision} ->
@@ -805,11 +806,8 @@ defmodule KomkiPolicy.LeanSpecTest do
       {:unsupported, _} ->
         %{"unsupported" => true}
 
-      {:error, %{code: code}} when code in @derive_input_errors ->
-        %{"input_error" => to_string(code)}
-
-      {:error, _} ->
-        :dropped
+      {:error, %{code: code, path: path}} ->
+        %{"input_error" => to_string(code), "path" => path}
     end
   end
 
@@ -1094,10 +1092,30 @@ defmodule KomkiPolicy.LeanSpecTest do
             s <- [snapshot, other, repaired(snapshot, op)],
             do: {r, compiled, s, intent(op)}
 
-      worlds ++ [{raw, registry, snapshot, intent("start")}]
+      worlds ++
+        [{raw, registry, snapshot, intent("start")}] ++
+        for {s, i} <- broken_contexts(snapshot, op), do: {raw, registry, s, i}
     else
       {:error, _} -> []
     end
+  end
+
+  # One defect of snapshot or intent per world, picked by hash, so decide
+  # meets the context errors in its own order; `start` with a broken
+  # snapshot is unsupported without a release (#644).
+  defp broken_contexts(snapshot, op) do
+    pick = fn corruptions ->
+      breaks = for {:break, _, _} = c <- corruptions, do: c
+      Enum.at(breaks, :erlang.phash2(snapshot, length(breaks)))
+    end
+
+    broken = corrupt_snapshot(snapshot, pick.(@snapshot_corruptions))
+
+    [
+      {broken, intent(op)},
+      {snapshot, corrupt_snapshot(intent(op), pick.(@intent_corruptions))},
+      {broken, intent("start")}
+    ]
   end
 
   # The float variant only where it differs (strictly: `3.0 != 3` is false
@@ -1342,17 +1360,9 @@ defmodule KomkiPolicy.LeanSpecTest do
               else: corruption_gen(@snapshot_corruptions)
             )
         ) do
-      intent = %{
-        "schema" => "komki-intent/1",
-        "intent_id" => "intent-drt",
-        "operation" => op,
-        "object" => "obj-drt@v1",
-        "workspace" => "ws-drt"
-      }
-
       {corrupt_registry(raw, registry_corruption),
        corrupt_snapshot(snapshot, snapshot_corruption),
-       corrupt_snapshot(intent, intent_corruption)}
+       corrupt_snapshot(intent(op), intent_corruption)}
     end
   end
 
@@ -1813,8 +1823,8 @@ defmodule KomkiPolicy.LeanSpecTest do
       code in @json_error_codes ->
         %{"exit" => 2, "result" => %{"error" => code}}
 
-      command == "decide" and code in Enum.map(@derive_input_errors, &to_string/1) ->
-        %{"exit" => 2, "result" => %{"input_error" => code}}
+      command == "decide" and cli_decide_modelled?(code, files) ->
+        %{"exit" => 2, "result" => %{"input_error" => code, "path" => path}}
 
       command == "verify" and cli_registry_compiles?(files) ->
         %{"exit" => 2, "result" => %{"input_error" => code, "path" => path}}
@@ -1822,6 +1832,28 @@ defmodule KomkiPolicy.LeanSpecTest do
       true ->
         :dropped
     end
+  end
+
+  # Without a release the model knows every input error of decide; with
+  # one, those of intent, snapshot and coherence and the modelled codes,
+  # not the schema checks of release and stand.
+  defp cli_decide_modelled?(code, files) do
+    cli_registry_compiles?(files) and
+      (not List.keymember?(files, "release", 0) or
+         code in Enum.map(@derive_input_errors, &to_string/1) or
+         cli_context_error?(files))
+  end
+
+  defp cli_context_error?(files) do
+    [raw, snapshot, intent] =
+      for name <- ~w(registry snapshot intent) do
+        {_, bytes} = List.keyfind(files, name, 0)
+        {:ok, term} = KomkiPolicy.JSON.parse(bytes)
+        term
+      end
+
+    {:ok, registry} = Registry.compile(raw)
+    context_error(registry, snapshot, intent) != nil
   end
 
   defp cli_registry_compiles?(files) do
@@ -1881,10 +1913,14 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp release_cases({{raw, op, snapshot, _other, _mutations}, variants}) do
     with true <- op in Derive.output_operations(),
          {:ok, registry} <- Registry.compile(raw) do
-      for target <- [snapshot, repaired(snapshot, op)],
-          variant <- variants,
-          do:
-            {raw, registry, target, intent(op), release_variant(raw, target, op, variant), @stand}
+      release = release_variant(raw, snapshot, op, hd(variants))
+
+      for(
+        target <- [snapshot, repaired(snapshot, op)],
+        variant <- variants,
+        do: {raw, registry, target, intent(op), release_variant(raw, target, op, variant), @stand}
+      ) ++
+        for {s, i} <- broken_contexts(snapshot, op), do: {raw, registry, s, i, release, @stand}
     else
       _ -> []
     end
