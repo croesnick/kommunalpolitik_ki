@@ -23,7 +23,7 @@ defmodule KomkiPolicy.LeanSyncTest do
     Das Lean-Modell in lean/KomkiSpec/ dagegen prüfen und anpassen (lean/README.md),
     dann in apps/komki_policy den Pin erneuern:
 
-        shasum -a 256 lib/komki_policy/{calculus,context,derive,evaluator,json,registry,release,remedies,stand,verify}.ex > lean/SYNC.sha256
+        shasum -a 256 lib/komki_policy/{calculus,cli,context,derive,evaluator,json,registry,release,remedies,stand,verify}.ex > lean/SYNC.sha256
     """
   end
 

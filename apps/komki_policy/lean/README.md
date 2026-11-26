@@ -158,13 +158,17 @@ Gleitkommazahlen werden geparst, aber als Marker verglichen, weil
 selbst (`callHashOf`); jede Entscheidung und jeder Katalog, die ihn
 nennen, vergleicht ihn so mit `Release.call_hash/4`.
 
-Die CLI vergleicht er als Ganzes: `komki-policy decide` (auch mit
+Die CLI vergleicht er auf Dateibytes: `komki-policy decide` (auch mit
 `--release`/`--stand`), `verify` und `advance` laufen über `CLI.run/1` auf
 Dateien aus den Welten der übrigen Tests, jede vierte mit einem
-veränderten Byte in einer Datei, jede sechzehnte in allen. Das Modell liest
+veränderten Byte in einer Datei, jede achte ab einer wechselnden Datei mit
+einem eigenen Parserfehler je Datei, dazu `decide` mit unbekannter Umgebung, mit und ohne
+Freigabe, für die eigene Operation und für `start` (#644). Das Modell liest
 dieselben Bytes mit dem strengen Parser in der Reihenfolge der CLI und
 entscheidet; verglichen werden Exit-Code (§ 7), Fehlercode des Parsers und
-Entscheidung. `validate`, `plan`, Bedienfehler und Exit 4 deckt nur
+die Felder der Ausgabe, die das Modell kennt: die Entscheidung ohne die
+Echos der Eingabe, `result` bei `unsupported` und `refused`, der neue Stand.
+`validate`, `plan`, Bedienfehler, Lesefehler und Exit 4 deckt nur
 `cli_test.exs` ab.
 
 Ein weiterer Test prüft in Elixir, was `catalog_*_effective` für das Modell
@@ -188,6 +192,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` |
+| `cli.ex` | `cliFiles` und `cliCase` in `KomkiSpec/Bridge.lean` (Lesereihenfolge der Dateien, Exit-Codes) |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
 | `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
@@ -199,7 +204,7 @@ Dann das Lean-Modell gegen die Änderung prüfen und anpassen, `lake build`
 und den Differenztest laufen lassen und den Pin erneuern:
 
 ```bash
-shasum -a 256 lib/komki_policy/{calculus,context,derive,evaluator,json,registry,release,remedies,stand,verify}.ex > lean/SYNC.sha256
+shasum -a 256 lib/komki_policy/{calculus,cli,context,derive,evaluator,json,registry,release,remedies,stand,verify}.ex > lean/SYNC.sha256
 ```
 
 Die Tabellen aus `derive.ex` (Prämissen je Regel, Regelzweige,
@@ -258,8 +263,10 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   Version und Raum des Intents zum Snapshot passen, prüft
   `Context.ensure_coherence/2` vor `verify`; das Modell nimmt es an.
 - **Die Brücke ist unbewiesen.** `KomkiSpec/Bridge.lean` liest die Fälle
-  mit Leans eigenem JSON-Parser ins Modell ein, nicht mit `Json.lean`. Gleitkommazahlen hält sie von Ganzzahlen getrennt, so wie
-  `verify.ex` behauptete Ausdrücke strikt vergleicht (#626).
+  mit Leans eigenem JSON-Parser ins Modell ein; nur `cli-batch` und
+  `json-batch` lesen die Dateibytes mit `Json.lean`. Gleitkommazahlen hält
+  sie von Ganzzahlen getrennt, so wie `verify.ex` behauptete Ausdrücke
+  strikt vergleicht (#626).
 
 ## Lizenzen
 
