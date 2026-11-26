@@ -23,6 +23,7 @@ CI.
 | `derive_verifies` | `verify` akzeptiert jeden Baum, den `derive` baut | CONTRACT.md § 2.5, § 5 |
 | `verifyReport_verdict` | Der Bericht von `verify` (Befunde in der Reihenfolge der Prüfschritte, oder der Eingabefehler einer Ausgaberegel; die Eingabeprüfung des Beweisbaums läuft davor) ist leer genau dann, wenn das Urteil `valid` ist; damit gelten die Sätze über `verify` auch für ihn | CONTRACT.md § 5 |
 | `proofError_decodes` | Jeder Beweisbaum, den die Eingabeprüfung von `verify` annimmt (`proofError`, wie `validate_proof/1`), liegt im Modell, jede Prämisse mit einer der vier Arten | CONTRACT.md § 2.5, § 5 |
+| `snapshotError_validated` | Jeder Snapshot, den `Context.validate_snapshot/2` annimmt (`snapshotError`), liegt im Modell und im Wertebereich der Sätze (`Snapshot.validated`) | CONTRACT.md § 2.2 |
 | `derive_permit_stable`, `derive_deny_stable` | Mehr Fakten machen aus einem `permit` oder `deny` nichts anderes; nur ein `indeterminate` löst sich auf | R.5.2, B.4, CONTRACT.md § 4.4 |
 | `aktion_permit` | Eine Aktionsfreigabe überbrückt weder einen ungültigen Vertrag noch eine entfernte Bindung, bei `store` weder den Empfängertest (#417) noch eine unbelegte Beobachterliste (#432); Fenster, Nonce, Geltungsbereich, Call-Hash und Autorität stimmen | CONTRACT.md § 4.6, R.6 |
 | `offenlegung_permit` | Eine Offenlegungsfreigabe erlaubt nur `store`, mit gültigem Vertrag, erhaltener Bindung, belegter Beobachterliste, der geschlossenen Ausgabeart und dem Ziellabel, der Befugnis für jede gelockerte Bindung (BerechtigtZurLockerung) und einem Ziellabel, dessen Leser den Speicher abdecken | CONTRACT.md § 4.9, R.5.7 |
@@ -111,10 +112,10 @@ Wertebereichs, unter der jeweils anderen Übergaberegel, je Behauptungsfeld
 vertauscht oder ersetzt, und der stärkste Fälscher: ein Baum, der jede
 Behauptung aus der Zielwelt spiegelt, einen falschen Fakt als `false`.
 Verglichen wird der ganze Bericht: das Urteil und die Befunde in ihrer
-Reihenfolge samt Bindung und Fakt, oder Code und Pfad des Eingabefehlers,
-sobald Intent, Snapshot und ihre Kohärenz bestehen: die
-Snapshot-Voraussetzung einer Ausgaberegel und die Eingabeprüfung des
-Beweisbaums (dazu Mutationen an seiner Form: Schema, fremde Felder,
+Reihenfolge samt Bindung und Fakt, oder Code und Pfad jedes
+Eingabefehlers nach einer kompilierten Registry: Intent, Snapshot und
+ihre Kohärenz, die Snapshot-Voraussetzung einer Ausgaberegel und die
+Eingabeprüfung des Beweisbaums (dazu Mutationen an seiner Form: Schema, fremde Felder,
 falsche Typen, fehlende Schlüssel). Jeder Befundcode aus `verify.ex` und
 jeder Code dieser Eingabefehler muss dabei vorkommen.
 Für `derive` vergleicht er die Entscheidung über denselben Welten und den
@@ -153,6 +154,13 @@ beides unverdorben. Was `Registry.compile/1` und
 beziehungsweise `Snapshot.validated` erfüllen: die Voraussetzungen der
 Sätze und typrichtige Ausdrücke und Fakten nach § 3, mit denen die
 Zweige des Auswerters für falsch typisierte Werte unerreichbar sind.
+Dazu verdirbt er je Code und Pfad von `validate_intent/1`,
+`validate_snapshot/2` und `ensure_coherence/2` ein Feld von Intent oder
+Snapshot (auch ein fehlendes Feld oder den ganzen Datensatz), an einer Welt auch jedes geordnete Paar zweier solcher Felder,
+damit die Reihenfolge der Prüfungen zählt, und vergleicht den ersten
+Fehler mit `contextError` aus
+`KomkiSpec/ContextInput.lean`; `snapshotError_validated` beweist, dass
+jeder Snapshot, den es annimmt, im Wertebereich liegt.
 
 Die JSON-Schicht vergleicht er Byte für Byte: die Fixtures, Randfälle der
 Grammatik und von UTF-8, Verschachtelung um die Tiefengrenze des Encoders
@@ -205,14 +213,14 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` (Urteil), `KomkiSpec/VerifyReasons.lean` (Befunde), `KomkiSpec/ProofInput.lean` (Eingabeprüfung des Beweisbaums) |
-| `validations.ex` | `firstUnknown` in `KomkiSpec/ProofInput.lean` (`closed_fields/3`: erstes unbekanntes Feld in Sortierreihenfolge) |
+| `validations.ex` | `firstUnknown` in `KomkiSpec/ProofInput.lean` (`closed_fields/3`: erstes unbekanntes Feld in Sortierreihenfolge), `kebabJ`, `objectRefJ` und `strIn knownOperations` in `KomkiSpec/ContextInput.lean` (`require_kebab/2`, `require_object_ref/2`, `require_operation/2`) |
 | `cli.ex` | `cliFiles` und `cliCase` in `KomkiSpec/Bridge.lean` (Lesereihenfolge der Dateien, Exit-Codes) |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
-| `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
+| `registry.ex` | `kebab` in `KomkiSpec/ContextInput.lean` (`kebab_id?/1`), Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
 | `json.ex` | `KomkiSpec/Json.lean` (Parser, kanonischer Encoder) |
 | `release.ex` | `callHashOf` in `KomkiSpec/CallHash.lean`, SHA-256 in `KomkiSpec/Sha256.lean` |
-| `context.ex` | `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean`, `Snapshot.validated` in `Input.lean` (Wertebereich nach der Eingabeprüfung) |
+| `context.ex` | `KomkiSpec/ContextInput.lean` (Eingabeprüfung von Intent und Snapshot, Kohärenz), `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean`, `Snapshot.validated` in `Input.lean` (Wertebereich nach der Eingabeprüfung) |
 
 Dann das Lean-Modell gegen die Änderung prüfen und anpassen, `lake build`
 und den Differenztest laufen lassen und den Pin erneuern:
@@ -266,17 +274,15 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   dieser Richtung: Lehnt Elixir mehr ab, als das Modell verlangt (Schema,
   Kennungsformat, geschlossene Felder, Quellenangabe der Fakten, Sortierung
   von Lesern und Transformationslabels, Vokabular der Befugnisse,
-  Operationsnamen, `identity`, `registry_ref`), bleibt das ungeprüft,
-  ebenso die Fehlercodes. Von den Eingabefehlern sind nur
-  die Snapshot-Voraussetzung der Ausgaberegeln (#628), für `derive`
-  `unknown_environment` und für `verify` die Eingabeprüfung des
-  Beweisbaums modelliert; Fälle mit einem anderen Eingabefehler lassen die
-  übrigen Vergleiche weg. Wo Elixir außerhalb des
+  Operationsnamen, `identity`, `registry_ref`), hält das für `Context`
+  der Vergleich mit `contextError`, für `Registry.compile/1` niemand,
+  ebenso dessen Fehlercodes. Für `verify` ist jeder Eingabefehler nach
+  einer kompilierten Registry modelliert (Intent, Snapshot, Kohärenz,
+  Snapshot-Voraussetzung der Ausgaberegeln (#628), Beweisbaum), für
+  `derive` nur `unknown_environment` und #628; Fälle mit einem anderen
+  Eingabefehler lassen die übrigen Vergleiche weg. Wo Elixir außerhalb des
   Bereichs abstürzen würde, etwa bei einem Ausdruck außerhalb von B.4,
   verweigert das Modell (`missing_operation_rule`).
-- **Kohärenz von Intent und Snapshot liegt außerhalb.** Dass Objekt,
-  Version und Raum des Intents zum Snapshot passen, prüft
-  `Context.ensure_coherence/2` vor `verify`; das Modell nimmt es an.
 - **Die Brücke ist unbewiesen.** `KomkiSpec/Bridge.lean` liest die Fälle
   mit Leans eigenem JSON-Parser ins Modell ein; nur `cli-batch` und
   `json-batch` lesen die Dateibytes mit `Json.lean`. Gleitkommazahlen hält

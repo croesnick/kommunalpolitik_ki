@@ -148,8 +148,11 @@ defmodule KomkiPolicy.Context do
   def ensure_coherence(ctx, auth) do
     object_ref = ctx.object["object_id"] <> "@" <> ctx.object["version"]
 
-    with :ok <- require_equal_workspace(auth.workspace, ctx.workspace["workspace_id"]) do
-      require_equal_object(auth.object_ref, object_ref)
+    with :ok <- require_equal_workspace(auth.workspace, ctx.workspace["workspace_id"]),
+         :ok <- require_equal_object(auth.object_ref, object_ref) do
+      :ok
+    else
+      {:error, {code, path, detail}} -> {:error, %{code: code, path: path, detail: detail}}
     end
   end
 

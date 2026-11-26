@@ -2,7 +2,7 @@ import Lean.Data.Json
 import KomkiSpec.Domain
 import KomkiSpec.Input
 import KomkiSpec.CallHash
-import KomkiSpec.ProofInput
+import KomkiSpec.ContextInput
 
 /-!
 # Bridge: the CLI's JSON into the model
@@ -80,14 +80,18 @@ def decodeRegistry (j : JVal) : Decode Registry := do
       | _ => pure []
     transformations := transformations.mergeSort fun a b => !decide (b.1 < a.1) }
 
+def decodeFact (p : String × JVal) : Decode (String × JVal) := do
+  pure (p.1, ← field p.2 "value")
+
+def decodeFactSource (p : String × JVal) : Decode (String × String × String) := do
+  pure (p.1, ← strAt p.2 "source", ← strAt p.2 "source_kind")
+
 def decodeSnapshot (j : JVal) : Decode Snapshot := do
   let ws ← field j "workspace"
   let obj ← field j "object"
   let entries ← asObj (← field j "facts")
-  let facts ← entries.mapM fun (name, entry) => do
-    pure (name, ← field entry "value")
-  let factSources ← entries.mapM fun (name, entry) => do
-    pure (name, ← strAt entry "source", ← strAt entry "source_kind")
+  let facts ← entries.mapM decodeFact
+  let factSources ← entries.mapM decodeFactSource
   pure {
     snapshotId := ← strAt j "snapshot_id"
     workspaceBindings := ← asStrs (← field ws "bindings")
@@ -138,10 +142,17 @@ def Report.toJson : Report → Json
     Json.mkObj [("reasons", .arr (rs.map Reason.toJson).toArray),
       ("result", .str (if rs.isEmpty then "valid" else "invalid"))]
 
+/-- `validate_intent/1`, `validate_snapshot/2`, `ensure_coherence/2`, in that order. -/
+def contextError (Γ : Registry) (intent snapshot : JVal) : Option InputError :=
+  (intentError intent).or ((snapshotError Γ snapshot).or (coherenceError intent snapshot))
+
 /-- One case `{"registry", "snapshot", "intent", "proof"}` → report. As in
-`check/4`, the output prerequisites come before the proof's validation, and
-only a validated proof is decoded. -/
+`check/4`: intent, snapshot and coherence first, then the output
+prerequisites, then the proof's validation; only validated input is decoded. -/
 def verifyCase (j : JVal) : Decode Report := do
+  let Γ₀ ← decodeRegistry (← field j "registry")
+  if let some e := contextError Γ₀ (← field j "intent") (← field j "snapshot") then
+    return .error e
   let (Γ, S) ← decodeWorld j
   let I ← decodeIntent (← field j "intent")
   let raw ← field j "proof"
@@ -363,15 +374,25 @@ def evalCase (j : JVal) : Decode Json := do
     | .unknown => "unknown"
   pure (Json.mkObj [("verdict", .str verdict)])
 
-/-- One case `{"registry", "snapshot"?}` → whether each lies in the domain
-the input checks guarantee (`Registry.compiledOk`, `Snapshot.validated`). -/
+def InputError.json : Option InputError → Json
+  | some e => Json.mkObj [("code", .str e.code), ("path", .str e.path)]
+  | none => .null
+
+/-- One case `{"registry", "snapshot", "intent"}` → whether the registry lies
+in the domain the input checks guarantee (`Registry.compiledOk`), the first
+error of `validate_intent/1`, `validate_snapshot/2` and `ensure_coherence/2`,
+and for an accepted snapshot whether it lies in that domain
+(`Snapshot.validated`). -/
 def domainCase (j : JVal) : Decode Json := do
   let Γ ← decodeRegistry (← field j "registry")
-  let snapshot ← match j.get? "snapshot" with
-    | some s => do pure (some (Snapshot.validated Γ (← decodeSnapshot s)))
-    | none => pure none
-  pure (Json.mkObj [("registry", .bool Γ.compiledOk),
-    ("snapshot", match snapshot with | some b => .bool b | none => .null)])
+  let s ← field j "snapshot"
+  let i ← field j "intent"
+  let snapshot ← match snapshotError Γ s with
+    | none => do pure (Json.bool (Snapshot.validated Γ (← decodeSnapshot s)))
+    | some _ => pure Json.null
+  let err := contextError Γ i s
+  pure (Json.mkObj [("context_error", InputError.json err), ("registry", .bool Γ.compiledOk),
+    ("snapshot", snapshot)])
 
 /-! ## The JSON layer -/
 

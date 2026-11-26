@@ -49,10 +49,17 @@ defmodule KomkiPolicy.LeanSpecTest do
                    label_preservation_false recipient_inclusion_false expression_mismatch
                    fact_refs_mismatch condition_false condition_unknown conclusion_mismatch
                    conclusion_unsupported)
-  # Every input error of verify once intent and snapshot pass (§ 4.5, § 5).
-  @proof_input_errors ~w(emit_digest_missing emit_object_not_classified missing_field
-                         invalid_schema unknown_field invalid_entry invalid_premise
-                         invalid_premise_kind unknown_premise_field)
+  # Input errors of verify: intent, snapshot and coherence (§ 2.2, § 2.3),
+  # the output prerequisites and the proof's validation (§ 4.5, § 5).
+  @proof_input_errors ~w(invalid_record invalid_reference_id unknown_environment
+                         unknown_fact_field intent_snapshot_mismatch invalid_flag
+                         invalid_classification invalid_fact_value invalid_operation
+                         invalid_reference_list invalid_source invalid_source_kind
+                         registry_ref_mismatch unknown_binding_reference unknown_observer
+                         unsorted_references emit_digest_missing
+                         emit_object_not_classified missing_field invalid_schema unknown_field
+                         invalid_entry invalid_premise invalid_premise_kind
+                         unknown_premise_field)
   @modelled_input_errors [:emit_digest_missing, :emit_object_not_classified]
   @derive_input_errors [:unknown_environment | @modelled_input_errors]
   @decision_fields ~w(decision rule checked_label blockers missing_evidence proof
@@ -122,7 +129,105 @@ defmodule KomkiPolicy.LeanSpecTest do
     :undeclared_fact,
     :unknown_classification,
     :unsorted_labels,
-    :duplicate_label
+    :duplicate_label,
+    # One per code and path of validate_snapshot/2; `:delete` drops the
+    # key, `[]` replaces the whole record.
+    {:break, [], 7},
+    {:break, ["schema"], "komki-snapshot/0"},
+    {:break, ["schema"], :delete},
+    {:break, ["zusatz"], true},
+    {:break, ["aaa"], true},
+    {:break, ["snapshot_id"], "Snap 1"},
+    {:break, ["registry_ref"], "reg-fremd"},
+    {:break, ["identity"], "fremd"},
+    {:break, ["workspace"], 7},
+    {:break, ["workspace", "zusatz"], 1},
+    {:break, ["workspace", "workspace_id"], nil},
+    {:break, ["workspace", "valid"], "ja"},
+    {:break, ["workspace", "bindings"], "b-eins@1"},
+    {:break, ["workspace", "bindings"], [7]},
+    {:break, ["workspace", "bindings"], ["z@1", "a@1"]},
+    {:break, ["workspace", "bindings"], ["b-fremd@1"]},
+    {:break, ["workspace", "environment"], :delete},
+    {:break, ["workspace", "environment"], "env-fremd"},
+    {:break, ["object"], []},
+    {:break, ["object", "zusatz"], 1},
+    {:break, ["object", "object_id"], "Obj"},
+    {:break, ["object", "version"], "v_1"},
+    {:break, ["object", "classification"], "offen"},
+    {:break, ["object", "labels"], nil},
+    {:break, ["object", "labels"], ["b-fremd@1"]},
+    {:break, ["facts"], 7},
+    {:break, ["facts", "audit_path_ready"], 7},
+    {:break, ["facts", "audit_path_ready", "zusatz"], 1},
+    # Undeclared and with a foreign field: the closed fields come first.
+    {:break, ["facts", "fremd"], %{"value" => true, "source" => "s", "zusatz" => 1}},
+    {:break, ["facts", "audit_path_ready", "source"], 7},
+    {:break, ["facts", "audit_path_ready", "source"], :delete},
+    {:break, ["facts", "audit_path_ready", "value"], "ja"},
+    {:break, ["facts", "count", "value"], 2.0},
+    {:break, ["facts", "fremd"], %{"value" => true, "source" => "s", "source_kind" => "test"}},
+    {:break, ["facts", "audit_path_ready", "source_kind"], "erfunden"},
+    {:break, ["facts", "audit_path_ready", "value"], nil}
+  ]
+  # One per code and path of validate_intent/1 and ensure_coherence/2.
+  @intent_corruptions [
+    {:break, [], "intent"},
+    {:break, ["schema"], "komki-intent/0"},
+    {:break, ["schema"], :delete},
+    {:break, ["zusatz"], true},
+    {:break, ["aaa"], true},
+    {:break, ["intent_id"], "Intent 1"},
+    {:break, ["object"], "obj-drt"},
+    {:break, ["workspace"], 7},
+    {:break, ["operation"], "plan"},
+    {:break, ["workspace"], "ws-fremd"},
+    {:break, ["object"], "obj-fremd@v1"},
+    {:break, ["object"], "obj-drt@v2"},
+    {:break, ["object"], "a@b@c"}
+  ]
+
+  # Every code and path the breaks above reach (validate_intent/1,
+  # validate_snapshot/2, ensure_coherence/2).
+  @context_errors [
+    {"intent_snapshot_mismatch", "$.object"},
+    {"intent_snapshot_mismatch", "$.workspace"},
+    {"invalid_classification", "$.object.classification"},
+    {"invalid_fact_value", "$.facts.audit_path_ready.value"},
+    {"invalid_fact_value", "$.facts.count.value"},
+    {"invalid_flag", "$.workspace.valid"},
+    {"invalid_operation", "$.operation"},
+    {"invalid_record", "$"},
+    {"invalid_record", "$.facts"},
+    {"invalid_record", "$.facts.audit_path_ready"},
+    {"invalid_record", "$.object"},
+    {"invalid_record", "$.workspace"},
+    {"invalid_reference_id", "$.intent_id"},
+    {"invalid_reference_id", "$.object"},
+    {"invalid_reference_id", "$.object.object_id"},
+    {"invalid_reference_id", "$.object.version"},
+    {"invalid_reference_id", "$.snapshot_id"},
+    {"invalid_reference_id", "$.workspace"},
+    {"invalid_reference_id", "$.workspace.workspace_id"},
+    {"invalid_reference_list", "$.object.labels"},
+    {"invalid_reference_list", "$.workspace.bindings"},
+    {"invalid_schema", "$.schema"},
+    {"invalid_source", "$.facts.audit_path_ready.source"},
+    {"invalid_source_kind", "$.facts.audit_path_ready.source_kind"},
+    {"registry_ref_mismatch", "$.registry_ref"},
+    {"unknown_binding_reference", "$.object.labels"},
+    {"unknown_binding_reference", "$.workspace.bindings"},
+    {"unknown_environment", "$.workspace.environment"},
+    {"unknown_fact_field", "$.facts.fremd"},
+    {"unknown_field", "$.aaa"},
+    {"unknown_field", "$.facts.audit_path_ready.zusatz"},
+    {"unknown_field", "$.facts.fremd.zusatz"},
+    {"unknown_field", "$.object.zusatz"},
+    {"unknown_field", "$.workspace.zusatz"},
+    {"unknown_field", "$.zusatz"},
+    {"unknown_observer", "$.identity"},
+    {"unsorted_references", "$.object.labels"},
+    {"unsorted_references", "$.workspace.bindings"}
   ]
 
   # The error codes of JSON.parse/1, which the Lean parser models.
@@ -425,7 +530,8 @@ defmodule KomkiPolicy.LeanSpecTest do
   # (`Registry.compiledOk`, `Snapshot.validated`). Corrupted inputs go to
   # Elixir; whatever it accepts has to pass the Lean checks.
   test "Eingabeprüfung: was Registry.compile und Context annehmen, liegt im Wertebereich" do
-    cases = domain_gen() |> seeded_list() |> Enum.map(&domain_case/1)
+    generated = seeded_list(domain_gen())
+    cases = Enum.map(generated ++ defect_pairs(generated), &domain_case/1)
 
     pairs = for {line, expected} <- cases, expected != :dropped, do: {line, expected}
 
@@ -438,12 +544,19 @@ defmodule KomkiPolicy.LeanSpecTest do
 
     snapshots = Enum.count(pairs, fn {_, e} -> e["snapshot"] end)
 
+    codes =
+      Enum.frequencies(
+        for {_, %{"context_error" => %{"path" => p, "code" => c}}} <- pairs, do: {c, p}
+      )
+
     IO.puts(
-      "\nlean_spec domain: registries #{length(pairs)}, snapshots #{snapshots}, rejected #{length(cases) - length(pairs)}"
+      "\nlean_spec domain: registries #{length(pairs)}, snapshots #{snapshots}, rejected #{length(cases) - length(pairs)}, context errors #{map_size(codes)}"
     )
 
     assert length(pairs) >= 3_000
     assert snapshots >= 1_000
+    missing = @context_errors -- Map.keys(codes)
+    assert missing == [], "Kontextfehler ohne Fall: #{inspect(missing)}"
   end
 
   # The JSON layer (CONTRACT.md § 6) byte for byte: the fixtures, generated
@@ -607,7 +720,6 @@ defmodule KomkiPolicy.LeanSpecTest do
         line = %{"registry" => raw, "snapshot" => snapshot, "intent" => intent, "proof" => proof}
         {line, elixir_report(registry, snapshot, intent, proof)}
       end)
-      |> Enum.reject(fn {_, report} -> report == :dropped end)
       |> Enum.with_index()
 
     lean = run_lean("verify-batch", judged)
@@ -626,7 +738,6 @@ defmodule KomkiPolicy.LeanSpecTest do
 
     %{
       compared: length(judged),
-      dropped: length(cases) - length(judged),
       valid: count.("valid"),
       invalid: count.("invalid"),
       input_error: count.("input_error"),
@@ -642,29 +753,19 @@ defmodule KomkiPolicy.LeanSpecTest do
     }
   end
 
-  # Once intent, snapshot and their coherence pass, the model knows every
-  # input error of verify: the output prerequisites (#628) and the proof's
-  # validation, each with code and path.
+  # The model knows every input error of verify against a compiled
+  # registry: intent, snapshot, coherence, the output prerequisites (#628)
+  # and the proof's validation, each with code and path.
   defp elixir_report(registry, snapshot, intent, proof) do
     case Verify.check(registry, snapshot, intent, proof) do
-      {:ok, outcome} ->
-        outcome
-
-      {:error, %{code: code, path: path}} ->
-        if context_valid?(registry, snapshot, intent),
-          do: %{"input_error" => to_string(code), "path" => path},
-          else: :dropped
+      {:ok, outcome} -> outcome
+      {:error, %{code: code, path: path}} -> %{"input_error" => to_string(code), "path" => path}
     end
   end
 
-  defp context_valid?(registry, snapshot, intent) do
-    with {:ok, auth} <- Context.validate_intent(intent),
-         {:ok, ctx} <- Context.validate_snapshot(snapshot, registry) do
-      Context.ensure_coherence(ctx, auth) == :ok
-    else
-      _ -> false
-    end
-  end
+  # The intent may be broken as a whole (`@intent_corruptions`).
+  defp operation_of(%{"operation" => op}), do: op
+  defp operation_of(_intent), do: nil
 
   defp rule_of(%{"rule" => rule}), do: rule
   defp rule_of(_proof), do: nil
@@ -704,7 +805,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     report_mismatches!(mismatches, label, what)
 
     Enum.frequencies_by(judged, fn {{line, result}, _} ->
-      {line["intent"]["operation"], result["decision"] || Enum.at(Map.keys(result), 0)}
+      {operation_of(line["intent"]), result["decision"] || Enum.at(Map.keys(result), 0)}
     end)
   end
 
@@ -1044,10 +1145,27 @@ defmodule KomkiPolicy.LeanSpecTest do
         for target <- [snapshot, other, fixed],
             do: {raw, registry, target, intent(op), mirrored_tree(registry, target, op)}
 
-      cases ++ mirrored
+      cases ++ mirrored ++ broken_verify_cases(raw, registry, snapshot, op, sources)
     else
       {:error, _} -> []
     end
+  end
+
+  # The first tree on a broken snapshot or intent, once a malformed proof
+  # on a broken snapshot; for an output rule also a coherence error on a
+  # snapshot outside the rule's domain. check/4 reports the context first.
+  defp broken_verify_cases(_raw, _registry, _snapshot, _op, []), do: []
+
+  defp broken_verify_cases(raw, registry, snapshot, op, [{_, tree} | _]) do
+    off =
+      if op in Derive.output_operations(),
+        do: [{hd(off_domain(snapshot)), Map.put(intent(op), "workspace", "ws-fremd")}],
+        else: []
+
+    [{broken, _} | _] = contexts = broken_contexts(snapshot, op)
+
+    [{raw, registry, broken, intent(op), 7}] ++
+      for {s, i} <- contexts ++ off, do: {raw, registry, s, i, tree}
   end
 
   # Decisions per world: the snapshot, the second snapshot and the repaired
@@ -1067,6 +1185,23 @@ defmodule KomkiPolicy.LeanSpecTest do
     else
       {:error, _} -> []
     end
+  end
+
+  # One defect of snapshot or intent per world, picked by hash, so a check
+  # meets the context errors in its own order; also with `start`.
+  defp broken_contexts(snapshot, op) do
+    pick = fn corruptions ->
+      breaks = for {:break, _, _} = c <- corruptions, do: c
+      Enum.at(breaks, :erlang.phash2(snapshot, length(breaks)))
+    end
+
+    broken = corrupt_snapshot(snapshot, pick.(@snapshot_corruptions))
+
+    [
+      {broken, intent(op)},
+      {snapshot, corrupt_snapshot(intent(op), pick.(@intent_corruptions))},
+      {broken, intent("start")}
+    ]
   end
 
   # The float variant only where it differs (strictly: `3.0 != 3` is false
@@ -1264,12 +1399,43 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp corruption_gen(corruptions),
     do: StreamData.one_of([StreamData.constant(:none), StreamData.member_of(corruptions)])
 
+  # Every ordered pair of two :break defects on one clean world, so the
+  # order of the checks shows.
+  defp defect_pairs(generated) do
+    {raw, snapshot, intent} = Enum.find(generated, &clean_context?/1)
+    snapshot_breaks = for {:break, _, _} = c <- @snapshot_corruptions, do: c
+    intent_breaks = for {:break, _, _} = c <- @intent_corruptions, do: c
+
+    for(
+      a <- snapshot_breaks,
+      b <- snapshot_breaks,
+      a != b,
+      do: {raw, snapshot |> corrupt_snapshot(a) |> corrupt_snapshot(b), intent}
+    ) ++
+      for a <- intent_breaks,
+          b <- intent_breaks,
+          a != b,
+          do: {raw, snapshot, intent |> corrupt_snapshot(a) |> corrupt_snapshot(b)}
+  end
+
+  defp clean_context?({raw, snapshot, intent}) do
+    case Registry.compile(raw) do
+      {:ok, compiled} ->
+        context_error(compiled, snapshot, intent) == nil and
+          is_map_key(snapshot["facts"], "audit_path_ready")
+
+      {:error, _} ->
+        false
+    end
+  end
+
   # A redeclared base fact gets a string value in half the snapshots, so
   # Context has to hold the base fact to boolean against fact_fields (§ 4.2).
   defp domain_gen do
     gen all(
-          {raw, _op, snapshot, _other, _} <- world_gen(),
+          {raw, op, snapshot, _other, _} <- world_gen(),
           registry_corruption <- corruption_gen(@registry_corruptions),
+          intent_corruption <- corruption_gen(@intent_corruptions),
           snapshot_corruption <-
             if(registry_corruption == :base_fact_redeclared,
               do:
@@ -1280,28 +1446,59 @@ defmodule KomkiPolicy.LeanSpecTest do
               else: corruption_gen(@snapshot_corruptions)
             )
         ) do
+      intent = %{
+        "schema" => "komki-intent/1",
+        "intent_id" => "intent-drt",
+        "operation" => op,
+        "object" => "obj-drt@v1",
+        "workspace" => "ws-drt"
+      }
+
       {corrupt_registry(raw, registry_corruption),
-       corrupt_snapshot(snapshot, snapshot_corruption)}
+       corrupt_snapshot(snapshot, snapshot_corruption),
+       corrupt_snapshot(intent, intent_corruption)}
     end
   end
 
-  defp domain_case({raw, snapshot}) do
+  defp domain_case({raw, snapshot, intent}) do
     case Registry.compile(raw) do
       {:ok, compiled} ->
-        case KomkiPolicy.Context.validate_snapshot(snapshot, compiled) do
-          {:ok, _} ->
-            {%{"registry" => raw, "snapshot" => snapshot, "intent" => %{"operation" => "domain"}},
-             %{"registry" => true, "snapshot" => true}}
+        accepted = match?({:ok, _}, Context.validate_snapshot(snapshot, compiled))
 
-          {:error, _} ->
-            {%{"registry" => raw, "intent" => %{"operation" => "domain"}},
-             %{"registry" => true, "snapshot" => nil}}
-        end
+        {%{"registry" => raw, "snapshot" => snapshot, "intent" => intent},
+         %{
+           "registry" => true,
+           "snapshot" => if(accepted, do: true),
+           "context_error" => context_error(compiled, snapshot, intent)
+         }}
 
       {:error, _} ->
         {nil, :dropped}
     end
   end
+
+  # The first error of validate_intent/1, validate_snapshot/2 and
+  # ensure_coherence/2, in that order.
+  defp context_error(compiled, snapshot, intent) do
+    with {:ok, auth} <- Context.validate_intent(intent),
+         {:ok, ctx} <- Context.validate_snapshot(snapshot, compiled),
+         :ok <- Context.ensure_coherence(ctx, auth) do
+      nil
+    else
+      {:error, %{code: code, path: path}} -> %{"code" => to_string(code), "path" => path}
+    end
+  end
+
+  # Puts `value` at `path` (`:delete` drops the key, `[]` replaces the term);
+  # a missing or non-object parent leaves the term as it is.
+  defp break_path(_term, [], value), do: value
+  defp break_path(term, [key], :delete) when is_map(term), do: Map.delete(term, key)
+  defp break_path(term, [key], value) when is_map(term), do: Map.put(term, key, value)
+
+  defp break_path(term, [key | rest], value) when is_map(term) and is_map_key(term, key),
+    do: Map.update!(term, key, &break_path(&1, rest, value))
+
+  defp break_path(term, _path, _value), do: term
 
   defp corrupt_registry(raw, :none), do: raw
 
@@ -1366,6 +1563,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   end
 
   defp corrupt_snapshot(snapshot, :none), do: snapshot
+  defp corrupt_snapshot(term, {:break, path, value}), do: break_path(term, path, value)
 
   defp corrupt_snapshot(snapshot, :unsorted_bindings),
     do: update_in(snapshot, ["workspace", "bindings"], &Enum.reverse/1)
@@ -1725,7 +1923,7 @@ defmodule KomkiPolicy.LeanSpecTest do
       command == "decide" and code in Enum.map(@derive_input_errors, &to_string/1) ->
         %{"exit" => 2, "result" => %{"input_error" => code}}
 
-      command == "verify" and cli_context_valid?(files) ->
+      command == "verify" and cli_registry_compiles?(files) ->
         %{"exit" => 2, "result" => %{"input_error" => code, "path" => path}}
 
       true ->
@@ -1733,16 +1931,12 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
-  defp cli_context_valid?(files) do
-    parsed = Map.new(files, fn {name, bytes} -> {name, KomkiPolicy.JSON.parse(bytes)} end)
+  defp cli_registry_compiles?(files) do
+    {_, bytes} = List.keyfind(files, "registry", 0)
 
-    with {:ok, raw} <- parsed["registry"],
-         {:ok, registry} <- Registry.compile(raw),
-         {:ok, snapshot} <- parsed["snapshot"],
-         {:ok, intent} <- parsed["intent"] do
-      context_valid?(registry, snapshot, intent)
-    else
-      _ -> false
+    case KomkiPolicy.JSON.parse(bytes) do
+      {:ok, raw} -> match?({:ok, _}, Registry.compile(raw))
+      {:error, _} -> false
     end
   end
 

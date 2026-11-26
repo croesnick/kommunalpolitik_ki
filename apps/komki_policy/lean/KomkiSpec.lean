@@ -21,3 +21,5 @@ import KomkiSpec.ReleaseCatalogSound
 import KomkiSpec.VerifyReasons
 import KomkiSpec.ProofInput
 import KomkiSpec.ProofInputSound
+import KomkiSpec.ContextInputSound
+import KomkiSpec.ContextInput
