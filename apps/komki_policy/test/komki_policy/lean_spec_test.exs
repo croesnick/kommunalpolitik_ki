@@ -512,8 +512,9 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
-  # Not a comparison with Lean, but the property the Lean theorem states
-  # for the model (#631): a GO the catalog offers takes effect. Each offer
+  # Not a comparison with Lean, but the property the Lean theorems state
+  # for the model (catalog_*_effective, #631, and release_catalog_*_effective
+  # after a denied release): a GO the catalog offers takes effect. Each offer
   # becomes a release with a fresh nonce; the release branch has to permit.
   # The object-scope GO (quarantine) is an Erstklassifikation (R.2.5), no
   # call of the release branch.
