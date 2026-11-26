@@ -64,7 +64,8 @@ Vermittlers, nicht der Engine.
 Die Sätze setzen voraus, was `Registry.compile/1` und `Context` durchsetzen
 (`Registry.WellFormed`, `Registry.AuthoritiesKnown`, `Snapshot.WellFormed`:
 Leser und Befugnis-Autoritäten ⊆ 𝒪, sortierte und eindeutige Labels,
-geschlossene Klassifikation, boolesche Basisfakten). Die Brücke prüft alles
+geschlossene Klassifikation, boolesche Basisfakten; dazu 𝒪 ≠ ∅ für
+`release_catalog_offenlegung_grantable`, `validate_observers/1`). Die Brücke prüft alles
 an jedem Fall des Differenztests (`Registry.wellFormed_sound`,
 `Registry.wellFormed_authorities`, `Snapshot.wellFormed_sound`). Dass
 `Registry.compile/1` und `Context` das wirklich durchsetzen, prüft ein
@@ -179,9 +180,11 @@ und `refused`, der neue Stand. `validate`, `plan`, Bedienfehler, Lesefehler
 und Exit 4 deckt nur
 `cli_test.exs` ab.
 
-Ein weiterer Test prüft in Elixir, was `catalog_*_effective` für das Modell
-beweist: Jedes angebotene GO für den exakten Call wird zu einer Freigabe
-mit frischer Nonce, und der Freigabe-Zweig muss erlauben.
+Ein weiterer Test prüft in Elixir, was `catalog_*_effective` und
+`release_catalog_*_effective` für das Modell beweisen: Jedes angebotene GO
+für den exakten Call, nach einer Ablehnung im normalen wie im
+Freigabe-Zweig, wird zu einer Freigabe mit frischer Nonce, und der
+Freigabe-Zweig muss erlauben.
 
 `KOMKI_SPEC_SEED` und `KOMKI_SPEC_RUNS` erweitern die Suche. Eine Abweichung
 schreibt ihre Fälle als JSONL-Datei; `komki-spec verify-batch`,
