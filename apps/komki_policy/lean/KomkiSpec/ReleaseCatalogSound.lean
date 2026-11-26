@@ -69,16 +69,16 @@ theorem release_catalog_aktion_mem {Γ : Registry} {c : CatalogCtx} {codes : Lis
   · simp [hrule] at hm
 
 /-- No empty promise after a denied Aktionsfreigabe (§ 2.8): the fresh GO
-the catalog offers is permitted, at any stand, with a fresh nonce and any
-observer as the granting authority. -/
+the catalog offers is permitted at any stand `St'`, with a nonce fresh
+there and any observer as the granting authority. -/
 theorem release_catalog_aktion_effective {Γ : Registry} {S : Snapshot} {I : Intent}
-    {R : Release} {St : Stand} {bs : List Blocker} {c h nonce auth : String}
+    {R : Release} {St St' : Stand} {bs : List Blocker} {c h nonce auth : String}
     (hd : deriveWithRelease Γ S I R St c = .decision (.deny bs))
     (hm : Go.aktion h ∈
       (catalogGos Γ (releaseCatalogCtx Γ S I.operation R c) (codesOf bs)).flatten)
-    (hn : St.consumed.lookup nonce = none) (ha : auth ∈ Γ.observers) :
-    deriveWithRelease Γ S I (aktionRelease h auth nonce St) St c =
-      .decision (.permit (proposalOf (aktionRelease h auth nonce St) St c)) := by
+    (hn : St'.consumed.lookup nonce = none) (ha : auth ∈ Γ.observers) :
+    deriveWithRelease Γ S I (aktionRelease h auth nonce St') St' c =
+      .decision (.permit (proposalOf (aktionRelease h auth nonce St') St' c)) := by
   obtain ⟨henv, hop, _, hdig, hcls, hbs⟩ := release_decision hd
   obtain ⟨hany, hkind, hh⟩ := release_catalog_aktion_mem rfl hm
   simp only [releaseCatalogCtx, Option.getD_some, ne_eq, Option.some.injEq] at hkind hh
@@ -159,9 +159,9 @@ theorem release_catalog_aktion_effective {Γ : Registry} {S : Snapshot} {I : Int
           subst hb
           simp [unbridgeableFor]
       · cases hb
-  have hchecks : releaseChecks Γ (aktionRelease h auth nonce St) St c = [] :=
+  have hchecks : releaseChecks Γ (aktionRelease h auth nonce St') St' c = [] :=
     releaseChecks_nil.2 ⟨hh, Int.le_refl _, Int.le_refl _, hn, rfl, ha⟩
-  have hblock : releaseBlockers Γ S I.operation (aktionRelease h auth nonce St) St c = [] := by
+  have hblock : releaseBlockers Γ S I.operation (aktionRelease h auth nonce St') St' c = [] := by
     simp only [releaseBlockers, aktionRelease, aktionBlockers]
     simp only [aktionRelease] at hchecks
     simp only [(by decide : ("aktionsfreigabe" == "offenlegungsfreigabe") = false),
@@ -214,18 +214,20 @@ theorem release_catalog_offenlegung_mem {Γ : Registry} {c : CatalogCtx} {codes 
   · simp [hrule] at hm
 
 /-- No empty promise after a denied Offenlegungsfreigabe (§ 2.8, § 4.9):
-the fresh GO the catalog offers is permitted, with a fresh nonce and an
-authority holding every needed Befugnis. -/
+the fresh GO the catalog offers is permitted at any stand `St'`, with a nonce
+fresh there and an observer holding every needed Befugnis. With nothing to
+relax, any observer will do. -/
 theorem release_catalog_offenlegung_effective {Γ : Registry} {S : Snapshot} {I : Intent}
-    {R : Release} {St : Stand} {bs : List Blocker} {c h art nonce auth : String}
+    {R : Release} {St St' : Stand} {bs : List Blocker} {c h art nonce auth : String}
     {zl : List String}
     (hd : deriveWithRelease Γ S I R St c = .decision (.deny bs))
     (hm : Go.offenlegung h art zl ∈
       (catalogGos Γ (releaseCatalogCtx Γ S I.operation R c) (codesOf bs)).flatten)
-    (hn : St.consumed.lookup nonce = none) (hak : Γ.AuthoritiesKnown)
-    (hb : auth ∈ lockerungsbefugte Γ (checkedLabel "store" S) (actualRecipients Γ S) art) :
-    deriveWithRelease Γ S I (offenlegungRelease h art zl auth nonce St) St c =
-      .decision (.permit (proposalOf (offenlegungRelease h art zl auth nonce St) St c)) := by
+    (hn : St'.consumed.lookup nonce = none) (ha : auth ∈ Γ.observers)
+    (hb : ∀ b ∈ lockerungsbeduerftig Γ (checkedLabel "store" S) (actualRecipients Γ S),
+      befugnis Γ b auth art = true) :
+    deriveWithRelease Γ S I (offenlegungRelease h art zl auth nonce St') St' c =
+      .decision (.permit (proposalOf (offenlegungRelease h art zl auth nonce St') St' c)) := by
   obtain ⟨henv, _, hkop, hdig, hcls, hbs⟩ := release_decision hd
   obtain ⟨hkind, hany, hh, hart, hzl⟩ := release_catalog_offenlegung_mem rfl hm
   simp only [releaseCatalogCtx, Option.getD_some, Option.some.injEq] at hkind hh hart hzl
@@ -332,23 +334,22 @@ theorem release_catalog_offenlegung_effective {Γ : Registry} {S : Snapshot} {I 
     | some a => simp [ha] at hart; rw [hart]
   have hfresh : ∀ (f : Release → List Blocker), (∀ R₁ R₂ : Release, R₁.ausgabeart = R₂.ausgabeart →
       R₁.ziellabel = R₂.ziellabel → f R₁ = f R₂) →
-      f (offenlegungRelease h art zl auth nonce St) = f R :=
+      f (offenlegungRelease h art zl auth nonce St') = f R :=
     fun f hf => hf _ _ (by simp [offenlegungRelease, hausg]) (by simp [offenlegungRelease, hzl])
-  have hzb' : ziellabelBlockers Γ S (offenlegungRelease h art zl auth nonce St) = [] := by
+  have hzb' : ziellabelBlockers Γ S (offenlegungRelease h art zl auth nonce St') = [] := by
     rw [hfresh (ziellabelBlockers Γ S) (fun R₁ R₂ ha hz => by simp [ziellabelBlockers, ha, hz]),
       hzb]
-  have hzr' : ziellabelRecipientBlockers Γ S (offenlegungRelease h art zl auth nonce St) = [] := by
+  have hzr' : ziellabelRecipientBlockers Γ S (offenlegungRelease h art zl auth nonce St') = [] := by
     rw [hfresh (ziellabelRecipientBlockers Γ S)
       (fun R₁ R₂ _ hz => by simp [ziellabelRecipientBlockers, hz]), hzr]
-  have ha : auth ∈ Γ.observers := lockerungsbefugte_known hak hb
-  have hchecks : releaseChecks Γ (offenlegungRelease h art zl auth nonce St) St c = [] :=
+  have hchecks : releaseChecks Γ (offenlegungRelease h art zl auth nonce St') St' c = [] :=
     releaseChecks_nil.2 ⟨hh, Int.le_refl _, Int.le_refl _, hn, rfl, ha⟩
-  have hbef : befugnisBlockers Γ S (offenlegungRelease h art zl auth nonce St) = [] := by
+  have hbef : befugnisBlockers Γ S (offenlegungRelease h art zl auth nonce St') = [] := by
     unfold befugnisBlockers
     rw [List.filterMap_eq_nil_iff]
     intro b hx
-    simp [offenlegungRelease, mem_lockerungsbefugte hb b hx]
-  have hblock : releaseBlockers Γ S I.operation (offenlegungRelease h art zl auth nonce St) St c =
+    simp [offenlegungRelease, hb b hx]
+  have hblock : releaseBlockers Γ S I.operation (offenlegungRelease h art zl auth nonce St') St' c =
       [] := by
     simp only [releaseBlockers, offenlegungRelease, beq_self_eq_true, ite_true,
       offenlegungBlockers]
@@ -361,28 +362,82 @@ theorem release_catalog_offenlegung_effective {Γ : Registry} {S : Snapshot} {I 
   rw [hblock]
   simp [henv', hdig', hcls, offenlegungRelease, hstore, (by decide : "store" ∈ outputOperations)]
 
+/-- A Befugnis names an observer, once `Registry.compile/1` has checked the
+authorities. -/
+theorem befugnis_known {Γ : Registry} (hak : Γ.AuthoritiesKnown) {b a art : String}
+    (h : befugnis Γ b a art = true) : a ∈ Γ.observers := by
+  unfold befugnis at h
+  split at h
+  · cases h
+  · next bd hbd =>
+    obtain ⟨⟨a', r, o⟩, hx, hxa⟩ := List.any_eq_true.1 h
+    simp only [Bool.and_eq_true, beq_iff_eq] at hxa
+    obtain ⟨⟨rfl, _⟩, _⟩ := hxa
+    exact hak b bd hbd _ hx
+
+/-- Someone can take the offer up. The catalog offers an Offenlegungsfreigabe
+only if the denied release lacked no Befugnis (`lockerungsbefugnis_fehlt` is
+beyond it), so its authority serves; with nothing to relax, any observer. -/
+theorem release_catalog_offenlegung_grantable {Γ : Registry} {S : Snapshot} {I : Intent}
+    {R : Release} {St St' : Stand} {bs : List Blocker} {c h art nonce : String}
+    {zl : List String}
+    (hd : deriveWithRelease Γ S I R St c = .decision (.deny bs))
+    (hm : Go.offenlegung h art zl ∈
+      (catalogGos Γ (releaseCatalogCtx Γ S I.operation R c) (codesOf bs)).flatten)
+    (hn : St'.consumed.lookup nonce = none) (hak : Γ.AuthoritiesKnown)
+    (hobs : Γ.observers ≠ []) :
+    ∃ auth, deriveWithRelease Γ S I (offenlegungRelease h art zl auth nonce St') St' c =
+      .decision (.permit (proposalOf (offenlegungRelease h art zl auth nonce St') St' c)) := by
+  obtain ⟨_, _, _, _, _, hbs⟩ := release_decision hd
+  obtain ⟨hkind, hany, _, hart, _⟩ := release_catalog_offenlegung_mem rfl hm
+  simp only [releaseCatalogCtx, Option.some.injEq] at hkind hart
+  have hbs' : bs = offenlegungBlockers Γ S R St c := by
+    rw [hbs bs rfl]
+    simp [releaseBlockers, hkind]
+  have hbef : ∀ b ∈ lockerungsbeduerftig Γ (checkedLabel "store" S) (actualRecipients Γ S),
+      befugnis Γ b R.authority art = true := by
+    intro b hb
+    cases hf : befugnis Γ b R.authority art
+    · have hmem : ({ code := "lockerungsbefugnis_fehlt", binding := some b } : Blocker) ∈ bs := by
+        rw [hbs']
+        simp only [offenlegungBlockers, List.mem_append]
+        refine Or.inl (Or.inr ?_)
+        simp only [befugnisBlockers, List.mem_filterMap]
+        exact ⟨b, hb, by simp [← hart, hf]⟩
+      have := hany _ (List.mem_map_of_mem hmem)
+      simp [offenlegungBeyond, offenlegungUnbridgeableCodes] at this
+    · rfl
+  cases hl : lockerungsbeduerftig Γ (checkedLabel "store" S) (actualRecipients Γ S) with
+  | nil =>
+    obtain ⟨o, ho⟩ := List.exists_mem_of_ne_nil _ hobs
+    exact ⟨o, release_catalog_offenlegung_effective hd hm hn ho (by simp [hl])⟩
+  | cons b _ =>
+    have hb := hbef b (by simp [hl])
+    exact ⟨R.authority, release_catalog_offenlegung_effective hd hm hn (befugnis_known hak hb) hbef⟩
+
 /-- `release_catalog_aktion_effective` for the whole catalog of a denied release. -/
 theorem release_remedies_aktion_effective {Γ : Registry} {S : Snapshot} {I : Intent}
-    {R : Release} {St : Stand} {bs : List Blocker} {c h nonce auth : String}
+    {R : Release} {St St' : Stand} {bs : List Blocker} {c h nonce auth : String}
     (hd : deriveWithRelease Γ S I R St c = .decision (.deny bs))
     (hm : Transition.go (.aktion h) ∈
       (catalog Γ (releaseCatalogCtx Γ S I.operation R c) (bs.map Blocker.finding)).flatten)
-    (hn : St.consumed.lookup nonce = none) (ha : auth ∈ Γ.observers) :
-    deriveWithRelease Γ S I (aktionRelease h auth nonce St) St c =
-      .decision (.permit (proposalOf (aktionRelease h auth nonce St) St c)) :=
+    (hn : St'.consumed.lookup nonce = none) (ha : auth ∈ Γ.observers) :
+    deriveWithRelease Γ S I (aktionRelease h auth nonce St') St' c =
+      .decision (.permit (proposalOf (aktionRelease h auth nonce St') St' c)) :=
   release_catalog_aktion_effective hd (deny_go_mem hm) hn ha
 
 /-- `release_catalog_offenlegung_effective` for the whole catalog of a denied release. -/
 theorem release_remedies_offenlegung_effective {Γ : Registry} {S : Snapshot} {I : Intent}
-    {R : Release} {St : Stand} {bs : List Blocker} {c h art nonce auth : String}
+    {R : Release} {St St' : Stand} {bs : List Blocker} {c h art nonce auth : String}
     {zl : List String}
     (hd : deriveWithRelease Γ S I R St c = .decision (.deny bs))
     (hm : Transition.go (.offenlegung h art zl) ∈
       (catalog Γ (releaseCatalogCtx Γ S I.operation R c) (bs.map Blocker.finding)).flatten)
-    (hn : St.consumed.lookup nonce = none) (hak : Γ.AuthoritiesKnown)
-    (hb : auth ∈ lockerungsbefugte Γ (checkedLabel "store" S) (actualRecipients Γ S) art) :
-    deriveWithRelease Γ S I (offenlegungRelease h art zl auth nonce St) St c =
-      .decision (.permit (proposalOf (offenlegungRelease h art zl auth nonce St) St c)) :=
-  release_catalog_offenlegung_effective hd (deny_go_mem hm) hn hak hb
+    (hn : St'.consumed.lookup nonce = none) (ha : auth ∈ Γ.observers)
+    (hb : ∀ b ∈ lockerungsbeduerftig Γ (checkedLabel "store" S) (actualRecipients Γ S),
+      befugnis Γ b auth art = true) :
+    deriveWithRelease Γ S I (offenlegungRelease h art zl auth nonce St') St' c =
+      .decision (.permit (proposalOf (offenlegungRelease h art zl auth nonce St') St' c)) :=
+  release_catalog_offenlegung_effective hd (deny_go_mem hm) hn ha hb
 
 end KomkiSpec

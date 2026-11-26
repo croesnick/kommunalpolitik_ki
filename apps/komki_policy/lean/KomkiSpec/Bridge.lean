@@ -403,7 +403,8 @@ def jsonCase (j : JVal) : Decode Json := do
 def cliFiles : String → List String
   | "verify" => ["registry", "snapshot", "intent", "proof"]
   | "advance" => ["stand", "proposal"]
-  | _ => ["registry", "snapshot", "intent", "release", "stand"]
+  | "decide" => ["registry", "snapshot", "intent", "release", "stand"]
+  | _ => []
 
 def cliResult (exit : Nat) (result : Json) : Json :=
   Json.mkObj [("exit", Lean.toJson exit), ("result", result)]
@@ -433,7 +434,7 @@ def cliCase (j : JVal) : Decode Json := do
   | "advance" =>
     let r ← advanceCase input
     pure (cliResult (if (r.getObjVal? "ok").toOption.isSome then 0 else 1) r)
-  | _ =>
+  | "decide" =>
     -- Without a release, `decide` rejects an unsupported operation before it
     -- validates the snapshot (`decide_validated?/4`); with one, the other
     -- way round (`release_validated?/5`). #644 asks which order holds.
@@ -445,5 +446,6 @@ def cliCase (j : JVal) : Decode Json := do
     let exit := if (r.getObjVal? "input_error").toOption.isSome then 2
       else if (r.getObjVal? "unsupported").toOption.isSome then 3 else 0
     pure (cliResult exit r)
+  | other => throw s!"unknown command {other}"
 
 end KomkiSpec
