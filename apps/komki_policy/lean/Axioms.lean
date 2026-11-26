@@ -19,6 +19,7 @@ open KomkiSpec
 #print axioms derive_verifies
 #print axioms verifyReport_verdict
 #print axioms proofError_decodes
+#print axioms snapshotError_validated
 #print axioms aktion_permit
 #print axioms offenlegung_permit
 #print axioms release_single_use
