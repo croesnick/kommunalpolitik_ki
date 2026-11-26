@@ -12,7 +12,9 @@ with `derive`'s decision, or `<id> error <reason>`.
 `komki-spec release-batch` and `advance-batch`: the same for
 `decide_with_release/5` (`{…, "release", "stand", "call_hash"}`) and for
 `Stand.advance/2` (`{"id", "stand", "proposal"}`); `eval-batch` for
-`Evaluator.evaluate/2` (`{"id", "expression", "facts"}`).
+`Evaluator.evaluate/2` (`{"id", "expression", "facts"}`); `domain-batch`
+checks a registry (and snapshot) against the domain the input checks
+guarantee (`{"id", "registry", "snapshot"?}`).
 
 `komki-spec constants`: the fixed tables of the model, for the comparison
 with `KomkiPolicy.Derive`.
@@ -51,9 +53,10 @@ def main : List String → IO UInt32
   | ["release-batch", path] => runBatch (fun j => (releaseCase j).map (·.compress)) path
   | ["advance-batch", path] => runBatch (fun j => (advanceCase j).map (·.compress)) path
   | ["eval-batch", path] => runBatch (fun j => (evalCase j).map (·.compress)) path
+  | ["domain-batch", path] => runBatch (fun j => (domainCase j).map (·.compress)) path
   | ["constants"] => do
     IO.println constants.compress
     return 0
   | _ => do
-    IO.eprintln "usage: komki-spec verify-batch|derive-batch|release-batch|advance-batch|eval-batch <cases.jsonl> | komki-spec constants"
+    IO.eprintln "usage: komki-spec verify-batch|derive-batch|release-batch|advance-batch|eval-batch|domain-batch <cases.jsonl> | komki-spec constants"
     return 2

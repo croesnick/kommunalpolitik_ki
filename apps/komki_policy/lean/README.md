@@ -25,11 +25,19 @@ CI.
 | `release_single_use` | Ist der Verbrauch committet, erlaubt dieselbe Freigabe nie wieder, an keinem späteren Stand | CONTRACT.md § 2.7, B.8 |
 | `advance_cas` | Von zwei Vorschlägen für denselben Stand committet höchstens einer | CONTRACT.md § 2.7 |
 | `catalog_aktion_effective`, `catalog_offenlegung_effective` | Bietet der Katalog einer Ablehnung des normalen Zweigs ein GO für den exakten Call an, erlaubt der Freigabe-Zweig eine Freigabe genau nach diesem Angebot | CONTRACT.md § 2.8, #631 |
+| `catalog_gos` | Die GO-Angebote des ganzen Katalogs (`catalog`) sind Eintrag für Eintrag die, über die die Wirksamkeitssätze sprechen (`catalogGos`), für jeden Befund, den `derive` meldet | CONTRACT.md § 2.8 |
+| `remedies_aktion_effective`, `remedies_offenlegung_effective` | Daraus: Jedes GO, das ein Eintrag des ganzen Katalogs einer Ablehnung des normalen Zweigs anbietet, wirkt | CONTRACT.md § 2.8 |
 | `catalog_ascending` | In jedem Eintrag des Katalogs stehen die Fortsetzungen in der normativen Ordnung: kein GO vor einer Fortsetzung, die nichts verletzt | CONTRACT.md § 2.8 |
+| `derive_fakt_deny`, `derive_fakt_indeterminate` | `fakt_nachreichen` fragt nach genau dem Feld, das sein Befund nennt, nie nach keinem | CONTRACT.md § 2.8 |
+| `derive_blockers_named`, `derive_evidence_named` | Was ein Befund nennt, ist das, was § 2.8 meint: bei `missing_fact` einen Fakt, der im Snapshot fehlt; bei `recipients_unproven` die Beobachterliste, die nicht `true` ist; bei `basis_right_false` einen Basisfakt der Regel, der `false` ist, bei `audit_path_not_ready` genau `audit_path_ready`; bei `binding_condition_false` ein Feld der falschen Bedingung, und keines nur, wenn die Bedingung unabhängig von den Fakten `false` ist | CONTRACT.md § 2.8, § 4.3, § 4.4 |
+| `derive_transformations_listed` | `registrierte_transformation` listet bei `label_not_included` genau die registrierten Transformationen mit `input_labels ⊆ λ(x)` und `output_labels ⊆ B_W`, in der Reihenfolge der Registry | CONTRACT.md § 2.1, § 2.8 |
+| `remedies_transformation` | `registrierte_transformation` bietet nur registrierte Transformationen mit `input_labels ⊆ λ(x)` und `output_labels` im Prüflabel an; ein Objekt mit diesen Labels besteht die Label-Inklusion | CONTRACT.md § 2.1, § 2.8 |
+| `catalog_neuerRaum`, `neuer_raum_necessary`, `neuer_raum_recipients_necessary` | `neuer_raum` trägt `required_bindings` = λ(x) bei `admit`, sonst `[]`, und `required_recipients` = ρ_Γ(c). Beides ist notwendig: Jeder Raum, in dem `derive` x aufnimmt, hat alle `required_bindings`; jeder Raum in derselben Umgebung, in dem `derive` erlaubt, lässt alle `required_recipients` unter seinem Prüflabel zu | CONTRACT.md § 2.8, B.7 |
 | `derive_deny_remedied`, `derive_indeterminate_remedied`, `release_remedied` | Jeder Blocker und jeder fehlende Beleg von `derive`, auch im Freigabe-Zweig, bekommt mindestens eine Fortsetzung, kein nacktes `deny` | CONTRACT.md § 2.8, APPA Theorem 5 |
 | `eval_mono` | Mehr Fakten kippen kein bekanntes Urteil des dreiwertigen Auswerters | R.5.2, CONTRACT.md § 3 |
 | `recipients_antitone`, `permitted_antitone` | Mehr Bindungen, nie mehr Empfänger; Erlaubt vererbt sich auf Teilmengen | A.2 |
 | `no_forbidden_recipient` | Ohne Lockerung erreicht nichts, was von x abhängt, einen Beobachter außerhalb von R_Γ(λ(x)) | Kern von A.3: nur die Labels, ohne Schrittmodell |
+| `Registry.compiledOk_sound`, `Snapshot.validated_sound` | Was die Eingabeprüfung im Modell zusichert (`Registry.compiledOk`, `Snapshot.validated`), erfüllt die Voraussetzungen der übrigen Sätze | CONTRACT.md § 2.1, § 2.2, § 3 |
 
 Kein `sorry`: `lake build` behandelt jede Warnung als Fehler.
 `./check-axioms.sh` zeigt die Axiome je Hauptsatz und lässt nur Leans
@@ -52,7 +60,9 @@ Die Sätze setzen voraus, was `Registry.compile/1` und `Context` durchsetzen
 Leser und Befugnis-Autoritäten ⊆ 𝒪, sortierte und eindeutige Labels,
 geschlossene Klassifikation, boolesche Basisfakten). Die Brücke prüft alles
 an jedem Fall des Differenztests (`Registry.wellFormed_sound`,
-`Registry.wellFormed_authorities`, `Snapshot.wellFormed_sound`).
+`Registry.wellFormed_authorities`, `Snapshot.wellFormed_sound`). Dass
+`Registry.compile/1` und `Context` das wirklich durchsetzen, prüft ein
+eigener Differenztest mit verdorbenen Eingaben (siehe unten).
 
 ## Vertrauenskette
 
@@ -116,14 +126,30 @@ Den Auswerter vergleicht er auch direkt: die Grenzfälle aus
 `priv/fixtures/expressions/evaluate_expectations.json` und 8 000
 generierte Ausdrücke über generierten Fakten, Urteil gegen Urteil.
 
+Die Eingabeprüfung vergleicht er mit verdorbenen Eingaben: Je Welt wird
+die Registry an einer Stelle beschädigt (fremder Leser, fremde Autorität,
+fremder Umgebungsbeobachter, leere oder doppelte Leser, unbekanntes Ein-
+oder Ausgabelabel einer Transformation, leere Eingabelabels, ein in
+`fact_fields` umdeklarierter Basisfakt, ein Ausdruck mit unbekanntem Feld, falschem
+Literaltyp, Gleitkommazahl, negativer Schranke, falschem Operator für den
+Feldtyp oder falscher Form) und der Snapshot ebenso (unsortierte oder
+doppelte Bindungen und Labels, unbekannte Bindung oder Umgebung, Fakt mit
+falschem Typ, auch ein Basisfakt als String, `string_set` mit einem
+Nicht-String, undeklarierter Fakt, fremde Klassifikation), jeweils oder
+beides unverdorben. Was `Registry.compile/1` und
+`Context.validate_snapshot/2` annehmen, muss `Registry.compiledOk`
+beziehungsweise `Snapshot.validated` erfüllen: die Voraussetzungen der
+Sätze und typrichtige Ausdrücke und Fakten nach § 3, mit denen die
+Zweige des Auswerters für falsch typisierte Werte unerreichbar sind.
+
 Ein weiterer Test prüft in Elixir, was `catalog_*_effective` für das Modell
 beweist: Jedes angebotene GO für den exakten Call wird zu einer Freigabe
 mit frischer Nonce, und der Freigabe-Zweig muss erlauben.
 
 `KOMKI_SPEC_SEED` und `KOMKI_SPEC_RUNS` erweitern die Suche. Eine Abweichung
 schreibt ihre Fälle als JSONL-Datei; `komki-spec verify-batch`,
-`derive-batch`, `release-batch`, `advance-batch` beziehungsweise
-`eval-batch` spielt sie nach.
+`derive-batch`, `release-batch`, `advance-batch`, `eval-batch`
+beziehungsweise `domain-batch` spielt sie nach.
 
 ## Synchron halten
 
@@ -139,8 +165,8 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `verify.ex` | `KomkiSpec/Verify.lean` |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
-| `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal` |
-| `context.ex` | `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean` (Wertebereich nach der Eingabeprüfung) |
+| `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
+| `context.ex` | `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean`, `Snapshot.validated` in `Input.lean` (Wertebereich nach der Eingabeprüfung) |
 
 Dann das Lean-Modell gegen die Änderung prüfen und anpassen, `lake build`
 und den Differenztest laufen lassen und den Pin erneuern:
@@ -156,12 +182,15 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 
 ## Grenzen
 
-- **Vom Remedy-Katalog sind Wirksamkeit, Ordnung und Vollständigkeit
-  bewiesen,** nicht die Payloads der übrigen Fortsetzungen; die hält der
-  Differenztest am Elixir-Code. Die Wirksamkeitssätze sprechen über
+- **Vom Remedy-Katalog sind Wirksamkeit, Ordnung, Vollständigkeit und
+  die Payload-Zusagen aus § 2.8 bewiesen**: das Feld von
+  `fakt_nachreichen`, die Liste der Transformationen, notwendige Bindungen
+  und Empfänger von `neuer_raum`. Dass die Registry ihre Transformationen
+  nach Kennung sortiert hält, besorgt die unbewiesene Brücke wie
+  `Remedies.matching_transformations/2`. Die Wirksamkeitssätze sprechen über
   `catalogGos` (`Release.lean`), Ordnung und Vollständigkeit über `catalog`
-  (`Remedies.lean`). Dass beide auf den GO-Einträgen übereinstimmen, zeigt
-  nur der Differenztest, der beide mit Elixir vergleicht; ein Satz fehlt.
+  (`Remedies.lean`); `catalog_gos` zeigt, dass beide dieselben GOs
+  anbieten.
 - **Katalogsätze nur für den normalen Zweig.** `catalog_*_effective` gilt
   für die GO-Angebote einer Ablehnung im normalen Zweig. Dass ein erneutes
   Angebot nach einer Ablehnung im Freigabe-Zweig wirkt, prüft nur der
@@ -183,11 +212,17 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   Reihenfolge modelliert die Spezifikation nicht; bei `derive` dagegen
   Blocker und fehlende Belege samt Reihenfolge.
 - **Nur der geprüfte Wertebereich.** Das Modell setzt voraus, was
-  `Registry.compile/1` und `Context` durchsetzen (siehe oben). Von der
-  Eingabeprüfung sind nur die Snapshot-Voraussetzung der Ausgaberegeln
-  (#628) und, für `derive`, `unknown_environment` modelliert und
-  abgeglichen; Fälle mit einem anderen Eingabefehler lässt der
-  Differenztest weg. Wo Elixir außerhalb des
+  `Registry.compile/1` und `Context` durchsetzen (siehe oben). Dass sie es
+  durchsetzen, prüft der Differenztest für die Verderbungen seines
+  Katalogs, je eine für jede Prüfung, auf der die Sätze ruhen, und nur in
+  dieser Richtung: Lehnt Elixir mehr ab, als das Modell verlangt (Schema,
+  Kennungsformat, geschlossene Felder, Quellenangabe der Fakten, Sortierung
+  von Lesern und Transformationslabels, Vokabular der Befugnisse,
+  Operationsnamen, `identity`, `registry_ref`), bleibt das ungeprüft,
+  ebenso die Fehlercodes. Von den Eingabefehlern sind nur
+  die Snapshot-Voraussetzung der Ausgaberegeln (#628) und, für `derive`,
+  `unknown_environment` als Urteil modelliert; Fälle mit einem anderen
+  Eingabefehler lassen die übrigen Vergleiche weg. Wo Elixir außerhalb des
   Bereichs abstürzen würde, etwa bei einem Ausdruck außerhalb von B.4,
   verweigert das Modell (`missing_operation_rule`).
 - **Kohärenz von Intent und Snapshot liegt außerhalb.** Dass Objekt,

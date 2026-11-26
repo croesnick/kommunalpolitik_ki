@@ -13,3 +13,6 @@ import KomkiSpec.ReleaseSound
 import KomkiSpec.CatalogSound
 import KomkiSpec.Remedies
 import KomkiSpec.RemediesSound
+import KomkiSpec.Input
+import KomkiSpec.CatalogAgree
+import KomkiSpec.RemediesPayload

@@ -7,7 +7,8 @@ Mirrors `KomkiPolicy.Derive.decide_with_release/5` (Aktionsfreigabe § 4.6,
 Offenlegungsfreigabe § 4.9), `KomkiPolicy.Stand.advance/2` (§ 2.7) and the
 GO part of `KomkiPolicy.Remedies.catalog/3` (§ 2.8): which finding offers
 which GO (`catalogGos`, which the catalog theorems are about). The whole
-catalog is `catalog` in `Remedies.lean`.
+catalog is `catalog` in `Remedies.lean`; `catalog_gos` shows both offer the
+same GOs.
 
 The call hash is SHA-256 over the call (§ 2.6). The model takes the hash of
 the decided call as a parameter `callHash`; the theorems hold for every
