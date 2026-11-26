@@ -164,7 +164,9 @@ Die CLI vergleicht er auf Dateibytes: `komki-policy decide` (auch mit
 Dateien aus den Welten der übrigen Tests, jede vierte mit einem
 veränderten Byte in einer Datei, jede achte ab einer wechselnden Datei mit
 einem eigenen Parserfehler je Datei, dazu `decide` mit unbekannter Umgebung, mit und ohne
-Freigabe, für die eigene Operation und für `start` (#644). Das Modell liest
+Freigabe, für die eigene Operation und für `start`, und ohne Freigabe `start`
+mit einem Snapshot ohne `object`, den nur die vorgezogene
+`unsupported`-Prüfung beantwortet (#644). Das Modell liest
 dieselben Bytes mit dem strengen Parser in der Reihenfolge der CLI und
 entscheidet; verglichen werden Exit-Code (§ 7), Fehlercode des Parsers und
 die Felder der Ausgabe, die das Modell kennt: die Entscheidung ohne die
