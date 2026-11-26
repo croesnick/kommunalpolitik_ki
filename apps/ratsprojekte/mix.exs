@@ -4,7 +4,7 @@ defmodule Ratsprojekte.MixProject do
   def project do
     [
       app: :ratsprojekte,
-      version: "0.1.0",
+      version: "0.1.1",
       description:
         "Lokaler Hub für Ratsprojekte: der gemeinsame Stand von der Idee zum Antrag (Phoenix LiveView)",
       elixir: "~> 1.17",
