@@ -135,7 +135,11 @@ Für die Freigabe-Zweige vergleicht er dasselbe samt geplantem Verbrauch
 danach, verbrauchte Nonce, unbekannte Autorität, Offenlegungsfreigaben mit
 passender oder falscher Ausgabeart und Ziellabel). Für `advance` vergleicht
 er den nächsten Stand oder den Ablehnungsgrund, auch für die Wiederholung
-nach einem Commit.
+nach einem Commit. Die Schemaprüfungen von Freigabe, Stand und Vorschlag
+(`KomkiSpec/ReleaseInput.lean`) vergleicht er an je einem Fixture mit
+Aktions- und Offenlegungsfreigabe: jede Verderbung aus seinem Katalog
+allein, jedes geordnete Paar, Freigabe mit Stand, Intent mit Freigabe und
+Stand mit Vorschlag, jeweils Code und Pfad des ersten Fehlers.
 
 Den Auswerter vergleicht er auch direkt: die Grenzfälle aus
 `priv/fixtures/expressions/evaluate_expectations.json` und 8 000
@@ -213,7 +217,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 |---|---|
 | `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige), `callHashOf` in `KomkiSpec/CallHash.lean` (`output_call_hash/2`) |
 | `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
-| `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
+| `stand.ex` | `advance` in `KomkiSpec/Release.lean`, `standError` und `proposalError` in `KomkiSpec/ReleaseInput.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` (Urteil), `KomkiSpec/VerifyReasons.lean` (Befunde), `KomkiSpec/ProofInput.lean` (Eingabeprüfung des Beweisbaums) |
 | `validations.ex` | `firstUnknown` in `KomkiSpec/ProofInput.lean` (`closed_fields/3`: erstes unbekanntes Feld in Sortierreihenfolge) |
 | `cli.ex` | `cliFiles` und `cliCase` in `KomkiSpec/Bridge.lean` (Lesereihenfolge der Dateien, Exit-Codes) |
@@ -221,7 +225,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
 | `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
 | `json.ex` | `KomkiSpec/Json.lean` (Parser, kanonischer Encoder) |
-| `release.ex` | `callHashOf` in `KomkiSpec/CallHash.lean`, SHA-256 in `KomkiSpec/Sha256.lean` |
+| `release.ex` | `callHashOf` in `KomkiSpec/CallHash.lean`, SHA-256 in `KomkiSpec/Sha256.lean`, `releaseError` in `KomkiSpec/ReleaseInput.lean` |
 | `context.ex` | `KomkiSpec/ContextInput.lean` (Eingabeprüfung von Intent und Snapshot, Kohärenz), `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean`, `Snapshot.validated` in `Input.lean` (Wertebereich nach der Eingabeprüfung) |
 
 Dann das Lean-Modell gegen die Änderung prüfen und anpassen, `lake build`
@@ -257,8 +261,9 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   auch für `callHashOf`, den die Brücke rechnet (SHA-256 über die
   kanonische Form, § 2.6). Dass verschiedene Calls verschiedene Hashes
   haben, setzt die Kollisionsresistenz von SHA-256 voraus; beweisen lässt
-  sie sich nicht. Die Schemaprüfung von Freigabe und Stand ist nicht
-  modelliert.
+  sie sich nicht. Die vier beschreibenden Felder einer Freigabe
+  (`operation`, `object`, `workspace`, `content_digest`) prüft auch
+  Elixir nur auf ihre Form; an den Call bindet allein `call_hash` (#655).
 - **JSON-Schicht ausführbar, nicht bewiesen.** `Json.lean` und
   `Sha256.lean` sind ausführbare Spezifikationen, die der Differenztest am
   Elixir-Code hält; Sätze über sie gibt es nicht. Gleitkommazahlen druckt
@@ -281,9 +286,9 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   ebenso dessen Fehlercodes. Für `verify` ist jeder Eingabefehler nach
   einer kompilierten Registry modelliert (Intent, Snapshot, Kohärenz,
   Snapshot-Voraussetzung der Ausgaberegeln (#628), Beweisbaum), ebenso
-  für `derive` (Intent, `unsupported`, Snapshot, Kohärenz, #628); im
-  Freigabe-Zweig fehlen die Schemaprüfungen von Freigabe und Stand, Fälle
-  mit einem solchen Eingabefehler lassen die übrigen Vergleiche weg. Wo Elixir außerhalb des
+  für `derive` (Intent, `unsupported`, Snapshot, Kohärenz, #628, im
+  Freigabe-Zweig dazu die Schemata von Freigabe und Stand) und für
+  `advance` (Stand und Vorschlag). Wo Elixir außerhalb des
   Bereichs abstürzen würde, etwa bei einem Ausdruck außerhalb von B.4,
   verweigert das Modell (`missing_operation_rule`).
 - **Die Brücke ist unbewiesen.** `KomkiSpec/Bridge.lean` liest die Fälle

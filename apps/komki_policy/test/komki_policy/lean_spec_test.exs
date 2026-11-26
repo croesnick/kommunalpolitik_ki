@@ -8,9 +8,8 @@ defmodule KomkiPolicy.LeanSpecTest do
   #
   # Only cases inside the validated domain are compared: Elixir has to
   # return a verdict, a decision or a modelled input error. Against a
-  # compiled registry that is every input error of `verify` and of `derive`
-  # without a release; with one, the schema checks of release and stand
-  # are not modelled and drop the case. Within
+  # compiled registry that is every input error of `verify` and `derive`,
+  # and every one of `advance`; any other drops the case. Within
   # that domain, everything compared has to match. KOMKI_SPEC_SEED and
   # KOMKI_SPEC_RUNS widen the search; a mismatch writes its cases to a JSONL
   # file for replay with `komki-spec verify-batch` or `derive-batch`.
@@ -161,6 +160,72 @@ defmodule KomkiPolicy.LeanSpecTest do
     {:break, ["operation"], "plan"},
     {:break, ["workspace"], "ws-fremd"},
     {:break, ["object"], "obj-fremd@v1"}
+  ]
+
+  # One per code and path of Release.validate/1, Stand.validate/1 and
+  # validate_proposal/1 (CONTRACT § 2.6, § 2.7, § 4.6); `:delete` drops the
+  # field, `[]` replaces the whole record.
+  @release_breaks [
+    {[], 7},
+    {["schema"], :delete},
+    {["schema"], "komki-release/9"},
+    {["zusatz"], true},
+    {["ausgabeart"], "sitzungsmappe"},
+    {["release_id"], "Go 1"},
+    {["kind"], "erfunden"},
+    {["kind"], "offenlegungsfreigabe"},
+    {["operation"], "plan"},
+    {["object"], "obj"},
+    {["workspace"], 7},
+    {["content_digest"], "abc"},
+    {["call_hash"], String.upcase(@hex)},
+    {["scope"], "Scope"},
+    {["authority"], nil},
+    {["valid_from"], -1},
+    {["valid_until"], "100"},
+    {["valid_from"], 999_999},
+    {["nonce"], "N"}
+  ]
+  @offenlegung_breaks [
+    {["ausgabeart"], :delete},
+    {["ausgabeart"], nil},
+    {["ausgabeart"], "erfunden"},
+    {["ausgabeart"], 7},
+    {["ziellabel"], :delete},
+    {["ziellabel"], []},
+    {["ziellabel"], ["ratsprojekte@1", "b-eins@1"]},
+    {["ziellabel"], ["kein-ref"]},
+    {["ziellabel"], "ratsprojekte@1"},
+    {["schema"], "komki-release/1"}
+  ]
+  @stand_breaks [
+    {[], "stand"},
+    {["schema"], :delete},
+    {["schema"], 1},
+    {["zusatz"], true},
+    {["stand_id"], "Stand"},
+    {["version"], -1},
+    {["version"], "3"},
+    {["scope"], 7},
+    {["as_of"], "50"},
+    {["consumed"], :delete},
+    {["consumed"], []},
+    {["consumed"], %{"N" => "go-a"}},
+    {["consumed"], %{"n-a" => 7}}
+  ]
+  @proposal_breaks [
+    {[], nil},
+    {["zusatz"], true},
+    {["ausgabeart"], "sitzungsmappe"},
+    {:merge, %{"ausgabeart" => "erfunden", "ziellabel" => ["ratsprojekte@1"]}},
+    {:merge, %{"ausgabeart" => "ratsprojekte-essenz", "ziellabel" => []}},
+    {:merge, %{"ausgabeart" => nil, "ziellabel" => nil}},
+    {["release_id"], :delete},
+    {["release_id"], "Go"},
+    {["nonce"], 7},
+    {["stand_ref"], "stand-drt@03"},
+    {["call_hash"], "abc"},
+    {["stand_version_after"], -1}
   ]
 
   # The error codes of JSON.parse/1, which the Lean parser models.
@@ -406,6 +471,60 @@ defmodule KomkiPolicy.LeanSpecTest do
     for op <- Derive.output_operations(), decision <- ~w(permit deny) do
       assert Map.get(stats, {op, decision}, 0) >= 100, "zu wenige #{op}/#{decision}"
     end
+  end
+
+  test "Freigabe, Stand und Vorschlag: Eingabefehler wie im Lean-Modell" do
+    cases = fixture_release_cases()
+    aktion = Enum.find(cases, &(elem(&1, 4)["kind"] == "aktionsfreigabe"))
+    offen = Enum.find(cases, &(elem(&1, 4)["kind"] == "offenlegungsfreigabe"))
+    {raw, registry, snapshot, intent, release, stand} = aktion
+    intent_breaks = for {:break, path, value} <- @intent_corruptions, do: {path, value}
+
+    decide =
+      for(r <- break_variants(release, @release_breaks), do: put_elem(aktion, 4, r)) ++
+        for(r <- break_variants(elem(offen, 4), @offenlegung_breaks), do: put_elem(offen, 4, r)) ++
+        for(s <- break_variants(stand, @stand_breaks), do: put_elem(aktion, 5, s)) ++
+        for(
+          a <- @release_breaks,
+          b <- @stand_breaks,
+          do: {raw, registry, snapshot, intent, schema_break(release, a), schema_break(stand, b)}
+        ) ++
+        for a <- intent_breaks,
+            b <- @release_breaks,
+            do:
+              {raw, registry, snapshot, schema_break(intent, a), schema_break(release, b), stand}
+
+    proposal = proposal("n-neu", 3, 4)
+
+    advance =
+      for(p <- break_variants(proposal, @proposal_breaks), do: {@stand, p}) ++
+        for(s <- break_variants(@stand, @stand_breaks), do: {s, proposal}) ++
+        for a <- @stand_breaks,
+            b <- @proposal_breaks,
+            do: {schema_break(@stand, a), schema_break(proposal, b)}
+
+    decide_pairs = Enum.map(decide, &release_pair/1)
+
+    advance_pairs =
+      for {s, p} <- advance,
+          do:
+            {%{"stand" => s, "proposal" => p, "intent" => %{"operation" => "advance"}},
+             elixir_advance(s, p)}
+
+    compare_json!(decide_pairs, "release-batch", "release", "Release/Stand.validate und Lean")
+    compare_json!(advance_pairs, "advance-batch", "advance", "Stand.advance/2 und Lean")
+
+    codes =
+      for {_, %{"input_error" => code, "path" => path}} <- decide_pairs ++ advance_pairs,
+          uniq: true,
+          do: {code, path}
+
+    IO.puts(
+      "\nlean_spec schemas: #{length(decide_pairs) + length(advance_pairs)} Fälle, #{length(codes)} Fehler"
+    )
+
+    # Each code and path of the three checks meets its break.
+    assert length(codes) >= 35
   end
 
   test "advance: Stand und das Lean-Modell gehen gleich über" do
@@ -761,9 +880,7 @@ defmodule KomkiPolicy.LeanSpecTest do
         %{"unsupported" => true}
 
       {:error, %{code: code, path: path}} ->
-        if code in @derive_input_errors or context_error(registry, snapshot, intent),
-          do: %{"input_error" => to_string(code), "path" => path},
-          else: :dropped
+        %{"input_error" => to_string(code), "path" => path}
     end
   end
 
@@ -771,7 +888,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     case Stand.advance(stand, proposal) do
       {:ok, next} -> %{"ok" => next |> Stand.to_record() |> Map.delete("schema")}
       {:refused, %{code: code}} -> %{"refused" => to_string(code)}
-      {:error, _} -> :dropped
+      {:error, %{code: code, path: path}} -> %{"input_error" => to_string(code), "path" => path}
     end
   end
 
@@ -1395,13 +1512,26 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
-  # Puts `value` at `path`; a missing or non-object parent leaves the term as it is.
+  # Puts `value` at `path` (`:delete` drops the key, `[]` replaces the term);
+  # a missing or non-object parent leaves the term as it is.
+  defp break_path(_term, [], value), do: value
+  defp break_path(term, [key], :delete) when is_map(term), do: Map.delete(term, key)
   defp break_path(term, [key], value) when is_map(term), do: Map.put(term, key, value)
 
   defp break_path(term, [key | rest], value) when is_map(term) and is_map_key(term, key),
     do: Map.update!(term, key, &break_path(&1, rest, value))
 
   defp break_path(term, _path, _value), do: term
+
+  defp schema_break(term, {:merge, fields}) when is_map(term), do: Map.merge(term, fields)
+  defp schema_break(term, {:merge, _}), do: term
+  defp schema_break(term, {path, value}), do: break_path(term, path, value)
+
+  # Each break alone and every ordered pair, so the order of the checks shows.
+  defp break_variants(term, breaks) do
+    for(b <- breaks, do: schema_break(term, b)) ++
+      for a <- breaks, b <- breaks, a != b, do: term |> schema_break(a) |> schema_break(b)
+  end
 
   defp corrupt_registry(raw, :none), do: raw
 
@@ -1823,37 +1953,12 @@ defmodule KomkiPolicy.LeanSpecTest do
       code in @json_error_codes ->
         %{"exit" => 2, "result" => %{"error" => code}}
 
-      command == "decide" and cli_decide_modelled?(code, files) ->
-        %{"exit" => 2, "result" => %{"input_error" => code, "path" => path}}
-
-      command == "verify" and cli_registry_compiles?(files) ->
+      command == "advance" or cli_registry_compiles?(files) ->
         %{"exit" => 2, "result" => %{"input_error" => code, "path" => path}}
 
       true ->
         :dropped
     end
-  end
-
-  # Without a release the model knows every input error of decide; with
-  # one, those of intent, snapshot and coherence and the modelled codes,
-  # not the schema checks of release and stand.
-  defp cli_decide_modelled?(code, files) do
-    cli_registry_compiles?(files) and
-      (not List.keymember?(files, "release", 0) or
-         code in Enum.map(@derive_input_errors, &to_string/1) or
-         cli_context_error?(files))
-  end
-
-  defp cli_context_error?(files) do
-    [raw, snapshot, intent] =
-      for name <- ~w(registry snapshot intent) do
-        {_, bytes} = List.keyfind(files, name, 0)
-        {:ok, term} = KomkiPolicy.JSON.parse(bytes)
-        term
-      end
-
-    {:ok, registry} = Registry.compile(raw)
-    context_error(registry, snapshot, intent) != nil
   end
 
   defp cli_registry_compiles?(files) do

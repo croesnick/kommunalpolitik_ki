@@ -3,6 +3,7 @@ import KomkiSpec.Domain
 import KomkiSpec.Input
 import KomkiSpec.CallHash
 import KomkiSpec.ContextInput
+import KomkiSpec.ReleaseInput
 
 /-!
 # Bridge: the CLI's JSON into the model
@@ -362,12 +363,13 @@ def releaseDecisionJson (Γ : Registry) (S : Snapshot) (rule : String) (R : Rele
     if rule == "emit" then [("assigned_label", assigned)] else []
 
 /-- One case `{"registry", "snapshot", "intent", "release", "stand"}`. As
-`release_validated?/5`: intent, snapshot and coherence first; the schema
-checks of release and stand are not modelled. -/
+`release_validated?/5`: intent, snapshot and coherence, then the schemas of
+release and stand. -/
 def releaseCase (j : JVal) : Decode Json := do
-  if let some e := contextError (← decodeRegistry (← field j "registry")) (← field j "intent")
-      (← field j "snapshot") then
-    return inputErrorJson e
+  let Γ₀ ← decodeRegistry (← field j "registry")
+  let err := (contextError Γ₀ (← field j "intent") (← field j "snapshot")).or <|
+    (releaseError (← field j "release")).or (standError (← field j "stand"))
+  if let some e := err then return inputErrorJson e
   let (Γ, S) ← decodeWorld j
   let I ← decodeIntent (← field j "intent")
   let R ← decodeRelease (← field j "release")
@@ -380,8 +382,11 @@ def releaseCase (j : JVal) : Decode Json := do
 
 /-- One case `{"stand", "proposal"}`. -/
 def advanceCase (j : JVal) : Decode Json := do
-  let St ← decodeStand (← field j "stand")
-  let P ← decodeProposal (← field j "proposal")
+  let stand ← field j "stand"
+  let proposal ← field j "proposal"
+  if let some e := (standError stand).or (proposalError proposal) then return inputErrorJson e
+  let St ← decodeStand stand
+  let P ← decodeProposal proposal
   pure <| match advance St P with
     | .ok St' => Json.mkObj [("ok", St'.toJson)]
     | .refused code => Json.mkObj [("refused", .str code)]
@@ -485,7 +490,9 @@ def cliCase (j : JVal) : Decode Json := do
       r.toJson)
   | "advance" =>
     let r ← advanceCase input
-    pure (cliResult (if (r.getObjVal? "ok").toOption.isSome then 0 else 1) r)
+    let exit := if (r.getObjVal? "ok").toOption.isSome then 0
+      else if (r.getObjVal? "input_error").toOption.isSome then 2 else 1
+    pure (cliResult exit r)
   | "decide" =>
     let r ← if (input.get? "release").isSome then releaseCase input else deriveCase input
     let exit := if (r.getObjVal? "input_error").toOption.isSome then 2
