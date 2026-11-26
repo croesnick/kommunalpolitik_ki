@@ -18,7 +18,7 @@ defmodule KomkiCli.MixProject do
   def project do
     [
       app: :komki_cli,
-      version: "0.1.0",
+      version: "0.2.0",
       description:
         "KomKI: lokal gesandboxter Arbeitsraum für den pi-Agenten, mit Vermittler, Regel-Prüfkern, Egress-Proxy und Connectoren als Rollen",
       elixir: "~> 1.19",

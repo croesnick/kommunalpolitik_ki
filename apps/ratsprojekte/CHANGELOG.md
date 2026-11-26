@@ -1,8 +1,8 @@
----
-ratsprojekte: patch
----
+## 0.1.1 (2026-11-26)
 
-# Entsperr-Freigabe an den Prüfcode der anfragenden Stelle gebunden
+### Fehlerbehebungen
+
+#### Entsperr-Freigabe an den Prüfcode der anfragenden Stelle gebunden
 
 Der Touch-ID-Dialog beim Entsperren sah für jede Anfrage gleich aus, egal wer
 sie gestellt hatte: Ein Programm im eigenen Benutzerkonto konnte über den
