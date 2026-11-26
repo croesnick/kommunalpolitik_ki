@@ -496,8 +496,10 @@ defmodule KomkiPolicy.LeanSpecTest do
 
       compare_json!(pairs, "cli-batch", "cli", "komki-policy und dem Lean-Modell")
 
+      # Over the generated calls only: the fixed ones would meet the
+      # thresholds for decide on their own.
       stats =
-        Enum.frequencies_by(pairs, fn
+        Enum.frequencies_by(Enum.take(pairs, length(calls)), fn
           {line, %{"exit" => exit}} -> {line["command"], exit}
           {line, :dropped} -> {line["command"], :dropped}
         end)
@@ -815,7 +817,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp report_mismatches!([], _label, _what), do: :ok
 
   defp report_mismatches!(mismatches, label, what) do
-    path = Path.join(System.tmp_dir!(), "komki-spec-mismatch-#{label}.jsonl")
+    path = Path.join(System.tmp_dir!(), "komki-spec-mismatch-#{label}-#{System.pid()}.jsonl")
     File.write!(path, for({id, _, _, line} <- mismatches, do: case_line(id, line)))
 
     shown =
@@ -1585,25 +1587,17 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp decides?(values) do
     files = Map.new(values)
 
-    with {:ok, registry} <- Registry.compile(files["registry"]) do
-      result =
-        case files do
-          %{"release" => release, "stand" => stand} ->
-            Derive.decide_with_release(
-              registry,
-              files["snapshot"],
-              files["intent"],
-              release,
-              stand
-            )
-
-          _ ->
-            Derive.decide(registry, files["snapshot"], files["intent"])
-        end
-
-      match?({:ok, _}, result)
+    case Registry.compile(files["registry"]) do
+      {:ok, registry} -> match?({:ok, _}, decide_files(registry, files))
+      {:error, _} -> false
     end
   end
+
+  defp decide_files(registry, %{"release" => release, "stand" => stand} = files),
+    do: Derive.decide_with_release(registry, files["snapshot"], files["intent"], release, stand)
+
+  defp decide_files(registry, files),
+    do: Derive.decide(registry, files["snapshot"], files["intent"])
 
   # The canonical bytes of each file. In every fourth case one file gets a
   # byte inserted, replaced or dropped, or is cut short. In every eighth the
