@@ -4,6 +4,8 @@ Formales Modell der Policy-Engine in Lean 4: `derive` mit normalem Zweig
 und Freigabe-Zweigen, `verify`, der Remedy-Katalog, der Auswerter und der
 Standübergang `advance`, mit Beweisen ihrer Korrektheit für die
 Regelzweige `admit`, `emit`, `store` und `transfer` (Tickets #625, #629).
+Dazu, ausführbar und nur per Differenztest gehalten, die JSON-Schicht
+samt Call-Hash.
 Der Elixir-Code wird per Differenztest gegen das bewiesene Lean-Modell
 gehalten, ein Pin meldet jede Änderung an den gespiegelten Modulen. Die
 Spezifikation läuft nicht in komki mit, sie ist ein Prüforakel in Repo und
@@ -70,7 +72,7 @@ eigener Differenztest mit verdorbenen Eingaben (siehe unten).
 flowchart LR
   RFC["RFC 0003 und CONTRACT.md<br/>(Prosa)"] -->|"Review: sagt das Modell<br/>dasselbe?"| Modell["Lean-Modell<br/>KomkiSpec/"]
   Modell -->|"Lean-Kernel prüft"| Beweis["verify_sound,<br/>derive_sound, …"]
-  Modell -->|"Differenztest<br/>lean_spec_test.exs"| Elixir["verify.ex,<br/>derive.ex"]
+  Modell -->|"Differenztest<br/>lean_spec_test.exs"| Elixir["verify.ex, derive.ex,<br/>json.ex, release.ex, …"]
   Elixir -->|"Pin<br/>SYNC.sha256"| Modell
 ```
 
@@ -142,14 +144,26 @@ beziehungsweise `Snapshot.validated` erfüllen: die Voraussetzungen der
 Sätze und typrichtige Ausdrücke und Fakten nach § 3, mit denen die
 Zweige des Auswerters für falsch typisierte Werte unerreichbar sind.
 
+Die JSON-Schicht vergleicht er Byte für Byte: die Fixtures, Randfälle der
+Grammatik und von UTF-8, Verschachtelung um die Tiefengrenze des Encoders
+(#473), 8 000 generierte Dokumente mit wechselndem Leerraum und wechselnden
+Escapes, vier von fünf um ein Byte verändert oder abgeschnitten, dazu
+die Überlaufgrenze der Gleitkommazahlen und je Klasse von UTF-8-Leitbytes
+eine gültige und eine kaputte Folge. Verglichen werden der
+Fehlercode von `JSON.parse/1` oder die kanonische Form samt SHA-256.
+Gleitkommazahlen werden geparst, aber als Marker verglichen, weil
+`Float.to_string/1` nicht modelliert ist. Den Call-Hash rechnet die Brücke
+selbst (`callHashOf`); jede Entscheidung und jeder Katalog, die ihn
+nennen, vergleicht ihn so mit `Release.call_hash/4`.
+
 Ein weiterer Test prüft in Elixir, was `catalog_*_effective` für das Modell
 beweist: Jedes angebotene GO für den exakten Call wird zu einer Freigabe
 mit frischer Nonce, und der Freigabe-Zweig muss erlauben.
 
 `KOMKI_SPEC_SEED` und `KOMKI_SPEC_RUNS` erweitern die Suche. Eine Abweichung
 schreibt ihre Fälle als JSONL-Datei; `komki-spec verify-batch`,
-`derive-batch`, `release-batch`, `advance-batch`, `eval-batch`
-beziehungsweise `domain-batch` spielt sie nach.
+`derive-batch`, `release-batch`, `advance-batch`, `eval-batch`,
+`domain-batch` beziehungsweise `json-batch` spielt sie nach.
 
 ## Synchron halten
 
@@ -159,20 +173,22 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 
 | Elixir | Lean |
 |---|---|
-| `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige) |
+| `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige), `callHashOf` in `KomkiSpec/CallHash.lean` (`output_call_hash/2`) |
 | `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
 | `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
+| `json.ex` | `KomkiSpec/Json.lean` (Parser, kanonischer Encoder) |
+| `release.ex` | `callHashOf` in `KomkiSpec/CallHash.lean`, SHA-256 in `KomkiSpec/Sha256.lean` |
 | `context.ex` | `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean`, `Snapshot.validated` in `Input.lean` (Wertebereich nach der Eingabeprüfung) |
 
 Dann das Lean-Modell gegen die Änderung prüfen und anpassen, `lake build`
 und den Differenztest laufen lassen und den Pin erneuern:
 
 ```bash
-shasum -a 256 lib/komki_policy/{calculus,context,derive,evaluator,registry,remedies,stand,verify}.ex > lean/SYNC.sha256
+shasum -a 256 lib/komki_policy/{calculus,context,derive,evaluator,json,registry,release,remedies,stand,verify}.ex > lean/SYNC.sha256
 ```
 
 Die Tabellen aus `derive.ex` (Prämissen je Regel, Regelzweige,
@@ -200,11 +216,17 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   nicht abdecken. RFC 0003 R.5.7 verlangt sie für jede entfernte Bindung
   (∀ b ∈ L∖L′). Die Abweichung liegt im Vertrag, nicht im Code; zu
   entscheiden in #638.
-- **Call-Hash als Eingabe.** SHA-256 über den Call (§ 2.6) rechnet Lean
-  nicht; das Modell nimmt den Hash des entschiedenen Calls als Parameter,
-  die Sätze gelten für jeden Wert, der Differenztest reicht den von Elixir
-  berechneten durch. Die Schemaprüfung von Freigabe und Stand ist nicht
+- **Call-Hash als Parameter der Sätze.** Das Modell nimmt den Hash des
+  entschiedenen Calls als Parameter; die Sätze gelten für jeden Wert, also
+  auch für `callHashOf`, den die Brücke rechnet (SHA-256 über die
+  kanonische Form, § 2.6). Dass verschiedene Calls verschiedene Hashes
+  haben, setzt die Kollisionsresistenz von SHA-256 voraus; beweisen lässt
+  sie sich nicht. Die Schemaprüfung von Freigabe und Stand ist nicht
   modelliert.
+- **JSON-Schicht ausführbar, nicht bewiesen.** `Json.lean` und
+  `Sha256.lean` sind ausführbare Spezifikationen, die der Differenztest am
+  Elixir-Code hält; Sätze über sie gibt es nicht. Gleitkommazahlen druckt
+  der Encoder nicht.
 - **Ohne Zielarbeitsraum.** R.5.6 verlangt bei der Übergabe an einen
   Zielarbeitsraum zusätzlich dessen Aufnahmeregel. CONTRACT.md § 4.8
   klammert das aus (#270), das Modell auch.
@@ -228,8 +250,8 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 - **Kohärenz von Intent und Snapshot liegt außerhalb.** Dass Objekt,
   Version und Raum des Intents zum Snapshot passen, prüft
   `Context.ensure_coherence/2` vor `verify`; das Modell nimmt es an.
-- **Die Brücke ist unbewiesen.** `KomkiSpec/Bridge.lean` liest JSON ins
-  Modell ein. Gleitkommazahlen hält sie von Ganzzahlen getrennt, so wie
+- **Die Brücke ist unbewiesen.** `KomkiSpec/Bridge.lean` liest die Fälle
+  mit Leans eigenem JSON-Parser ins Modell ein, nicht mit `Json.lean`. Gleitkommazahlen hält sie von Ganzzahlen getrennt, so wie
   `verify.ex` behauptete Ausdrücke strikt vergleicht (#626).
 
 ## Lizenzen
