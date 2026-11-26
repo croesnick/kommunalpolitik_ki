@@ -3,7 +3,7 @@ import KomkiSpec.Domain
 import KomkiSpec.Input
 import KomkiSpec.CallHash
 import KomkiSpec.ContextInput
-import KomkiSpec.ReleaseInput
+import KomkiSpec.RegistryInput
 
 /-!
 # Bridge: the CLI's JSON into the model
@@ -50,27 +50,44 @@ def asStrs (j : JVal) : Decode (List String) := do
 def strAt (j : JVal) (k : String) : Decode String := do
   asStr (← field j k)
 
+def decodeEnvironment (p : String × JVal) : Decode (String × List String) := do
+  pure (p.1, sortStrings (← asStrs (← field p.2 "observers")))
+
+def decodeAuthority (e : JVal) : Decode (String × String × String) := do
+  pure (← strAt e "authority", ← strAt e "restriction", ← strAt e "output")
+
+def decodeAuthorities : Option JVal → Decode (List (String × String × String))
+  | some (.arr es) => es.mapM decodeAuthority
+  | _ => pure []
+
+def decodeBinding (p : String × JVal) : Decode (String × Binding) := do
+  let readers := sortStrings (← asStrs (← field p.2 "readers"))
+  let befugnisse ← decodeAuthorities (p.2.get? "relaxation_authorities")
+  pure (p.1, { readers, operations := ← asObj (← field p.2 "operations"), befugnisse : Binding })
+
+def decodeTransformation (p : String × JVal) : Decode (String × List String × List String) := do
+  pure (p.1, ← asStrs (← field p.2 "input_labels"), ← asStrs (← field p.2 "output_labels"))
+
+def decodeFactField (p : String × JVal) : Decode (String × String) := do
+  pure (p.1, ← asStr p.2)
+
+def decodeTransformations : Option JVal → Decode (List (String × List String × List String))
+  | some (.obj ts) => ts.mapM decodeTransformation
+  | _ => pure []
+
+def decodeFactFields : Option JVal → Decode (List (String × String))
+  | some (.obj fs) => fs.mapM decodeFactField
+  | _ => pure []
+
 def decodeRegistry (j : JVal) : Decode Registry := do
-  let environments ← (← asObj (← field j "environments")).mapM fun (id, env) => do
-    pure (id, sortStrings (← asStrs (← field env "observers")))
-  let bindings ← (← asObj (← field j "bindings")).mapM fun (id, b) => do
-    let readers := sortStrings (← asStrs (← field b "readers"))
-    let befugnisse ← match b.get? "relaxation_authorities" with
-      | some (.arr es) => es.mapM fun e => do
-          pure (← strAt e "authority", ← strAt e "restriction", ← strAt e "output")
-      | _ => pure []
-    pure (id, { readers, operations := ← asObj (← field b "operations"), befugnisse : Binding })
-  let transformations ← match j.get? "transformations" with
-    | some (.obj ts) => ts.mapM fun (id, t) => do
-        pure (id, ← asStrs (← field t "input_labels"), ← asStrs (← field t "output_labels"))
-    | _ => pure []
+  let environments ← (← asObj (← field j "environments")).mapM decodeEnvironment
+  let bindings ← (← asObj (← field j "bindings")).mapM decodeBinding
+  let transformations ← decodeTransformations (j.get? "transformations")
   pure {
     registryId := ← strAt j "registry_id"
     observers := sortStrings (← asStrs (← field j "observers"))
     environments, bindings
-    factFields := ← match j.get? "fact_fields" with
-      | some (.obj fs) => fs.mapM fun (n, t) => do pure (n, ← asStr t)
-      | _ => pure []
+    factFields := ← decodeFactFields (j.get? "fact_fields")
     transformations := transformations.mergeSort fun a b => !decide (b.1 < a.1) }
 
 def decodeFact (p : String × JVal) : Decode (String × JVal) := do
@@ -400,13 +417,17 @@ def InputError.json : Option InputError → Json
   | some e => Json.mkObj [("code", .str e.code), ("path", .str e.path)]
   | none => .null
 
-/-- One case `{"registry", "snapshot", "intent"}` → whether the registry lies
-in the domain the input checks guarantee (`Registry.compiledOk`), the first
+/-- One case `{"registry", "snapshot", "intent"}` → the first error of
+`Registry.compile/1`, or whether the registry lies in the domain the input
+checks guarantee (`Registry.compiledOk`), the first
 error of `validate_intent/1`, `validate_snapshot/2` and `ensure_coherence/2`,
 and for an accepted snapshot whether it lies in that domain
 (`Snapshot.validated`). -/
 def domainCase (j : JVal) : Decode Json := do
-  let Γ ← decodeRegistry (← field j "registry")
+  let raw ← field j "registry"
+  if let some e := registryError raw then
+    return Json.mkObj [("registry_error", InputError.json (some e))]
+  let Γ ← decodeRegistry raw
   let s ← field j "snapshot"
   let i ← field j "intent"
   let snapshot ← match snapshotError Γ s with
@@ -472,7 +493,11 @@ def cliCase (j : JVal) : Decode Json := do
     | some (.str hex) =>
       match KomkiSpec.Json.parse (← hexBytes hex) with
       | .error code => return cliResult 2 (Json.mkObj [("error", .str code)])
-      | .ok v => parsed := parsed ++ [(name, v)]
+      | .ok v =>
+        -- `load_registry/1` compiles right after parsing.
+        if name == "registry" then
+          if let some e := registryError v then return cliResult 2 (inputErrorJson e)
+        parsed := parsed ++ [(name, v)]
     | some _ => throw s!"file {name} is not hex"
   let input := JVal.obj parsed
   match command with

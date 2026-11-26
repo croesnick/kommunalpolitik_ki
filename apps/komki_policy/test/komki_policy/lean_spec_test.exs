@@ -7,9 +7,9 @@ defmodule KomkiPolicy.LeanSpecTest do
   # `mix test --only lean_spec`.
   #
   # Only cases inside the validated domain are compared: Elixir has to
-  # return a verdict, a decision or a modelled input error. Against a
-  # compiled registry that is every input error of `verify` and `derive`,
-  # and every one of `advance`; any other drops the case. Within
+  # return a verdict, a decision or a modelled input error, which is every
+  # input error of `verify`, `derive` and `advance`, `Registry.compile/1`
+  # included. Within
   # that domain, everything compared has to match. KOMKI_SPEC_SEED and
   # KOMKI_SPEC_RUNS widen the search; a mismatch writes its cases to a JSONL
   # file for replay with `komki-spec verify-batch` or `derive-batch`.
@@ -116,6 +116,162 @@ defmodule KomkiPolicy.LeanSpecTest do
     {:expression, %{"all" => true}},
     {:expression, %{"eq" => [1, 1]}},
     {:expression, %{"any" => [%{"eq" => ["count", "x"]}]}}
+  ]
+
+  # One per code and path of Registry.compile/1 (CONTRACT § 2.1, § 3). New
+  # entries get their own ids; `:observer` stands for an observer of the
+  # world, `:binding` for one of its bindings, `@binding_spec` for a valid
+  # binding.
+  @binding_spec %{
+    "readers" => [:observer],
+    "operations" => %{},
+    "relaxation_authorities" => []
+  }
+  @authority %{"authority" => :observer, "restriction" => "readers", "output" => "sitzungsmappe"}
+  @registry_breaks [
+    {[], 7},
+    {["schema"], :delete},
+    {["schema"], "komki-registry/1"},
+    {["zusatz"], true},
+    {["registry_id"], "Reg 1"},
+    {["observers"], "o-a"},
+    {["observers"], []},
+    {["observers"], [7]},
+    {["observers"], ["o-a", "o-a"]},
+    {["observers"], ["O"]},
+    {["fact_fields"], 7},
+    {["fact_fields", "count"], "float"},
+    {["environments"], %{}},
+    {["environments", "kein-ref"], %{"observers" => [:observer]}},
+    {["environments", "env-neu@1"], 7},
+    {["environments", "env-neu@1"], %{"observers" => [:observer], "zusatz" => 1}},
+    {["environments", "env-neu@1"], %{"observers" => []}},
+    {["environments", "env-neu@1"], %{"observers" => ["o-fremd"]}},
+    {["bindings"], 7},
+    {["bindings", "kein-ref"], @binding_spec},
+    {["bindings", "b-neu@1"], 7},
+    {["bindings", "b-neu@1"], Map.put(@binding_spec, "zusatz", 1)},
+    {["bindings", "b-neu@1"], Map.put(@binding_spec, "readers", "o-a")},
+    {["bindings", "b-neu@1"], Map.put(@binding_spec, "readers", ["o-fremd"])},
+    {["bindings", "b-neu@1"], Map.delete(@binding_spec, "relaxation_authorities")},
+    {["bindings", "b-neu@1"], Map.put(@binding_spec, "relaxation_authorities", [7])},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "relaxation_authorities", [Map.put(@authority, "zusatz", 1)])},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "relaxation_authorities", [Map.put(@authority, "authority", "O")])},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "relaxation_authorities", [
+       Map.put(@authority, "authority", "o-fremd")
+     ])},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "relaxation_authorities", [Map.put(@authority, "restriction", "x")])},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "relaxation_authorities", [Map.put(@authority, "output", "O")])},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "relaxation_authorities", [Map.put(@authority, "output", "x-y")])},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "relaxation_authorities", [@authority, @authority])},
+    {["bindings", "b-neu@1"], Map.put(@binding_spec, "operations", 7)},
+    {["bindings", "b-neu@1"], Map.put(@binding_spec, "operations", %{"plan" => true})},
+    {["bindings", "b-neu@1"], Map.put(@binding_spec, "operations", %{"admit" => 7})},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "operations", %{"admit" => %{"eq" => ["count"]}})},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "operations", %{"emit" => %{"all" => [true, %{"not" => 1}]}})},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "operations", %{"store" => %{"eq" => ["fremd", 1]}})},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "operations", %{"transfer" => %{"eq" => ["count", "x"]}})},
+    {["transformations"], 7},
+    {["transformations"], nil},
+    {["transformations", "kein-ref"], %{"input_labels" => [], "output_labels" => []}},
+    {["transformations", "t-neu@1"], 7},
+    {["transformations", "t-neu@1"], %{"input_labels" => "x", "output_labels" => []}},
+    {["transformations", "t-neu@1"], %{"input_labels" => [7], "output_labels" => []}},
+    {["transformations", "t-neu@1"], %{"input_labels" => [], "output_labels" => []}},
+    {["transformations", "t-neu@1"], %{"input_labels" => ["z@1", "a@1"], "output_labels" => []}},
+    {["transformations", "t-neu@1"], %{"input_labels" => ["x@1"], "output_labels" => []}},
+    {["transformations", "t-neu@1"], %{"input_labels" => [:binding], "output_labels" => 7}},
+    {["transformations", "t-neu@1"],
+     %{"input_labels" => ["x@1"], "output_labels" => [], "zusatz" => 1}},
+    # Two defects in one entry, so the order within it shows.
+    {["bindings", "b-neu@1"], Map.merge(@binding_spec, %{"zusatz" => 1, "readers" => "o-a"})},
+    {["bindings", "b-neu@1"],
+     Map.merge(@binding_spec, %{"readers" => "o-a", "relaxation_authorities" => 7})},
+    {["bindings", "b-neu@1"],
+     Map.merge(@binding_spec, %{"relaxation_authorities" => 7, "operations" => 7})},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "relaxation_authorities", [
+       %{@authority | "authority" => "o-fremd", "restriction" => "x"}
+     ])},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "relaxation_authorities", [
+       Map.merge(@authority, %{"authority" => "O", "zusatz" => 1})
+     ])},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "relaxation_authorities", [
+       %{@authority | "restriction" => "x", "output" => "O"}
+     ])},
+    {["bindings", "b-neu@1"], Map.put(@binding_spec, "relaxation_authorities", [@authority, 7])},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "operations", %{"plan" => true, "admit" => 7})},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "operations", %{"admit" => 7, "emit" => %{"not" => 1}})},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "operations", %{
+       "admit" => %{"any" => [%{"eq" => ["fremd", 1]}, %{"not" => 1}]}
+     })},
+    {["environments", "env-neu@1"], %{"observers" => [], "zusatz" => 1}},
+    {["transformations", "t-neu@1"], %{"input_labels" => [], "output_labels" => 7}}
+  ]
+
+  # Every code and path the registry breaks reach.
+  @registry_errors [
+    {"duplicate_entry", "$.observers"},
+    {"duplicate_relaxation_authority", "$.bindings.b-neu@1.relaxation_authorities"},
+    {"empty_list", "$.environments.env-neu@1.observers"},
+    {"empty_list", "$.observers"},
+    {"empty_list", "$.transformations.t-neu@1.input_labels"},
+    {"invalid_entry", "$.observers"},
+    {"invalid_fact_type", "$.fact_fields"},
+    {"invalid_observers", "$.bindings.b-neu@1.readers"},
+    {"invalid_observers", "$.observers"},
+    {"invalid_operations", "$.bindings.b-neu@1.operations"},
+    {"invalid_output_kind", "$.bindings.b-neu@1.relaxation_authorities.[0].output"},
+    {"invalid_record", "$"},
+    {"invalid_record", "$.bindings.b-neu@1"},
+    {"invalid_record", "$.bindings.b-neu@1.relaxation_authorities.[0]"},
+    {"invalid_record", "$.environments.env-neu@1"},
+    {"invalid_record", "$.transformations.t-neu@1"},
+    {"invalid_reference_id", "$.bindings"},
+    {"invalid_reference_id", "$.bindings.b-neu@1.relaxation_authorities.[0].authority"},
+    {"invalid_reference_id", "$.bindings.b-neu@1.relaxation_authorities.[0].output"},
+    {"invalid_reference_id", "$.environments"},
+    {"invalid_reference_id", "$.transformations"},
+    {"invalid_registry_id", "$.registry_id"},
+    {"invalid_relaxation_authorities", "$.bindings.b-neu@1.relaxation_authorities"},
+    {"invalid_restriction_kind", "$.bindings.b-neu@1.relaxation_authorities.[0].restriction"},
+    {"invalid_schema", "$.schema"},
+    {"invalid_transformations", "$.transformations"},
+    {"invalid_transformations", "$.transformations.t-neu@1.input_labels"},
+    {"no_bindings", "$.bindings"},
+    {"no_environments", "$.environments"},
+    {"unknown_binding_reference", "$.transformations.t-neu@1.input_labels"},
+    {"unknown_fact_field", "$.bindings.b-neu@1.operations.store"},
+    {"unknown_field", "$.bindings.b-neu@1.relaxation_authorities.[0].zusatz"},
+    {"unknown_field", "$.bindings.b-neu@1.zusatz"},
+    {"unknown_field", "$.environments.env-neu@1.zusatz"},
+    {"unknown_field", "$.transformations.t-neu@1.zusatz"},
+    {"unknown_field", "$.zusatz"},
+    {"unknown_observer", "$.bindings.b-neu@1.readers"},
+    {"unknown_observer", "$.bindings.b-neu@1.relaxation_authorities.[0].authority"},
+    {"unknown_observer", "$.environments.env-neu@1.observers"},
+    {"unknown_operation", "$.bindings.b-neu@1.operations.plan"},
+    {"invalid_transformations", "$.transformations.t-neu@1.output_labels"},
+    {"expression_type_mismatch", "$.bindings.b-neu@1.operations.transfer"},
+    {"unsorted_references", "$.transformations.t-neu@1.input_labels"},
+    {"unsupported_expression", "$.bindings.b-neu@1.operations.admit"},
+    {"unsupported_expression", "$.bindings.b-neu@1.operations.emit.[1]"}
   ]
 
   @snapshot_corruptions [
@@ -701,7 +857,9 @@ defmodule KomkiPolicy.LeanSpecTest do
   # Elixir; whatever it accepts has to pass the Lean checks.
   test "Eingabeprüfung: was Registry.compile und Context annehmen, liegt im Wertebereich" do
     generated = seeded_list(domain_gen())
-    cases = Enum.map(generated ++ defect_pairs(generated), &domain_case/1)
+
+    cases =
+      Enum.map(generated ++ defect_pairs(generated) ++ registry_pairs(generated), &domain_case/1)
 
     pairs = for {line, expected} <- cases, expected != :dropped, do: {line, expected}
 
@@ -718,6 +876,12 @@ defmodule KomkiPolicy.LeanSpecTest do
       Enum.frequencies(
         for {_, %{"context_error" => %{"path" => p, "code" => c}}} <- pairs, do: {c, p}
       )
+
+    registry_codes =
+      for {_, %{"registry_error" => %{"path" => p, "code" => c}}} <- pairs, uniq: true, do: {c, p}
+
+    missing_registry = @registry_errors -- registry_codes
+    assert missing_registry == [], "Registry-Fehler ohne Fall: #{inspect(missing_registry)}"
 
     IO.puts(
       "\nlean_spec domain: registries #{length(pairs)}, snapshots #{snapshots}, rejected #{length(cases) - length(pairs)}, context errors #{map_size(codes)}"
@@ -1585,6 +1749,24 @@ defmodule KomkiPolicy.LeanSpecTest do
           do: {raw, snapshot, intent |> corrupt_snapshot(a) |> corrupt_snapshot(b)}
   end
 
+  # Every registry break alone and every ordered pair on one clean world.
+  defp registry_pairs(generated) do
+    {raw, snapshot, intent} = Enum.find(generated, &clean_context?/1)
+    fill = %{observer: hd(raw["observers"]), binding: hd(Enum.sort(Map.keys(raw["bindings"])))}
+    breaks = for {path, v} <- @registry_breaks, do: {path, fill_in(v, fill)}
+
+    for({path, v} <- breaks, do: {break_path(raw, path, v), snapshot, intent}) ++
+      for {pa, va} = a <- breaks,
+          {pb, vb} = b <- breaks,
+          a != b,
+          do: {raw |> break_path(pa, va) |> break_path(pb, vb), snapshot, intent}
+  end
+
+  defp fill_in(atom, fill) when is_map_key(fill, atom), do: fill[atom]
+  defp fill_in(list, fill) when is_list(list), do: Enum.map(list, &fill_in(&1, fill))
+  defp fill_in(%{} = map, fill), do: Map.new(map, fn {k, v} -> {k, fill_in(v, fill)} end)
+  defp fill_in(value, _fill), do: value
+
   defp clean_context?({raw, snapshot, intent}) do
     case Registry.compile(raw) do
       {:ok, compiled} ->
@@ -1631,8 +1813,9 @@ defmodule KomkiPolicy.LeanSpecTest do
            "context_error" => context_error(compiled, snapshot, intent)
          }}
 
-      {:error, _} ->
-        {nil, :dropped}
+      {:error, %{code: code, path: path}} ->
+        {%{"registry" => raw, "snapshot" => snapshot, "intent" => intent},
+         %{"registry_error" => %{"code" => to_string(code), "path" => path}}}
     end
   end
 
@@ -2084,25 +2267,16 @@ defmodule KomkiPolicy.LeanSpecTest do
     decision |> Map.take(fields) |> Map.put("gos", gos(decision["remedies"]))
   end
 
-  defp cli_input_error(command, code, path, files) do
+  defp cli_input_error(command, code, path, _files) do
     cond do
       code in @json_error_codes ->
         %{"exit" => 2, "result" => %{"error" => code}}
 
-      command == "advance" or cli_registry_compiles?(files) ->
+      command in ~w(decide verify advance) ->
         %{"exit" => 2, "result" => %{"input_error" => code, "path" => path}}
 
       true ->
         :dropped
-    end
-  end
-
-  defp cli_registry_compiles?(files) do
-    {_, bytes} = List.keyfind(files, "registry", 0)
-
-    case KomkiPolicy.JSON.parse(bytes) do
-      {:ok, raw} -> match?({:ok, _}, Registry.compile(raw))
-      {:error, _} -> false
     end
   end
 

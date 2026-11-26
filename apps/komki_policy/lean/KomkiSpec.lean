@@ -24,3 +24,5 @@ import KomkiSpec.ProofInputSound
 import KomkiSpec.ContextInputSound
 import KomkiSpec.ContextInput
 import KomkiSpec.ReleaseInput
+import KomkiSpec.RegistryInput
+import KomkiSpec.RegistryInputSound
