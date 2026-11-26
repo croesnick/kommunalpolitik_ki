@@ -1,11 +1,13 @@
 # Lean-Spezifikation von komki_policy
 
-Formales Modell von `derive` (normaler Zweig) und `verify` in Lean 4, mit
-Beweis ihrer Korrektheit für die Regelzweige `admit`, `emit`, `store` und
-`transfer` (Ticket #625). `lib/komki_policy/derive.ex` und `verify.ex`
-werden per Differenztest gegen das bewiesene Lean-Modell gehalten, ein Pin
-meldet jede Änderung an den gespiegelten Modulen. Die Spezifikation läuft nicht in komki mit, sie ist ein Prüforakel
-in Repo und CI.
+Formales Modell der Policy-Engine in Lean 4: `derive` mit normalem Zweig
+und Freigabe-Zweigen, `verify`, die GO-Angebote des Remedy-Katalogs und
+der Standübergang `advance`, mit Beweisen ihrer Korrektheit für die
+Regelzweige `admit`, `emit`, `store` und `transfer` (Tickets #625, #629).
+Der Elixir-Code wird per Differenztest gegen das bewiesene Lean-Modell
+gehalten, ein Pin meldet jede Änderung an den gespiegelten Modulen. Die
+Spezifikation läuft nicht in komki mit, sie ist ein Prüforakel in Repo und
+CI.
 
 ## Was bewiesen ist
 
@@ -18,6 +20,11 @@ in Repo und CI.
 | `derive_sound`, `derive_complete` | `derive` erlaubt genau dann, wenn die Regel ableitbar ist (`Derivable`, dieselbe Aussage, in der `verify_sound` endet) | CONTRACT.md § 4.3–§ 4.5, § 4.7, § 4.8 |
 | `derive_verifies` | `verify` akzeptiert jeden Baum, den `derive` baut | CONTRACT.md § 2.5, § 5 |
 | `derive_permit_stable`, `derive_deny_stable` | Mehr Fakten machen aus einem `permit` oder `deny` nichts anderes; nur ein `indeterminate` löst sich auf | R.5.2, B.4, CONTRACT.md § 4.4 |
+| `aktion_permit` | Eine Aktionsfreigabe überbrückt weder einen ungültigen Vertrag noch eine entfernte Bindung, bei `store` weder den Empfängertest (#417) noch eine unbelegte Beobachterliste (#432); Fenster, Nonce, Geltungsbereich, Call-Hash und Autorität stimmen | CONTRACT.md § 4.6, R.6 |
+| `offenlegung_permit` | Eine Offenlegungsfreigabe erlaubt nur `store`, mit gültigem Vertrag, erhaltener Bindung, belegter Beobachterliste, der geschlossenen Ausgabeart und dem Ziellabel, der Befugnis für jede gelockerte Bindung (BerechtigtZurLockerung) und einem Ziellabel, dessen Leser den Speicher abdecken | CONTRACT.md § 4.9, R.5.7 |
+| `release_single_use` | Ist der Verbrauch committet, erlaubt dieselbe Freigabe nie wieder, an keinem späteren Stand | CONTRACT.md § 2.7, B.8 |
+| `advance_cas` | Von zwei Vorschlägen für denselben Stand committet höchstens einer | CONTRACT.md § 2.7 |
+| `catalog_aktion_effective`, `catalog_offenlegung_effective` | Bietet der Katalog einer Ablehnung des normalen Zweigs ein GO für den exakten Call an, erlaubt der Freigabe-Zweig eine Freigabe genau nach diesem Angebot | CONTRACT.md § 2.8, #631 |
 | `eval_mono` | Mehr Fakten kippen kein bekanntes Urteil des dreiwertigen Auswerters | R.5.2, CONTRACT.md § 3 |
 | `recipients_antitone`, `permitted_antitone` | Mehr Bindungen, nie mehr Empfänger; Erlaubt vererbt sich auf Teilmengen | A.2 |
 | `no_forbidden_recipient` | Ohne Lockerung erreicht nichts, was von x abhängt, einen Beobachter außerhalb von R_Γ(λ(x)) | Kern von A.3: nur die Labels, ohne Schrittmodell |
@@ -39,10 +46,11 @@ nennen. B_W ist unveränderlich (RFC 4.1); das durchzusetzen ist Sache des
 Vermittlers, nicht der Engine.
 
 Die Sätze setzen voraus, was `Registry.compile/1` und `Context` durchsetzen
-(`Registry.WellFormed`, `Snapshot.WellFormed`: Leser ⊆ 𝒪, sortierte und
-eindeutige Labels, geschlossene Klassifikation, boolesche Basisfakten). Die
-Brücke prüft beides an jedem Fall des Differenztests
-(`Registry.wellFormed_sound`, `Snapshot.wellFormed_sound`).
+(`Registry.WellFormed`, `Registry.AuthoritiesKnown`, `Snapshot.WellFormed`:
+Leser und Befugnis-Autoritäten ⊆ 𝒪, sortierte und eindeutige Labels,
+geschlossene Klassifikation, boolesche Basisfakten). Die Brücke prüft alles
+an jedem Fall des Differenztests (`Registry.wellFormed_sound`,
+`Registry.wellFormed_authorities`, `Snapshot.wellFormed_sound`).
 
 ## Vertrauenskette
 
@@ -89,11 +97,25 @@ Für `derive` vergleicht er die Entscheidung über denselben Welten und den
 Fixtures: Urteil, Prüflabel, Blocker samt `condition` und
 `recipients_outside`, fehlende Belege, den ganzen Beweisbaum,
 `assigned_label`, `content_digest`, dazu `unsupported` und die Eingabefehler
-aus #628. Nicht verglichen werden die Echos der Eingabe und die Remedies.
+aus #628, und von den Remedies die GO-Angebote je Befund. Nicht verglichen
+werden die Echos der Eingabe und die übrigen Fortsetzungen.
+
+Für die Freigabe-Zweige vergleicht er dasselbe samt geplantem Verbrauch
+(`release`), über den Fixtures mit Freigabe und je Welt drei Varianten
+(gültig, falscher Call-Hash, fremder Geltungsbereich, Fenster davor oder
+danach, verbrauchte Nonce, unbekannte Autorität, Offenlegungsfreigaben mit
+passender oder falscher Ausgabeart und Ziellabel). Für `advance` vergleicht
+er den nächsten Stand oder den Ablehnungsgrund, auch für die Wiederholung
+nach einem Commit.
+
+Ein weiterer Test prüft in Elixir, was `catalog_*_effective` für das Modell
+beweist: Jedes angebotene GO für den exakten Call wird zu einer Freigabe
+mit frischer Nonce, und der Freigabe-Zweig muss erlauben.
 
 `KOMKI_SPEC_SEED` und `KOMKI_SPEC_RUNS` erweitern die Suche. Eine Abweichung
-schreibt ihre Fälle als JSONL-Datei; `komki-spec verify-batch <datei>`
-beziehungsweise `komki-spec derive-batch <datei>` spielt sie nach.
+schreibt ihre Fälle als JSONL-Datei; `komki-spec verify-batch`,
+`derive-batch`, `release-batch` beziehungsweise `advance-batch` spielt sie
+nach.
 
 ## Synchron halten
 
@@ -103,10 +125,12 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 
 | Elixir | Lean |
 |---|---|
-| `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum) |
+| `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige) |
+| `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (nur die GO-Angebote) |
+| `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
-| `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean` |
+| `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
 | `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal` |
 | `context.ex` | `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean` (Wertebereich nach der Eingabeprüfung) |
 
@@ -114,7 +138,7 @@ Dann das Lean-Modell gegen die Änderung prüfen und anpassen, `lake build`
 und den Differenztest laufen lassen und den Pin erneuern:
 
 ```bash
-shasum -a 256 lib/komki_policy/{calculus,context,derive,evaluator,registry,verify}.ex > lean/SYNC.sha256
+shasum -a 256 lib/komki_policy/{calculus,context,derive,evaluator,registry,remedies,stand,verify}.ex > lean/SYNC.sha256
 ```
 
 Die Tabellen aus `derive.ex` (Prämissen je Regel, Regelzweige,
@@ -124,9 +148,23 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 
 ## Grenzen
 
-- **Ohne Freigaben.** Die Freigabe-Zweige (§ 4.6, § 4.9), der
-  Remedy-Katalog (§ 2.8) und `advance` (§ 2.7) sind nicht modelliert; sie
-  folgen in #629.
+- **Vom Remedy-Katalog nur die GO-Angebote.** Welche Fortsetzung ein
+  Befund ohne GO bekommt (`fakt_nachreichen`, `registrierte_transformation`,
+  `neuer_raum`), modelliert die Spezifikation nicht.
+- **Katalogsätze nur für den normalen Zweig.** `catalog_*_effective` gilt
+  für die GO-Angebote einer Ablehnung im normalen Zweig. Dass ein erneutes
+  Angebot nach einer Ablehnung im Freigabe-Zweig wirkt, prüft nur der
+  Elixir-Test „Katalog: jedes angebotene GO wirkt“.
+- **Lockerung nach dem Vertrag.** `BerechtigtZurLockerung` folgt CONTRACT.md
+  § 4.9 Schritt 6: Befugnis nur für Bindungen, deren Leser den Speicher
+  nicht abdecken. RFC 0003 R.5.7 verlangt sie für jede entfernte Bindung
+  (∀ b ∈ L∖L′). Die Abweichung liegt im Vertrag, nicht im Code; zu
+  entscheiden in #638.
+- **Call-Hash als Eingabe.** SHA-256 über den Call (§ 2.6) rechnet Lean
+  nicht; das Modell nimmt den Hash des entschiedenen Calls als Parameter,
+  die Sätze gelten für jeden Wert, der Differenztest reicht den von Elixir
+  berechneten durch. Die Schemaprüfung von Freigabe und Stand ist nicht
+  modelliert.
 - **Ohne Zielarbeitsraum.** R.5.6 verlangt bei der Übergabe an einen
   Zielarbeitsraum zusätzlich dessen Aufnahmeregel. CONTRACT.md § 4.8
   klammert das aus (#270), das Modell auch.

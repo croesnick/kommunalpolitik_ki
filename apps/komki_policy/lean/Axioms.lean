@@ -17,6 +17,12 @@ open KomkiSpec
 #print axioms derive_permit_stable
 #print axioms derive_deny_stable
 #print axioms derive_verifies
+#print axioms aktion_permit
+#print axioms offenlegung_permit
+#print axioms release_single_use
+#print axioms advance_cas
+#print axioms catalog_aktion_effective
+#print axioms catalog_offenlegung_effective
 #print axioms eval_mono
 #print axioms recipients_antitone
 #print axioms permitted_antitone

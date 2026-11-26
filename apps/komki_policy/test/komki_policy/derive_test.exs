@@ -821,4 +821,57 @@ defmodule KomkiPolicy.DeriveTest do
       assert hash == release["call_hash"]
     end
   end
+
+  describe "Offenlegungsfreigabe: Ziellabel (#631, #632)" do
+    defp registry_with(fun) do
+      {:ok, compiled} = Registry.compile(fun.(fixture("registry.json")))
+      compiled
+    end
+
+    defp offenlegung_case do
+      dir = "case_offenlegung_permit/"
+
+      {fixture(dir <> "snapshot.json"), fixture(dir <> "intent.json"),
+       fixture(dir <> "release.json"), fixture(dir <> "stand.json")}
+    end
+
+    test "Ziellabel ohne Lesezugriff auf den Speicher: kein Angebot, das GO wirkt nicht (#631)" do
+      {snapshot, intent, release, stand} = offenlegung_case()
+
+      narrow =
+        registry_with(
+          &update_in(&1, ["bindings", "ratsprojekte@1", "readers"], fn readers ->
+            List.delete(readers, "vorstand")
+          end)
+        )
+
+      {:ok, denied} = Derive.decide(narrow, snapshot, intent)
+      types = for r <- denied["remedies"], t <- r["transitions"], do: t["type"]
+
+      assert denied["decision"] == "deny"
+      refute "offenlegungsfreigabe" in types
+      refute "aktionsfreigabe" in types
+
+      assert {:ok, %{"decision" => "deny", "blockers" => blockers}} =
+               Derive.decide_with_release(narrow, snapshot, intent, release, stand)
+
+      assert ["recipient_not_allowed"] == Enum.map(blockers, & &1["code"])
+    end
+
+    test "unbekanntes Ziellabel: deny mit ziellabel_unknown statt Absturz (#632)" do
+      {snapshot, intent, release, stand} = offenlegung_case()
+
+      missing =
+        registry_with(&update_in(&1, ["bindings"], fn b -> Map.delete(b, "ratsprojekte@1") end))
+
+      {:ok, denied} = Derive.decide(missing, snapshot, intent)
+      types = for r <- denied["remedies"], t <- r["transitions"], do: t["type"]
+      refute "offenlegungsfreigabe" in types
+
+      assert {:ok, %{"decision" => "deny", "blockers" => blockers}} =
+               Derive.decide_with_release(missing, snapshot, intent, release, stand)
+
+      assert ["ziellabel_unknown"] == Enum.map(blockers, & &1["code"])
+    end
+  end
 end

@@ -1,4 +1,5 @@
 import KomkiSpec.DeriveSound
+import KomkiSpec.Release
 
 /-!
 # The validated domain, checked at runtime
@@ -12,7 +13,8 @@ that domain turns the test red instead of slipping past the theorems.
 namespace KomkiSpec
 
 def Registry.wellFormed (Γ : Registry) : Bool :=
-  Γ.bindings.all fun (_, bd) => bd.readers.all Γ.observers.contains
+  Γ.bindings.all fun (_, bd) =>
+    bd.readers.all Γ.observers.contains && bd.befugnisse.all fun x => Γ.observers.contains x.1
 
 def Snapshot.wellFormed (S : Snapshot) : Bool :=
   (S.classification == "classified" || S.classification == "quarantine") &&
@@ -46,8 +48,17 @@ theorem Registry.wellFormed_sound {Γ : Registry} (h : Γ.wellFormed = true) : �
   · next bd hbd =>
     have hmem : (b, bd) ∈ Γ.bindings := mem_of_lookup hbd
     have := List.all_eq_true.1 h _ hmem
-    exact List.contains_iff_mem.1 (List.all_eq_true.1 this o ho)
+    simp only [Bool.and_eq_true] at this
+    exact List.contains_iff_mem.1 (List.all_eq_true.1 this.1 o ho)
   · cases ho
+
+theorem Registry.wellFormed_authorities {Γ : Registry} (h : Γ.wellFormed = true) :
+    Γ.AuthoritiesKnown := by
+  intro b bd hbd x hx
+  unfold Registry.binding? at hbd
+  have := List.all_eq_true.1 h _ (mem_of_lookup hbd)
+  simp only [Bool.and_eq_true] at this
+  exact List.contains_iff_mem.1 (List.all_eq_true.1 this.2 x hx)
 
 theorem Snapshot.wellFormed_sound {S : Snapshot} (h : S.wellFormed = true) : S.WellFormed := by
   simp only [Snapshot.wellFormed, Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq,
