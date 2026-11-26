@@ -21,7 +21,7 @@ CI.
 | `handover_within_admitted` | Wird x in einen Raum aufgenommen, erreicht ein geprüftes `store` oder `transfer` aus demselben Raum nur Beobachter in R_Γ(λ(x)) | A.3 an der Engine |
 | `derive_sound`, `derive_complete` | `derive` erlaubt genau dann, wenn die Regel ableitbar ist (`Derivable`, dieselbe Aussage, in der `verify_sound` endet) | CONTRACT.md § 4.3–§ 4.5, § 4.7, § 4.8 |
 | `derive_verifies` | `verify` akzeptiert jeden Baum, den `derive` baut | CONTRACT.md § 2.5, § 5 |
-| `verifyReport_verdict` | Der Bericht von `verify` (Befunde in der Reihenfolge der Prüfschritte, oder der Eingabefehler) ist leer genau dann, wenn das Urteil `valid` ist; damit gelten die Sätze über `verify` auch für ihn | CONTRACT.md § 5 |
+| `verifyReport_verdict` | Der Bericht von `verify` (Befunde in der Reihenfolge der Prüfschritte, oder der Eingabefehler einer Ausgaberegel; die Eingabeprüfung des Beweisbaums läuft davor) ist leer genau dann, wenn das Urteil `valid` ist; damit gelten die Sätze über `verify` auch für ihn | CONTRACT.md § 5 |
 | `proofError_decodes` | Jeder Beweisbaum, den die Eingabeprüfung von `verify` annimmt (`proofError`, wie `validate_proof/1`), liegt im Modell, jede Prämisse mit einer der vier Arten | CONTRACT.md § 2.5, § 5 |
 | `derive_permit_stable`, `derive_deny_stable` | Mehr Fakten machen aus einem `permit` oder `deny` nichts anderes; nur ein `indeterminate` löst sich auf | R.5.2, B.4, CONTRACT.md § 4.4 |
 | `aktion_permit` | Eine Aktionsfreigabe überbrückt weder einen ungültigen Vertrag noch eine entfernte Bindung, bei `store` weder den Empfängertest (#417) noch eine unbelegte Beobachterliste (#432); Fenster, Nonce, Geltungsbereich, Call-Hash und Autorität stimmen | CONTRACT.md § 4.6, R.6 |
@@ -205,6 +205,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` (Urteil), `KomkiSpec/VerifyReasons.lean` (Befunde), `KomkiSpec/ProofInput.lean` (Eingabeprüfung des Beweisbaums) |
+| `validations.ex` | `firstUnknown` in `KomkiSpec/ProofInput.lean` (`closed_fields/3`: erstes unbekanntes Feld in Sortierreihenfolge) |
 | `cli.ex` | `cliFiles` und `cliCase` in `KomkiSpec/Bridge.lean` (Lesereihenfolge der Dateien, Exit-Codes) |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
@@ -217,7 +218,7 @@ Dann das Lean-Modell gegen die Änderung prüfen und anpassen, `lake build`
 und den Differenztest laufen lassen und den Pin erneuern:
 
 ```bash
-shasum -a 256 lib/komki_policy/{calculus,cli,context,derive,evaluator,json,registry,release,remedies,stand,verify}.ex > lean/SYNC.sha256
+shasum -a 256 lib/komki_policy/{calculus,cli,context,derive,evaluator,json,registry,release,remedies,stand,validations,verify}.ex > lean/SYNC.sha256
 ```
 
 Die Tabellen aus `derive.ex` (Prämissen je Regel, Regelzweige,
@@ -255,9 +256,9 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 - **Ohne Zielarbeitsraum.** R.5.6 verlangt bei der Übergabe an einen
   Zielarbeitsraum zusätzlich dessen Aufnahmeregel. CONTRACT.md § 4.8
   klammert das aus (#270), das Modell auch.
-- **Bei `verify` nur das Urteil.** Befundcodes von `verify` und ihre
-  Reihenfolge modelliert die Spezifikation nicht; bei `derive` dagegen
-  Blocker und fehlende Belege samt Reihenfolge.
+- **Bei `verify` ist nur die Leere des Berichts bewiesen**
+  (`verifyReport_verdict`). Codes, Reihenfolge, Bindung und Fakt der
+  Befunde sowie Code und Pfad der Eingabefehler hält der Differenztest.
 - **Nur der geprüfte Wertebereich.** Das Modell setzt voraus, was
   `Registry.compile/1` und `Context` durchsetzen (siehe oben). Dass sie es
   durchsetzen, prüft der Differenztest für die Verderbungen seines

@@ -262,7 +262,7 @@ defmodule KomkiPolicy.LeanSpecTest do
       for {snapshot, intent, proof} <-
             audit_attacks() ++
               unknown_conditions() ++
-              non_object_proofs() ++ for({s, i} <- worlds, p <- proofs, do: {s, i, p}) do
+              shape_proofs() ++ for({s, i} <- worlds, p <- proofs, do: {s, i, p}) do
         {raw, registry, snapshot, intent, proof}
       end
 
@@ -925,9 +925,32 @@ defmodule KomkiPolicy.LeanSpecTest do
   end
 
   # validate_proof/1 on a proof that is no object.
-  defp non_object_proofs do
-    for proof <- [[], "komki-proof/1"],
-        do: {fixture("case_permit/snapshot.json"), fixture("case_permit/intent.json"), proof}
+  # validate_proof/1 on a proof that is no object, and two defects at once,
+  # so the order of its checks shows. Then a quarantined object whose tree
+  # claims not_quarantine false: object_quarantine comes first.
+  defp shape_proofs do
+    snapshot = fixture("case_permit/snapshot.json")
+    intent = fixture("case_permit/intent.json")
+    permit = fixture("case_permit/proof_valid.json")
+    index = Enum.find_index(permit["premises"], &(&1["kind"] == "condition"))
+
+    broken = [
+      [],
+      "komki-proof/1",
+      permit |> Map.put("zusatz", true) |> Map.delete("intent_ref"),
+      %{permit | "conclusion" => 7, "rule" => 7},
+      update_in(
+        permit,
+        ["premises", Access.at(index)],
+        &%{&1 | "expression" => nil, "value" => 7}
+      ),
+      put_in(permit, ["premises", Access.at(index), "expression"], "x")
+    ]
+
+    quarantined = put_in(snapshot, ["object", "classification"], "quarantine")
+
+    for(proof <- broken, do: {snapshot, intent, proof}) ++
+      [{quarantined, intent, put_named(permit, "not_quarantine", "value", false)}]
   end
 
   defp refute_condition(%{"kind" => "condition"} = premise), do: %{premise | "value" => false}
@@ -2161,14 +2184,19 @@ defmodule KomkiPolicy.LeanSpecTest do
         {:top, "schema", "komki-proof/0"},
         {:top, "zusatz", true},
         {:top, "rule", 7},
+        {:top, "conclusion", 7},
+        {:top, "registry_ref", 7},
+        {:top, "snapshot_ref", 7},
+        {:top, "intent_ref", 7},
         {:top, "checked_label", ["b-eins@1", 7]},
         {:top, "premises", %{}},
         {:drop_top, "schema"},
         {:drop_top, "intent_ref"}
       ]),
       StreamData.tuple(
-        {StreamData.constant(:put), index, StreamData.member_of(~w(kind name value binding fact)),
-         StreamData.member_of([7, nil])}
+        {StreamData.constant(:put), index,
+         StreamData.member_of(~w(kind name value binding fact expression)),
+         StreamData.member_of([7, nil, "x"])}
       ),
       StreamData.tuple(
         {StreamData.constant(:drop_key), index, StreamData.member_of(~w(kind name value))}

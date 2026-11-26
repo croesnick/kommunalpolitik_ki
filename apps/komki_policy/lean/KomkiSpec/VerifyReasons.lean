@@ -79,7 +79,8 @@ def quarantineReasons (S : Snapshot) (p : Premise) : List Reason :=
 /-- Step 8: `condition_reasons/3`: expression, `fact_refs`, the recomputed
 verdict, the claimed value. Without a registry entry only the expression
 check and the claim run. A compiled registry's expressions parse; were one
-not to, no tree would pass. -/
+not to, `Evaluator.evaluate/2` would raise, and the model reports
+`condition_unknown` so that no tree passes. -/
 def conditionReasons (Γ : Registry) (S : Snapshot) (rule : String) (p : Premise) :
     List Reason :=
   let b := p.strField? "binding"
