@@ -22,6 +22,7 @@ CI.
 | `derive_sound`, `derive_complete` | `derive` erlaubt genau dann, wenn die Regel ableitbar ist (`Derivable`, dieselbe Aussage, in der `verify_sound` endet) | CONTRACT.md § 4.3–§ 4.5, § 4.7, § 4.8 |
 | `derive_verifies` | `verify` akzeptiert jeden Baum, den `derive` baut | CONTRACT.md § 2.5, § 5 |
 | `verifyReport_verdict` | Der Bericht von `verify` (Befunde in der Reihenfolge der Prüfschritte, oder der Eingabefehler) ist leer genau dann, wenn das Urteil `valid` ist; damit gelten die Sätze über `verify` auch für ihn | CONTRACT.md § 5 |
+| `proofError_decodes` | Jeder Beweisbaum, den die Eingabeprüfung von `verify` annimmt (`proofError`, wie `validate_proof/1`), liegt im Modell, jede Prämisse mit einer der vier Arten | CONTRACT.md § 2.5, § 5 |
 | `derive_permit_stable`, `derive_deny_stable` | Mehr Fakten machen aus einem `permit` oder `deny` nichts anderes; nur ein `indeterminate` löst sich auf | R.5.2, B.4, CONTRACT.md § 4.4 |
 | `aktion_permit` | Eine Aktionsfreigabe überbrückt weder einen ungültigen Vertrag noch eine entfernte Bindung, bei `store` weder den Empfängertest (#417) noch eine unbelegte Beobachterliste (#432); Fenster, Nonce, Geltungsbereich, Call-Hash und Autorität stimmen | CONTRACT.md § 4.6, R.6 |
 | `offenlegung_permit` | Eine Offenlegungsfreigabe erlaubt nur `store`, mit gültigem Vertrag, erhaltener Bindung, belegter Beobachterliste, der geschlossenen Ausgabeart und dem Ziellabel, der Befugnis für jede gelockerte Bindung (BerechtigtZurLockerung) und einem Ziellabel, dessen Leser den Speicher abdecken | CONTRACT.md § 4.9, R.5.7 |
@@ -109,10 +110,12 @@ Wertebereichs, unter der jeweils anderen Übergaberegel, je Behauptungsfeld
 vertauscht oder ersetzt, und der stärkste Fälscher: ein Baum, der jede
 Behauptung aus der Zielwelt spiegelt, einen falschen Fakt als `false`.
 Verglichen wird der ganze Bericht: das Urteil und die Befunde in ihrer
-Reihenfolge samt Bindung und Fakt, oder der Code, mit dem Elixir die
-Snapshot-Voraussetzung einer Ausgaberegel verwirft; jeder andere
-Eingabefehler fällt heraus. Jeder Befundcode aus `verify.ex` muss dabei
-vorkommen.
+Reihenfolge samt Bindung und Fakt, oder Code und Pfad des Eingabefehlers,
+sobald Intent, Snapshot und ihre Kohärenz bestehen: die
+Snapshot-Voraussetzung einer Ausgaberegel und die Eingabeprüfung des
+Beweisbaums (dazu Mutationen an seiner Form: Schema, fremde Felder,
+falsche Typen, fehlende Schlüssel). Jeder Befundcode aus `verify.ex` und
+jeder Code dieser Eingabefehler muss dabei vorkommen.
 Für `derive` vergleicht er die Entscheidung über denselben Welten und den
 Fixtures: Urteil, Prüflabel, Blocker samt `condition` und
 `recipients_outside`, fehlende Belege, den ganzen Beweisbaum,
@@ -196,7 +199,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige), `callHashOf` in `KomkiSpec/CallHash.lean` (`output_call_hash/2`) |
 | `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
-| `verify.ex` | `KomkiSpec/Verify.lean` (Urteil), `KomkiSpec/VerifyReasons.lean` (Befunde) |
+| `verify.ex` | `KomkiSpec/Verify.lean` (Urteil), `KomkiSpec/VerifyReasons.lean` (Befunde), `KomkiSpec/ProofInput.lean` (Eingabeprüfung des Beweisbaums) |
 | `cli.ex` | `cliFiles` und `cliCase` in `KomkiSpec/Bridge.lean` (Lesereihenfolge der Dateien, Exit-Codes) |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
@@ -259,9 +262,10 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   von Lesern und Transformationslabels, Vokabular der Befugnisse,
   Operationsnamen, `identity`, `registry_ref`), bleibt das ungeprüft,
   ebenso die Fehlercodes. Von den Eingabefehlern sind nur
-  die Snapshot-Voraussetzung der Ausgaberegeln (#628) und, für `derive`,
-  `unknown_environment` als Urteil modelliert; Fälle mit einem anderen
-  Eingabefehler lassen die übrigen Vergleiche weg. Wo Elixir außerhalb des
+  die Snapshot-Voraussetzung der Ausgaberegeln (#628), für `derive`
+  `unknown_environment` und für `verify` die Eingabeprüfung des
+  Beweisbaums modelliert; Fälle mit einem anderen Eingabefehler lassen die
+  übrigen Vergleiche weg. Wo Elixir außerhalb des
   Bereichs abstürzen würde, etwa bei einem Ausdruck außerhalb von B.4,
   verweigert das Modell (`missing_operation_rule`).
 - **Kohärenz von Intent und Snapshot liegt außerhalb.** Dass Objekt,

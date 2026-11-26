@@ -17,7 +17,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   use ExUnit.Case, async: false
   use ExUnitProperties
 
-  alias KomkiPolicy.{Calculus, CLI, Derive, Evaluator, Registry, Release, Stand, Verify}
+  alias KomkiPolicy.{Calculus, CLI, Context, Derive, Evaluator, Registry, Release, Stand, Verify}
 
   @moduletag :lean_spec
   @moduletag timeout: 600_000
@@ -49,6 +49,10 @@ defmodule KomkiPolicy.LeanSpecTest do
                    label_preservation_false recipient_inclusion_false expression_mismatch
                    fact_refs_mismatch condition_false condition_unknown conclusion_mismatch
                    conclusion_unsupported)
+  # Every input error of verify once intent and snapshot pass (§ 4.5, § 5).
+  @proof_input_errors ~w(emit_digest_missing emit_object_not_classified missing_field
+                         invalid_schema unknown_field invalid_entry invalid_premise
+                         invalid_premise_kind unknown_premise_field)
   @modelled_input_errors [:emit_digest_missing, :emit_object_not_classified]
   @derive_input_errors [:unknown_environment | @modelled_input_errors]
   @decision_fields ~w(decision rule checked_label blockers missing_evidence proof
@@ -257,7 +261,8 @@ defmodule KomkiPolicy.LeanSpecTest do
     cases =
       for {snapshot, intent, proof} <-
             audit_attacks() ++
-              unknown_conditions() ++ for({s, i} <- worlds, p <- proofs, do: {s, i, p}) do
+              unknown_conditions() ++
+              non_object_proofs() ++ for({s, i} <- worlds, p <- proofs, do: {s, i, p}) do
         {raw, registry, snapshot, intent, proof}
       end
 
@@ -266,6 +271,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     assert stats.valid >= 6
     assert stats.invalid >= 500
     assert stats.input_error >= 6
+    assert stats.input_errors["invalid_record"] == 2
   end
 
   test "Generierte Welten und geschmiedete Bäume: Elixir und Lean urteilen gleich" do
@@ -286,6 +292,9 @@ defmodule KomkiPolicy.LeanSpecTest do
     IO.puts("\nlean_spec seed=#{seed} runs=#{runs}: #{inspect(stats)}")
 
     assert stats.input_error >= 200
+
+    assert @proof_input_errors -- Map.keys(stats.input_errors) == [],
+           "Eingabefehler ohne Fall: #{inspect(@proof_input_errors -- Map.keys(stats.input_errors))}"
 
     assert @verify_codes -- Map.keys(stats.codes) == [],
            "Befundcodes ohne Fall: #{inspect(@verify_codes -- Map.keys(stats.codes))}"
@@ -510,12 +519,8 @@ defmodule KomkiPolicy.LeanSpecTest do
       end
 
       # Intact files never meet an input error the model does not know: a
-      # decision turned into one would leave the comparison unseen. verify
-      # is exempt, its mutated trees fail the proof validation by design.
-      dropped =
-        for {{%{"command" => command}, :dropped}, true} <- tagged,
-            command != "verify",
-            do: command
+      # decision turned into one would leave the comparison unseen.
+      dropped = for {{line, :dropped}, true} <- tagged, do: line["command"]
 
       assert dropped == [],
              "unverändert und doch verworfen: #{inspect(Enum.frequencies(dropped))}"
@@ -612,7 +617,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     report_mismatches!(mismatches, label, "Verify.check/4 und dem Lean-Prüfer")
 
     verdicts =
-      Enum.map(judged, fn {{line, report}, _} -> {line["proof"]["rule"], verdict(report)} end)
+      Enum.map(judged, fn {{line, report}, _} -> {rule_of(line["proof"]), verdict(report)} end)
 
     count = fn verdict -> Enum.count(verdicts, fn {_, v} -> v == verdict end) end
 
@@ -629,22 +634,37 @@ defmodule KomkiPolicy.LeanSpecTest do
       codes:
         Enum.frequencies(
           for {{_, %{"reasons" => reasons}}, _} <- judged, reason <- reasons, do: reason["code"]
-        )
+        ),
+      input_errors: Enum.frequencies(for {{_, %{"input_error" => code}}, _} <- judged, do: code)
     }
   end
 
+  # Once intent, snapshot and their coherence pass, the model knows every
+  # input error of verify: the output prerequisites (#628) and the proof's
+  # validation, each with code and path.
   defp elixir_report(registry, snapshot, intent, proof) do
     case Verify.check(registry, snapshot, intent, proof) do
       {:ok, outcome} ->
         outcome
 
-      {:error, %{code: code}} when code in @modelled_input_errors ->
-        %{"input_error" => to_string(code)}
-
-      {:error, _} ->
-        :dropped
+      {:error, %{code: code, path: path}} ->
+        if context_valid?(registry, snapshot, intent),
+          do: %{"input_error" => to_string(code), "path" => path},
+          else: :dropped
     end
   end
+
+  defp context_valid?(registry, snapshot, intent) do
+    with {:ok, auth} <- Context.validate_intent(intent),
+         {:ok, ctx} <- Context.validate_snapshot(snapshot, registry) do
+      Context.ensure_coherence(ctx, auth) == :ok
+    else
+      _ -> false
+    end
+  end
+
+  defp rule_of(%{"rule" => rule}), do: rule
+  defp rule_of(_proof), do: nil
 
   defp verdict(%{"result" => result}), do: result
   defp verdict(%{"input_error" => _}), do: "input_error"
@@ -899,6 +919,12 @@ defmodule KomkiPolicy.LeanSpecTest do
       facts = Map.drop(snapshot["facts"], ["purpose", "input_in_approved_case_scope"])
       {%{snapshot | "facts" => facts}, intent, claimed}
     end
+  end
+
+  # validate_proof/1 on a proof that is no object.
+  defp non_object_proofs do
+    for proof <- [[], "komki-proof/1"],
+        do: {fixture("case_permit/snapshot.json"), fixture("case_permit/intent.json"), proof}
   end
 
   defp refute_condition(%{"kind" => "condition"} = premise), do: %{premise | "value" => false}
@@ -1637,15 +1663,16 @@ defmodule KomkiPolicy.LeanSpecTest do
         Map.new(files, fn {name, bytes} -> {name, Base.encode16(bytes, case: :lower)} end)
     }
 
-    {line, cli_expected(command, List.keymember?(files, "release", 0), out, exit)}
+    {line, cli_expected(command, files, out, exit)}
   end
 
-  defp cli_expected(command, release?, out, exit) do
+  defp cli_expected(command, files, out, exit) do
     {:ok, parsed} = KomkiPolicy.JSON.parse(out)
+    release? = List.keymember?(files, "release", 0)
 
     case {command, exit, parsed} do
-      {_, 2, %{"result" => "error", "code" => code}} ->
-        cli_input_error(command, code)
+      {_, 2, %{"result" => "error", "code" => code, "path" => path}} ->
+        cli_input_error(command, code, path, files)
 
       {"decide", 0, _} ->
         %{"exit" => 0, "result" => decided(parsed, release?)}
@@ -1672,7 +1699,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     decision |> Map.take(fields) |> Map.put("gos", gos(decision["remedies"]))
   end
 
-  defp cli_input_error(command, code) do
+  defp cli_input_error(command, code, path, files) do
     cond do
       code in @json_error_codes ->
         %{"exit" => 2, "result" => %{"error" => code}}
@@ -1680,11 +1707,24 @@ defmodule KomkiPolicy.LeanSpecTest do
       command == "decide" and code in Enum.map(@derive_input_errors, &to_string/1) ->
         %{"exit" => 2, "result" => %{"input_error" => code}}
 
-      command == "verify" and code in Enum.map(@modelled_input_errors, &to_string/1) ->
-        %{"exit" => 2, "result" => %{"input_error" => code}}
+      command == "verify" and cli_context_valid?(files) ->
+        %{"exit" => 2, "result" => %{"input_error" => code, "path" => path}}
 
       true ->
         :dropped
+    end
+  end
+
+  defp cli_context_valid?(files) do
+    parsed = Map.new(files, fn {name, bytes} -> {name, KomkiPolicy.JSON.parse(bytes)} end)
+
+    with {:ok, raw} <- parsed["registry"],
+         {:ok, registry} <- Registry.compile(raw),
+         {:ok, snapshot} <- parsed["snapshot"],
+         {:ok, intent} <- parsed["intent"] do
+      context_valid?(registry, snapshot, intent)
+    else
+      _ -> false
     end
   end
 
@@ -2121,6 +2161,27 @@ defmodule KomkiPolicy.LeanSpecTest do
          StreamData.member_of(["snapshot_ref", "registry_ref", "intent_ref"]),
          StreamData.constant("fremd")}
       ),
+      # The proof's own shape (validate_proof/1): each error code once.
+      StreamData.member_of([
+        {:top, "schema", "komki-proof/0"},
+        {:top, "zusatz", true},
+        {:top, "rule", 7},
+        {:top, "checked_label", ["b-eins@1", 7]},
+        {:top, "premises", %{}},
+        {:drop_top, "schema"},
+        {:drop_top, "intent_ref"}
+      ]),
+      StreamData.tuple(
+        {StreamData.constant(:put), index, StreamData.member_of(~w(kind name value binding fact)),
+         StreamData.member_of([7, nil])}
+      ),
+      StreamData.tuple(
+        {StreamData.constant(:drop_key), index, StreamData.member_of(~w(kind name value))}
+      ),
+      # Kind and name both broken: the kind is checked first.
+      StreamData.tuple(
+        {StreamData.constant(:replace), index, StreamData.member_of([7, %{"kind" => 7}])}
+      ),
       StreamData.tuple(
         {StreamData.constant(:top), StreamData.constant("conclusion"),
          StreamData.member_of(["permit", "deny"])}
@@ -2135,6 +2196,11 @@ defmodule KomkiPolicy.LeanSpecTest do
       )
     ])
   end
+
+  # Once `premises` is no list, the premise mutations have nothing to act on.
+  defp mutate(_mutation, proof)
+       when not (is_map_key(proof, "premises") and is_list(:erlang.map_get("premises", proof))),
+       do: proof
 
   defp mutate({:flip_value, i}, proof),
     do: update_premise(proof, i, &Map.put(&1, "value", not Map.get(&1, "value", true)))
@@ -2159,6 +2225,9 @@ defmodule KomkiPolicy.LeanSpecTest do
     do: update_premise(proof, i, &Map.put(&1, key, value))
 
   defp mutate({:top, key, value}, proof), do: Map.put(proof, key, value)
+  defp mutate({:drop_top, key}, proof), do: Map.delete(proof, key)
+  defp mutate({:drop_key, i, key}, proof), do: update_premise(proof, i, &Map.delete(&1, key))
+  defp mutate({:replace, i, value}, proof), do: update_premise(proof, i, fn _ -> value end)
 
   defp floatify_expression(%{"expression" => expression} = premise),
     do: Map.put(premise, "expression", floatify(expression))
@@ -2173,9 +2242,13 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp floatify(value) when is_map(value), do: Map.new(value, fn {k, v} -> {k, floatify(v)} end)
   defp floatify(value), do: value
 
+  # Premises that are no object any more stay as they are.
   defp update_premise(proof, i, fun) do
-    if i < length(proof["premises"]),
-      do: Map.update!(proof, "premises", &List.update_at(&1, i, fun)),
-      else: proof
+    Map.update!(proof, "premises", fn premises ->
+      List.update_at(premises, i, fn
+        premise when is_map(premise) -> fun.(premise)
+        premise -> premise
+      end)
+    end)
   end
 end

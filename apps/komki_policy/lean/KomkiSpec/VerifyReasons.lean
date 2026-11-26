@@ -135,8 +135,23 @@ def conclusionReasons (premiseFindings : List Reason) (conclusion : String) : Li
 
 /-! ## The report -/
 
-/-- `check/4`'s answer: an input error's code, or the reasons (none: `valid`). -/
-abbrev Report := Except String (List Reason)
+/-- An input error: `code` and `path` of `{code, path, detail}`. -/
+structure InputError where
+  code : String
+  path : String
+  deriving DecidableEq, Repr
+
+/-- `check/4`'s answer: an input error, or the reasons (none: `valid`). -/
+abbrev Report := Except InputError (List Reason)
+
+/-- `Context.ensure_output_input/1` for the output rules (§ 4.5, #628). -/
+def outputInputError? (S : Snapshot) (operation : String) : Option InputError :=
+  if !outputOperations.contains operation then none
+  else if (S.facts.lookup "output_content_digest").isNone then
+    some ⟨"emit_digest_missing", "$.facts.output_content_digest"⟩
+  else if S.classification != "classified" then
+    some ⟨"emit_object_not_classified", "$.object.classification"⟩
+  else none
 
 /-- Steps 1–9 on input that passed validation. -/
 def verifyReasons (Γ : Registry) (S : Snapshot) (I : Intent) (P : Proof) : List Reason :=
@@ -150,11 +165,9 @@ def verifyReasons (Γ : Registry) (S : Snapshot) (I : Intent) (P : Proof) : List
   rs ++ conclusionReasons rs P.conclusion
 
 def verifyReport (Γ : Registry) (S : Snapshot) (I : Intent) (P : Proof) : Report :=
-  if outputOperations.contains I.operation &&
-      (S.facts.lookup "output_content_digest").isNone then .error "emit_digest_missing"
-  else if outputOperations.contains I.operation && S.classification != "classified" then
-    .error "emit_object_not_classified"
-  else .ok (verifyReasons Γ S I P)
+  match outputInputError? S I.operation with
+  | some e => .error e
+  | none => .ok (verifyReasons Γ S I P)
 
 def Report.verdict : Report → Outcome
   | .error _ => .inputError
@@ -297,7 +310,7 @@ the tree is `valid`, and an input error exactly when `verify` has one. -/
 theorem verifyReport_verdict {Γ : Registry} {S : Snapshot} {I : Intent} {P : Proof} :
     (verifyReport Γ S I P).verdict = verify Γ S I P := by
   have key := @verifyReasons_nil Γ S I P
-  unfold verifyReport verify outputInputOk
+  unfold verifyReport verify outputInputOk outputInputError?
   generalize referencesOk Γ S I P = a at key ⊢
   generalize (sortStrings P.checkedLabel != checkedLabel P.rule S) = b at key ⊢
   generalize requiredSetOk P.rule (checkedLabel P.rule S) P.premises = c at key ⊢
