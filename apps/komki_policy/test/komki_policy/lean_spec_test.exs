@@ -41,6 +41,14 @@ defmodule KomkiPolicy.LeanSpecTest do
   @tags ~w(x y z)
   @claim_fields ~w(object_labels checked_label actual_recipients allowed_recipients fact_refs
                    assigned_label workspace_bindings)
+  # Every reason code of verify.ex, in check order (§ 5).
+  @verify_codes ~w(snapshot_mismatch registry_mismatch intent_mismatch rule_mismatch
+                   unsupported_rule checked_label_mismatch missing_required_premise
+                   unknown_premise fact_missing fact_value_mismatch premise_not_true
+                   object_quarantine label_inclusion_false label_assignment_false
+                   label_preservation_false recipient_inclusion_false expression_mismatch
+                   fact_refs_mismatch condition_false condition_unknown conclusion_mismatch
+                   conclusion_unsupported)
   @modelled_input_errors [:emit_digest_missing, :emit_object_not_classified]
   @derive_input_errors [:unknown_environment | @modelled_input_errors]
   @decision_fields ~w(decision rule checked_label blockers missing_evidence proof
@@ -248,7 +256,8 @@ defmodule KomkiPolicy.LeanSpecTest do
 
     cases =
       for {snapshot, intent, proof} <-
-            audit_attacks() ++ for({s, i} <- worlds, p <- proofs, do: {s, i, p}) do
+            audit_attacks() ++
+              unknown_conditions() ++ for({s, i} <- worlds, p <- proofs, do: {s, i, p}) do
         {raw, registry, snapshot, intent, proof}
       end
 
@@ -277,6 +286,9 @@ defmodule KomkiPolicy.LeanSpecTest do
     IO.puts("\nlean_spec seed=#{seed} runs=#{runs}: #{inspect(stats)}")
 
     assert stats.input_error >= 200
+
+    assert @verify_codes -- Map.keys(stats.codes) == [],
+           "Befundcodes ohne Fall: #{inspect(@verify_codes -- Map.keys(stats.codes))}"
 
     for rule <- Derive.proof_rules() do
       assert stats.valid_by_rule[rule] >= 150, "zu wenige gültige #{rule}-Bäume"
@@ -548,21 +560,24 @@ defmodule KomkiPolicy.LeanSpecTest do
       cases
       |> Enum.map(fn {raw, registry, snapshot, intent, proof} ->
         line = %{"registry" => raw, "snapshot" => snapshot, "intent" => intent, "proof" => proof}
-        {line, elixir_verdict(registry, snapshot, intent, proof)}
+        {line, elixir_report(registry, snapshot, intent, proof)}
       end)
-      |> Enum.reject(fn {_, verdict} -> verdict == :dropped end)
+      |> Enum.reject(fn {_, report} -> report == :dropped end)
       |> Enum.with_index()
 
     lean = run_lean("verify-batch", judged)
 
     mismatches =
-      for {{line, verdict}, id} <- judged,
-          Map.get(lean, id) != verdict,
-          do: {id, verdict, Map.get(lean, id), line}
+      for {{line, report}, id} <- judged,
+          parse_decision(Map.get(lean, id)) != report,
+          do: {id, report, parse_decision(Map.get(lean, id)), line}
 
     report_mismatches!(mismatches, label, "Verify.check/4 und dem Lean-Prüfer")
 
-    count = fn verdict -> Enum.count(judged, fn {{_, v}, _} -> v == verdict end) end
+    verdicts =
+      Enum.map(judged, fn {{line, report}, _} -> {line["proof"]["rule"], verdict(report)} end)
+
+    count = fn verdict -> Enum.count(verdicts, fn {_, v} -> v == verdict end) end
 
     %{
       compared: length(judged),
@@ -571,19 +586,31 @@ defmodule KomkiPolicy.LeanSpecTest do
       invalid: count.("invalid"),
       input_error: count.("input_error"),
       valid_by_rule:
-        judged
-        |> Enum.filter(fn {{_, v}, _} -> v == "valid" end)
-        |> Enum.frequencies_by(fn {{line, _}, _} -> line["proof"]["rule"] end)
+        verdicts
+        |> Enum.filter(fn {_, v} -> v == "valid" end)
+        |> Enum.frequencies_by(fn {rule, _} -> rule end),
+      codes:
+        Enum.frequencies(
+          for {{_, %{"reasons" => reasons}}, _} <- judged, reason <- reasons, do: reason["code"]
+        )
     }
   end
 
-  defp elixir_verdict(registry, snapshot, intent, proof) do
+  defp elixir_report(registry, snapshot, intent, proof) do
     case Verify.check(registry, snapshot, intent, proof) do
-      {:ok, %{"result" => result}} -> result
-      {:error, %{code: code}} when code in @modelled_input_errors -> "input_error"
-      {:error, _} -> :dropped
+      {:ok, outcome} ->
+        outcome
+
+      {:error, %{code: code}} when code in @modelled_input_errors ->
+        %{"input_error" => to_string(code)}
+
+      {:error, _} ->
+        :dropped
     end
   end
+
+  defp verdict(%{"result" => result}), do: result
+  defp verdict(%{"input_error" => _}), do: "input_error"
 
   defp compare_decisions!(cases, label) do
     cases
@@ -813,6 +840,27 @@ defmodule KomkiPolicy.LeanSpecTest do
   defp audit_attacks do
     forged_trees() ++ off_domain_trees()
   end
+
+  # Conditions whose facts are gone (verdict unknown) and that claim false:
+  # verify.ex reports the recomputed verdict before the claim.
+  defp unknown_conditions do
+    {:ok, registry} = Registry.compile(fixture("registry.json"))
+
+    for dir <- ~w(case_permit case_emit_permit),
+        snapshot = fixture(dir <> "/snapshot.json"),
+        intent = fixture(dir <> "/intent.json") do
+      claimed =
+        Map.update!(derived_proof(registry, snapshot, intent), "premises", fn premises ->
+          Enum.map(premises, &refute_condition/1)
+        end)
+
+      facts = Map.drop(snapshot["facts"], ["purpose", "input_in_approved_case_scope"])
+      {%{snapshot | "facts" => facts}, intent, claimed}
+    end
+  end
+
+  defp refute_condition(%{"kind" => "condition"} = premise), do: %{premise | "value" => false}
+  defp refute_condition(premise), do: premise
 
   defp off_domain_trees do
     {:ok, registry} = Registry.compile(fixture("registry.json"))
@@ -1488,7 +1536,7 @@ defmodule KomkiPolicy.LeanSpecTest do
       {_, 2, %{"result" => "error", "code" => code}} -> cli_input_error(command, code)
       {"decide", 0, _} -> %{"exit" => 0, "result" => decided(parsed, release?)}
       {"decide", 3, _} -> %{"exit" => 3, "result" => %{"unsupported" => true}}
-      {"verify", _, _} when exit in [0, 1] -> %{"exit" => exit, "result" => parsed["result"]}
+      {"verify", _, _} when exit in [0, 1] -> %{"exit" => exit, "result" => parsed}
       {"advance", 0, _} -> %{"exit" => 0, "result" => %{"ok" => Map.delete(parsed, "schema")}}
       {"advance", 1, _} -> %{"exit" => 1, "result" => %{"refused" => parsed["code"]}}
       _ -> %{"exit" => exit, "result" => parsed}
@@ -1509,7 +1557,7 @@ defmodule KomkiPolicy.LeanSpecTest do
         %{"exit" => 2, "result" => %{"input_error" => code}}
 
       command == "verify" and code in Enum.map(@modelled_input_errors, &to_string/1) ->
-        %{"exit" => 2, "result" => "input_error"}
+        %{"exit" => 2, "result" => %{"input_error" => code}}
 
       true ->
         :dropped
@@ -1943,6 +1991,11 @@ defmodule KomkiPolicy.LeanSpecTest do
       StreamData.tuple(
         {StreamData.constant(:put), index, StreamData.member_of(@claim_fields),
          subset_gen(@observers ++ @bindings, 0)}
+      ),
+      StreamData.tuple(
+        {StreamData.constant(:top),
+         StreamData.member_of(["snapshot_ref", "registry_ref", "intent_ref"]),
+         StreamData.constant("fremd")}
       ),
       StreamData.tuple(
         {StreamData.constant(:top), StreamData.constant("conclusion"),

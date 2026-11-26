@@ -21,6 +21,7 @@ CI.
 | `handover_within_admitted` | Wird x in einen Raum aufgenommen, erreicht ein geprüftes `store` oder `transfer` aus demselben Raum nur Beobachter in R_Γ(λ(x)) | A.3 an der Engine |
 | `derive_sound`, `derive_complete` | `derive` erlaubt genau dann, wenn die Regel ableitbar ist (`Derivable`, dieselbe Aussage, in der `verify_sound` endet) | CONTRACT.md § 4.3–§ 4.5, § 4.7, § 4.8 |
 | `derive_verifies` | `verify` akzeptiert jeden Baum, den `derive` baut | CONTRACT.md § 2.5, § 5 |
+| `verifyReport_verdict` | Der Bericht von `verify` (Befunde in der Reihenfolge der Prüfschritte, oder der Eingabefehler) ist leer genau dann, wenn das Urteil `valid` ist; damit gelten die Sätze über `verify` auch für ihn | CONTRACT.md § 5 |
 | `derive_permit_stable`, `derive_deny_stable` | Mehr Fakten machen aus einem `permit` oder `deny` nichts anderes; nur ein `indeterminate` löst sich auf | R.5.2, B.4, CONTRACT.md § 4.4 |
 | `aktion_permit` | Eine Aktionsfreigabe überbrückt weder einen ungültigen Vertrag noch eine entfernte Bindung, bei `store` weder den Empfängertest (#417) noch eine unbelegte Beobachterliste (#432); Fenster, Nonce, Geltungsbereich, Call-Hash und Autorität stimmen | CONTRACT.md § 4.6, R.6 |
 | `offenlegung_permit` | Eine Offenlegungsfreigabe erlaubt nur `store`, mit gültigem Vertrag, erhaltener Bindung, belegter Beobachterliste, der geschlossenen Ausgabeart und dem Ziellabel, der Befugnis für jede gelockerte Bindung (BerechtigtZurLockerung) und einem Ziellabel, dessen Leser den Speicher abdecken | CONTRACT.md § 4.9, R.5.7 |
@@ -106,8 +107,11 @@ mit Gleitkomma- statt Ganzzahl-Literalen (#626), mutiert, außerhalb des
 Wertebereichs, unter der jeweils anderen Übergaberegel, je Behauptungsfeld
 vertauscht oder ersetzt, und der stärkste Fälscher: ein Baum, der jede
 Behauptung aus der Zielwelt spiegelt, einen falschen Fakt als `false`.
-Verglichen wird, wo Elixir ein Urteil fällt oder die Snapshot-Voraussetzung
-einer Ausgaberegel verwirft; jeder andere Eingabefehler fällt heraus.
+Verglichen wird der ganze Bericht: das Urteil und die Befunde in ihrer
+Reihenfolge samt Bindung und Fakt, oder der Code, mit dem Elixir die
+Snapshot-Voraussetzung einer Ausgaberegel verwirft; jeder andere
+Eingabefehler fällt heraus. Jeder Befundcode aus `verify.ex` muss dabei
+vorkommen.
 Für `derive` vergleicht er die Entscheidung über denselben Welten und den
 Fixtures: Urteil, Prüflabel, Blocker samt `condition` und
 `recipients_outside`, fehlende Belege, den ganzen Beweisbaum,
@@ -163,7 +167,7 @@ Dateien aus den Welten der übrigen Tests, jede vierte mit einem
 veränderten Byte in einer Datei, jede sechzehnte in allen. Das Modell liest
 dieselben Bytes mit dem strengen Parser in der Reihenfolge der CLI und
 entscheidet; verglichen werden Exit-Code (§ 7), Fehlercode des Parsers und
-Entscheidung. `validate`, `plan`, Bedienfehler und Exit 4 deckt nur
+Entscheidung beziehungsweise Prüfbericht. `validate`, `plan`, Bedienfehler und Exit 4 deckt nur
 `cli_test.exs` ab.
 
 Ein weiterer Test prüft in Elixir, was `catalog_*_effective` für das Modell
@@ -186,7 +190,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige), `callHashOf` in `KomkiSpec/CallHash.lean` (`output_call_hash/2`) |
 | `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean` |
-| `verify.ex` | `KomkiSpec/Verify.lean` |
+| `verify.ex` | `KomkiSpec/Verify.lean` (Urteil), `KomkiSpec/VerifyReasons.lean` (Befunde) |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
 | `registry.ex` | Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |

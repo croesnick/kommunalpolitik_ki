@@ -2,6 +2,7 @@ import Lean.Data.Json
 import KomkiSpec.Domain
 import KomkiSpec.Input
 import KomkiSpec.CallHash
+import KomkiSpec.VerifyReasons
 
 /-!
 # Bridge: the CLI's JSON into the model
@@ -126,15 +127,21 @@ def decodeProof (j : JVal) : Decode Proof := do
     checkedLabel := ← asStrs (← field j "checked_label")
     premises := ← (← asArr (← field j "premises")).mapM decodePremise }
 
-def Outcome.label : Outcome → String
-  | .valid => "valid"
-  | .invalid => "invalid"
-  | .inputError => "input_error"
+def Reason.toJson (r : Reason) : Json :=
+  let opt : Option String → Json := fun o => (o.map Json.str).getD .null
+  Json.mkObj [("binding", opt r.binding), ("code", .str r.code), ("fact", opt r.fact)]
 
-/-- One case `{"registry", "snapshot", "intent", "proof"}` → verdict. -/
-def verifyCase (j : JVal) : Decode Outcome := do
+/-- `check/4`'s outcome `{"reasons", "result"}`, or `{"input_error": code}`. -/
+def Report.toJson : Report → Json
+  | .error code => Json.mkObj [("input_error", .str code)]
+  | .ok rs =>
+    Json.mkObj [("reasons", .arr (rs.map Reason.toJson).toArray),
+      ("result", .str (if rs.isEmpty then "valid" else "invalid"))]
+
+/-- One case `{"registry", "snapshot", "intent", "proof"}` → report. -/
+def verifyCase (j : JVal) : Decode Report := do
   let (Γ, S) ← decodeWorld j
-  pure (verify Γ S (← decodeIntent (← field j "intent")) (← decodeProof (← field j "proof")))
+  pure (verifyReport Γ S (← decodeIntent (← field j "intent")) (← decodeProof (← field j "proof")))
 
 /-! ## `derive`'s decision as JSON -/
 
@@ -420,8 +427,9 @@ def cliCase (j : JVal) : Decode Json := do
   let input := JVal.obj parsed
   match command with
   | "verify" =>
-    let o ← verifyCase input
-    pure (cliResult (match o with | .valid => 0 | .invalid => 1 | .inputError => 2) (.str o.label))
+    let r ← verifyCase input
+    pure (cliResult (match r.verdict with | .valid => 0 | .invalid => 1 | .inputError => 2)
+      r.toJson)
   | "advance" =>
     let r ← advanceCase input
     pure (cliResult (if (r.getObjVal? "ok").toOption.isSome then 0 else 1) r)
