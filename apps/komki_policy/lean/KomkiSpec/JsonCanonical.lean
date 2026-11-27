@@ -275,7 +275,7 @@ theorem arr_text (d e : Nat) (i : String) (is : List String) (r : List Char) :
   | nil => simp [String.intercalate_singleton, arrBody]
   | cons j js ih =>
     rw [List.map_cons, List.map_cons, String.intercalate_cons_cons]
-    rw [← List.map_cons] 
+    rw [← List.map_cons]
     simp only [String.toList_append, List.append_assoc] at ih ⊢
     rw [ih]; simp [arrBody]
 
