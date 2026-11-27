@@ -39,6 +39,8 @@ open KomkiSpec
 #print axioms ReleaseGap638.offenlegung_drops_without_befugnis
 #print axioms ReleaseGap673.release_any_environment
 #print axioms jsonCase_canonical
+#print axioms Json.finiteDouble_iff
+#print axioms Json.parse_floatsOk
 #print axioms deriveCase_decides
 #print axioms releaseCase_decides
 #print axioms deriveCase_unsupported
