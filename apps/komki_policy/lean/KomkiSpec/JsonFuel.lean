@@ -9,7 +9,9 @@ the grammar. `parse_noFuel`: that never happens, on any bytes. Each reader
 needs at most a linear amount in the bytes left (`readValue_good`:
 `3 n + 1`, `readArray_good` and `readObject_good`: `3 n + 3`,
 `readItems_good` and `readEntries_good`: `3 n + 2`, `readString_noFuel`:
-`n + 1`), and each succeeds only past its start (`Good`).
+`n + 1`), and each succeeds only past its start (`Good`). The factor 3 is
+needed (`[` repeated `k` times needs `3 k - 1`); the proof carries down to
+`3 * size + 1`.
 -/
 
 namespace KomkiSpec.Json
