@@ -21,7 +21,9 @@ unsupported operation, which Elixir answers before it checks the snapshot;
 `verifyCase_outputError` the output rule's input error, which Elixir reports
 before it checks the proof tree. `decodeRegistry_transformations_sorted`:
 the bridge keeps the transformations sorted by id, the order the remedy
-catalog lists them in. The order of the checks and the error a rejected
+catalog lists them in. `cliCase_verify`, `cliCase_decide`,
+`cliCase_decide_release`, `cliCase_advance`: on accepted files the CLI's
+exit code follows § 7. The order of the checks and the error a rejected
 case reports stay with the differential test.
 -/
 
@@ -478,5 +480,145 @@ theorem cliCase_verify {j : JVal} {files : List (String × JVal)}
   rw [show verifyCase (JVal.obj [("registry", r), ("snapshot", s), ("intent", i), ("proof", pr)])
     = _ from hv, ← verifyReport_verdict]
   cases hvd : Report.verdict (verifyReport Γ S I P) <;> simp [hvd, verifyExit]
+
+/-- The exit code § 7 assigns to an answer of `derive`. -/
+def derivedExit : Derived → Nat
+  | .decision _ => 0
+  | .inputError _ => 2
+  | .unsupported => 3
+
+theorem derived_exit (Γ : Registry) (S : Snapshot) (rule c : String) (r : Derived) :
+    (if ((r.toJson Γ S rule c).getObjVal? "input_error").toOption.isSome then 2
+      else if ((r.toJson Γ S rule c).getObjVal? "unsupported").toOption.isSome then 3
+      else 0) = derivedExit r := by
+  cases r with
+  | decision d =>
+    simp only [Derived.toJson, decisionJson]
+    by_cases ha : rule = "admit"
+    · subst ha; cases d <;> rfl
+    · by_cases he : rule = "emit"
+      · subst he; cases d <;> rfl
+      · cases d <;> simp [ha, he] <;> rfl
+  | inputError code => rfl
+  | unsupported => rfl
+
+/-- The exit code § 7 assigns to an answer of `deriveWithRelease`. -/
+def releaseExit : ReleaseDerived → Nat
+  | .decision _ => 0
+  | .inputError _ => 2
+  | .unsupported => 3
+
+theorem release_exit (Γ : Registry) (S : Snapshot) (I : Intent) (R : Release) (c : String)
+    (r : ReleaseDerived) :
+    let out := match r with
+      | .decision d => releaseDecisionJson Γ S I.operation R c d
+      | .inputError code => inputErrorJson ⟨code, modelErrorPath code⟩
+      | .unsupported => Lean.Json.mkObj [("unsupported", .bool true)]
+    (if (out.getObjVal? "input_error").toOption.isSome then 2
+      else if (out.getObjVal? "unsupported").toOption.isSome then 3
+      else 0) = releaseExit r := by
+  cases r with
+  | decision d =>
+    simp only [releaseDecisionJson]
+    by_cases he : I.operation = "emit"
+    · rw [he]; cases d <;> rfl
+    · cases d <;> simp [he] <;> rfl
+  | inputError code => rfl
+  | unsupported => rfl
+
+/-- `cliCase` with `decide` and no release on files that parse and pass the
+input checks: exit 0 on a decision, 2 on the model's input error, 3 on
+`unsupported` (§ 7), and the output is `deriveCase`'s. -/
+theorem cliCase_decide {j : JVal} {files : List (String × JVal)}
+    (hc : j.get? "command" = some (.str "decide")) (hf : j.get? "files" = some (.obj files))
+    {hr hs hi : String} {br bs bi : ByteArray} {r s i : JVal}
+    (hfr : files.lookup "registry" = some (.str hr)) (hbr : hexBytes hr = .ok br)
+    (hpr : KomkiSpec.Json.parse br = .ok r)
+    (hfs : files.lookup "snapshot" = some (.str hs)) (hbs : hexBytes hs = .ok bs)
+    (hps : KomkiSpec.Json.parse bs = .ok s)
+    (hfi : files.lookup "intent" = some (.str hi)) (hbi : hexBytes hi = .ok bi)
+    (hpi : KomkiSpec.Json.parse bi = .ok i)
+    (hfrel : files.lookup "release" = none) (hfst : files.lookup "stand" = none)
+    (hreg : registryError r = none) {Γ : Registry} (hΓ : decodeRegistry r = .ok Γ)
+    (hctx : contextError Γ i s = none) :
+    ∃ S I, decodeSnapshot s = .ok S ∧ decodeIntent i = .ok I ∧
+      cliCase j = .ok (if proofRules.contains I.operation then
+        cliResult (derivedExit (derive Γ S I))
+          ((derive Γ S I).toJson Γ S I.operation (callHashOf S I))
+      else cliResult 3 (Lean.Json.mkObj [("unsupported", .bool true)])) := by
+  obtain ⟨S, I, hS, hI, _, _, hv⟩ :=
+    deriveCase_decides (j := JVal.obj [("registry", r), ("snapshot", s), ("intent", i)])
+      rfl rfl rfl hreg hΓ hctx
+  refine ⟨S, I, hS, hI, ?_⟩
+  simp [cliCase, strAt_ok hc, field_ok hf, asObj, cliFiles, hfr, hbr, hpr, hfs, hbs, hps, hfi,
+    hbi, hpi, hfrel, hfst, hreg, bind, Except.bind, pure, Except.pure]
+  rw [show deriveCase (JVal.obj [("registry", r), ("snapshot", s), ("intent", i)]) = _ from hv]
+  by_cases hop : proofRules.contains I.operation = true
+  · have hm : I.operation ∈ proofRules := by simpa using hop
+    simp only [hop, hm, ite_true]
+    rw [derived_exit]
+    rfl
+  · have hm : I.operation ∉ proofRules := by simpa using hop
+    simp only [hop, hm, ite_false, Bool.false_eq_true]
+    rfl
+
+/-- `cliCase` with `decide`, a release and a stand on files that parse and
+pass the input checks: exit 0 on a decision, 2 on the model's input error,
+3 on `unsupported` (§ 7), and the output is `releaseCase`'s. -/
+theorem cliCase_decide_release {j : JVal} {files : List (String × JVal)}
+    (hc : j.get? "command" = some (.str "decide")) (hf : j.get? "files" = some (.obj files))
+    {hr hs hi hl ht : String} {br bs bi bl bt : ByteArray} {r s i rel st : JVal}
+    (hfr : files.lookup "registry" = some (.str hr)) (hbr : hexBytes hr = .ok br)
+    (hpr : KomkiSpec.Json.parse br = .ok r)
+    (hfs : files.lookup "snapshot" = some (.str hs)) (hbs : hexBytes hs = .ok bs)
+    (hps : KomkiSpec.Json.parse bs = .ok s)
+    (hfi : files.lookup "intent" = some (.str hi)) (hbi : hexBytes hi = .ok bi)
+    (hpi : KomkiSpec.Json.parse bi = .ok i)
+    (hfl : files.lookup "release" = some (.str hl)) (hbl : hexBytes hl = .ok bl)
+    (hpl : KomkiSpec.Json.parse bl = .ok rel)
+    (hft : files.lookup "stand" = some (.str ht)) (hbt : hexBytes ht = .ok bt)
+    (hpt : KomkiSpec.Json.parse bt = .ok st)
+    (hreg : registryError r = none) {Γ : Registry} (hΓ : decodeRegistry r = .ok Γ)
+    (hctx : contextError Γ i s = none) (hre : releaseError rel = none)
+    (hste : standError st = none) :
+    ∃ S I R St, decodeSnapshot s = .ok S ∧ decodeIntent i = .ok I ∧
+      decodeRelease rel = .ok R ∧ decodeStand st = .ok St ∧
+      cliCase j = .ok (cliResult (releaseExit (deriveWithRelease Γ S I R St (callHashOf S I)))
+        (match deriveWithRelease Γ S I R St (callHashOf S I) with
+          | .decision d => releaseDecisionJson Γ S I.operation R (callHashOf S I) d
+          | .inputError code => inputErrorJson ⟨code, modelErrorPath code⟩
+          | .unsupported => Lean.Json.mkObj [("unsupported", .bool true)])) := by
+  obtain ⟨S, I, R, St, hS, hI, hR, hSt, _, _, hv⟩ :=
+    releaseCase_decides (j := JVal.obj [("registry", r), ("snapshot", s), ("intent", i),
+      ("release", rel), ("stand", st)]) rfl rfl rfl rfl rfl hreg hΓ hctx hre hste
+  refine ⟨S, I, R, St, hS, hI, hR, hSt, ?_⟩
+  simp [cliCase, strAt_ok hc, field_ok hf, asObj, cliFiles, hfr, hbr, hpr, hfs, hbs, hps, hfi,
+    hbi, hpi, hfl, hbl, hpl, hft, hbt, hpt, hreg, bind, Except.bind, pure, Except.pure]
+  rw [show releaseCase (JVal.obj [("registry", r), ("snapshot", s), ("intent", i),
+    ("release", rel), ("stand", st)]) = _ from hv]
+  rw [← release_exit Γ S I R (callHashOf S I)]
+  rfl
+
+/-- `cliCase` with `advance` on a stand and a proposal that parse and pass
+the input checks: exit 0 with the new stand, or 1 with the refusal (§ 7). -/
+theorem cliCase_advance {j : JVal} {files : List (String × JVal)}
+    (hc : j.get? "command" = some (.str "advance")) (hf : j.get? "files" = some (.obj files))
+    {hst hpr : String} {bst bpr : ByteArray} {st pr : JVal}
+    (hfs : files.lookup "stand" = some (.str hst)) (hbs : hexBytes hst = .ok bst)
+    (hps : KomkiSpec.Json.parse bst = .ok st)
+    (hfp : files.lookup "proposal" = some (.str hpr)) (hbp : hexBytes hpr = .ok bpr)
+    (hpp : KomkiSpec.Json.parse bpr = .ok pr)
+    (hste : standError st = none) (hpe : proposalError pr = none) :
+    ∃ St P, decodeStand st = .ok St ∧ decodeProposal pr = .ok P ∧
+      cliCase j = .ok (match advance St P with
+        | .ok St' => cliResult 0 (Lean.Json.mkObj [("ok", St'.toJson)])
+        | .refused code => cliResult 1 (Lean.Json.mkObj [("refused", .str code)])) := by
+  obtain ⟨St, P, hSt, hP, hv⟩ :=
+    advanceCase_decides (j := JVal.obj [("stand", st), ("proposal", pr)]) rfl rfl hste hpe
+  refine ⟨St, P, hSt, hP, ?_⟩
+  simp [cliCase, strAt_ok hc, field_ok hf, asObj, cliFiles, hfs, hbs, hps, hfp, hbp, hpp,
+    bind, Except.bind, pure, Except.pure]
+  rw [show advanceCase (JVal.obj [("stand", st), ("proposal", pr)]) = _ from hv]
+  cases advance St P <;> rfl
 
 end KomkiSpec
