@@ -579,4 +579,153 @@ theorem keyword_At {s : ByteArray} {pos : Nat} {kw : String} {v : JVal}
   · next b hb => rw [he b hb]; rfl
   · rfl
 
+/-! ## Whitespace and the scalars at `readValue` -/
+
+/-- The UTF-8 bytes of a character list. -/
+def enc (cs : List Char) : List UInt8 := cs.flatMap String.utf8EncodeChar
+
+theorem bytes_ofList_enc : ∀ (l : List Char), bytes (String.ofList l) = enc l
+  | [] => by decide
+  | c :: l => by
+    rw [show String.ofList (c :: l) = c.toString ++ String.ofList l by simp, bytes_append,
+      bytes_char, bytes_ofList_enc l]
+    simp [enc]
+
+theorem bytes_eq_enc (s : String) : bytes s = enc s.toList := by
+  rw [← bytes_ofList_enc, String.ofList_toList]
+
+theorem enc_append (a b : List Char) : enc (a ++ b) = enc a ++ enc b := by
+  simp [enc]
+
+theorem enc_ascii {c : Char} (h : c.toNat ≤ 0x7F) (cs : List Char) :
+    enc (c :: cs) = asciiByte c :: enc cs := by
+  simp [enc, utf8EncodeChar_ascii h, asciiByte]
+
+theorem skipWs_stop {s : ByteArray} {pos : Nat} {b : UInt8} (h : at? s pos = some b)
+    (hb : isWs b = false) : skipWs s pos = pos := by
+  rw [skipWs]
+  unfold at? at h
+  split at h
+  · next hlt => cases h; rw [dite_eq_left_of_eq_true (eq_true hlt)]; simp [hb]
+  · cases h
+
+theorem skipWs_ws {s : ByteArray} {pos : Nat} {b : UInt8} (h : at? s pos = some b)
+    (hb : isWs b = true) : skipWs s pos = skipWs s (pos + 1) := by
+  rw [skipWs]
+  unfold at? at h
+  split at h
+  · next hlt => cases h; rw [dite_eq_left_of_eq_true (eq_true hlt)]; simp [hb]
+  · cases h
+
+/-- Whitespace bytes, then a byte that is none. -/
+theorem skipWs_At {s : ByteArray} : ∀ {pos : Nat} {ws : List UInt8} {b : UInt8},
+    At s pos (ws ++ [b]) → (∀ w ∈ ws, isWs w = true) → isWs b = false →
+    skipWs s pos = pos + ws.length
+  | pos, [], b, h, _, hb => by simpa using skipWs_stop h.1 hb
+  | pos, w :: ws, b, h, hw, hb => by
+    rw [skipWs_ws h.1 (hw w List.mem_cons_self),
+      skipWs_At h.2 (fun x hx => hw x (List.mem_cons_of_mem _ hx)) hb]
+    simp [Nat.add_assoc, Nat.add_comm 1]
+
+/-- What follows a value in the canonical text: `,` or a newline. -/
+def Follow (s : ByteArray) (k : Nat) : Prop := at? s k = some 0x2C ∨ at? s k = some 0x0A
+
+theorem Follow.alnum {s : ByteArray} {k : Nat} (h : Follow s k) : EndsAt s k isAlnum := by
+  intro b hb; rcases h with h | h <;> rw [h] at hb <;> cases hb <;> decide
+
+theorem Follow.number {s : ByteArray} {k : Nat} (h : Follow s k) : EndsAt s k isNumberByte := by
+  intro b hb; rcases h with h | h <;> rw [h] at hb <;> cases hb <;> decide
+
+theorem readValue_keyword {s : ByteArray} {pos f : Nat} {kw : String} {v : JVal} {b : UInt8}
+    (hb : bytes kw = b :: (bytes kw).tail) (hd : readValue (f + 1) s pos = keyword s pos kw v)
+    (h : At s pos (bytes kw)) (hf : Follow s (pos + (bytes kw).length)) :
+    readValue (f + 1) s pos = .ok (v, pos + (bytes kw).length) := by
+  rw [hd, keyword_At (by rw [hb]; simp) h hf.alnum]
+
+theorem readValue_null {s : ByteArray} {pos f : Nat} (h : At s pos (bytes "null"))
+    (hf : Follow s (pos + 4)) : readValue (f + 1) s pos = .ok (.null, pos + 4) := by
+  have h0 : at? s pos = some 0x6E := by
+    rw [show bytes "null" = [0x6E, 0x75, 0x6C, 0x6C] by decide] at h; exact h.1
+  rw [readValue_keyword (kw := "null") (v := .null) (b := 0x6E) (by decide) (by simp [readValue, h0]) h
+    (by simpa [show (bytes "null").length = 4 by decide] using hf)]
+  rfl
+
+theorem readValue_bool {s : ByteArray} {pos f : Nat} (b : Bool)
+    (h : At s pos (bytes (if b then "true" else "false")))
+    (hf : Follow s (pos + (bytes (if b then "true" else "false")).length)) :
+    readValue (f + 1) s pos = .ok (.bool b, pos + (bytes (if b then "true" else "false")).length) := by
+  cases b <;> simp only [Bool.false_eq_true, ite_false, ite_true] at h hf ⊢
+  · have h0 : at? s pos = some 0x66 := by
+      rw [show bytes "false" = [0x66, 0x61, 0x6C, 0x73, 0x65] by decide] at h; exact h.1
+    exact readValue_keyword (kw := "false") (v := .bool false) (b := 0x66) (by decide)
+      (by simp [readValue, h0]) h hf
+  · have h0 : at? s pos = some 0x74 := by
+      rw [show bytes "true" = [0x74, 0x72, 0x75, 0x65] by decide] at h; exact h.1
+    exact readValue_keyword (kw := "true") (v := .bool true) (b := 0x74) (by decide)
+      (by simp [readValue, h0]) h hf
+
+theorem readValue_int {s : ByteArray} {pos f : Nat} (i : Int) (h : At s pos (bytes (toString i)))
+    (hf : Follow s (pos + (bytes (toString i)).length)) :
+    readValue (f + 1) s pos = .ok (.int i, pos + (bytes (toString i)).length) := by
+  have hb := bytes_toString_int i
+  obtain ⟨d, ds, hd, hdig, _⟩ := digitBytes_shape i.natAbs
+  obtain ⟨b, hb0, hcase⟩ : ∃ b, at? s pos = some b ∧ (b = 0x2D ∨ isDigit b = true) := by
+    rw [hb] at h
+    by_cases hi : i < 0
+    · simp only [hi, ite_true, List.cons_append, List.nil_append] at h
+      exact ⟨_, h.1, Or.inl rfl⟩
+    · simp only [hi, ite_false, List.nil_append, hd] at h
+      exact ⟨_, h.1, Or.inr hdig⟩
+  have hdisp : readValue (f + 1) s pos = readNumber s pos := by
+    simp only [readValue, hb0]
+    have hnum : (isDigit b || b == 0x2D) = true := by
+      rcases hcase with rfl | h
+      · decide
+      · simp [h]
+    rcases hcase with rfl | hd'
+    · simp
+    · have h1 : b ≠ 0x7B := fun e => by subst e; exact absurd hd' (by decide)
+      have h2 : b ≠ 0x5B := fun e => by subst e; exact absurd hd' (by decide)
+      have h3 : b ≠ 0x22 := fun e => by subst e; exact absurd hd' (by decide)
+      have h4 : b ≠ 0x6E := fun e => by subst e; exact absurd hd' (by decide)
+      have h5 : b ≠ 0x74 := fun e => by subst e; exact absurd hd' (by decide)
+      have h6 : b ≠ 0x66 := fun e => by subst e; exact absurd hd' (by decide)
+      simp [h1, h2, h3, h4, h5, h6, hd']
+  rw [hdisp, readNumber_int i h hf.number]
+
+theorem escapeChar_ne_nil (c : Char) : bytes (escapeChar c) ≠ [] := by
+  unfold escapeChar
+  repeat' split
+  all_goals first
+    | decide
+    | (rw [bytes_append, show bytes "\\u00" = [0x5C, 0x75, 0x30, 0x30] by decide]; simp)
+    | (rw [bytes_char]; exact String.utf8EncodeChar_ne_nil)
+
+theorem bodyBytes_length : ∀ cs : List Char, cs.length ≤ (bodyBytes cs).length
+  | [] => by simp
+  | c :: cs => by
+    rw [bodyBytes_cons, List.length_append]
+    have := bodyBytes_length cs
+    have : 0 < (bytes (escapeChar c)).length := List.length_pos_iff.2 (escapeChar_ne_nil c)
+    simp; omega
+
+theorem bytes_encodeString (str : String) :
+    bytes (encodeString str) = [0x22] ++ bodyBytes str.toList ++ [0x22] := by
+  simp only [encodeString, bytes_append, bodyBytes]
+  rw [show bytes "\"" = [0x22] by decide]
+
+theorem readValue_str {s : ByteArray} {pos f : Nat} (str : String)
+    (h : At s pos (bytes (encodeString str))) (hl : (bytes (encodeString str)).length < f + 1) :
+    readValue (f + 1) s pos = .ok (.str str, pos + (bytes (encodeString str)).length) := by
+  rw [bytes_encodeString] at h hl ⊢
+  rw [List.append_assoc] at h
+  have h0 := h.1
+  have hb := readString_body str.toList [] (pos + 1) f h.2
+    (by have := bodyBytes_length str.toList; simp at hl; omega)
+  simp only [List.utf8Encode_nil, List.nil_append, String.ofList_toList] at hb
+  rw [show ByteArray.empty.data = #[] from rfl] at hb
+  simp only [readValue, h0]
+  simp [hb, Except.map]
+  omega
+
 end KomkiSpec.Json
