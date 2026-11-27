@@ -12,6 +12,10 @@ closing quote and returns the string, for every `Char`: the two-byte
 escapes, `\u00XX` for the other control characters, one byte for the rest
 of ASCII, and two to four bytes otherwise, which pass the parser's check of
 well-formed UTF-8 (`utf8Len_char`, RFC 3629).
+
+Numbers and keywords: `readNumber_int` reads back `toString i` for every
+integer, `keyword_At` the literals `true`, `false` and `null`, each followed
+by a byte that ends the token (`EndsAt`).
 -/
 
 namespace KomkiSpec.Json
@@ -366,5 +370,213 @@ theorem readString_body {s : ByteArray} :
     simp only [ByteArray.data_append, List.data_toByteArray] at ih
     rw [ih, bodyBytes_cons]
     simp [Nat.add_assoc]
+
+/-! ## Numbers and keywords -/
+
+/-- The byte of an ASCII character. -/
+def asciiByte (c : Char) : UInt8 := UInt8.ofNat c.toNat
+
+theorem bytes_ofList_ascii : ∀ {l : List Char}, (∀ c ∈ l, c.toNat ≤ 0x7F) →
+    bytes (String.ofList l) = l.map asciiByte
+  | [], _ => by decide
+  | c :: l, h => by
+    rw [show String.ofList (c :: l) = c.toString ++ String.ofList l by
+      simp]
+    rw [bytes_append, bytes_char, utf8EncodeChar_ascii (h c (by simp)),
+      bytes_ofList_ascii (fun c hc => h c (by simp [hc]))]
+    rfl
+
+theorem digit_toNat {c : Char} (h : c.isDigit = true) : 48 ≤ c.toNat ∧ c.toNat ≤ 57 :=
+  Char.isDigit_iff_toNat.1 h
+
+theorem digit_ascii {c : Char} (h : c.isDigit = true) : c.toNat ≤ 0x7F := by
+  have := digit_toNat h; omega
+
+theorem isDigit_asciiByte {c : Char} (h : c.isDigit = true) : isDigit (asciiByte c) = true := by
+  have := digit_toNat h
+  simp only [isDigit, inRange, asciiByte, UInt8.le_iff_toNat_le, UInt8.toNat_ofNat',
+    Bool.and_eq_true, decide_eq_true_eq]
+  simp only [UInt8.reduceToNat, Nat.reducePow]
+  omega
+
+theorem digitsValue_map {ds : List Char} (h : ∀ c ∈ ds, c.isDigit = true) :
+    digitsValue (ds.map asciiByte) = Nat.ofDigitChars 10 ds 0 := by
+  unfold digitsValue
+  rw [Nat.ofDigitChars_eq_foldl, List.foldl_map]
+  generalize 0 = init
+  induction ds generalizing init with
+  | nil => rfl
+  | cons c ds ih =>
+    simp only [List.foldl_cons]
+    have hc := h c (by simp)
+    rw [ih (fun c hc => h c (by simp [hc]))]
+    congr 1
+    have := digit_toNat hc
+    have hle : (48 : UInt8) ≤ asciiByte c := by
+      rw [UInt8.le_iff_toNat_le]; simp only [asciiByte, UInt8.toNat_ofNat']; simp; omega
+    rw [UInt8.toNat_sub_of_le _ _ hle]
+    simp only [asciiByte, UInt8.toNat_ofNat']
+    simp; omega
+
+theorem toDigits_head (n : Nat) (hn : 0 < n) : ∃ c cs, Nat.toDigits 10 n = c :: cs ∧ c ≠ '0' := by
+  induction n using Nat.strongRecOn with
+  | _ n ih =>
+    by_cases h : n < 10
+    · rw [Nat.toDigits_of_lt_base h]
+      have key : ∀ k, k < 10 → 0 < k → k.digitChar ≠ '0' := by decide
+      exact ⟨_, _, rfl, key n h hn⟩
+    · rw [Nat.toDigits_of_base_le (by decide) (by omega)]
+      obtain ⟨c, cs, hc, h0⟩ := ih (n / 10) (by omega) (by omega)
+      exact ⟨c, cs ++ [Nat.digitChar (n % 10)], by simp [hc], h0⟩
+
+theorem toDigits_digits (n : Nat) : ∀ c ∈ Nat.toDigits 10 n, c.isDigit = true :=
+  fun _ h => Nat.isDigit_of_mem_toDigits (by decide) (by decide) h
+
+/-- The digits of `n` as bytes. -/
+def digitBytes (n : Nat) : List UInt8 := (Nat.toDigits 10 n).map asciiByte
+
+theorem bytes_toString_int (i : Int) :
+    bytes (toString i) = (if i < 0 then [0x2D] else []) ++ digitBytes i.natAbs := by
+  cases i with
+  | ofNat m =>
+    simp only [Int.toString_eq_repr, Int.repr, Nat.repr_eq_ofList_toDigits]
+    rw [bytes_ofList_ascii (fun c hc => digit_ascii (toDigits_digits m c hc))]
+    simp [digitBytes]
+  | negSucc m =>
+    simp only [Int.toString_eq_repr, Int.repr, Nat.repr_eq_ofList_toDigits]
+    rw [bytes_append, bytes_ofList_ascii (fun c hc => digit_ascii (toDigits_digits _ c hc))]
+    simp [digitBytes]
+    rw [show bytes "-" = [45] by decide]
+    rfl
+
+theorem digitBytes_digits (n : Nat) : ∀ b ∈ digitBytes n, isDigit b = true := by
+  intro b hb
+  obtain ⟨c, hc, rfl⟩ := List.mem_map.1 hb
+  exact isDigit_asciiByte (toDigits_digits n c hc)
+
+theorem digitBytes_shape (n : Nat) :
+    ∃ d ds, digitBytes n = d :: ds ∧ isDigit d = true ∧ (d == 0x30 && ds.length > 0) = false := by
+  by_cases hn : n = 0
+  · subst hn; exact ⟨0x30, [], by decide, by decide, by decide⟩
+  · obtain ⟨c, cs, hc, h0⟩ := toDigits_head n (by omega)
+    refine ⟨asciiByte c, cs.map asciiByte, by simp [digitBytes, hc],
+      digitBytes_digits n _ (by simp [digitBytes, hc]), ?_⟩
+    have hd := digit_toNat (toDigits_digits n c (by simp [hc]))
+    have : asciiByte c ≠ 0x30 := by
+      intro e
+      have := congrArg UInt8.toNat e
+      simp only [asciiByte, UInt8.toNat_ofNat'] at this
+      simp at this
+      exact h0 (by rw [← char_of_toNat (by omega : c.toNat = 48)])
+    simp [this]
+
+theorem takeWhile_all {α : Type} {p : α → Bool} :
+    ∀ {l : List α}, (∀ x ∈ l, p x = true) → l.takeWhile p = l
+  | [], _ => rfl
+  | x :: l, h => by
+    have ih := takeWhile_all (p := p) (l := l) (fun y hy => h y (List.mem_cons_of_mem _ hy))
+    simp only [List.takeWhile_cons, h x List.mem_cons_self, ite_true, ih]
+
+theorem splitNumber_digits (neg : Bool) (n : Nat) :
+    splitNumber ((if neg then [0x2D] else []) ++ digitBytes n) =
+      some ⟨neg, digitBytes n, none, none⟩ := by
+  obtain ⟨d, ds, hd, hdig, hz⟩ := digitBytes_shape n
+  have hall := digitBytes_digits n
+  have htw : (digitBytes n).takeWhile isDigit = digitBytes n :=
+    takeWhile_all hall
+  have hneq : d ≠ 0x2D := by intro e; subst e; exact absurd hdig (by decide)
+  rw [hd] at htw ⊢
+  have hz' : d = 0x30 → ds = [] := by
+    intro e; subst e; cases ds with
+    | nil => rfl
+    | cons _ _ => simp at hz
+  have hh : (d :: ds).head! = d := rfl
+  cases neg <;> simp [splitNumber, htw, hneq, hh] <;> exact hz'
+
+/-- The byte after a token, if any, is not one of `bs`'s kind. -/
+def EndsAt (s : ByteArray) (k : Nat) (p : UInt8 → Bool) : Prop :=
+  ∀ b, at? s k = some b → p b = false
+
+theorem numberEnd_At {s : ByteArray} : ∀ {pos : Nat} {bs : List UInt8}, At s pos bs →
+    (∀ b ∈ bs, isNumberByte b = true) → EndsAt s (pos + bs.length) isNumberByte →
+    numberEnd s pos = pos + bs.length
+  | pos, [], _, _, he => by
+    rw [numberEnd]
+    split
+    · next h =>
+      have := he s[pos] (by simp [at?, h])
+      simp [this]
+    · rfl
+  | pos, b :: bs, h, hn, he => by
+    rw [numberEnd]
+    have hb := h.1
+    unfold at? at hb
+    split at hb
+    · next hlt =>
+      cases hb
+      rw [dite_eq_left_of_eq_true (eq_true hlt)]
+      simp only [hn _ List.mem_cons_self, ite_true]
+      rw [numberEnd_At h.2 (fun x hx => hn x (List.mem_cons_of_mem _ hx))
+        (by simpa [Nat.add_assoc, Nat.add_comm 1] using he)]
+      simp [Nat.add_assoc, Nat.add_comm 1]
+    · cases hb
+
+theorem digitsValue_digitBytes (n : Nat) : digitsValue (digitBytes n) = n := by
+  rw [digitBytes, digitsValue_map (toDigits_digits n), Nat.ofDigitChars_ten_toDigits]
+
+/-- An integer the encoder wrote, followed by a byte that ends the number. -/
+theorem readNumber_int {s : ByteArray} {pos : Nat} (i : Int) (h : At s pos (bytes (toString i)))
+    (he : EndsAt s (pos + (bytes (toString i)).length) isNumberByte) :
+    readNumber s pos = .ok (.int i, pos + (bytes (toString i)).length) := by
+  have hnum : ∀ b ∈ bytes (toString i), isNumberByte b = true := by
+    intro b hb
+    rw [bytes_toString_int] at hb
+    simp only [List.mem_append] at hb
+    rcases hb with hb | hb
+    · split at hb <;> simp_all [isNumberByte]
+    · simp [isNumberByte, digitBytes_digits _ b hb]
+  have hend := numberEnd_At h hnum he
+  have hx := At_extract h
+  unfold readNumber
+  simp only [hend, hx, List.toList_toArray]
+  have hs := splitNumber_digits (decide (i < 0)) i.natAbs
+  simp only [decide_eq_true_eq] at hs
+  rw [bytes_toString_int, hs]
+  simp only [Option.isNone_none, Bool.and_self, ite_true, digitsValue_digitBytes]
+  by_cases hi : i < 0 <;> simp [hi] <;> omega
+
+theorem get!_bytes (kw : String) (i : Nat) (hi : i < (bytes kw).length) :
+    kw.toUTF8.get! i = (bytes kw)[i] := by
+  unfold bytes at hi ⊢
+  simp only [String.toUTF8_eq_toByteArray, ByteArray.get!, Array.getElem!_eq_getD, Array.getD,
+    Array.getElem_toList]
+  simp only [Array.length_toList] at hi
+  have : i < kw.utf8ByteSize := by simpa [String.size_toByteArray] using hi
+  simp [this]
+
+theorem keyword_At {s : ByteArray} {pos : Nat} {kw : String} {v : JVal}
+    (hne : bytes kw ≠ []) (h : At s pos (bytes kw))
+    (he : EndsAt s (pos + (bytes kw).length) isAlnum) :
+    keyword s pos kw v = .ok (v, pos + (bytes kw).length) := by
+  have hg := At_get h
+  have hlen : kw.toUTF8.size = (bytes kw).length := by simp [bytes]
+  unfold keyword
+  simp only [hlen]
+  have hsize : pos + (bytes kw).length ≤ s.size := by
+    cases hb : bytes kw with
+    | nil => exact absurd hb hne
+    | cons x xs =>
+      have := at?_lt (hg xs.length (by simp [hb]))
+      simp only [List.length_cons]; omega
+  have hall : (List.range (bytes kw).length).all
+      (fun i => s.get! (pos + i) == kw.toUTF8.get! i) = true := by
+    rw [List.all_eq_true]
+    intro i hi
+    have hi' := List.mem_range.1 hi
+    rw [get!_of_at? (hg i hi'), get!_bytes kw i hi', beq_self_eq_true]
+  simp only [hsize, hall, decide_true, Bool.true_and, ite_true]
+  split
+  · next b hb => rw [he b hb]; rfl
+  · rfl
 
 end KomkiSpec.Json
