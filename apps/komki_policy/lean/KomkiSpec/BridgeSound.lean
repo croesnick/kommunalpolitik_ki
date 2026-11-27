@@ -16,8 +16,12 @@ input, and the call hash comes from a call that always encodes, so
 `callHashOf` never falls back to `""`. `deriveCase_unsupported` covers an
 unsupported operation, which Elixir answers before it checks the snapshot;
 `advanceCase_decides` covers `advance`, `verifyCase_decides` the report of
-`verify`, whose verdict is then `verify`'s (`verifyCase_verdict`). The order of the checks and the
-error a rejected case reports stay with the differential test.
+`verify`, whose verdict is then `verify`'s (`verifyCase_verdict`), and
+`verifyCase_outputError` the output rule's input error, which Elixir reports
+before it checks the proof tree. `decodeRegistry_transformations_sorted`:
+the bridge keeps the transformations sorted by id, the order the remedy
+catalog lists them in. The order of the checks and the error a rejected
+case reports stay with the differential test.
 -/
 
 namespace KomkiSpec
@@ -360,7 +364,8 @@ theorem releaseCase_decides {j r i s rel st : JVal} (hr : j.get? "registry" = so
 /-- On every case whose context and proof tree the input checks accept,
 `verifyCase` answers with `verifyReport` on the decoded input; an output
 rule's input error comes from `verifyReport` as well. `Γ` names the decoded
-registry. -/
+registry. With a missing output prerequisite the proof tree need not be
+accepted (`verifyCase_outputError`). -/
 theorem verifyCase_decides {j r i s pr : JVal} (hr : j.get? "registry" = some r)
     (hi : j.get? "intent" = some i) (hs : j.get? "snapshot" = some s)
     (hp : j.get? "proof" = some pr) (hreg : registryError r = none) {Γ : Registry}
@@ -387,8 +392,67 @@ theorem verifyCase_verdict {j r i s pr : JVal} (hr : j.get? "registry" = some r)
     (hp : j.get? "proof" = some pr) (hreg : registryError r = none) {Γ : Registry}
     (hΓ : decodeRegistry r = .ok Γ) (hctx : contextError Γ i s = none)
     (hpe : proofError pr = none) :
-    ∃ S I P, S.validated Γ = true ∧ (verifyCase j).map Report.verdict = .ok (verify Γ S I P) := by
-  obtain ⟨S, I, P, _, _, _, hval, h⟩ := verifyCase_decides hr hi hs hp hreg hΓ hctx hpe
-  exact ⟨S, I, P, hval, by rw [h, ← verifyReport_verdict]; rfl⟩
+    ∃ S I P, decodeSnapshot s = .ok S ∧ decodeIntent i = .ok I ∧ decodeProof pr = .ok P ∧
+      S.validated Γ = true ∧ (verifyCase j).map Report.verdict = .ok (verify Γ S I P) := by
+  obtain ⟨S, I, P, hS, hI, hP, hval, h⟩ := verifyCase_decides hr hi hs hp hreg hΓ hctx hpe
+  exact ⟨S, I, P, hS, hI, hP, hval, by rw [h, ← verifyReport_verdict]; rfl⟩
+
+/-- A missing output prerequisite (§ 4.5): as `check/4`, the bridge reports
+it before it checks the proof tree, whatever the tree. -/
+theorem verifyCase_outputError {j r i s pr : JVal} (hr : j.get? "registry" = some r)
+    (hi : j.get? "intent" = some i) (hs : j.get? "snapshot" = some s)
+    (hp : j.get? "proof" = some pr) (hreg : registryError r = none) {Γ : Registry}
+    (hΓ : decodeRegistry r = .ok Γ) (hctx : contextError Γ i s = none) {S : Snapshot}
+    {I : Intent} (hS : decodeSnapshot s = .ok S) (hI : decodeIntent i = .ok I) {e : InputError}
+    (he : outputInputError? S I.operation = some e) :
+    verifyCase j = .ok (.error e) := by
+  have hctx' := hctx
+  simp only [contextError, Option.or_eq_none_iff] at hctx'
+  obtain ⟨_, hse, _⟩ := hctx'
+  obtain ⟨S', hS', _, hw⟩ := decodeWorld_ok hr hs hreg hΓ hse
+  rw [hS] at hS'
+  cases hS'
+  simp only [verifyCase, field_ok hr, field_ok hi, field_ok hs, field_ok hp, hΓ, hctx, hw, hI,
+    he, bind, Except.bind, pure, Except.pure]
+
+/-- Sorting by key with the order `sortEntries` uses leaves the keys sorted. -/
+theorem mergeSort_keys_sorted {α : Type} (l : List (String × α)) :
+    ((l.mergeSort fun a b => !decide (b.1 < a.1)).map (·.1)).Pairwise (fun a b => ¬ b < a) := by
+  have hs := List.pairwise_mergeSort (le := fun a b : String × α => !decide (b.1 < a.1))
+    (fun a b c hab hbc => by
+      simp only [Bool.not_eq_true', decide_eq_false_iff_not, String.not_lt] at hab hbc ⊢
+      exact String.le_trans hab hbc)
+    (fun a b => by
+      simp only [Bool.or_eq_true, Bool.not_eq_true', decide_eq_false_iff_not, String.not_lt]
+      exact String.le_total b.1 a.1 |>.symm)
+    l
+  exact List.pairwise_map.2 (hs.imp fun h => by simpa using h)
+
+/-- The bridge keeps a registry's transformations sorted by id, as
+`Registry.compile/1` does. -/
+theorem decodeRegistry_transformations_sorted {j : JVal} {Γ : Registry}
+    (h : decodeRegistry j = .ok Γ) :
+    (Γ.transformations.map (·.1)).Pairwise (fun a b => ¬ b < a) := by
+  unfold decodeRegistry at h
+  simp only [bind, Except.bind, pure, Except.pure] at h
+  repeat' (first | (cases h; done) | split at h)
+  cases h
+  exact mergeSort_keys_sorted _
+
+/-- On a decoded registry the catalog offers its matching transformations
+sorted by id (`entry_transformations`: in the registry's order). -/
+theorem matchingTransformations_sorted {j : JVal} {Γ : Registry}
+    (h : decodeRegistry j = .ok Γ) (c : CatalogCtx) :
+    ∃ ts : List (String × List String),
+      matchingTransformations Γ c = ts.map (fun (id, out) => .transformation id out) ∧
+      (ts.map (·.1)).Pairwise (fun a b => ¬ b < a) := by
+  let keep := fun (t : String × List String × List String) =>
+    t.2.1.all c.objectLabels.contains && t.2.2.all c.checked.contains
+  refine ⟨(Γ.transformations.filter keep).map fun t => (t.1, t.2.2), ?_, ?_⟩
+  · simp [matchingTransformations, keep, List.map_map, Function.comp_def]
+  · rw [List.map_map]
+    have hs := decodeRegistry_transformations_sorted h
+    have hsub := ((List.filter_sublist (p := keep) (l := Γ.transformations)).map (·.1))
+    exact (hs.sublist hsub).imp id |> fun hp => by simpa [Function.comp_def] using hp
 
 end KomkiSpec
