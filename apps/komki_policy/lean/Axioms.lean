@@ -21,6 +21,9 @@ open KomkiSpec
 #print axioms proofError_decodes
 #print axioms snapshotError_validated
 #print axioms registryError_compiledOk
+#print axioms Json.canonical_injective
+#print axioms callHashInput_isSome
+#print axioms callHashInput_injective
 #print axioms aktion_permit
 #print axioms offenlegung_permit
 #print axioms release_single_use

@@ -26,3 +26,5 @@ import KomkiSpec.ContextInput
 import KomkiSpec.ReleaseInput
 import KomkiSpec.RegistryInput
 import KomkiSpec.RegistryInputSound
+import KomkiSpec.JsonCanonical
+import KomkiSpec.CallHashSound

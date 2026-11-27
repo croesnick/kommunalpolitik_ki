@@ -25,6 +25,7 @@ CI.
 | `proofError_decodes` | Jeder Beweisbaum, den die Eingabeprüfung von `verify` annimmt (`proofError`, wie `validate_proof/1`), liegt im Modell, jede Prämisse mit einer der vier Arten | CONTRACT.md § 2.5, § 5 |
 | `snapshotError_validated` | Jeder Snapshot, den `Context.validate_snapshot/2` annimmt (`snapshotError`), liegt im Modell und im Wertebereich der Sätze (`Snapshot.validated`) | CONTRACT.md § 2.2 |
 | `registryError_compiledOk` | Jede Registry, die `Registry.compile/1` annimmt (`registryError`), liegt im Modell und im Wertebereich der Sätze (`Registry.compiledOk`): Leser, Autoritäten und Umgebungsbeobachter ⊆ 𝒪, nicht leer, Fakttypen aus dem geschlossenen Vokabular, jeder Ausdruck typgeprüft nach § 3, Transformationslabels ⊆ Bindungen | CONTRACT.md § 2.1, § 3 |
+| `Json.canonical_injective`, `callHashInput_isSome`, `callHashInput_injective` | Der kanonische JSON-Encoder ist injektiv auf Werten, deren Objekte ihre Schlüssel sortiert führen (`JVal.Canon`). Für jeden Snapshot, den die Eingabeprüfung annimmt (`Snapshot.validated`, `snapshotError_validated`), lässt sich der Call immer kodieren, `callHashOf` fällt also nie auf `""` zurück. Gleiche Eingabebytes für SHA-256 bedeuten denselben Call: gleicher Digest (fehlend oder vorhanden), gleiches `object_id@version`, gleiche Operation, gleicher Arbeitsraum. Für Elixirs `call_hash/4` gilt das über den Differenztest, der die kanonische Form Byte für Byte vergleicht | CONTRACT.md § 2.6 |
 | `derive_permit_stable`, `derive_deny_stable` | Mehr Fakten machen aus einem `permit` oder `deny` nichts anderes; nur ein `indeterminate` löst sich auf | R.5.2, B.4, CONTRACT.md § 4.4 |
 | `aktion_permit` | Eine Aktionsfreigabe überbrückt weder einen ungültigen Vertrag noch eine entfernte Bindung, bei `store` weder den Empfängertest (#417) noch eine unbelegte Beobachterliste (#432); Fenster, Nonce, Geltungsbereich, Call-Hash und Autorität stimmen | CONTRACT.md § 4.6, R.6 |
 | `offenlegung_permit` | Eine Offenlegungsfreigabe erlaubt nur `store`, mit gültigem Vertrag, erhaltener Bindung, belegter Beobachterliste, der geschlossenen Ausgabeart und dem Ziellabel, der Befugnis für jede gelockerte Bindung (BerechtigtZurLockerung) und einem Ziellabel, dessen Leser den Speicher abdecken | CONTRACT.md § 4.9, R.5.7 |
@@ -221,7 +222,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 
 | Elixir | Lean |
 |---|---|
-| `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige), `callHashOf` in `KomkiSpec/CallHash.lean` (`output_call_hash/2`) |
+| `derive.ex` | `KomkiSpec/Derive.lean` (normaler Zweig, Beweisbaum), `KomkiSpec/Release.lean` (Freigabe-Zweige), `callPayload` in `KomkiSpec/CallHash.lean` (`output_call_hash/2`, fehlender Digest als `null`) |
 | `remedies.ex` | `catalogGos` in `KomkiSpec/Release.lean` (GO-Angebote), `catalog` in `KomkiSpec/Remedies.lean` |
 | `stand.ex` | `advance` in `KomkiSpec/Release.lean`, `standError` und `proposalError` in `KomkiSpec/ReleaseInput.lean` |
 | `verify.ex` | `KomkiSpec/Verify.lean` (Urteil), `KomkiSpec/VerifyReasons.lean` (Befunde), `KomkiSpec/ProofInput.lean` (Eingabeprüfung des Beweisbaums) |
@@ -231,7 +232,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
 | `registry.ex` | `KomkiSpec/RegistryInput.lean` (`registryError`, Compile-Fehler mit Code und Pfad), `kebab` in `KomkiSpec/ContextInput.lean` (`kebab_id?/1`), `refId` und `outputKinds` in `KomkiSpec/ReleaseInput.lean` (`reference_id?/1`, `output_kinds/0`), Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
 | `json.ex` | `KomkiSpec/Json.lean` (Parser, kanonischer Encoder) |
-| `release.ex` | `callHashOf` in `KomkiSpec/CallHash.lean`, SHA-256 in `KomkiSpec/Sha256.lean`, `releaseError` in `KomkiSpec/ReleaseInput.lean` |
+| `release.ex` | `callPayload` und `callHashInput` in `KomkiSpec/CallHash.lean` (`call_hash/4`), SHA-256 in `KomkiSpec/Sha256.lean`, `releaseError` in `KomkiSpec/ReleaseInput.lean` |
 | `context.ex` | `KomkiSpec/ContextInput.lean` (Eingabeprüfung von Intent und Snapshot, Kohärenz), `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean`, `Snapshot.validated` in `Input.lean` (Wertebereich nach der Eingabeprüfung) |
 
 Dann das Lean-Modell gegen die Änderung prüfen und anpassen, `lake build`
@@ -266,14 +267,19 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   entschiedenen Calls als Parameter; die Sätze gelten für jeden Wert, also
   auch für `callHashOf`, den die Brücke rechnet (SHA-256 über die
   kanonische Form, § 2.6). Dass verschiedene Calls verschiedene Hashes
-  haben, setzt die Kollisionsresistenz von SHA-256 voraus; beweisen lässt
-  sie sich nicht. Die vier beschreibenden Felder einer Freigabe
+  haben, folgt aus zwei Schritten: Verschiedene Calls ergeben verschiedene
+  Eingabebytes für SHA-256 (`callHashInput_injective`, bewiesen für das
+  Lean-Modell, für Elixir über den Byte-Vergleich des Differenztests), und
+  verschiedene Eingaben ergeben verschiedene Hashes (Kollisionsresistenz von
+  SHA-256, nicht beweisbar). Die vier beschreibenden Felder einer Freigabe
   (`operation`, `object`, `workspace`, `content_digest`) prüft auch
   Elixir nur auf ihre Form; an den Call bindet allein `call_hash` (#655).
-- **JSON-Schicht ausführbar, nicht bewiesen.** `Json.lean` und
-  `Sha256.lean` sind ausführbare Spezifikationen, die der Differenztest am
-  Elixir-Code hält; Sätze über sie gibt es nicht. Gleitkommazahlen druckt
-  der Encoder nicht.
+- **JSON-Schicht zum Teil bewiesen.** Vom kanonischen Encoder ist die
+  Injektivität bewiesen (`Json.canonical_injective`); der Leser dafür
+  (`KomkiSpec/JsonCanonical.lean`) dient nur dem Beweis. Der Parser in
+  `Json.lean` und `Sha256.lean` sind ausführbare Spezifikationen, die der
+  Differenztest am Elixir-Code hält; Sätze über sie gibt es nicht.
+  Gleitkommazahlen druckt der Encoder nicht.
 - **Ohne Zielarbeitsraum.** R.5.6 verlangt bei der Übergabe an einen
   Zielarbeitsraum zusätzlich dessen Aufnahmeregel. CONTRACT.md § 4.8
   klammert das aus (#270), das Modell auch.
