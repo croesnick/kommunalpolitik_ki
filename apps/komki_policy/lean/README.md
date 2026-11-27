@@ -333,8 +333,8 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   eingeschlossen, wie Elixir antwortet, hält der Differenztest. Offen
   bleibt `domainCase`, das die Eingabeprüfung nur ausgibt; bewiesen ist die
   Prüfung selbst (`registryError_compiledOk`, `snapshotError_validated`),
-  nicht ihre Ausgabe durch die Brücke. Offen ist außerdem an `cliCase` alles, was abgewiesene
-  Dateien betrifft (die Sätze `cliCase_verify`, `cliCase_decide`,
+  nicht ihre Ausgabe durch die Brücke. Offen ist außerdem an `cliCase`
+  alles, was abgewiesene Dateien betrifft (die Sätze `cliCase_verify`, `cliCase_decide`,
   `cliCase_decide_release` und `cliCase_advance` gelten für angenommene
   Dateien): Dateireihenfolge und Parse-Fehler; Usage-Fehler und
   überzählige oder fehlende Dateien modelliert `cliCase` nicht. Offen sind

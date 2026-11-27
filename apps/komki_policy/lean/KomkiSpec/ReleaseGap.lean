@@ -154,7 +154,7 @@ def Γ2 : Registry :=
   { registryId := "r", observers := ["a", "w", "x"], environments := envs2,
     bindings := [("b@1", b2)], factFields := [("output_content_digest", "string")] }
 
-/-- The object of `ReleaseGap`, but the operation right is missing: the
+/-- The object of `ReleaseGap`, but the operation right is false: the
 normal branch blocks with `basis_right_false`, which an Aktionsfreigabe
 bridges. -/
 def S2 : Snapshot :=
@@ -203,7 +203,7 @@ theorem validated : ∀ e ∈ ["env", "env2"], ({ S2 with environment := e }).va
 
 /-- The gap of #673: a release bound to the call hash of the emit into `env`
 also binds the same emit into `env2`, and permits both, though the normal
-branch blocks either (`basis_right_false`). R.6.2 asks a release to fix its
+branch blocks both (`basis_right_false`). R.6.2 asks a release to fix its
 target. Independent of #354 in substance: both environments are allowed
 recipients, and closing only #354 keeps both permits. The proof would need
 work then, though: the release branch would compute the recipient check,
