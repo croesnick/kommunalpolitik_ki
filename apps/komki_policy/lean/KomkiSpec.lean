@@ -31,3 +31,4 @@ import KomkiSpec.CallHashSound
 import KomkiSpec.PathSound
 import KomkiSpec.JsonParseCanon
 import KomkiSpec.BridgeSound
+import KomkiSpec.VerifyReasonsSound
