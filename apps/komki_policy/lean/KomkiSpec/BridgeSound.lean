@@ -3,6 +3,7 @@ import KomkiSpec.RegistryInputSound
 import KomkiSpec.CallHashSound
 import KomkiSpec.ReleaseInput
 import KomkiSpec.VerifyReasons
+import KomkiSpec.JsonParseCanon
 
 /-!
 # The bridge decides every accepted case
@@ -415,21 +416,8 @@ theorem verifyCase_outputError {j r i s pr : JVal} (hr : j.get? "registry" = som
   simp only [verifyCase, field_ok hr, field_ok hi, field_ok hs, field_ok hp, hΓ, hctx, hw, hI,
     he, bind, Except.bind, pure, Except.pure]
 
-/-- Sorting by key with the order `sortEntries` uses leaves the keys sorted. -/
-theorem mergeSort_keys_sorted {α : Type} (l : List (String × α)) :
-    ((l.mergeSort fun a b => !decide (b.1 < a.1)).map (·.1)).Pairwise (fun a b => ¬ b < a) := by
-  have hs := List.pairwise_mergeSort (le := fun a b : String × α => !decide (b.1 < a.1))
-    (fun a b c hab hbc => by
-      simp only [Bool.not_eq_true', decide_eq_false_iff_not, String.not_lt] at hab hbc ⊢
-      exact String.le_trans hab hbc)
-    (fun a b => by
-      simp only [Bool.or_eq_true, Bool.not_eq_true', decide_eq_false_iff_not, String.not_lt]
-      exact String.le_total b.1 a.1 |>.symm)
-    l
-  exact List.pairwise_map.2 (hs.imp fun h => by simpa using h)
-
-/-- The bridge keeps a registry's transformations sorted by id, as
-`Registry.compile/1` does. -/
+/-- The bridge keeps a registry's transformations sorted by id; Elixir sorts
+them in `Remedies.matching_transformations/2`. -/
 theorem decodeRegistry_transformations_sorted {j : JVal} {Γ : Registry}
     (h : decodeRegistry j = .ok Γ) :
     (Γ.transformations.map (·.1)).Pairwise (fun a b => ¬ b < a) := by
@@ -437,7 +425,7 @@ theorem decodeRegistry_transformations_sorted {j : JVal} {Γ : Registry}
   simp only [bind, Except.bind, pure, Except.pure] at h
   repeat' (first | (cases h; done) | split at h)
   cases h
-  exact mergeSort_keys_sorted _
+  exact Json.mergeSort_keys_sorted _
 
 /-- On a decoded registry the catalog offers its matching transformations
 sorted by id (`entry_transformations`: in the registry's order). -/
@@ -455,4 +443,37 @@ theorem matchingTransformations_sorted {j : JVal} {Γ : Registry}
     have hsub := ((List.filter_sublist (p := keep) (l := Γ.transformations)).map (·.1))
     exact (hs.sublist hsub).imp id |> fun hp => by simpa [Function.comp_def] using hp
 
+/-- The exit code § 7 assigns to a verdict of `verify`. -/
+def verifyExit : Outcome → Nat
+  | .valid => 0
+  | .invalid => 1
+  | .inputError => 2
+
+/-- `komki-policy verify` on files that parse and pass the input checks:
+the exit code is 0 exactly on `valid`, 1 on `invalid`, 2 on an output
+rule's input error (§ 7), and the output is `verify`'s report. -/
+theorem cliCase_verify {j : JVal} {files : List (String × JVal)}
+    (hc : j.get? "command" = some (.str "verify")) (hf : j.get? "files" = some (.obj files))
+    {hr hs hi hp : String} {br bs bi bp : ByteArray} {r s i pr : JVal}
+    (hfr : files.lookup "registry" = some (.str hr)) (hbr : hexBytes hr = .ok br)
+    (hpr : KomkiSpec.Json.parse br = .ok r)
+    (hfs : files.lookup "snapshot" = some (.str hs)) (hbs : hexBytes hs = .ok bs)
+    (hps : KomkiSpec.Json.parse bs = .ok s)
+    (hfi : files.lookup "intent" = some (.str hi)) (hbi : hexBytes hi = .ok bi)
+    (hpi : KomkiSpec.Json.parse bi = .ok i)
+    (hfp : files.lookup "proof" = some (.str hp)) (hbp : hexBytes hp = .ok bp)
+    (hpp : KomkiSpec.Json.parse bp = .ok pr)
+    (hreg : registryError r = none) {Γ : Registry} (hΓ : decodeRegistry r = .ok Γ)
+    (hctx : contextError Γ i s = none) (hpe : proofError pr = none) :
+    ∃ S I P, decodeSnapshot s = .ok S ∧ decodeIntent i = .ok I ∧ decodeProof pr = .ok P ∧
+      cliCase j = .ok (cliResult (verifyExit (verify Γ S I P)) (verifyReport Γ S I P).toJson) := by
+  let input := JVal.obj [("registry", r), ("snapshot", s), ("intent", i), ("proof", pr)]
+  obtain ⟨S, I, P, hS, hI, hP, _, hv⟩ :=
+    verifyCase_decides (j := input) rfl rfl rfl rfl hreg hΓ hctx hpe
+  refine ⟨S, I, P, hS, hI, hP, ?_⟩
+  simp [cliCase, strAt_ok hc, field_ok hf, asObj, cliFiles, hfr, hbr, hpr, hfs, hbs, hps, hfi,
+    hbi, hpi, hfp, hbp, hpp, hreg, bind, Except.bind, pure, Except.pure]
+  rw [show verifyCase (JVal.obj [("registry", r), ("snapshot", s), ("intent", i), ("proof", pr)])
+    = _ from hv, ← verifyReport_verdict]
+  cases hvd : Report.verdict (verifyReport Γ S I P) <;> simp [hvd, verifyExit]
 end KomkiSpec

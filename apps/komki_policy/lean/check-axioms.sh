@@ -17,7 +17,7 @@ for theorem in verify_sound verify_sound_rfc derivable_permitted handover_within
   enginePath_preservation enginePath_handover enginePath_no_forbidden emit_assignment \
   Json.parse_strict Json.parse_canon Json.parse_canonical_injective \
   deriveCase_decides releaseCase_decides deriveCase_unsupported advanceCase_decides \
-  verifyCase_decides verifyCase_verdict verifyCase_outputError \
+  verifyCase_decides verifyCase_verdict verifyCase_outputError cliCase_verify \
   decodeRegistry_transformations_sorted matchingTransformations_sorted \
   verifyReasons_grounded aktion_permit offenlegung_permit release_single_use advance_cas \
   catalog_aktion_effective catalog_offenlegung_effective catalog_gos \

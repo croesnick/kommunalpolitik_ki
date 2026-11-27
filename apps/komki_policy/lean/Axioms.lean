@@ -38,6 +38,7 @@ open KomkiSpec
 #print axioms verifyCase_decides
 #print axioms verifyCase_verdict
 #print axioms verifyCase_outputError
+#print axioms cliCase_verify
 #print axioms decodeRegistry_transformations_sorted
 #print axioms matchingTransformations_sorted
 #print axioms verifyReasons_grounded

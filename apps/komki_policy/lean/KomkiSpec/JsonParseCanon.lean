@@ -69,22 +69,27 @@ end KomkiSpec
 
 namespace KomkiSpec.Json
 
-theorem sortEntries_strict {acc : List (String × JVal)} (h : ∀ kv ∈ acc, kv.2.Strict)
-    (hnd : (acc.map (·.1)).Nodup) : (JVal.obj (sortEntries acc)).Strict := by
-  show ((sortEntries acc).map (·.1)).Pairwise (· < ·) ∧ JVal.StrictObj (sortEntries acc)
-  refine ⟨?_, strictObj_iff.2 fun kv hkv => h kv (List.mem_mergeSort.1 hkv)⟩
-  have hs := List.pairwise_mergeSort (le := fun a b : String × JVal => !decide (b.1 < a.1))
+/-- Sorting by key with the order `sortEntries` uses leaves the keys sorted. -/
+theorem mergeSort_keys_sorted {α : Type} (l : List (String × α)) :
+    ((l.mergeSort fun a b => !decide (b.1 < a.1)).map (·.1)).Pairwise (fun a b => ¬ b < a) := by
+  have hs := List.pairwise_mergeSort (le := fun a b : String × α => !decide (b.1 < a.1))
     (fun a b c hab hbc => by
       simp only [Bool.not_eq_true', decide_eq_false_iff_not, String.not_lt] at hab hbc ⊢
       exact String.le_trans hab hbc)
     (fun a b => by
       simp only [Bool.or_eq_true, Bool.not_eq_true', decide_eq_false_iff_not, String.not_lt]
       exact String.le_total b.1 a.1 |>.symm)
-    acc
+    l
+  exact List.pairwise_map.2 (hs.imp fun h => by simpa using h)
+
+theorem sortEntries_strict {acc : List (String × JVal)} (h : ∀ kv ∈ acc, kv.2.Strict)
+    (hnd : (acc.map (·.1)).Nodup) : (JVal.obj (sortEntries acc)).Strict := by
+  show ((sortEntries acc).map (·.1)).Pairwise (· < ·) ∧ JVal.StrictObj (sortEntries acc)
+  refine ⟨?_, strictObj_iff.2 fun kv hkv => h kv (List.mem_mergeSort.1 hkv)⟩
   have hnd' : ((sortEntries acc).map (·.1)).Nodup :=
     ((List.mergeSort_perm acc _).map _).nodup_iff.2 hnd
   have hle : ((sortEntries acc).map (·.1)).Pairwise (fun a b => ¬ b < a) :=
-    List.pairwise_map.2 (hs.imp fun h => by simpa using h)
+    mergeSort_keys_sorted acc
   exact (hle.and hnd').imp fun h => Std.lt_of_le_of_ne h.1 h.2
 
 theorem keyword_ok {s : ByteArray} {pos : Nat} {kw : String} {v w : JVal} {p : Nat}
