@@ -28,7 +28,9 @@ CI.
 | `registryError_compiledOk` | Jede Registry, die `Registry.compile/1` annimmt (`registryError`), liegt im Modell und im Wertebereich der Sätze (`Registry.compiledOk`): Leser, Autoritäten und Umgebungsbeobachter ⊆ 𝒪, nicht leer, Fakttypen aus dem geschlossenen Vokabular, jeder Ausdruck typgeprüft nach § 3, Transformationslabels ⊆ Bindungen | CONTRACT.md § 2.1, § 3 |
 | `Json.canonical_injective`, `callHashInput_isSome`, `callHashInput_injective` | Der kanonische JSON-Encoder ist injektiv auf Werten, deren Objekte ihre Schlüssel sortiert führen (`JVal.Canon`). Für jeden Snapshot, den die Eingabeprüfung annimmt (`Snapshot.validated`, `snapshotError_validated`), lässt sich der Call immer kodieren, `callHashOf` fällt also nie auf `""` zurück. Gleiche Eingabebytes für SHA-256 bedeuten denselben Call: gleicher Digest (fehlend oder vorhanden), gleiches `object_id@version`, gleiche Operation, gleicher Arbeitsraum. Für Elixirs `call_hash/4` gilt das über den Differenztest, der die kanonische Form Byte für Byte vergleicht | CONTRACT.md § 2.6 |
 | `Json.parse_strict`, `Json.parse_canon`, `Json.parse_canonical_injective` | Jeder Wert, den der strenge Parser liefert, führt seine Objektschlüssel streng sortiert, also ohne Duplikat (`JVal.Strict`, daraus `JVal.Canon`). Eine solche Liste stellt eine Elixir-Map eindeutig dar: Listengleichheit in Lean entspricht `===` auf den Maps aus `JSON.parse/1`. Zwei Dokumente, die zu verschiedenen Werten geparst werden, haben verschiedene kanonische Formen, sofern sich beide kodieren lassen (keine Gleitkommazahl, Tiefe ≤ 128). Das ist die Lean-Seite der Testmethode `canonical(parse(x)) == canonical(parse(y))`; kein anderer Satz stützt sich bisher darauf | CONTRACT.md § 6 |
-| `deriveCase_decides`, `deriveCase_unsupported`, `releaseCase_decides`, `advanceCase_decides` | Auf jeden Fall, den `Registry.compile/1` und die Eingabeprüfung annehmen (beim Freigabe-Zweig auch Release und Stand, bei `advance` Stand und Vorschlag), antwortet die Brücke, ohne abzubrechen: mit `derive`, `deriveWithRelease` bzw. `advance` auf der eingelesenen Eingabe, wobei das Modell selbst auch `unsupported` oder einen Eingabefehler liefern kann. Registry und Snapshot liegen dabei im validierten Bereich, und der Call lässt sich immer kodieren, `callHashOf` fällt also nie auf `""` zurück. Eine nicht unterstützte Operation beantwortet die Brücke wie `decide_validated?/4` mit `unsupported`, bevor sie den Snapshot prüft | CONTRACT.md § 2.6, § 4.6 |
+| `deriveCase_decides`, `deriveCase_unsupported`, `releaseCase_decides`, `advanceCase_decides` | Jeden Fall, den `Registry.compile/1` und die Eingabeprüfung annehmen (beim Freigabe-Zweig auch Release und Stand, bei `advance` Stand und Vorschlag), beantwortet die Brücke ohne Abbruch mit `derive`, `deriveWithRelease` bzw. `advance` auf der eingelesenen Eingabe, wobei das Modell selbst auch `unsupported` oder einen Eingabefehler liefern kann. Registry und Snapshot liegen dabei im validierten Bereich, und der Call lässt sich immer kodieren, `callHashOf` fällt also nie auf `""` zurück. Eine nicht unterstützte Operation beantwortet die Brücke wie `decide_validated?/4` mit `unsupported`, bevor sie den Snapshot prüft | CONTRACT.md § 2.6, § 4.6 |
+| `verifyCase_decides`, `verifyCase_verdict`, `verifyCase_outputError`, `cliCase_verify` | Jeden Fall, dessen Registry `Registry.compile/1` und dessen Kontext und Beweisbaum die Eingabeprüfung annehmen (`registryError`, `contextError`, `proofError`), beantwortet die Brücke ohne Abbruch mit `verifyReport` auf der eingelesenen Eingabe, auch den Eingabefehler einer Ausgaberegel. Ihr Urteil ist damit das von `verify` auf dieser Eingabe, und die Sätze über `verify` gelten für das, was der Differenztest vergleicht. Fehlt eine Ausgabe-Voraussetzung (§ 4.5), meldet die Brücke den Fehler wie `check/4` vor der Prüfung des Beweisbaums, unabhängig vom Baum. `cliCase_verify`: Mit `verify` auf solchen Dateien endet `cliCase` mit Exit 0 genau bei `valid`, 1 bei `invalid`, 2 beim Eingabefehler einer Ausgaberegel, wie `cli.ex` (§ 7 widerspricht sich dort, #648) | CONTRACT.md § 5, § 7 |
+| `decodeRegistry_transformations_sorted`, `matchingTransformations_sorted` | Die Brücke hält die Transformationen einer Registry nach Kennung sortiert, und der Remedy-Katalog bietet die passenden in dieser Reihenfolge an | CONTRACT.md § 2.1, § 2.8 |
 | `derive_permit_stable`, `derive_deny_stable` | Mehr Fakten machen aus einem `permit` oder `deny` nichts anderes; nur ein `indeterminate` löst sich auf | R.5.2, B.4, CONTRACT.md § 4.4 |
 | `aktion_permit` | Eine Aktionsfreigabe überbrückt weder einen ungültigen Vertrag noch eine entfernte Bindung, bei `store` weder den Empfängertest (#417) noch eine unbelegte Beobachterliste (#432); Fenster, Nonce, Geltungsbereich, Call-Hash und Autorität stimmen | CONTRACT.md § 4.6, R.6 |
 | `offenlegung_permit` | Eine Offenlegungsfreigabe erlaubt nur `store`, mit gültigem Vertrag, erhaltener Bindung, belegter Beobachterliste, der geschlossenen Ausgabeart und dem Ziellabel, der Befugnis für jede gelockerte Bindung (BerechtigtZurLockerung) und einem Ziellabel, dessen Leser den Speicher abdecken | CONTRACT.md § 4.9, R.5.7 |
@@ -257,8 +259,10 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   die Payload-Zusagen aus § 2.8 bewiesen**: das Feld von
   `fakt_nachreichen`, die Liste der Transformationen, notwendige Bindungen
   und Empfänger von `neuer_raum`. Dass die Registry ihre Transformationen
-  nach Kennung sortiert hält, besorgt die unbewiesene Brücke wie
-  `Remedies.matching_transformations/2`. Die Wirksamkeitssätze sprechen über
+  nach Kennung sortiert hält, besorgt die Brücke wie
+  `Remedies.matching_transformations/2`; bewiesen in
+  `decodeRegistry_transformations_sorted` und
+  `matchingTransformations_sorted`. Die Wirksamkeitssätze sprechen über
   `catalogGos` (`Release.lean`), Ordnung und Vollständigkeit über `catalog`
   (`Remedies.lean`); `catalog_gos` zeigt, dass beide dieselben GOs
   anbieten.
@@ -304,14 +308,19 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   `advance` modelliert. Wo Elixir außerhalb des Bereichs abstürzen würde,
   etwa bei einem Ausdruck außerhalb von B.4, verweigert das Modell
   (`missing_operation_rule`).
-- **Die Brücke ist zum Teil bewiesen.** Für `deriveCase`, `releaseCase`
-  und `advanceCase` ist bewiesen, dass sie jeden angenommenen Fall mit dem
-  Modell beantworten (`deriveCase_decides`, `releaseCase_decides`,
-  `advanceCase_decides`). Offen bleiben `verifyCase`, `domainCase`,
-  `jsonCase` und `cliCase`, der Batch-Dispatch in `Main.lean`, dass
+- **Die Brücke ist zum Teil bewiesen.** Für `deriveCase`, `releaseCase`,
+  `advanceCase` und `verifyCase` ist bewiesen, dass sie jeden angenommenen
+  Fall mit dem Modell beantworten (`deriveCase_decides`,
+  `releaseCase_decides`, `advanceCase_decides`, `verifyCase_decides`).
+  Offen bleiben `domainCase` und `jsonCase`, die die Eingabeprüfung und
+  den Parser wiedergeben, sowie `cliCase` bis auf `verify` auf angenommenen
+  Dateien (`cliCase_verify`): Dateireihenfolge, `decide` und `advance`;
+  Usage-Fehler und überzählige oder fehlende Dateien modelliert `cliCase`
+  nicht. Offen sind außerdem der Batch-Dispatch in `Main.lean`, dass
   abgewiesene Eingaben denselben Fehler wie Elixir melden, die Reihenfolge
-  der Prüfungen und dass die JSON-Ausgabe der Elixir-Ausgabe gleicht; das
-  hält der Differenztest.
+  der Prüfungen (bewiesen ist nur: Ausgabe-Voraussetzung vor Beweisbaum,
+  `verifyCase_outputError`) und dass die JSON-Ausgabe der Elixir-Ausgabe
+  gleicht; das hält der Differenztest.
   `KomkiSpec/Bridge.lean` liest die Fälle
   mit dem strengen Parser aus `Json.lean` ins Modell ein, `cli-batch` und
   `json-batch` auch die Dateibytes. Gleitkommazahlen hält er von
