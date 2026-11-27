@@ -29,3 +29,4 @@ import KomkiSpec.RegistryInputSound
 import KomkiSpec.JsonCanonical
 import KomkiSpec.CallHashSound
 import KomkiSpec.PathSound
+import KomkiSpec.JsonParseCanon
