@@ -274,6 +274,20 @@ defmodule KomkiPolicy.RegistryTest do
       term = put_in(base_registry(), ["bindings", "test@1", "operations"], %{"reject" => true})
       assert %{code: :unknown_operation} = compile_term_error(term)
     end
+
+    # Beyond 32 keys a map no longer iterates in key order; the first error
+    # still comes from the first transformation in sort order.
+    test "Transformationen werden in Sortierreihenfolge geprüft" do
+      transformations =
+        Map.new(1..40, fn i ->
+          {"t#{i}@1", %{"input_labels" => ["fremd@1"], "output_labels" => []}}
+        end)
+
+      term = Map.put(base_registry(), "transformations", transformations)
+
+      assert %{code: :unknown_binding_reference, path: "$.transformations.t10@1.input_labels"} =
+               compile_term_error(term)
+    end
   end
 
   describe "Ausdrucks-Compile (§ 3)" do
