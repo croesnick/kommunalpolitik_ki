@@ -33,6 +33,8 @@ open KomkiSpec
 #print axioms Json.parse_canonical_injective
 #print axioms deriveCase_decides
 #print axioms releaseCase_decides
+#print axioms deriveCase_unsupported
+#print axioms advanceCase_decides
 #print axioms aktion_permit
 #print axioms offenlegung_permit
 #print axioms release_single_use

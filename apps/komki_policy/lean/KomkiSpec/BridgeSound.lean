@@ -6,11 +6,16 @@ import KomkiSpec.ReleaseInput
 /-!
 # The bridge decides every accepted case
 
-`deriveCase` is what the differential test compares with Elixir's
-`decide`. `deriveCase_decides`: once `Registry.compile/1` and the context
-checks accept a case, the bridge neither throws nor drops it, decides with
-`derive` on the decoded, validated input, and hashes a call that always
-encodes, so `callHashOf` never falls back to `""`.
+The differential test compares Elixir with the bridge, the soundness
+theorems speak about the model. `deriveCase_decides`, `releaseCase_decides`:
+once `Registry.compile/1` and the context checks (for a release also
+`Release.validate/1` and `Stand.validate/1`) accept a case, the bridge does
+not throw; it answers with `derive` resp. `deriveWithRelease` on the decoded
+input, and the call hash comes from a call that always encodes, so
+`callHashOf` never falls back to `""`. `deriveCase_unsupported` covers an
+unsupported operation, which Elixir answers before it checks the snapshot;
+`advanceCase_decides` covers `advance`. The order of the checks and the
+error a rejected case reports stay with the differential test.
 -/
 
 namespace KomkiSpec
@@ -198,6 +203,75 @@ theorem standError_decodes {j : JVal} (h : standError j = none) :
     · cases hcons
   | _ => simp [standError] at h
 
+theorem refJ_str {o : Option JVal} (h : refJ o = true) : ∃ s, o = some (.str s) := by
+  match o, h with
+  | some (.str s), _ => exact ⟨s, rfl⟩
+
+/-- Every proposal `validate_proposal/1` accepts decodes into the model. -/
+theorem proposalError_decodes {j : JVal} (h : proposalError j = none) :
+    ∃ P, decodeProposal j = .ok P := by
+  cases j with
+  | obj kvs =>
+    simp only [proposalError, Option.or_eq_none_iff] at h
+    obtain ⟨_, hoff, _, hid, hnonce, href, hch, hver⟩ := h
+    obtain ⟨id, hid⟩ := kebabError_str hid
+    obtain ⟨nonce, hnonce⟩ := kebabError_str hnonce
+    obtain ⟨sref, href⟩ := refJ_str (by simpa using href)
+    obtain ⟨ch, hch⟩ := hex64_str (by simpa using hch)
+    obtain ⟨v, hv, hv0⟩ := natJ_int (by simpa using hver)
+    obtain ⟨aa, haa⟩ : ∃ aa, optStrAt (.obj kvs) "ausgabeart" = .ok aa := by
+      unfold optStrAt; split <;> exact ⟨_, rfl⟩
+    have hz : ∃ zs, (match (JVal.obj kvs).get? "ziellabel" with
+        | some v => asStrs v
+        | none => pure [] : Decode (List String)) = .ok zs := by
+      cases hz : (JVal.obj kvs).get? "ziellabel" with
+      | none => exact ⟨[], rfl⟩
+      | some z =>
+        have hhas : (kvs.lookup "ziellabel").isSome = true := by
+          simp only [JVal.get?] at hz; simp [hz]
+        simp only [hhas] at hoff
+        split at hoff
+        · cases hoff
+        split at hoff
+        · next ha => simp_all
+        split at hoff
+        · cases hoff
+        split at hoff
+        · cases hoff
+        next hzl =>
+        rw [hz] at hzl
+        obtain ⟨xs, ss, hxs, hss⟩ := ziellabelOk_strs (by simpa using hzl)
+        cases hxs
+        exact ⟨ss, asStrs_ok hss⟩
+    obtain ⟨zs, hzs⟩ := hz
+    simp only [pure, Except.pure] at hzs
+    cases hd : decodeProposal (.obj kvs) with
+    | ok P => exact ⟨P, rfl⟩
+    | error e =>
+      simp only [decodeProposal, strAt_ok hid, strAt_ok hnonce, strAt_ok href, strAt_ok hch,
+        field_ok hv, asNat, asInt, haa, bind, Except.bind, pure, Except.pure] at hd
+      simp only [show ¬ v < 0 by omega, ite_false] at hd
+      cases hzl : (JVal.obj kvs).get? "ziellabel" with
+      | none => simp [hzl] at hd
+      | some z => simp only [hzl] at hd hzs; simp [hzs] at hd
+  | _ => simp [proposalError] at h
+
+/-- On every case whose stand and proposal the input checks accept,
+`advanceCase` answers with `advance` on the decoded input. -/
+theorem advanceCase_decides {j st pr : JVal} (hst : j.get? "stand" = some st)
+    (hpr : j.get? "proposal" = some pr) (hste : standError st = none)
+    (hpe : proposalError pr = none) :
+    ∃ St P, decodeStand st = .ok St ∧ decodeProposal pr = .ok P ∧
+      advanceCase j = .ok (match advance St P with
+        | .ok St' => Lean.Json.mkObj [("ok", St'.toJson)]
+        | .refused code => Lean.Json.mkObj [("refused", .str code)]) := by
+  obtain ⟨St, hSt⟩ := standError_decodes hste
+  obtain ⟨P, hP⟩ := proposalError_decodes hpe
+  refine ⟨St, P, hSt, hP, ?_⟩
+  simp only [advanceCase, field_ok hst, field_ok hpr, hste, hpe, hSt, hP, bind, Except.bind,
+    pure, Except.pure, Option.or]
+  cases advance St P <;> rfl
+
 /-- A registry `compile/1` accepts and a snapshot the context check accepts
 decode into the validated domain, so `decodeWorld` does not throw. -/
 theorem decodeWorld_ok {j r s : JVal} (hr : j.get? "registry" = some r)
@@ -218,9 +292,22 @@ theorem decodeWorld_ok {j r s : JVal} (hr : j.get? "registry" = some r)
   simp [decodeWorld, field_ok hr, field_ok hs, hΓ, hS, hwΓ, hwS, bind, Except.bind, pure,
     Except.pure]
 
+/-- An unsupported operation: `decide_validated?/4` answers `unsupported`
+after the intent check, before the snapshot is checked; so does the bridge.
+`Γ` names the decoded registry. -/
+theorem deriveCase_unsupported {j r i s : JVal} (hr : j.get? "registry" = some r)
+    (hi : j.get? "intent" = some i) (hs : j.get? "snapshot" = some s) {Γ : Registry}
+    (hΓ : decodeRegistry r = .ok Γ) (hie : intentError i = none) {I : Intent}
+    (hI : decodeIntent i = .ok I) (hop : proofRules.contains I.operation = false) :
+    deriveCase j = .ok (Lean.Json.mkObj [("unsupported", .bool true)]) := by
+  have hn : I.operation ∉ proofRules := by simpa using hop
+  simp [deriveCase, field_ok hr, field_ok hi, field_ok hs, hΓ, hI, hie, hn, bind,
+    Except.bind, pure, Except.pure]
+
 /-- On every case the input checks accept, `deriveCase` decides: it throws
 nothing, and its answer is `derive` on the decoded input, which lies in the
-validated domain, with the call hash of a call that encodes. -/
+validated domain, with the call hash of a call that encodes. `Γ` names the
+decoded registry. -/
 theorem deriveCase_decides {j r i s : JVal} (hr : j.get? "registry" = some r)
     (hi : j.get? "intent" = some i) (hs : j.get? "snapshot" = some s)
     (hreg : registryError r = none) {Γ : Registry} (hΓ : decodeRegistry r = .ok Γ)
@@ -240,8 +327,9 @@ theorem deriveCase_decides {j r i s : JVal} (hr : j.get? "registry" = some r)
   cases proofRules.contains I.operation <;> simp
 
 /-- On every case the input checks accept, `releaseCase` decides: it throws
-nothing, and its answer is `deriveWithRelease` on the decoded input, with the
-call hash of a call that encodes. -/
+nothing, and its answer is `deriveWithRelease` on the decoded input (which
+may itself answer `unsupported` or an input error), with the call hash of a
+call that encodes. `Γ` names the decoded registry. -/
 theorem releaseCase_decides {j r i s rel st : JVal} (hr : j.get? "registry" = some r)
     (hi : j.get? "intent" = some i) (hs : j.get? "snapshot" = some s)
     (hrel : j.get? "release" = some rel) (hst : j.get? "stand" = some st)
