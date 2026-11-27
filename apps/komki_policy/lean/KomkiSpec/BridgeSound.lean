@@ -23,7 +23,7 @@ before it checks the proof tree. `decodeRegistry_transformations_sorted`:
 the bridge keeps the transformations sorted by id, the order the remedy
 catalog lists them in. `cliCase_verify`, `cliCase_decide`,
 `cliCase_decide_release`, `cliCase_advance`: on accepted files the CLI's
-exit code follows § 7. The order of the checks and the error a rejected
+exit code follows `cli.ex` (§ 7). The order of the checks and the error a rejected
 case reports stay with the differential test.
 -/
 
@@ -487,6 +487,7 @@ def derivedExit : Derived → Nat
   | .inputError _ => 2
   | .unsupported => 3
 
+/-- The keys `cliCase` inspects classify an answer as `derivedExit` does. -/
 theorem derived_exit (Γ : Registry) (S : Snapshot) (rule c : String) (r : Derived) :
     (if ((r.toJson Γ S rule c).getObjVal? "input_error").toOption.isSome then 2
       else if ((r.toJson Γ S rule c).getObjVal? "unsupported").toOption.isSome then 3
@@ -508,6 +509,7 @@ def releaseExit : ReleaseDerived → Nat
   | .inputError _ => 2
   | .unsupported => 3
 
+/-- The keys `cliCase` inspects classify an answer as `releaseExit` does. -/
 theorem release_exit (Γ : Registry) (S : Snapshot) (I : Intent) (R : Release) (c : String)
     (r : ReleaseDerived) :
     let out := match r with
@@ -600,7 +602,8 @@ theorem cliCase_decide_release {j : JVal} {files : List (String × JVal)}
   rfl
 
 /-- `cliCase` with `advance` on a stand and a proposal that parse and pass
-the input checks: exit 0 with the new stand, or 1 with the refusal (§ 7). -/
+the input checks: exit 0 with the new stand, or 1 with the refusal, as
+`cli.ex` (§ 7 contradicts itself on `refused`, #648). -/
 theorem cliCase_advance {j : JVal} {files : List (String × JVal)}
     (hc : j.get? "command" = some (.str "advance")) (hf : j.get? "files" = some (.obj files))
     {hst hpr : String} {bst bpr : ByteArray} {st pr : JVal}
