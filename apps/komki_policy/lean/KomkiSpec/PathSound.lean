@@ -10,25 +10,41 @@ the same room, by `emit` or by `store` or `transfer`. What links the hops is
 the mediator's duty, stated as the hypotheses of a hop: the admitting
 snapshot names λ(x), B_W stays fixed in the room (RFC 4.1), and an emitted
 object carries the label its tree assigns (R.5.5).
+
+Only the normal branch with a proof tree is covered. A release decides
+without a tree and still bridges `recipient_not_allowed` for `emit` and
+`transfer` (CONTRACT.md § 4.6, #354); control paths through the start of a
+room (R.5.3) have no rule in `proofRules`. `handover_within_admitted` is
+the one-room case of `enginePath_handover`.
 -/
 
 namespace KomkiSpec
 
 /-- The label an output leaves its room with: the `assigned_label` of an
-`emit` tree, the object's labels for `store` and `transfer`. -/
+`emit` tree, the object's labels for `store` and `transfer`. The mediator
+writes λ(y) from the decision's `assigned_label`, which on a permit is the
+checked label B_W; `emit_assignment` shows every `label_assignment` premise
+of a valid tree assigns that same set. -/
 def ExitLabel (S : Snapshot) (P : Proof) (ly : List String) : Prop :=
   if P.rule = "emit" then
     ∃ p ∈ P.premises, p.name = "label_assignment" ∧ ∃ xs,
       p.get? "assigned_label" = some (.arr xs) ∧ strings? xs = some ly
   else S.objectLabels = ly
 
-/-- One hop: x (labels `lx`) admitted into a room by a verified tree, an
-output (labels `ly`) leaving the same room by a verified tree. -/
-structure Hop (Γ : Registry) (lx ly : List String) : Prop where
-  admit : ∃ S I P, verify Γ S I P = .valid ∧ P.rule = "admit" ∧ S.objectLabels = lx ∧
-    ∃ S' I' P', verify Γ S' I' P' = .valid ∧
-      (P'.rule = "emit" ∨ handoverOperations.contains P'.rule = true) ∧
-      S'.workspaceBindings = S.workspaceBindings ∧ ExitLabel S' P' ly
+/-- x (labels `lx`) admitted into a room with bindings `bw` by a verified tree. -/
+def Admits (Γ : Registry) (bw lx : List String) : Prop :=
+  ∃ S I P, verify Γ S I P = .valid ∧ P.rule = "admit" ∧ S.objectLabels = lx ∧
+    S.workspaceBindings = bw
+
+/-- An output (labels `ly`) leaving a room with bindings `bw` by a verified tree. -/
+def Exits (Γ : Registry) (bw ly : List String) : Prop :=
+  ∃ S I P, verify Γ S I P = .valid ∧
+    (P.rule = "emit" ∨ handoverOperations.contains P.rule = true) ∧
+    S.workspaceBindings = bw ∧ ExitLabel S P ly
+
+/-- One hop: in through `admit`, out of the same room. -/
+inductive Hop (Γ : Registry) (lx ly : List String) : Prop
+  | mk (bw : List String) : Admits Γ bw lx → Exits Γ bw ly → Hop Γ lx ly
 
 /-- A path of hops through rooms; no Lockerung step exists. -/
 inductive EnginePath (Γ : Registry) : List String → List String → Prop
@@ -93,11 +109,11 @@ theorem enginePath_preservation {Γ : Registry} (wf : Γ.WellFormed) {lx ly : Li
   induction p with
   | refl => exact fun _ h => h
   | hop h _ ih =>
-    obtain ⟨S, I, P, hv, hr, hx, S', I', P', hv', hr', hW, hl⟩ := h.admit
+    obtain ⟨bw, ⟨S, I, P, hv, hr, hx, hb⟩, ⟨S', I', P', hv', hr', hb', hl⟩⟩ := h
     have ⟨hduty, _⟩ := verify_sound_rfc wf hv
     simp only [LabelDuty, hr, ite_true] at hduty
     have hexit := exit_label wf hv' hr' hl
-    exact fun l hl' => ih l (hexit l (hW ▸ hduty l (hx ▸ hl')))
+    exact fun l hl' => ih l (hexit l (hb' ▸ hb ▸ hduty l (hx ▸ hl')))
 
 /-- A.3, corollary at the engine: a verified `store` or `transfer` of an
 object at the end of a path reaches only observers in R_Γ(λ(x)). -/
