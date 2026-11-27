@@ -1,8 +1,9 @@
 import KomkiSpec.ReleaseSound
 import KomkiSpec.Input
+import KomkiSpec.CallHash
 
 /-!
-# Open release questions as theorems (#354, #638)
+# Open release questions as theorems (#354, #638, #673)
 
 `enginePath_handover` (A.3 along a path) covers the normal branch with a
 proof tree only. An Aktionsfreigabe decides without one, and for `emit` and
@@ -23,6 +24,13 @@ the store, while R.5.7 asks the Befugnis for every removed binding. With
 the binding its operation rules go too (§ 4.9 step 8). The fixture
 `case_offenlegung_permit` is such a case already: `web-oeffentlich-fall@1`
 goes without a Befugnis.
+
+`ReleaseGap673.release_any_environment` records #673: the call hash binds
+digest, object, operation and workspace, not the environment
+(`callHashOf_environment`), and the release branch reads it only as
+`R.callHash == c` (`permits_callHash`). A release a person gave for the emit
+into one environment permits the same emit into another, though R.6.2 asks
+a release to fix its target.
 -/
 
 namespace KomkiSpec.ReleaseGap
@@ -125,3 +133,64 @@ theorem offenlegung_drops_without_befugnis :
   decide +kernel
 
 end KomkiSpec.ReleaseGap638
+
+namespace KomkiSpec.ReleaseGap673
+open ReleaseGap
+
+/-- The call hash names digest, object, operation and workspace, not the
+environment. -/
+theorem callHashOf_environment (S : Snapshot) (I : Intent) (e : String) :
+    callHashOf { S with environment := e } I = callHashOf S I := rfl
+
+/-- The same Γ as `ReleaseGap`, with a second environment `env2` observed by `x`. -/
+def envs2 : List (String × List String) := [("env", ["w"]), ("env2", ["x"])]
+
+def Γ2 : Registry := { ReleaseGap.Γ with observers := ["a", "w", "x"], environments := envs2 }
+
+def I : Intent := ⟨"i", "emit"⟩
+
+theorem permits_eq (Γ : Registry) (S : Snapshot) (I : Intent) (R : Release) (St : Stand)
+    (c : String) :
+    permits (deriveWithRelease Γ S I R St c) =
+      ((Γ.environment? S.environment).isSome && outputOperations.contains I.operation &&
+        (R.kind == "aktionsfreigabe" || (R.kind == "offenlegungsfreigabe" && I.operation == "store")) &&
+        (S.facts.lookup "output_content_digest").isSome && S.classification == "classified" &&
+        (releaseBlockers Γ S I.operation R St c).isEmpty) := by
+  unfold deriveWithRelease
+  cases he : Γ.environment? S.environment <;>
+    cases ho : outputOperations.contains I.operation <;>
+    cases hk : (R.kind == "aktionsfreigabe" || (R.kind == "offenlegungsfreigabe" && I.operation == "store")) <;>
+    cases hd : S.facts.lookup "output_content_digest" <;>
+    cases hc : S.classification == "classified" <;>
+    cases hb : releaseBlockers Γ S I.operation R St c <;>
+    simp_all [permits]
+
+/-- The release branch reads the call hash only as `R.callHash == c`: a
+release bound to its call decides as one bound to any other matching hash. -/
+theorem permits_callHash (Γ : Registry) (S : Snapshot) (I : Intent) (R : Release) (St : Stand)
+    (c c' : String) :
+    permits (deriveWithRelease Γ S I { R with callHash := c } St c) =
+      permits (deriveWithRelease Γ S I { R with callHash := c' } St c') := by
+  have hb : ∀ op, releaseBlockers Γ S op { R with callHash := c } St c =
+      releaseBlockers Γ S op { R with callHash := c' } St c' := by
+    intro op
+    simp [releaseBlockers, aktionBlockers, offenlegungBlockers, releaseChecks, befugnisBlockers,
+      ziellabelBlockers, ziellabelRecipientBlockers, befugnis]
+  rw [permits_eq, permits_eq, hb]
+
+/-- The gap of #673: a release bound to the call hash of the emit into `env`
+(observer `w`) also binds the same emit into `env2` (observer `x`), and
+permits both; neither observer reads `b@1`. -/
+theorem release_any_environment :
+    callHashOf { ReleaseGap.S with environment := "env2" } I = callHashOf ReleaseGap.S I ∧
+    ∀ e ∈ ["env", "env2"],
+      permits (deriveWithRelease Γ2 { ReleaseGap.S with environment := e } I
+        { R with callHash := callHashOf ReleaseGap.S I } St
+        (callHashOf { ReleaseGap.S with environment := e } I)) = true := by
+  refine ⟨rfl, ?_⟩
+  intro e he
+  erw [permits_callHash Γ2 _ I R St (callHashOf ReleaseGap.S I) "h"]
+  revert e
+  decide +kernel
+
+end KomkiSpec.ReleaseGap673
