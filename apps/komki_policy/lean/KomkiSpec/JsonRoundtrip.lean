@@ -16,6 +16,13 @@ well-formed UTF-8 (`utf8Len_char`, RFC 3629).
 Numbers and keywords: `readNumber_int` reads back `toString i` for every
 integer, `keyword_At` the literals `true`, `false` and `null`, each followed
 by a byte that ends the token (`EndsAt`).
+
+Structure: `readValue_enc`, `readItems_enc` and `readEntries_enc` read back
+every encoded value, array body and object body, the layout of
+`arr_bytes` and `obj_bytes`, as long as the fuel exceeds the bytes left.
+The main theorem `parse_canonical`: for every value with strictly sorted
+keys (`JVal.Strict`), `parse` reads its canonical text back to it. With
+`parse_strict` the two are inverse on the values the parser returns.
 -/
 
 namespace KomkiSpec.Json
@@ -727,5 +734,544 @@ theorem readValue_str {s : ByteArray} {pos f : Nat} (str : String)
   simp only [readValue, h0]
   simp [hb, Except.map]
   omega
+
+/-! ## Arrays, objects and the whole document -/
+
+/-- The indent of depth `e` as bytes. -/
+def padB (e : Nat) : List UInt8 := List.replicate (2 * e) 0x20
+
+theorem bytes_pad : ∀ e, bytes (pad e) = padB e
+  | 0 => by decide
+  | e + 1 => by
+    rw [show pad (e + 1) = "  " ++ pad e by simp [pad, List.replicate_succ, String.join_cons],
+      bytes_append, bytes_pad e, show bytes "  " = [0x20, 0x20] by decide]
+    simp only [padB, Nat.mul_succ, List.replicate_succ]
+    rfl
+
+theorem lit_open_arr : bytes "[\n" = [0x5B, 0x0A] := by decide
+theorem lit_open_obj : bytes "{\n" = [0x7B, 0x0A] := by decide
+theorem lit_sep : bytes ",\n" = [0x2C, 0x0A] := by decide
+theorem lit_nl : bytes "\n" = [0x0A] := by decide
+theorem lit_close_arr : bytes "]" = [0x5D] := by decide
+theorem lit_close_obj : bytes "}" = [0x7D] := by decide
+theorem lit_colon : bytes ": " = [0x3A, 0x20] := by decide
+
+/-- An array's bytes after `[`, its newline and the first indent. -/
+def arrBodyB (d e : Nat) : List String → List UInt8
+  | [] => []
+  | [i] => bytes i ++ [0x0A] ++ padB e ++ [0x5D]
+  | i :: is => bytes i ++ [0x2C, 0x0A] ++ padB d ++ arrBodyB d e is
+
+theorem arr_inner (d e : Nat) (i : String) (is : List String) :
+    bytes (",\n".intercalate ((i :: is).map (pad d ++ ·)) ++ "\n" ++ pad e ++ "]") =
+      padB d ++ arrBodyB d e (i :: is) := by
+  induction is generalizing i with
+  | nil =>
+    simp [String.intercalate_singleton, bytes_append, bytes_pad, arrBodyB, lit_nl, lit_close_arr]
+  | cons j js ih =>
+    have ih' := ih j
+    simp only [List.map_cons] at ih' ⊢
+    rw [String.intercalate_cons_cons]
+    rw [show arrBodyB d e (i :: j :: js) = bytes i ++ [0x2C, 0x0A] ++ padB d ++
+      arrBodyB d e (j :: js) from rfl]
+    simp only [String.append_assoc, bytes_append, bytes_pad] at ih' ⊢
+    rw [ih']
+    simp only [lit_sep, List.append_assoc, List.cons_append, List.nil_append]
+
+theorem arr_bytes (d e : Nat) (i : String) (is : List String) :
+    bytes ("[\n" ++ ",\n".intercalate ((i :: is).map (pad d ++ ·)) ++ "\n" ++ pad e ++ "]") =
+      [0x5B, 0x0A] ++ padB d ++ arrBodyB d e (i :: is) := by
+  have h := arr_inner d e i is
+  simp only [String.append_assoc, bytes_append] at h ⊢
+  rw [h, lit_open_arr, List.append_assoc]
+
+/-- An object's bytes after `{`, its newline and the first indent. -/
+def objBodyB (d e : Nat) : List (String × String) → List UInt8
+  | [] => []
+  | [(k, v)] => bytes (encodeString k) ++ [0x3A, 0x20] ++ bytes v ++ [0x0A] ++ padB e ++ [0x7D]
+  | (k, v) :: es =>
+    bytes (encodeString k) ++ [0x3A, 0x20] ++ bytes v ++ [0x2C, 0x0A] ++ padB d ++ objBodyB d e es
+
+theorem obj_inner (d e : Nat) (k v : String) (es : List (String × String)) :
+    bytes (",\n".intercalate (((k, v) :: es).map fun (k, v) => pad d ++ encodeString k ++ ": " ++ v) ++
+      "\n" ++ pad e ++ "}") = padB d ++ objBodyB d e ((k, v) :: es) := by
+  induction es generalizing k v with
+  | nil =>
+    simp [String.intercalate_singleton, bytes_append, bytes_pad, objBodyB, lit_nl, lit_close_obj,
+      lit_colon]
+  | cons kv es ih =>
+    obtain ⟨k', v'⟩ := kv
+    have ih' := ih k' v'
+    simp only [List.map_cons] at ih' ⊢
+    rw [String.intercalate_cons_cons]
+    rw [show objBodyB d e ((k, v) :: (k', v') :: es) = bytes (encodeString k) ++ [0x3A, 0x20] ++
+      bytes v ++ [0x2C, 0x0A] ++ padB d ++ objBodyB d e ((k', v') :: es) from rfl]
+    simp only [String.append_assoc, bytes_append, bytes_pad] at ih' ⊢
+    rw [ih']
+    simp only [lit_sep, lit_colon, List.append_assoc, List.cons_append, List.nil_append]
+
+theorem obj_bytes (d e : Nat) (k v : String) (es : List (String × String)) :
+    bytes ("{\n" ++ ",\n".intercalate (((k, v) :: es).map fun (k, v) =>
+      pad d ++ encodeString k ++ ": " ++ v) ++ "\n" ++ pad e ++ "}") =
+      [0x7B, 0x0A] ++ padB d ++ objBodyB d e ((k, v) :: es) := by
+  have h := obj_inner d e k v es
+  simp only [String.append_assoc, bytes_append] at h ⊢
+  rw [h, lit_open_obj, List.append_assoc]
+
+/-- A byte that can start an encoded value. -/
+def LeadB (b : UInt8) : Prop := isWs b = false ∧ b ≠ 0x5D ∧ b ≠ 0x2C ∧ b ≠ 0x7D
+
+instance (b : UInt8) : Decidable (LeadB b) := by unfold LeadB; infer_instance
+
+theorem digit_leadB {b : UInt8} (h : isDigit b = true) : LeadB b := by
+  simp only [isDigit, inRange, Bool.and_eq_true, decide_eq_true_eq, UInt8.le_iff_toNat_le] at h
+  simp only [UInt8.reduceToNat] at h
+  simp only [LeadB, isWs, Bool.or_eq_false_iff, beq_eq_false_iff_ne, ne_eq, ← UInt8.toNat_inj,
+    UInt8.reduceToNat]
+  omega
+
+theorem encode_head {d : Nat} {v : JVal} {t : String} (h : encode d v = .ok t) :
+    ∃ b, (bytes t).head? = some b ∧ LeadB b := by
+  unfold encode at h
+  split at h
+  · cases h
+  split at h
+  · cases h; exact ⟨0x6E, by decide, by decide⟩
+  · next b' =>
+    cases h
+    cases b'
+    · exact ⟨0x66, by decide, by decide⟩
+    · exact ⟨0x74, by decide, by decide⟩
+  · next i =>
+    cases h
+    rw [bytes_toString_int]
+    obtain ⟨d', ds, hd, hdig, _⟩ := digitBytes_shape i.natAbs
+    by_cases hi : i < 0
+    · exact ⟨0x2D, by simp [hi], by decide⟩
+    · exact ⟨d', by simp [hi, hd], digit_leadB hdig⟩
+  · cases h
+  · next str =>
+    cases h
+    exact ⟨0x22, by rw [bytes_encodeString]; simp, by decide⟩
+  · cases h; exact ⟨0x5B, by decide, by decide⟩
+  · next xs hne =>
+    simp only [bind, Except.bind] at h
+    split at h
+    · cases h
+    · cases h
+      exact ⟨0x5B, by simp [String.append_assoc, bytes_append, lit_open_arr], by decide⟩
+  · cases h; exact ⟨0x7B, by decide, by decide⟩
+  · next kvs hne =>
+    simp only [bind, Except.bind] at h
+    split at h
+    · cases h
+    · cases h
+      exact ⟨0x7B, by simp [String.append_assoc, bytes_append, lit_open_obj], by decide⟩
+
+theorem At_prefix {s : ByteArray} {pos : Nat} {a b : List UInt8} (h : At s pos (a ++ b)) :
+    At s pos a := (At_append.1 h).1
+
+theorem At_suffix {s : ByteArray} {pos : Nat} {a b : List UInt8} (h : At s pos (a ++ b)) :
+    At s (pos + a.length) b := (At_append.1 h).2
+
+/-- A newline and an indent, then a byte that is no whitespace. -/
+theorem skip_indent {s : ByteArray} {pos e : Nat} {b : UInt8} {rest : List UInt8}
+    (h : At s pos ([0x0A] ++ padB e ++ b :: rest)) (hb : isWs b = false) :
+    skipWs s pos = pos + 1 + 2 * e := by
+  have h' : At s pos (([0x0A] ++ padB e) ++ [b]) := by
+    have := At_prefix (a := ([0x0A] ++ padB e) ++ [b]) (b := rest) (by simpa using h)
+    exact this
+  rw [skipWs_At h' (by intro w hw; simp [padB] at hw; rcases hw with rfl | ⟨_, rfl⟩ <;> decide) hb]
+  simp [padB]; omega
+
+theorem sortEntries_sorted {kvs : List (String × JVal)} (h : (kvs.map (·.1)).Pairwise (· < ·)) :
+    sortEntries kvs = kvs := by
+  apply List.mergeSort_of_pairwise
+  rw [List.pairwise_map] at h
+  exact h.imp fun h' => by simpa using String.lt_asymm h'
+
+theorem arrBodyB_head (d e : Nat) (i : String) (is : List String) :
+    ∃ t, arrBodyB d e (i :: is) = bytes i ++ t := by
+  cases is with
+  | nil => exact ⟨[0x0A] ++ padB e ++ [0x5D], by simp [arrBodyB]⟩
+  | cons j js => exact ⟨[0x2C, 0x0A] ++ padB d ++ arrBodyB d e (j :: js), by simp [arrBodyB]⟩
+
+/-- An object key: `readString` after its opening quote returns it. -/
+theorem readString_key {s : ByteArray} {pos f : Nat} {k : String} {rest : List UInt8}
+    (h : At s pos (bytes (encodeString k) ++ rest)) (hl : (bytes (encodeString k)).length < f + 1) :
+    readString f s (pos + 1) #[] = .ok (k, pos + (bytes (encodeString k)).length) := by
+  rw [bytes_encodeString] at h hl ⊢
+  have h' := At_prefix h
+  rw [List.append_assoc] at h'
+  have hb := readString_body k.toList [] (pos + 1) f h'.2
+    (by have := bodyBytes_length k.toList; simp at hl; omega)
+  simp only [List.utf8Encode_nil, List.nil_append, String.ofList_toList] at hb
+  rw [show ByteArray.empty.data = #[] from rfl] at hb
+  rw [hb]
+  simp; omega
+
+theorem objBodyB_head (d e : Nat) (k v : String) (es : List (String × String)) :
+    ∃ t, objBodyB d e ((k, v) :: es) = bytes (encodeString k) ++ t := by
+  cases es with
+  | nil => exact ⟨[0x3A, 0x20] ++ bytes v ++ [0x0A] ++ padB e ++ [0x7D], by simp [objBodyB]⟩
+  | cons kv es =>
+    obtain ⟨k', v'⟩ := kv
+    exact ⟨[0x3A, 0x20] ++ bytes v ++ [0x2C, 0x0A] ++ padB d ++ objBodyB d e ((k', v') :: es),
+      by simp [objBodyB]⟩
+
+theorem At_at {s : ByteArray} {pos : Nat} {l : List UInt8} (h : At s pos l) {k : Nat} {b : UInt8}
+    (hk : l[k]? = some b) : at? s (pos + k) = some b := by
+  obtain ⟨hlt, rfl⟩ := List.getElem?_eq_some_iff.1 hk
+  exact At_get h k hlt
+
+mutual
+theorem readValue_enc : ∀ (v : JVal) {d : Nat} {t : String}, v.Strict → encode d v = .ok t →
+    ∀ {s : ByteArray} {pos fuel : Nat}, At s pos (bytes t) → Follow s (pos + (bytes t).length) →
+    (bytes t).length < fuel → readValue fuel s pos = .ok (v, pos + (bytes t).length)
+  | .null, _, _, _, h, _, _, fuel, hA, hF, hl => by
+    unfold encode at h; split at h; · cases h
+    cases h
+    obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 1 := ⟨fuel - 1, by omega⟩
+    have h4 : (bytes "null").length = 4 := by decide
+    rw [h4] at hF ⊢
+    exact readValue_null hA hF
+  | .bool b, _, _, _, h, _, _, fuel, hA, hF, hl => by
+    unfold encode at h; split at h; · cases h
+    cases h
+    obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 1 := ⟨fuel - 1, by omega⟩
+    exact readValue_bool b hA hF
+  | .int i, _, _, _, h, _, _, fuel, hA, hF, hl => by
+    unfold encode at h; split at h; · cases h
+    cases h
+    obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 1 := ⟨fuel - 1, by omega⟩
+    exact readValue_int i hA hF
+  | .float _ _, _, _, _, h, _, _, _, _, _, _ => by unfold encode at h; split at h <;> cases h
+  | .str str, _, _, _, h, _, _, fuel, hA, hF, hl => by
+    unfold encode at h; split at h; · cases h
+    cases h
+    obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 1 := ⟨fuel - 1, by omega⟩
+    exact readValue_str str hA hl
+  | .arr [], _, _, _, h, s, pos, fuel, hA, hF, hl => by
+    unfold encode at h; split at h; · cases h
+    cases h
+    rw [show bytes "[]" = [0x5B, 0x5D] by decide] at hA hl ⊢
+    obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 2 := ⟨fuel - 2, by simp at hl; omega⟩
+    have h1 : skipWs s (pos + 1) = pos + 1 := skipWs_stop hA.2.1 (by decide)
+    simp [readValue, readArray, hA.1, h1, hA.2.1]
+  | .arr (x :: xs), d, t, hc, h, s, pos, fuel, hA, hF, hl => by
+    obtain ⟨is, hi, rfl⟩ := encode_arr h
+    obtain ⟨i, is', hx, _, rfl⟩ := encodeItems_cons hi
+    rw [arr_bytes] at hA hF hl ⊢
+    simp only [List.append_assoc, List.length_append, List.length_cons, List.length_nil] at hA hl
+    obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 2 := ⟨fuel - 2, by omega⟩
+    obtain ⟨b, hb, hlead⟩ := encode_head hx
+    obtain ⟨t1, ht1⟩ := arrBodyB_head (d + 1) d i is'
+    obtain ⟨rest, hrest⟩ : ∃ rest, arrBodyB (d + 1) d (i :: is') = b :: rest := by
+      rw [ht1]
+      cases hbi : bytes i with
+      | nil => simp [hbi] at hb
+      | cons b' bs => simp [hbi] at hb; subst hb; exact ⟨_, rfl⟩
+    have hr := hA.2
+    have hw := skip_indent (e := d + 1) (b := b) (rest := rest)
+      (by rw [hrest] at hr; simpa using hr) hlead.1
+    have hA2 : At s (pos + 1 + 1 + 2 * (d + 1)) (arrBodyB (d + 1) d (i :: is')) := by
+      have := At_suffix (a := [0x0A] ++ padB (d + 1)) (b := arrBodyB (d + 1) d (i :: is'))
+        (by simpa using hA.2)
+      simp only [padB, List.length_append, List.length_cons, List.length_nil,
+        List.length_replicate] at this
+      rw [show pos + 1 + 1 + 2 * (d + 1) = pos + 1 + (0 + 1 + 2 * (d + 1)) by omega]
+      exact this
+    have hn : at? s (pos + 1 + 1 + 2 * (d + 1)) = some b := by
+      have := hA2; rw [hrest] at this; exact this.1
+    have ih := readItems_enc (x :: xs) hc hi (List.cons_ne_nil _ _) (fuel := f) (acc := [])
+      hA2 (by simp [padB] at hl; omega)
+    have hne1 : b ≠ 0x5D := hlead.2.1
+    have hne2 : b ≠ 0x2C := hlead.2.2.1
+    simp only [readValue, hA.1, readArray, hw, hn]
+    simp [hne1, hne2, ih, padB]
+    omega
+  | .obj [], _, _, _, h, s, pos, fuel, hA, hF, hl => by
+    unfold encode at h; split at h; · cases h
+    cases h
+    rw [show bytes "{}" = [0x7B, 0x7D] by decide] at hA hl ⊢
+    obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 2 := ⟨fuel - 2, by simp at hl; omega⟩
+    have h1 : skipWs s (pos + 1) = pos + 1 := skipWs_stop hA.2.1 (by decide)
+    simp [readValue, readObject, hA.1, h1, hA.2.1]
+  | .obj ((k, v) :: kvs), d, t, hc, h, s, pos, fuel, hA, hF, hl => by
+    obtain ⟨es, he, rfl⟩ := encode_obj h
+    have hsort : (es.mergeSort fun a b => !decide (b.1 < a.1)) = es := by
+      apply List.mergeSort_of_pairwise
+      have hp := hc.1
+      rw [← encodeEntries_keys he, List.pairwise_map] at hp
+      exact hp.imp fun h' => by simpa using String.lt_asymm h'
+    obtain ⟨sv, es', hv, _, rfl⟩ := encodeEntries_cons he
+    rw [hsort, obj_bytes] at hA hF hl ⊢
+    simp only [List.append_assoc, List.length_append, List.length_cons, List.length_nil] at hA hl
+    obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 2 := ⟨fuel - 2, by omega⟩
+    obtain ⟨t1, ht1⟩ := objBodyB_head (d + 1) d k sv es'
+    obtain ⟨rest, hrest⟩ : ∃ rest, objBodyB (d + 1) d ((k, sv) :: es') = 0x22 :: rest := by
+      rw [ht1, bytes_encodeString]
+      exact ⟨bodyBytes k.toList ++ [0x22] ++ t1, by simp⟩
+    have hr := hA.2
+    have hw := skip_indent (e := d + 1) (b := 0x22) (rest := rest)
+      (by rw [hrest] at hr; simpa using hr) (by decide)
+    have hA2 : At s (pos + 1 + 1 + 2 * (d + 1)) (objBodyB (d + 1) d ((k, sv) :: es')) := by
+      have := At_suffix (a := [0x0A] ++ padB (d + 1)) (b := objBodyB (d + 1) d ((k, sv) :: es'))
+        (by simpa using hA.2)
+      simp only [padB, List.length_append, List.length_cons, List.length_nil,
+        List.length_replicate] at this
+      rw [show pos + 1 + 1 + 2 * (d + 1) = pos + 1 + (0 + 1 + 2 * (d + 1)) by omega]
+      exact this
+    have hn : at? s (pos + 1 + 1 + 2 * (d + 1)) = some 0x22 := by
+      have := hA2; rw [hrest] at this; exact this.1
+    have ih := readEntries_enc ((k, v) :: kvs) hc.2 he (List.cons_ne_nil _ _) (fuel := f)
+      (acc := []) (by simpa using hc.1) hA2 (by simp [padB] at hl; omega)
+    simp only [readValue, hA.1, readObject, hw, hn]
+    simp [ih, padB]
+    omega
+
+theorem readItems_enc : ∀ (xs : List JVal) {d e : Nat} {is : List String}, JVal.StrictList xs →
+    encodeItems d xs = .ok is → xs ≠ [] →
+    ∀ {s : ByteArray} {pos fuel : Nat} {acc : List JVal}, At s pos (arrBodyB d e is) →
+    (arrBodyB d e is).length < fuel →
+    readItems fuel s pos acc = .ok (.arr (acc ++ xs), pos + (arrBodyB d e is).length)
+  | [], _, _, _, _, _, hne, _, _, _, _, _, _ => absurd rfl hne
+  | x :: xs, d, e, is, hc, h, _, s, pos, fuel, acc, hA, hl => by
+    obtain ⟨i, is', hx, hxs, rfl⟩ := encodeItems_cons h
+    obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 1 := ⟨fuel - 1, by omega⟩
+    cases xs with
+    | nil =>
+      simp only [encodeItems] at hxs
+      cases hxs
+      simp only [arrBodyB, List.append_assoc] at hA hl ⊢
+      have hi := At_prefix hA
+      have hr := At_suffix hA
+      have hF : Follow s (pos + (bytes i).length) := Or.inr hr.1
+      simp only [List.length_append, List.length_cons, List.length_nil] at hl
+      have hv := readValue_enc x hc.1 hx (fuel := f) hi hF (by omega)
+      have hw := skip_indent (e := e) (b := 0x5D) (rest := []) (by simpa using hr) (by decide)
+      have hcl : at? s (pos + (bytes i).length + 1 + 2 * e) = some 0x5D := by
+        have hA' : At s pos ((bytes i ++ [0x0A] ++ padB e) ++ [0x5D]) := by simpa using hA
+        have := (At_suffix hA').1
+        simp [padB] at this
+        rw [show pos + (bytes i).length + 1 + 2 * e = pos + ((bytes i).length + (2 * e + 1)) by omega]
+        exact this
+      simp only [readItems, bind, Except.bind, hv, hw, hcl]
+      simp [padB]
+      omega
+    | cons y ys =>
+      obtain ⟨i2, is'', hy, hys, rfl⟩ := encodeItems_cons hxs
+      rw [show arrBodyB d e (i :: i2 :: is'') = bytes i ++ [0x2C, 0x0A] ++ padB d ++
+        arrBodyB d e (i2 :: is'') from rfl] at hA hl ⊢
+      simp only [List.append_assoc] at hA
+      have hi := At_prefix hA
+      have hr := At_suffix hA
+      have hcomma : at? s (pos + (bytes i).length) = some 0x2C := hr.1
+      simp only [List.length_append, List.length_cons, List.length_nil] at hl
+      have hv := readValue_enc x hc.1 hx (fuel := f) hi (Or.inl hcomma) (by omega)
+      have hw : skipWs s (pos + (bytes i).length) = pos + (bytes i).length :=
+        skipWs_stop hcomma (by decide)
+      obtain ⟨b, hb, hlead⟩ := encode_head hy
+      obtain ⟨t2, ht2⟩ := arrBodyB_head d e i2 is''
+      obtain ⟨rest, hrest⟩ : ∃ rest, arrBodyB d e (i2 :: is'') = b :: rest := by
+        rw [ht2]
+        cases hbi : bytes i2 with
+        | nil => simp [hbi] at hb
+        | cons b' bs => simp [hbi] at hb; subst hb; exact ⟨_, rfl⟩
+      have hr2 := hr.2
+      rw [hrest] at hr2
+      have hk := skip_indent (e := d) (b := b) (rest := rest) (by simpa using hr2) hlead.1
+      have hA2 : At s (pos + (bytes i).length + 1 + 1 + 2 * d) (arrBodyB d e (i2 :: is'')) := by
+        have := At_suffix (a := [0x0A] ++ padB d) (b := arrBodyB d e (i2 :: is'')) (by simpa using hr.2)
+        simp only [padB, List.length_append, List.length_cons, List.length_nil,
+          List.length_replicate] at this
+        rw [show pos + (bytes i).length + 1 + 1 + 2 * d =
+          pos + (bytes i).length + 1 + (0 + 1 + 2 * d) by omega]
+        exact this
+      have hn : at? s (pos + (bytes i).length + 1 + 1 + 2 * d) = some b := by
+        have := hA2; rw [hrest] at this; exact this.1
+      have ih := readItems_enc (y :: ys) hc.2 hxs (List.cons_ne_nil _ _) (fuel := f)
+        (acc := acc ++ [x]) hA2 (by omega)
+      have hne1 : b ≠ 0x5D := hlead.2.1
+      simp only [readItems, bind, Except.bind, hv, hw, hcomma, hk, hn]
+      simp [hne1, ih, padB]
+      omega
+
+theorem readEntries_enc : ∀ (kvs : List (String × JVal)) {d e : Nat} {es : List (String × String)},
+    JVal.StrictObj kvs → encodeEntries d kvs = .ok es → kvs ≠ [] →
+    ∀ {s : ByteArray} {pos fuel : Nat} {acc : List (String × JVal)},
+    ((acc ++ kvs).map (·.1)).Pairwise (· < ·) → At s pos (objBodyB d e es) →
+    (objBodyB d e es).length < fuel →
+    readEntries fuel s pos acc = .ok (.obj (acc ++ kvs), pos + (objBodyB d e es).length)
+  | [], _, _, _, _, _, hne, _, _, _, _, _, _, _ => absurd rfl hne
+  | (k, v) :: kvs, d, e, es, hc, h, _, s, pos, fuel, acc, hp, hA, hl => by
+    obtain ⟨sv, es', hv, hes, rfl⟩ := encodeEntries_cons h
+    obtain ⟨f, rfl⟩ : ∃ f, fuel = f + 1 := ⟨fuel - 1, by omega⟩
+    -- The shared prefix: key, `: `, value.
+    obtain ⟨tail, htail, hsep⟩ : ∃ tail, objBodyB d e ((k, sv) :: es') =
+        bytes (encodeString k) ++ [0x3A, 0x20] ++ bytes sv ++ tail ∧
+        (tail.head? = some 0x0A ∨ tail.head? = some 0x2C) := by
+      cases es' with
+      | nil => exact ⟨[0x0A] ++ padB e ++ [0x7D], by simp [objBodyB], Or.inl rfl⟩
+      | cons kv es'' =>
+        obtain ⟨k', v'⟩ := kv
+        exact ⟨[0x2C, 0x0A] ++ padB d ++ objBodyB d e ((k', v') :: es''),
+          by simp [objBodyB, List.append_assoc], Or.inr rfl⟩
+    have hA' := hA
+    rw [htail] at hA' hl
+    simp only [List.append_assoc] at hA'
+    simp only [List.length_append, List.length_cons, List.length_nil] at hl
+    have hkey := readString_key (f := f) hA' (by omega)
+    obtain ⟨kpos, hkpos⟩ : ∃ kpos, kpos = pos + (bytes (encodeString k)).length := ⟨_, rfl⟩
+    rw [← hkpos] at hkey
+    have hr1 := At_suffix hA'
+    rw [← hkpos] at hr1
+    have hcolon : at? s kpos = some 0x3A := hr1.1
+    have hcs : skipWs s kpos = kpos := skipWs_stop hcolon (by decide)
+    obtain ⟨b, hb, hlead⟩ := encode_head hv
+    obtain ⟨bs, hbs⟩ : ∃ bs, bytes sv = b :: bs := by
+      cases hsv : bytes sv with
+      | nil => simp [hsv] at hb
+      | cons b' bs => simp [hsv] at hb; subst hb; exact ⟨bs, rfl⟩
+    have hsp : skipWs s (kpos + 1) = kpos + 2 := by
+      have h2 : At s (kpos + 1) ([0x20] ++ [b]) := by
+        have := hr1.2; rw [hbs] at this; exact ⟨this.1, this.2.1, trivial⟩
+      rw [skipWs_At h2 (by decide) hlead.1]
+      simp
+    have hvA : At s (kpos + 2) (bytes sv) := by
+      have := At_prefix (a := bytes sv) (b := tail) hr1.2.2
+      simpa [Nat.add_assoc] using this
+    have hF : Follow s (kpos + 2 + (bytes sv).length) := by
+      have := At_suffix (a := bytes sv) (b := tail) hr1.2.2
+      rcases hsep with h1 | h1 <;> cases ht : tail with
+      | nil => simp [ht] at h1
+      | cons t ts =>
+        simp [ht] at h1; subst h1; rw [ht] at this
+        first | exact Or.inr (by simpa [Nat.add_assoc] using this.1)
+              | exact Or.inl (by simpa [Nat.add_assoc] using this.1)
+    have hval := readValue_enc v hc.1 hv (fuel := f) hvA hF (by omega)
+    have hdup : (acc.any (·.1 == k)) = false := by
+      rw [List.any_eq_false]
+      intro kv hkv heq
+      simp only [beq_iff_eq] at heq
+      rw [List.map_append, List.pairwise_append] at hp
+      have := hp.2.2 kv.1 (List.mem_map_of_mem hkv) k (by simp)
+      rw [heq] at this
+      exact String.lt_irrefl k this
+    have hvt : At s (kpos + 2 + (bytes sv).length) tail := by
+      have := At_suffix (a := bytes sv) (b := tail) hr1.2.2
+      simpa [Nat.add_assoc] using this
+    cases kvs with
+    | nil =>
+      simp only [encodeEntries] at hes
+      cases hes
+      have ht : tail = [0x0A] ++ padB e ++ [0x7D] := by
+        have := htail; simp only [objBodyB, List.append_assoc] at this
+        exact (List.append_cancel_left (List.append_cancel_left (List.append_cancel_left this))).symm
+      subst ht
+      have hw := skip_indent (e := e) (b := 0x7D) (rest := []) (by simpa using hvt) (by decide)
+      have hcl : at? s (kpos + 2 + (bytes sv).length + 1 + 2 * e) = some 0x7D := by
+        have hvt' : At s (kpos + 2 + (bytes sv).length) (([0x0A] ++ padB e) ++ [0x7D]) := by
+          simpa using hvt
+        have := (At_suffix hvt').1
+        simp [padB] at this
+        rw [show kpos + 2 + (bytes sv).length + 1 + 2 * e =
+          kpos + 2 + (bytes sv).length + (2 * e + 1) by omega]
+        exact this
+      have hsorted := sortEntries_sorted (kvs := acc ++ [(k, v)]) (by simpa using hp)
+      simp only [readEntries, bind, Except.bind, hkey, hcs, hcolon, hsp, hval, hdup, hw, hcl]
+      simp [hsorted, htail, padB]
+      omega
+    | cons kv2 kvs' =>
+      obtain ⟨k2, v2⟩ := kv2
+      obtain ⟨sv2, es'', _, _, rfl⟩ := encodeEntries_cons hes
+      have ht : tail = [0x2C, 0x0A] ++ padB d ++ objBodyB d e ((k2, sv2) :: es'') := by
+        have := htail; simp only [objBodyB, List.append_assoc] at this
+        have := List.append_cancel_left (List.append_cancel_left (List.append_cancel_left this))
+        simpa using this.symm
+      subst ht
+      have hcomma : at? s (kpos + 2 + (bytes sv).length) = some 0x2C := hvt.1
+      have hw : skipWs s (kpos + 2 + (bytes sv).length) = kpos + 2 + (bytes sv).length :=
+        skipWs_stop hcomma (by decide)
+      obtain ⟨t2, ht2⟩ := objBodyB_head d e k2 sv2 es''
+      obtain ⟨rest, hrest⟩ : ∃ rest, objBodyB d e ((k2, sv2) :: es'') = 0x22 :: rest := by
+        rw [ht2, bytes_encodeString]
+        exact ⟨bodyBytes k2.toList ++ [0x22] ++ t2, by simp⟩
+      have hr2 := hvt.2
+      rw [hrest] at hr2
+      have hk := skip_indent (e := d) (b := 0x22) (rest := rest) (by simpa using hr2) (by decide)
+      have hA2 : At s (kpos + 2 + (bytes sv).length + 1 + 1 + 2 * d)
+          (objBodyB d e ((k2, sv2) :: es'')) := by
+        have := At_suffix (a := [0x0A] ++ padB d) (b := objBodyB d e ((k2, sv2) :: es''))
+          (by simpa using hvt.2)
+        simp only [padB, List.length_append, List.length_cons, List.length_nil,
+          List.length_replicate] at this
+        rw [show kpos + 2 + (bytes sv).length + 1 + 1 + 2 * d =
+          kpos + 2 + (bytes sv).length + 1 + (0 + 1 + 2 * d) by omega]
+        exact this
+      have hn : at? s (kpos + 2 + (bytes sv).length + 1 + 1 + 2 * d) = some 0x22 := by
+        have := hA2; rw [hrest] at this; exact this.1
+      have hp' : (((acc ++ [(k, v)]) ++ (k2, v2) :: kvs').map (·.1)).Pairwise (· < ·) := by
+        simpa using hp
+      have ih := readEntries_enc ((k2, v2) :: kvs') hc.2 hes (List.cons_ne_nil _ _) (fuel := f)
+        (acc := acc ++ [(k, v)]) hp' hA2 (by simp [padB] at hl; omega)
+      simp only [readEntries, bind, Except.bind, hkey, hcs, hcolon, hsp, hval, hdup, hw, hcomma,
+        hk, hn]
+      simp [ih, htail, padB]
+      omega
+end
+
+theorem At_drop (s : ByteArray) (k : Nat) : At s k (s.data.toList.drop k) := by
+  by_cases hk : k < s.size
+  · have e : s.data.toList.drop k = s[k] :: s.data.toList.drop (k + 1) := by
+      rw [List.drop_eq_getElem_cons (by simpa using hk)]
+      rfl
+    rw [e]
+    exact ⟨by unfold at?; rw [dite_eq_left_of_eq_true (eq_true hk)], At_drop s (k + 1)⟩
+  · have : s.data.toList.drop k = [] := List.drop_eq_nil_of_le (by simp; omega)
+    rw [this]; trivial
+termination_by s.size - k
+
+theorem skipWs_end {s : ByteArray} : skipWs s s.size = s.size := by
+  rw [skipWs]; simp
+
+/-- Main theorem: the strict parser reads back the canonical text of every
+value with strictly sorted keys. -/
+theorem parse_canonical {v : JVal} {t : String} (hs : v.Strict) (h : canonical v = .ok t) :
+    parse t.toUTF8 = .ok v := by
+  unfold canonical at h
+  cases he : encode 0 v with
+  | error _ => simp [he, Except.map] at h
+  | ok t0 =>
+    simp only [he, Except.map, Except.ok.injEq] at h
+    subst h
+    have hb : (t0 ++ "\n").toUTF8.data.toList = bytes t0 ++ [0x0A] := by
+      have : (t0 ++ "\n").toUTF8.data.toList = bytes (t0 ++ "\n") := by simp [bytes]
+      rw [this, bytes_append, lit_nl]
+    have hA := At_drop (t0 ++ "\n").toUTF8 0
+    simp only [List.drop_zero, hb] at hA
+    have hsize : (t0 ++ "\n").toUTF8.size = (bytes t0).length + 1 := by
+      have := congrArg List.length hb; simpa using this
+    obtain ⟨b, hb0, hlead⟩ := encode_head he
+    have h0 : at? (t0 ++ "\n").toUTF8 0 = some b := by
+      cases hbt : bytes t0 with
+      | nil => simp [hbt] at hb0
+      | cons b' bs => rw [hbt] at hA hb0; simp at hb0; subst hb0; exact hA.1
+    have hw : skipWs (t0 ++ "\n").toUTF8 0 = 0 := skipWs_stop h0 hlead.1
+    have hnl : at? (t0 ++ "\n").toUTF8 (bytes t0).length = some 0x0A := by
+      have := At_suffix hA; simpa using this.1
+    have hv := readValue_enc v hs he (fuel := 4 * (t0 ++ "\n").toUTF8.size + 4)
+      (At_prefix hA) (Or.inr (by simpa using hnl)) (by omega)
+    have hend : skipWs (t0 ++ "\n").toUTF8 (0 + (bytes t0).length) =
+        (t0 ++ "\n").toUTF8.size := by
+      rw [Nat.zero_add, skipWs_ws hnl (by decide), ← hsize, skipWs_end]
+    unfold parse
+    simp only [hw, bind, Except.bind]
+    split
+    · omega
+    rw [hv]
+    simp only []
+    rw [hend]
+    simp
 
 end KomkiSpec.Json

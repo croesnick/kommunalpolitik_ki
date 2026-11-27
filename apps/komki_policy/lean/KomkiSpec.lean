@@ -30,5 +30,6 @@ import KomkiSpec.JsonCanonical
 import KomkiSpec.CallHashSound
 import KomkiSpec.PathSound
 import KomkiSpec.JsonParseCanon
+import KomkiSpec.JsonRoundtrip
 import KomkiSpec.BridgeSound
 import KomkiSpec.VerifyReasonsSound
