@@ -2,10 +2,12 @@
 # JSON values as `verify.ex` sees them
 
 `KomkiPolicy.JSON.parse` yields Elixir terms; `verify.ex` compares them with
-`==`. Objects here are key-sorted lists with unique keys, so the derived
-structural `BEq` is Elixir's map equality. Lean cannot derive `DecidableEq`
-for this nested type; the soundness proofs never need it, because every
-check they rely on matches on patterns instead of comparing with `==`.
+`==`, claimed expressions strictly with `!==` (#626). Objects here are
+key-sorted lists with unique keys, so the derived structural `BEq` is
+Elixir's map equality, with floats kept apart from integers. Lean cannot
+derive `DecidableEq` for this nested type; the soundness proofs never need
+it, because every check they rely on matches on patterns instead of
+comparing with `==`.
 -/
 
 namespace KomkiSpec

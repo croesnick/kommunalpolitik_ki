@@ -46,7 +46,8 @@ theorem recipients_nonempty (Γ : Rules B O)
     recipients Γ L o ↔ ∀ b, L b → Γ.readers b o :=
   ⟨fun h => h.2, fun h => ⟨wf b₀ o (h b₀ hb₀), h⟩⟩
 
-/-- A.2: more bindings, never more recipients. -/
+/-- A.2: adding bindings to a label can only shrink its recipient set, never
+grow it. -/
 theorem recipients_antitone (Γ : Rules B O) {L₁ L₂ : B → Prop} (h : Sub L₁ L₂) :
     Sub (recipients Γ L₂) (recipients Γ L₁) :=
   fun _ ⟨hO, hR⟩ => ⟨hO, fun b hb => hR b (h b hb)⟩
@@ -88,7 +89,9 @@ theorem preservation {lx ly : B → Prop} (p : Path lx ly) : Sub lx ly := by
     | keep => exact ih
 
 /-- A.3, corollary: if o ∉ R_Γ(λ(x)), no event that depends on x reaches o
-without a Lockerung. -/
+without a Lockerung. Steps are modelled only by their effect on labels
+(`Step`), so this shows that the RFC's rules admit no forbidden recipient,
+not that komki's operations follow those rules. -/
 theorem no_forbidden_recipient (Γ : Rules B O) (c : Situation B O)
     {lx ly : B → Prop} {o : O}
     (hno : ¬ recipients Γ lx o) (p : Path lx ly) (hobs : c.observers o) :

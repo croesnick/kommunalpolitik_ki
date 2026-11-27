@@ -621,11 +621,12 @@ will, bleibt auf einem Stand vor #435.
 
 ## Lean 4 und elan
 
-**Zweck:** Lean prüft die Beweise der Spezifikation von `komki_policy`
+**Zweck:** Lean prüft die Beweise im Lean-Modell von `komki_policy`
 (`apps/komki_policy/lean/`, [#625](https://github.com/croesnick/kommunalpolitik_ki/issues/625))
-und baut den Prüfer `komki-spec`, gegen den der Differenztest den
-Elixir-Prüfer hält. elan installiert die Lean-Version, die
-`apps/komki_policy/lean/lean-toolchain` pinnt. Lean 4 steht unter
+und baut daraus den Prüfer `komki-spec`. Der Differenztest vergleicht die
+Urteile des Elixir-Prüfers mit denen von `komki-spec`. elan ist die
+Versionsverwaltung von Lean und installiert die Version, die
+`apps/komki_policy/lean/lean-toolchain` festlegt. Lean 4 steht unter
 Apache-2.0, elan unter Apache-2.0 und MIT. Die Toolchain belegt rund 2,8 GB;
 Mathlib wird nicht gebraucht.
 
@@ -657,8 +658,8 @@ Lean-Version. Entfernen: `rm -rf ~/.cache/elan`.
 | Workflow `Lean` (`.github/workflows/lean.yml`) | Installiert elan als gepinnte Release-Datei (Version und SHA-256 im Workflow) |
 
 **Fallback (wenn Lean nicht verfügbar):** Der normale `mix test` schließt
-den Differenztest aus und prüft nur den Pin `lean/SYNC.sha256`. Die
-Beweise und der Differenztest laufen dann im Workflow `Lean` auf GitHub.
+den Differenztest aus und prüft nur die Prüfsummen in `lean/SYNC.sha256`.
+Die Beweise und der Differenztest laufen dann im Workflow `Lean` auf GitHub.
 
 ---
 

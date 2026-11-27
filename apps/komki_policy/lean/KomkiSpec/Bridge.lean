@@ -2,11 +2,13 @@ import Lean.Data.Json
 import KomkiSpec.Verify
 
 /-!
-# Bridge: the CLI's JSON into the model
+# Bridge: decoding the CLI's JSON into the model
 
-Unverified and deliberately thin. It reads the records `komki-policy verify`
-reads and assumes they passed Elixir's input validation; anything else is a
-decoding error, never a verdict. Sorting mirrors `Registry.compile/1`.
+Reads the records `komki-policy verify` reads and turns them into the
+structures of `Model.lean`. It assumes they passed Elixir's input
+validation; any other input is a decoding error, never a verdict. Sorting
+mirrors `Registry.compile/1`. Kept deliberately thin, because no theorem
+covers it.
 -/
 
 namespace KomkiSpec

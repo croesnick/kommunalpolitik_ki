@@ -19,9 +19,9 @@ defmodule KomkiPolicy.LeanSyncTest do
           do: path
 
     assert stale == [], """
-    Geändert seit dem letzten Abgleich mit der Lean-Spezifikation: #{Enum.join(stale, ", ")}.
-    Das Lean-Modell in lean/KomkiSpec/ dagegen prüfen und anpassen (lean/README.md),
-    dann in apps/komki_policy den Pin erneuern:
+    Geändert seit dem letzten Abgleich mit dem Lean-Modell: #{Enum.join(stale, ", ")}.
+    Das Lean-Modell in lean/KomkiSpec/ gegen die Änderung prüfen und bei Bedarf
+    anpassen (lean/README.md), dann in apps/komki_policy die Prüfsummen erneuern:
 
         shasum -a 256 lib/komki_policy/{calculus,context,evaluator,registry,verify}.ex > lean/SYNC.sha256
     """

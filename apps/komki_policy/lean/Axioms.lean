@@ -1,8 +1,11 @@
 import KomkiSpec
 
 /-!
-The main theorems and the axioms they rest on. CI fails if `sorryAx`
-appears; `lake build` already fails on any `sorry` warning.
+Prints the axioms each main theorem rests on. `check-axioms.sh` runs this
+file and fails unless every theorem below depends only on Lean's standard
+axioms (`propext`, `Classical.choice`, `Quot.sound`): a `sorry` shows up as
+`sorryAx`, a home-made `axiom` under its own name. `lake build` already
+fails on any `sorry`, since every warning is an error.
 -/
 
 open KomkiSpec

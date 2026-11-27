@@ -1,7 +1,9 @@
-# Lean-Spezifikation von komki_policy (#625): Beweise prüfen, ohne sorry,
-# und Verify.check/4 differenziell gegen den bewiesenen Lean-Prüfer testen.
-# Details: apps/komki_policy/lean/README.md. Der Pin lean/SYNC.sha256 läuft
-# im normalen mix test der CI mit (ci.yml), nicht hier.
+# Lean-Modell von komki_policy (#625): Beweise prüfen (kein offen gelassener
+# Beweis per `sorry`, nur Leans Standardaxiome) und im Differenztest die
+# Urteile von Verify.check/4 mit denen des Lean-Prüfers vergleichen.
+# Details: apps/komki_policy/lean/README.md.
+# Die Prüfsummen in lean/SYNC.sha256 prüft der normale mix test in ci.yml,
+# nicht dieser Workflow.
 
 name: Lean
 
@@ -63,7 +65,8 @@ jobs:
           restore-keys: |
             lean-${{ runner.os }}-${{ hashFiles('apps/komki_policy/lean/lean-toolchain') }}-
 
-      # Jede Warnung ist ein Fehler (lakefile.toml), ein sorry also auch.
+      # Jede Warnung ist ein Fehler (lakefile.toml), also auch die Warnung zu
+      # einem offen gelassenen Beweis (sorry).
       - name: Beweise prüfen und komki-spec bauen
         working-directory: apps/komki_policy/lean
         run: lake build
