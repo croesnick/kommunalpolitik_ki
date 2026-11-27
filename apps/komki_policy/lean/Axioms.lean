@@ -35,6 +35,8 @@ open KomkiSpec
 #print axioms Json.parse_canonical_iff
 #print axioms Json.parse_noFuel
 #print axioms Sha256.known_answers
+#print axioms ReleaseGap.aktion_bridges_recipient
+#print axioms ReleaseGap638.offenlegung_drops_without_befugnis
 #print axioms deriveCase_decides
 #print axioms releaseCase_decides
 #print axioms deriveCase_unsupported
