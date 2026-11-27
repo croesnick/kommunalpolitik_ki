@@ -24,6 +24,10 @@ open KomkiSpec
 #print axioms Json.canonical_injective
 #print axioms callHashInput_isSome
 #print axioms callHashInput_injective
+#print axioms enginePath_preservation
+#print axioms enginePath_handover
+#print axioms enginePath_no_forbidden
+#print axioms emit_assignment
 #print axioms aktion_permit
 #print axioms offenlegung_permit
 #print axioms release_single_use
