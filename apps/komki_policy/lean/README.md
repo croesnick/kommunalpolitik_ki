@@ -4,8 +4,8 @@ Formales Modell der Policy-Engine in Lean 4: `derive` mit normalem Zweig
 und Freigabe-Zweigen, `verify`, der Remedy-Katalog, der Auswerter und der
 Standübergang `advance`, mit Beweisen ihrer Korrektheit für die
 Regelzweige `admit`, `emit`, `store` und `transfer` (Tickets #625, #629).
-Dazu, ausführbar und nur per Differenztest gehalten, die JSON-Schicht
-samt Call-Hash.
+Dazu die JSON-Schicht samt Call-Hash, ausführbar und zum Teil bewiesen
+(siehe Grenzen).
 Der Elixir-Code wird per Differenztest gegen das bewiesene Lean-Modell
 gehalten, ein Pin meldet jede Änderung an den gespiegelten Modulen. Die
 Spezifikation läuft nicht in komki mit, sie ist ein Prüforakel in Repo und
@@ -26,7 +26,7 @@ CI.
 | `snapshotError_validated` | Jeder Snapshot, den `Context.validate_snapshot/2` annimmt (`snapshotError`), liegt im Modell und im Wertebereich der Sätze (`Snapshot.validated`) | CONTRACT.md § 2.2 |
 | `registryError_compiledOk` | Jede Registry, die `Registry.compile/1` annimmt (`registryError`), liegt im Modell und im Wertebereich der Sätze (`Registry.compiledOk`): Leser, Autoritäten und Umgebungsbeobachter ⊆ 𝒪, nicht leer, Fakttypen aus dem geschlossenen Vokabular, jeder Ausdruck typgeprüft nach § 3, Transformationslabels ⊆ Bindungen | CONTRACT.md § 2.1, § 3 |
 | `Json.canonical_injective`, `callHashInput_isSome`, `callHashInput_injective` | Der kanonische JSON-Encoder ist injektiv auf Werten, deren Objekte ihre Schlüssel sortiert führen (`JVal.Canon`). Für jeden Snapshot, den die Eingabeprüfung annimmt (`Snapshot.validated`, `snapshotError_validated`), lässt sich der Call immer kodieren, `callHashOf` fällt also nie auf `""` zurück. Gleiche Eingabebytes für SHA-256 bedeuten denselben Call: gleicher Digest (fehlend oder vorhanden), gleiches `object_id@version`, gleiche Operation, gleicher Arbeitsraum. Für Elixirs `call_hash/4` gilt das über den Differenztest, der die kanonische Form Byte für Byte vergleicht | CONTRACT.md § 2.6 |
-| `Json.parse_canon`, `Json.parse_canonical_injective` | Jeder Wert, den der strenge Parser liefert, führt seine Objektschlüssel sortiert (`JVal.Canon`). Zwei Dokumente, die zu verschiedenen Werten geparst werden, haben verschiedene kanonische Formen | CONTRACT.md § 2.6 |
+| `Json.parse_strict`, `Json.parse_canon`, `Json.parse_canonical_injective` | Jeder Wert, den der strenge Parser liefert, führt seine Objektschlüssel streng sortiert, also ohne Duplikat (`JVal.Strict`, daraus `JVal.Canon`). Eine solche Liste stellt eine Elixir-Map eindeutig dar: Listengleichheit in Lean entspricht `===` auf den Maps aus `JSON.parse/1`. Zwei Dokumente, die zu verschiedenen Werten geparst werden, haben verschiedene kanonische Formen, sofern sich beide kodieren lassen (keine Gleitkommazahl, Tiefe ≤ 128). Das ist die Lean-Seite der Testmethode `canonical(parse(x)) == canonical(parse(y))`; kein anderer Satz stützt sich bisher darauf | CONTRACT.md § 6 |
 | `derive_permit_stable`, `derive_deny_stable` | Mehr Fakten machen aus einem `permit` oder `deny` nichts anderes; nur ein `indeterminate` löst sich auf | R.5.2, B.4, CONTRACT.md § 4.4 |
 | `aktion_permit` | Eine Aktionsfreigabe überbrückt weder einen ungültigen Vertrag noch eine entfernte Bindung, bei `store` weder den Empfängertest (#417) noch eine unbelegte Beobachterliste (#432); Fenster, Nonce, Geltungsbereich, Call-Hash und Autorität stimmen | CONTRACT.md § 4.6, R.6 |
 | `offenlegung_permit` | Eine Offenlegungsfreigabe erlaubt nur `store`, mit gültigem Vertrag, erhaltener Bindung, belegter Beobachterliste, der geschlossenen Ausgabeart und dem Ziellabel, der Befugnis für jede gelockerte Bindung (BerechtigtZurLockerung) und einem Ziellabel, dessen Leser den Speicher abdecken | CONTRACT.md § 4.9, R.5.7 |
@@ -279,8 +279,8 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 - **JSON-Schicht zum Teil bewiesen.** Vom kanonischen Encoder ist die
   Injektivität bewiesen (`Json.canonical_injective`); der Leser dafür
   (`KomkiSpec/JsonCanonical.lean`) dient nur dem Beweis. Vom Parser in
-  `Json.lean` ist bewiesen, dass er nur kanonische Werte liefert
-  (`Json.parse_canon`); dass er sonst `JSON.parse/1` entspricht, hält der
+  `Json.lean` ist bewiesen, dass er nur Werte mit streng sortierten
+  Schlüsseln liefert (`Json.parse_strict`); dass er sonst `JSON.parse/1` entspricht, hält der
   Differenztest, ebenso `Sha256.lean`.
   Gleitkommazahlen druckt der Encoder nicht.
 - **Ohne Zielarbeitsraum.** R.5.6 verlangt bei der Übergabe an einen

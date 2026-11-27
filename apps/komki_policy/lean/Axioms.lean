@@ -28,6 +28,7 @@ open KomkiSpec
 #print axioms enginePath_handover
 #print axioms enginePath_no_forbidden
 #print axioms emit_assignment
+#print axioms Json.parse_strict
 #print axioms Json.parse_canon
 #print axioms Json.parse_canonical_injective
 #print axioms aktion_permit
