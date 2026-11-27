@@ -952,8 +952,12 @@ defmodule KomkiPolicy.LeanSpecTest do
         Enum.map(Enum.with_index(calls), fn {{command, values}, i} ->
           cli_pair(dir, command, cli_files(values, i))
         end) ++
-          for {command, values} <- broken_snapshot_calls(calls) ++ broken_registry_calls(calls),
-              do: cli_pair(dir, command, intact_files(values))
+          for(
+            {command, values} <- broken_snapshot_calls(calls),
+            do: cli_pair(dir, command, intact_files(values))
+          ) ++
+          for {command, files} <- broken_registry_calls(calls),
+              do: cli_pair(dir, command, files)
 
       compare_json!(pairs, "cli-batch", "cli", "komki-policy und dem Lean-Modell")
 
@@ -2152,19 +2156,26 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
-  # A registry Registry.compile/1 rejects next to a broken snapshot: the CLI
-  # compiles the registry before it reads the other files.
+  # A registry Registry.compile/1 rejects next to a snapshot that is no
+  # JSON at all: the CLI compiles the registry before it parses the other
+  # files, so the registry error wins.
   defp broken_registry_calls(calls) do
     for {command, values} <- Enum.take_every(calls, 20),
         List.keymember?(values, "registry", 0) do
-      broken =
-        Enum.map(values, fn
-          {"registry", registry} -> {"registry", Map.put(registry, "zusatz", true)}
-          {"snapshot", _} -> {"snapshot", 7}
-          file -> file
+      files =
+        Enum.map(intact_files(values), fn
+          {"registry", _} ->
+            {"registry",
+             KomkiPolicy.JSON.canonical(Map.put(Map.new(values)["registry"], "zusatz", true))}
+
+          {"snapshot", _} ->
+            {"snapshot", "{"}
+
+          file ->
+            file
         end)
 
-      {command, broken}
+      {command, files}
     end
   end
 
