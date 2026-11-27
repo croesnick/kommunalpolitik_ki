@@ -1,8 +1,9 @@
 import KomkiSpec.ReleaseSound
 import KomkiSpec.Input
+import KomkiSpec.CallHash
 
 /-!
-# Open release questions as theorems (#354, #638)
+# Open release questions as theorems (#354, #638, #673)
 
 `enginePath_handover` (A.3 along a path) covers the normal branch with a
 proof tree only. An Aktionsfreigabe decides without one, and for `emit` and
@@ -23,6 +24,13 @@ the store, while R.5.7 asks the Befugnis for every removed binding. With
 the binding its operation rules go too (§ 4.9 step 8). The fixture
 `case_offenlegung_permit` is such a case already: `web-oeffentlich-fall@1`
 goes without a Befugnis.
+
+`ReleaseGap673.release_any_environment` records #673: the call hash binds
+digest, object, operation and workspace, not the environment
+(`callHashOf_environment`), and the release branch reads it only as
+`R.callHash == c` (`permits_callHash`). A release a person gave for the emit
+into one environment permits the same emit into another, though R.6.2 asks
+a release to fix its target.
 -/
 
 namespace KomkiSpec.ReleaseGap
@@ -125,3 +133,95 @@ theorem offenlegung_drops_without_befugnis :
   decide +kernel
 
 end KomkiSpec.ReleaseGap638
+
+namespace KomkiSpec.ReleaseGap673
+open ReleaseGap
+
+/-- The call hash names digest, object, operation and workspace, not the
+environment. -/
+theorem callHashOf_environment (S : Snapshot) (I : Intent) (e : String) :
+    callHashOf { S with environment := e } I = callHashOf S I := rfl
+
+/-- `b@1`, read by `a`, `w` and `x`: both environments are allowed
+recipients, so the witness does not lean on #354. -/
+def b2 : Binding :=
+  { readers := ["a", "w", "x"], operations := [("emit", .bool true), ("transfer", .bool true)] }
+
+def envs2 : List (String × List String) := [("env", ["w"]), ("env2", ["x"])]
+
+/-- Two environments, `env` observed by `w` and `env2` observed by `x`. -/
+def Γ2 : Registry :=
+  { registryId := "r", observers := ["a", "w", "x"], environments := envs2,
+    bindings := [("b@1", b2)], factFields := [("output_content_digest", "string")] }
+
+/-- The object of `ReleaseGap`, but the operation right is false: the
+normal branch blocks with `basis_right_false`, which an Aktionsfreigabe
+bridges. -/
+def S2 : Snapshot :=
+  { ReleaseGap.S with
+    facts := [("audit_path_ready", .bool true), ("environment_observers_complete", .bool true),
+      ("has_operation_right", .bool false), ("output_content_digest", .str "d")] }
+
+def I : Intent := ⟨"i", "emit"⟩
+
+/-- `permits` as the branch's guards and empty blockers. -/
+theorem permits_eq (Γ : Registry) (S : Snapshot) (I : Intent) (R : Release) (St : Stand)
+    (c : String) :
+    permits (deriveWithRelease Γ S I R St c) =
+      ((Γ.environment? S.environment).isSome && outputOperations.contains I.operation &&
+        (R.kind == "aktionsfreigabe" || (R.kind == "offenlegungsfreigabe" && I.operation == "store")) &&
+        (S.facts.lookup "output_content_digest").isSome && S.classification == "classified" &&
+        (releaseBlockers Γ S I.operation R St c).isEmpty) := by
+  unfold deriveWithRelease
+  cases he : Γ.environment? S.environment <;>
+    cases ho : outputOperations.contains I.operation <;>
+    cases hk : (R.kind == "aktionsfreigabe" || (R.kind == "offenlegungsfreigabe" && I.operation == "store")) <;>
+    cases hd : S.facts.lookup "output_content_digest" <;>
+    cases hc : S.classification == "classified" <;>
+    cases hb : releaseBlockers Γ S I.operation R St c <;>
+    simp_all [permits]
+
+/-- The release branch reads the call hash only as `R.callHash == c`: a
+release bound to its call decides as one bound to any other matching hash. -/
+theorem permits_callHash (Γ : Registry) (S : Snapshot) (I : Intent) (R : Release) (St : Stand)
+    (c c' : String) :
+    permits (deriveWithRelease Γ S I { R with callHash := c } St c) =
+      permits (deriveWithRelease Γ S I { R with callHash := c' } St c') := by
+  have hb : ∀ op, releaseBlockers Γ S op { R with callHash := c } St c =
+      releaseBlockers Γ S op { R with callHash := c' } St c' := by
+    intro op
+    simp [releaseBlockers, aktionBlockers, offenlegungBlockers, releaseChecks, befugnisBlockers,
+      ziellabelBlockers, ziellabelRecipientBlockers, befugnis]
+  rw [permits_eq, permits_eq, hb]
+
+theorem compiledOk : Γ2.compiledOk = true := by
+  simp [Registry.compiledOk, Γ2, b2, envs2, Expr.ofJVal, Registry.wellFormed, scalarType,
+    subsetOfList, Expr.typed]
+
+theorem validated : ∀ e ∈ ["env", "env2"], ({ S2 with environment := e }).validated Γ2 = true := by
+  decide +kernel
+
+/-- The gap of #673: a release bound to the call hash of the emit into `env`
+also binds the same emit into `env2`, and permits both, though the normal
+branch blocks both (`basis_right_false`). R.6.2 asks a release to fix its
+target. Independent of #354 in substance: both environments are allowed
+recipients, and closing only #354 keeps both permits. The proof would need
+work then, though: the release branch would compute the recipient check,
+which `decide +kernel` does not reduce, so prove that part by `simp`. -/
+theorem release_any_environment :
+    Γ2.compiledOk = true ∧
+    callHashOf { S2 with environment := "env2" } I = callHashOf { S2 with environment := "env" } I ∧
+    ∀ e ∈ ["env", "env2"],
+      ({ S2 with environment := e }).validated Γ2 = true ∧
+      ReleaseGap.deniesWith "basis_right_false" (derive Γ2 { S2 with environment := e } I) = true ∧
+      permits (deriveWithRelease Γ2 { S2 with environment := e } I
+        { R with callHash := callHashOf { S2 with environment := "env" } I } St
+        (callHashOf { S2 with environment := e } I)) = true := by
+  refine ⟨compiledOk, rfl, ?_⟩
+  intro e he
+  refine ⟨validated e he, ?_⟩
+  erw [permits_callHash Γ2 _ I R St (callHashOf { S2 with environment := "env" } I) "h"]
+  revert e
+  decide +kernel
+
+end KomkiSpec.ReleaseGap673

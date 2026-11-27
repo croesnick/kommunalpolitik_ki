@@ -439,12 +439,22 @@ def domainCase (j : JVal) : Decode Json := do
 
 /-! ## The JSON layer -/
 
+mutual
 /-- Floats as a marker: `Float.to_string/1` is not modelled. -/
-partial def maskFloats : JVal → JVal
+def maskFloats : JVal → JVal
   | .float _ _ => .str "<float>"
-  | .arr xs => .arr (xs.map maskFloats)
-  | .obj kvs => .obj (kvs.map fun (k, v) => (k, maskFloats v))
+  | .arr xs => .arr (maskFloatsList xs)
+  | .obj kvs => .obj (maskFloatsObj kvs)
   | v => v
+
+def maskFloatsList : List JVal → List JVal
+  | [] => []
+  | x :: xs => maskFloats x :: maskFloatsList xs
+
+def maskFloatsObj : List (String × JVal) → List (String × JVal)
+  | [] => []
+  | (k, v) :: kvs => (k, maskFloats v) :: maskFloatsObj kvs
+end
 
 def hexBytes (s : String) : Decode ByteArray := do
   let digit := fun (c : Char) =>

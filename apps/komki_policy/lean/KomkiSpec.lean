@@ -34,5 +34,6 @@ import KomkiSpec.JsonRoundtrip
 import KomkiSpec.JsonFuel
 import KomkiSpec.Sha256Kat
 import KomkiSpec.ReleaseGap
+import KomkiSpec.JsonBridgeSound
 import KomkiSpec.BridgeSound
 import KomkiSpec.VerifyReasonsSound
