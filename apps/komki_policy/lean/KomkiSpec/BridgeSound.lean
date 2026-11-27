@@ -449,9 +449,11 @@ def verifyExit : Outcome → Nat
   | .invalid => 1
   | .inputError => 2
 
-/-- `komki-policy verify` on files that parse and pass the input checks:
+/-- `cliCase` with `verify` on files that parse and pass the input checks:
 the exit code is 0 exactly on `valid`, 1 on `invalid`, 2 on an output
-rule's input error (§ 7), and the output is `verify`'s report. -/
+rule's input error, as `cli.ex` (§ 7 contradicts itself here, #648), and the
+output is `verify`'s report. `cliCase` models neither usage errors nor
+extra or missing files; the CLI rejects those with `usage`. -/
 theorem cliCase_verify {j : JVal} {files : List (String × JVal)}
     (hc : j.get? "command" = some (.str "verify")) (hf : j.get? "files" = some (.obj files))
     {hr hs hi hp : String} {br bs bi bp : ByteArray} {r s i pr : JVal}
@@ -476,4 +478,5 @@ theorem cliCase_verify {j : JVal} {files : List (String × JVal)}
   rw [show verifyCase (JVal.obj [("registry", r), ("snapshot", s), ("intent", i), ("proof", pr)])
     = _ from hv, ← verifyReport_verdict]
   cases hvd : Report.verdict (verifyReport Γ S I P) <;> simp [hvd, verifyExit]
+
 end KomkiSpec
