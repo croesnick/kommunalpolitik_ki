@@ -24,6 +24,7 @@ CI.
 | `verifyReport_verdict` | Der Bericht von `verify` (Befunde in der Reihenfolge der Prüfschritte, oder der Eingabefehler einer Ausgaberegel; die Eingabeprüfung des Beweisbaums läuft davor) ist leer genau dann, wenn das Urteil `valid` ist; damit gelten die Sätze über `verify` auch für ihn | CONTRACT.md § 5 |
 | `proofError_decodes` | Jeder Beweisbaum, den die Eingabeprüfung von `verify` annimmt (`proofError`, wie `validate_proof/1`), liegt im Modell, jede Prämisse mit einer der vier Arten | CONTRACT.md § 2.5, § 5 |
 | `snapshotError_validated` | Jeder Snapshot, den `Context.validate_snapshot/2` annimmt (`snapshotError`), liegt im Modell und im Wertebereich der Sätze (`Snapshot.validated`) | CONTRACT.md § 2.2 |
+| `registryError_compiledOk` | Jede Registry, die `Registry.compile/1` annimmt (`registryError`), liegt im Modell und im Wertebereich der Sätze (`Registry.compiledOk`): Leser, Autoritäten und Umgebungsbeobachter ⊆ 𝒪, nicht leer, Fakttypen aus dem geschlossenen Vokabular, jeder Ausdruck typgeprüft nach § 3, Transformationslabels ⊆ Bindungen | CONTRACT.md § 2.1, § 3 |
 | `derive_permit_stable`, `derive_deny_stable` | Mehr Fakten machen aus einem `permit` oder `deny` nichts anderes; nur ein `indeterminate` löst sich auf | R.5.2, B.4, CONTRACT.md § 4.4 |
 | `aktion_permit` | Eine Aktionsfreigabe überbrückt weder einen ungültigen Vertrag noch eine entfernte Bindung, bei `store` weder den Empfängertest (#417) noch eine unbelegte Beobachterliste (#432); Fenster, Nonce, Geltungsbereich, Call-Hash und Autorität stimmen | CONTRACT.md § 4.6, R.6 |
 | `offenlegung_permit` | Eine Offenlegungsfreigabe erlaubt nur `store`, mit gültigem Vertrag, erhaltener Bindung, belegter Beobachterliste, der geschlossenen Ausgabeart und dem Ziellabel, der Befugnis für jede gelockerte Bindung (BerechtigtZurLockerung) und einem Ziellabel, dessen Leser den Speicher abdecken | CONTRACT.md § 4.9, R.5.7 |
@@ -166,7 +167,12 @@ Snapshot (auch ein fehlendes Feld oder den ganzen Datensatz), an einer Welt auch
 damit die Reihenfolge der Prüfungen zählt, und vergleicht den ersten
 Fehler mit `contextError` aus
 `KomkiSpec/ContextInput.lean`; `snapshotError_validated` beweist, dass
-jeder Snapshot, den es annimmt, im Wertebereich liegt.
+jeder Snapshot, den es annimmt, im Wertebereich liegt. Ebenso für
+`Registry.compile/1`: feste Verderbungen der Registry, die jeden
+Fehlercode auf jeder Ebene erreichen (Soll-Liste `@registry_errors` im
+Test), an einer Welt jedes geordnete Paar, verglichen mit `registryError` aus
+`KomkiSpec/RegistryInput.lean`; `registryError_compiledOk` beweist, dass
+jede Registry, die es annimmt, im Wertebereich liegt.
 
 Die JSON-Schicht vergleicht er Byte für Byte: die Fixtures, Randfälle der
 Grammatik und von UTF-8, Verschachtelung um die Tiefengrenze des Encoders
@@ -223,7 +229,7 @@ spiegelt. Ändert sich eines, schlägt `lean_sync_test.exs` im normalen
 | `cli.ex` | `cliFiles` und `cliCase` in `KomkiSpec/Bridge.lean` (Lesereihenfolge der Dateien, Exit-Codes) |
 | `evaluator.ex` | `KomkiSpec/Evaluator.lean` |
 | `calculus.ex` | `allowedRecipients` in `KomkiSpec/Verify.lean`, `lockerungsbeduerftig` und `lockerungsbefugte` in `KomkiSpec/Release.lean` |
-| `registry.ex` | `kebab` in `KomkiSpec/ContextInput.lean` (`kebab_id?/1`), `refId` und `outputKinds` in `KomkiSpec/ReleaseInput.lean` (`reference_id?/1`, `output_kinds/0`), Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
+| `registry.ex` | `KomkiSpec/RegistryInput.lean` (`registryError`, Compile-Fehler mit Code und Pfad), `kebab` in `KomkiSpec/ContextInput.lean` (`kebab_id?/1`), `refId` und `outputKinds` in `KomkiSpec/ReleaseInput.lean` (`reference_id?/1`, `output_kinds/0`), Sortierung in `KomkiSpec/Bridge.lean`, `Registry.WellFormed`, `Expr.ofJVal`, `Registry.compiledOk` und `Expr.typed` in `KomkiSpec/Input.lean` |
 | `json.ex` | `KomkiSpec/Json.lean` (Parser, kanonischer Encoder) |
 | `release.ex` | `callHashOf` in `KomkiSpec/CallHash.lean`, SHA-256 in `KomkiSpec/Sha256.lean`, `releaseError` in `KomkiSpec/ReleaseInput.lean` |
 | `context.ex` | `KomkiSpec/ContextInput.lean` (Eingabeprüfung von Intent und Snapshot, Kohärenz), `KomkiSpec/Model.lean`, `Snapshot.WellFormed` in `DeriveSound.lean`, `Snapshot.wellFormed` in `Domain.lean`, `Snapshot.validated` in `Input.lean` (Wertebereich nach der Eingabeprüfung) |
@@ -274,23 +280,15 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
 - **Bei `verify` ist nur die Leere des Berichts bewiesen**
   (`verifyReport_verdict`). Codes, Reihenfolge, Bindung und Fakt der
   Befunde sowie Code und Pfad der Eingabefehler hält der Differenztest.
-- **Nur der geprüfte Wertebereich.** Das Modell setzt voraus, was
-  `Registry.compile/1` und `Context` durchsetzen (siehe oben). Dass sie es
-  durchsetzen, prüft der Differenztest für die Verderbungen seines
-  Katalogs, je eine für jede Prüfung, auf der die Sätze ruhen, und nur in
-  dieser Richtung: Lehnt Elixir mehr ab, als das Modell verlangt (Schema,
-  Kennungsformat, geschlossene Felder, Quellenangabe der Fakten, Sortierung
-  von Lesern und Transformationslabels, Vokabular der Befugnisse,
-  Operationsnamen, `identity`, `registry_ref`), hält das für `Context`
-  der Vergleich mit `contextError`, für `Registry.compile/1` niemand,
-  ebenso dessen Fehlercodes. Für `verify` ist jeder Eingabefehler nach
-  einer kompilierten Registry modelliert (Intent, Snapshot, Kohärenz,
-  Snapshot-Voraussetzung der Ausgaberegeln (#628), Beweisbaum), ebenso
-  für `derive` (Intent, `unsupported`, Snapshot, Kohärenz, #628, im
-  Freigabe-Zweig dazu die Schemata von Freigabe und Stand) und für
-  `advance` (Stand und Vorschlag). Wo Elixir außerhalb des
-  Bereichs abstürzen würde, etwa bei einem Ausdruck außerhalb von B.4,
-  verweigert das Modell (`missing_operation_rule`).
+- **Eingabeprüfung als Spiegelbild bewiesen.** Dass `Registry.compile/1`
+  und `Context` nur annehmen, was die Sätze voraussetzen, ist für ihr
+  Lean-Spiegelbild bewiesen (`registryError_compiledOk`,
+  `snapshotError_validated`). Dass das Spiegelbild Elixir entspricht, Code
+  und Pfad jedes Fehlers eingeschlossen, hält der Differenztest. Damit ist
+  jeder Eingabefehler von `verify`, `derive` (auch im Freigabe-Zweig) und
+  `advance` modelliert. Wo Elixir außerhalb des Bereichs abstürzen würde,
+  etwa bei einem Ausdruck außerhalb von B.4, verweigert das Modell
+  (`missing_operation_rule`).
 - **Die Brücke ist unbewiesen.** `KomkiSpec/Bridge.lean` liest die Fälle
   mit dem strengen Parser aus `Json.lean` ins Modell ein, `cli-batch` und
   `json-batch` auch die Dateibytes. Gleitkommazahlen hält er von

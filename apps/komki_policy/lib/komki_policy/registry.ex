@@ -426,7 +426,10 @@ defmodule KomkiPolicy.Registry do
         {:ok, %{}}
 
       %{} = transformations ->
-        collect_transformations(Map.to_list(transformations), binding_ids, "$.transformations")
+        transformations
+        |> Map.to_list()
+        |> Enum.sort()
+        |> collect_transformations(binding_ids, "$.transformations")
 
       _other ->
         fail(:invalid_transformations, "$.transformations", "expected an object")
@@ -478,7 +481,8 @@ defmodule KomkiPolicy.Registry do
   # input_labels: nichtleer, sortiert, eindeutig, ⊆ bindings (§ 2.1).
   defp require_sorted_unique_bindings(list, binding_ids, path, :input_labels)
        when is_list(list) do
-    with :ok <- require_nonempty(list, path),
+    with :ok <- require_binding_strings(list, path),
+         :ok <- require_nonempty(list, path),
          :ok <- require_sorted_unique(list, path) do
       unknown_binding(list, binding_ids, path)
     end
@@ -487,13 +491,20 @@ defmodule KomkiPolicy.Registry do
   # output_labels: sortiert, eindeutig, ⊆ bindings; darf leer sein (§ 2.1).
   defp require_sorted_unique_bindings(list, binding_ids, path, :output_labels)
        when is_list(list) do
-    with :ok <- require_sorted_unique(list, path) do
+    with :ok <- require_binding_strings(list, path),
+         :ok <- require_sorted_unique(list, path) do
       unknown_binding(list, binding_ids, path)
     end
   end
 
   defp require_sorted_unique_bindings(_other, _binding_ids, path, _side) do
     fail(:invalid_transformations, path, "expected an array of binding references")
+  end
+
+  defp require_binding_strings(list, path) do
+    if Enum.all?(list, &is_binary/1),
+      do: :ok,
+      else: fail(:invalid_transformations, path, "expected an array of binding references")
   end
 
   defp unknown_binding(list, binding_ids, path) do
@@ -654,7 +665,7 @@ defmodule KomkiPolicy.Registry do
     if Map.has_key?(fact_fields, field) do
       :ok
     else
-      fail(:unknown_fact_field, path <> " field", "field not declared in fact_fields: " <> field)
+      fail(:unknown_fact_field, path, "field not declared in fact_fields: " <> field)
     end
   end
 
