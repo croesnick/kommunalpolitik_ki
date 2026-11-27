@@ -22,7 +22,8 @@ every encoded value, array body and object body, the layout of
 `arr_bytes` and `obj_bytes`, as long as the fuel exceeds the bytes left.
 The main theorem `parse_canonical`: for every value with strictly sorted
 keys (`JVal.Strict`), `parse` reads its canonical text back to it. With
-`parse_strict` the two are inverse on the values the parser returns.
+`parse_strict` (`parse_canonical_iff`), `parse` undoes the canonical encoder
+on every value of the parser that encodes (no float, depth ≤ 128).
 -/
 
 namespace KomkiSpec.Json
@@ -97,7 +98,6 @@ theorem At_extract {s : ByteArray} {pos : Nat} {bs : List UInt8} (h : At s pos b
       split at this
       · exact Option.some.inj this
       · cases this
-
 
 theorem inRange_toNat (b lo hi : UInt8) :
     inRange b lo hi = (decide (lo.toNat ≤ b.toNat) && decide (b.toNat ≤ hi.toNat)) := by
@@ -342,7 +342,6 @@ theorem readString_char (c : Char) (h : At s pos (bytes (escapeChar c))) :
     rw [he] at h hx hl ⊢
     rw [readString_multi h.1 (utf8Len_lead hl) hl, hx]
 
-
 end
 
 /-- The escaped characters of a string body. -/
@@ -500,7 +499,7 @@ theorem splitNumber_digits (neg : Bool) (n : Nat) :
   have hh : (d :: ds).head! = d := rfl
   cases neg <;> simp [splitNumber, htw, hneq, hh] <;> exact hz'
 
-/-- The byte after a token, if any, is not one of `bs`'s kind. -/
+/-- The byte at `k`, if any, fails `p`: the token ends there. -/
 def EndsAt (s : ByteArray) (k : Nat) (p : UInt8 → Bool) : Prop :=
   ∀ b, at? s k = some b → p b = false
 
@@ -588,26 +587,6 @@ theorem keyword_At {s : ByteArray} {pos : Nat} {kw : String} {v : JVal}
 
 /-! ## Whitespace and the scalars at `readValue` -/
 
-/-- The UTF-8 bytes of a character list. -/
-def enc (cs : List Char) : List UInt8 := cs.flatMap String.utf8EncodeChar
-
-theorem bytes_ofList_enc : ∀ (l : List Char), bytes (String.ofList l) = enc l
-  | [] => by decide
-  | c :: l => by
-    rw [show String.ofList (c :: l) = c.toString ++ String.ofList l by simp, bytes_append,
-      bytes_char, bytes_ofList_enc l]
-    simp [enc]
-
-theorem bytes_eq_enc (s : String) : bytes s = enc s.toList := by
-  rw [← bytes_ofList_enc, String.ofList_toList]
-
-theorem enc_append (a b : List Char) : enc (a ++ b) = enc a ++ enc b := by
-  simp [enc]
-
-theorem enc_ascii {c : Char} (h : c.toNat ≤ 0x7F) (cs : List Char) :
-    enc (c :: cs) = asciiByte c :: enc cs := by
-  simp [enc, utf8EncodeChar_ascii h, asciiByte]
-
 theorem skipWs_stop {s : ByteArray} {pos : Nat} {b : UInt8} (h : at? s pos = some b)
     (hb : isWs b = false) : skipWs s pos = pos := by
   rw [skipWs]
@@ -624,7 +603,7 @@ theorem skipWs_ws {s : ByteArray} {pos : Nat} {b : UInt8} (h : at? s pos = some 
   · next hlt => cases h; rw [dite_eq_left_of_eq_true (eq_true hlt)]; simp [hb]
   · cases h
 
-/-- Whitespace bytes, then a byte that is none. -/
+/-- Whitespace bytes, then a byte that is not whitespace. -/
 theorem skipWs_At {s : ByteArray} : ∀ {pos : Nat} {ws : List UInt8} {b : UInt8},
     At s pos (ws ++ [b]) → (∀ w ∈ ws, isWs w = true) → isWs b = false →
     skipWs s pos = pos + ws.length
@@ -918,11 +897,6 @@ theorem objBodyB_head (d e : Nat) (k v : String) (es : List (String × String)) 
     obtain ⟨k', v'⟩ := kv
     exact ⟨[0x3A, 0x20] ++ bytes v ++ [0x2C, 0x0A] ++ padB d ++ objBodyB d e ((k', v') :: es),
       by simp [objBodyB]⟩
-
-theorem At_at {s : ByteArray} {pos : Nat} {l : List UInt8} (h : At s pos l) {k : Nat} {b : UInt8}
-    (hk : l[k]? = some b) : at? s (pos + k) = some b := by
-  obtain ⟨hlt, rfl⟩ := List.getElem?_eq_some_iff.1 hk
-  exact At_get h k hlt
 
 mutual
 theorem readValue_enc : ∀ (v : JVal) {d : Nat} {t : String}, v.Strict → encode d v = .ok t →
@@ -1273,5 +1247,12 @@ theorem parse_canonical {v : JVal} {t : String} (hs : v.Strict) (h : canonical v
     simp only []
     rw [hend]
     simp
+
+/-- `JVal.Strict` is exactly what the round trip needs: an encodable value
+comes back from its canonical text if and only if its keys are strictly
+sorted, since everything `parse` returns is (`parse_strict`). -/
+theorem parse_canonical_iff {v : JVal} {t : String} (h : canonical v = .ok t) :
+    parse t.toUTF8 = .ok v ↔ v.Strict :=
+  ⟨parse_strict, fun hs => parse_canonical hs h⟩
 
 end KomkiSpec.Json
