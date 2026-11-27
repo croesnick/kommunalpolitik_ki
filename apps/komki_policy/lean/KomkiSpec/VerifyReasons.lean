@@ -14,6 +14,17 @@ so every theorem about `verify` holds for the report as well.
 
 namespace KomkiSpec
 
+/-- Every code `verify.ex` reports: those of CONTRACT.md § 5, steps 1–9, and
+`premise_not_true` (#480), which § 5 does not name yet. `komki-spec
+constants` exports the list; the differential test holds it to Elixir's. -/
+def reasonCodes : List String :=
+  ["snapshot_mismatch", "registry_mismatch", "intent_mismatch", "unsupported_rule",
+   "rule_mismatch", "checked_label_mismatch", "missing_required_premise", "unknown_premise",
+   "fact_missing", "fact_value_mismatch", "premise_not_true", "object_quarantine",
+   "label_inclusion_false", "label_assignment_false", "label_preservation_false",
+   "recipient_inclusion_false", "expression_mismatch", "fact_refs_mismatch",
+   "condition_false", "condition_unknown", "conclusion_mismatch", "conclusion_unsupported"]
+
 /-- One entry of `reasons`: `{"code", "binding", "fact"}`. -/
 structure Reason where
   code : String

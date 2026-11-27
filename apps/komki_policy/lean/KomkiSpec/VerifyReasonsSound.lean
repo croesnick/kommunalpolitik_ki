@@ -5,25 +5,17 @@ import KomkiSpec.VerifyReasons
 
 `verifyReport_verdict` settles whether the report has findings. Here: what
 each finding says is grounded in the case (`verifyReasons_grounded`). Its
-code comes from the closed list of CONTRACT.md § 5, a binding it names is
-one of the checked label or of a premise of the tree, and a fact it names is
-one a premise of the tree claims. A finding never points at a binding or a
-fact the case does not contain.
+code is one `verify.ex` reports (`reasonCodes`), a binding it names belongs
+to the checked label or is a premise's `binding`, and a fact it names is a
+premise's `fact`. A finding never points at a binding or a fact the case
+does not contain. Which premise a finding names, and which check a code
+belongs to, stay with the differential test.
 -/
 
 namespace KomkiSpec
 
-/-- The codes of CONTRACT.md § 5, steps 1–9. -/
-def reasonCodes : List String :=
-  ["snapshot_mismatch", "registry_mismatch", "intent_mismatch", "unsupported_rule",
-   "rule_mismatch", "checked_label_mismatch", "missing_required_premise", "unknown_premise",
-   "fact_missing", "fact_value_mismatch", "premise_not_true", "object_quarantine",
-   "label_inclusion_false", "label_assignment_false", "label_preservation_false",
-   "recipient_inclusion_false", "expression_mismatch", "fact_refs_mismatch",
-   "condition_false", "condition_unknown", "conclusion_mismatch", "conclusion_unsupported"]
-
-/-- A finding grounded in the case: a code from § 5, a binding of the checked
-label or of a premise, a fact a premise claims. -/
+/-- A finding grounded in the case: a code `verify.ex` reports, a binding of
+the checked label or a premise's `binding`, a premise's `fact`. -/
 def Reason.Grounded (S : Snapshot) (P : Proof) (r : Reason) : Prop :=
   r.code ∈ reasonCodes ∧
   (∀ b, r.binding = some b →
@@ -139,8 +131,9 @@ theorem local_grounded {S : Snapshot} {P : Proof} {p : Premise} (hp : p ∈ P.pr
     · exact ⟨p, hp, hf ▸ hf'⟩
 
 /-- Main theorem: every finding of `verify` is grounded in the case. Its
-code is one of § 5, a binding it names belongs to the checked label or to a
-premise of the tree, and a fact it names is claimed by a premise. -/
+code is one `verify.ex` reports, a binding it names belongs to the checked
+label or is a premise's `binding`, and a fact it names is a premise's
+`fact`. -/
 theorem verifyReasons_grounded {Γ : Registry} {S : Snapshot} {I : Intent} {P : Proof} :
     ∀ r ∈ verifyReasons Γ S I P, r.Grounded S P := by
   intro r hr

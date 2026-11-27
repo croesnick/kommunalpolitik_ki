@@ -627,6 +627,8 @@ defmodule KomkiPolicy.LeanSpecTest do
     assert constants["proof_rules"] == Derive.proof_rules()
     assert constants["output_operations"] == Derive.output_operations()
     assert constants["handover_operations"] == Derive.handover_operations()
+    # verifyReasons_grounded holds for exactly the codes verify.ex reports.
+    assert Enum.sort(constants["reason_codes"]) == Enum.sort(@verify_codes)
 
     for rule <- Derive.proof_rules() do
       assert constants["required_premises"][rule] == Derive.required_premises(rule)

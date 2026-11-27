@@ -22,7 +22,7 @@ CI.
 | `derive_sound`, `derive_complete` | `derive` erlaubt genau dann, wenn die Regel ableitbar ist (`Derivable`, dieselbe Aussage, in der `verify_sound` endet) | CONTRACT.md § 4.3–§ 4.5, § 4.7, § 4.8 |
 | `derive_verifies` | `verify` akzeptiert jeden Baum, den `derive` baut | CONTRACT.md § 2.5, § 5 |
 | `verifyReport_verdict` | Der Bericht von `verify` (Befunde in der Reihenfolge der Prüfschritte, oder der Eingabefehler einer Ausgaberegel; die Eingabeprüfung des Beweisbaums läuft davor) ist leer genau dann, wenn das Urteil `valid` ist; damit gelten die Sätze über `verify` auch für ihn | CONTRACT.md § 5 |
-| `verifyReasons_grounded` | Jeder Befund von `verify` stützt sich auf den Fall: sein Code stammt aus der geschlossenen Liste des § 5, eine genannte Bindung gehört zum Prüflabel oder zu einer Prämisse des Baums, ein genannter Fakt wird von einer Prämisse behauptet | CONTRACT.md § 5 |
+| `verifyReasons_grounded` | Jeder Befund von `verify` stützt sich auf den Fall: sein Code ist einer der Codes, die `verify.ex` meldet (§ 5, dazu `premise_not_true` aus #480; die Liste hält der Differenztest an Elixir fest), eine genannte Bindung gehört zum Prüflabel oder ist die Bindung einer Prämisse des Baums, ein genannter Fakt ist der Fakt einer Prämisse | CONTRACT.md § 5 |
 | `proofError_decodes` | Jeder Beweisbaum, den die Eingabeprüfung von `verify` annimmt (`proofError`, wie `validate_proof/1`), liegt im Modell, jede Prämisse mit einer der vier Arten | CONTRACT.md § 2.5, § 5 |
 | `snapshotError_validated` | Jeder Snapshot, den `Context.validate_snapshot/2` annimmt (`snapshotError`), liegt im Modell und im Wertebereich der Sätze (`Snapshot.validated`) | CONTRACT.md § 2.2 |
 | `registryError_compiledOk` | Jede Registry, die `Registry.compile/1` annimmt (`registryError`), liegt im Modell und im Wertebereich der Sätze (`Registry.compiledOk`): Leser, Autoritäten und Umgebungsbeobachter ⊆ 𝒪, nicht leer, Fakttypen aus dem geschlossenen Vokabular, jeder Ausdruck typgeprüft nach § 3, Transformationslabels ⊆ Bindungen | CONTRACT.md § 2.1, § 3 |
@@ -289,10 +289,12 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   Zielarbeitsraum zusätzlich dessen Aufnahmeregel. CONTRACT.md § 4.8
   klammert das aus (#270), das Modell auch.
 - **Beim Bericht von `verify` sind die Leere und die Bezüge bewiesen**
-  (`verifyReport_verdict`, `verifyReasons_grounded`): kein Befund ohne
-  fehlschlagende Prüfung, keiner mit fremdem Code, fremder Bindung oder
-  fremdem Fakt. Welcher Code zu welcher Prüfung gehört, die Reihenfolge
-  der Befunde sowie Code und Pfad der Eingabefehler hält der Differenztest.
+  (`verifyReport_verdict`, `verifyReasons_grounded`): Befunde gibt es genau
+  dann, wenn eine Prüfung fehlschlägt, und keiner trägt einen fremden Code,
+  eine fremde Bindung oder einen fremden Fakt. Welcher Befund zu welcher
+  fehlschlagenden Prüfung gehört, welche Bindung und welchen Fakt er genau
+  nennt, die Reihenfolge der Befunde sowie Code und Pfad der Eingabefehler
+  hält der Differenztest.
 - **Eingabeprüfung als Spiegelbild bewiesen.** Dass `Registry.compile/1`
   und `Context` nur annehmen, was die Sätze voraussetzen, ist für ihr
   Lean-Spiegelbild bewiesen (`registryError_compiledOk`,

@@ -50,7 +50,8 @@ def constants : Json :=
     ("required_premises", Json.mkObj (proofRules.map fun r => (r, toJson (requiredPremises r)))),
     ("proof_rules", toJson proofRules),
     ("output_operations", toJson outputOperations),
-    ("handover_operations", toJson handoverOperations)]
+    ("handover_operations", toJson handoverOperations),
+    ("reason_codes", toJson reasonCodes)]
 
 def main : List String → IO UInt32
   | ["verify-batch", path] => runBatch (fun j => (verifyCase j).map (·.toJson.compress)) path
