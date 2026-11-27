@@ -25,6 +25,7 @@ CI.
 | `proofError_decodes` | Jeder Beweisbaum, den die Eingabeprüfung von `verify` annimmt (`proofError`, wie `validate_proof/1`), liegt im Modell, jede Prämisse mit einer der vier Arten | CONTRACT.md § 2.5, § 5 |
 | `snapshotError_validated` | Jeder Snapshot, den `Context.validate_snapshot/2` annimmt (`snapshotError`), liegt im Modell und im Wertebereich der Sätze (`Snapshot.validated`) | CONTRACT.md § 2.2 |
 | `registryError_compiledOk` | Jede Registry, die `Registry.compile/1` annimmt (`registryError`), liegt im Modell und im Wertebereich der Sätze (`Registry.compiledOk`): Leser, Autoritäten und Umgebungsbeobachter ⊆ 𝒪, nicht leer, Fakttypen aus dem geschlossenen Vokabular, jeder Ausdruck typgeprüft nach § 3, Transformationslabels ⊆ Bindungen | CONTRACT.md § 2.1, § 3 |
+| `Json.canonical_injective`, `callHashInput_isSome`, `callHashInput_injective` | Der kanonische JSON-Encoder ist injektiv auf Werten, deren Objekte ihre Schlüssel sortiert führen (`JVal.Canon`). Für einen geprüften Snapshot lässt sich der Call immer kodieren, `callHashOf` fällt also nie auf `""` zurück. Gleiche Eingabebytes für SHA-256 bedeuten denselben Call: gleicher Digest, gleiches Objekt, gleiche Operation, gleicher Arbeitsraum | CONTRACT.md § 2.6 |
 | `derive_permit_stable`, `derive_deny_stable` | Mehr Fakten machen aus einem `permit` oder `deny` nichts anderes; nur ein `indeterminate` löst sich auf | R.5.2, B.4, CONTRACT.md § 4.4 |
 | `aktion_permit` | Eine Aktionsfreigabe überbrückt weder einen ungültigen Vertrag noch eine entfernte Bindung, bei `store` weder den Empfängertest (#417) noch eine unbelegte Beobachterliste (#432); Fenster, Nonce, Geltungsbereich, Call-Hash und Autorität stimmen | CONTRACT.md § 4.6, R.6 |
 | `offenlegung_permit` | Eine Offenlegungsfreigabe erlaubt nur `store`, mit gültigem Vertrag, erhaltener Bindung, belegter Beobachterliste, der geschlossenen Ausgabeart und dem Ziellabel, der Befugnis für jede gelockerte Bindung (BerechtigtZurLockerung) und einem Ziellabel, dessen Leser den Speicher abdecken | CONTRACT.md § 4.9, R.5.7 |
@@ -265,14 +266,18 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   entschiedenen Calls als Parameter; die Sätze gelten für jeden Wert, also
   auch für `callHashOf`, den die Brücke rechnet (SHA-256 über die
   kanonische Form, § 2.6). Dass verschiedene Calls verschiedene Hashes
-  haben, setzt die Kollisionsresistenz von SHA-256 voraus; beweisen lässt
-  sie sich nicht. Die vier beschreibenden Felder einer Freigabe
+  haben, folgt aus zwei Schritten: Verschiedene Calls ergeben verschiedene
+  Eingabebytes für SHA-256 (`callHashInput_injective`, bewiesen), und
+  verschiedene Eingaben ergeben verschiedene Hashes (Kollisionsresistenz von
+  SHA-256, nicht beweisbar). Die vier beschreibenden Felder einer Freigabe
   (`operation`, `object`, `workspace`, `content_digest`) prüft auch
   Elixir nur auf ihre Form; an den Call bindet allein `call_hash` (#655).
-- **JSON-Schicht ausführbar, nicht bewiesen.** `Json.lean` und
-  `Sha256.lean` sind ausführbare Spezifikationen, die der Differenztest am
-  Elixir-Code hält; Sätze über sie gibt es nicht. Gleitkommazahlen druckt
-  der Encoder nicht.
+- **JSON-Schicht zum Teil bewiesen.** Vom kanonischen Encoder ist die
+  Injektivität bewiesen (`Json.canonical_injective`); der Leser dafür
+  (`KomkiSpec/JsonCanonical.lean`) dient nur dem Beweis. Der Parser in
+  `Json.lean` und `Sha256.lean` sind ausführbare Spezifikationen, die der
+  Differenztest am Elixir-Code hält; Sätze über sie gibt es nicht.
+  Gleitkommazahlen druckt der Encoder nicht.
 - **Ohne Zielarbeitsraum.** R.5.6 verlangt bei der Übergabe an einen
   Zielarbeitsraum zusätzlich dessen Aufnahmeregel. CONTRACT.md § 4.8
   klammert das aus (#270), das Modell auch.

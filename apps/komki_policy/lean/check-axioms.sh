@@ -12,7 +12,8 @@ fi
 printf '%s\n' "$out"
 for theorem in verify_sound verify_sound_rfc derivable_permitted handover_within_admitted \
   verify_emit_assigns derive_sound derive_complete derive_permit_stable derive_deny_stable \
-  derive_verifies verifyReport_verdict proofError_decodes snapshotError_validated registryError_compiledOk aktion_permit offenlegung_permit release_single_use advance_cas \
+  derive_verifies verifyReport_verdict proofError_decodes snapshotError_validated registryError_compiledOk \
+  Json.canonical_injective callHashInput_isSome callHashInput_injective aktion_permit offenlegung_permit release_single_use advance_cas \
   catalog_aktion_effective catalog_offenlegung_effective catalog_gos \
   release_catalog_aktion_effective release_catalog_offenlegung_effective \
   release_catalog_offenlegung_grantable \

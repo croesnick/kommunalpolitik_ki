@@ -9,20 +9,30 @@ import KomkiSpec.Model
 `content_digest`, object, operation and workspace, lowercase hex. The model
 takes the hash as a parameter `callHash`; the theorems hold for every value,
 so for this one too. The bridge computes it here, and the differential test
-compares every decision and catalog that names it with Elixir.
+compares every decision and catalog that names it with Elixir. That the
+hash binds the call up to SHA-256 collisions is `callHashInput_injective`
+(`CallHashSound.lean`).
 -/
 
 namespace KomkiSpec
 
-/-- `output_call_hash/2`: an absent digest enters as `null`. -/
-def callHashOf (S : Snapshot) (I : Intent) : String :=
-  let payload := JVal.obj [("content_digest", (S.fact? "output_content_digest").getD .null),
+/-- The object `output_call_hash/2` encodes; an absent digest enters as `null`. -/
+def callPayload (S : Snapshot) (I : Intent) : JVal :=
+  JVal.obj [("content_digest", (S.fact? "output_content_digest").getD .null),
     ("object", .str S.objectRef), ("operation", .str I.operation),
     ("workspace", .str S.workspaceId)]
-  -- Fact values are strings, booleans, integers or string sets
-  -- (`Snapshot.validated`), so encoding never fails here.
-  match Json.canonical payload with
-  | .ok text => Sha256.hex text.toUTF8
-  | .error _ => ""
+
+/-- The bytes SHA-256 runs over. For a validated snapshot they always exist
+(`callHashInput_isSome`). -/
+def callHashInput (S : Snapshot) (I : Intent) : Option ByteArray :=
+  match Json.canonical (callPayload S I) with
+  | .ok text => some text.toUTF8
+  | .error _ => none
+
+/-- `output_call_hash/2`. -/
+def callHashOf (S : Snapshot) (I : Intent) : String :=
+  match callHashInput S I with
+  | some bytes => Sha256.hex bytes
+  | none => ""
 
 end KomkiSpec
