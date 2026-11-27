@@ -619,6 +619,50 @@ will, bleibt auf einem Stand vor #435.
 
 ---
 
+## Lean 4 und elan
+
+**Zweck:** Lean prüft die Beweise im Lean-Modell von `komki_policy`
+(`apps/komki_policy/lean/`, [#625](https://github.com/croesnick/kommunalpolitik_ki/issues/625))
+und baut daraus den Prüfer `komki-spec`. Der Differenztest vergleicht die
+Urteile des Elixir-Prüfers mit denen von `komki-spec`. elan ist die
+Versionsverwaltung von Lean und installiert die Version, die
+`apps/komki_policy/lean/lean-toolchain` festlegt. Lean 4 steht unter
+Apache-2.0, elan unter Apache-2.0 und MIT. Die Toolchain belegt rund 2,8 GB;
+Mathlib wird nicht gebraucht.
+
+**Install** (macOS mit Apple Silicon; dieselbe elan-Version wie die CI, mit
+Prüfsumme, nach `~/.cache/elan`, ohne Änderung an Shell-Profilen):
+
+```bash
+curl -fsSL -o /tmp/elan.tar.gz \
+  https://github.com/leanprover/elan/releases/download/v4.2.4/elan-aarch64-apple-darwin.tar.gz
+echo "7ad829861392c718dfebde3a83b5c8508df47be02af68894b094b0b3952616e5  /tmp/elan.tar.gz" | shasum -a 256 -c -
+tar -xzf /tmp/elan.tar.gz -C /tmp
+ELAN_HOME=~/.cache/elan /tmp/elan-init -y --default-toolchain none --no-modify-path
+```
+
+Jede neue Shell braucht vor `lake` die Umgebung:
+
+```bash
+export ELAN_HOME=~/.cache/elan PATH=~/.cache/elan/bin:$PATH
+```
+
+Der erste `lake build` in `apps/komki_policy/lean` holt die gepinnte
+Lean-Version. Entfernen: `rm -rf ~/.cache/elan`.
+
+**Benötigt von:**
+
+| Skill / Workflow | Anmerkung |
+|---|---|
+| `mix test --only lean_spec` in `apps/komki_policy` | Differenztest, braucht `lean/.lake/build/bin/komki-spec` |
+| Workflow `Lean` (`.github/workflows/lean.yml`) | Installiert elan als gepinnte Release-Datei (Version und SHA-256 im Workflow) |
+
+**Fallback (wenn Lean nicht verfügbar):** Der normale `mix test` schließt
+den Differenztest aus und prüft nur die Prüfsummen in `lean/SYNC.sha256`.
+Die Beweise und der Differenztest laufen dann im Workflow `Lean` auf GitHub.
+
+---
+
 ## Hinzufügen einer neuen Abhängigkeit
 
 1. Abhängigkeit in diesem Dokument eintragen (Zweck, Install, Konfiguration,

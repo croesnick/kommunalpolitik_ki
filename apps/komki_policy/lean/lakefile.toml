@@ -1,0 +1,15 @@
+# Lean specification of komki_policy (#625). No dependencies, no Mathlib.
+name = "komki_spec"
+version = "0.1.0"
+defaultTargets = ["KomkiSpec", "komki-spec"]
+
+# Every warning fails the build; a `sorry` is a warning.
+[leanOptions]
+warningAsError = true
+
+[[lean_lib]]
+name = "KomkiSpec"
+
+[[lean_exe]]
+name = "komki-spec"
+root = "Main"
