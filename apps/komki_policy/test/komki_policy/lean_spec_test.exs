@@ -81,7 +81,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     assert stats.invalid >= 100
   end
 
-  test "Generierte Welten und geschmiedete Bäume: Elixir und Lean urteilen gleich" do
+  test "Generierte Szenarien und manipulierte Bäume: Elixir und Lean urteilen gleich" do
     seed = env_int("KOMKI_SPEC_SEED", 20_261_123)
     runs = env_int("KOMKI_SPEC_RUNS", 8_000)
 

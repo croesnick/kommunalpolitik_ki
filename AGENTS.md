@@ -133,7 +133,7 @@ Pro Tool unter `tools/`: `uv sync`, `uv run ruff check`, `uv run ruff format --c
 
 ### Lean
 
-`apps/komki_policy/lean/` enthält ein Lean-Modell des Ableitungsprüfers `verify` (bisher Regelzweig `admit`): Beweise über das Modell und ein Differenztest, der `verify.ex` mit dem Modell vergleicht. Es prüft nur in Repo und CI und ist deshalb kein Tool im Sinne von § 1 (GO in #625). Ändert ein PR ein Elixir-Modul, dessen Prüfsumme in `apps/komki_policy/lean/SYNC.sha256` steht, prüft er das Lean-Modell gegen die Änderung, passt es bei Bedarf an und erneuert die Prüfsummen: [README](apps/komki_policy/lean/README.md#wenn-sich-der-elixir-code-ändert).
+`apps/komki_policy/lean/` enthält ein Lean-Modell von `verify`, dem Prüfer für Beweisbäume (bisher Regelzweig `admit`): Beweise über das Modell und ein Differenztest, der `verify.ex` mit dem Modell vergleicht. Es prüft nur in Repo und CI und ist deshalb kein Tool im Sinne von § 1 (GO in #625). Ändert ein PR ein Elixir-Modul, dessen Prüfsumme in `apps/komki_policy/lean/SYNC.sha256` steht, prüft er das Lean-Modell gegen die Änderung, passt es bei Bedarf an und erneuert die Prüfsummen: [README](apps/komki_policy/lean/README.md#wenn-sich-der-elixir-code-ändert).
 
 ### Versionen
 
