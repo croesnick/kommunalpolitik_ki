@@ -2,7 +2,7 @@ import KomkiSpec.ReleaseSound
 import KomkiSpec.Input
 
 /-!
-# What an Aktionsfreigabe bridges for `emit` and `transfer` (#354)
+# Open release questions as theorems (#354, #638)
 
 `enginePath_handover` (A.3 along a path) covers the normal branch with a
 proof tree only. An Aktionsfreigabe decides without one, and for `emit` and
@@ -19,7 +19,10 @@ Aktionsfreigabe is no Lockerung; whether it may keep doing this is open in
 `ReleaseGap638.offenlegung_drops_without_befugnis` records the second open
 question, #638: an Offenlegungsfreigabe removes a binding from the label
 without its authority's Befugnis when the binding's readers already cover
-the store, while R.5.7 asks the Befugnis for every removed binding.
+the store, while R.5.7 asks the Befugnis for every removed binding. With
+the binding its operation rules go too (§ 4.9 step 8). The fixture
+`case_offenlegung_permit` is such a case already: `web-oeffentlich-fall@1`
+goes without a Befugnis.
 -/
 
 namespace KomkiSpec.ReleaseGap
