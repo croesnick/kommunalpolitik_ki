@@ -118,10 +118,10 @@ defmodule KomkiPolicy.LeanSpecTest do
     {:expression, %{"any" => [%{"eq" => ["count", "x"]}]}}
   ]
 
-  # One per code and path of Registry.compile/1 (CONTRACT § 2.1, § 3). New
-  # entries get their own ids; `:observer` stands for an observer of the
-  # world, `:binding` for one of its bindings, `@binding_spec` for a valid
-  # binding.
+  # Breaks reaching every code of Registry.compile/1 on every level
+  # (CONTRACT § 2.1, § 3), the pairs listed in @registry_errors. New entries
+  # get their own ids; `:observer` stands for an observer of the world,
+  # `:binding` for one of its bindings, `@binding_spec` for a valid binding.
   @binding_spec %{
     "readers" => [:observer],
     "operations" => %{},
@@ -139,6 +139,8 @@ defmodule KomkiPolicy.LeanSpecTest do
     {["observers"], [7]},
     {["observers"], ["o-a", "o-a"]},
     {["observers"], ["O"]},
+    {["observers"], ["O", "O"]},
+    {["fact_fields"], :delete},
     {["fact_fields"], 7},
     {["fact_fields", "count"], "float"},
     {["environments"], %{}},
@@ -147,12 +149,15 @@ defmodule KomkiPolicy.LeanSpecTest do
     {["environments", "env-neu@1"], %{"observers" => [:observer], "zusatz" => 1}},
     {["environments", "env-neu@1"], %{"observers" => []}},
     {["environments", "env-neu@1"], %{"observers" => ["o-fremd"]}},
+    {["environments", "env-neu@1"], %{"observers" => ["O"]}},
+    {["environments", "env-neu@1"], %{"observers" => 7}},
     {["bindings"], 7},
     {["bindings", "kein-ref"], @binding_spec},
     {["bindings", "b-neu@1"], 7},
     {["bindings", "b-neu@1"], Map.put(@binding_spec, "zusatz", 1)},
     {["bindings", "b-neu@1"], Map.put(@binding_spec, "readers", "o-a")},
     {["bindings", "b-neu@1"], Map.put(@binding_spec, "readers", ["o-fremd"])},
+    {["bindings", "b-neu@1"], Map.put(@binding_spec, "readers", ["O"])},
     {["bindings", "b-neu@1"], Map.delete(@binding_spec, "relaxation_authorities")},
     {["bindings", "b-neu@1"], Map.put(@binding_spec, "relaxation_authorities", [7])},
     {["bindings", "b-neu@1"],
@@ -182,6 +187,11 @@ defmodule KomkiPolicy.LeanSpecTest do
      Map.put(@binding_spec, "operations", %{"store" => %{"eq" => ["fremd", 1]}})},
     {["bindings", "b-neu@1"],
      Map.put(@binding_spec, "operations", %{"transfer" => %{"eq" => ["count", "x"]}})},
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "operations", %{"admit" => %{"eq" => ["scope", nil]}})},
+    # Valid: an empty `member` list on a scalar field.
+    {["bindings", "b-neu@1"],
+     Map.put(@binding_spec, "operations", %{"emit" => %{"member" => ["count", []]}})},
     {["transformations"], 7},
     {["transformations"], nil},
     {["transformations", "kein-ref"], %{"input_labels" => [], "output_labels" => []}},
@@ -192,6 +202,9 @@ defmodule KomkiPolicy.LeanSpecTest do
     {["transformations", "t-neu@1"], %{"input_labels" => ["z@1", "a@1"], "output_labels" => []}},
     {["transformations", "t-neu@1"], %{"input_labels" => ["x@1"], "output_labels" => []}},
     {["transformations", "t-neu@1"], %{"input_labels" => [:binding], "output_labels" => 7}},
+    {["transformations", "t-neu@1"],
+     %{"input_labels" => [:binding], "output_labels" => ["z@1", "a@1"]}},
+    {["transformations", "t-neu@1"], %{"input_labels" => [:binding], "output_labels" => ["x@1"]}},
     {["transformations", "t-neu@1"],
      %{"input_labels" => ["x@1"], "output_labels" => [], "zusatz" => 1}},
     # Two defects in one entry, so the order within it shows.
@@ -232,9 +245,12 @@ defmodule KomkiPolicy.LeanSpecTest do
     {"empty_list", "$.environments.env-neu@1.observers"},
     {"empty_list", "$.observers"},
     {"empty_list", "$.transformations.t-neu@1.input_labels"},
+    {"invalid_entry", "$.bindings.b-neu@1.readers"},
+    {"invalid_entry", "$.environments.env-neu@1.observers"},
     {"invalid_entry", "$.observers"},
     {"invalid_fact_type", "$.fact_fields"},
     {"invalid_observers", "$.bindings.b-neu@1.readers"},
+    {"invalid_observers", "$.environments.env-neu@1.observers"},
     {"invalid_observers", "$.observers"},
     {"invalid_operations", "$.bindings.b-neu@1.operations"},
     {"invalid_output_kind", "$.bindings.b-neu@1.relaxation_authorities.[0].output"},
@@ -257,6 +273,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     {"no_bindings", "$.bindings"},
     {"no_environments", "$.environments"},
     {"unknown_binding_reference", "$.transformations.t-neu@1.input_labels"},
+    {"unknown_binding_reference", "$.transformations.t-neu@1.output_labels"},
     {"unknown_fact_field", "$.bindings.b-neu@1.operations.store"},
     {"unknown_field", "$.bindings.b-neu@1.relaxation_authorities.[0].zusatz"},
     {"unknown_field", "$.bindings.b-neu@1.zusatz"},
@@ -268,8 +285,10 @@ defmodule KomkiPolicy.LeanSpecTest do
     {"unknown_observer", "$.environments.env-neu@1.observers"},
     {"unknown_operation", "$.bindings.b-neu@1.operations.plan"},
     {"invalid_transformations", "$.transformations.t-neu@1.output_labels"},
+    {"expression_type_mismatch", "$.bindings.b-neu@1.operations.admit"},
     {"expression_type_mismatch", "$.bindings.b-neu@1.operations.transfer"},
     {"unsorted_references", "$.transformations.t-neu@1.input_labels"},
+    {"unsorted_references", "$.transformations.t-neu@1.output_labels"},
     {"unsupported_expression", "$.bindings.b-neu@1.operations.admit"},
     {"unsupported_expression", "$.bindings.b-neu@1.operations.emit.[1]"}
   ]
@@ -858,10 +877,8 @@ defmodule KomkiPolicy.LeanSpecTest do
   test "Eingabeprüfung: was Registry.compile und Context annehmen, liegt im Wertebereich" do
     generated = seeded_list(domain_gen())
 
-    cases =
+    pairs =
       Enum.map(generated ++ defect_pairs(generated) ++ registry_pairs(generated), &domain_case/1)
-
-    pairs = for {line, expected} <- cases, expected != :dropped, do: {line, expected}
 
     compare_json!(
       pairs,
@@ -884,7 +901,7 @@ defmodule KomkiPolicy.LeanSpecTest do
     assert missing_registry == [], "Registry-Fehler ohne Fall: #{inspect(missing_registry)}"
 
     IO.puts(
-      "\nlean_spec domain: registries #{length(pairs)}, snapshots #{snapshots}, rejected #{length(cases) - length(pairs)}, context errors #{map_size(codes)}"
+      "\nlean_spec domain: registries #{length(pairs)}, snapshots #{snapshots}, context errors #{map_size(codes)}"
     )
 
     assert length(pairs) >= 3_000
@@ -931,15 +948,16 @@ defmodule KomkiPolicy.LeanSpecTest do
     try do
       calls = cli_commands()
 
-      tagged =
+      pairs =
         Enum.map(Enum.with_index(calls), fn {{command, values}, i} ->
-          files = cli_files(values, i)
-          {cli_pair(dir, command, files), files == intact_files(values)}
+          cli_pair(dir, command, cli_files(values, i))
         end) ++
-          for {command, values} <- broken_snapshot_calls(calls),
-              do: {cli_pair(dir, command, intact_files(values)), true}
-
-      pairs = Enum.map(tagged, &elem(&1, 0))
+          for(
+            {command, values} <- broken_snapshot_calls(calls),
+            do: cli_pair(dir, command, intact_files(values))
+          ) ++
+          for {command, files} <- broken_registry_calls(calls),
+              do: cli_pair(dir, command, files)
 
       compare_json!(pairs, "cli-batch", "cli", "komki-policy und dem Lean-Modell")
 
@@ -948,7 +966,6 @@ defmodule KomkiPolicy.LeanSpecTest do
       stats =
         Enum.frequencies_by(Enum.take(pairs, length(calls)), fn
           {line, %{"exit" => exit}} -> {line["command"], exit}
-          {line, :dropped} -> {line["command"], :dropped}
         end)
 
       IO.puts("\nlean_spec cli: #{inspect(stats)}")
@@ -966,13 +983,6 @@ defmodule KomkiPolicy.LeanSpecTest do
       for code <- @derive_input_errors do
         assert Map.get(codes, to_string(code), 0) >= 5, "zu wenige Fälle #{code}"
       end
-
-      # Intact files never meet an input error the model does not know: a
-      # decision turned into one would leave the comparison unseen.
-      dropped = for {{line, :dropped}, true} <- tagged, do: line["command"]
-
-      assert dropped == [],
-             "unverändert und doch verworfen: #{inspect(Enum.frequencies(dropped))}"
     after
       File.rm_rf!(dir)
     end
@@ -1124,10 +1134,7 @@ defmodule KomkiPolicy.LeanSpecTest do
   # Pairs {case line, Elixir result} against the Lean batch `command`;
   # returns the results counted by operation and kind.
   defp compare_json!(pairs, command, label, what) do
-    judged =
-      pairs
-      |> Enum.reject(fn {_, result} -> result == :dropped end)
-      |> Enum.with_index()
+    judged = Enum.with_index(pairs)
 
     lean = run_lean(command, judged)
 
@@ -2149,6 +2156,29 @@ defmodule KomkiPolicy.LeanSpecTest do
     end
   end
 
+  # A registry Registry.compile/1 rejects next to a snapshot that is no
+  # JSON at all: the CLI compiles the registry before it parses the other
+  # files, so the registry error wins.
+  defp broken_registry_calls(calls) do
+    for {command, values} <- Enum.take_every(calls, 20),
+        List.keymember?(values, "registry", 0) do
+      files =
+        Enum.map(intact_files(values), fn
+          {"registry", _} ->
+            {"registry",
+             KomkiPolicy.JSON.canonical(Map.put(Map.new(values)["registry"], "zusatz", true))}
+
+          {"snapshot", _} ->
+            {"snapshot", "{"}
+
+          file ->
+            file
+        end)
+
+      {command, files}
+    end
+  end
+
   defp broken_snapshots(snapshot, operation, release) do
     unknown = put_in(snapshot, ["workspace", "environment"], "umgebung-unbekannt@1")
     without_object = if release == [], do: [{Map.delete(snapshot, "object"), "start"}], else: []
@@ -2240,7 +2270,7 @@ defmodule KomkiPolicy.LeanSpecTest do
 
     case {command, exit, parsed} do
       {_, 2, %{"result" => "error", "code" => code, "path" => path}} ->
-        cli_input_error(command, code, path, files)
+        cli_input_error(code, path)
 
       {"decide", 0, _} ->
         %{"exit" => 0, "result" => decided(parsed, release?)}
@@ -2267,18 +2297,11 @@ defmodule KomkiPolicy.LeanSpecTest do
     decision |> Map.take(fields) |> Map.put("gos", gos(decision["remedies"]))
   end
 
-  defp cli_input_error(command, code, path, _files) do
-    cond do
-      code in @json_error_codes ->
-        %{"exit" => 2, "result" => %{"error" => code}}
+  defp cli_input_error(code, _path) when code in @json_error_codes,
+    do: %{"exit" => 2, "result" => %{"error" => code}}
 
-      command in ~w(decide verify advance) ->
-        %{"exit" => 2, "result" => %{"input_error" => code, "path" => path}}
-
-      true ->
-        :dropped
-    end
-  end
+  defp cli_input_error(code, path),
+    do: %{"exit" => 2, "result" => %{"input_error" => code, "path" => path}}
 
   defp seeded_list(generator) do
     generator

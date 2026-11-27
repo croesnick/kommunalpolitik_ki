@@ -169,8 +169,9 @@ damit die Reihenfolge der Prüfungen zählt, und vergleicht den ersten
 Fehler mit `contextError` aus
 `KomkiSpec/ContextInput.lean`; `snapshotError_validated` beweist, dass
 jeder Snapshot, den es annimmt, im Wertebereich liegt. Ebenso für
-`Registry.compile/1`: je Code und Pfad eine Verderbung der Registry, an
-einer Welt jedes geordnete Paar, verglichen mit `registryError` aus
+`Registry.compile/1`: feste Verderbungen der Registry, die jeden
+Fehlercode auf jeder Ebene erreichen (Soll-Liste `@registry_errors` im
+Test), an einer Welt jedes geordnete Paar, verglichen mit `registryError` aus
 `KomkiSpec/RegistryInput.lean`; `registryError_compiledOk` beweist, dass
 jede Registry, die es annimmt, im Wertebereich liegt.
 
