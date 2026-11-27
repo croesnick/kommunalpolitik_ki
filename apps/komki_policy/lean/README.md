@@ -46,6 +46,7 @@ CI.
 | `eval_mono` | Mehr Fakten kippen kein bekanntes Urteil des dreiwertigen Auswerters | R.5.2, CONTRACT.md § 3 |
 | `recipients_antitone`, `permitted_antitone` | Mehr Bindungen, nie mehr Empfänger; Erlaubt vererbt sich auf Teilmengen | A.2 |
 | `no_forbidden_recipient` | Ohne Lockerung erreicht nichts, was von x abhängt, einen Beobachter außerhalb von R_Γ(λ(x)) | Kern von A.3: nur die Labels, ohne Schrittmodell |
+| `enginePath_preservation`, `enginePath_handover`, `enginePath_no_forbidden` | A.3 an der Engine über beliebig viele Räume: Jeder Schritt eines Wegs ist ein geprüfter `admit`-Baum und ein geprüfter `emit`-, `store`- oder `transfer`-Baum aus demselben Raum. Entlang des Wegs gilt λ(x) ⊆ λ(y), und ein geprüftes `store` oder `transfer` am Ende erreicht nur Beobachter in R_Γ(λ(x)). Vorausgesetzt ist, was der Vermittler zusichert: Der aufnehmende Snapshot nennt λ(x), B_W bleibt im Raum fest, ein erzeugtes Objekt trägt das Label, das sein Baum zuweist | A.3, R.5.4–R.5.6 |
 | `Registry.compiledOk_sound`, `Snapshot.validated_sound` | Was die Eingabeprüfung im Modell zusichert (`Registry.compiledOk`, `Snapshot.validated`), erfüllt die Voraussetzungen der übrigen Sätze | CONTRACT.md § 2.1, § 2.2, § 3 |
 
 Kein `sorry`: `lake build` behandelt jede Warnung als Fehler.
