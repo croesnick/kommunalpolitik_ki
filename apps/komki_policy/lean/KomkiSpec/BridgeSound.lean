@@ -2,6 +2,7 @@ import KomkiSpec.ProofInputSound
 import KomkiSpec.RegistryInputSound
 import KomkiSpec.CallHashSound
 import KomkiSpec.ReleaseInput
+import KomkiSpec.VerifyReasons
 
 /-!
 # The bridge decides every accepted case
@@ -14,7 +15,8 @@ not throw; it answers with `derive` resp. `deriveWithRelease` on the decoded
 input, and the call hash comes from a call that always encodes, so
 `callHashOf` never falls back to `""`. `deriveCase_unsupported` covers an
 unsupported operation, which Elixir answers before it checks the snapshot;
-`advanceCase_decides` covers `advance`. The order of the checks and the
+`advanceCase_decides` covers `advance`, `verifyCase_decides` the report of
+`verify`, whose verdict is then `verify`'s (`verifyCase_verdict`). The order of the checks and the
 error a rejected case reports stay with the differential test.
 -/
 
@@ -354,5 +356,39 @@ theorem releaseCase_decides {j r i s rel st : JVal} (hr : j.get? "registry" = so
   simp only [releaseCase, field_ok hr, field_ok hi, field_ok hs, field_ok hrel, field_ok hst,
     hΓ, hw, hI, hR, hSt, hctx, hre, hste, bind, Except.bind, pure, Except.pure, Option.or]
   cases deriveWithRelease Γ S I R St (callHashOf S I) <;> rfl
+
+/-- On every case whose context and proof tree the input checks accept,
+`verifyCase` answers with `verifyReport` on the decoded input; an output
+rule's input error comes from `verifyReport` as well. `Γ` names the decoded
+registry. -/
+theorem verifyCase_decides {j r i s pr : JVal} (hr : j.get? "registry" = some r)
+    (hi : j.get? "intent" = some i) (hs : j.get? "snapshot" = some s)
+    (hp : j.get? "proof" = some pr) (hreg : registryError r = none) {Γ : Registry}
+    (hΓ : decodeRegistry r = .ok Γ) (hctx : contextError Γ i s = none)
+    (hpe : proofError pr = none) :
+    ∃ S I P, decodeSnapshot s = .ok S ∧ decodeIntent i = .ok I ∧ decodeProof pr = .ok P ∧
+      S.validated Γ = true ∧ verifyCase j = .ok (verifyReport Γ S I P) := by
+  have hctx' := hctx
+  simp only [contextError, Option.or_eq_none_iff] at hctx'
+  obtain ⟨hie, hse, _⟩ := hctx'
+  obtain ⟨S, hS, hval, hw⟩ := decodeWorld_ok hr hs hreg hΓ hse
+  obtain ⟨I, hI⟩ := intentError_decodes hie
+  obtain ⟨P, hP, _⟩ := proofError_decodes hpe
+  refine ⟨S, I, P, hS, hI, hP, hval, ?_⟩
+  simp only [verifyCase, field_ok hr, field_ok hi, field_ok hs, field_ok hp, hΓ, hctx, hw, hI,
+    hpe, hP, bind, Except.bind, pure, Except.pure]
+  unfold verifyReport
+  cases outputInputError? S I.operation <;> rfl
+
+/-- The bridge's verdict on such a case is `verify`'s, so every theorem about
+`verify` speaks about what the differential test compares. -/
+theorem verifyCase_verdict {j r i s pr : JVal} (hr : j.get? "registry" = some r)
+    (hi : j.get? "intent" = some i) (hs : j.get? "snapshot" = some s)
+    (hp : j.get? "proof" = some pr) (hreg : registryError r = none) {Γ : Registry}
+    (hΓ : decodeRegistry r = .ok Γ) (hctx : contextError Γ i s = none)
+    (hpe : proofError pr = none) :
+    ∃ S I P, S.validated Γ = true ∧ (verifyCase j).map Report.verdict = .ok (verify Γ S I P) := by
+  obtain ⟨S, I, P, _, _, _, hval, h⟩ := verifyCase_decides hr hi hs hp hreg hΓ hctx hpe
+  exact ⟨S, I, P, hval, by rw [h, ← verifyReport_verdict]; rfl⟩
 
 end KomkiSpec
