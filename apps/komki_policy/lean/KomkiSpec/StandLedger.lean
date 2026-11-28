@@ -12,7 +12,9 @@ agree only while no nonce appears twice (`Stand.Ledger`).
 property, its keys are strictly sorted. `advance_ledger`,
 `advances_ledger`: `advance` keeps it, since it refuses a consumed nonce.
 `ledger_lookup`: on such a list `lookup` finds exactly the consumed pairs,
-whatever their order. `advances_ledger_parsed` puts the three together.
+whatever their order. `advances_ledger_decoded` puts the three together.
+Every decision reads `consumed` only through `lookup`; the output
+(`Stand.toJson`) is not covered.
 -/
 
 namespace KomkiSpec
@@ -134,12 +136,16 @@ theorem ledger_lookup {St : Stand} (hl : St.Ledger) {n r : String} :
         · exact hm
 
 /-- Main theorem: every stand reachable by committed `advance` steps from a
-stand the bridge decodes from a parsed file keeps every nonce at most once,
-so `consumed` behaves like the `Map` that `stand.ex` keeps. -/
-theorem advances_ledger_parsed {s : ByteArray} {j : JVal} {St St' : Stand}
-    (hp : Json.parse s = .ok j) (hd : decodeStand j = .ok St) (ha : Advances St St') :
+stand the bridge decodes from a strict value keeps every nonce at most once,
+and `lookup` reads `consumed` as a finite map. A strict value is a parsed
+file (`Json.parse_strict`) or any field of one (`get?_strict`), so this
+covers the CLI's stand file and the `stand` field of a case alike. The
+output of a stand (`Stand.toJson`) is not covered; that stays with the
+differential test. -/
+theorem advances_ledger_decoded {j : JVal} {St St' : Stand}
+    (hj : j.Strict) (hd : decodeStand j = .ok St) (ha : Advances St St') :
     St'.Ledger ∧ ∀ n r, St'.consumed.lookup n = some r ↔ (n, r) ∈ St'.consumed :=
-  have hl := advances_ledger ha (decodeStand_ledger (Json.parse_strict hp) hd)
+  have hl := advances_ledger ha (decodeStand_ledger hj hd)
   ⟨hl, fun _ _ => ledger_lookup hl⟩
 
 end KomkiSpec
