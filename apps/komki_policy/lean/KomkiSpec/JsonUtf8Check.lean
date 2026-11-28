@@ -10,8 +10,8 @@ decides; `parse` answers `invalid_utf8` only at the first place a UTF-8
 decoder stops, where a sequence fails `utf8Len` (`BadFrom`). The proof
 carries the invariant that the accumulator is valid UTF-8 (`AccValid`):
 every `\u` escape appends a scalar value (`utf8_char`, `hex4?_lt`), every
-raw sequence the encoding of a `Char` (`utf8Len_wf`). `surrogate_answers` pins the surrogate escapes and their
-error code by computation.
+raw sequence the encoding of a `Char` (`utf8Len_wf`). `surrogate_answers`
+pins the surrogate escapes and their error code by computation.
 -/
 
 namespace KomkiSpec.Json
@@ -115,7 +115,8 @@ theorem simpleEscape_out {e c : UInt8} (h : simpleEscape e = some c) : c < 0x80 
        omega)
 
 /-- From `p` on, the input is well-formed up to a byte `q` where `utf8Len`
-fails: the first place a UTF-8 decoder started at `p` stops. -/
+fails. Since UTF-8 decodes uniquely, `q` is where a decoder started at `p`
+stops. -/
 def BadFrom (s : ByteArray) (p : Nat) : Prop :=
   ∃ q b, Wf s p q ∧ at? s q = some b ∧ 0x80 ≤ b.toNat ∧ utf8Len s q b = none
 
@@ -287,7 +288,8 @@ theorem readObject_byByte : ∀ (f : Nat) (s : ByteArray) (pos : Nat),
       · next hc => exact readEntries_byByte f s _ [] (Wf.byte hb hc (by decide))
       · exact byByte_error (by decide)
 
-theorem readEntries_byByte : ∀ (f : Nat) (s : ByteArray) (pos : Nat) (acc : List (String × JVal)),
+theorem readEntries_byByte :
+    ∀ (f : Nat) (s : ByteArray) (pos : Nat) (acc : List (String × JVal)),
     Wf s pos (pos + 1) → ByByte s pos (readEntries f s pos acc)
   | 0, _, _, _, _ => by rw [readEntries]; exact byByte_error (by decide)
   | f + 1, s, pos, acc, h0 => by
@@ -368,9 +370,9 @@ theorem readItems_byByte : ∀ (f : Nat) (s : ByteArray) (pos : Nat) (acc : List
       · exact byByte_error (by decide)
 end
 
-/-- Main theorem: `parse` answers `invalid_utf8` only at the first byte where
-a UTF-8 decoder stops: the input is well-formed up to `q`, and the sequence
-at `q` fails `utf8Len`, the table of `utf8_seq/2`. The closing
+/-- Main theorem: `parse` answers `invalid_utf8` only if the input is
+well-formed up to some `q` and the sequence at `q` fails `utf8Len`, the table
+of `utf8_seq/2`. The closing
 `String.fromUTF8?` check, which `json.ex` does not have, never decides: a
 mutant check that rejected valid text would answer `invalid_utf8` where no
 such `q` exists. -/
@@ -393,9 +395,9 @@ def parseAnswer (s : String) : String :=
   | .ok _ => "ok"
   | .error e => e
 
-/-- Surrogate escapes: only a high one followed by a low one reads, as the
-scalar both encode; in these six cases every other combination is `invalid_string`, the code
-`json.ex` reports (`require_low_surrogate/5`). The kernel computes it. -/
+/-- Surrogate escapes, in these six cases: only a high one followed by a low
+one reads, as the scalar both encode; the others are `invalid_string`, the
+code `json.ex` reports (`require_low_surrogate/5`). The kernel computes it. -/
 theorem surrogate_answers :
     parseAnswer "\"\\ud800\"" = "invalid_string" ∧
     parseAnswer "\"\\udc00\"" = "invalid_string" ∧
