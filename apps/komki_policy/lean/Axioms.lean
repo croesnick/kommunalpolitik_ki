@@ -43,6 +43,8 @@ open KomkiSpec
 #print axioms Json.parse_floatsOk
 #print axioms Json.parse_validUTF8
 #print axioms deriveCase_decides
+#print axioms domainCase_rejected
+#print axioms domainCase_accepted
 #print axioms releaseCase_decides
 #print axioms deriveCase_unsupported
 #print axioms advanceCase_decides
