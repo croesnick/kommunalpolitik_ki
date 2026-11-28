@@ -58,6 +58,9 @@ open KomkiSpec
 #print axioms cliCase_decide
 #print axioms cliCase_decide_release
 #print axioms cliCase_advance
+#print axioms cliCase_registry_parseError
+#print axioms cliCase_registry_rejected
+#print axioms cliCase_stand_parseError
 #print axioms decodeRegistry_transformations_sorted
 #print axioms matchingTransformations_sorted
 #print axioms verifyReasons_grounded

@@ -38,6 +38,7 @@ CI.
 | `domainCase_rejected`, `domainCase_accepted` | Die Eingabeprüfung gibt die Brücke in der Form aus, die der Differenztest aus Elixirs Antwort ableitet (`domain_case/1`): bei abgewiesener Registry nur deren Fehler; sonst, wenn Snapshot und Intent vorliegen, `registry: true`, den Kontextfehler und `snapshot: true` genau dann, wenn der Snapshot angenommen ist (sonst `null`). Dass Lean dieselben Fälle annimmt und dieselben Fehler mit Code und Pfad meldet wie Elixir, hält der Differenztest | CONTRACT.md § 2.1–2.3 |
 | `deriveCase_decides`, `deriveCase_unsupported`, `releaseCase_decides`, `advanceCase_decides` | Jeden Fall, den `Registry.compile/1` und die Eingabeprüfung annehmen (beim Freigabe-Zweig auch Release und Stand, bei `advance` Stand und Vorschlag), beantwortet die Brücke ohne Abbruch mit `derive`, `deriveWithRelease` bzw. `advance` auf der eingelesenen Eingabe, wobei das Modell selbst auch `unsupported` oder einen Eingabefehler liefern kann. Registry und Snapshot liegen dabei im validierten Bereich, und der Call lässt sich immer kodieren, `callHashOf` fällt also nie auf `""` zurück. Eine nicht unterstützte Operation beantwortet die Brücke wie `decide_validated?/4` mit `unsupported`, bevor sie den Snapshot prüft | CONTRACT.md § 2.6, § 4.6 |
 | `verifyCase_decides`, `verifyCase_verdict`, `verifyCase_outputError`, `cliCase_verify` | Jeden Fall, dessen Registry `Registry.compile/1` und dessen Kontext und Beweisbaum die Eingabeprüfung annehmen (`registryError`, `contextError`, `proofError`), beantwortet die Brücke ohne Abbruch mit `verifyReport` auf der eingelesenen Eingabe, auch den Eingabefehler einer Ausgaberegel. Ihr Urteil ist damit das von `verify` auf dieser Eingabe, und die Sätze über `verify` gelten für das, was der Differenztest vergleicht. Fehlt eine Ausgabe-Voraussetzung (§ 4.5), meldet die Brücke den Fehler wie `check/4` vor der Prüfung des Beweisbaums, unabhängig vom Baum. `cliCase_verify`: Mit `verify` auf solchen Dateien endet `cliCase` mit Exit 0 genau bei `valid`, 1 bei `invalid`, 2 beim Eingabefehler einer Ausgaberegel, wie `cli.ex` (§ 7 widerspricht sich dort, #648) | CONTRACT.md § 5, § 7 |
+| `cliCase_registry_parseError`, `cliCase_registry_rejected`, `cliCase_stand_parseError` | Die erste Datei in CLI-Reihenfolge (Registry bei `verify` und `decide`, Stand bei `advance`): Parst sie nicht, endet `cliCase` mit Exit 2 und dem Code des Parsers (ohne Pfad, den Lean nicht modelliert; der Differenztest vergleicht ebenso nur den Code); lehnt `Registry.compile/1` die Registry ab, mit Exit 2 und diesem Eingabefehler, wie `load_registry/1` direkt nach dem Parsen | CONTRACT.md § 7 |
 | `cliCase_decide`, `cliCase_decide_release`, `cliCase_advance` | Mit `decide` (ohne oder mit Release und Stand) und mit `advance` auf Dateien, die parsen und die Eingabeprüfung bestehen, endet `cliCase` wie `cli.ex` und § 7: `decide` mit Exit 0 bei einer Entscheidung, 2 beim Eingabefehler des Modells, 3 bei `unsupported`; `advance` mit 0 und dem neuen Stand oder 1 bei `refused`, wie `cli.ex` (§ 7 widerspricht sich bei `refused`, #648). Die Ausgabe ist die von `deriveCase`, `releaseCase` bzw. `advanceCase` | CONTRACT.md § 7 |
 | `decodeRegistry_transformations_sorted`, `matchingTransformations_sorted` | Die Brücke hält die Transformationen einer Registry nach Kennung sortiert, und der Remedy-Katalog bietet die passenden in dieser Reihenfolge an | CONTRACT.md § 2.1, § 2.8 |
 | `derive_permit_stable`, `derive_deny_stable` | Mehr Fakten machen aus einem `permit` oder `deny` nichts anderes; nur ein `indeterminate` löst sich auf | R.5.2, B.4, CONTRACT.md § 4.4 |
@@ -353,10 +354,13 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   deren Fehler (`domainCase_accepted`, `domainCase_rejected`). Die Felder
   `registry` und `snapshot` prüfen im Differenztest damit nur noch, ob Lean
   dieselben Fälle annimmt wie Elixir.
-  Offen ist an `cliCase`
-  alles, was abgewiesene Dateien betrifft (die Sätze `cliCase_verify`, `cliCase_decide`,
-  `cliCase_decide_release` und `cliCase_advance` gelten für angenommene
-  Dateien): Dateireihenfolge und Parse-Fehler; Usage-Fehler und
+  An `cliCase` gelten `cliCase_verify`, `cliCase_decide`,
+  `cliCase_decide_release` und `cliCase_advance` für angenommene Dateien.
+  Von abgewiesenen Dateien ist nur die erste in CLI-Reihenfolge bewiesen
+  (`cliCase_registry_parseError`, `cliCase_registry_rejected`,
+  `cliCase_stand_parseError`): Sie endet mit Exit 2 und ihrem Fehler, bevor
+  eine weitere Datei gelesen wird. Offen sind spätere Dateien und damit die
+  Dateireihenfolge; Usage-Fehler und
   überzählige oder fehlende Dateien modelliert `cliCase` nicht. Offen sind
   außerdem der Batch-Dispatch in `Main.lean`, dass
   abgewiesene Eingaben denselben Fehler wie Elixir melden, die Reihenfolge

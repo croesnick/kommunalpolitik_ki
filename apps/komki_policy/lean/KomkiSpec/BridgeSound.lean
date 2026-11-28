@@ -23,7 +23,9 @@ before it checks the proof tree. `decodeRegistry_transformations_sorted`:
 the bridge keeps the transformations sorted by id, the order the remedy
 catalog lists them in. `cliCase_verify`, `cliCase_decide`,
 `cliCase_decide_release`, `cliCase_advance`: on accepted files the CLI's
-exit code follows `cli.ex` (§ 7). `domainCase_rejected`, `domainCase_accepted`:
+exit code follows `cli.ex` (§ 7); `cliCase_registry_parseError`,
+`cliCase_registry_rejected`, `cliCase_stand_parseError`: a rejected first file
+ends it with exit 2. `domainCase_rejected`, `domainCase_accepted`:
 the bridge prints the input checks in the shape the differential test derives
 from Elixir's answer (`domain_case/1`). The order of the checks and the error a rejected
 case reports stay with the differential test.
@@ -655,5 +657,42 @@ theorem cliCase_advance {j : JVal} {files : List (String × JVal)}
     bind, Except.bind, pure, Except.pure]
   rw [show advanceCase (JVal.obj [("stand", st), ("proposal", pr)]) = _ from hv]
   cases advance St P <;> rfl
+
+/-- A registry file that does not parse stops `verify` and `decide` before any
+other file: exit 2 with the parser's code (§ 7). -/
+theorem cliCase_registry_parseError {j : JVal} {files : List (String × JVal)} {cmd : String}
+    (hcmd : cmd = "verify" ∨ cmd = "decide")
+    (hc : j.get? "command" = some (.str cmd)) (hf : j.get? "files" = some (.obj files))
+    {hr : String} {br : ByteArray} {code : String}
+    (hfr : files.lookup "registry" = some (.str hr)) (hbr : hexBytes hr = .ok br)
+    (hpr : KomkiSpec.Json.parse br = .error code) :
+    cliCase j = .ok (cliResult 2 (Lean.Json.mkObj [("error", .str code)])) := by
+  rcases hcmd with rfl | rfl <;>
+  simp [cliCase, strAt_ok hc, field_ok hf, asObj, cliFiles, hfr, hbr, hpr, bind, Except.bind,
+    pure, Except.pure]
+
+/-- A registry `Registry.compile/1` rejects stops `verify` and `decide` right
+after parsing, as `load_registry/1` does: exit 2 with that input error. -/
+theorem cliCase_registry_rejected {j : JVal} {files : List (String × JVal)} {cmd : String}
+    (hcmd : cmd = "verify" ∨ cmd = "decide")
+    (hc : j.get? "command" = some (.str cmd)) (hf : j.get? "files" = some (.obj files))
+    {hr : String} {br : ByteArray} {r : JVal} {e : InputError}
+    (hfr : files.lookup "registry" = some (.str hr)) (hbr : hexBytes hr = .ok br)
+    (hpr : KomkiSpec.Json.parse br = .ok r) (he : registryError r = some e) :
+    cliCase j = .ok (cliResult 2 (inputErrorJson e)) := by
+  rcases hcmd with rfl | rfl <;>
+  simp [cliCase, strAt_ok hc, field_ok hf, asObj, cliFiles, hfr, hbr, hpr, he, bind, Except.bind,
+    pure, Except.pure]
+
+/-- A stand file that does not parse stops `advance` before the proposal:
+exit 2 with the parser's code. -/
+theorem cliCase_stand_parseError {j : JVal} {files : List (String × JVal)}
+    (hc : j.get? "command" = some (.str "advance")) (hf : j.get? "files" = some (.obj files))
+    {hs : String} {bs : ByteArray} {code : String}
+    (hfs : files.lookup "stand" = some (.str hs)) (hbs : hexBytes hs = .ok bs)
+    (hps : KomkiSpec.Json.parse bs = .error code) :
+    cliCase j = .ok (cliResult 2 (Lean.Json.mkObj [("error", .str code)])) := by
+  simp [cliCase, strAt_ok hc, field_ok hf, asObj, cliFiles, hfs, hbs, hps, bind, Except.bind,
+    pure, Except.pure]
 
 end KomkiSpec
