@@ -25,7 +25,7 @@ catalog lists them in. `cliCase_verify`, `cliCase_decide`,
 `cliCase_decide_release`, `cliCase_advance`: on accepted files the CLI's
 exit code follows `cli.ex` (§ 7); `cliCase_registry_parseError`,
 `cliCase_registry_rejected`, `cliCase_stand_parseError`: a rejected first file
-ends it with exit 2. `domainCase_rejected`, `domainCase_accepted`:
+ends `cliCase` with exit 2 and that file's error, whatever the other files hold. `domainCase_rejected`, `domainCase_accepted`:
 the bridge prints the input checks in the shape the differential test derives
 from Elixir's answer (`domain_case/1`). The order of the checks and the error a rejected
 case reports stay with the differential test.

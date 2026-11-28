@@ -360,8 +360,9 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   (`cliCase_registry_parseError`, `cliCase_registry_rejected`,
   `cliCase_stand_parseError`): Sie endet mit Exit 2 und ihrem Fehler, bevor
   eine weitere Datei gelesen wird. Offen sind spätere Dateien und damit die
-  Dateireihenfolge; Usage-Fehler und
-  überzählige oder fehlende Dateien modelliert `cliCase` nicht. Offen sind
+  Dateireihenfolge; die hält der Differenztest. Usage-Fehler, Lesefehler
+  (`read_error`) und überzählige oder fehlende Dateien modelliert `cliCase`
+  nicht. Offen sind
   außerdem der Batch-Dispatch in `Main.lean`, dass
   abgewiesene Eingaben denselben Fehler wie Elixir melden, die Reihenfolge
   der Prüfungen (bewiesen ist nur: Ausgabe-Voraussetzung vor Beweisbaum,
