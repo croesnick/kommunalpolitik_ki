@@ -22,6 +22,7 @@ for theorem in verify_sound verify_sound_rfc derivable_permitted handover_within
   domainCase_rejected domainCase_accepted \
   verifyCase_decides verifyCase_verdict verifyCase_outputError cliCase_verify \
   cliCase_decide cliCase_decide_release cliCase_advance \
+  cliCase_registry_parseError cliCase_registry_rejected cliCase_stand_parseError \
   decodeRegistry_transformations_sorted matchingTransformations_sorted \
   verifyReasons_grounded aktion_permit offenlegung_permit release_single_use advance_cas \
   catalog_aktion_effective catalog_offenlegung_effective catalog_gos \
