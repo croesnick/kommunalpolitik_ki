@@ -1,4 +1,5 @@
 import KomkiSpec.JsonParseCanon
+-- The kernel computations below evaluate 2^1024 and 10^309.
 set_option exponentiation.threshold 1100
 
 /-!
@@ -9,8 +10,9 @@ way `binary_to_float/1` fails. It decides that through a shortcut on the
 number of decimal digits (`finiteDouble`). `finiteDouble_iff`: the shortcut
 is exactly the comparison of `m · 10^e` with `overflowBound`, the boundaries
 at 308 and 310 digits included. `parse_floatsOk`: every float `parse`
-returns passes it. That the representation equals Elixir's float, rounding
-included, stays with the differential test.
+returns passes it. The rounded value is not modelled; the differential test
+masks floats and only checks which numbers are accepted, at the overflow
+boundary through `@overflow_cases`.
 -/
 
 namespace KomkiSpec.Json
@@ -98,6 +100,7 @@ theorem finiteDouble_iff (m : Nat) (e : Int) :
           _ < overflowBound * 10 ^ (k + 1) :=
             Nat.mul_lt_mul_of_pos_right lo (Nat.pow_pos (by decide))
       · simp [h1, h2]
+
 /-- A float the parser may hand back: its magnitude `|m| / 10^s` rounds to a
 finite double. -/
 def floatOk : JVal → Bool
@@ -121,6 +124,8 @@ theorem floatOk_neg {σ : Int} (hσ : σ.natAbs = 1) {m : Nat} {e : Int}
   have hs : -(((-e).toNat : Nat) : Int) = e := by omega
   simp only [floatOk, ha, hs, hf]
 
+/-- `floatOk_pos`/`floatOk_neg` in the shape `¬(!finiteDouble m e) = true`
+that `readNumber`'s guard leaves in context. -/
 theorem floatOk_pos' {σ : Int} (hσ : σ.natAbs = 1) {m : Nat} {e : Int}
     (hf : ¬(!finiteDouble m e) = true) (he : e ≥ 0) :
     floatOk (.float (σ * m * 10 ^ e.toNat) 0) = true :=

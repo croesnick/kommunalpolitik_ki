@@ -175,7 +175,8 @@ def splitNumber (bs : List UInt8) : Option NumberToken :=
 def digitsValue (ds : List UInt8) : Nat := ds.foldl (fun n d => 10 * n + (d - 0x30).toNat) 0
 
 /-- The smallest magnitude that rounds to infinity: halfway between the
-largest double and 2^1024 (`binary_to_float/1` fails from there on). -/
+largest double and 2^1024. That `binary_to_float/1` fails from there on is
+held by the differential test (`@overflow_cases`), not proven. -/
 def overflowBound : Nat := 2 ^ 1024 - 2 ^ 970
 
 def digitCount (n : Nat) : Nat := (toString n).length
