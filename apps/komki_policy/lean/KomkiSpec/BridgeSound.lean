@@ -23,7 +23,9 @@ before it checks the proof tree. `decodeRegistry_transformations_sorted`:
 the bridge keeps the transformations sorted by id, the order the remedy
 catalog lists them in. `cliCase_verify`, `cliCase_decide`,
 `cliCase_decide_release`, `cliCase_advance`: on accepted files the CLI's
-exit code follows `cli.ex` (§ 7). The order of the checks and the error a rejected
+exit code follows `cli.ex` (§ 7). `domainCase_rejected`, `domainCase_accepted`:
+the bridge prints the input checks the way the differential test expects them
+from Elixir. The order of the checks and the error a rejected
 case reports stay with the differential test.
 -/
 
@@ -444,6 +446,35 @@ theorem matchingTransformations_sorted {j : JVal} {Γ : Registry}
     have hs := decodeRegistry_transformations_sorted h
     have hsub := ((List.filter_sublist (p := keep) (l := Γ.transformations)).map (·.1))
     exact (hs.sublist hsub).imp id |> fun hp => by simpa [Function.comp_def] using hp
+
+/-- `domainCase` on a registry `Registry.compile/1` rejects: the bridge
+reports that error and nothing else. -/
+theorem domainCase_rejected {j r : JVal} (hr : j.get? "registry" = some r) {e : InputError}
+    (he : registryError r = some e) :
+    domainCase j = .ok (Lean.Json.mkObj [("registry_error", InputError.json (some e))]) := by
+  simp [domainCase, field_ok hr, he, bind, Except.bind, pure, Except.pure]
+
+/-- `domainCase` on an accepted registry: it decodes, reports `registry: true`
+(the decoded registry is in the domain, `compiledOk`), the context error, and
+`snapshot: true` exactly when the snapshot check accepts (`validated`),
+`null` otherwise. That is what the differential test expects from Elixir. -/
+theorem domainCase_accepted {j r s i : JVal} (hr : j.get? "registry" = some r)
+    (hs : j.get? "snapshot" = some s) (hi : j.get? "intent" = some i)
+    (hre : registryError r = none) :
+    ∃ Γ, decodeRegistry r = .ok Γ ∧
+      domainCase j = .ok (Lean.Json.mkObj [("context_error", InputError.json (contextError Γ i s)),
+        ("registry", .bool true),
+        ("snapshot", if snapshotError Γ s = none then .bool true else Lean.Json.null)]) := by
+  obtain ⟨Γ, hΓ, hok⟩ := registryError_compiledOk hre
+  refine ⟨Γ, hΓ, ?_⟩
+  cases hse : snapshotError Γ s with
+  | none =>
+    obtain ⟨S, hS, hval⟩ := snapshotError_validated hse
+    simp [domainCase, field_ok hr, field_ok hs, field_ok hi, hre, hΓ, hok, hse, hS, hval, bind,
+      Except.bind, pure, Except.pure]
+  | some e =>
+    simp [domainCase, field_ok hr, field_ok hs, field_ok hi, hre, hΓ, hok, hse, bind,
+      Except.bind, pure, Except.pure]
 
 /-- The exit code § 7 assigns to a verdict of `verify`. -/
 def verifyExit : Outcome → Nat

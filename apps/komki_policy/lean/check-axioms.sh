@@ -19,6 +19,7 @@ for theorem in verify_sound verify_sound_rfc derivable_permitted handover_within
   ReleaseGap638.offenlegung_drops_without_befugnis ReleaseGap673.release_any_environment jsonCase_canonical \
   Json.finiteDouble_iff Json.parse_floatsOk Json.parse_validUTF8 \
   deriveCase_decides releaseCase_decides deriveCase_unsupported advanceCase_decides \
+  domainCase_rejected domainCase_accepted \
   verifyCase_decides verifyCase_verdict verifyCase_outputError cliCase_verify \
   cliCase_decide cliCase_decide_release cliCase_advance \
   decodeRegistry_transformations_sorted matchingTransformations_sorted \
