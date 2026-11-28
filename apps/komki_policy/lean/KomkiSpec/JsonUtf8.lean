@@ -14,8 +14,9 @@ encode some characters (`Wf`). Outside strings and in escapes those are
 ASCII (`skipWs_wf`, `numberEnd_wf`, `keyword_wf`, `hex4?_wf`); a multi-byte
 sequence passes `utf8Len` only if it is the encoding of a `Char`
 (`utf8Len_wf`, via `String.utf8EncodeChar`). The specification is the
-library's, not `utf8Len` itself. Error codes and the pairing of surrogates
-in `\u` escapes stay with the differential test.
+library's, not `utf8Len` itself. Where `invalid_utf8` comes from is in
+`JsonUtf8Check.lean`, surrogate escapes at six cases too; that Elixir
+reports the same codes stays with the differential test.
 
 The proof does not use the `String.fromUTF8?` check at the end of
 `readString`; `utf8Len_wf` is the step that carries over to `utf8_seq/2`.

@@ -32,6 +32,7 @@ CI.
 | `Json.parse_noFuel` | Auf jeder Eingabe reicht die Fuel des Parsers (`4 · Größe + 4`): `parse` antwortet nie `fuel`, sondern immer nach der strengen Grammatik des Modells, wie `JSON.parse/1`, das keine Fuel kennt. Dass die Antworten übereinstimmen, hält der Differenztest (siehe Grenzen) | CONTRACT.md § 6 |
 | `Json.finiteDouble_iff`, `Json.parse_floatsOk` | Die Abkürzung über die Stellenzahl, mit der der Parser unendliche Gleitkommazahlen abweist (ab 310 Stellen abweisen, bis 308 annehmen, dazwischen rechnen), ist genau der Vergleich von `m · 10^e` mit `overflowBound`, per Definition der Mitte zwischen größtem Double und 2^1024. Jede Gleitkommazahl, die `parse` liefert, liegt darunter. Dass `binary_to_float/1` genau dort kippt, ist nicht bewiesen; das hält der Differenztest (`@overflow_cases`: Grenze und eins darunter) | CONTRACT.md § 6 |
 | `Json.parse_validUTF8` | `parse` nimmt nur Eingaben an, die als Ganzes gültiges UTF-8 im Sinne von Leans `ByteArray.IsValidUTF8` sind (RFC 3629): keine Überlänge, kein Surrogat, nichts über U+10FFFF, keine abgeschnittene Folge, kein loses Folgebyte, in Strings wie außerhalb. Die Spezifikation ist die der Lean-Bibliothek, nicht die eigene Prüfung `utf8Len` | CONTRACT.md § 6 |
+| `Json.parse_invalid_utf8`, `Json.surrogate_answers` | `parse` meldet `invalid_utf8` nur, wenn die Eingabe bis zu einer Stelle gültiges UTF-8 ist und die Folge dort die Tabelle von `utf8_seq/2` (`utf8Len`) nicht besteht. Die zusätzliche Prüfung mit `String.fromUTF8?` am Ende eines Strings, die `json.ex` nicht hat, entscheidet nie. Surrogat-Escapes: Nur hoch gefolgt von tief wird gelesen, jede andere Folge ist `invalid_string` (vom Kernel nachgerechnet an sechs Fällen) | CONTRACT.md § 6 |
 | `jsonCase_canonical` | Auf den Bytes der kanonischen Form eines Werts mit streng sortierten Schlüsseln antwortet der JSON-Pfad der Brücke (`json-batch`: parsen, Gleitkommazahlen maskieren, kanonisch kodieren, hashen) mit genau diesem Text und seinem SHA-256: Die kanonische Form ist ein Fixpunkt. Über andere Eingabe sagt der Satz nichts | CONTRACT.md § 6 |
 | `Sha256.known_answers` | Das SHA-256 des Modells liefert auf den gängigen Testnachrichten (`""`, `"abc"`, 448 und 896 Bit), an den Padding-Grenzen (55, 56 und 64 Byte), auf einer UTF-8-Nachricht und auf einem Call-Hash-Eingang in kanonischer Form über vier Blöcke denselben Digest wie `shasum -a 256`; der Kernel rechnet nach (`decide +kernel`, ohne `native_decide`). Das prüft die Implementierung auf diesen Eingaben, nicht für jede | CONTRACT.md § 2.6 |
 | `domainCase_rejected`, `domainCase_accepted` | Die Eingabeprüfung gibt die Brücke in der Form aus, die der Differenztest aus Elixirs Antwort ableitet (`domain_case/1`): bei abgewiesener Registry nur deren Fehler; sonst, wenn Snapshot und Intent vorliegen, `registry: true`, den Kontextfehler und `snapshot: true` genau dann, wenn der Snapshot angenommen ist (sonst `null`). Dass Lean dieselben Fälle annimmt und dieselben Fehler mit Code und Pfad meldet wie Elixir, hält der Differenztest | CONTRACT.md § 2.1–2.3 |
@@ -307,9 +308,14 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   dort). Dass die
   Fuel auf beliebiger Eingabe reicht, ist bewiesen (`Json.parse_noFuel`).
   Dass der Parser nur gültiges UTF-8 annimmt, ist bewiesen
-  (`Json.parse_validUTF8`); offen ist, dass er dabei denselben Fehlercode
-  meldet wie Elixir und Surrogate in `\u`-Escapes nur paarweise annimmt.
-  Beides hält der Differenztest.
+  (`Json.parse_validUTF8`), und `invalid_utf8` meldet er nur, wenn die
+  Eingabe bis zu einer Stelle gültig ist und die Folge dort `utf8Len` nicht
+  besteht (`Json.parse_invalid_utf8`).
+  Surrogat-Escapes sind an sechs Fällen nachgerechnet
+  (`Json.surrogate_answers`); dass Elixir überall denselben Code meldet,
+  hält der Differenztest.
+  Den Pfad eines JSON-Fehlers (`$.a.b`) modelliert Lean nicht, `parse`
+  liefert nur den Code; ihn prüfen nur die Einzeltests in `json_test.exs`.
   Gleitkommazahlen druckt der Encoder nicht; dass der Parser nur endliche
   liefert, ist bewiesen (`Json.parse_floatsOk`). Den gerundeten Wert
   modelliert Lean nicht; der Differenztest maskiert Gleitkommazahlen und
