@@ -314,6 +314,8 @@ Ausgabe- und Übergaberegeln) prüft der Differenztest direkt gegen
   Surrogat-Escapes sind an sechs Fällen nachgerechnet
   (`Json.surrogate_answers`); dass Elixir überall denselben Code meldet,
   hält der Differenztest.
+  Den Pfad eines JSON-Fehlers (`$.a.b`) modelliert Lean nicht, `parse`
+  liefert nur den Code; ihn prüfen nur die Einzeltests in `json_test.exs`.
   Gleitkommazahlen druckt der Encoder nicht; dass der Parser nur endliche
   liefert, ist bewiesen (`Json.parse_floatsOk`). Den gerundeten Wert
   modelliert Lean nicht; der Differenztest maskiert Gleitkommazahlen und
