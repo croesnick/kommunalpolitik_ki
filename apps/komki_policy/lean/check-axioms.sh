@@ -17,7 +17,7 @@ for theorem in verify_sound verify_sound_rfc derivable_permitted handover_within
   enginePath_preservation enginePath_handover enginePath_no_forbidden emit_assignment \
   Json.parse_strict Json.parse_canon Json.parse_canonical_injective Json.parse_canonical Json.parse_canonical_iff Json.parse_noFuel Sha256.known_answers ReleaseGap.aktion_bridges_recipient \
   ReleaseGap638.offenlegung_drops_without_befugnis ReleaseGap673.release_any_environment jsonCase_canonical \
-  Json.finiteDouble_iff Json.parse_floatsOk Json.parse_validUTF8 advances_ledger_decoded \
+  Json.finiteDouble_iff Json.parse_floatsOk Json.parse_validUTF8 Json.parse_invalid_utf8 Json.surrogate_answers advances_ledger_decoded \
   deriveCase_decides releaseCase_decides deriveCase_unsupported advanceCase_decides \
   domainCase_rejected domainCase_accepted \
   verifyCase_decides verifyCase_verdict verifyCase_outputError cliCase_verify \

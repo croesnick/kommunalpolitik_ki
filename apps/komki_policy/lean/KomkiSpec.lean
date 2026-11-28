@@ -37,6 +37,7 @@ import KomkiSpec.ReleaseGap
 import KomkiSpec.JsonBridgeSound
 import KomkiSpec.JsonFloat
 import KomkiSpec.JsonUtf8
+import KomkiSpec.JsonUtf8Check
 import KomkiSpec.StandLedger
 import KomkiSpec.BridgeSound
 import KomkiSpec.VerifyReasonsSound

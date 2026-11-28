@@ -42,6 +42,8 @@ open KomkiSpec
 #print axioms Json.finiteDouble_iff
 #print axioms Json.parse_floatsOk
 #print axioms Json.parse_validUTF8
+#print axioms Json.parse_invalid_utf8
+#print axioms Json.surrogate_answers
 #print axioms advances_ledger_decoded
 #print axioms deriveCase_decides
 #print axioms domainCase_rejected

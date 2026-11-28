@@ -569,6 +569,8 @@ defmodule KomkiPolicy.LeanSpecTest do
     "\"\\ud800\"",
     "\"\\ud800\\u0041\"",
     "\"\\ud800\\udc00\"",
+    "\"\\ud800\\ud800\"",
+    "\"\\udbff\\udfff\"",
     "\"\\udc00\"",
     "\"\\u12\"",
     "\"\\u12g4\"",
