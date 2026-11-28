@@ -41,6 +41,7 @@ open KomkiSpec
 #print axioms jsonCase_canonical
 #print axioms Json.finiteDouble_iff
 #print axioms Json.parse_floatsOk
+#print axioms Json.parse_validUTF8
 #print axioms deriveCase_decides
 #print axioms releaseCase_decides
 #print axioms deriveCase_unsupported
