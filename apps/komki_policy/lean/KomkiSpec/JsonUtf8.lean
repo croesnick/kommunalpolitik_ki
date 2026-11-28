@@ -16,6 +16,9 @@ sequence passes `utf8Len` only if it is the encoding of a `Char`
 (`utf8Len_wf`, via `String.utf8EncodeChar`). The specification is the
 library's, not `utf8Len` itself. Error codes and the pairing of surrogates
 in `\u` escapes stay with the differential test.
+
+The proof does not use the `String.fromUTF8?` check at the end of
+`readString`; `utf8Len_wf` is the step that carries over to `utf8_seq/2`.
 -/
 
 namespace KomkiSpec.Json
@@ -58,6 +61,8 @@ def cont (s : ByteArray) (k i : Nat) (lo hi : UInt8) : Bool :=
   | some b => inRange b lo hi
   | none => false
 
+/-- `utf8Len` with its local check lifted out to `cont`; must match `Json.lean`
+line for line (`rfl`). -/
 theorem utf8Len_eq (s : ByteArray) (k : Nat) (b : UInt8) : utf8Len s k b =
     if inRange b 0xC2 0xDF && cont s k 1 0x80 0xBF then some 2
     else if (inRange b 0xE1 0xEC || inRange b 0xEE 0xEF) && cont s k 1 0x80 0xBF &&
@@ -150,6 +155,7 @@ theorem wf4 {s : ByteArray} {k : Nat} {b x y z : UInt8} (hb : at? s k = some b)
     exact ⟨hb, hx, hy, hz, trivial⟩)
   rwa [he] at this
 
+/-- A sequence `utf8Len` accepts is the encoding of one `Char`. -/
 theorem utf8Len_wf {s : ByteArray} {k : Nat} {b : UInt8} {n : Nat}
     (hb : at? s k = some b) (h : utf8Len s k b = some n) : Wf s k (k + n) := by
   rw [utf8Len_eq] at h
@@ -164,39 +170,20 @@ theorem utf8Len_wf {s : ByteArray} {k : Nat} {b : UInt8} {n : Nat}
     obtain ⟨x, hx, x1, x2⟩ := cont_at h1
     simp only [UInt8.reduceToNat] at *
     exact wf2 hb hx b1 b2 x1 x2
-  · obtain ⟨⟨hl, h1⟩, h2⟩ := hc
-    obtain ⟨x, hx, x1, x2⟩ := cont_at h1
-    obtain ⟨y, hy, y1, y2⟩ := cont_at h2
-    simp only [UInt8.reduceToNat] at *
-    exact wf3 hb hx hy (by omega) (by omega) (by omega) (by omega) y1 y2 (by dsimp only; omega)
-  · obtain ⟨⟨hl, h1⟩, h2⟩ := hc
-    obtain ⟨x, hx, x1, x2⟩ := cont_at h1
-    obtain ⟨y, hy, y1, y2⟩ := cont_at h2
-    simp only [UInt8.reduceToNat] at *
-    exact wf3 hb hx hy (by omega) (by omega) (by omega) (by omega) y1 y2 (by dsimp only; omega)
-  · obtain ⟨⟨hl, h1⟩, h2⟩ := hc
-    obtain ⟨x, hx, x1, x2⟩ := cont_at h1
-    obtain ⟨y, hy, y1, y2⟩ := cont_at h2
-    simp only [UInt8.reduceToNat] at *
-    exact wf3 hb hx hy (by omega) (by omega) (by omega) (by omega) y1 y2 (by dsimp only; omega)
-  · obtain ⟨⟨⟨hl, h1⟩, h2⟩, h3⟩ := hc
-    obtain ⟨x, hx, x1, x2⟩ := cont_at h1
-    obtain ⟨y, hy, y1, y2⟩ := cont_at h2
-    obtain ⟨z, hz, z1, z2⟩ := cont_at h3
-    simp only [UInt8.reduceToNat] at *
-    exact wf4 hb hx hy hz (by omega) (by omega) (by omega) (by omega) y1 y2 z1 z2 (by dsimp only; omega)
-  · obtain ⟨⟨⟨hl, h1⟩, h2⟩, h3⟩ := hc
-    obtain ⟨x, hx, x1, x2⟩ := cont_at h1
-    obtain ⟨y, hy, y1, y2⟩ := cont_at h2
-    obtain ⟨z, hz, z1, z2⟩ := cont_at h3
-    simp only [UInt8.reduceToNat] at *
-    exact wf4 hb hx hy hz (by omega) (by omega) (by omega) (by omega) y1 y2 z1 z2 (by dsimp only; omega)
-  · obtain ⟨⟨⟨hl, h1⟩, h2⟩, h3⟩ := hc
-    obtain ⟨x, hx, x1, x2⟩ := cont_at h1
-    obtain ⟨y, hy, y1, y2⟩ := cont_at h2
-    obtain ⟨z, hz, z1, z2⟩ := cont_at h3
-    simp only [UInt8.reduceToNat] at *
-    exact wf4 hb hx hy hz (by omega) (by omega) (by omega) (by omega) y1 y2 z1 z2 (by dsimp only; omega)
+  all_goals first
+    | (obtain ⟨⟨hl, h1⟩, h2⟩ := hc
+       obtain ⟨x, hx, x1, x2⟩ := cont_at h1
+       obtain ⟨y, hy, y1, y2⟩ := cont_at h2
+       simp only [UInt8.reduceToNat] at *
+       exact wf3 hb hx hy (by omega) (by omega) (by omega) (by omega) y1 y2
+         (by dsimp only; omega))
+    | (obtain ⟨⟨⟨hl, h1⟩, h2⟩, h3⟩ := hc
+       obtain ⟨x, hx, x1, x2⟩ := cont_at h1
+       obtain ⟨y, hy, y1, y2⟩ := cont_at h2
+       obtain ⟨z, hz, z1, z2⟩ := cont_at h3
+       simp only [UInt8.reduceToNat] at *
+       exact wf4 hb hx hy hz (by omega) (by omega) (by omega) (by omega) y1 y2 z1 z2
+         (by dsimp only; omega))
 
 theorem at?_get! {s : ByteArray} {k : Nat} (h : k < s.size) : at? s k = some (s.get! k) := by
   unfold at?; simp [h, ByteArray.get!]; rfl
