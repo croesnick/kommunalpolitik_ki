@@ -24,8 +24,8 @@ the bridge keeps the transformations sorted by id, the order the remedy
 catalog lists them in. `cliCase_verify`, `cliCase_decide`,
 `cliCase_decide_release`, `cliCase_advance`: on accepted files the CLI's
 exit code follows `cli.ex` (§ 7). `domainCase_rejected`, `domainCase_accepted`:
-the bridge prints the input checks the way the differential test expects them
-from Elixir. The order of the checks and the error a rejected
+the bridge prints the input checks in the shape the differential test derives
+from Elixir's answer (`domain_case/1`). The order of the checks and the error a rejected
 case reports stay with the differential test.
 -/
 
@@ -457,7 +457,8 @@ theorem domainCase_rejected {j r : JVal} (hr : j.get? "registry" = some r) {e : 
 /-- `domainCase` on an accepted registry: it decodes, reports `registry: true`
 (the decoded registry is in the domain, `compiledOk`), the context error, and
 `snapshot: true` exactly when the snapshot check accepts (`validated`),
-`null` otherwise. That is what the differential test expects from Elixir. -/
+`null` otherwise: the shape the differential test derives from Elixir's
+answer. Needs the `snapshot` and `intent` fields. -/
 theorem domainCase_accepted {j r s i : JVal} (hr : j.get? "registry" = some r)
     (hs : j.get? "snapshot" = some s) (hi : j.get? "intent" = some i)
     (hre : registryError r = none) :
